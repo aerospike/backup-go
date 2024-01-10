@@ -1,2 +1,1 @@
-# aerospike-tools-backup-go
-asbackup rewrite in golang
+# aerospike-tools-backup-lib

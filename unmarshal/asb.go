@@ -1,11 +1,14 @@
 package unmarshal
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"strconv"
+
+	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 type section int
@@ -25,6 +28,8 @@ const (
 	UDFLT          = "UDF"
 	sindexLT       = "sindex"
 	recordHeaderLT = "record header"
+	recordBinsLT   = "record bins"
+	binLT          = "bin"
 	keyLT          = "key"
 	digestLT       = "digest"
 	setLT          = "set"
@@ -34,13 +39,20 @@ const (
 )
 
 const (
-	namespaceToken      = "namespace"
-	firstFileToken      = "first-file"
-	globalSectionMarker = "*"
-	maxNamespaceLength  = 31
-	maxTokenSize        = 1000
-	maxGeneration       = 65535
-	maxBinCount         = 65535
+	namespaceToken           = "namespace"
+	firstFileToken           = "first-file"
+	globalSectionMarker byte = '*'
+	recordHeaderMarker  byte = '+'
+	recordBinsMarker    byte = '-'
+	maxNamespaceLength       = 31
+	maxTokenSize             = 1000
+	maxGeneration            = 65535
+	maxBinCount              = 65535
+)
+
+const (
+	boolTrueByte  = 'T'
+	boolFalseByte = 'F'
 )
 
 type CountingByteScanner struct {
@@ -524,12 +536,14 @@ const (
 	BinTypeNil     BinType = 'N'
 	BinTypeBool    BinType = 'Z'
 	BinTypeInteger BinType = 'I'
-	BinTypeDouble  BinType = 'D'
+	BinTypeFloat   BinType = 'D'
 	BinTypeString  BinType = 'S'
-	BinTYpeBlob    BinType = 'B'
+	BinTypeBlob    BinType = 'B'
+	BinTypeGeoJSON BinType = 'G'
 )
 
 type Bin struct {
+	name  string
 	btype BinType
 	value any
 }
@@ -542,12 +556,13 @@ type Record struct {
 	generation uint16
 	expiration uint32
 	binCount   uint16
+	bins       []*Bin
 }
 
 var expectedRecordHeaderTypes = []byte{'k', 'n', 'd', 's', 'g', 't', 'b'}
 
 func (r *ASBReader) readRecord() (*Record, error) {
-	var res Record
+	var res a.Record
 
 	r.section = recordS
 
@@ -580,6 +595,7 @@ func (r *ASBReader) readRecord() (*Record, error) {
 		switch i {
 		case 0:
 			key, err := r.readKey()
+			v := a.NewKeyWithDigest()
 			if err != nil {
 				return nil, err
 			}
@@ -626,23 +642,198 @@ func (r *ASBReader) readRecord() (*Record, error) {
 				return nil, err
 			}
 			res.expiration = exp
+
 		case 6:
 			binCount, err := r.readBinCount()
 			if err != nil {
 				return nil, err
 			}
 			res.binCount = binCount
+
 		default:
 			return nil, fmt.Errorf("read too many record header lines, count: %d", i)
 		}
 
+		if i < len(expectedRecordHeaderTypes) {
+			if err := _expectChar(r, recordHeaderMarker); err != nil {
+				return nil, err
+			}
+		}
 	}
+
+	bins, err := r.readBins(res.binCount)
+	if err != nil {
+		return nil, err
+	}
+	res.bins = bins
+
+	return &res, nil
+}
+
+func (r *ASBReader) readBins(count uint16) ([]*Bin, error) {
+	res := make([]*Bin, count)
+
+	r.lineType = recordBinsLT
+
+	for i := uint16(0); i < count; i++ {
+		if err := _expectChar(r, recordBinsMarker); err != nil {
+			return nil, err
+		}
+
+		if err := _expectChar(r, ' '); err != nil {
+			return nil, err
+		}
+	}
+
+	return res, nil
+}
+
+var bytesBinTypes = map[byte]struct{}{
+	'B': {},
+	'J': {},
+	'C': {},
+	'P': {},
+	'R': {},
+	'H': {},
+	'E': {},
+	'Y': {},
+	'M': {},
+	'L': {},
+}
+
+// TODO make this use bytesBinTypes
+var binTypes = map[byte]struct{}{
+	// basic types
+	'N': {},
+	'Z': {},
+	'I': {},
+	'D': {},
+	'S': {},
+	// bytes types
+	'B': {},
+	'J': {},
+	'C': {},
+	'P': {},
+	'R': {},
+	'H': {},
+	'E': {},
+	'Y': {},
+	'M': {},
+	'L': {},
+	// end bytes types
+	'U': {},
+	'X': {},
+	'G': {},
+}
+
+func (r *ASBReader) readBin() (*Bin, error) {
+	var res Bin
+
+	r.lineType = binLT
+
+	if err := _expectChar(r, '-'); err != nil {
+		return nil, err
+	}
+
+	if err := _expectChar(r, ' '); err != nil {
+		return nil, err
+	}
+
+	binType, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := binTypes[binType]; !ok {
+		return nil, fmt.Errorf("invalid bin type %b", binType)
+	}
+
+	b, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	var base64Encoded bool
+	switch b {
+	case '!':
+	case ' ':
+		base64Encoded = true
+	default:
+		return nil, fmt.Errorf("invalid character in bytes bin %b, expected '!' or ' '", b)
+	}
+
+	if base64Encoded {
+		if err := _expectChar(r, ' '); err != nil {
+			return nil, err
+		}
+	}
+
+	name, err := _readUntilAny(r, []byte{' ', '\n'})
+	if err != nil {
+		return nil, err
+	}
+	res.name = string(name)
+
+	var binVal any
+	var binErr error
+
+	// 'N' is a special case where the line ends after the bin name
+	if binType == 'N' {
+		res.btype = BinTypeNil
+		if err := _expectChar(r, '\n'); err != nil {
+			return nil, err
+		}
+		return &res, nil
+	} else {
+		if err := _expectChar(r, ' '); err != nil {
+			return nil, err
+		}
+	}
+
+	switch binType {
+	case 'Z':
+		res.btype = BinTypeBool
+		binVal, binErr = _readBool(r, '\n')
+	case 'I':
+		res.btype = BinTypeInteger
+		binVal, binErr = _readInteger(r, '\n')
+	case 'D':
+		res.btype = BinTypeFloat
+		binVal, binErr = _readFloat(r, '\n')
+	case 'S':
+		res.btype = BinTypeString
+		binVal, binErr = _readString(r, ' ')
+	case 'U':
+		return nil, errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
+	case 'X':
+		res.btype = BinTypeString
+		val, err := _readBase64Bytes(r, ' ')
+		if err != nil {
+			return nil, err
+		}
+
+		binVal = string(val)
+	case 'G':
+		res.btype = BinTypeGeoJSON
+		binVal, binErr = _readString(r, ' ')
+	}
+
+	if _, ok := bytesBinTypes[binType]; ok {
+		res.btype = BinTypeBlob
+		binVal, binErr = _readBytes(r, ' ')
+	}
+
+	if binErr != nil {
+		return nil, binErr
+	}
+
+	res.value = binVal
 
 	return &res, nil
 }
 
 func (r *ASBReader) readKey() (*Key, error) {
-	var res Key
+	var res a.Key
 
 	r.lineType = keyLT
 
@@ -658,56 +849,35 @@ func (r *ASBReader) readKey() (*Key, error) {
 		return nil, err
 	}
 
+	var keyVal any
+	var keyErr error
+
 	switch b {
 	case 'I':
-		res.ktype = KeyTypeInteger
-		keyVal, err := _readInteger(r, '\n')
-		if err != nil {
-			return nil, err
-		}
-		res.value = keyVal
+		keyVal, keyErr = _readInteger(r, '\n')
 
 	case 'D':
-		res.ktype = KeyTypeFloat
-		keyVal, err := _readFloat(r, '\n')
-		if err != nil {
-			return nil, err
-		}
-		res.value = keyVal
+		keyVal, keyErr := _readFloat(r, '\n')
 
 	case 'S':
-		res.ktype = KeyTypeString
 
-		length, err := _readSize(r, ' ')
+		keyVal, err := _readString(r, ' ')
 		if err != nil {
 			return nil, err
 		}
 
-		keyVal, err := _readNBytes(r, int(length))
-		if err != nil {
-			return nil, err
-		}
-
-		res.value = string(keyVal)
+		res.value = keyVal
 
 	// TODO why is this needed? is it legacy? what asbackup option produces base64 encoded key strings?
 	case 'X':
 		res.ktype = KeyTypeString
 
-		length, err := _readSize(r, ' ')
+		keyVal, err := _readBase64Bytes(r, ' ')
 		if err != nil {
 			return nil, err
 		}
 
-		keyVal, err := _readNBytes(r, int(length))
-		if err != nil {
-			return nil, err
-		}
-
-		decoded := []byte{}
-		base64.StdEncoding.Decode(decoded, keyVal)
-
-		res.value = string(decoded)
+		res.value = string(keyVal)
 
 	case 'B':
 		b, err := r.ReadByte()
@@ -718,24 +888,20 @@ func (r *ASBReader) readKey() (*Key, error) {
 		var base64Encoded bool
 		switch b {
 		case '!':
-			base64Encoded = true
 		case ' ':
+			base64Encoded = true
 		default:
 			return nil, fmt.Errorf("invalid character in bytes key %b, expected '!' or ' '", b)
 		}
 
+		var keyVal []byte
 		if base64Encoded {
-			if err := _expectChar(r, '\n'); err != nil {
+			if err := _expectChar(r, ' '); err != nil {
 				return nil, err
 			}
 		}
 
-		length, err := _readSize(r, ' ')
-		if err != nil {
-			return nil, err
-		}
-
-		data, err := _readNBytes(r, int(length))
+		data, err := _readNBytes(r, ' ')
 		if err != nil {
 			return nil, err
 		}
@@ -752,6 +918,10 @@ func (r *ASBReader) readKey() (*Key, error) {
 
 	default:
 		return nil, fmt.Errorf("invalid key type %b", b)
+	}
+
+	if keyErr != nil {
+		return nil, keyErr
 	}
 
 	if err := _expectChar(r, '\n'); err != nil {
@@ -835,7 +1005,7 @@ func (r *ASBReader) readDigest() (string, error) {
 	r.lineType = digestLT
 
 	digestSize := 20
-	digest, err := _read_block_decode(r, digestSize)
+	digest, err := _readBlockDecode(r, digestSize)
 	if err != nil {
 		return "", err
 	}
@@ -849,7 +1019,21 @@ func (r *ASBReader) readDigest() (string, error) {
 
 // ***** Helper Functions
 
-func _read_block_decode(src io.ByteReader, n int) ([]byte, error) {
+func _readBase64Bytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
+	size, err := _readSize(src, sizeDelim)
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := _readBlockDecode(src, int(size))
+	if err != nil {
+		return nil, err
+	}
+
+	return val, nil
+}
+
+func _readBlockDecode(src io.ByteReader, n int) ([]byte, error) {
 	bytes, err := _readNBytes(src, n)
 	if err != nil {
 		return nil, err
@@ -862,6 +1046,46 @@ func _read_block_decode(src io.ByteReader, n int) ([]byte, error) {
 	}
 
 	return decoded, nil
+}
+
+func _readString(src io.ByteScanner, sizeDelim byte) (string, error) {
+	val, err := _readBytes(src, sizeDelim)
+	if err != nil {
+		return "", nil
+	}
+
+	return string(val), err
+}
+
+func _readBytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
+	length, err := _readSize(src, sizeDelim)
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := _readNBytes(src, int(length))
+	if err != nil {
+		return nil, err
+	}
+
+	return val, nil
+}
+
+func _readBool(src io.ByteScanner, delim byte) (bool, error) {
+	bytes, err := _readUntil(src, delim)
+	if err != nil {
+		return false, err
+	}
+
+	b := bytes[0]
+	switch b {
+	case boolTrueByte:
+		return true, nil
+	case boolFalseByte:
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean character %b", b)
+	}
 }
 
 func _readFloat(src io.ByteScanner, delim byte) (float64, error) {
@@ -909,7 +1133,11 @@ func _readSize(src io.ByteScanner, delim byte) (uint32, error) {
 }
 
 func _readUntil(src io.ByteScanner, delim byte) ([]byte, error) {
-	bytes := make([]byte, maxTokenSize)
+	return _readUntilAny(src, []byte{delim})
+}
+
+func _readUntilAny(src io.ByteScanner, delims []byte) ([]byte, error) {
+	bts := make([]byte, maxTokenSize)
 	var i int
 	for i = 0; i < maxTokenSize; i++ {
 		b, err := src.ReadByte()
@@ -917,17 +1145,17 @@ func _readUntil(src io.ByteScanner, delim byte) ([]byte, error) {
 			return nil, err
 		}
 
-		if b == delim {
+		if bytes.ContainsRune(delims, rune(b)) {
 			err := src.UnreadByte()
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		bytes[i] = b
+		bts[i] = b
 	}
 
-	return bytes, nil
+	return bts, nil
 }
 
 func _readNBytes(src io.ByteReader, n int) ([]byte, error) {

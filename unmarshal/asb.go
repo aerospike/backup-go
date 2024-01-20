@@ -1,6 +1,7 @@
 package unmarshal
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"errors"
@@ -13,16 +14,26 @@ import (
 
 type section int
 
-// sections
+// section names
 const (
-	headerS   = "header"
-	metadataS = "meta-data"
-	globalS   = "global"
-	recordS   = "records"
+	undefinedS = ""
+	headerS    = "header"
+	metadataS  = "meta-data"
+	globalS    = "global"
+	recordS    = "records"
 )
 
-// line types
+// section markers
 const (
+	globalSectionMarker   byte = '*'
+	metadataSectionMarker byte = '#'
+	recordHeaderMarker    byte = '+'
+	recordBinsMarker      byte = '-'
+)
+
+// line names
+const (
+	undefinedLT    = ""
 	versionLT      = "version"
 	namespaceLT    = "namespace"
 	UDFLT          = "UDF"
@@ -38,29 +49,32 @@ const (
 	binCountLT     = "bin count"
 )
 
+// literal asb tokens
 const (
-	namespaceToken           = "namespace"
-	firstFileToken           = "first-file"
-	globalSectionMarker byte = '*'
-	recordHeaderMarker  byte = '+'
-	recordBinsMarker    byte = '-'
-	maxNamespaceLength       = 31
-	maxTokenSize             = 1000
-	maxGeneration            = 65535
-	maxBinCount              = 65535
+	namespaceToken = "namespace"
+	firstFileToken = "first-file"
 )
 
+// value bounds
+const (
+	maxNamespaceLength = 31
+	maxTokenSize       = 1000
+	maxGeneration      = 65535
+	maxBinCount        = 65535
+)
+
+// asb boolean encoding
 const (
 	boolTrueByte  = 'T'
 	boolFalseByte = 'F'
 )
 
-type CountingByteScanner struct {
+type countingByteScanner struct {
 	io.ByteScanner
 	count uint64
 }
 
-func (c *CountingByteScanner) ReadByte() (byte, error) {
+func (c *countingByteScanner) ReadByte() (byte, error) {
 	b, err := c.ByteScanner.ReadByte()
 	if err != nil {
 		return 0, err
@@ -71,7 +85,7 @@ func (c *CountingByteScanner) ReadByte() (byte, error) {
 	return b, err
 }
 
-func (c *CountingByteScanner) UnreadByte() error {
+func (c *countingByteScanner) UnreadByte() error {
 	err := c.ByteScanner.UnreadByte()
 	if err != nil {
 		return err
@@ -82,15 +96,51 @@ func (c *CountingByteScanner) UnreadByte() error {
 	return err
 }
 
-type ParseErrArgs struct {
+type parseErrArgs struct {
 	section  string
 	lineType string
 }
 
+type metaData struct {
+	namespace string
+	first     bool
+}
+
 type ASBReader struct {
-	CountingByteScanner
-	ParseErrArgs
-	hasReadHeader bool
+	countingByteScanner
+	parseErrArgs
+	header   *Header
+	metaData *metaData
+}
+
+func NewASBReader(src io.Reader) (*ASBReader, error) {
+	cbs := bufio.NewReader(src)
+	asb := ASBReader{
+		countingByteScanner: countingByteScanner{
+			cbs,
+			0,
+		},
+		parseErrArgs: parseErrArgs{
+			section:  undefinedS,
+			lineType: undefinedLT,
+		},
+	}
+
+	header, err := asb.readHeader()
+	if err != nil {
+		return nil, fmt.Errorf("error while reading header: %w", err)
+	}
+	asb.header = header
+	// TODO make sure file version is 3.1
+
+	meta, err := asb.readMetadata()
+	if err != nil {
+		return nil, fmt.Errorf("error while reading metadata: %w", err)
+	}
+	asb.metaData = meta
+
+	return &asb, nil
+
 }
 
 func (r *ASBReader) newParseError(err error) error {
@@ -101,24 +151,20 @@ func (r *ASBReader) newParseError(err error) error {
 func (r *ASBReader) NextToken() (any, error) {
 
 	v, err := func() (any, error) {
-		if !r.hasReadHeader {
-			return r.readHeader()
-			r.hasReadHeader = true
-		}
-
 		b, err := r.ReadByte()
 		if err != nil {
 			return nil, err
 		}
 
 		switch b {
-		case '#':
+		case metadataSectionMarker:
 			return r.readMetadata()
-		case '*':
+		case globalSectionMarker:
 			return r.readGlobals()
-
+		case recordHeaderMarker:
+			return r.readRecord()
 		default:
-			return nil, fmt.Errorf("read invalid asb line start character %s", b)
+			return nil, fmt.Errorf("read invalid line start character %b", b)
 		}
 	}()
 
@@ -149,19 +195,13 @@ func (r *ASBReader) readHeader() (*Header, error) {
 	}
 
 	return &Header{
-		version: string(bytes[7:10]),
+		version: string(bytes[8:11]),
 	}, nil
 }
 
-type MetaData struct {
-	namespace string
-	first     bool
-}
-
-// TODO handle namespaces with escaped characters (e.g. space or line feed)
-// TODO consume the start character '#' here
-func (r *ASBReader) readMetadata() (*MetaData, error) {
-	var res MetaData
+// readMetadata consumes all metadata lines
+func (r *ASBReader) readMetadata() (*metaData, error) {
+	var res metaData
 
 	r.section = metadataS
 
@@ -170,6 +210,10 @@ func (r *ASBReader) readMetadata() (*MetaData, error) {
 		return nil, err
 	}
 	res.namespace = namespace
+
+	if err := _expectChar(r, metadataSectionMarker); err != nil {
+		return nil, err
+	}
 
 	first, err := r.readFirst()
 	if err != nil {
@@ -181,15 +225,6 @@ func (r *ASBReader) readMetadata() (*MetaData, error) {
 }
 
 func (r *ASBReader) readNamespace() (string, error) {
-	b, err := r.ReadByte()
-	if err != nil {
-		return "", err
-	}
-
-	if b != '#' {
-		return "", fmt.Errorf("invalid character %b in metadata section namespace line", b)
-	}
-
 	if err := _expectChar(r, ' '); err != nil {
 		return "", err
 	}
@@ -238,102 +273,34 @@ func (r *ASBReader) readFirst() (bool, error) {
 
 }
 
-type SIndexType byte
-
-const (
-	BinSIndex         SIndexType = 'N'
-	ListElementSIndex SIndexType = 'L'
-	MapKeySIndex      SIndexType = 'K'
-	MapValueSIndex    SIndexType = 'V'
-)
-
-type SIPathBinType = byte
-
-const (
-	NumericSIDataType     SIPathBinType = 'N'
-	StringSIDataType      SIPathBinType = 'S'
-	GEO2DSphereSIDataType SIPathBinType = 'G'
-	BlobSIDataType        SIPathBinType = 'B'
-)
-
-type SIndexPath struct {
-	binName string
-	binType SIPathBinType
-}
-
-type SecondaryIndex struct {
-	namespace     string
-	set           string
-	name          string
-	indexType     SIndexType
-	paths         []*SIndexPath
-	dataType      SIPathBinType
-	valuesCovered int
-}
-
-type UDFType = byte
-
-const (
-	LUAUDFType UDFType = 'L'
-)
-
-type UDF struct {
-	udfType UDFType
-	name    string
-	length  uint32
-	content []byte
-}
-
-type Globals struct {
-	secondaryIndexes []*SecondaryIndex
-	UDFs             []*UDF
-}
-
-func (r *ASBReader) readGlobals() (*Globals, error) {
-	var res Globals
+func (r *ASBReader) readGlobals() (any, error) {
+	var res any
 
 	r.section = globalS
 
-	for {
-		b, err := r.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		if b != '*' {
-			break
-		}
-
-		if err := _expectChar(r, ' '); err != nil {
-			return nil, err
-		}
-
-		b, err = r.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		switch b {
-		case 'i':
-			sindex, err := r.readSIndex()
-			if err != nil {
-				return nil, err
-			}
-
-			res.secondaryIndexes = append(res.secondaryIndexes, sindex)
-		case 'u':
-			udf, err := r.readUDF()
-			if err != nil {
-				return nil, err
-			}
-
-			res.UDFs = append(res.UDFs, udf)
-		default:
-			return nil, fmt.Errorf("invalid global line type %b", b)
-		}
+	if err := _expectChar(r, ' '); err != nil {
+		return nil, err
 	}
 
-	return &res, nil
+	b, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	switch b {
+	case 'i':
+		res, err = r.readSIndex()
+	case 'u':
+		res, err = r.readUDF()
+	default:
+		return nil, fmt.Errorf("invalid global line type %b", b)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 // NOTE this is meant to read the UDF line AFTER the global start '* [SP] i'
@@ -350,7 +317,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.namespace = string(namespace)
+	res.Namespace = string(namespace)
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -360,7 +327,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.set = string(set)
+	res.Set = string(set)
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -370,7 +337,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.name = string(name)
+	res.Name = string(name)
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -383,13 +350,13 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 
 	switch b {
 	case 'N':
-		res.indexType = BinSIndex
+		res.IndexType = BinSIndex
 	case 'L':
-		res.indexType = ListElementSIndex
+		res.IndexType = ListElementSIndex
 	case 'K':
-		res.indexType = MapKeySIndex
+		res.IndexType = MapKeySIndex
 	case 'V':
-		res.indexType = MapValueSIndex
+		res.IndexType = MapValueSIndex
 	default:
 		return nil, fmt.Errorf("invalid secondary index type %b", b)
 	}
@@ -405,9 +372,9 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	if npaths == 0 {
 		return nil, errors.New("missing path(s) in sindex block")
 	}
-	res.valuesCovered = int(npaths)
+	res.ValuesCovered = int(npaths)
 
-	res.paths = make([]*SIndexPath, npaths)
+	res.Paths = make([]*SIndexPath, npaths)
 
 	for i := uint32(0); i < npaths; i++ {
 		var path SIndexPath
@@ -420,7 +387,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 		if err != nil {
 			return nil, err
 		}
-		path.binName = string(name)
+		path.BinName = string(name)
 
 		if err := _expectChar(r, ' '); err != nil {
 			return nil, err
@@ -433,18 +400,18 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 
 		switch b {
 		case 'S':
-			path.binType = StringSIDataType
+			path.BinType = StringSIDataType
 		case 'N':
-			path.binType = NumericSIDataType
+			path.BinType = NumericSIDataType
 		case 'G':
-			path.binType = GEO2DSphereSIDataType
+			path.BinType = GEO2DSphereSIDataType
 		case 'B':
-			path.binType = BlobSIDataType
+			path.BinType = BlobSIDataType
 		default:
 			return nil, fmt.Errorf("invalid sindex path type %b", b)
 		}
 
-		res.paths[i] = &path
+		res.Paths[i] = &path
 	}
 
 	if err := _expectChar(r, '\n'); err != nil {
@@ -530,39 +497,20 @@ type Key struct {
 	value any
 }
 
-type BinType = byte
-
-const (
-	BinTypeNil     BinType = 'N'
-	BinTypeBool    BinType = 'Z'
-	BinTypeInteger BinType = 'I'
-	BinTypeFloat   BinType = 'D'
-	BinTypeString  BinType = 'S'
-	BinTypeBlob    BinType = 'B'
-	BinTypeGeoJSON BinType = 'G'
-)
-
-type Bin struct {
-	name  string
-	btype BinType
-	value any
-}
-
-type Record struct {
+type recordData struct {
 	key        Key // optional
 	namespace  string
-	digest     string
+	digest     []byte
 	set        string // optional
-	generation uint16
+	generation uint32
 	expiration uint32
 	binCount   uint16
-	bins       []*Bin
 }
 
 var expectedRecordHeaderTypes = []byte{'k', 'n', 'd', 's', 'g', 't', 'b'}
 
 func (r *ASBReader) readRecord() (*Record, error) {
-	var res a.Record
+	var recData recordData
 
 	r.section = recordS
 
@@ -595,11 +543,10 @@ func (r *ASBReader) readRecord() (*Record, error) {
 		switch i {
 		case 0:
 			key, err := r.readKey()
-			v := a.NewKeyWithDigest()
 			if err != nil {
 				return nil, err
 			}
-			res.key = *key
+			recData.key = *key
 
 		case 1:
 			// TODO use a generic readNamespace readString function here
@@ -613,42 +560,42 @@ func (r *ASBReader) readRecord() (*Record, error) {
 				return nil, err
 			}
 
-			res.namespace = string(namespace)
+			recData.namespace = string(namespace)
 
 		case 2:
 			digest, err := r.readDigest()
 			if err != nil {
 				return nil, err
 			}
-			res.digest = digest
+			recData.digest = digest
 
 		case 3:
 			set, err := r.readSet()
 			if err != nil {
 				return nil, err
 			}
-			res.set = set
+			recData.set = set
 
 		case 4:
 			gen, err := r.readGeneration()
 			if err != nil {
 				return nil, err
 			}
-			res.generation = gen
+			recData.generation = gen
 
 		case 5:
 			exp, err := r.readExpiration()
 			if err != nil {
 				return nil, err
 			}
-			res.expiration = exp
+			recData.expiration = exp
 
 		case 6:
 			binCount, err := r.readBinCount()
 			if err != nil {
 				return nil, err
 			}
-			res.binCount = binCount
+			recData.binCount = binCount
 
 		default:
 			return nil, fmt.Errorf("read too many record header lines, count: %d", i)
@@ -661,17 +608,34 @@ func (r *ASBReader) readRecord() (*Record, error) {
 		}
 	}
 
-	bins, err := r.readBins(res.binCount)
+	var rec Record
+
+	bins, err := r.readBins(recData.binCount)
 	if err != nil {
 		return nil, err
 	}
-	res.bins = bins
+	rec.Bins = bins
 
-	return &res, nil
+	key, err := a.NewKeyWithDigest(
+		recData.namespace,
+		recData.set,
+		recData.key,
+		recData.digest,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rec.Key = key
+	rec.Bins = bins
+	rec.Expiration = recData.expiration
+	rec.Generation = recData.generation
+
+	return &rec, nil
 }
 
-func (r *ASBReader) readBins(count uint16) ([]*Bin, error) {
-	res := make([]*Bin, count)
+func (r *ASBReader) readBins(count uint16) (a.BinMap, error) {
+	bins := make(a.BinMap, count)
 
 	r.lineType = recordBinsLT
 
@@ -683,9 +647,15 @@ func (r *ASBReader) readBins(count uint16) ([]*Bin, error) {
 		if err := _expectChar(r, ' '); err != nil {
 			return nil, err
 		}
+
+		err := r.readBin(bins)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
-	return res, nil
+	return bins, nil
 }
 
 var bytesBinTypes = map[byte]struct{}{
@@ -726,31 +696,21 @@ var binTypes = map[byte]struct{}{
 	'G': {},
 }
 
-func (r *ASBReader) readBin() (*Bin, error) {
-	var res Bin
-
+func (r *ASBReader) readBin(bins a.BinMap) error {
 	r.lineType = binLT
-
-	if err := _expectChar(r, '-'); err != nil {
-		return nil, err
-	}
-
-	if err := _expectChar(r, ' '); err != nil {
-		return nil, err
-	}
 
 	binType, err := r.ReadByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if _, ok := binTypes[binType]; !ok {
-		return nil, fmt.Errorf("invalid bin type %b", binType)
+		return fmt.Errorf("invalid bin type %b", binType)
 	}
 
 	b, err := r.ReadByte()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var base64Encoded bool
@@ -759,81 +719,76 @@ func (r *ASBReader) readBin() (*Bin, error) {
 	case ' ':
 		base64Encoded = true
 	default:
-		return nil, fmt.Errorf("invalid character in bytes bin %b, expected '!' or ' '", b)
+		return fmt.Errorf("invalid character in bytes bin %b, expected '!' or ' '", b)
 	}
 
 	if base64Encoded {
 		if err := _expectChar(r, ' '); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	name, err := _readUntilAny(r, []byte{' ', '\n'})
+	nameBytes, err := _readUntilAny(r, []byte{' ', '\n'})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	res.name = string(name)
+	name := string(nameBytes)
 
 	var binVal any
 	var binErr error
 
 	// 'N' is a special case where the line ends after the bin name
 	if binType == 'N' {
-		res.btype = BinTypeNil
 		if err := _expectChar(r, '\n'); err != nil {
-			return nil, err
+			return err
 		}
-		return &res, nil
+
+		bins[name] = nil
+
+		return nil
 	} else {
 		if err := _expectChar(r, ' '); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	switch binType {
 	case 'Z':
-		res.btype = BinTypeBool
 		binVal, binErr = _readBool(r, '\n')
 	case 'I':
-		res.btype = BinTypeInteger
 		binVal, binErr = _readInteger(r, '\n')
 	case 'D':
-		res.btype = BinTypeFloat
 		binVal, binErr = _readFloat(r, '\n')
 	case 'S':
-		res.btype = BinTypeString
 		binVal, binErr = _readString(r, ' ')
 	case 'U':
-		return nil, errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
+		return errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
 	case 'X':
-		res.btype = BinTypeString
 		val, err := _readBase64Bytes(r, ' ')
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		binVal = string(val)
 	case 'G':
-		res.btype = BinTypeGeoJSON
 		binVal, binErr = _readString(r, ' ')
 	}
 
 	if _, ok := bytesBinTypes[binType]; ok {
-		res.btype = BinTypeBlob
 		binVal, binErr = _readBytes(r, ' ')
 	}
 
 	if binErr != nil {
-		return nil, binErr
+		return binErr
 	}
 
-	res.value = binVal
+	bins[name] = binVal
 
-	return &res, nil
+	return nil
 }
 
 func (r *ASBReader) readKey() (*Key, error) {
-	var res a.Key
+	var res Key
 
 	r.lineType = keyLT
 
@@ -849,17 +804,25 @@ func (r *ASBReader) readKey() (*Key, error) {
 		return nil, err
 	}
 
-	var keyVal any
-	var keyErr error
-
 	switch b {
 	case 'I':
-		keyVal, keyErr = _readInteger(r, '\n')
+		res.ktype = KeyTypeInteger
+		keyVal, err := _readInteger(r, '\n')
+		if err != nil {
+			return nil, err
+		}
+		res.value = keyVal
 
 	case 'D':
-		keyVal, keyErr := _readFloat(r, '\n')
+		res.ktype = KeyTypeFloat
+		keyVal, err := _readFloat(r, '\n')
+		if err != nil {
+			return nil, err
+		}
+		res.value = keyVal
 
 	case 'S':
+		res.ktype = KeyTypeString
 
 		keyVal, err := _readString(r, ' ')
 		if err != nil {
@@ -894,7 +857,6 @@ func (r *ASBReader) readKey() (*Key, error) {
 			return nil, fmt.Errorf("invalid character in bytes key %b, expected '!' or ' '", b)
 		}
 
-		var keyVal []byte
 		if base64Encoded {
 			if err := _expectChar(r, ' '); err != nil {
 				return nil, err
@@ -918,10 +880,6 @@ func (r *ASBReader) readKey() (*Key, error) {
 
 	default:
 		return nil, fmt.Errorf("invalid key type %b", b)
-	}
-
-	if keyErr != nil {
-		return nil, keyErr
 	}
 
 	if err := _expectChar(r, '\n'); err != nil {
@@ -967,7 +925,7 @@ func (r *ASBReader) readExpiration() (uint32, error) {
 
 }
 
-func (r *ASBReader) readGeneration() (uint16, error) {
+func (r *ASBReader) readGeneration() (uint32, error) {
 	r.lineType = genLT
 
 	gen, err := _readInteger(r, '\n')
@@ -983,7 +941,7 @@ func (r *ASBReader) readGeneration() (uint16, error) {
 		return 0, err
 	}
 
-	return uint16(gen), nil
+	return uint32(gen), nil
 }
 
 func (r *ASBReader) readSet() (string, error) {
@@ -1001,20 +959,20 @@ func (r *ASBReader) readSet() (string, error) {
 	return string(set), err
 }
 
-func (r *ASBReader) readDigest() (string, error) {
+func (r *ASBReader) readDigest() ([]byte, error) {
 	r.lineType = digestLT
 
 	digestSize := 20
 	digest, err := _readBlockDecode(r, digestSize)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := _expectChar(r, '\n'); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(digest), nil
+	return digest, nil
 }
 
 // ***** Helper Functions

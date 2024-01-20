@@ -3,18 +3,16 @@ package handlers
 import (
 	"backuplib/workers"
 	"errors"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-type RestoreUnmarshaller interface {
-	UnmarshalRecord([]byte) (*a.Record, error)
+type RestoreUnmarshaler interface {
+	NextToken() (any, error)
 }
 
 type RestoreArgs struct {
 	Namespace    string
 	Set          string
-	UnMarshaller RestoreUnmarshaller
+	UnMarshaller RestoreUnmarshaler
 	Parallel     int
 	FilePath     string
 	DirPath      string

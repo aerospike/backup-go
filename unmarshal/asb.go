@@ -47,12 +47,14 @@ const (
 	genLT          = "generation"
 	expirationLT   = "expiration"
 	binCountLT     = "bin count"
+	firstLT        = "first"
 )
 
 // literal asb tokens
 const (
-	namespaceToken = "namespace"
-	firstFileToken = "first-file"
+	namespaceToken  = "namespace"
+	firstFileToken  = "first-file"
+	asbVersionToken = "Version"
 )
 
 // value bounds
@@ -67,6 +69,11 @@ const (
 const (
 	boolTrueByte  = 'T'
 	boolFalseByte = 'F'
+)
+
+// escape character
+const (
+	asbEscape = '\\'
 )
 
 type countingByteScanner struct {
@@ -109,7 +116,7 @@ type metaData struct {
 type ASBReader struct {
 	countingByteScanner
 	parseErrArgs
-	header   *Header
+	header   *header
 	metaData *metaData
 }
 
@@ -157,8 +164,6 @@ func (r *ASBReader) NextToken() (any, error) {
 		}
 
 		switch b {
-		case metadataSectionMarker:
-			return r.readMetadata()
 		case globalSectionMarker:
 			return r.readGlobals()
 		case recordHeaderMarker:
@@ -175,27 +180,35 @@ func (r *ASBReader) NextToken() (any, error) {
 	return v, nil
 }
 
-type Header struct {
+type header struct {
 	version string
 }
 
-func (r *ASBReader) readHeader() (*Header, error) {
+func (r *ASBReader) readHeader() (*header, error) {
 
 	r.section = headerS
 	r.lineType = versionLT
 
-	versionTextLen := len("Version x.y\n")
-	bytes := make([]byte, versionTextLen)
-	for i := 0; i < versionTextLen; i++ {
-		var err error
-		bytes[i], err = r.ReadByte()
-		if err != nil {
-			return nil, err
-		}
+	if err := _expectToken(r, asbVersionToken); err != nil {
+		return nil, err
 	}
 
-	return &Header{
-		version: string(bytes[8:11]),
+	if err := _expectChar(r, ' '); err != nil {
+		return nil, err
+	}
+
+	// version number format is "x.y"
+	ver, err := _readNBytes(r, 3)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := _expectChar(r, '\n'); err != nil {
+		return nil, err
+	}
+
+	return &header{
+		version: string(ver),
 	}, nil
 }
 
@@ -205,41 +218,63 @@ func (r *ASBReader) readMetadata() (*metaData, error) {
 
 	r.section = metadataS
 
-	namespace, err := r.readNamespace()
-	if err != nil {
-		return nil, err
-	}
-	res.namespace = namespace
+	for {
+		startC, err := r.ReadByte()
+		if err != nil {
+			return nil, err
+		}
 
-	if err := _expectChar(r, metadataSectionMarker); err != nil {
-		return nil, err
-	}
+		// the metadata section is optional
+		if startC != metadataSectionMarker {
+			r.UnreadByte()
+			break
+		}
 
-	first, err := r.readFirst()
-	if err != nil {
-		return nil, err
+		if err := _expectChar(r, ' '); err != nil {
+			return nil, err
+		}
+
+		metaToken, err := _readUntilAny(r, []byte{' ', '\n'}, false)
+		if err != nil {
+			return nil, err
+		}
+
+		switch string(metaToken) {
+		case namespaceToken:
+			val, err := r.readNamespace()
+			if err != nil {
+				return nil, err
+			}
+			res.namespace = val
+
+		case firstFileToken:
+			val, err := r.readFirst()
+			if err != nil {
+				return nil, err
+			}
+			res.first = val
+
+		default:
+			return nil, fmt.Errorf("unknown meta data line type %s", metaToken)
+		}
 	}
-	res.first = first
 
 	return &res, nil
 }
 
 func (r *ASBReader) readNamespace() (string, error) {
-	if err := _expectChar(r, ' '); err != nil {
-		return "", err
-	}
-
-	if err := _expectToken(r, namespaceToken); err != nil {
-		return "", err
-	}
+	r.lineType = namespaceLT
 
 	if err := _expectChar(r, ' '); err != nil {
 		return "", err
 	}
 
-	//TODO support escaped namespaces that might have \n in them
-	bytes, err := _readUntil(r, '\n')
+	bytes, err := _readUntil(r, '\n', true)
 	if err != nil {
+		return "", err
+	}
+
+	if err := _expectChar(r, '\n'); err != nil {
 		return "", err
 	}
 
@@ -247,23 +282,7 @@ func (r *ASBReader) readNamespace() (string, error) {
 }
 
 func (r *ASBReader) readFirst() (bool, error) {
-	b, err := r.ReadByte()
-	if err != nil {
-		return false, err
-	}
-
-	// The first-file metadata line is optional
-	if b != '#' {
-		return false, nil
-	}
-
-	if err := _expectChar(r, ' '); err != nil {
-		return false, err
-	}
-
-	if err := _expectToken(r, firstFileToken); err != nil {
-		return false, nil
-	}
+	r.lineType = firstLT
 
 	if err := _expectChar(r, '\n'); err != nil {
 		return false, err
@@ -313,7 +332,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 		return nil, err
 	}
 
-	namespace, err := _readUntil(r, ' ')
+	namespace, err := _readUntil(r, ' ', true)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +342,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 		return nil, err
 	}
 
-	set, err := _readUntil(r, ' ')
+	set, err := _readUntil(r, ' ', true)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +352,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 		return nil, err
 	}
 
-	name, err := _readUntil(r, ' ')
+	name, err := _readUntil(r, ' ', true)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +402,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 			return nil, err
 		}
 
-		name, err := _readUntil(r, ' ')
+		name, err := _readUntil(r, ' ', true)
 		if err != nil {
 			return nil, err
 		}
@@ -447,7 +466,7 @@ func (r *ASBReader) readUDF() (*UDF, error) {
 		return nil, err
 	}
 
-	name, err := _readUntil(r, ' ')
+	name, err := _readUntil(r, ' ', true)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +570,7 @@ func (r *ASBReader) readRecord() (*Record, error) {
 		case 1:
 			// TODO use a generic readNamespace readString function here
 			r.lineType = namespaceLT
-			namespace, err := _readUntil(r, '\n')
+			namespace, err := _readUntil(r, '\n', true)
 			if err != nil {
 				return nil, err
 			}
@@ -728,7 +747,7 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 		}
 	}
 
-	nameBytes, err := _readUntilAny(r, []byte{' ', '\n'})
+	nameBytes, err := _readUntilAny(r, []byte{' ', '\n'}, true)
 	if err != nil {
 		return err
 	}
@@ -947,7 +966,7 @@ func (r *ASBReader) readGeneration() (uint32, error) {
 func (r *ASBReader) readSet() (string, error) {
 	r.lineType = setLT
 
-	set, err := _readUntil(r, '\n')
+	set, err := _readUntil(r, '\n', true)
 	if err != nil {
 		return "", err
 	}
@@ -1030,7 +1049,7 @@ func _readBytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
 }
 
 func _readBool(src io.ByteScanner, delim byte) (bool, error) {
-	bytes, err := _readUntil(src, delim)
+	bytes, err := _readUntil(src, delim, false)
 	if err != nil {
 		return false, err
 	}
@@ -1047,7 +1066,7 @@ func _readBool(src io.ByteScanner, delim byte) (bool, error) {
 }
 
 func _readFloat(src io.ByteScanner, delim byte) (float64, error) {
-	bytes, err := _readUntil(src, delim)
+	bytes, err := _readUntil(src, delim, false)
 	if err != nil {
 		return 0, err
 	}
@@ -1061,7 +1080,7 @@ func _readFloat(src io.ByteScanner, delim byte) (float64, error) {
 }
 
 func _readInteger(src io.ByteScanner, delim byte) (int64, error) {
-	bytes, err := _readUntil(src, delim)
+	bytes, err := _readUntil(src, delim, false)
 	if err != nil {
 		return 0, err
 	}
@@ -1077,7 +1096,7 @@ func _readInteger(src io.ByteScanner, delim byte) (int64, error) {
 // _readSize reads a size or length token from the asb format
 // the value should fit in a uint32
 func _readSize(src io.ByteScanner, delim byte) (uint32, error) {
-	bytes, err := _readUntil(src, delim)
+	bytes, err := _readUntil(src, delim, false)
 	if err != nil {
 		return 0, err
 	}
@@ -1090,27 +1109,41 @@ func _readSize(src io.ByteScanner, delim byte) (uint32, error) {
 	return uint32(num), nil
 }
 
-func _readUntil(src io.ByteScanner, delim byte) ([]byte, error) {
-	return _readUntilAny(src, []byte{delim})
+func _readUntil(src io.ByteScanner, delim byte, escaped bool) ([]byte, error) {
+	return _readUntilAny(src, []byte{delim}, escaped)
 }
 
-func _readUntilAny(src io.ByteScanner, delims []byte) ([]byte, error) {
-	bts := make([]byte, maxTokenSize)
-	var i int
+func _readUntilAny(src io.ByteScanner, delims []byte, escaped bool) ([]byte, error) {
+	var (
+		bts []byte
+		esc bool
+		i   int
+	)
+
 	for i = 0; i < maxTokenSize; i++ {
 		b, err := src.ReadByte()
 		if err != nil {
 			return nil, err
 		}
 
-		if bytes.ContainsRune(delims, rune(b)) {
-			err := src.UnreadByte()
-			if err != nil {
-				return nil, err
-			}
+		// read past the escape character
+		if escaped && b == asbEscape && !esc {
+			esc = true
+			continue
 		}
 
-		bts[i] = b
+		if !esc && bytes.ContainsRune(delims, rune(b)) {
+			// hit a delimiter so return
+			return bts, src.UnreadByte()
+		}
+
+		esc = false
+
+		bts = append(bts, b)
+
+		if i == maxTokenSize-1 {
+			return nil, fmt.Errorf("token larger than max size")
+		}
 	}
 
 	return bts, nil
@@ -1150,8 +1183,8 @@ func _expectToken(src io.ByteReader, token string) error {
 		return err
 	}
 
-	if string(bytes) != firstFileToken {
-		return fmt.Errorf("invalid token, read %s, wanted %s", string(bytes), firstFileToken)
+	if string(bytes) != token {
+		return fmt.Errorf("invalid token, read %s, wanted %s", string(bytes), token)
 	}
 
 	return nil

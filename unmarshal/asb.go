@@ -109,8 +109,8 @@ type parseErrArgs struct {
 }
 
 type metaData struct {
-	namespace string
-	first     bool
+	Namespace string
+	First     bool
 }
 
 type ASBReader struct {
@@ -169,7 +169,7 @@ func (r *ASBReader) NextToken() (any, error) {
 		case recordHeaderMarker:
 			return r.readRecord()
 		default:
-			return nil, fmt.Errorf("read invalid line start character %b", b)
+			return nil, fmt.Errorf("read invalid line start character %c", b)
 		}
 	}()
 
@@ -181,7 +181,7 @@ func (r *ASBReader) NextToken() (any, error) {
 }
 
 type header struct {
-	version string
+	Version string
 }
 
 func (r *ASBReader) readHeader() (*header, error) {
@@ -208,7 +208,7 @@ func (r *ASBReader) readHeader() (*header, error) {
 	}
 
 	return &header{
-		version: string(ver),
+		Version: string(ver),
 	}, nil
 }
 
@@ -245,14 +245,14 @@ func (r *ASBReader) readMetadata() (*metaData, error) {
 			if err != nil {
 				return nil, err
 			}
-			res.namespace = val
+			res.Namespace = val
 
 		case firstFileToken:
 			val, err := r.readFirst()
 			if err != nil {
 				return nil, err
 			}
-			res.first = val
+			res.First = val
 
 		default:
 			return nil, fmt.Errorf("unknown meta data line type %s", metaToken)
@@ -312,7 +312,7 @@ func (r *ASBReader) readGlobals() (any, error) {
 	case 'u':
 		res, err = r.readUDF()
 	default:
-		return nil, fmt.Errorf("invalid global line type %b", b)
+		return nil, fmt.Errorf("invalid global line type %c", b)
 	}
 
 	if err != nil {
@@ -322,7 +322,8 @@ func (r *ASBReader) readGlobals() (any, error) {
 	return res, nil
 }
 
-// NOTE this is meant to read the UDF line AFTER the global start '* [SP] i'
+// readSindex is used to read secondary index lines in the global section of the asb file.
+// readSindex expects that r has been advanced past the secondary index global line markter '* i'
 func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	var res SecondaryIndex
 
@@ -377,7 +378,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	case 'V':
 		res.IndexType = MapValueSIndex
 	default:
-		return nil, fmt.Errorf("invalid secondary index type %b", b)
+		return nil, fmt.Errorf("invalid secondary index type %c", b)
 	}
 
 	if err := _expectChar(r, ' '); err != nil {
@@ -427,7 +428,7 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 		case 'B':
 			path.BinType = BlobSIDataType
 		default:
-			return nil, fmt.Errorf("invalid sindex path type %b", b)
+			return nil, fmt.Errorf("invalid sindex path type %c", b)
 		}
 
 		res.Paths[i] = &path
@@ -459,7 +460,7 @@ func (r *ASBReader) readUDF() (*UDF, error) {
 	case LUAUDFType:
 		res.udfType = LUAUDFType
 	default:
-		return nil, fmt.Errorf("invalid UDF type %b in global section UDF line", b)
+		return nil, fmt.Errorf("invalid UDF type %c in global section UDF line", b)
 	}
 
 	if err := _expectChar(r, ' '); err != nil {
@@ -552,7 +553,7 @@ func (r *ASBReader) readRecord() (*Record, error) {
 		} else if i == 3 && b == expectedRecordHeaderTypes[4] {
 			i++
 		} else if b != expectedRecordHeaderTypes[i] {
-			return nil, fmt.Errorf("invalid record header line type %b expected %b", b, expectedRecordHeaderTypes[i])
+			return nil, fmt.Errorf("invalid record header line type %c expected %c", b, expectedRecordHeaderTypes[i])
 		}
 
 		if err := _expectChar(r, ' '); err != nil {
@@ -724,7 +725,7 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 	}
 
 	if _, ok := binTypes[binType]; !ok {
-		return fmt.Errorf("invalid bin type %b", binType)
+		return fmt.Errorf("invalid bin type %c", binType)
 	}
 
 	b, err := r.ReadByte()
@@ -738,7 +739,7 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 	case ' ':
 		base64Encoded = true
 	default:
-		return fmt.Errorf("invalid character in bytes bin %b, expected '!' or ' '", b)
+		return fmt.Errorf("invalid character in bytes bin %c, expected '!' or ' '", b)
 	}
 
 	if base64Encoded {
@@ -873,7 +874,7 @@ func (r *ASBReader) readKey() (*Key, error) {
 		case ' ':
 			base64Encoded = true
 		default:
-			return nil, fmt.Errorf("invalid character in bytes key %b, expected '!' or ' '", b)
+			return nil, fmt.Errorf("invalid character in bytes key %c, expected '!' or ' '", b)
 		}
 
 		if base64Encoded {
@@ -898,7 +899,7 @@ func (r *ASBReader) readKey() (*Key, error) {
 		res.value = keyVal
 
 	default:
-		return nil, fmt.Errorf("invalid key type %b", b)
+		return nil, fmt.Errorf("invalid key type %c", b)
 	}
 
 	if err := _expectChar(r, '\n'); err != nil {
@@ -1061,7 +1062,7 @@ func _readBool(src io.ByteScanner, delim byte) (bool, error) {
 	case boolFalseByte:
 		return false, nil
 	default:
-		return false, fmt.Errorf("invalid boolean character %b", b)
+		return false, fmt.Errorf("invalid boolean character %c", b)
 	}
 }
 
@@ -1171,7 +1172,7 @@ func _expectChar(src io.ByteReader, c byte) error {
 	}
 
 	if b != c {
-		return fmt.Errorf("invalid character, read %b, wanted %b", b, c)
+		return fmt.Errorf("invalid character, read %c, expected %c", b, c)
 	}
 
 	return nil
@@ -1184,7 +1185,7 @@ func _expectToken(src io.ByteReader, token string) error {
 	}
 
 	if string(bytes) != token {
-		return fmt.Errorf("invalid token, read %s, wanted %s", string(bytes), token)
+		return fmt.Errorf("invalid token, read %s, expected %s", string(bytes), token)
 	}
 
 	return nil

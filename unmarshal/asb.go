@@ -1031,12 +1031,12 @@ func _readBlockDecode(src io.ByteReader, n int) ([]byte, error) {
 	}
 
 	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(bytes)))
-	_, err = base64.StdEncoding.Decode(decoded, bytes)
+	bw, err := base64.StdEncoding.Decode(decoded, bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	return decoded, nil
+	return decoded[:bw], nil
 }
 
 func _readString(src io.ByteScanner, sizeDelim byte) (string, error) {

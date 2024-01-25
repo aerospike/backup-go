@@ -677,6 +677,11 @@ func randomAsbTestBin() *asbTestBin {
 	}
 
 	bt := binTypeList[randIntn(len(binTypeList))]
+	for bt == 'U' {
+		// ignore the 'U' bin type for now, use an explicit case
+		bt = binTypeList[randIntn(len(binTypeList))]
+	}
+
 	res.BinType = bt
 	res.StringRepresentation += string(bt)
 
@@ -694,11 +699,6 @@ func randomAsbTestBin() *asbTestBin {
 	binName := randomString(100, true, true)
 	res.StringRepresentation += binName
 	res.Name = binName
-
-	if bt == 'U' {
-		// ignore LDT case
-		return &res
-	}
 
 	if bt == 'N' {
 		res.Value = nil
@@ -807,7 +807,7 @@ func TestASBReader_readBin(t *testing.T) {
 		wantErr bool
 	}
 
-	randPositiveTests := make([]test, 100)
+	randPositiveTests := make([]test, 1000)
 
 	for i := range randPositiveTests {
 		randBin := randomAsbTestBin()
@@ -920,6 +920,16 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader("I int-bin 1"),
+				},
+			},
+			want:    map[string]any{},
+			wantErr: true,
+		},
+		{
+			name: "negative LDT bin",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("U ldt-bin 1\n"),
 				},
 			},
 			want:    map[string]any{},

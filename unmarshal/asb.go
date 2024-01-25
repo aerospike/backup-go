@@ -512,13 +512,13 @@ const (
 
 // TODO maybe this should just be an empty interface
 // it's type can be inferred later
-type Key struct {
+type userKey struct {
 	ktype KeyType
 	value any
 }
 
 type recordData struct {
-	key        Key // optional
+	key        userKey // optional
 	namespace  string
 	digest     []byte
 	set        string // optional
@@ -647,7 +647,6 @@ func (r *ASBReader) readRecord() (*Record, error) {
 	}
 
 	rec.Key = key
-	rec.Bins = bins
 	rec.Expiration = recData.expiration
 	rec.Generation = recData.generation
 
@@ -694,26 +693,26 @@ var bytesBinTypes = map[byte]struct{}{
 // TODO make this use bytesBinTypes
 var binTypes = map[byte]struct{}{
 	// basic types
-	'N': {},
-	'Z': {},
-	'I': {},
-	'D': {},
-	'S': {},
+	'N': {}, // nil
+	'Z': {}, // bool
+	'I': {}, // int64
+	'D': {}, // float64
+	'S': {}, // string
 	// bytes types
-	'B': {},
-	'J': {},
-	'C': {},
-	'P': {},
-	'R': {},
-	'H': {},
-	'E': {},
-	'Y': {},
-	'M': {},
-	'L': {},
+	'B': {}, // bytes
+	'J': {}, // java bytes
+	'C': {}, // c# bytes
+	'P': {}, // python bytes
+	'R': {}, // ruby bytes
+	'H': {}, // php bytes
+	'E': {}, // erlang bytes
+	'Y': {}, // HLL bytes
+	'M': {}, // map bytes
+	'L': {}, // list bytes
 	// end bytes types
-	'U': {},
-	'X': {},
-	'G': {},
+	'U': {}, // LDT
+	'X': {}, // base64 encoded string
+	'G': {}, // geojson
 }
 
 func (r *ASBReader) readBin(bins a.BinMap) error {
@@ -742,7 +741,7 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 		return fmt.Errorf("invalid character in bytes bin %c, expected '!' or ' '", b)
 	}
 
-	if base64Encoded {
+	if !base64Encoded {
 		if err := _expectChar(r, ' '); err != nil {
 			return err
 		}
@@ -795,11 +794,19 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 	}
 
 	if _, ok := bytesBinTypes[binType]; ok {
-		binVal, binErr = _readBytes(r, ' ')
+		if base64Encoded {
+			binVal, binErr = _readBase64Bytes(r, ' ')
+		} else {
+			binVal, binErr = _readBytes(r, ' ')
+		}
 	}
 
 	if binErr != nil {
 		return binErr
+	}
+
+	if err := _expectChar(r, '\n'); err != nil {
+		return err
 	}
 
 	bins[name] = binVal
@@ -807,8 +814,8 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 	return nil
 }
 
-func (r *ASBReader) readKey() (*Key, error) {
-	var res Key
+func (r *ASBReader) readKey() (*userKey, error) {
+	var res userKey
 
 	r.lineType = keyLT
 
@@ -891,6 +898,7 @@ func (r *ASBReader) readKey() (*Key, error) {
 		var keyVal []byte
 		if base64Encoded {
 			keyVal = []byte{}
+			// TODO use the decode block function for this
 			base64.StdEncoding.Decode(keyVal, data)
 		} else {
 			keyVal = data
@@ -982,6 +990,7 @@ func (r *ASBReader) readSet() (string, error) {
 func (r *ASBReader) readDigest() ([]byte, error) {
 	r.lineType = digestLT
 
+	// TODO make this a constant
 	digestSize := 20
 	digest, err := _readBlockDecode(r, digestSize)
 	if err != nil {
@@ -1000,6 +1009,10 @@ func (r *ASBReader) readDigest() ([]byte, error) {
 func _readBase64Bytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
 	size, err := _readSize(src, sizeDelim)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := _expectChar(src, sizeDelim); err != nil {
 		return nil, err
 	}
 
@@ -1038,6 +1051,10 @@ func _readString(src io.ByteScanner, sizeDelim byte) (string, error) {
 func _readBytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
 	length, err := _readSize(src, sizeDelim)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := _expectChar(src, sizeDelim); err != nil {
 		return nil, err
 	}
 
@@ -1166,13 +1183,17 @@ func _readNBytes(src io.ByteReader, n int) ([]byte, error) {
 }
 
 func _expectChar(src io.ByteReader, c byte) error {
+	return _expectAnyChar(src, []byte{c})
+}
+
+func _expectAnyChar(src io.ByteReader, chars []byte) error {
 	b, err := src.ReadByte()
 	if err != nil {
 		return err
 	}
 
-	if b != c {
-		return fmt.Errorf("invalid character, read %c, expected %c", b, c)
+	if !bytes.ContainsRune(chars, rune(b)) {
+		return fmt.Errorf("invalid character, read %c, expected one of %s", b, string(chars))
 	}
 
 	return nil

@@ -513,8 +513,8 @@ const (
 // TODO maybe this should just be an empty interface
 // it's type can be inferred later
 type userKey struct {
-	ktype KeyType
-	value any
+	Ktype KeyType
+	Value any
 }
 
 type recordData struct {
@@ -814,100 +814,107 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 	return nil
 }
 
+var asbKeyTypes = map[byte]struct{}{
+	'I': {}, // int64
+	'D': {}, // float64
+	'S': {}, // string
+	'X': {}, // base64 encoded string
+	'B': {}, // bytes
+}
+
+// readKey reads a record key line from the asb file
+// it expects that r has been advanced past the record key line marker '+ k'
 func (r *ASBReader) readKey() (*userKey, error) {
 	var res userKey
 
 	r.lineType = keyLT
+
+	keyTypeChar, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := asbKeyTypes[keyTypeChar]; !ok {
+		return nil, fmt.Errorf("invalid key type %c", keyTypeChar)
+	}
 
 	b, err := r.ReadByte()
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO check that b is a valid key type here
-	// so that the error will match the character count
-
-	if err := _expectChar(r, ' '); err != nil {
-		return nil, err
+	// handle the special case where a bytes key is not base64 encoded
+	var base64Encoded bool
+	switch b {
+	case '!':
+	case ' ':
+		base64Encoded = true
+	default:
+		return nil, fmt.Errorf("invalid character %c, expected '!' or ' '", keyTypeChar)
 	}
 
-	switch b {
+	if !base64Encoded {
+		if err := _expectChar(r, ' '); err != nil {
+			return nil, err
+		}
+	}
+
+	switch keyTypeChar {
 	case 'I':
-		res.ktype = KeyTypeInteger
+		res.Ktype = KeyTypeInteger
 		keyVal, err := _readInteger(r, '\n')
 		if err != nil {
 			return nil, err
 		}
-		res.value = keyVal
+		res.Value = keyVal
 
 	case 'D':
-		res.ktype = KeyTypeFloat
+		res.Ktype = KeyTypeFloat
 		keyVal, err := _readFloat(r, '\n')
 		if err != nil {
 			return nil, err
 		}
-		res.value = keyVal
+		res.Value = keyVal
 
 	case 'S':
-		res.ktype = KeyTypeString
+		res.Ktype = KeyTypeString
 
 		keyVal, err := _readString(r, ' ')
 		if err != nil {
 			return nil, err
 		}
 
-		res.value = keyVal
+		res.Value = keyVal
 
-	// TODO why is this needed? is it legacy? what asbackup option produces base64 encoded key strings?
 	case 'X':
-		res.ktype = KeyTypeString
+		res.Ktype = KeyTypeString
 
 		keyVal, err := _readBase64Bytes(r, ' ')
 		if err != nil {
 			return nil, err
 		}
 
-		res.value = string(keyVal)
+		res.Value = string(keyVal)
 
 	case 'B':
-		b, err := r.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		var base64Encoded bool
-		switch b {
-		case '!':
-		case ' ':
-			base64Encoded = true
-		default:
-			return nil, fmt.Errorf("invalid character in bytes key %c, expected '!' or ' '", b)
-		}
-
-		if base64Encoded {
-			if err := _expectChar(r, ' '); err != nil {
-				return nil, err
-			}
-		}
-
-		data, err := _readNBytes(r, ' ')
-		if err != nil {
-			return nil, err
-		}
+		res.Ktype = KeyTypeBlob
 
 		var keyVal []byte
 		if base64Encoded {
-			keyVal = []byte{}
-			// TODO use the decode block function for this
-			base64.StdEncoding.Decode(keyVal, data)
+			keyVal, err = _readBase64Bytes(r, ' ')
 		} else {
-			keyVal = data
+			keyVal, err = _readBytes(r, ' ')
 		}
 
-		res.value = keyVal
+		if err != nil {
+			return nil, err
+		}
+
+		res.Value = keyVal
 
 	default:
-		return nil, fmt.Errorf("invalid key type %c", b)
+		// should never happen because of the previous check for membership in asbKeyTypes
+		return nil, fmt.Errorf("invalid key type %c", keyTypeChar)
 	}
 
 	if err := _expectChar(r, '\n'); err != nil {

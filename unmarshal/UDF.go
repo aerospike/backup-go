@@ -7,8 +7,7 @@ const (
 )
 
 type UDF struct {
-	udfType UDFType
-	name    string
-	length  uint32
-	content []byte
+	UDFType UDFType
+	Name    string
+	Content []byte
 }

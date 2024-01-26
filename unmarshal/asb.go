@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -61,8 +62,9 @@ const (
 const (
 	maxNamespaceLength = 31
 	maxTokenSize       = 1000
-	maxGeneration      = 65535
-	maxBinCount        = 65535
+	maxGeneration      = math.MaxUint16
+	maxBinCount        = math.MaxUint16
+	maxExpiration      = math.MaxUint32
 )
 
 // asb boolean encoding
@@ -75,6 +77,23 @@ const (
 const (
 	asbEscape = '\\'
 )
+
+// TODO maybe use error functions for each asb level, reader, section, line type
+// that way you don't have to track section and line type in the reader
+// this would allow passing an interface for the reader to most functions
+// and would allow the reader to be used in a more generic way making tests easier
+
+func newReaderError(offset uint64, err error) error {
+	return fmt.Errorf("error while reading asb file at character %d error: %w", offset, err)
+}
+
+func newSectionError(section string, err error) error {
+	return fmt.Errorf("error while reading section: %s, error: %w", section, err)
+}
+
+func newLineError(lineType string, err error) error {
+	return fmt.Errorf("error while reading line type: %s, error: %w", lineType, err)
+}
 
 type countingByteScanner struct {
 	io.ByteScanner
@@ -103,11 +122,6 @@ func (c *countingByteScanner) UnreadByte() error {
 	return err
 }
 
-type parseErrArgs struct {
-	section  string
-	lineType string
-}
-
 type metaData struct {
 	Namespace string
 	First     bool
@@ -115,7 +129,6 @@ type metaData struct {
 
 type ASBReader struct {
 	countingByteScanner
-	parseErrArgs
 	header   *header
 	metaData *metaData
 }
@@ -126,10 +139,6 @@ func NewASBReader(src io.Reader) (*ASBReader, error) {
 		countingByteScanner: countingByteScanner{
 			cbs,
 			0,
-		},
-		parseErrArgs: parseErrArgs{
-			section:  undefinedS,
-			lineType: undefinedLT,
 		},
 	}
 
@@ -150,31 +159,33 @@ func NewASBReader(src io.Reader) (*ASBReader, error) {
 
 }
 
-func (r *ASBReader) newParseError(err error) error {
-	return fmt.Errorf("parsing failed for section: %s, type: %s, at character: %d error: %w", r.section, r.lineType, r.count, err)
-}
-
 // TODO wrap errors returned from this with a character count
 func (r *ASBReader) NextToken() (any, error) {
 
 	v, err := func() (any, error) {
-		b, err := r.ReadByte()
+		b, err := _peek(r)
 		if err != nil {
 			return nil, err
 		}
 
+		var v any
+
 		switch b {
 		case globalSectionMarker:
-			return r.readGlobals()
+			v, err = r.readGlobals()
+			err = newSectionError(globalS, err)
 		case recordHeaderMarker:
-			return r.readRecord()
+			v, err = r.readRecord()
+			err = newSectionError(recordS, err)
 		default:
-			return nil, fmt.Errorf("read invalid line start character %c", b)
+			v, err = nil, fmt.Errorf("read invalid line start character %c", b)
 		}
+
+		return v, err
 	}()
 
 	if err != nil {
-		return nil, r.newParseError(err)
+		return nil, newReaderError(r.count, err)
 	}
 
 	return v, nil
@@ -185,9 +196,7 @@ type header struct {
 }
 
 func (r *ASBReader) readHeader() (*header, error) {
-
-	r.section = headerS
-	r.lineType = versionLT
+	var res header
 
 	if err := _expectToken(r, asbVersionToken); err != nil {
 		return nil, err
@@ -207,27 +216,28 @@ func (r *ASBReader) readHeader() (*header, error) {
 		return nil, err
 	}
 
-	return &header{
-		Version: string(ver),
-	}, nil
+	res.Version = string(ver)
+
+	return &res, nil
 }
 
 // readMetadata consumes all metadata lines
 func (r *ASBReader) readMetadata() (*metaData, error) {
 	var res metaData
 
-	r.section = metadataS
-
 	for {
-		startC, err := r.ReadByte()
+		startC, err := _peek(r)
 		if err != nil {
 			return nil, err
 		}
 
 		// the metadata section is optional
 		if startC != metadataSectionMarker {
-			r.UnreadByte()
 			break
+		}
+
+		if err := _expectChar(r, metadataSectionMarker); err != nil {
+			return nil, err
 		}
 
 		if err := _expectChar(r, ' '); err != nil {
@@ -241,16 +251,21 @@ func (r *ASBReader) readMetadata() (*metaData, error) {
 
 		switch string(metaToken) {
 		case namespaceToken:
+
+			if err := _expectChar(r, ' '); err != nil {
+				return nil, err
+			}
+
 			val, err := r.readNamespace()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(namespaceLT, err)
 			}
 			res.Namespace = val
 
 		case firstFileToken:
 			val, err := r.readFirst()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(firstLT, err)
 			}
 			res.First = val
 
@@ -263,12 +278,6 @@ func (r *ASBReader) readMetadata() (*metaData, error) {
 }
 
 func (r *ASBReader) readNamespace() (string, error) {
-	r.lineType = namespaceLT
-
-	if err := _expectChar(r, ' '); err != nil {
-		return "", err
-	}
-
 	bytes, err := _readUntil(r, '\n', true)
 	if err != nil {
 		return "", err
@@ -282,8 +291,6 @@ func (r *ASBReader) readNamespace() (string, error) {
 }
 
 func (r *ASBReader) readFirst() (bool, error) {
-	r.lineType = firstLT
-
 	if err := _expectChar(r, '\n'); err != nil {
 		return false, err
 	}
@@ -295,7 +302,9 @@ func (r *ASBReader) readFirst() (bool, error) {
 func (r *ASBReader) readGlobals() (any, error) {
 	var res any
 
-	r.section = globalS
+	if err := _expectChar(r, globalSectionMarker); err != nil {
+		return nil, err
+	}
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -309,14 +318,16 @@ func (r *ASBReader) readGlobals() (any, error) {
 	switch b {
 	case 'i':
 		res, err = r.readSIndex()
+		if err != nil {
+			return nil, newLineError(sindexLT, err)
+		}
 	case 'u':
 		res, err = r.readUDF()
+		if err != nil {
+			return nil, newLineError(UDFLT, err)
+		}
 	default:
 		return nil, fmt.Errorf("invalid global line type %c", b)
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	return res, nil
@@ -326,8 +337,6 @@ func (r *ASBReader) readGlobals() (any, error) {
 // readSindex expects that r has been advanced past the secondary index global line markter '* i'
 func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	var res SecondaryIndex
-
-	r.lineType = sindexLT
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -441,11 +450,10 @@ func (r *ASBReader) readSIndex() (*SecondaryIndex, error) {
 	return &res, nil
 }
 
-// NOTE this is meant to read the UDF line AFTER the global start '* [SP] u'
+// readUDF is used to read UDF lines in the global section of the asb file.
+// readUDF expects that r has been advanced past the UDF global line marker '* u '
 func (r *ASBReader) readUDF() (*UDF, error) {
 	var res UDF
-
-	r.lineType = UDFLT
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -458,7 +466,7 @@ func (r *ASBReader) readUDF() (*UDF, error) {
 
 	switch b {
 	case LUAUDFType:
-		res.udfType = LUAUDFType
+		res.UDFType = LUAUDFType
 	default:
 		return nil, fmt.Errorf("invalid UDF type %c in global section UDF line", b)
 	}
@@ -471,7 +479,7 @@ func (r *ASBReader) readUDF() (*UDF, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.name = string(name)
+	res.Name = string(name)
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -481,7 +489,6 @@ func (r *ASBReader) readUDF() (*UDF, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.length = length
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -491,7 +498,7 @@ func (r *ASBReader) readUDF() (*UDF, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.content = content
+	res.Content = content
 
 	if err := _expectChar(r, '\n'); err != nil {
 		return nil, err
@@ -510,15 +517,8 @@ const (
 	KeyTypeBlob    KeyType = 'B'
 )
 
-// TODO maybe this should just be an empty interface
-// it's type can be inferred later
-type userKey struct {
-	Ktype KeyType
-	Value any
-}
-
 type recordData struct {
-	key        userKey // optional
+	userKey    any // optional
 	namespace  string
 	digest     []byte
 	set        string // optional
@@ -532,11 +532,11 @@ var expectedRecordHeaderTypes = []byte{'k', 'n', 'd', 's', 'g', 't', 'b'}
 func (r *ASBReader) readRecord() (*Record, error) {
 	var recData recordData
 
-	r.section = recordS
-
 	for i := 0; i < len(expectedRecordHeaderTypes); i++ {
 
-		r.lineType = recordS
+		if err := _expectChar(r, recordHeaderMarker); err != nil {
+			return nil, err
+		}
 
 		if err := _expectChar(r, ' '); err != nil {
 			return nil, err
@@ -562,22 +562,16 @@ func (r *ASBReader) readRecord() (*Record, error) {
 
 		switch i {
 		case 0:
-			key, err := r.readKey()
+			key, err := r.readUserKey()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(keyLT, err)
 			}
-			recData.key = *key
+			recData.userKey = key
 
 		case 1:
-			// TODO use a generic readNamespace readString function here
-			r.lineType = namespaceLT
-			namespace, err := _readUntil(r, '\n', true)
+			namespace, err := r.readNamespace()
 			if err != nil {
-				return nil, err
-			}
-
-			if err := _expectChar(r, '\n'); err != nil {
-				return nil, err
+				return nil, newLineError(namespaceLT, err)
 			}
 
 			recData.namespace = string(namespace)
@@ -585,46 +579,41 @@ func (r *ASBReader) readRecord() (*Record, error) {
 		case 2:
 			digest, err := r.readDigest()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(digestLT, err)
 			}
 			recData.digest = digest
 
 		case 3:
 			set, err := r.readSet()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(setLT, err)
 			}
 			recData.set = set
 
 		case 4:
 			gen, err := r.readGeneration()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(genLT, err)
 			}
 			recData.generation = gen
 
 		case 5:
 			exp, err := r.readExpiration()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(expirationLT, err)
 			}
 			recData.expiration = exp
 
 		case 6:
 			binCount, err := r.readBinCount()
 			if err != nil {
-				return nil, err
+				return nil, newLineError(binCountLT, err)
 			}
 			recData.binCount = binCount
 
 		default:
+			// should never happen because this is set to the length of expectedRecordHeaderTypes
 			return nil, fmt.Errorf("read too many record header lines, count: %d", i)
-		}
-
-		if i < len(expectedRecordHeaderTypes) {
-			if err := _expectChar(r, recordHeaderMarker); err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -632,14 +621,14 @@ func (r *ASBReader) readRecord() (*Record, error) {
 
 	bins, err := r.readBins(recData.binCount)
 	if err != nil {
-		return nil, err
+		return nil, newLineError(recordBinsLT, err)
 	}
 	rec.Bins = bins
 
 	key, err := a.NewKeyWithDigest(
 		recData.namespace,
 		recData.set,
-		recData.key,
+		recData.userKey,
 		recData.digest,
 	)
 	if err != nil {
@@ -655,8 +644,6 @@ func (r *ASBReader) readRecord() (*Record, error) {
 
 func (r *ASBReader) readBins(count uint16) (a.BinMap, error) {
 	bins := make(a.BinMap, count)
-
-	r.lineType = recordBinsLT
 
 	for i := uint16(0); i < count; i++ {
 		if err := _expectChar(r, recordBinsMarker); err != nil {
@@ -716,8 +703,6 @@ var binTypes = map[byte]struct{}{
 }
 
 func (r *ASBReader) readBin(bins a.BinMap) error {
-	r.lineType = binLT
-
 	binType, err := r.ReadByte()
 	if err != nil {
 		return err
@@ -783,7 +768,7 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 	case 'U':
 		return errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
 	case 'X':
-		val, err := _readBase64Bytes(r, ' ')
+		val, err := _readBase64BytesSized(r, ' ')
 		if err != nil {
 			return err
 		}
@@ -795,7 +780,7 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 
 	if _, ok := bytesBinTypes[binType]; ok {
 		if base64Encoded {
-			binVal, binErr = _readBase64Bytes(r, ' ')
+			binVal, binErr = _readBase64BytesSized(r, ' ')
 		} else {
 			binVal, binErr = _readBytes(r, ' ')
 		}
@@ -822,12 +807,10 @@ var asbKeyTypes = map[byte]struct{}{
 	'B': {}, // bytes
 }
 
-// readKey reads a record key line from the asb file
+// readUserKey reads a record key line from the asb file
 // it expects that r has been advanced past the record key line marker '+ k'
-func (r *ASBReader) readKey() (*userKey, error) {
-	var res userKey
-
-	r.lineType = keyLT
+func (r *ASBReader) readUserKey() (any, error) {
+	var res any
 
 	keyTypeChar, err := r.ReadByte()
 	if err != nil {
@@ -861,47 +844,39 @@ func (r *ASBReader) readKey() (*userKey, error) {
 
 	switch keyTypeChar {
 	case 'I':
-		res.Ktype = KeyTypeInteger
 		keyVal, err := _readInteger(r, '\n')
 		if err != nil {
 			return nil, err
 		}
-		res.Value = keyVal
+		res = keyVal
 
 	case 'D':
-		res.Ktype = KeyTypeFloat
 		keyVal, err := _readFloat(r, '\n')
 		if err != nil {
 			return nil, err
 		}
-		res.Value = keyVal
+		res = keyVal
 
 	case 'S':
-		res.Ktype = KeyTypeString
-
 		keyVal, err := _readString(r, ' ')
 		if err != nil {
 			return nil, err
 		}
 
-		res.Value = keyVal
+		res = keyVal
 
 	case 'X':
-		res.Ktype = KeyTypeString
-
-		keyVal, err := _readBase64Bytes(r, ' ')
+		keyVal, err := _readBase64BytesSized(r, ' ')
 		if err != nil {
 			return nil, err
 		}
 
-		res.Value = string(keyVal)
+		res = string(keyVal)
 
 	case 'B':
-		res.Ktype = KeyTypeBlob
-
 		var keyVal []byte
 		if base64Encoded {
-			keyVal, err = _readBase64Bytes(r, ' ')
+			keyVal, err = _readBase64BytesSized(r, ' ')
 		} else {
 			keyVal, err = _readBytes(r, ' ')
 		}
@@ -910,7 +885,7 @@ func (r *ASBReader) readKey() (*userKey, error) {
 			return nil, err
 		}
 
-		res.Value = keyVal
+		res = keyVal
 
 	default:
 		// should never happen because of the previous check for membership in asbKeyTypes
@@ -921,18 +896,16 @@ func (r *ASBReader) readKey() (*userKey, error) {
 		return nil, err
 	}
 
-	return &res, nil
+	return res, nil
 }
 
 func (r *ASBReader) readBinCount() (uint16, error) {
-	r.lineType = binCountLT
-
 	binCount, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
 	}
 
-	if binCount > maxBinCount {
+	if binCount > maxBinCount || binCount < 0 {
 		return 0, fmt.Errorf("invalid bin count %d", binCount)
 	}
 
@@ -945,8 +918,6 @@ func (r *ASBReader) readBinCount() (uint16, error) {
 }
 
 func (r *ASBReader) readExpiration() (uint32, error) {
-	r.lineType = expirationLT
-
 	exp, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -961,8 +932,6 @@ func (r *ASBReader) readExpiration() (uint32, error) {
 }
 
 func (r *ASBReader) readGeneration() (uint32, error) {
-	r.lineType = genLT
-
 	gen, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -980,8 +949,6 @@ func (r *ASBReader) readGeneration() (uint32, error) {
 }
 
 func (r *ASBReader) readSet() (string, error) {
-	r.lineType = setLT
-
 	set, err := _readUntil(r, '\n', true)
 	if err != nil {
 		return "", err
@@ -995,11 +962,7 @@ func (r *ASBReader) readSet() (string, error) {
 }
 
 func (r *ASBReader) readDigest() ([]byte, error) {
-	r.lineType = digestLT
-
-	// TODO make this a constant
-	digestSize := 20
-	digest, err := _readBlockDecode(r, digestSize)
+	digest, err := _readBase64BytesDelimted(r, '\n')
 	if err != nil {
 		return nil, err
 	}
@@ -1013,7 +976,16 @@ func (r *ASBReader) readDigest() ([]byte, error) {
 
 // ***** Helper Functions
 
-func _readBase64Bytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
+func _readBase64BytesDelimted(src io.ByteScanner, delim byte) ([]byte, error) {
+	encoded, err := _readUntil(src, delim, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return _decodeBase64(encoded)
+}
+
+func _readBase64BytesSized(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
 	size, err := _readSize(src, sizeDelim)
 	if err != nil {
 		return nil, err
@@ -1037,8 +1009,12 @@ func _readBlockDecode(src io.ByteReader, n int) ([]byte, error) {
 		return nil, err
 	}
 
-	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(bytes)))
-	bw, err := base64.StdEncoding.Decode(decoded, bytes)
+	return _decodeBase64(bytes)
+}
+
+func _decodeBase64(src []byte) ([]byte, error) {
+	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(src)))
+	bw, err := base64.StdEncoding.Decode(decoded, src)
 	if err != nil {
 		return nil, err
 	}
@@ -1200,7 +1176,11 @@ func _expectAnyChar(src io.ByteReader, chars []byte) error {
 	}
 
 	if !bytes.ContainsRune(chars, rune(b)) {
-		return fmt.Errorf("invalid character, read %c, expected one of %s", b, string(chars))
+		if len(chars) == 1 {
+			return fmt.Errorf("invalid character, read %c, expected %c", b, chars[0])
+		} else {
+			return fmt.Errorf("invalid character, read %c, expected one of %s", b, string(chars))
+		}
 	}
 
 	return nil
@@ -1217,4 +1197,15 @@ func _expectToken(src io.ByteReader, token string) error {
 	}
 
 	return nil
+}
+
+func _peek(src io.ByteScanner) (byte, error) {
+	b, err := src.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+
+	err = src.UnreadByte()
+
+	return b, err
 }

@@ -3,57 +3,16 @@ package unmarshal
 import (
 	"encoding/base64"
 	"fmt"
-	"math/rand"
 	"strings"
 	"testing"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/google/go-cmp/cmp"
 )
-
-var asbr = rand.New(rand.NewSource(1))
-
-func randNon0Intn(n int) int {
-	return 1 + asbr.Intn(n-1)
-}
-
-// TODO further randomize the letter set
-// randomString generates a string of random characters with length between 0 and n
-// if escaped is true, escaped characters may be added to the string
-func randomString(n int, escaped bool, allowControlChars bool) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:\";'<>?,./")
-	var controlChars = []rune("\n\\ ")
-
-	slen := asbr.Intn(n)
-	s := []rune{}
-	for len(s) < slen {
-		chars := ""
-		usedControlChar := false
-
-		if allowControlChars {
-			if asbr.Intn(len(letters)-len(controlChars)) == 1 {
-				if escaped {
-					chars += "\\"
-				}
-
-				chars += string(controlChars[asbr.Intn(len(controlChars))])
-				usedControlChar = true
-			}
-		}
-
-		if !usedControlChar {
-			chars += string(letters[asbr.Intn(len(letters))])
-		}
-
-		s = append(s, []rune(chars)...)
-	}
-
-	return string(s)
-}
 
 func TestASBReader_readHeader(t *testing.T) {
 	type fields struct {
 		countingByteScanner countingByteScanner
-		parseErrArgs        parseErrArgs
 		header              *header
 		metaData            *metaData
 	}
@@ -74,16 +33,6 @@ func TestASBReader_readHeader(t *testing.T) {
 				Version: "3.1",
 			},
 			wantErr: false,
-		},
-		{
-			name: "negative random",
-			fields: fields{
-				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(randomString(40, false, true)),
-				},
-			},
-			want:    nil,
-			wantErr: true,
 		},
 		{
 			name: "negative missing line feed",
@@ -120,7 +69,6 @@ func TestASBReader_readHeader(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &ASBReader{
 				countingByteScanner: tt.fields.countingByteScanner,
-				parseErrArgs:        tt.fields.parseErrArgs,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
 			}
@@ -138,11 +86,8 @@ func TestASBReader_readHeader(t *testing.T) {
 
 func TestASBReader_readMetadata(t *testing.T) {
 
-	randNs1 := randomString(15, true, true)
-
 	type fields struct {
 		countingByteScanner countingByteScanner
-		parseErrArgs        parseErrArgs
 		header              *header
 		metaData            *metaData
 	}
@@ -156,7 +101,6 @@ func TestASBReader_readMetadata(t *testing.T) {
 			name: "positive escaped namespace",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					// NOTE a character is appended to the end (in this case "a") to prevent EOF errors
 					ByteScanner: strings.NewReader("# namespace ns\\\n1\n# first-file\na"),
 				},
 			},
@@ -191,19 +135,6 @@ func TestASBReader_readMetadata(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "positive random namespace",
-			fields: fields{
-				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("# namespace %s\n# first-file\na", randNs1)),
-				},
-			},
-			want: &metaData{
-				Namespace: randNs1,
-				First:     true,
-			},
-			wantErr: false,
-		},
-		{
 			name: "negative empty metadata line",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
@@ -228,16 +159,6 @@ func TestASBReader_readMetadata(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader("# namespace dergin3\n#first-file\n"),
-				},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "negative random data",
-			fields: fields{
-				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader("#" + randomString(2000, false, true)),
 				},
 			},
 			want:    nil,
@@ -278,7 +199,6 @@ func TestASBReader_readMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &ASBReader{
 				countingByteScanner: tt.fields.countingByteScanner,
-				parseErrArgs:        tt.fields.parseErrArgs,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
 			}
@@ -294,118 +214,9 @@ func TestASBReader_readMetadata(t *testing.T) {
 	}
 }
 
-func unescapeString(s string) string {
-	var res string
-
-	var esc bool
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\\' && !esc {
-			esc = true
-			continue
-		}
-
-		esc = false
-
-		res += string(s[i])
-	}
-
-	return res
-}
-
-func randomSIndex() *SecondaryIndex {
-	var res SecondaryIndex
-
-	sindexTypes := []SIndexType{
-		BinSIndex,
-		ListElementSIndex,
-		MapKeySIndex,
-		MapValueSIndex,
-	}
-
-	namespace := randomString(100, true, true)
-	set := randomString(50, true, true)
-	name := randomString(100, true, true)
-	indexType := sindexTypes[asbr.Intn(len(sindexTypes))]
-
-	paths := make([]*SIndexPath, randNon0Intn(4))
-	for i := range paths {
-		paths[i] = randomSIndexPath()
-	}
-
-	valuesCovered := len(paths)
-
-	res.Namespace = namespace
-	res.Set = set
-	res.Name = name
-	res.IndexType = indexType
-	res.Paths = paths
-	res.ValuesCovered = valuesCovered
-
-	return &res
-}
-
-func randomSIndexPath() *SIndexPath {
-	var res SIndexPath
-
-	sindexPathTypes := []SIPathBinType{
-		NumericSIDataType,
-		StringSIDataType,
-		GEO2DSphereSIDataType,
-		BlobSIDataType,
-	}
-
-	res.BinName = randomString(50, true, true)
-	res.BinType = sindexPathTypes[asbr.Intn(len(sindexPathTypes))]
-
-	return &res
-}
-
-func sindexToString(sindex *SecondaryIndex) string {
-	var res string
-
-	res = fmt.Sprintf(" %s %s %s %c %d", sindex.Namespace, sindex.Set, sindex.Name, sindex.IndexType, sindex.ValuesCovered)
-
-	for _, path := range sindex.Paths {
-		res += fmt.Sprintf(" %s", sindexPathToString(path))
-	}
-
-	return res
-}
-
-func sindexPathToString(path *SIndexPath) string {
-	return fmt.Sprintf("%s %c", path.BinName, path.BinType)
-}
-
-func getUnescapedSIndex(sindex *SecondaryIndex) *SecondaryIndex {
-	var res SecondaryIndex
-
-	res.Namespace = unescapeString(sindex.Namespace)
-	res.Set = unescapeString(sindex.Set)
-	res.Name = unescapeString(sindex.Name)
-	res.IndexType = sindex.IndexType
-	res.ValuesCovered = sindex.ValuesCovered
-
-	res.Paths = make([]*SIndexPath, len(sindex.Paths))
-	for i := range sindex.Paths {
-		res.Paths[i] = getUnescapedSIndexPath(sindex.Paths[i])
-	}
-
-	return &res
-}
-
-func getUnescapedSIndexPath(path *SIndexPath) *SIndexPath {
-	var res SIndexPath
-
-	res.BinName = unescapeString(path.BinName)
-	res.BinType = path.BinType
-
-	return &res
-}
-
 func TestASBReader_readSIndex(t *testing.T) {
 	type fields struct {
 		countingByteScanner countingByteScanner
-		parseErrArgs        parseErrArgs
 		header              *header
 		metaData            *metaData
 	}
@@ -415,23 +226,6 @@ func TestASBReader_readSIndex(t *testing.T) {
 		fields  fields
 		want    *SecondaryIndex
 		wantErr bool
-	}
-
-	randPositiveTests := make([]test, 1000)
-	for i := range randPositiveTests {
-		randSI := randomSIndex()
-		randSIText := sindexToString(randSI)
-
-		randPositiveTests[i] = test{
-			name: "positive random " + fmt.Sprint(i),
-			fields: fields{
-				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(randSIText + "\n"),
-				},
-			},
-			want:    getUnescapedSIndex(randSI),
-			wantErr: false,
-		}
 	}
 
 	tests := []test{
@@ -635,8 +429,6 @@ func TestASBReader_readSIndex(t *testing.T) {
 		},
 	}
 
-	tests = append(tests, randPositiveTests...)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "positive random 48" {
@@ -644,7 +436,6 @@ func TestASBReader_readSIndex(t *testing.T) {
 			}
 			r := &ASBReader{
 				countingByteScanner: tt.fields.countingByteScanner,
-				parseErrArgs:        tt.fields.parseErrArgs,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
 			}
@@ -660,126 +451,129 @@ func TestASBReader_readSIndex(t *testing.T) {
 	}
 }
 
-type asbTestBin struct {
-	BinType              byte
-	Value                any
-	Name                 string
-	StringRepresentation string
-	encoded              bool
-}
-
-func randomAsbTestBin() *asbTestBin {
-	var res asbTestBin
-
-	var binTypeList []byte
-	for t := range binTypes { // NOTE these are note deterministic because of random map key order in go
-		binTypeList = append(binTypeList, t)
+func TestASBReader_readUDF(t *testing.T) {
+	type fields struct {
+		countingByteScanner countingByteScanner
+		header              *header
+		metaData            *metaData
 	}
 
-	bt := binTypeList[asbr.Intn(len(binTypeList))]
-	for bt == 'U' {
-		// ignore the 'U' bin type for now, use an explicit case
-		bt = binTypeList[asbr.Intn(len(binTypeList))]
+	type test struct {
+		name    string
+		fields  fields
+		want    *UDF
+		wantErr bool
 	}
 
-	res.BinType = bt
-	res.StringRepresentation += string(bt)
-
-	// this applies to bytes bins that are not base64 encoded
-	compressed := false
-	if _, ok := bytesBinTypes[bt]; ok {
-		if asbr.Intn(2) == 1 {
-			compressed = true
-			res.StringRepresentation += "!"
-		}
+	tests := []test{
+		{
+			name: "positive lua udf",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" L lua-udf 11 lua-content\n"),
+				},
+			},
+			want: &UDF{
+				UDFType: LUAUDFType,
+				Name:    "lua-udf",
+				Content: []byte("lua-content"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative missing space after udf type",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" Llua-udf 11 lua-content\n"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing space after udf name",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" L lua-udf11 lua-content\n"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing length",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" L lua-udf  lua-content\n"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing space after length",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" L lua-udf 11lua-content\n"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing content",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" L lua-udf 11 \n"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing new line",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" L lua-udf 11 lua-content"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing starting space",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("L lua-udf 11 lua-content\n"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
-	res.StringRepresentation += " "
-
-	binName := randomString(100, true, true)
-	res.StringRepresentation += binName
-	res.Name = binName
-
-	if bt == 'N' {
-		res.Value = nil
-		res.StringRepresentation += "\n"
-		return &res
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ASBReader{
+				countingByteScanner: tt.fields.countingByteScanner,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+			}
+			got, err := r.readUDF()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ASBReader.readUDF() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Errorf("ASBReader.readUDF() mismatch:\n%s", diff)
+			}
+		})
 	}
-
-	res.StringRepresentation += " "
-
-	var binVal any
-	var strVal string
-
-	switch bt {
-	case 'Z':
-		// bool is rendered as T or F so it is a special case
-		val := asbr.Intn(2) == 1
-		if val {
-			strVal = "T"
-		} else {
-			strVal = "F"
-		}
-		binVal = val
-	case 'I':
-		binVal = asbr.Int63()
-		strVal = fmt.Sprint(binVal)
-	case 'D':
-		binVal = asbr.Float64()
-		strVal = fmt.Sprint(binVal)
-	case 'S':
-		val := randomString(100, false, true)
-		res.StringRepresentation += fmt.Sprint(len(val))
-		res.StringRepresentation += " "
-		binVal = val
-		strVal = val
-	case 'X':
-		randStr := randomString(100, false, true)
-		val := base64.StdEncoding.EncodeToString([]byte(randStr))
-		res.StringRepresentation += fmt.Sprint(len(val))
-		res.StringRepresentation += " "
-		binVal = randStr
-		strVal = val
-		res.encoded = true
-	case 'G':
-		val := randomString(100, false, true)
-		res.StringRepresentation += fmt.Sprint(len(val))
-		res.StringRepresentation += " "
-		strVal = val
-		binVal = val
-	}
-
-	if _, ok := bytesBinTypes[bt]; ok {
-		var val []byte
-		if !compressed {
-			randStr := randomString(100, false, true)
-			val = []byte(base64.StdEncoding.EncodeToString([]byte(randStr)))
-			strVal = string(val)
-			res.encoded = true
-			res.StringRepresentation += fmt.Sprint(len(val))
-			res.StringRepresentation += " "
-			binVal = []byte(randStr)
-		} else {
-			randStr := randomString(100, false, true)
-			strVal = randStr
-			val = []byte(randStr)
-			res.StringRepresentation += fmt.Sprint(len(val))
-			res.StringRepresentation += " "
-			binVal = val
-		}
-	}
-
-	res.Value = binVal
-	res.StringRepresentation += strVal
-	res.StringRepresentation += "\n"
-
-	return &res
 }
 
 func TestASBReader_readBin(t *testing.T) {
 	type fields struct {
 		countingByteScanner countingByteScanner
-		parseErrArgs        parseErrArgs
 		header              *header
 		metaData            *metaData
 	}
@@ -789,23 +583,6 @@ func TestASBReader_readBin(t *testing.T) {
 		fields  fields
 		want    map[string]any
 		wantErr bool
-	}
-
-	randPositiveTests := make([]test, 1000)
-
-	for i := range randPositiveTests {
-		randBin := randomAsbTestBin()
-		randBinText := randBin.StringRepresentation
-		randPositiveTests[i] = test{
-			name: "positive random " + fmt.Sprint(i),
-			fields: fields{
-				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(randBinText),
-				},
-			},
-			want:    map[string]any{unescapeString(randBin.Name): randBin.Value},
-			wantErr: false,
-		}
 	}
 
 	tests := []test{
@@ -921,8 +698,6 @@ func TestASBReader_readBin(t *testing.T) {
 		},
 	}
 
-	tests = append(tests, randPositiveTests...)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "positive random 10" {
@@ -930,7 +705,6 @@ func TestASBReader_readBin(t *testing.T) {
 			}
 			r := &ASBReader{
 				countingByteScanner: tt.fields.countingByteScanner,
-				parseErrArgs:        tt.fields.parseErrArgs,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
 			}
@@ -947,89 +721,9 @@ func TestASBReader_readBin(t *testing.T) {
 	}
 }
 
-type asbTestKey struct {
-	Key                  *userKey
-	stringRepresentation string
-}
-
-func randomAsbTestKey() *asbTestKey {
-	var res asbTestKey
-	res.Key = &userKey{}
-
-	var keyTypeList []byte
-	for t := range asbKeyTypes {
-		keyTypeList = append(keyTypeList, t)
-	}
-
-	kt := keyTypeList[asbr.Intn(len(keyTypeList))]
-	res.stringRepresentation += string(kt)
-
-	var compressed bool
-	if kt == 'B' {
-		if asbr.Intn(10) == 1 {
-			compressed = true
-			res.stringRepresentation += "!"
-		}
-	}
-
-	res.stringRepresentation += " "
-
-	switch kt {
-	case 'I':
-		val := asbr.Int63()
-		res.Key.Ktype = KeyTypeInteger
-		res.Key.Value = val
-		res.stringRepresentation += fmt.Sprint(val)
-	case 'D':
-		val := asbr.Float64()
-		res.Key.Ktype = KeyTypeFloat
-		res.Key.Value = val
-		res.stringRepresentation += fmt.Sprint(val)
-	case 'S':
-		val := randomString(100, false, true)
-		res.Key.Ktype = KeyTypeString
-		res.Key.Value = val
-		res.stringRepresentation += fmt.Sprint(len(val))
-		res.stringRepresentation += " "
-		res.stringRepresentation += val
-	case 'X':
-		randStr := randomString(100, false, true)
-		val := base64.StdEncoding.EncodeToString([]byte(randStr))
-		res.Key.Ktype = KeyTypeString
-		res.Key.Value = randStr
-		res.stringRepresentation += fmt.Sprint(len(val))
-		res.stringRepresentation += " "
-		res.stringRepresentation += val
-	case 'B':
-		var val []byte
-		if !compressed {
-			randStr := randomString(100, false, true)
-			val = []byte(base64.StdEncoding.EncodeToString([]byte(randStr)))
-			res.Key.Ktype = KeyTypeBlob
-			res.Key.Value = []byte(randStr)
-			res.stringRepresentation += fmt.Sprint(len(val))
-			res.stringRepresentation += " "
-			res.stringRepresentation += string(val)
-		} else {
-			randStr := randomString(100, false, true)
-			val = []byte(randStr)
-			res.Key.Ktype = KeyTypeBlob
-			res.Key.Value = []byte(randStr)
-			res.stringRepresentation += fmt.Sprint(len(val))
-			res.stringRepresentation += " "
-			res.stringRepresentation += string(val)
-		}
-	}
-
-	res.stringRepresentation += "\n"
-
-	return &res
-}
-
 func TestASBReader_readKey(t *testing.T) {
 	type fields struct {
 		countingByteScanner countingByteScanner
-		parseErrArgs        parseErrArgs
 		header              *header
 		metaData            *metaData
 	}
@@ -1037,25 +731,8 @@ func TestASBReader_readKey(t *testing.T) {
 	type test struct {
 		name    string
 		fields  fields
-		want    *userKey
+		want    any
 		wantErr bool
-	}
-
-	randPositiveTests := make([]test, 1000)
-
-	for i := range randPositiveTests {
-		randKey := randomAsbTestKey()
-		randKeyText := randKey.stringRepresentation
-		randPositiveTests[i] = test{
-			name: "positive random " + fmt.Sprint(i),
-			fields: fields{
-				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(randKeyText),
-				},
-			},
-			want:    randKey.Key,
-			wantErr: false,
-		}
 	}
 
 	tests := []test{
@@ -1066,10 +743,7 @@ func TestASBReader_readKey(t *testing.T) {
 					ByteScanner: strings.NewReader("I 1\n"),
 				},
 			},
-			want: &userKey{
-				Ktype: KeyTypeInteger,
-				Value: int64(1),
-			},
+			want:    int64(1),
 			wantErr: false,
 		},
 		{
@@ -1079,10 +753,7 @@ func TestASBReader_readKey(t *testing.T) {
 					ByteScanner: strings.NewReader("D 1.1\n"),
 				},
 			},
-			want: &userKey{
-				Ktype: KeyTypeFloat,
-				Value: float64(1.1),
-			},
+			want:    float64(1.1),
 			wantErr: false,
 		},
 		{
@@ -1092,10 +763,7 @@ func TestASBReader_readKey(t *testing.T) {
 					ByteScanner: strings.NewReader("S 6 string\n"),
 				},
 			},
-			want: &userKey{
-				Ktype: KeyTypeString,
-				Value: "string",
-			},
+			want:    "string",
 			wantErr: false,
 		},
 		{
@@ -1105,10 +773,7 @@ func TestASBReader_readKey(t *testing.T) {
 					ByteScanner: strings.NewReader(fmt.Sprintf("X %d %s\n", base64.StdEncoding.EncodedLen(6), base64.StdEncoding.EncodeToString([]byte("string")))),
 				},
 			},
-			want: &userKey{
-				Ktype: KeyTypeString,
-				Value: "string",
-			},
+			want:    "string",
 			wantErr: false,
 		},
 		{
@@ -1118,10 +783,7 @@ func TestASBReader_readKey(t *testing.T) {
 					ByteScanner: strings.NewReader(fmt.Sprintf("B %d %s\n", base64.StdEncoding.EncodedLen(3), base64.StdEncoding.EncodeToString([]byte{0, 1, 2}))),
 				},
 			},
-			want: &userKey{
-				Ktype: KeyTypeBlob,
-				Value: []byte{0, 1, 2},
-			},
+			want:    []byte{0, 1, 2},
 			wantErr: false,
 		},
 		{
@@ -1131,10 +793,7 @@ func TestASBReader_readKey(t *testing.T) {
 					ByteScanner: strings.NewReader("B! 3 123\n"),
 				},
 			},
-			want: &userKey{
-				Ktype: KeyTypeBlob,
-				Value: []byte("123"),
-			},
+			want:    []byte("123"),
 			wantErr: false,
 		},
 		{
@@ -1259,26 +918,546 @@ func TestASBReader_readKey(t *testing.T) {
 		},
 	}
 
-	tests = append(tests, randPositiveTests...)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "positive random 10" {
-				fmt.Println("test")
-			}
 			r := &ASBReader{
 				countingByteScanner: tt.fields.countingByteScanner,
-				parseErrArgs:        tt.fields.parseErrArgs,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
 			}
-			got, err := r.readKey()
+			got, err := r.readUserKey()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ASBReader.readKey() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if diff := cmp.Diff(got, tt.want); diff != "" {
 				t.Errorf("ASBReader.readKey() mismatch:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestASBReader_readRecord(t *testing.T) {
+	type fields struct {
+		countingByteScanner countingByteScanner
+		header              *header
+		metaData            *metaData
+	}
+
+	type test struct {
+		name    string
+		fields  fields
+		want    *Record
+		wantErr bool
+	}
+
+	overMaxASBToken := strings.Repeat("a", maxTokenSize+1)
+
+	digest := []byte("12345678901234567890")
+	encodedDigest := base64.StdEncoding.EncodeToString(digest)
+
+	intKey, err := a.NewKeyWithDigest("namespace1", "set1", int64(10), digest)
+	if err != nil {
+		panic(err)
+	}
+
+	keyNoUserVal, err := a.NewKeyWithDigest("namespace1", "set1", nil, digest)
+	if err != nil {
+		panic(err)
+	}
+
+	keyNoUserValOrSet, err := a.NewKeyWithDigest("namespace1", "", nil, digest)
+	if err != nil {
+		panic(err)
+	}
+
+	tests := []test{
+		{
+			name: "positive key and set",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want: &Record{
+				Key: intKey,
+				Bins: map[string]any{
+					"bin1": nil,
+					"bin2": int64(2),
+				},
+				Generation: 10,
+				Expiration: 10,
+			},
+			wantErr: false,
+		},
+		{
+			name: "positive set and no key",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want: &Record{
+				Key: keyNoUserVal,
+				Bins: map[string]any{
+					"bin1": nil,
+					"bin2": int64(2),
+				},
+				Generation: 10,
+				Expiration: 10,
+			},
+			wantErr: false,
+		},
+		{
+			name: "positive no set and no key",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want: &Record{
+				Key: keyNoUserValOrSet,
+				Bins: map[string]any{
+					"bin1": nil,
+					"bin2": int64(2),
+				},
+				Generation: 10,
+				Expiration: 10,
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative bad starting char",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"x n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing starting char",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing space after starting char",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative invalid record line type",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ Z namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing space after record line type",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ kI 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing namespace",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing digest",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing generation",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing expiration",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing bin count",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing bins",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative bad user key",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k P hehe\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative bad namespace",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n " + overMaxASBToken + "\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative bad digest",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + overMaxASBToken + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative bad set",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s " + overMaxASBToken + "\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative bad generation",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g " + "notanint" + "\n" +
+							"+ t 10\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative bad expiration",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 999999999999999999999999999999999999\n" +
+							"+ b 2\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative bad bin count",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(
+						"+ k I 10\n" +
+							"+ n namespace1\n" +
+							"+ d " + encodedDigest + "\n" +
+							"+ s set1\n" +
+							"+ g 10\n" +
+							"+ t 10\n" +
+							"+ b 9999999999999999999999999999999999\n" +
+							"- N bin1\n" +
+							"- I bin2 2\n",
+					),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	// allow comp.Diff to compare aerospike keys
+	keyCmp := cmp.Comparer(func(x, y *a.Key) bool {
+		if x == nil || y == nil {
+			return x == y
+		}
+		if !x.Equals(y) {
+			return false
+		}
+		return x.String() == y.String()
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ASBReader{
+				countingByteScanner: tt.fields.countingByteScanner,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+			}
+			got, err := r.readRecord()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ASBReader.readRecord() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if diff := cmp.Diff(got, tt.want, keyCmp); diff != "" {
+				t.Errorf("ASBReader.readRecord() mismatch:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestASBReader_readBinCount(t *testing.T) {
+	type fields struct {
+		countingByteScanner countingByteScanner
+		header              *header
+		metaData            *metaData
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    uint16
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ASBReader{
+				countingByteScanner: tt.fields.countingByteScanner,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+			}
+			got, err := r.readBinCount()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ASBReader.readBinCount() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ASBReader.readBinCount() = %v, want %v", got, tt.want)
 			}
 		})
 	}

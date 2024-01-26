@@ -3,6 +3,8 @@ package unmarshal
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -1442,7 +1444,56 @@ func TestASBReader_readBinCount(t *testing.T) {
 		want    uint16
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "positive bin count",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("2\n"),
+				},
+			},
+			want:    2,
+			wantErr: false,
+		},
+		{
+			name: "negative bad bin count",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("notanint\n"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative missing line feed after bin count",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("2"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative bin count less than 0",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("-1\n"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative bin count greater than max",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("%d\n", maxBinCount+1)),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1458,6 +1509,334 @@ func TestASBReader_readBinCount(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("ASBReader.readBinCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestASBReader_readExpiration(t *testing.T) {
+	type fields struct {
+		countingByteScanner countingByteScanner
+		header              *header
+		metaData            *metaData
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    uint32
+		wantErr bool
+	}{
+		{
+			name: "positive expiration",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("10\n"),
+				},
+			},
+			want:    10,
+			wantErr: false,
+		},
+		{
+			name: "negative bad expiration",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("notanint\n"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative missing line feed after expiration",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("10"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ASBReader{
+				countingByteScanner: tt.fields.countingByteScanner,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+			}
+			got, err := r.readExpiration()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ASBReader.readExpiration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ASBReader.readExpiration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestASBReader_readGeneration(t *testing.T) {
+	type fields struct {
+		countingByteScanner countingByteScanner
+		header              *header
+		metaData            *metaData
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    uint32
+		wantErr bool
+	}{
+		{
+			name: "positive generation",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("10\n"),
+				},
+			},
+			want:    10,
+			wantErr: false,
+		},
+		{
+			name: "negative bad generation",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("notanint\n"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative missing line feed after generation",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("10"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative generation less than 0",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("-1\n"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative generation greater than max",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("%d\n", maxGeneration+1)),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ASBReader{
+				countingByteScanner: tt.fields.countingByteScanner,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+			}
+			got, err := r.readGeneration()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ASBReader.readGeneration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ASBReader.readGeneration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestASBReader_readSet(t *testing.T) {
+	type fields struct {
+		countingByteScanner countingByteScanner
+		header              *header
+		metaData            *metaData
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "positive set",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("set1\n"),
+				},
+			},
+			want:    "set1",
+			wantErr: false,
+		},
+		{
+			name: "negative missing line feed after set",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("set1"),
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "negative set too long",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(strings.Repeat("a", maxTokenSize+1) + "\n"),
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ASBReader{
+				countingByteScanner: tt.fields.countingByteScanner,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+			}
+			got, err := r.readSet()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ASBReader.readSet() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ASBReader.readSet() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestASBReader_readDigest(t *testing.T) {
+
+	digest := []byte("12345678901234567890")
+	encodedDigest := base64.StdEncoding.EncodeToString(digest)
+
+	type fields struct {
+		countingByteScanner countingByteScanner
+		header              *header
+		metaData            *metaData
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "positive digest",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(encodedDigest + "\n"),
+				},
+			},
+			want:    digest,
+			wantErr: false,
+		},
+		{
+			name: "negative bad digest",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("notabase64string!\n"),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing line feed after digest",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(encodedDigest),
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ASBReader{
+				countingByteScanner: tt.fields.countingByteScanner,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+			}
+			got, err := r.readDigest()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ASBReader.readDigest() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ASBReader.readDigest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_readBase64BytesDelimited(t *testing.T) {
+	str := "string"
+	encodedStr := base64.StdEncoding.EncodeToString([]byte(str))
+
+	type args struct {
+		src   io.ByteScanner
+		delim byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "positive base64 string",
+			args: args{
+				src:   strings.NewReader(encodedStr + "\n"),
+				delim: '\n',
+			},
+			want:    []byte(str),
+			wantErr: false,
+		},
+		{
+			name: "negative bad base64 string",
+			args: args{
+				src:   strings.NewReader("notabase64string!\n"),
+				delim: '\n',
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "negative missing delimiter after base64 string",
+			args: args{
+				src:   strings.NewReader(encodedStr),
+				delim: '\n',
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := _readBase64BytesDelimited(tt.args.src, tt.args.delim)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("_readBase64BytesDelimited() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("_readBase64BytesDelimited() = %v, want %v", got, tt.want)
 			}
 		})
 	}

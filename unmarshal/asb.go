@@ -64,7 +64,6 @@ const (
 	maxTokenSize       = 1000
 	maxGeneration      = math.MaxUint16
 	maxBinCount        = math.MaxUint16
-	maxExpiration      = math.MaxUint32
 )
 
 // asb boolean encoding
@@ -917,6 +916,9 @@ func (r *ASBReader) readBinCount() (uint16, error) {
 
 }
 
+// readExpiration reads an expiration line from the asb file
+// it expects that r has been advanced past the expiration line marker '+ t '
+// NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 func (r *ASBReader) readExpiration() (uint32, error) {
 	exp, err := _readInteger(r, '\n')
 	if err != nil {
@@ -962,7 +964,7 @@ func (r *ASBReader) readSet() (string, error) {
 }
 
 func (r *ASBReader) readDigest() ([]byte, error) {
-	digest, err := _readBase64BytesDelimted(r, '\n')
+	digest, err := _readBase64BytesDelimited(r, '\n')
 	if err != nil {
 		return nil, err
 	}
@@ -976,7 +978,7 @@ func (r *ASBReader) readDigest() ([]byte, error) {
 
 // ***** Helper Functions
 
-func _readBase64BytesDelimted(src io.ByteScanner, delim byte) ([]byte, error) {
+func _readBase64BytesDelimited(src io.ByteScanner, delim byte) ([]byte, error) {
 	encoded, err := _readUntil(src, delim, false)
 	if err != nil {
 		return nil, err

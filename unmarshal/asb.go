@@ -13,8 +13,6 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-type section int
-
 // section names
 const (
 	undefinedS = ""
@@ -83,15 +81,33 @@ const (
 // and would allow the reader to be used in a more generic way making tests easier
 
 func newReaderError(offset uint64, err error) error {
-	return fmt.Errorf("error while reading asb file at character %d error: %w", offset, err)
+	if err == io.EOF {
+		return err
+	} else if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("error while reading asb file at character %d: %w", offset, err)
 }
 
 func newSectionError(section string, err error) error {
-	return fmt.Errorf("error while reading section: %s, error: %w", section, err)
+	if err == io.EOF {
+		return err
+	} else if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("error while reading section: %s: %w", section, err)
 }
 
 func newLineError(lineType string, err error) error {
-	return fmt.Errorf("error while reading line type: %s, error: %w", lineType, err)
+	if err == io.EOF {
+		return err
+	} else if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("error while reading line type: %s: %w", lineType, err)
 }
 
 type countingByteScanner struct {
@@ -145,6 +161,7 @@ func NewASBReader(src io.Reader) (*ASBReader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while reading header: %w", err)
 	}
+
 	asb.header = header
 	// TODO make sure file version is 3.1
 
@@ -152,15 +169,14 @@ func NewASBReader(src io.Reader) (*ASBReader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while reading metadata: %w", err)
 	}
+
 	asb.metaData = meta
 
 	return &asb, nil
 
 }
 
-// TODO wrap errors returned from this with a character count
 func (r *ASBReader) NextToken() (any, error) {
-
 	v, err := func() (any, error) {
 		b, err := _peek(r)
 		if err != nil {
@@ -250,7 +266,6 @@ func (r *ASBReader) readMetadata() (*metaData, error) {
 
 		switch string(metaToken) {
 		case namespaceToken:
-
 			if err := _expectChar(r, ' '); err != nil {
 				return nil, err
 			}
@@ -676,6 +691,13 @@ var bytesBinTypes = map[byte]struct{}{
 	'L': {},
 }
 
+// these are types that are stored as msgPack encoded bytes
+var bytesToType = map[byte]struct{}{
+	'Y': {},
+	'M': {},
+	'L': {},
+}
+
 // TODO make this use bytesBinTypes
 var binTypes = map[byte]struct{}{
 	// basic types
@@ -692,6 +714,7 @@ var binTypes = map[byte]struct{}{
 	'R': {}, // ruby bytes
 	'H': {}, // php bytes
 	'E': {}, // erlang bytes
+	// bytes but parsed as another type TODO can these be compressed?
 	'Y': {}, // HLL bytes
 	'M': {}, // map bytes
 	'L': {}, // list bytes
@@ -757,13 +780,13 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 
 	switch binType {
 	case 'Z':
-		binVal, binErr = _readBool(r, '\n')
+		binVal, binErr = _readBool(r)
 	case 'I':
 		binVal, binErr = _readInteger(r, '\n')
 	case 'D':
 		binVal, binErr = _readFloat(r, '\n')
 	case 'S':
-		binVal, binErr = _readString(r, ' ')
+		binVal, binErr = _readStringSized(r, ' ')
 	case 'U':
 		return errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
 	case 'X':
@@ -774,14 +797,41 @@ func (r *ASBReader) readBin(bins a.BinMap) error {
 
 		binVal = string(val)
 	case 'G':
-		binVal, binErr = _readString(r, ' ')
+		binVal, binErr = _readGeoJSON(r, ' ')
 	}
 
 	if _, ok := bytesBinTypes[binType]; ok {
+		var val []byte
+
 		if base64Encoded {
-			binVal, binErr = _readBase64BytesSized(r, ' ')
+			val, binErr = _readBase64BytesSized(r, ' ')
 		} else {
-			binVal, binErr = _readBytes(r, ' ')
+			val, binErr = _readBytesSized(r, ' ')
+		}
+
+		// bytes special cases
+		if _, ok := bytesToType[binType]; ok {
+			switch binType {
+			case 'Y':
+				// HLLs are treated as bytes by the client so no decode is needed
+				binVal = a.NewHLLValue(val)
+			case 'M':
+				// maps need to be decoded so that the go client will write them as maps and not blobs
+				return errors.New("map bins are not supported yet")
+				// var m map[any]any
+				// binErr = msgpack.Unmarshal(val, &m)
+				// binVal = m
+			case 'L':
+				// lists are decoded for the same reason as maps
+				return errors.New("list bins are not supported yet")
+				// var l []any
+				// binErr = msgpack.Unmarshal(val, &l)
+				// binVal = l
+			default:
+				return fmt.Errorf("invalid bytes to type bin type %d", binType)
+			}
+		} else {
+			binVal = val
 		}
 	}
 
@@ -857,7 +907,7 @@ func (r *ASBReader) readUserKey() (any, error) {
 		res = keyVal
 
 	case 'S':
-		keyVal, err := _readString(r, ' ')
+		keyVal, err := _readStringSized(r, ' ')
 		if err != nil {
 			return nil, err
 		}
@@ -877,7 +927,7 @@ func (r *ASBReader) readUserKey() (any, error) {
 		if base64Encoded {
 			keyVal, err = _readBase64BytesSized(r, ' ')
 		} else {
-			keyVal, err = _readBytes(r, ' ')
+			keyVal, err = _readBytesSized(r, ' ')
 		}
 
 		if err != nil {
@@ -997,15 +1047,10 @@ func _readBase64BytesSized(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
 		return nil, err
 	}
 
-	val, err := _readBlockDecode(src, int(size))
-	if err != nil {
-		return nil, err
-	}
-
-	return val, nil
+	return _readBlockDecodeBase64(src, int(size))
 }
 
-func _readBlockDecode(src io.ByteReader, n int) ([]byte, error) {
+func _readBlockDecodeBase64(src io.ByteReader, n int) ([]byte, error) {
 	bytes, err := _readNBytes(src, n)
 	if err != nil {
 		return nil, err
@@ -1024,16 +1069,16 @@ func _decodeBase64(src []byte) ([]byte, error) {
 	return decoded[:bw], nil
 }
 
-func _readString(src io.ByteScanner, sizeDelim byte) (string, error) {
-	val, err := _readBytes(src, sizeDelim)
+func _readStringSized(src io.ByteScanner, sizeDelim byte) (string, error) {
+	val, err := _readBytesSized(src, sizeDelim)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return string(val), err
 }
 
-func _readBytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
+func _readBytesSized(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
 	length, err := _readSize(src, sizeDelim)
 	if err != nil {
 		return nil, err
@@ -1043,21 +1088,15 @@ func _readBytes(src io.ByteScanner, sizeDelim byte) ([]byte, error) {
 		return nil, err
 	}
 
-	val, err := _readNBytes(src, int(length))
-	if err != nil {
-		return nil, err
-	}
-
-	return val, nil
+	return _readNBytes(src, int(length))
 }
 
-func _readBool(src io.ByteScanner, delim byte) (bool, error) {
-	bytes, err := _readUntil(src, delim, false)
+func _readBool(src io.ByteScanner) (bool, error) {
+	b, err := src.ReadByte()
 	if err != nil {
 		return false, err
 	}
 
-	b := bytes[0]
 	switch b {
 	case boolTrueByte:
 		return true, nil
@@ -1074,12 +1113,7 @@ func _readFloat(src io.ByteScanner, delim byte) (float64, error) {
 		return 0, err
 	}
 
-	num, err := strconv.ParseFloat(string(bytes), 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return num, nil
+	return strconv.ParseFloat(string(bytes), 64)
 }
 
 func _readInteger(src io.ByteScanner, delim byte) (int64, error) {
@@ -1088,12 +1122,25 @@ func _readInteger(src io.ByteScanner, delim byte) (int64, error) {
 		return 0, err
 	}
 
-	num, err := strconv.ParseInt(string(bytes), 10, 64)
+	return strconv.ParseInt(string(bytes), 10, 64)
+}
+
+func _readGeoJSON(src io.ByteScanner, sizeDelim byte) (a.GeoJSONValue, error) {
+	val, err := _readStringSized(src, sizeDelim)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
-	return num, nil
+	return a.NewGeoJSONValue(val), nil
+}
+
+func _readHLL(src io.ByteScanner, sizeDelim byte) (a.HLLValue, error) {
+	bytes, err := _readBytesSized(src, sizeDelim)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.NewHLLValue(bytes), nil
 }
 
 // _readSize reads a size or length token from the asb format
@@ -1105,11 +1152,8 @@ func _readSize(src io.ByteScanner, delim byte) (uint32, error) {
 	}
 
 	num, err := strconv.ParseUint(string(bytes), 10, 32)
-	if err != nil {
-		return 0, err
-	}
 
-	return uint32(num), nil
+	return uint32(num), err
 }
 
 func _readUntil(src io.ByteScanner, delim byte, escaped bool) ([]byte, error) {
@@ -1143,19 +1187,14 @@ func _readUntilAny(src io.ByteScanner, delims []byte, escaped bool) ([]byte, err
 		esc = false
 
 		bts = append(bts, b)
-
-		if i == maxTokenSize-1 {
-			return nil, fmt.Errorf("token larger than max size")
-		}
 	}
 
-	return bts, nil
+	return nil, errors.New("token larger than max size")
 }
 
 func _readNBytes(src io.ByteReader, n int) ([]byte, error) {
 	bytes := make([]byte, n)
-	var i int
-	for i = 0; i < n; i++ {
+	for i := 0; i < n; i++ {
 		b, err := src.ReadByte()
 		if err != nil {
 			return nil, err

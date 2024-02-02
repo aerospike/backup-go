@@ -1,11 +1,13 @@
 package backuplib
 
 import (
+	datahandlers "backuplib/data_handlers"
 	"backuplib/handlers"
 	"backuplib/output"
 	"backuplib/workers"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -199,10 +201,48 @@ func (o *Client) RestoreDirectory(args *RestoreDirectoryArgs) (*handlers.Restore
 	return nil, errors.New("UNIMPLEMENTED")
 }
 
-type RestoreFileArgs struct {
-	// TODO
+type Decoder interface {
+	NextToken() (any, error)
 }
 
-func (o *Client) RestoreFile(args *RestoreDirectoryArgs) (*handlers.RestoreHandler, error) {
-	return nil, errors.New("UNIMPLEMENTED")
+type NewDecoder func(src io.Reader) Decoder
+
+type RestoreFileArgs struct {
+	NewDecoder NewDecoder // TODO the decoders need to take an opener closer
+	FilePath   string
+	Parallel   int
+}
+
+func (o *Client) RestoreFile(args *RestoreFileArgs) (*handlers.RestoreHandler, error) {
+	file, err := os.Open(args.FilePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var src io.Reader = file
+	// the readers will be reading from the same file
+	// if there are multiple workers so we need to lock the file
+	if args.Parallel > 1 {
+		src = NewLockedReader(file)
+	}
+
+	decoder := args.NewDecoder(src)
+
+	pf := datahandlers.NewDataPipelineFactory(
+		datahandlers.NewGenericReaderFactory(decoder),
+		datahandlers.NewNOOPProcessorFactory(),
+		datahandlers.NewRestoreWriterFactory(o.aerospikeClient),
+	)
+
+	jobs := make([]*datahandlers.DataPipeline, args.Parallel)
+	for i := 0; i < args.Parallel; i++ {
+		jobs[i] = pf.CreatePipeline()
+	}
+
+	restoreArgs := handlers.RestoreArgs{
+		Parallel: args.Parallel,
+	}
+
+	return handlers.NewRestoreHandler(jobs, restoreArgs)
 }

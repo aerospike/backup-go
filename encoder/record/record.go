@@ -1,8 +1,8 @@
 package record
 
 import (
-	"backuplib/marshal/binmap"
-	"backuplib/marshal/key"
+	"backuplib/encoder/binmap"
+	"backuplib/encoder/key"
 	"fmt"
 	"log"
 	"time"

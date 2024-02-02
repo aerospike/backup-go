@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"backuplib/marshal/record"
+	"backuplib/encoder/record"
 	"fmt"
 	"strconv"
 

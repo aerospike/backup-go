@@ -1,7 +1,7 @@
 package workers
 
 import (
-	parser "backuplib/marshal"
+	parser "backuplib/encoder"
 	"errors"
 	"io"
 	"log"

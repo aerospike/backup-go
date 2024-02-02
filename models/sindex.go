@@ -1,4 +1,4 @@
-package unmarshal
+package models
 
 // TODO make this a unique type
 type SIPathBinType = byte

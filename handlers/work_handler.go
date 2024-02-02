@@ -7,37 +7,39 @@ import (
 	"sync"
 )
 
-type Worker interface {
+type Job interface {
 	Run() error
-	Resume() error
 }
 
-type workHandler struct {
-	workers  []Worker
+type jobHandler struct {
+	parallel int
+	jobs     []Job
 	errors   chan error
 	wg       *sync.WaitGroup
 	workLock *sync.Mutex
 }
 
-func NewWorkHandler(workers []Worker) *workHandler {
-	return &workHandler{
-		workers:  workers,
-		errors:   make(chan error, len(workers)),
+func NewWorkHandler(jobs []Job, parallel int) *jobHandler {
+	return &jobHandler{
+		parallel: parallel,
+		jobs:     jobs,
+		errors:   make(chan error),
 		wg:       &sync.WaitGroup{},
 		workLock: &sync.Mutex{},
 	}
 }
 
-func (o *workHandler) lock() {
+func (o *jobHandler) lock() {
 	o.workLock.Lock()
 }
 
-func (o *workHandler) unlock() {
+func (o *jobHandler) unlock() {
 	o.workLock.Unlock()
 }
 
-func (o *workHandler) Run() error {
+func (o *jobHandler) Run() error {
 	o.lock()
+	defer o.unlock()
 	// TODO i should start at 1 if oneshot is done before this
 	// TODO maybe these should use a context that cancels all jobs if one fails
 	// TODO make sure the single shot work gets done first
@@ -45,32 +47,44 @@ func (o *workHandler) Run() error {
 	// all backup jobs finish
 	// one or more error
 	go func() {
-		defer o.unlock()
 		// TODO allow passing in a context
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		for _, worker := range o.workers {
+		// fill the job queue
+		jobQueue := make(chan Job, len(o.jobs))
+		for _, j := range o.jobs {
+			select {
+			case <-ctx.Done():
+				break
+			case jobQueue <- j:
+			}
+		}
+		close(jobQueue)
+
+		for i := 0; i < o.parallel; i++ {
 			o.wg.Add(1)
-			go func(w Worker, ctx context.Context) {
+			go func(jobs <-chan Job, ctx context.Context) {
 				defer o.wg.Done()
+
+				j := <-jobs
 
 				select {
 				case <-ctx.Done():
 					return
 				default:
-					err := w.Run()
+					err := j.Run()
 					if err != nil {
 						log.Println(err) // TODO error logging shouldn't be here
 						o.errors <- err
+						close(o.errors)
 						cancel()
 					}
 				}
-			}(worker, ctx)
+			}(jobQueue, ctx)
 		}
 
 		o.wg.Wait()
-		close(o.errors)
 	}()
 
 	fmt.Println("backup started")
@@ -78,10 +92,10 @@ func (o *workHandler) Run() error {
 	return nil
 }
 
-func (o *workHandler) Resume() error {
+func (o *jobHandler) Resume() error {
 	return o.Run()
 }
 
-func (o *workHandler) Wait() {
+func (o *jobHandler) Wait() {
 	o.wg.Wait()
 }

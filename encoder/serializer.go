@@ -2,10 +2,9 @@ package parser
 
 import (
 	"backuplib/encoder/record"
+	"backuplib/models"
 	"fmt"
 	"strconv"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 // PLANS ******
@@ -32,7 +31,7 @@ const (
 
 type ASMarshaler struct{}
 
-func (o *ASMarshaler) MarshalRecord(rec *a.Record) ([]byte, error) {
+func (o *ASMarshaler) MarshalRecord(rec *models.Record) ([]byte, error) {
 	// TODO this should take a pointer
 	return record.NewRecord(*rec).MarshalText()
 }

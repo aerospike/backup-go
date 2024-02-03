@@ -3,14 +3,9 @@ package backuplib
 import (
 	datahandlers "backuplib/data_handlers"
 	"backuplib/handlers"
-	"backuplib/output"
-	"backuplib/workers"
 	"errors"
-	"fmt"
 	"io"
-	"log"
 	"os"
-	"path/filepath"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -23,9 +18,7 @@ type BackupMarshaller interface {
 	MarshalRecord(*a.Record) ([]byte, error)
 }
 
-type Config struct {
-	Host a.Host
-}
+type Config struct{}
 
 type Client struct {
 	aerospikeClient *a.Client
@@ -43,150 +36,67 @@ func NewClient(ac *a.Client, cc Config) (*Client, error) {
 	}, nil
 }
 
-type BackupDirectoryArgs struct {
-	Namespace  string
-	Set        string
-	Marshaller BackupMarshaller
-	Parallel   int
-	DirPath    string
+type Encoder interface {
+	NextToken() (any, error)
 }
 
-func (o *Client) BackupDirectory(c BackupDirectoryArgs) (*handlers.BackupHandler, error) {
-	err := os.Mkdir(c.DirPath, 0755)
-	if err != nil && !errors.Is(err, os.ErrExist) {
-		return nil, err
-	}
-
-	backupWorkers := make([]*workers.BackupJob, c.Parallel)
-	for i := 0; i < c.Parallel; i++ {
-		begin := (i * PARTITIONS) / c.Parallel
-		count := PARTITIONS / c.Parallel // TODO verify no off by 1 error
-
-		// TODO check directory for existing backup files
-		// error if they are found unless -r is used
-		fileName := fmt.Sprintf("%s_%05d.asb", c.Namespace, i)
-		filePath := filepath.Join(c.DirPath, fileName)
-		// TODO this FD only needs to be opened in write mode
-		// create opens in RDWR
-		writer, err := os.Create(filePath)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		writer.Close()
-
-		out := output.NewFile(filePath)
-
-		backupJobConfig := &workers.BackupJobConfig{
-			Namespace:      c.Namespace,
-			Set:            c.Set,
-			Output:         out,
-			Marshaller:     c.Marshaller,
-			FirstPartition: begin,
-			NumPartitions:  count,
-		}
-
-		if i == 0 {
-			backupJobConfig.First = true
-		}
-
-		worker, err := workers.NewBackupJob(
-			backupJobConfig,
-			o.aerospikeClient,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		backupWorkers[i] = worker
-	}
-
-	backupArgs := handlers.BackupArgs{
-		Namespace:  c.Namespace,
-		Set:        c.Set,
-		Marshaller: c.Marshaller,
-		Parallel:   c.Parallel,
-		DirPath:    c.DirPath,
-	}
-
-	backupHandler, err := handlers.NewBackupHandler(
-		backupWorkers,
-		backupArgs,
-		handlers.Directory,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = backupHandler.Run()
-	return backupHandler, err
+type EncoderFactory interface {
+	CreateEncoder() (Encoder, error)
 }
 
+// TODO make default constructor for these argument structs
 type BackupFileArgs struct {
 	Namespace  string
 	Set        string
-	Marshaller BackupMarshaller
+	NewEncoder EncoderFactory
 	Parallel   int
 	FilePath   string
 }
 
+// TODO finish converting this from restore logic to backup logic
 func (o *Client) BackupFile(args BackupFileArgs) (*handlers.BackupHandler, error) {
-	writer, err := os.Create(args.FilePath)
+	file, err := os.Open(args.FilePath)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
-	writer.Close()
-	out := output.NewLockedFile(args.FilePath)
+	defer file.Close()
 
-	backupWorkers := make([]*workers.BackupJob, args.Parallel)
+	var src io.Reader = file
+
+	encoder, err := args.NewEncoder.CreateEncoder(src)
+	if err != nil {
+		return nil, err
+	}
+
+	reader := datahandlers.NewGenericReader(decoder)
+	readers := []datahandlers.DataReader{reader}
+
+	processors := make([]datahandlers.DataProcessor, args.Parallel)
 	for i := 0; i < args.Parallel; i++ {
-		begin := (i * PARTITIONS) / args.Parallel
-		count := PARTITIONS / args.Parallel // TODO verify no off by 1 error
-
-		backupJobConfig := &workers.BackupJobConfig{
-			Namespace:      args.Namespace,
-			Set:            args.Set,
-			Output:         out,
-			Marshaller:     args.Marshaller,
-			FirstPartition: begin,
-			NumPartitions:  count,
-		}
-
-		if i == 0 {
-			backupJobConfig.First = true
-		}
-
-		worker, err := workers.NewBackupJob(
-			backupJobConfig,
-			o.aerospikeClient,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		backupWorkers[i] = worker
+		processor := datahandlers.NewNOOPProcessor()
+		processors[i] = processor
 	}
 
-	backupArgs := handlers.BackupArgs{
-		Namespace:  args.Namespace,
-		Set:        args.Set,
-		Marshaller: args.Marshaller,
-		Parallel:   args.Parallel,
-		FilePath:   args.FilePath,
+	writers := make([]datahandlers.DataWriter, args.Parallel)
+	for i := 0; i < args.Parallel; i++ {
+		writer := datahandlers.NewRestoreWriter(o.aerospikeClient)
+		writers[i] = writer
 	}
 
-	backupHandler, err := handlers.NewBackupHandler(
-		backupWorkers,
-		backupArgs,
-		handlers.SingleFile,
+	pipeline := datahandlers.NewDataPipeline(
+		readers,
+		processors,
+		writers,
 	)
+
+	restoreArgs := handlers.RestoreArgs{}
+	handler, err := handlers.NewRestoreHandler(pipeline, restoreArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	err = backupHandler.Run()
-	return backupHandler, err
+	err = handler.Run()
+	return handler, err
 }
 
 func (o *Client) ResumeBackup(bh *handlers.BackupHandler) (*handlers.BackupHandler, error) {
@@ -205,10 +115,12 @@ type Decoder interface {
 	NextToken() (any, error)
 }
 
-type NewDecoder func(src io.Reader) Decoder
+type DecoderFactory interface {
+	CreateDecoder(src io.Reader) (Decoder, error)
+}
 
 type RestoreFileArgs struct {
-	NewDecoder NewDecoder // TODO the decoders need to take an opener closer
+	NewDecoder DecoderFactory // TODO the decoders need to take an opener closer
 	FilePath   string
 	Parallel   int
 }
@@ -221,28 +133,39 @@ func (o *Client) RestoreFile(args *RestoreFileArgs) (*handlers.RestoreHandler, e
 	defer file.Close()
 
 	var src io.Reader = file
-	// the readers will be reading from the same file
-	// if there are multiple workers so we need to lock the file
-	if args.Parallel > 1 {
-		src = NewLockedReader(file)
+
+	decoder, err := args.NewDecoder.CreateDecoder(src)
+	if err != nil {
+		return nil, err
 	}
 
-	decoder := args.NewDecoder(src)
+	reader := datahandlers.NewGenericReader(decoder)
+	readers := []datahandlers.DataReader{reader}
 
-	pf := datahandlers.NewDataPipelineFactory(
-		datahandlers.NewGenericReaderFactory(decoder),
-		datahandlers.NewNOOPProcessorFactory(),
-		datahandlers.NewRestoreWriterFactory(o.aerospikeClient),
+	processors := make([]datahandlers.DataProcessor, args.Parallel)
+	for i := 0; i < args.Parallel; i++ {
+		processor := datahandlers.NewNOOPProcessor()
+		processors[i] = processor
+	}
+
+	writers := make([]datahandlers.DataWriter, args.Parallel)
+	for i := 0; i < args.Parallel; i++ {
+		writer := datahandlers.NewRestoreWriter(o.aerospikeClient)
+		writers[i] = writer
+	}
+
+	pipeline := datahandlers.NewDataPipeline(
+		readers,
+		processors,
+		writers,
 	)
 
-	jobs := make([]*datahandlers.DataPipeline, args.Parallel)
-	for i := 0; i < args.Parallel; i++ {
-		jobs[i] = pf.CreatePipeline()
+	restoreArgs := handlers.RestoreArgs{}
+	handler, err := handlers.NewRestoreHandler(pipeline, restoreArgs)
+	if err != nil {
+		return nil, err
 	}
 
-	restoreArgs := handlers.RestoreArgs{
-		Parallel: args.Parallel,
-	}
-
-	return handlers.NewRestoreHandler(jobs, restoreArgs)
+	err = handler.Run()
+	return handler, err
 }

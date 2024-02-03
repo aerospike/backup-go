@@ -35,6 +35,7 @@ func NewTestClient(asc *a.Client, seed *rand.Source, dgf DataGeneratorFactory) *
 	}
 }
 
+// TODO allow passing in bins
 func (tc *TestClient) WriteRecords(n int, namespace, set string) error {
 	rng := rand.New(*tc.seed)
 	dg := tc.dgf.CreateDataGenerator(rng)

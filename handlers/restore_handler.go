@@ -6,86 +6,30 @@ import (
 )
 
 type RestoreArgs struct {
-	Parallel int
+	Mode WorkMode
 }
 
 type RestoreStatus struct {
-	active      bool
-	recordCount int
-	mode        WorkMode
+	Active      bool
+	RecordCount int
+	Mode        WorkMode
 }
 
 type RestoreHandler struct {
-	workers []*datahandlers.DataPipeline
-	status  RestoreStatus
-	args    RestoreArgs
-	errors  chan error
+	status RestoreStatus
+	args   RestoreArgs
+	errors chan error // TODO what buffer size should this have?
 	jobHandler
 }
 
-func NewRestoreHandler(workers []*datahandlers.DataPipeline, args RestoreArgs) (*RestoreHandler, error) {
-
-	workerImplementations := make([]Job, len(workers))
-	for i, w := range workers {
-		workerImplementations[i] = Job(w)
-	}
-
+func NewRestoreHandler(pipeline *datahandlers.DataPipeline, args RestoreArgs) (*RestoreHandler, error) {
 	return &RestoreHandler{
-		workers:    workers, // TODO should both this and workHandler have a list of workers?
 		args:       args,
-		errors:     make(chan error, len(workers)),
-		jobHandler: *NewWorkHandler(workerImplementations, args.Parallel),
+		errors:     make(chan error),
+		jobHandler: jobHandler{pipeline: pipeline},
 	}, nil
 }
 
 func (o *RestoreHandler) GetStats() (RestoreStatus, error) {
 	return RestoreStatus{}, errors.New("UNIMPLEMENTED")
 }
-
-// type restoreType int
-
-// const (
-// 	restoreTypeFile restoreType = iota
-// 	restoreTypeDir
-// )
-
-// type dataFormat int
-
-// const (
-// 	dataFormatASB dataFormat = iota
-// )
-
-// type restorePipelineFactory struct {
-// 	restoreType restoreType
-// 	filepath    string
-// 	dirpath     string
-// 	numPipes    int
-// }
-
-// func NewRestorePipelineFactory(restoreType restoreType, filepath, dirpath string, numPipes int) *restorePipelineFactory {
-// 	return &restorePipelineFactory{
-// 		restoreType: restoreType,
-// 		filepath:    filepath,
-// 		dirpath:     dirpath,
-// 		numPipes:    numPipes,
-// 	}
-// }
-
-// func (o *restorePipelineFactory) CreatePipelines() ([]*datahandlers.DataPipeline, error) {
-// 	workers := make([]*datahandlers.DataPipeline, o.numPipes)
-
-// 	for i := 0; i < o.numPipes; i++ {
-// 		var dp *datahandlers.DataPipeline
-
-// 		switch restoreType {
-// 		case restoreTypeFile:
-// 			dp = datahandlers.NewDataPipeline(
-// 				datahandlers.NewReader(
-// 					decoder.NewASBReader(),
-// 				),
-// 			)
-// 		}
-
-// 		workers[i] = &dp
-// 	}
-// }

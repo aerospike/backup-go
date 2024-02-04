@@ -9,3 +9,7 @@ const (
 	// s3File
 	// s3Dir
 )
+
+const (
+	PARTITIONS = 4096
+)

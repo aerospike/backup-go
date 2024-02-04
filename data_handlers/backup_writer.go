@@ -9,21 +9,21 @@ import (
 // TODO maybe just accept any in one method and have the encoder check for known types
 // to make this more generic and to allow support for subsets of these types
 // TODO will probably need a different interface for backup writers
-type BackupEncoder interface {
+type Encoder interface {
 	EncodeMetadata(v models.Metadata) ([]byte, error)
 	EncodeRecord(v models.Record) ([]byte, error)
 	EncodeUDF(v models.UDF) ([]byte, error)
 	EncodeSIndex(v models.SecondaryIndex) ([]byte, error)
 }
 
-// BackupWriter satisfies the DataWriter interface
-type BackupWriter struct {
-	encoder BackupEncoder
+// GenericWriter satisfies the DataWriter interface
+type GenericWriter struct {
+	encoder Encoder
 	output  io.Writer
 }
 
-func NewWriter(encoder BackupEncoder) *BackupWriter {
-	return &BackupWriter{
+func NewGenericWriter(encoder Encoder, output io.Writer) *GenericWriter {
+	return &GenericWriter{
 		encoder: encoder,
 	}
 }
@@ -31,7 +31,7 @@ func NewWriter(encoder BackupEncoder) *BackupWriter {
 // Write encodes v and writes it to the output
 // TODO let the encoder handle the type checking
 // TODO maybe restrict the types that can be written to this
-func (w *BackupWriter) Write(v interface{}) error {
+func (w *GenericWriter) Write(v interface{}) error {
 	var (
 		err  error
 		data []byte

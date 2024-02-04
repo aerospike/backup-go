@@ -6,7 +6,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-type BackupJobConfig struct {
+type ARConfig struct {
 	Namespace      string
 	Set            string
 	FirstPartition int
@@ -14,31 +14,31 @@ type BackupJobConfig struct {
 	First          bool
 }
 
-type backupStatus struct {
+type ARStatus struct {
 	partitionFilter *a.PartitionFilter
 	backupStarted   bool
 	scanPolicy      *a.ScanPolicy
 }
 
-type BackupJob struct {
-	config     *BackupJobConfig
-	status     *backupStatus
+type AerospikeReader struct {
+	config     *ARConfig
+	status     *ARStatus
 	client     *a.Client
 	recResChan <-chan *a.Result
 }
 
-func NewBackupJob(cfg *BackupJobConfig, client *a.Client) (*BackupJob, error) {
-	job := &BackupJob{
+func NewAerospikeReader(cfg *ARConfig, client *a.Client) (*AerospikeReader, error) {
+	job := &AerospikeReader{
 		config:     cfg,
 		client:     client,
-		status:     &backupStatus{},
+		status:     &ARStatus{},
 		recResChan: nil,
 	}
 
 	return job, nil
 }
 
-func (j *BackupJob) Read() (any, error) {
+func (j *AerospikeReader) Read() (any, error) {
 
 	// TODO do single shot work
 	// if j.status.first {
@@ -65,7 +65,7 @@ func (j *BackupJob) Read() (any, error) {
 
 // **** Helper Functions
 
-func startScan(j *BackupJob) (<-chan *a.Result, error) {
+func startScan(j *AerospikeReader) (<-chan *a.Result, error) {
 
 	j.recResChan = make(chan *a.Result)
 

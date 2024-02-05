@@ -27,7 +27,7 @@ type AerospikeReader struct {
 	recResChan <-chan *a.Result
 }
 
-func NewAerospikeReader(cfg *ARConfig, client *a.Client) (*AerospikeReader, error) {
+func NewAerospikeReader(cfg *ARConfig, client *a.Client) *AerospikeReader {
 	job := &AerospikeReader{
 		config:     cfg,
 		client:     client,
@@ -35,7 +35,7 @@ func NewAerospikeReader(cfg *ARConfig, client *a.Client) (*AerospikeReader, erro
 		recResChan: nil,
 	}
 
-	return job, nil
+	return job
 }
 
 func (j *AerospikeReader) Read() (any, error) {

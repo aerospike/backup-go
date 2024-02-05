@@ -4,21 +4,25 @@ import (
 	datahandlers "backuplib/data_handlers"
 )
 
-// TODO move job handler to the datahandlers package
-// don't export DataPipeline's Run method after that
-// just have the job handler call the Run method
-// then make a job handler a private field of the handler
-// (not a pointer, just a value) so that each handler has its own job handler
-type jobHandler struct {
-	pipeline *datahandlers.DataPipeline
+type workHandler struct {
+	jobHandler datahandlers.JobHandler
+	jobs       <-chan *datahandlers.DataPipeline
+	errors     chan<- error
 }
 
-// TODO this is not thread safe, the Run method should not be exported
-func (jh *jobHandler) Run(job *datahandlers.DataPipeline) error {
-	jh.pipeline = job
-	return job.Run()
-}
+func NewWorkHandler(jobs <-chan *datahandlers.DataPipeline, errors chan<- error) *workHandler {
+	jh := datahandlers.NewJobHandler(jobs)
 
-func (jh *jobHandler) Wait() {
-	jh.pipeline.Wait()
+	handler := &workHandler{
+		jobHandler: *jh,
+		jobs:       jobs,
+		errors:     errors,
+	}
+
+	go func() {
+		defer close(errors)
+		handler.errors <- handler.jobHandler.Run()
+	}()
+
+	return handler
 }

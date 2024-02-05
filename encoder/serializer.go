@@ -1,8 +1,9 @@
-package parser
+package encoder
 
 import (
 	"backuplib/encoder/record"
 	"backuplib/models"
+	"errors"
 	"fmt"
 	"strconv"
 )
@@ -29,11 +30,23 @@ const (
 	BackupFileVersion = 3.1
 )
 
-type ASMarshaler struct{}
+type ASBEncoder struct{}
 
-func (o *ASMarshaler) MarshalRecord(rec *models.Record) ([]byte, error) {
+func NewASBEncoder() *ASBEncoder {
+	return &ASBEncoder{}
+}
+
+func (o *ASBEncoder) EncodeRecord(rec *models.Record) ([]byte, error) {
 	// TODO this should take a pointer
 	return record.NewRecord(*rec).MarshalText()
+}
+
+func (o *ASBEncoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
+	return nil, errors.New("UNIMPLEMENTED")
+}
+
+func (o *ASBEncoder) EncodeSIndex(sindex *models.SecondaryIndex) ([]byte, error) {
+	return nil, errors.New("UNIMPLEMENTED")
 }
 
 // TODO this file/the public api should think about marshaling in terms of the backup file format

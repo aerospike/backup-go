@@ -8,7 +8,6 @@ import (
 )
 
 type BackupArgs struct {
-	Mode      WorkMode
 	Namespace string
 	Set       string
 	Parallel  int
@@ -20,67 +19,79 @@ type BackupStatus struct {
 	Mode        WorkMode
 }
 
-type BackupHandler struct {
+type backupHandler struct {
 	status BackupStatus
 	args   BackupArgs
-	errors chan error // TODO what buffer size should this have?
 	// TODO this should be a backuplib client which means handlers need to move to the backuplib package
-	AeroClient *a.Client
-	jobHandler
+	aeroClient *a.Client
+	jobs       chan<- *datahandlers.DataPipeline
+	workHandler
 }
 
-func NewBackupHandler(writers []datahandlers.DataWriter, args BackupArgs, ac *a.Client) (*BackupHandler, error) {
-	readers := make([]datahandlers.DataReader, args.Parallel)
-	for i := 0; i < args.Parallel; i++ {
-		for i := 0; i < args.Parallel; i++ {
-			var first bool
-			if i == 0 {
-				first = true
-			}
+func newBackupHandler(args BackupArgs, ac *a.Client, errors chan<- error) *backupHandler {
+	jobs := make(chan *datahandlers.DataPipeline)
+	wh := NewWorkHandler(jobs, errors)
 
-			begin := (i * PARTITIONS) / args.Parallel
-			count := PARTITIONS / args.Parallel // TODO verify no off by 1 error
-
-			ARCFG := &datahandlers.ARConfig{
-				Namespace:      args.Namespace,
-				Set:            args.Set,
-				FirstPartition: begin,
-				NumPartitions:  count,
-				First:          first,
-			}
-
-			dataReader, err := datahandlers.NewAerospikeReader(
-				ARCFG,
-				ac,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			readers[i] = dataReader
-		}
+	handler := &backupHandler{
+		args:        args,
+		aeroClient:  ac,
+		jobs:        jobs,
+		workHandler: *wh,
 	}
 
-	processors := make([]datahandlers.DataProcessor, args.Parallel)
-	for i := 0; i < args.Parallel; i++ {
+	return handler
+}
+
+// TODO don't expose this by moving it to the backuplib package
+// We don't want users calling Run directly
+func (bh *backupHandler) Run(writers []datahandlers.DataWriter) {
+	jobChan := bh.jobs
+
+	readers := make([]datahandlers.DataReader, bh.args.Parallel)
+	for i := 0; i < bh.args.Parallel; i++ {
+		var first bool
+		if i == 0 {
+			first = true
+		}
+
+		begin := (i * PARTITIONS) / bh.args.Parallel
+		count := PARTITIONS / bh.args.Parallel // TODO verify no off by 1 error
+
+		ARCFG := &datahandlers.ARConfig{
+			Namespace:      bh.args.Namespace,
+			Set:            bh.args.Set,
+			FirstPartition: begin,
+			NumPartitions:  count,
+			First:          first,
+		}
+
+		dataReader := datahandlers.NewAerospikeReader(
+			ARCFG,
+			bh.aeroClient,
+		)
+
+		readers[i] = dataReader
+	}
+
+	processors := make([]datahandlers.DataProcessor, bh.args.Parallel)
+	for i := 0; i < bh.args.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
 	}
 
-	pipeline := datahandlers.NewDataPipeline(
+	job := datahandlers.NewDataPipeline(
 		readers,
 		processors,
 		writers,
 	)
 
-	return &BackupHandler{
-		args:       args,
-		errors:     make(chan error),
-		jobHandler: jobHandler{pipeline: pipeline},
-		AeroClient: ac,
-	}, nil
+	jobChan <- job
 }
 
-func (o *BackupHandler) GetStats() (BackupStatus, error) {
+func (bh *backupHandler) Close() {
+	close(bh.jobs)
+}
+
+func (bh *backupHandler) GetStats() (BackupStatus, error) {
 	return BackupStatus{}, errors.New("UNIMPLEMENTED")
 }

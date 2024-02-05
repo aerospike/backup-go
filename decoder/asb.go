@@ -143,20 +143,6 @@ type metaData struct {
 	First     bool
 }
 
-type ASBReaderFactory struct {
-	src io.Reader
-}
-
-func NewASBReaderFactory(src io.Reader) *ASBReaderFactory {
-	return &ASBReaderFactory{
-		src: src,
-	}
-}
-
-func (f *ASBReaderFactory) CreateDecoder() (Decoder, error) {
-	return NewASBReader(f.src)
-}
-
 type ASBReader struct {
 	countingByteScanner
 	header   *header

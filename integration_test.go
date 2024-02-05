@@ -2,19 +2,21 @@ package backuplib_test
 
 import (
 	"backuplib"
-	"backuplib/decoder"
 	testresources "backuplib/test_resources"
+	"bytes"
+	"fmt"
+	"io"
 	"math/rand"
-	"path/filepath"
+	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 const (
 	Host          = "127.0.0.1"
 	Port          = 3000
+	namespace     = "test"
 	BackupDirPath = "./test_resources/backup"
 )
 
@@ -56,25 +58,41 @@ func (suite *BackupRestoreTestSuite) TearDownSuite() {
 	suite.Aeroclient.Close()
 }
 
-func (suite *BackupRestoreTestSuite) TestFile() {
+func (suite *BackupRestoreTestSuite) SetupTest() {
+	suite.testClient.Truncate(namespace, "")
+}
 
-	filePath := filepath.Join(BackupDirPath, "testfile")
+func (suite *BackupRestoreTestSuite) TearDownTest() {
+	suite.testClient.Truncate(namespace, "")
+}
 
-	bargs := backuplib.BackupFileArgs{
-		Namespace:  "test",
-		Marshaller: nil,
-		Parallel:   1,
-		FilePath:   filePath,
+func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
+	// Write some records to the database
+	err := suite.testClient.WriteRecords(10, namespace, "")
+	if err != nil {
+		panic(err)
 	}
 
-	bhandler, err := suite.backupClient.BackupFile(bargs)
-	assert.NoError(suite.T(), err)
+	dst := bytes.NewBuffer([]byte{})
+	enc := backuplib.NewASBEncoderFactory()
 
-	bhandler.Wait()
+	_, errors := suite.backupClient.BackupToWriter(
+		[]io.Writer{dst},
+		enc,
+		"test",
+		backuplib.BackupToWriterOptions{
+			Parallel: 1,
+		},
+	)
 
-	rargs := backuplib.RestoreFileArgs{
-		NewDecoder: decoder.NewASBReader(),
-		FilePath:   filePath,
-		Parallel:   1,
-	}
+	err = <-errors
+	suite.Assert().Nil(err)
+
+	fmt.Print(dst.String())
+
+	// TODO restore the records and check that they are the same
+}
+
+func TestBackupRestoreTestSuite(t *testing.T) {
+	suite.Run(t, new(BackupRestoreTestSuite))
 }

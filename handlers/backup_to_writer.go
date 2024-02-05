@@ -10,14 +10,13 @@ import (
 )
 
 type Encoder interface {
-	EncodeMetadata(v models.Metadata) ([]byte, error)
-	EncodeRecord(v models.Record) ([]byte, error)
-	EncodeUDF(v models.UDF) ([]byte, error)
-	EncodeSIndex(v models.SecondaryIndex) ([]byte, error)
+	EncodeRecord(v *models.Record) ([]byte, error)
+	EncodeUDF(v *models.UDF) ([]byte, error)
+	EncodeSIndex(v *models.SecondaryIndex) ([]byte, error)
 }
 
 type EncoderFactory interface {
-	CreateEncoder() (Encoder, error)
+	CreateEncoder() Encoder
 }
 
 type BackupToWriterArgs struct {
@@ -29,36 +28,64 @@ type BackupToWriterStatus struct {
 }
 
 type BackupToWriterHandler struct {
-	status  BackupToWriterStatus
-	args    BackupToWriterArgs
-	writers []io.Writer
-	BackupHandler
+	status       BackupToWriterStatus
+	args         BackupToWriterArgs
+	enc          EncoderFactory
+	writers      []io.Writer
+	workerErrors <-chan error
+	backupHandler
 }
 
-func NewBackupToWriterHandler(args BackupToWriterArgs, ac *a.Client, enc EncoderFactory, writers []io.Writer) (*BackupToWriterHandler, error) {
-
-	dataWriters := make([]datahandlers.DataWriter, len(writers))
-	for i, writer := range writers {
-		encoder, err := enc.CreateEncoder()
-		if err != nil {
-			return nil, err
-		}
-
-		dataWriters[i] = datahandlers.NewGenericWriter(encoder, writer)
-	}
-
-	backupHandler, err := NewBackupHandler(dataWriters, args.BackupArgs, ac)
-	if err != nil {
-		return nil, err
-	}
+func NewBackupToWriterHandler(args BackupToWriterArgs, ac *a.Client, enc EncoderFactory, writers []io.Writer) *BackupToWriterHandler {
+	workerErrors := make(chan error)
+	backupHandler := newBackupHandler(args.BackupArgs, ac, workerErrors)
 
 	return &BackupToWriterHandler{
 		args:          args,
+		enc:           enc,
 		writers:       writers,
-		BackupHandler: *backupHandler,
-	}, nil
+		workerErrors:  workerErrors,
+		backupHandler: *backupHandler,
+	}
 }
 
-func (o *BackupToWriterHandler) GetStats() (BackupToWriterStatus, error) {
+// TODO don't expose this by moving it to the backuplib package
+// we don't want users calling Run directly
+// TODO support passing in a context
+func (bwh *BackupToWriterHandler) Run(writers []io.Writer) <-chan error {
+	errors := make(chan error)
+
+	go func(errChan chan<- error) {
+		defer bwh.Close()
+		defer close(errChan)
+
+		for _, writer := range writers {
+
+			numDataWriters := bwh.args.Parallel
+			dataWriters := make([]datahandlers.DataWriter, numDataWriters)
+
+			for i := 0; i < numDataWriters; i++ {
+				encoder := bwh.enc.CreateEncoder()
+				dataWriters[i] = datahandlers.NewGenericWriter(encoder, writer)
+			}
+
+			bwh.backupHandler.Run(dataWriters)
+
+			select {
+			case err := <-bwh.workerErrors:
+				if err != nil {
+					errChan <- err
+					return
+				}
+			default:
+				continue
+			}
+		}
+	}(errors)
+
+	return errors
+}
+
+func (bwh *BackupToWriterHandler) GetStats() (BackupToWriterStatus, error) {
 	return BackupToWriterStatus{}, errors.New("UNIMPLEMENTED")
 }

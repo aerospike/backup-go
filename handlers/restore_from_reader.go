@@ -69,6 +69,14 @@ func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
 
 				dataReaders[i] = datahandlers.NewGenericReader(decoder)
 			}
+
+			rrh.restoreHandler.Run(dataReaders)
+
+			err := <-rrh.workerErrors
+			if err != nil {
+				errChan <- err
+				return
+			}
 		}
 	}(errors)
 

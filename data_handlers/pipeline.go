@@ -23,22 +23,19 @@ type DataProcessor interface {
 // TODO maybe the steps in the pipeline should exchange information on channels to make
 // them thread safe
 type DataPipeline struct {
-	runLock    *sync.Mutex
-	readers    []readStage
-	processors []processStage
-	writers    []writeStage
+	runLock         *sync.Mutex
+	readers         []readStage
+	processors      []processStage
+	writers         []writeStage
+	readSendChan    chan any
+	processSendChan chan any
 }
 
 func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPipeline {
 
 	chanSize := int(math.Max(math.Max(float64(len(r)), float64(len(p))), float64(len(w))))
+
 	readSendChan := make(chan any, chanSize)
-
-	processRecieveChan := readSendChan
-	processSendChan := make(chan any, chanSize)
-
-	writeRecieveChan := processSendChan
-
 	readers := make([]readStage, len(r))
 	for i, reader := range r {
 		readers[i] = readStage{
@@ -47,11 +44,12 @@ func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPip
 		}
 	}
 
+	processSendChan := make(chan any, chanSize)
 	processors := make([]processStage, len(p))
 	for i, processor := range p {
 		processors[i] = processStage{
 			p:       processor,
-			receive: processRecieveChan,
+			receive: readSendChan,
 			send:    processSendChan,
 		}
 	}
@@ -60,31 +58,32 @@ func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPip
 	for i, writer := range w {
 		writers[i] = writeStage{
 			w:       writer,
-			receive: writeRecieveChan,
+			receive: processSendChan,
 		}
 	}
 
 	return &DataPipeline{
-		readers:    readers,
-		processors: processors,
-		writers:    writers,
-		runLock:    &sync.Mutex{},
+		readers:         readers,
+		processors:      processors,
+		writers:         writers,
+		runLock:         &sync.Mutex{},
+		readSendChan:    readSendChan,
+		processSendChan: processSendChan,
 	}
 }
 
 // TODO support passing in a context
-// TODO support a parallel flag to bound the number of concurrent stages
 func (dp *DataPipeline) Run() error {
 	dp.runLock.Lock()
 	defer dp.runLock.Unlock()
 
-	errc := make(chan error)
-	wg := &sync.WaitGroup{}
+	errc := make(chan error, len(dp.readers)+len(dp.processors)+len(dp.writers))
 
+	rg := &sync.WaitGroup{}
 	for _, reader := range dp.readers {
-		wg.Add(1)
+		rg.Add(1)
 		go func(reader readStage) {
-			defer wg.Done()
+			defer rg.Done()
 			err := reader.Run()
 			if err != nil {
 				errc <- err
@@ -92,10 +91,11 @@ func (dp *DataPipeline) Run() error {
 		}(reader)
 	}
 
+	pg := &sync.WaitGroup{}
 	for _, processor := range dp.processors {
-		wg.Add(1)
+		pg.Add(1)
 		go func(processor processStage) {
-			defer wg.Done()
+			defer pg.Done()
 			err := processor.Run()
 			if err != nil {
 				errc <- err
@@ -103,6 +103,7 @@ func (dp *DataPipeline) Run() error {
 		}(processor)
 	}
 
+	wg := &sync.WaitGroup{}
 	for _, writer := range dp.writers {
 		wg.Add(1)
 		go func(writer writeStage) {
@@ -114,16 +115,14 @@ func (dp *DataPipeline) Run() error {
 		}(writer)
 	}
 
+	rg.Wait()
+	close(dp.readSendChan)
+	pg.Wait()
+	close(dp.processSendChan)
+	wg.Wait()
 	close(errc)
 
-	err := <-errc
-	if err != nil {
-		return err
-	}
-
-	wg.Wait()
-
-	return nil
+	return <-errc
 }
 
 func (dp *DataPipeline) Wait() {
@@ -141,7 +140,6 @@ func (rs *readStage) Run() error {
 	for {
 		v, err := rs.r.Read()
 		if err == io.EOF {
-			close(rs.send)
 			return nil
 		}
 		if err != nil {
@@ -162,7 +160,6 @@ func (ps *processStage) Run() error {
 	for {
 		v, active := <-ps.receive
 		if !active {
-			close(ps.send)
 			return nil
 		}
 		v, err := ps.p.Process(v)

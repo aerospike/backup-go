@@ -24,6 +24,7 @@ type GenericWriter struct {
 func NewGenericWriter(encoder Encoder, output io.Writer) *GenericWriter {
 	return &GenericWriter{
 		encoder: encoder,
+		output:  output,
 	}
 }
 

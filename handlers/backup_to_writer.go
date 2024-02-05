@@ -19,8 +19,8 @@ type EncoderFactory interface {
 	CreateEncoder() Encoder
 }
 
-type BackupToWriterArgs struct {
-	BackupArgs
+type BackupToWriterOpts struct {
+	BackupOpts
 }
 
 type BackupToWriterStatus struct {
@@ -29,19 +29,19 @@ type BackupToWriterStatus struct {
 
 type BackupToWriterHandler struct {
 	status       BackupToWriterStatus
-	args         BackupToWriterArgs
+	opts         BackupToWriterOpts
 	enc          EncoderFactory
 	writers      []io.Writer
 	workerErrors <-chan error
 	backupHandler
 }
 
-func NewBackupToWriterHandler(args BackupToWriterArgs, ac *a.Client, enc EncoderFactory, writers []io.Writer) *BackupToWriterHandler {
+func NewBackupToWriterHandler(args BackupToWriterOpts, ac *a.Client, enc EncoderFactory, namespace string, writers []io.Writer) *BackupToWriterHandler {
 	workerErrors := make(chan error)
-	backupHandler := newBackupHandler(args.BackupArgs, ac, workerErrors)
+	backupHandler := newBackupHandler(args.BackupOpts, ac, namespace, workerErrors)
 
 	return &BackupToWriterHandler{
-		args:          args,
+		opts:          args,
 		enc:           enc,
 		writers:       writers,
 		workerErrors:  workerErrors,
@@ -56,12 +56,24 @@ func (bwh *BackupToWriterHandler) Run(writers []io.Writer) <-chan error {
 	errors := make(chan error)
 
 	go func(errChan chan<- error) {
-		defer bwh.Close()
 		defer close(errChan)
 
 		for _, writer := range writers {
 
-			numDataWriters := bwh.args.Parallel
+			// TODO this is kind of messy synchronization,
+			// try to find a better way to handle this that doesn't require
+			// this non blocking select and the final error check after the loop
+			// this also needs to be duplicated in the restore handler
+			select {
+			case err := <-bwh.workerErrors:
+				if err != nil {
+					errChan <- err
+					return
+				}
+			default:
+			}
+
+			numDataWriters := bwh.opts.Parallel
 			dataWriters := make([]datahandlers.DataWriter, numDataWriters)
 
 			for i := 0; i < numDataWriters; i++ {
@@ -70,17 +82,14 @@ func (bwh *BackupToWriterHandler) Run(writers []io.Writer) <-chan error {
 			}
 
 			bwh.backupHandler.Run(dataWriters)
-
-			select {
-			case err := <-bwh.workerErrors:
-				if err != nil {
-					errChan <- err
-					return
-				}
-			default:
-				continue
-			}
 		}
+
+		bwh.Close()
+		err := <-bwh.workerErrors
+		if err != nil {
+			errChan <- err
+		}
+
 	}(errors)
 
 	return errors

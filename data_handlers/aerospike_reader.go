@@ -2,6 +2,7 @@ package datahandlers
 
 import (
 	"backuplib/models"
+	"io"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -53,7 +54,10 @@ func (j *AerospikeReader) Read() (any, error) {
 		j.status.backupStarted = true
 	}
 
-	res := <-j.recResChan
+	res, active := <-j.recResChan
+	if !active {
+		return nil, io.EOF
+	}
 	if res.Err != nil {
 		return nil, res.Err
 	}

@@ -48,13 +48,13 @@ type BackupToWriterOptions struct {
 }
 
 func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderFactory, namespace string, opts BackupToWriterOptions) (*handlers.BackupToWriterHandler, <-chan error) {
-	args := handlers.BackupToWriterArgs{
-		BackupArgs: handlers.BackupArgs{
+	args := handlers.BackupToWriterOpts{
+		BackupOpts: handlers.BackupOpts{
 			Parallel: opts.Parallel,
 		},
 	}
 
-	handler := handlers.NewBackupToWriterHandler(args, c.aerospikeClient, enc, writers)
+	handler := handlers.NewBackupToWriterHandler(args, c.aerospikeClient, enc, namespace, writers)
 	errors := handler.Run(writers)
 
 	return handler, errors

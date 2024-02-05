@@ -76,17 +76,3 @@ func (rw *RestoreWriter) WriteUDF(udf *models.UDF) error {
 	_, err := rw.asc.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)
 	return err
 }
-
-type RestoreWriterFactory struct {
-	asc *a.Client
-}
-
-func NewRestoreWriterFactory(a *a.Client) *RestoreWriterFactory {
-	return &RestoreWriterFactory{
-		asc: a,
-	}
-}
-
-func (rwf *RestoreWriterFactory) CreateWriter() DataWriter {
-	return NewRestoreWriter(rwf.asc)
-}

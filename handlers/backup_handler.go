@@ -24,20 +24,17 @@ type backupHandler struct {
 	opts      BackupOpts
 	// TODO this should be a backuplib client which means handlers need to move to the backuplib package
 	aeroClient *a.Client
-	jobs       chan<- *datahandlers.DataPipeline
-	workHandler
+	worker     workHandler
 }
 
-func newBackupHandler(args BackupOpts, ac *a.Client, namespace string, errors chan<- error) *backupHandler {
-	jobs := make(chan *datahandlers.DataPipeline)
-	wh := NewWorkHandler(jobs, errors)
+func newBackupHandler(args BackupOpts, ac *a.Client, namespace string) *backupHandler {
+	wh := newWorkHandler()
 
 	handler := &backupHandler{
-		namespace:   namespace,
-		opts:        args,
-		aeroClient:  ac,
-		jobs:        jobs,
-		workHandler: *wh,
+		namespace:  namespace,
+		opts:       args,
+		aeroClient: ac,
+		worker:     *wh,
 	}
 
 	return handler
@@ -45,10 +42,8 @@ func newBackupHandler(args BackupOpts, ac *a.Client, namespace string, errors ch
 
 // TODO don't expose this by moving it to the backuplib package
 // We don't want users calling Run directly
-func (bh *backupHandler) Run(writers []datahandlers.DataWriter) {
-	jobChan := bh.jobs
-
-	readers := make([]datahandlers.DataReader, bh.opts.Parallel)
+func (bh *backupHandler) Run(writers []DataWriter) error {
+	readers := make([]DataReader, bh.opts.Parallel)
 	for i := 0; i < bh.opts.Parallel; i++ {
 		var first bool
 		if i == 0 {
@@ -74,23 +69,19 @@ func (bh *backupHandler) Run(writers []datahandlers.DataWriter) {
 		readers[i] = dataReader
 	}
 
-	processors := make([]datahandlers.DataProcessor, bh.opts.Parallel)
+	processors := make([]DataProcessor, bh.opts.Parallel)
 	for i := 0; i < bh.opts.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
 	}
 
-	job := datahandlers.NewDataPipeline(
+	job := NewDataPipeline(
 		readers,
 		processors,
 		writers,
 	)
 
-	jobChan <- job
-}
-
-func (bh *backupHandler) Close() {
-	close(bh.jobs)
+	return bh.worker.doJob(job)
 }
 
 func (bh *backupHandler) GetStats() (BackupStatus, error) {

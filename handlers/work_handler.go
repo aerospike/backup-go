@@ -1,28 +1,14 @@
 package handlers
 
-import (
-	datahandlers "backuplib/data_handlers"
-)
-
 type workHandler struct {
-	jobHandler datahandlers.JobHandler
-	jobs       <-chan *datahandlers.DataPipeline
-	errors     chan<- error
+	currentJob *DataPipeline
 }
 
-func NewWorkHandler(jobs <-chan *datahandlers.DataPipeline, errors chan<- error) *workHandler {
-	jh := datahandlers.NewJobHandler(jobs)
+func newWorkHandler() *workHandler {
+	return &workHandler{}
+}
 
-	handler := &workHandler{
-		jobHandler: *jh,
-		jobs:       jobs,
-		errors:     errors,
-	}
-
-	go func() {
-		defer close(errors)
-		handler.errors <- handler.jobHandler.Run()
-	}()
-
-	return handler
+func (wh *workHandler) doJob(job *DataPipeline) error {
+	wh.currentJob = job
+	return wh.currentJob.run()
 }

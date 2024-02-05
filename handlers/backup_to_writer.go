@@ -28,23 +28,20 @@ type BackupToWriterStatus struct {
 }
 
 type BackupToWriterHandler struct {
-	status       BackupToWriterStatus
-	opts         BackupToWriterOpts
-	enc          EncoderFactory
-	writers      []io.Writer
-	workerErrors <-chan error
+	status  BackupToWriterStatus
+	opts    BackupToWriterOpts
+	enc     EncoderFactory
+	writers []io.Writer
 	backupHandler
 }
 
 func NewBackupToWriterHandler(args BackupToWriterOpts, ac *a.Client, enc EncoderFactory, namespace string, writers []io.Writer) *BackupToWriterHandler {
-	workerErrors := make(chan error)
-	backupHandler := newBackupHandler(args.BackupOpts, ac, namespace, workerErrors)
+	backupHandler := newBackupHandler(args.BackupOpts, ac, namespace)
 
 	return &BackupToWriterHandler{
 		opts:          args,
 		enc:           enc,
 		writers:       writers,
-		workerErrors:  workerErrors,
 		backupHandler: *backupHandler,
 	}
 }
@@ -60,34 +57,19 @@ func (bwh *BackupToWriterHandler) Run(writers []io.Writer) <-chan error {
 
 		for _, writer := range writers {
 
-			// TODO this is kind of messy synchronization,
-			// try to find a better way to handle this that doesn't require
-			// this non blocking select and the final error check after the loop
-			// this also needs to be duplicated in the restore handler
-			select {
-			case err := <-bwh.workerErrors:
-				if err != nil {
-					errChan <- err
-					return
-				}
-			default:
-			}
-
 			numDataWriters := bwh.opts.Parallel
-			dataWriters := make([]datahandlers.DataWriter, numDataWriters)
+			dataWriters := make([]DataWriter, numDataWriters)
 
 			for i := 0; i < numDataWriters; i++ {
 				encoder := bwh.enc.CreateEncoder()
 				dataWriters[i] = datahandlers.NewGenericWriter(encoder, writer)
 			}
 
-			bwh.backupHandler.Run(dataWriters)
-		}
-
-		bwh.Close()
-		err := <-bwh.workerErrors
-		if err != nil {
-			errChan <- err
+			err := bwh.backupHandler.Run(dataWriters)
+			if err != nil {
+				errChan <- err
+				return
+			}
 		}
 
 	}(errors)

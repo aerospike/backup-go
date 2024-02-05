@@ -13,13 +13,3 @@ func (p *NOOPProcessor) Process(data interface{}) (interface{}, error) {
 }
 
 type NOOPProcessorFactory struct{}
-
-// NewNOOPProcessorFactory creates a new ProcessorFactory
-func NewNOOPProcessorFactory() *NOOPProcessorFactory {
-	return &NOOPProcessorFactory{}
-}
-
-// CreateProcessor creates a new Processor
-func (f *NOOPProcessorFactory) CreateProcessor() DataProcessor {
-	return NewNOOPProcessor()
-}

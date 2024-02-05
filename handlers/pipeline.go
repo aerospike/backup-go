@@ -1,4 +1,4 @@
-package datahandlers
+package handlers
 
 import (
 	"io"
@@ -20,8 +20,6 @@ type DataProcessor interface {
 	Process(any) (any, error)
 }
 
-// TODO maybe the steps in the pipeline should exchange information on channels to make
-// them thread safe
 type DataPipeline struct {
 	runLock         *sync.Mutex
 	readers         []readStage
@@ -73,7 +71,7 @@ func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPip
 }
 
 // TODO support passing in a context
-func (dp *DataPipeline) Run() error {
+func (dp *DataPipeline) run() error {
 	dp.runLock.Lock()
 	defer dp.runLock.Unlock()
 

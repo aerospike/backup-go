@@ -25,23 +25,20 @@ type RestoreFromReaderStatus struct {
 }
 
 type RestoreFromReaderHandler struct {
-	status       RestoreFromReaderStatus
-	args         RestoreFromReaderArgs
-	dec          DecoderFactory
-	readers      []io.Reader
-	workerErrors <-chan error
+	status  RestoreFromReaderStatus
+	args    RestoreFromReaderArgs
+	dec     DecoderFactory
+	readers []io.Reader
 	restoreHandler
 }
 
 func NewRestoreFromReaderHandler(args RestoreFromReaderArgs, ac *a.Client, dec DecoderFactory, readers []io.Reader) *RestoreFromReaderHandler {
-	workerErrors := make(chan error)
-	restoreHandler := newRestoreHandler(args.RestoreArgs, ac, workerErrors)
+	restoreHandler := newRestoreHandler(args.RestoreArgs, ac)
 
 	return &RestoreFromReaderHandler{
 		args:           args,
 		dec:            dec,
 		readers:        readers,
-		workerErrors:   workerErrors,
 		restoreHandler: *restoreHandler,
 	}
 }
@@ -52,13 +49,12 @@ func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
 	errors := make(chan error)
 
 	go func(errChan chan<- error) {
-		defer rrh.Close()
 		defer close(errChan)
 
 		for _, reader := range readers {
 
 			numDataReaders := rrh.args.Parallel
-			dataReaders := make([]datahandlers.DataReader, numDataReaders)
+			dataReaders := make([]DataReader, numDataReaders)
 
 			for i := 0; i < numDataReaders; i++ {
 				decoder, err := rrh.dec.CreateDecoder(reader)
@@ -70,9 +66,7 @@ func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
 				dataReaders[i] = datahandlers.NewGenericReader(decoder)
 			}
 
-			rrh.restoreHandler.Run(dataReaders)
-
-			err := <-rrh.workerErrors
+			err := rrh.restoreHandler.Run(dataReaders)
 			if err != nil {
 				errChan <- err
 				return

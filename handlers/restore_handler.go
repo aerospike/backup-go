@@ -21,47 +21,40 @@ type restoreHandler struct {
 	status     RestoreStatus
 	args       RestoreArgs
 	aeroClient *a.Client
-	jobs       chan<- *datahandlers.DataPipeline
-	workHandler
+	worker     workHandler
 }
 
-func newRestoreHandler(args RestoreArgs, ac *a.Client, errors chan<- error) *restoreHandler {
-	jobs := make(chan *datahandlers.DataPipeline)
-	wh := NewWorkHandler(jobs, errors)
+func newRestoreHandler(args RestoreArgs, ac *a.Client) *restoreHandler {
+	wh := newWorkHandler()
 
 	return &restoreHandler{
-		args:        args,
-		aeroClient:  ac,
-		jobs:        jobs,
-		workHandler: *wh,
+		args:       args,
+		aeroClient: ac,
+		worker:     *wh,
 	}
 }
 
-func (rh *restoreHandler) Run(readers []datahandlers.DataReader) {
+func (rh *restoreHandler) Run(readers []DataReader) error {
 
-	processors := make([]datahandlers.DataProcessor, rh.args.Parallel)
+	processors := make([]DataProcessor, rh.args.Parallel)
 	for i := 0; i < rh.args.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
 	}
 
-	writers := make([]datahandlers.DataWriter, rh.args.Parallel)
+	writers := make([]DataWriter, rh.args.Parallel)
 	for i := 0; i < rh.args.Parallel; i++ {
 		writer := datahandlers.NewRestoreWriter(rh.aeroClient)
 		writers[i] = writer
 	}
 
-	job := datahandlers.NewDataPipeline(
+	job := NewDataPipeline(
 		readers,
 		processors,
 		writers,
 	)
 
-	rh.jobs <- job
-}
-
-func (rh *restoreHandler) Close() {
-	close(rh.jobs)
+	return rh.worker.doJob(job)
 }
 
 func (*restoreHandler) GetStats() (RestoreStatus, error) {

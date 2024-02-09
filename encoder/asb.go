@@ -5,6 +5,7 @@ import (
 	"backuplib/models"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 )
 
@@ -30,10 +31,16 @@ const (
 	BackupFileVersion = 3.1
 )
 
-type ASBEncoder struct{}
+type ASBEncoder struct {
+	writer    io.Writer
+	first     bool
+	namespace string
+}
 
-func NewASBEncoder() *ASBEncoder {
-	return &ASBEncoder{}
+func NewASBEncoder(w io.Writer) (*ASBEncoder, error) {
+	return &ASBEncoder{
+		writer: w,
+	}, nil
 }
 
 func (o *ASBEncoder) EncodeRecord(rec *models.Record) ([]byte, error) {
@@ -46,7 +53,7 @@ func (o *ASBEncoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
 }
 
 func (o *ASBEncoder) EncodeSIndex(sindex *models.SecondaryIndex) ([]byte, error) {
-	return nil, errors.New("UNIMPLEMENTED")
+	return encodeSIndexToASB(sindex)
 }
 
 // TODO this file/the public api should think about marshaling in terms of the backup file format
@@ -67,4 +74,62 @@ func GetNamespaceMetaText(namespace string) []byte {
 
 func GetFirstMetaText() []byte {
 	return []byte("# first-file\n")
+}
+
+// **** SINDEX ****
+
+const (
+	globalChar byte = '*'
+	sindexChar byte = 'i'
+)
+
+var asbEscapedChars = map[byte]struct{}{
+	'\\': {},
+	' ':  {},
+	'\n': {},
+}
+
+func escapeASBS(s string) string {
+	in := []byte(s)
+	v := []byte{}
+	for _, c := range in {
+		if _, ok := asbEscapedChars[c]; ok {
+			v = append(v, '\\')
+		}
+		v = append(v, c)
+	}
+
+	return string(v)
+}
+
+// TODO support escaped tokens
+func encodeSIndexToASB(sindex *models.SecondaryIndex) ([]byte, error) {
+	if sindex == nil {
+		return nil, errors.New("sindex is nil")
+	}
+
+	// sindexes only ever use 1 path for now
+	numPaths := 1
+
+	v := fmt.Sprintf(
+		"%c %c %s %s %s %c %d %s %c",
+		globalChar,
+		sindexChar,
+		escapeASBS(sindex.Namespace),
+		escapeASBS(sindex.Set),
+		escapeASBS(sindex.Name),
+		byte(sindex.IndexType),
+		numPaths,
+		escapeASBS(sindex.Path.BinName),
+		byte(sindex.Path.BinType),
+	)
+
+	// TODO does this need to be base64 encoded?
+	if sindex.Path.B64Context != "" {
+		v = fmt.Sprintf("%s %s", v, sindex.Path.B64Context)
+	}
+
+	v += "\n"
+
+	return []byte(v), nil
 }

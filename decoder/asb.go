@@ -409,6 +409,8 @@ func (r *ASBReader) readSIndex() (*models.SecondaryIndex, error) {
 		return nil, err
 	}
 
+	// NOTE: the number of paths is always 1 for now
+	// this means we read the value but don't use it
 	npaths, err := _readSize(r, ' ')
 	if err != nil {
 		return nil, err
@@ -416,47 +418,63 @@ func (r *ASBReader) readSIndex() (*models.SecondaryIndex, error) {
 	if npaths == 0 {
 		return nil, errors.New("missing path(s) in sindex block")
 	}
-	res.ValuesCovered = int(npaths)
 
-	res.Paths = make([]*models.SIndexPath, npaths)
+	var path models.SIndexPath
 
-	for i := uint32(0); i < npaths; i++ {
-		var path models.SIndexPath
-
-		if err := _expectChar(r, ' '); err != nil {
-			return nil, err
-		}
-
-		name, err := _readUntil(r, ' ', true)
-		if err != nil {
-			return nil, err
-		}
-		path.BinName = string(name)
-
-		if err := _expectChar(r, ' '); err != nil {
-			return nil, err
-		}
-
-		b, err := r.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		switch b {
-		case 'S':
-			path.BinType = models.StringSIDataType
-		case 'N':
-			path.BinType = models.NumericSIDataType
-		case 'G':
-			path.BinType = models.GEO2DSphereSIDataType
-		case 'B':
-			path.BinType = models.BlobSIDataType
-		default:
-			return nil, fmt.Errorf("invalid sindex path type %c", b)
-		}
-
-		res.Paths[i] = &path
+	if err := _expectChar(r, ' '); err != nil {
+		return nil, err
 	}
+
+	binName, err := _readUntil(r, ' ', true)
+	if err != nil {
+		return nil, err
+	}
+	path.BinName = string(binName)
+
+	if err := _expectChar(r, ' '); err != nil {
+		return nil, err
+	}
+
+	b, err = r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	switch b {
+	case 'S':
+		path.BinType = models.StringSIDataType
+	case 'N':
+		path.BinType = models.NumericSIDataType
+	case 'G':
+		path.BinType = models.GEO2DSphereSIDataType
+	case 'B':
+		path.BinType = models.BlobSIDataType
+	default:
+		return nil, fmt.Errorf("invalid sindex path type %c", b)
+	}
+
+	// check for optional context
+	b, err = _peek(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if b == ' ' {
+		if err := _expectChar(r, ' '); err != nil {
+			return nil, err
+		}
+
+		// NOTE: the context should always be base64 encoded
+		// so escaping is not needed
+		context, err := _readUntil(r, '\n', false)
+		if err != nil {
+			return nil, err
+		}
+
+		path.B64Context = string(context)
+	}
+
+	res.Path = path
 
 	if err := _expectChar(r, '\n'); err != nil {
 		return nil, err

@@ -12,8 +12,9 @@ type Decoder interface {
 	NextToken() (any, error)
 }
 
-type DecoderFactory interface {
+type DecoderBuilder interface {
 	CreateDecoder(src io.Reader) (Decoder, error)
+	SetSource(src io.Reader)
 }
 
 type RestoreFromReaderArgs struct {
@@ -27,12 +28,12 @@ type RestoreFromReaderStatus struct {
 type RestoreFromReaderHandler struct {
 	status  RestoreFromReaderStatus
 	args    RestoreFromReaderArgs
-	dec     DecoderFactory
+	dec     DecoderBuilder
 	readers []io.Reader
 	restoreHandler
 }
 
-func NewRestoreFromReaderHandler(args RestoreFromReaderArgs, ac *a.Client, dec DecoderFactory, readers []io.Reader) *RestoreFromReaderHandler {
+func NewRestoreFromReaderHandler(args RestoreFromReaderArgs, ac *a.Client, dec DecoderBuilder, readers []io.Reader) *RestoreFromReaderHandler {
 	restoreHandler := newRestoreHandler(args.RestoreArgs, ac)
 
 	return &RestoreFromReaderHandler{
@@ -57,6 +58,7 @@ func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
 			dataReaders := make([]DataReader, numDataReaders)
 
 			for i := 0; i < numDataReaders; i++ {
+				rrh.dec.SetSource(reader)
 				decoder, err := rrh.dec.CreateDecoder(reader)
 				if err != nil {
 					errChan <- err

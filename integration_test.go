@@ -66,6 +66,7 @@ func (suite *BackupRestoreTestSuite) TearDownTest() {
 	suite.testClient.Truncate(namespace, "")
 }
 
+// TODO make sure that sindex NULL values are filtered out
 func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
 	// Write some records to the database
 	err := suite.testClient.WriteRecords(10, namespace, "")

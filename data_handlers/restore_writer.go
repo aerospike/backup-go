@@ -2,7 +2,6 @@ package datahandlers
 
 import (
 	"backuplib/models"
-	"errors"
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -20,6 +19,8 @@ func NewRestoreWriter(asc *a.Client) *RestoreWriter {
 }
 
 // Write writes the data
+// TODO support write policy
+// TODO support batch writes
 func (rw *RestoreWriter) Write(data any) error {
 	switch d := data.(type) {
 	case *models.Record:
@@ -33,16 +34,13 @@ func (rw *RestoreWriter) Write(data any) error {
 	}
 }
 
-// TODO check that this does not overwrite existing sindexes
 // WriteSecondaryIndex writes a secondary index to Aerospike
+// TODO check that this does not overwrite existing sindexes
+// TODO support write policy
 func (rw *RestoreWriter) WriteSecondaryIndex(si *models.SecondaryIndex) error {
-	// SIndexes always have one path for now
-	if len(si.Paths) != 1 {
-		return errors.New("invalid number of sindex paths")
-	}
 
 	var sindexType a.IndexType
-	switch si.Paths[0].BinType {
+	switch si.Path.BinType {
 	case models.NumericSIDataType:
 		sindexType = a.NUMERIC
 	case models.StringSIDataType:
@@ -55,7 +53,7 @@ func (rw *RestoreWriter) WriteSecondaryIndex(si *models.SecondaryIndex) error {
 		return nil
 	}
 
-	binName := si.Paths[0].BinName
+	binName := si.Path.BinName
 	_, err := rw.asc.CreateIndex(nil, si.Namespace, si.Set, si.Name, binName, sindexType)
 
 	return err
@@ -63,6 +61,7 @@ func (rw *RestoreWriter) WriteSecondaryIndex(si *models.SecondaryIndex) error {
 
 // WriteUDF writes a UDF to Aerospike
 // TODO check that this does not overwrite existing UDFs
+// TODO support write policy
 func (rw *RestoreWriter) WriteUDF(udf *models.UDF) error {
 
 	var UDFLang a.Language

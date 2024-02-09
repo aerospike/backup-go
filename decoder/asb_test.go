@@ -245,13 +245,49 @@ func TestASBReader_readSIndex(t *testing.T) {
 				Set:       "testSet1",
 				Name:      "sindex1",
 				IndexType: models.BinSIndex,
-				Paths: []*models.SIndexPath{
-					{
-						BinName: "bin1",
-						BinType: models.NumericSIDataType,
-					},
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.NumericSIDataType,
 				},
-				ValuesCovered: 1,
+			},
+			wantErr: false,
+		},
+		{
+			name: "positive bin numeric no set",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" userdata1  sindex1 N 1 bin1 N\n"),
+				},
+			},
+			want: &models.SecondaryIndex{
+				Namespace: "userdata1",
+				Set:       "",
+				Name:      "sindex1",
+				IndexType: models.BinSIndex,
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.NumericSIDataType,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "positive bin numeric no set with context",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(" userdata1  sindex1 N 1 bin1 N context\n"),
+				},
+			},
+			want: &models.SecondaryIndex{
+				Namespace: "userdata1",
+				Set:       "",
+				Name:      "sindex1",
+				IndexType: models.BinSIndex,
+				Path: models.SIndexPath{
+					BinName:    "bin1",
+					BinType:    models.NumericSIDataType,
+					B64Context: "context",
+				},
 			},
 			wantErr: false,
 		},
@@ -267,13 +303,10 @@ func TestASBReader_readSIndex(t *testing.T) {
 				Set:       "testSet1",
 				Name:      "sindex1",
 				IndexType: models.ListElementSIndex,
-				Paths: []*models.SIndexPath{
-					{
-						BinName: "bin1",
-						BinType: models.StringSIDataType,
-					},
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.StringSIDataType,
 				},
-				ValuesCovered: 1,
 			},
 			wantErr: false,
 		},
@@ -289,13 +322,10 @@ func TestASBReader_readSIndex(t *testing.T) {
 				Set:       "testSet1",
 				Name:      "sindex1",
 				IndexType: models.MapKeySIndex,
-				Paths: []*models.SIndexPath{
-					{
-						BinName: "bin1",
-						BinType: models.GEO2DSphereSIDataType,
-					},
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.GEO2DSphereSIDataType,
 				},
-				ValuesCovered: 1,
 			},
 			wantErr: false,
 		},
@@ -311,13 +341,10 @@ func TestASBReader_readSIndex(t *testing.T) {
 				Set:       "testSet1",
 				Name:      "sindex1",
 				IndexType: models.MapValueSIndex,
-				Paths: []*models.SIndexPath{
-					{
-						BinName: "bin1",
-						BinType: models.BlobSIDataType,
-					},
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.BlobSIDataType,
 				},
-				ValuesCovered: 1,
 			},
 			wantErr: false,
 		},
@@ -3388,13 +3415,10 @@ func TestASBReader_readGlobals(t *testing.T) {
 				Set:       "testSet1",
 				Name:      "sindex1",
 				IndexType: models.BinSIndex,
-				Paths: []*models.SIndexPath{
-					{
-						BinName: "bin1",
-						BinType: models.NumericSIDataType,
-					},
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.NumericSIDataType,
 				},
-				ValuesCovered: 1,
 			},
 			wantErr: false,
 		},
@@ -3515,13 +3539,10 @@ func TestASBReader_NextToken(t *testing.T) {
 				Set:       "testSet1",
 				Name:      "sindex1",
 				IndexType: models.BinSIndex,
-				Paths: []*models.SIndexPath{
-					{
-						BinName: "bin1",
-						BinType: models.NumericSIDataType,
-					},
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.NumericSIDataType,
 				},
-				ValuesCovered: 1,
 			},
 			wantErr: false,
 		},

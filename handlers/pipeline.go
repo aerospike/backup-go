@@ -21,7 +21,6 @@ type DataProcessor interface {
 }
 
 type DataPipeline struct {
-	runLock         *sync.Mutex
 	readers         []readStage
 	processors      []processStage
 	writers         []writeStage
@@ -64,7 +63,6 @@ func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPip
 		readers:         readers,
 		processors:      processors,
 		writers:         writers,
-		runLock:         &sync.Mutex{},
 		readSendChan:    readSendChan,
 		processSendChan: processSendChan,
 	}
@@ -72,9 +70,6 @@ func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPip
 
 // TODO support passing in a context
 func (dp *DataPipeline) run() error {
-	dp.runLock.Lock()
-	defer dp.runLock.Unlock()
-
 	errc := make(chan error, len(dp.readers)+len(dp.processors)+len(dp.writers))
 
 	rg := &sync.WaitGroup{}
@@ -121,11 +116,6 @@ func (dp *DataPipeline) run() error {
 	close(errc)
 
 	return <-errc
-}
-
-func (dp *DataPipeline) Wait() {
-	dp.runLock.Lock()
-	defer dp.runLock.Unlock()
 }
 
 type readStage struct {

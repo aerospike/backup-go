@@ -37,7 +37,8 @@ func NewClient(ac *a.Client, cc Config) (*Client, error) {
 // just repetadly call the Run method of the generic handler with new io.readers/writers
 
 type EncoderFactory interface {
-	CreateEncoder() handlers.Encoder
+	CreateEncoder() (handlers.Encoder, error)
+	SetDestination(dest io.Writer)
 }
 
 // TODO make default constructor for these argument structs
@@ -62,6 +63,7 @@ func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderFactory, namespa
 
 type DecoderFactory interface {
 	CreateDecoder(src io.Reader) (handlers.Decoder, error)
+	SetSource(src io.Reader)
 }
 
 type RestoreFromReaderOptions struct {

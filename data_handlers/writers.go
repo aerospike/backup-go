@@ -1,7 +1,9 @@
 package datahandlers
 
 import (
+	"backuplib/encoder"
 	"backuplib/models"
+	"bytes"
 	"fmt"
 	"io"
 )
@@ -63,5 +65,32 @@ func (w *GenericWriter) Write(v interface{}) error {
 	}
 
 	_, err = w.output.Write(data)
+	return err
+}
+
+type ASBWriter struct {
+	GenericWriter
+	namespace string
+	first     bool
+}
+
+func NewASBWriter(encoder *encoder.ASBEncoder, output io.Writer) *ASBWriter {
+	return &ASBWriter{
+		GenericWriter: *NewGenericWriter(encoder, output),
+	}
+}
+
+func (w *ASBWriter) Init(namespace string, first bool) error {
+	w.namespace = namespace
+	w.first = first
+
+	header := bytes.Buffer{}
+	header.Write(encoder.GetVersionText())
+	header.Write(encoder.GetNamespaceMetaText(namespace))
+	if first {
+		header.Write(encoder.GetFirstMetaText())
+	}
+	_, err := w.output.Write(header.Bytes())
+
 	return err
 }

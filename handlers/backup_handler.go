@@ -7,9 +7,14 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
+type AerospikePolicies struct {
+	InfoPolicy *a.InfoPolicy
+}
+
 type BackupOpts struct {
 	Set      string
 	Parallel int
+	Policies AerospikePolicies
 }
 
 type BackupStatus struct {

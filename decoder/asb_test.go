@@ -1948,10 +1948,30 @@ func TestASBReader_readExpiration(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "positive no expiration",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader("0\n"),
+				},
+			},
+			want:    math.MaxUint32,
+			wantErr: false,
+		},
+		{
 			name: "negative bad expiration",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader("notanint\n"),
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative expiration too large",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("%d\n", math.MaxUint32+1)),
 				},
 			},
 			want:    0,

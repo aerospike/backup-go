@@ -2,8 +2,13 @@ package encoder
 
 import (
 	"backuplib/models"
+	"fmt"
+	"math"
 	"reflect"
 	"testing"
+	"time"
+
+	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 func Test_escapeASBS(t *testing.T) {
@@ -39,7 +44,7 @@ func Test_escapeASBS(t *testing.T) {
 	}
 }
 
-func Test_encodeSIndexToASB(t *testing.T) {
+func Test__SIndexToASB(t *testing.T) {
 	type args struct {
 		sindex *models.SecondaryIndex
 	}
@@ -107,13 +112,434 @@ func Test_encodeSIndexToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := encodeSIndexToASB(tt.args.sindex)
+			got, err := _SIndexToASB(tt.args.sindex)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeSIndexToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("encodeSIndexToASB() = %v, want %v", string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func Test_binToASB(t *testing.T) {
+	type args struct {
+		k string
+		v any
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "positive nil bin",
+			args: args{
+				k: "binName",
+				v: nil,
+			},
+			want: []byte("- N binName\n"),
+		},
+		{
+			name: "positive escaped bin name",
+			args: args{
+				k: "b\nin Nam\\e",
+				v: nil,
+			},
+			want: []byte("- N b\\\nin\\ Nam\\\\e\n"),
+		},
+		{
+			name: "positive bool bin",
+			args: args{
+				k: "binName",
+				v: true,
+			},
+			want: []byte("- Z binName T\n"),
+		},
+		{
+			name: "positive int bin",
+			args: args{
+				k: "binName",
+				v: int64(123),
+			},
+			want: []byte("- I binName 123\n"),
+		},
+		{
+			name: "positive negative int bin",
+			args: args{
+				k: "binName",
+				v: int64(-123),
+			},
+			want: []byte("- I binName -123\n"),
+		},
+		{
+			name: "positive float bin",
+			args: args{
+				k: "binName",
+				v: 123.456,
+			},
+			want: []byte("- D binName 123.456000\n"),
+		},
+		{
+			name: "positive negative float bin",
+			args: args{
+				k: "binName",
+				v: -123.456,
+			},
+			want: []byte("- D binName -123.456000\n"),
+		},
+		{
+			name: "positive string bin",
+			args: args{
+				k: "binName",
+				v: "hello",
+			},
+			want: []byte("- S binName 5 hello\n"),
+		},
+		{
+			name: "positive HLL bin",
+			args: args{
+				k: "binName",
+				v: a.HLLValue("hello"),
+			},
+			want: []byte("- Y binName 5 " + base64Encode(a.HLLValue("hello")) + "\n"),
+		},
+		{
+			name: "positive bytes bin",
+			args: args{
+				k: "binName",
+				v: []byte("hello"),
+			},
+			want: []byte("- B binName 5 " + base64Encode([]byte("hello")) + "\n"),
+		},
+		{
+			name: "negative map bin",
+			args: args{
+				k: "binName",
+				v: map[any]any{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative list bin",
+			args: args{
+				k: "binName",
+				v: []any{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative unknown bin",
+			args: args{
+				k: "binName",
+				v: struct{}{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := binToASB(tt.args.k, tt.args.v)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("encodeBinToASB() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("encodeBinToASB() = %v, want %v", string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func Test_boolToASB(t *testing.T) {
+	type args struct {
+		b bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want byte
+	}{
+		{
+			name: "positive true",
+			args: args{
+				b: true,
+			},
+			want: asbTrue,
+		},
+		{
+			name: "positive false",
+			args: args{
+				b: false,
+			},
+			want: asbFalse,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := boolToASB(tt.args.b); got != tt.want {
+				t.Errorf("boolToASB() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_binsToASB(t *testing.T) {
+	type args struct {
+		bins a.BinMap
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				bins: a.BinMap{
+					"bin1": true,
+					"bin2": int64(123),
+				},
+			},
+			want: []byte("- Z bin1 T\n- I bin2 123\n"),
+		},
+		{
+			name: "negative unknown bin",
+			args: args{
+				bins: a.BinMap{
+					"bin1": struct{}{},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := binsToASB(tt.args.bins)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("encodeBinsToASB() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("encodeBinsToASB() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_userKeyToASB(t *testing.T) {
+	type args struct {
+		userKey a.Value
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "positive int64 user key",
+			args: args{
+				userKey: a.NewValue(int64(123)),
+			},
+			want: []byte("+ k I 123\n"),
+		},
+		{
+			name: "positive negative int64 user key",
+			args: args{
+				userKey: a.NewValue(int64(-123)),
+			},
+			want: []byte("+ k I -123\n"),
+		},
+		{
+			name: "positive float64 user key",
+			args: args{
+				userKey: a.NewValue(123.456),
+			},
+			want: []byte("+ k D 123.456000\n"),
+		},
+		{
+			name: "positive negative float64 user key",
+			args: args{
+				userKey: a.NewValue(-123.456),
+			},
+			want: []byte("+ k D -123.456000\n"),
+		},
+		{
+			name: "positive string user key",
+			args: args{
+				userKey: a.NewValue("hello"),
+			},
+			want: []byte("+ k S 5 hello\n"),
+		},
+		{
+			name: "positive bytes user key",
+			args: args{
+				userKey: a.NewValue([]byte("hello")),
+			},
+			want: []byte("+ k B 5 " + base64Encode([]byte("hello")) + "\n"),
+		},
+		{
+			name: "positive nil user key",
+			args: args{
+				userKey: nil,
+			},
+			want: nil,
+		},
+		{
+			name: "negative unknown user key",
+			args: args{
+				userKey: a.NewValue(true),
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := userKeyToASB(tt.args.userKey)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("userKeyToASB() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("userKeyToASB() = %v, want %v", string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func Test_keyToASB(t *testing.T) {
+	NoSetKey, _ := a.NewKey("ns", "", 1)
+	stringKey, _ := a.NewKey("ns", "set", "hello")
+
+	type args struct {
+		k *a.Key
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "positive no set no user key",
+			args: args{
+				k: NoSetKey,
+			},
+			want: []byte(fmt.Sprintf("+ k I 1\n+ n ns\n+ d %s\n", base64Encode(NoSetKey.Digest()))),
+		},
+		{
+			name: "positive string key",
+			args: args{
+				k: stringKey,
+			},
+			want: []byte(fmt.Sprintf("+ k S 5 hello\n+ n ns\n+ d %s\n+ s set\n", base64Encode(stringKey.Digest()))),
+		},
+		{
+			name: "negative key is nil",
+			args: args{
+				k: nil,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := keyToASB(tt.args.k)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("keyToASB() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("keyToASB() = %v, want %v", string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func Test_getExpirationTime(t *testing.T) {
+	type args struct {
+		ttl      uint32
+		unix_now int64
+	}
+	tests := []struct {
+		name string
+		args args
+		want uint32
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				ttl:      123,
+				unix_now: citrusLeafEpoch,
+			},
+			want: 123,
+		},
+		{
+			name: "positive never expire",
+			args: args{
+				ttl: math.MaxUint32,
+			},
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getExpirationTime(tt.args.ttl, tt.args.unix_now); got != tt.want {
+				t.Errorf("getExpirationTime() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_recordToASB(t *testing.T) {
+	now := time.Now()
+	nowUnix := now.Unix()
+	getTimeNow = func() time.Time { return now }
+	recExpr := 10
+	expExpr := (nowUnix - citrusLeafEpoch) + int64(recExpr)
+
+	key, _ := a.NewKey("test", "demo", "1234")
+
+	type args struct {
+		r *models.Record
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				r: &models.Record{
+					Key: key,
+					Bins: a.BinMap{
+						"bin1": 0,
+						"bin2": "hello",
+					},
+					Generation: 1234,
+					Expiration: uint32(recExpr),
+				},
+			},
+			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), expExpr)),
+		},
+		// TODO add more tests
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := recordToASB(tt.args.r)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("recordToASB() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("recordToASB() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}

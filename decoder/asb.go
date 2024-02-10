@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	"strconv"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -74,6 +75,11 @@ const (
 // escape character
 const (
 	asbEscape = '\\'
+)
+
+// constants
+const (
+	citrusLeafEpoch = 1262304000 // pulled from C client cf_clock.h
 )
 
 // TODO maybe use error functions for each asb level, reader, section, line type
@@ -985,9 +991,14 @@ func (r *ASBReader) readBinCount() (uint16, error) {
 
 }
 
+// function pointer for time.Now allows for testing
+var getTimeNow = time.Now
+
 // readExpiration reads an expiration line from the asb file
 // it expects that r has been advanced past the expiration line marker '+ t '
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
+// TODO expireation needs to be updated based on how mmuch time has passed since the backup.
+// I think that should be done in a processor though, not here
 func (r *ASBReader) readExpiration() (uint32, error) {
 	exp, err := _readInteger(r, '\n')
 	if err != nil {
@@ -998,8 +1009,18 @@ func (r *ASBReader) readExpiration() (uint32, error) {
 		return 0, err
 	}
 
-	return uint32(exp), nil
+	if exp == 0 {
+		// 0 is a special value that means never expire
+		// the asb format stores this value as 0 but the server
+		// needs (uint32)-1
+		return math.MaxUint32, nil
+	}
 
+	if exp < 0 || exp > math.MaxUint32 {
+		return 0, fmt.Errorf("invalid expiration time %d", exp)
+	}
+
+	return uint32(exp), nil
 }
 
 func (r *ASBReader) readGeneration() (uint32, error) {

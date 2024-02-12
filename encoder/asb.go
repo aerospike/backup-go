@@ -1,39 +1,19 @@
 package encoder
 
 import (
-	"backuplib/encoder/record"
 	"backuplib/models"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"strconv"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-// PLANS ******
-// each tyype that goes into the backup file ex: records, udf, sindex
-// will get its own exported object. These will implement standard marshaling interfaces
-// starting with encoding TextMarshaller's https://pkg.go.dev/encoding#TextMarshaler MarshalText() ([]byte, error)
-// This package will export the Marshal generic function that will accept the exported types and call MarshalText on them (maybe)
-// sub types like Key will not have exported methods/types but instead be parsed in the methods of their supertypes, ex for key: record
-
-// To write serializer functions or wrapper types with marshal/unmarshal methods? that is the question
-// func SerialzeRecord(r a.Record) {
-
-// }
-
-type MarshalType int
-
 const (
-	RECORD = iota
-)
-
-const (
-	BackupFileVersion = 3.1
+	ASBFormatVersion = 3.1
 )
 
 type ASBEncoder struct {
@@ -49,8 +29,7 @@ func NewASBEncoder(w io.Writer) (*ASBEncoder, error) {
 }
 
 func (o *ASBEncoder) EncodeRecord(rec *models.Record) ([]byte, error) {
-	// TODO this should take a pointer
-	return record.NewRecord(*rec).MarshalText()
+	return recordToASB(rec)
 }
 
 func (o *ASBEncoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
@@ -62,8 +41,7 @@ func (o *ASBEncoder) EncodeSIndex(sindex *models.SecondaryIndex) ([]byte, error)
 }
 
 func GetVersionText() []byte {
-	versionString := strconv.FormatFloat(BackupFileVersion, 'f', -1, 64)
-	return []byte(fmt.Sprintf("Version %s\n", versionString))
+	return []byte(fmt.Sprintf("Version %f\n", ASBFormatVersion))
 }
 
 func GetNamespaceMetaText(namespace string) []byte {
@@ -94,6 +72,10 @@ var getTimeNow = time.Now
 
 func recordToASB(r *models.Record) ([]byte, error) {
 	var data []byte
+
+	if r == nil {
+		return nil, errors.New("record is nil")
+	}
 
 	keyText, err := keyToASB(r.Key)
 	if err != nil {
@@ -129,7 +111,8 @@ func binsToASB(bins a.BinMap) ([]byte, error) {
 
 	// NOTE golang's random order map iteration
 	// means that any backup files that include
-	// multi element bin maps will never be the same
+	// multi element bin maps may not be identical
+	// over multiple backups even if the data is the same
 	for k, v := range bins {
 		binText, err := binToASB(k, v)
 		if err != nil {
@@ -191,7 +174,7 @@ func keyToASB(k *a.Key) ([]byte, error) {
 	}
 	data = append(data, userKeyText...)
 
-	namespaceText := fmt.Sprintf("+ n %s\n", k.Namespace())
+	namespaceText := fmt.Sprintf("+ n %s\n", escapeASBS(k.Namespace()))
 	data = append(data, namespaceText...)
 
 	b64Digest := base64Encode(k.Digest())
@@ -199,7 +182,7 @@ func keyToASB(k *a.Key) ([]byte, error) {
 	data = append(data, digestText...)
 
 	if k.SetName() != "" {
-		setnameText := fmt.Sprintf("+ s %s\n", k.SetName())
+		setnameText := fmt.Sprintf("+ s %s\n", escapeASBS(k.SetName()))
 		data = append(data, setnameText...)
 	}
 

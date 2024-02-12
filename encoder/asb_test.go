@@ -5,11 +5,85 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/stretchr/testify/suite"
 )
+
+type asbEncoderTestSuite struct {
+	suite.Suite
+}
+
+func (suite *asbEncoderTestSuite) TestEncodeRecord() {
+	dst := &strings.Builder{}
+	encoder, err := NewASBEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	now := time.Now()
+	nowUnix := now.Unix()
+	getTimeNow = func() time.Time { return now }
+	defer func() { getTimeNow = time.Now }()
+	recExpr := 10
+	expExpr := (nowUnix - citrusLeafEpoch) + int64(recExpr)
+
+	key, _ := a.NewKey("test", "demo", "1234")
+	rec := &models.Record{
+		Key: key,
+		Bins: a.BinMap{
+			"bin1": 0,
+		},
+		Generation: 1234,
+		Expiration: uint32(recExpr),
+	}
+
+	expected := fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 1\n- I bin1 0\n", base64Encode(key.Digest()), expExpr)
+
+	actual, err := encoder.EncodeRecord(rec)
+	suite.Assert().NoError(err)
+	actStr := string(actual)
+	suite.Assert().Equal(expected, actStr)
+
+	actual, err = encoder.EncodeRecord(nil)
+	suite.Assert().Error(err)
+	suite.Assert().Nil(actual)
+}
+
+func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
+	dst := &strings.Builder{}
+	encoder, err := NewASBEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	sindex := &models.SecondaryIndex{
+		Namespace: "ns",
+		Name:      "name",
+		IndexType: models.BinSIndex,
+		Path: models.SIndexPath{
+			BinName: "bin",
+			BinType: models.StringSIDataType,
+		},
+	}
+
+	expected := []byte("* i ns  name N 1 bin S\n")
+	actual, err := encoder.EncodeSIndex(sindex)
+	suite.Assert().NoError(err)
+	suite.Assert().Equal(expected, actual)
+
+	actual, err = encoder.EncodeSIndex(nil)
+	suite.Assert().Error(err)
+	suite.Assert().Nil(actual)
+}
+
+func TestASBEncoderTestSuite(t *testing.T) {
+	suite.Run(t, new(asbEncoderTestSuite))
+}
 
 func Test_escapeASBS(t *testing.T) {
 	type args struct {
@@ -324,11 +398,19 @@ func Test_binsToASB(t *testing.T) {
 				t.Errorf("encodeBinsToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			sortedGot := sortBinOutput(string(got))
+			sortedWant := sortBinOutput(string(tt.want))
+			if !reflect.DeepEqual(sortedGot, sortedWant) {
 				t.Errorf("encodeBinsToASB() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func sortBinOutput(s string) []byte {
+	var sorted sort.StringSlice = strings.Split(s, "\n")
+	sorted.Sort()
+	return []byte(strings.Join(sorted, "\n"))
 }
 
 func Test_userKeyToASB(t *testing.T) {
@@ -415,6 +497,7 @@ func Test_userKeyToASB(t *testing.T) {
 func Test_keyToASB(t *testing.T) {
 	NoSetKey, _ := a.NewKey("ns", "", 1)
 	stringKey, _ := a.NewKey("ns", "set", "hello")
+	escKey, _ := a.NewKey("\\n s", "set\n", "hello")
 
 	type args struct {
 		k *a.Key
@@ -438,6 +521,13 @@ func Test_keyToASB(t *testing.T) {
 				k: stringKey,
 			},
 			want: []byte(fmt.Sprintf("+ k S 5 hello\n+ n ns\n+ d %s\n+ s set\n", base64Encode(stringKey.Digest()))),
+		},
+		{
+			name: "positive escaped key",
+			args: args{
+				k: escKey,
+			},
+			want: []byte(fmt.Sprintf("+ k S 5 hello\n+ n \\\\n\\ s\n+ d %s\n+ s set\\\n\n", base64Encode(escKey.Digest()))),
 		},
 		{
 			name: "negative key is nil",
@@ -500,10 +590,12 @@ func Test_recordToASB(t *testing.T) {
 	now := time.Now()
 	nowUnix := now.Unix()
 	getTimeNow = func() time.Time { return now }
+	defer func() { getTimeNow = time.Now }()
 	recExpr := 10
 	expExpr := (nowUnix - citrusLeafEpoch) + int64(recExpr)
 
 	key, _ := a.NewKey("test", "demo", "1234")
+	escKey, _ := a.NewKey("test\n", "de mo", "1234")
 
 	type args struct {
 		r *models.Record
@@ -529,7 +621,49 @@ func Test_recordToASB(t *testing.T) {
 			},
 			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), expExpr)),
 		},
-		// TODO add more tests
+		{
+			name: "positive escaped key",
+			args: args{
+				r: &models.Record{
+					Key: escKey,
+					Bins: a.BinMap{
+						"bin1": 0,
+						"bin2": "hello",
+					},
+					Generation: 1234,
+					Expiration: uint32(recExpr),
+				},
+			},
+			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\\\n\n+ d %s\n+ s de\\ mo\n+ g 1234\n+ t %d\n+ b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), expExpr)),
+		},
+		{
+			name: "negative record is nil",
+			args: args{
+				r: nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative key is nil",
+			args: args{
+				r: &models.Record{
+					Key: nil,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative bins is nil",
+			args: args{
+				r: &models.Record{
+					Key:        key,
+					Bins:       nil,
+					Expiration: uint32(recExpr),
+					Generation: 1234,
+				},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -538,8 +672,81 @@ func Test_recordToASB(t *testing.T) {
 				t.Errorf("recordToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			sortedGot := sortBinOutput(string(got))
+			sortedWant := sortBinOutput(string(tt.want))
+			if !reflect.DeepEqual(sortedGot, sortedWant) {
 				t.Errorf("recordToASB() = %v, want %v", string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func TestGetFirstMetaText(t *testing.T) {
+	tests := []struct {
+		name string
+		want []byte
+	}{
+		{
+			name: "positive simple",
+			want: []byte("# first-file\n"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetFirstMetaText(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetFirstMetaText() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetNamespaceMetaText(t *testing.T) {
+	type args struct {
+		namespace string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []byte
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				namespace: "ns",
+			},
+			want: []byte(fmt.Sprintf("# namespace %s\n", "ns")),
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				namespace: " n\ns\\",
+			},
+			want: []byte(fmt.Sprintf("# namespace %s\n", "\\ n\\\ns\\\\")),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetNamespaceMetaText(tt.args.namespace); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetNamespaceMetaText() = %v, want %v", string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func TestGetVersionText(t *testing.T) {
+	tests := []struct {
+		name string
+		want []byte
+	}{
+		{
+			name: "positive simple",
+			want: []byte(fmt.Sprintf("Version %f\n", ASBFormatVersion)),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetVersionText(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetVersionText() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}

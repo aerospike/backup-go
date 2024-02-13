@@ -38,13 +38,3 @@ func (dg *ASDataGenerator) GenerateRecord(namespace, set string) *a.Record {
 		Bins: dg.GenerateBins(),
 	}
 }
-
-type ASDataGeneratorFactory struct{}
-
-func NewASDataGeneratorFactory() *ASDataGeneratorFactory {
-	return &ASDataGeneratorFactory{}
-}
-
-func (dgf *ASDataGeneratorFactory) CreateDataGenerator(r *rand.Rand) DataGenerator {
-	return NewASDataGenerator(r)
-}

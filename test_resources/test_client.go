@@ -3,46 +3,28 @@ package testresources
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"reflect"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-type DataGenerator interface {
-	GenerateRecord(namespace, set string) *a.Record
-}
-
-type DataGeneratorFactory interface {
-	CreateDataGenerator(*rand.Rand) DataGenerator
-}
-
 type TestClient struct {
-	asc  *a.Client
-	seed *rand.Source
-	dgf  DataGeneratorFactory
+	asc *a.Client
 }
 
 type digest = string
 
 type RecordMap map[digest]*a.Record
 
-func NewTestClient(asc *a.Client, seed *rand.Source, dgf DataGeneratorFactory) *TestClient {
+func NewTestClient(asc *a.Client) *TestClient {
 	return &TestClient{
-		asc:  asc,
-		seed: seed,
-		dgf:  dgf,
+		asc: asc,
 	}
 }
 
 // TODO allow passing in bins
-func (tc *TestClient) WriteRecords(n int, namespace, set string) error {
-	rng := rand.New(*tc.seed)
-	dg := tc.dgf.CreateDataGenerator(rng)
-
-	for i := 0; i < n; i++ {
-		rec := dg.GenerateRecord(namespace, set)
-
+func (tc *TestClient) WriteRecords(n int, namespace, set string, recs []*a.Record) error {
+	for _, rec := range recs {
 		err := tc.asc.Put(nil, rec.Key, rec.Bins)
 		if err != nil {
 			return err
@@ -73,22 +55,23 @@ func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 	return records, nil
 }
 
-func (tc *TestClient) ValidateRecords(records RecordMap, expCount int, namespace, set string) error {
-	rng := rand.New(*tc.seed)
-	dg := tc.dgf.CreateDataGenerator(rng)
+func (tc *TestClient) ValidateRecords(expectedRecs []*a.Record, expCount int, namespace, set string) error {
+	actualRecs, err := tc.ReadAllRecords(namespace, set)
+	if err != nil {
+		return err
+	}
 
-	if len(records) != expCount {
+	if len(actualRecs) != expCount {
 		return errors.New("unexpected number of records")
 	}
 
-	for range records {
-		expected := dg.GenerateRecord(namespace, set)
-		actual, ok := records[string(expected.Key.Digest())]
+	for _, expRec := range expectedRecs {
+		actual, ok := actualRecs[string(expRec.Key.Digest())]
 		if !ok {
 			return errors.New("missing record")
 		}
-		if !reflect.DeepEqual(expected.Bins, actual.Bins) {
-			return fmt.Errorf("wanted bins: %v\n got bins: %v", expected.Bins, actual.Bins)
+		if !reflect.DeepEqual(expRec.Bins, actual.Bins) {
+			return fmt.Errorf("wanted bins: %v\n got bins: %v", expRec.Bins, actual.Bins)
 		}
 	}
 

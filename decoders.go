@@ -6,18 +6,18 @@ import (
 	"io"
 )
 
-type ASBReaderBuilder struct {
+type ASBDecoderBuilder struct {
 	src io.Reader
 }
 
-func NewASBReaderBuilder() *ASBReaderBuilder {
-	return &ASBReaderBuilder{}
+func NewASBDecoderBuilder() *ASBDecoderBuilder {
+	return &ASBDecoderBuilder{}
 }
 
-func (f *ASBReaderBuilder) SetSource(src io.Reader) {
+func (f *ASBDecoderBuilder) SetSource(src io.Reader) {
 	f.src = src
 }
 
-func (f *ASBReaderBuilder) CreateDecoder() (handlers.Decoder, error) {
-	return decoder.NewASBReader(f.src)
+func (f *ASBDecoderBuilder) CreateDecoder() (handlers.Decoder, error) {
+	return decoder.NewASBDecoder(f.src)
 }

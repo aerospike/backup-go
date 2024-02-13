@@ -13,13 +13,11 @@ import (
 )
 
 const (
-	ASBFormatVersion = 3.1
+	ASBFormatVersion = "3.1"
 )
 
 type ASBEncoder struct {
-	writer    io.Writer
-	first     bool
-	namespace string
+	writer io.Writer
 }
 
 func NewASBEncoder(w io.Writer) (*ASBEncoder, error) {
@@ -41,7 +39,7 @@ func (o *ASBEncoder) EncodeSIndex(sindex *models.SecondaryIndex) ([]byte, error)
 }
 
 func GetVersionText() []byte {
-	return []byte(fmt.Sprintf("Version %f\n", ASBFormatVersion))
+	return []byte(fmt.Sprintf("Version %s\n", ASBFormatVersion))
 }
 
 func GetNamespaceMetaText(namespace string) []byte {
@@ -54,13 +52,6 @@ func GetFirstMetaText() []byte {
 
 // **** RECORD ****
 
-// line markers
-const (
-	recordMetaChar byte = '+'
-	recordBinChar  byte = '-'
-)
-
-// constants
 const (
 	citrusLeafEpoch = 1262304000 // pulled from C client cf_clock.h
 	asbTrue         = 'T'

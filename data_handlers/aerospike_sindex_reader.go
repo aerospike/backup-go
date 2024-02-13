@@ -40,3 +40,7 @@ func (r *AerospikeSIndexReader) Read() (any, error) {
 
 	return nil, io.EOF
 }
+
+func (r *AerospikeSIndexReader) Cancel() error {
+	return nil
+}

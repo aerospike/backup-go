@@ -740,7 +740,7 @@ func TestGetVersionText(t *testing.T) {
 	}{
 		{
 			name: "positive simple",
-			want: []byte(fmt.Sprintf("Version %f\n", ASBFormatVersion)),
+			want: []byte(fmt.Sprintf("Version %s\n", ASBFormatVersion)),
 		},
 	}
 	for _, tt := range tests {

@@ -36,7 +36,7 @@ func NewClient(ac *a.Client, cc Config) (*Client, error) {
 // pipelines should be created at generic/io.reader/writer backup and read Run time so that the file methods
 // just repetadly call the Run method of the generic handler with new io.readers/writers
 
-type EncoderFactory interface {
+type EncoderBuilder interface {
 	CreateEncoder() (handlers.Encoder, error)
 	SetDestination(dest io.Writer)
 }
@@ -48,7 +48,7 @@ type BackupToWriterOptions struct {
 	Parallel int
 }
 
-func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderFactory, namespace string, opts BackupToWriterOptions) (*handlers.BackupToWriterHandler, <-chan error) {
+func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderBuilder, namespace string, opts BackupToWriterOptions) (*handlers.BackupToWriterHandler, <-chan error) {
 	args := handlers.BackupToWriterOpts{
 		BackupOpts: handlers.BackupOpts{
 			Parallel: opts.Parallel,
@@ -61,8 +61,8 @@ func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderFactory, namespa
 	return handler, errors
 }
 
-type DecoderFactory interface {
-	CreateDecoder(src io.Reader) (handlers.Decoder, error)
+type DecoderBuilder interface {
+	CreateDecoder() (handlers.Decoder, error)
 	SetSource(src io.Reader)
 }
 
@@ -70,7 +70,7 @@ type RestoreFromReaderOptions struct {
 	Parallel int
 }
 
-func (c *Client) RestoreFromReader(readers []io.Reader, dec DecoderFactory, opts RestoreFromReaderOptions) (*handlers.RestoreFromReaderHandler, <-chan error) {
+func (c *Client) RestoreFromReader(readers []io.Reader, dec DecoderBuilder, opts RestoreFromReaderOptions) (*handlers.RestoreFromReaderHandler, <-chan error) {
 	args := handlers.RestoreFromReaderArgs{
 		RestoreArgs: handlers.RestoreArgs{
 			Parallel: opts.Parallel,

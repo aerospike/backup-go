@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math/rand"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -40,9 +39,7 @@ func (suite *BackupRestoreTestSuite) SetupSuite() {
 
 	suite.Aeroclient = asc
 
-	randSource := rand.NewSource(0)
-	dataGenFactory := testresources.NewASDataGeneratorFactory()
-	testClient := testresources.NewTestClient(asc, &randSource, dataGenFactory)
+	testClient := testresources.NewTestClient(asc)
 	suite.testClient = testClient
 
 	backupCFG := backuplib.Config{}
@@ -69,7 +66,21 @@ func (suite *BackupRestoreTestSuite) TearDownTest() {
 // TODO make sure that sindex NULL values are filtered out
 func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
 	// Write some records to the database
-	err := suite.testClient.WriteRecords(10, namespace, "")
+	expectedRecs := make([]*a.Record, 10)
+	for i := 0; i < 10; i++ {
+		key, err := a.NewKey(namespace, "", i)
+		if err != nil {
+			panic(err)
+		}
+		expectedRecs[i] = &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"bin1": i,
+			},
+		}
+	}
+
+	err := suite.testClient.WriteRecords(10, namespace, "", expectedRecs)
 	if err != nil {
 		panic(err)
 	}
@@ -77,7 +88,7 @@ func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
 	dst := bytes.NewBuffer([]byte{})
 	enc := backuplib.NewASBEncoderFactory()
 
-	_, errors := suite.backupClient.BackupToWriter(
+	bh, errors := suite.backupClient.BackupToWriter(
 		[]io.Writer{dst},
 		enc,
 		"test",
@@ -85,13 +96,35 @@ func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
 			Parallel: 1,
 		},
 	)
+	suite.Assert().NotNil(bh)
 
 	err = <-errors
 	suite.Assert().Nil(err)
 
 	fmt.Print(dst.String())
 
+	suite.testClient.Truncate(namespace, "")
+
 	// TODO restore the records and check that they are the same
+
+	reader := bytes.NewReader(dst.Bytes())
+	dec := backuplib.NewASBDecoderBuilder()
+
+	rh, errors := suite.backupClient.RestoreFromReader(
+		[]io.Reader{reader},
+		dec,
+		backuplib.RestoreFromReaderOptions{
+			Parallel: 1,
+		},
+	)
+	suite.Assert().NotNil(rh)
+
+	err = <-errors
+	suite.Assert().Nil(err)
+
+	err = suite.testClient.ValidateRecords(expectedRecs, 10, namespace, "")
+	suite.Assert().Nil(err)
+
 }
 
 func TestBackupRestoreTestSuite(t *testing.T) {

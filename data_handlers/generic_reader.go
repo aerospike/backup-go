@@ -17,3 +17,7 @@ func NewGenericReader(decoder Decoder) *GenericReader {
 func (dr *GenericReader) Read() (any, error) {
 	return dr.decoder.NextToken()
 }
+
+func (dr *GenericReader) Cancel() error {
+	return nil
+}

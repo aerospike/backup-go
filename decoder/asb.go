@@ -149,15 +149,15 @@ type metaData struct {
 	First     bool
 }
 
-type ASBReader struct {
+type ASBDecoder struct {
 	countingByteScanner
 	header   *header
 	metaData *metaData
 }
 
-func NewASBReader(src io.Reader) (*ASBReader, error) {
+func NewASBDecoder(src io.Reader) (*ASBDecoder, error) {
 	cbs := bufio.NewReader(src)
-	asb := ASBReader{
+	asb := ASBDecoder{
 		countingByteScanner: countingByteScanner{
 			cbs,
 			0,
@@ -183,7 +183,7 @@ func NewASBReader(src io.Reader) (*ASBReader, error) {
 
 }
 
-func (r *ASBReader) NextToken() (any, error) {
+func (r *ASBDecoder) NextToken() (any, error) {
 	v, err := func() (any, error) {
 		b, err := _peek(r)
 		if err != nil {
@@ -217,7 +217,7 @@ type header struct {
 	Version string
 }
 
-func (r *ASBReader) readHeader() (*header, error) {
+func (r *ASBDecoder) readHeader() (*header, error) {
 	var res header
 
 	if err := _expectToken(r, asbVersionToken); err != nil {
@@ -244,7 +244,7 @@ func (r *ASBReader) readHeader() (*header, error) {
 }
 
 // readMetadata consumes all metadata lines
-func (r *ASBReader) readMetadata() (*metaData, error) {
+func (r *ASBDecoder) readMetadata() (*metaData, error) {
 	var res metaData
 
 	for {
@@ -298,7 +298,7 @@ func (r *ASBReader) readMetadata() (*metaData, error) {
 	return &res, nil
 }
 
-func (r *ASBReader) readNamespace() (string, error) {
+func (r *ASBDecoder) readNamespace() (string, error) {
 	bytes, err := _readUntil(r, '\n', true)
 	if err != nil {
 		return "", err
@@ -311,7 +311,7 @@ func (r *ASBReader) readNamespace() (string, error) {
 	return string(bytes), nil
 }
 
-func (r *ASBReader) readFirst() (bool, error) {
+func (r *ASBDecoder) readFirst() (bool, error) {
 	if err := _expectChar(r, '\n'); err != nil {
 		return false, err
 	}
@@ -320,7 +320,7 @@ func (r *ASBReader) readFirst() (bool, error) {
 
 }
 
-func (r *ASBReader) readGlobals() (any, error) {
+func (r *ASBDecoder) readGlobals() (any, error) {
 	var res any
 
 	if err := _expectChar(r, globalSectionMarker); err != nil {
@@ -356,7 +356,7 @@ func (r *ASBReader) readGlobals() (any, error) {
 
 // readSindex is used to read secondary index lines in the global section of the asb file.
 // readSindex expects that r has been advanced past the secondary index global line markter '* i'
-func (r *ASBReader) readSIndex() (*models.SecondaryIndex, error) {
+func (r *ASBDecoder) readSIndex() (*models.SecondaryIndex, error) {
 	var res models.SecondaryIndex
 
 	if err := _expectChar(r, ' '); err != nil {
@@ -491,7 +491,7 @@ func (r *ASBReader) readSIndex() (*models.SecondaryIndex, error) {
 
 // readUDF is used to read UDF lines in the global section of the asb file.
 // readUDF expects that r has been advanced past the UDF global line marker '* u '
-func (r *ASBReader) readUDF() (*models.UDF, error) {
+func (r *ASBDecoder) readUDF() (*models.UDF, error) {
 	var res models.UDF
 
 	if err := _expectChar(r, ' '); err != nil {
@@ -568,7 +568,7 @@ type recordData struct {
 
 var expectedRecordHeaderTypes = []byte{'k', 'n', 'd', 's', 'g', 't', 'b'}
 
-func (r *ASBReader) readRecord() (*models.Record, error) {
+func (r *ASBDecoder) readRecord() (*models.Record, error) {
 	var recData recordData
 
 	for i := 0; i < len(expectedRecordHeaderTypes); i++ {
@@ -681,7 +681,7 @@ func (r *ASBReader) readRecord() (*models.Record, error) {
 	return &rec, nil
 }
 
-func (r *ASBReader) readBins(count uint16) (a.BinMap, error) {
+func (r *ASBDecoder) readBins(count uint16) (a.BinMap, error) {
 	bins := make(a.BinMap, count)
 
 	for i := uint16(0); i < count; i++ {
@@ -749,7 +749,7 @@ var binTypes = map[byte]struct{}{
 	'G': {}, // geojson
 }
 
-func (r *ASBReader) readBin(bins a.BinMap) error {
+func (r *ASBDecoder) readBin(bins a.BinMap) error {
 	binType, err := r.ReadByte()
 	if err != nil {
 		return err
@@ -883,7 +883,7 @@ var asbKeyTypes = map[byte]struct{}{
 
 // readUserKey reads a record key line from the asb file
 // it expects that r has been advanced past the record key line marker '+ k'
-func (r *ASBReader) readUserKey() (any, error) {
+func (r *ASBDecoder) readUserKey() (any, error) {
 	var res any
 
 	keyTypeChar, err := r.ReadByte()
@@ -973,7 +973,7 @@ func (r *ASBReader) readUserKey() (any, error) {
 	return res, nil
 }
 
-func (r *ASBReader) readBinCount() (uint16, error) {
+func (r *ASBDecoder) readBinCount() (uint16, error) {
 	binCount, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -999,7 +999,7 @@ var getTimeNow = time.Now
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 // TODO expireation needs to be updated based on how mmuch time has passed since the backup.
 // I think that should be done in a processor though, not here
-func (r *ASBReader) readExpiration() (uint32, error) {
+func (r *ASBDecoder) readExpiration() (uint32, error) {
 	exp, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -1023,7 +1023,7 @@ func (r *ASBReader) readExpiration() (uint32, error) {
 	return uint32(exp), nil
 }
 
-func (r *ASBReader) readGeneration() (uint32, error) {
+func (r *ASBDecoder) readGeneration() (uint32, error) {
 	gen, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -1040,7 +1040,7 @@ func (r *ASBReader) readGeneration() (uint32, error) {
 	return uint32(gen), nil
 }
 
-func (r *ASBReader) readSet() (string, error) {
+func (r *ASBDecoder) readSet() (string, error) {
 	set, err := _readUntil(r, '\n', true)
 	if err != nil {
 		return "", err
@@ -1053,7 +1053,7 @@ func (r *ASBReader) readSet() (string, error) {
 	return string(set), err
 }
 
-func (r *ASBReader) readDigest() ([]byte, error) {
+func (r *ASBDecoder) readDigest() ([]byte, error) {
 	digest, err := _readBase64BytesDelimited(r, '\n')
 	if err != nil {
 		return nil, err

@@ -178,6 +178,10 @@ func parseAerospikeVersion(versionStr string) (AerospikeVersion, error) {
 }
 
 func parseSIndexResponse(sindexString string) ([]*models.SecondaryIndex, error) {
+	if sindexString == "" {
+		return nil, nil
+	}
+
 	// Remove the trailing semicolon if it exists
 	if sindexString[len(sindexString)-1] == ';' {
 		sindexString = sindexString[:len(sindexString)-1]

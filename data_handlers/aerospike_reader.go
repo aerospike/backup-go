@@ -17,7 +17,7 @@ type ARConfig struct {
 
 type ARStatus struct {
 	partitionFilter *a.PartitionFilter
-	backupStarted   bool
+	started         bool
 	scanPolicy      *a.ScanPolicy
 }
 
@@ -26,6 +26,7 @@ type AerospikeReader struct {
 	status     *ARStatus
 	client     *a.Client
 	recResChan <-chan *a.Result
+	recSet     *a.Recordset
 }
 
 func NewAerospikeReader(cfg *ARConfig, client *a.Client) *AerospikeReader {
@@ -40,18 +41,13 @@ func NewAerospikeReader(cfg *ARConfig, client *a.Client) *AerospikeReader {
 }
 
 func (j *AerospikeReader) Read() (any, error) {
-
-	// TODO do single shot work
-	// if j.status.first {
-	// }
-
-	if !j.status.backupStarted {
+	if !j.status.started {
 		var err error
 		j.recResChan, err = startScan(j)
 		if err != nil {
 			return nil, err
 		}
-		j.status.backupStarted = true
+		j.status.started = true
 	}
 
 	res, active := <-j.recResChan
@@ -65,6 +61,11 @@ func (j *AerospikeReader) Read() (any, error) {
 	rec := (*models.Record)(res.Record)
 
 	return rec, nil
+}
+
+func (j *AerospikeReader) Cancel() error {
+	j.status.started = false
+	return j.recSet.Close()
 }
 
 // **** Helper Functions
@@ -90,6 +91,8 @@ func startScan(j *AerospikeReader) (<-chan *a.Result, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	j.recSet = recSet
 
 	return recSet.Results(), nil
 }

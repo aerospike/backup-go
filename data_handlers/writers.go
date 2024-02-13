@@ -68,6 +68,10 @@ func (w *GenericWriter) Write(v interface{}) error {
 	return err
 }
 
+func (w *GenericWriter) Cancel() error {
+	return nil
+}
+
 type ASBWriter struct {
 	GenericWriter
 	namespace string

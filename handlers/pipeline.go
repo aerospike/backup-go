@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"io"
 	"math"
 	"sync"
@@ -10,10 +11,16 @@ import (
 type DataReader interface {
 	// Read must return io.EOF when there is no more data to read
 	Read() (any, error)
+	// Cancel tells the reader to clean up its resources
+	// usually this is a no-op
+	Cancel() error
 }
 
 type DataWriter interface {
 	Write(any) error
+	// Cancel tells the writer to clean up its resources
+	// usually this is a no-op
+	Cancel() error
 }
 
 type DataProcessor interface {
@@ -68,17 +75,20 @@ func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPip
 	}
 }
 
-// TODO support passing in a context
 func (dp *DataPipeline) run() error {
 	errc := make(chan error, len(dp.readers)+len(dp.processors)+len(dp.writers))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	rg := &sync.WaitGroup{}
 	for _, reader := range dp.readers {
 		rg.Add(1)
 		go func(reader readStage) {
 			defer rg.Done()
-			err := reader.Run()
+			err := reader.Run(ctx)
 			if err != nil {
+				cancel()
 				errc <- err
 			}
 		}(reader)
@@ -89,8 +99,9 @@ func (dp *DataPipeline) run() error {
 		pg.Add(1)
 		go func(processor processStage) {
 			defer pg.Done()
-			err := processor.Run()
+			err := processor.Run(ctx)
 			if err != nil {
+				cancel()
 				errc <- err
 			}
 		}(processor)
@@ -101,8 +112,9 @@ func (dp *DataPipeline) run() error {
 		wg.Add(1)
 		go func(writer writeStage) {
 			defer wg.Done()
-			err := writer.Run()
+			err := writer.Run(ctx)
 			if err != nil {
+				cancel()
 				errc <- err
 			}
 		}(writer)
@@ -115,6 +127,9 @@ func (dp *DataPipeline) run() error {
 	wg.Wait()
 	close(errc)
 
+	// TODO improve error handling
+	// this should return a slice of errors
+	// each error should identify the stage it came from
 	return <-errc
 }
 
@@ -124,7 +139,7 @@ type readStage struct {
 }
 
 // TODO support passing in a context
-func (rs *readStage) Run() error {
+func (rs *readStage) Run(ctx context.Context) error {
 	for {
 		v, err := rs.r.Read()
 		if err == io.EOF {
@@ -133,7 +148,11 @@ func (rs *readStage) Run() error {
 		if err != nil {
 			return err
 		}
-		rs.send <- v
+		select {
+		case <-ctx.Done():
+			return nil
+		case rs.send <- v:
+		}
 	}
 }
 
@@ -144,9 +163,17 @@ type processStage struct {
 }
 
 // TODO support passing in a context
-func (ps *processStage) Run() error {
+func (ps *processStage) Run(ctx context.Context) error {
 	for {
-		v, active := <-ps.receive
+		var (
+			v      any
+			active bool
+		)
+		select {
+		case <-ctx.Done():
+			return nil
+		case v, active = <-ps.receive:
+		}
 		if !active {
 			return nil
 		}
@@ -154,7 +181,11 @@ func (ps *processStage) Run() error {
 		if err != nil {
 			return err
 		}
-		ps.send <- v
+		select {
+		case <-ctx.Done():
+			return nil
+		case ps.send <- v:
+		}
 	}
 }
 
@@ -163,9 +194,17 @@ type writeStage struct {
 	receive chan any
 }
 
-func (ws *writeStage) Run() error {
+func (ws *writeStage) Run(ctx context.Context) error {
 	for {
-		v, active := <-ws.receive
+		var (
+			v      any
+			active bool
+		)
+		select {
+		case <-ctx.Done():
+			return nil
+		case v, active = <-ws.receive:
+		}
 		if !active {
 			return nil
 		}

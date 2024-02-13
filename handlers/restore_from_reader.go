@@ -13,7 +13,7 @@ type Decoder interface {
 }
 
 type DecoderBuilder interface {
-	CreateDecoder(src io.Reader) (Decoder, error)
+	CreateDecoder() (Decoder, error)
 	SetSource(src io.Reader)
 }
 
@@ -59,7 +59,7 @@ func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
 
 			for i := 0; i < numDataReaders; i++ {
 				rrh.dec.SetSource(reader)
-				decoder, err := rrh.dec.CreateDecoder(reader)
+				decoder, err := rrh.dec.CreateDecoder()
 				if err != nil {
 					errChan <- err
 					return

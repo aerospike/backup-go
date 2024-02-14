@@ -1,4 +1,4 @@
-package handlers
+package backuplib
 
 type workHandler struct {
 	currentJob *DataPipeline

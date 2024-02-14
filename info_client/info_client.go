@@ -101,13 +101,13 @@ func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
 	return getAerospikeVersion(ic.conn)
 }
 
-func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SecondaryIndex, error) {
+func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 	return getSIndexes(ic.conn, namespace)
 }
 
 // ***** Utility functions *****
 
-func getSIndexes(conn Connection, namespace string) ([]*models.SecondaryIndex, error) {
+func getSIndexes(conn Connection, namespace string) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersion{6, 1, 0}
 	version, err := getAerospikeVersion(conn)
 	if err != nil {
@@ -177,7 +177,7 @@ func parseAerospikeVersion(versionStr string) (AerospikeVersion, error) {
 	}, nil
 }
 
-func parseSIndexResponse(sindexString string) ([]*models.SecondaryIndex, error) {
+func parseSIndexResponse(sindexString string) ([]*models.SIndex, error) {
 	if sindexString == "" {
 		return nil, nil
 	}
@@ -197,7 +197,7 @@ func parseSIndexResponse(sindexString string) ([]*models.SecondaryIndex, error) 
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
 	}
 
-	sindexes := make([]*models.SecondaryIndex, len(sindexInfo))
+	sindexes := make([]*models.SIndex, len(sindexInfo))
 	for i, sindexStr := range sindexInfo {
 		sindex, err := parseSIndex(sindexStr)
 		if err != nil {
@@ -211,8 +211,8 @@ func parseSIndexResponse(sindexString string) ([]*models.SecondaryIndex, error) 
 }
 
 // parseSindex parses a single infoMap containing a sindex into a SecondaryIndex model
-func parseSIndex(sindexMap infoMap) (*models.SecondaryIndex, error) {
-	si := &models.SecondaryIndex{}
+func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
+	si := &models.SIndex{}
 
 	if val, ok := sindexMap["ns"]; ok {
 		si.Namespace = val

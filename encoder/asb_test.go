@@ -61,7 +61,7 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 		suite.FailNow("unexpected error: %v", err)
 	}
 
-	sindex := &models.SecondaryIndex{
+	sindex := &models.SIndex{
 		Namespace: "ns",
 		Name:      "name",
 		IndexType: models.BinSIndex,
@@ -120,7 +120,7 @@ func Test_escapeASBS(t *testing.T) {
 
 func Test__SIndexToASB(t *testing.T) {
 	type args struct {
-		sindex *models.SecondaryIndex
+		sindex *models.SIndex
 	}
 	tests := []struct {
 		name    string
@@ -131,7 +131,7 @@ func Test__SIndexToASB(t *testing.T) {
 		{
 			name: "positive sindex no set or context",
 			args: args{
-				sindex: &models.SecondaryIndex{
+				sindex: &models.SIndex{
 					Namespace: "ns",
 					Name:      "name",
 					IndexType: models.BinSIndex,
@@ -146,7 +146,7 @@ func Test__SIndexToASB(t *testing.T) {
 		{
 			name: "positive escaped sindex no context",
 			args: args{
-				sindex: &models.SecondaryIndex{
+				sindex: &models.SIndex{
 					Namespace: "n s",
 					Name:      "name\n",
 					Set:       "se\\t",
@@ -162,7 +162,7 @@ func Test__SIndexToASB(t *testing.T) {
 		{
 			name: "positive sindex with set and context",
 			args: args{
-				sindex: &models.SecondaryIndex{
+				sindex: &models.SIndex{
 					Namespace: "ns",
 					Name:      "name",
 					Set:       "set",
@@ -682,6 +682,7 @@ func Test_recordToASB(t *testing.T) {
 }
 
 func TestGetFirstMetaText(t *testing.T) {
+	enc := &ASBEncoder{}
 	tests := []struct {
 		name string
 		want []byte
@@ -693,7 +694,7 @@ func TestGetFirstMetaText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetFirstMetaText(); !reflect.DeepEqual(got, tt.want) {
+			if got := enc.GetFirstMetaText(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetFirstMetaText() = %v, want %v", got, tt.want)
 			}
 		})
@@ -701,6 +702,7 @@ func TestGetFirstMetaText(t *testing.T) {
 }
 
 func TestGetNamespaceMetaText(t *testing.T) {
+	enc := &ASBEncoder{}
 	type args struct {
 		namespace string
 	}
@@ -726,7 +728,7 @@ func TestGetNamespaceMetaText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetNamespaceMetaText(tt.args.namespace); !reflect.DeepEqual(got, tt.want) {
+			if got := enc.GetNamespaceMetaText(tt.args.namespace); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetNamespaceMetaText() = %v, want %v", string(got), string(tt.want))
 			}
 		})
@@ -734,6 +736,7 @@ func TestGetNamespaceMetaText(t *testing.T) {
 }
 
 func TestGetVersionText(t *testing.T) {
+	enc := &ASBEncoder{}
 	tests := []struct {
 		name string
 		want []byte
@@ -745,7 +748,7 @@ func TestGetVersionText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetVersionText(); !reflect.DeepEqual(got, tt.want) {
+			if got := enc.GetVersionText(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetVersionText() = %v, want %v", string(got), string(tt.want))
 			}
 		})

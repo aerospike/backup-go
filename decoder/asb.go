@@ -356,8 +356,8 @@ func (r *ASBDecoder) readGlobals() (any, error) {
 
 // readSindex is used to read secondary index lines in the global section of the asb file.
 // readSindex expects that r has been advanced past the secondary index global line markter '* i'
-func (r *ASBDecoder) readSIndex() (*models.SecondaryIndex, error) {
-	var res models.SecondaryIndex
+func (r *ASBDecoder) readSIndex() (*models.SIndex, error) {
+	var res models.SIndex
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -503,7 +503,7 @@ func (r *ASBDecoder) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	switch b {
+	switch models.UDFType(b) {
 	case models.LUAUDFType:
 		res.UDFType = models.LUAUDFType
 	default:

@@ -34,19 +34,19 @@ func (o *ASBEncoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
 	return nil, errors.New("UNIMPLEMENTED")
 }
 
-func (o *ASBEncoder) EncodeSIndex(sindex *models.SecondaryIndex) ([]byte, error) {
+func (o *ASBEncoder) EncodeSIndex(sindex *models.SIndex) ([]byte, error) {
 	return _SIndexToASB(sindex)
 }
 
-func GetVersionText() []byte {
+func (o *ASBEncoder) GetVersionText() []byte {
 	return []byte(fmt.Sprintf("Version %s\n", ASBFormatVersion))
 }
 
-func GetNamespaceMetaText(namespace string) []byte {
+func (o *ASBEncoder) GetNamespaceMetaText(namespace string) []byte {
 	return []byte(fmt.Sprintf("# namespace %s\n", escapeASBS(namespace)))
 }
 
-func GetFirstMetaText() []byte {
+func (o *ASBEncoder) GetFirstMetaText() []byte {
 	return []byte("# first-file\n")
 }
 
@@ -248,7 +248,7 @@ func escapeASBS(s string) string {
 }
 
 // TODO support escaped tokens
-func _SIndexToASB(sindex *models.SecondaryIndex) ([]byte, error) {
+func _SIndexToASB(sindex *models.SIndex) ([]byte, error) {
 	if sindex == nil {
 		return nil, errors.New("sindex is nil")
 	}

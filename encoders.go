@@ -2,7 +2,6 @@ package backuplib
 
 import (
 	"backuplib/encoder"
-	"backuplib/handlers"
 	"io"
 )
 
@@ -18,7 +17,7 @@ func (f *ASBEncoderFactory) SetDestination(dst io.Writer) {
 	f.dst = dst
 }
 
-func (f *ASBEncoderFactory) CreateEncoder() (handlers.Encoder, error) {
+func (f *ASBEncoderFactory) CreateEncoder() (Encoder, error) {
 	return encoder.NewASBEncoder(
 		f.dst,
 	)

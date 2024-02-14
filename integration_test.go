@@ -4,7 +4,6 @@ import (
 	"backuplib"
 	testresources "backuplib/test_resources"
 	"bytes"
-	"fmt"
 	"io"
 	"testing"
 
@@ -19,14 +18,14 @@ const (
 	BackupDirPath = "./test_resources/backup"
 )
 
-type BackupRestoreTestSuite struct {
+type backupRestoreTestSuite struct {
 	suite.Suite
 	Aeroclient   *a.Client
 	testClient   *testresources.TestClient
 	backupClient *backuplib.Client
 }
 
-func (suite *BackupRestoreTestSuite) SetupSuite() {
+func (suite *backupRestoreTestSuite) SetupSuite() {
 	asc, aerr := a.NewClientWithPolicy(
 		a.NewClientPolicy(),
 		Host,
@@ -51,23 +50,25 @@ func (suite *BackupRestoreTestSuite) SetupSuite() {
 	suite.backupClient = backupClient
 }
 
-func (suite *BackupRestoreTestSuite) TearDownSuite() {
+func (suite *backupRestoreTestSuite) TearDownSuite() {
 	suite.Aeroclient.Close()
 }
 
-func (suite *BackupRestoreTestSuite) SetupTest() {
+func (suite *backupRestoreTestSuite) SetupTest() {
 	suite.testClient.Truncate(namespace, "")
 }
 
-func (suite *BackupRestoreTestSuite) TearDownTest() {
+func (suite *backupRestoreTestSuite) TearDownTest() {
 	suite.testClient.Truncate(namespace, "")
 }
 
 // TODO make sure that sindex NULL values are filtered out
-func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
+// TODO mock the DB
+func (suite *backupRestoreTestSuite) TestBackupToWriter() {
 	// Write some records to the database
-	expectedRecs := make([]*a.Record, 10)
-	for i := 0; i < 10; i++ {
+	numRec := 100
+	expectedRecs := make([]*a.Record, numRec)
+	for i := 0; i < numRec; i++ {
 		key, err := a.NewKey(namespace, "", i)
 		if err != nil {
 			panic(err)
@@ -80,7 +81,7 @@ func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
 		}
 	}
 
-	err := suite.testClient.WriteRecords(10, namespace, "", expectedRecs)
+	err := suite.testClient.WriteRecords(numRec, namespace, "", expectedRecs)
 	if err != nil {
 		panic(err)
 	}
@@ -101,11 +102,7 @@ func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
 	err = <-errors
 	suite.Assert().Nil(err)
 
-	fmt.Print(dst.String())
-
 	suite.testClient.Truncate(namespace, "")
-
-	// TODO restore the records and check that they are the same
 
 	reader := bytes.NewReader(dst.Bytes())
 	dec := backuplib.NewASBDecoderBuilder()
@@ -122,11 +119,11 @@ func (suite *BackupRestoreTestSuite) TestBackupToWriter() {
 	err = <-errors
 	suite.Assert().Nil(err)
 
-	err = suite.testClient.ValidateRecords(expectedRecs, 10, namespace, "")
+	err = suite.testClient.ValidateRecords(expectedRecs, numRec, namespace, "")
 	suite.Assert().Nil(err)
 
 }
 
 func TestBackupRestoreTestSuite(t *testing.T) {
-	suite.Run(t, new(BackupRestoreTestSuite))
+	suite.Run(t, new(backupRestoreTestSuite))
 }

@@ -1,4 +1,4 @@
-package handlers
+package backuplib
 
 import (
 	"context"
@@ -140,6 +140,7 @@ type readStage struct {
 
 // TODO support passing in a context
 func (rs *readStage) Run(ctx context.Context) error {
+	defer rs.r.Cancel()
 	for {
 		v, err := rs.r.Read()
 		if err == io.EOF {
@@ -195,6 +196,7 @@ type writeStage struct {
 }
 
 func (ws *writeStage) Run(ctx context.Context) error {
+	defer ws.w.Cancel()
 	for {
 		var (
 			v      any

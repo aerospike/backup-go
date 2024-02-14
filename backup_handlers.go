@@ -1,10 +1,9 @@
-package handlers
+package backuplib
 
 import (
 	datahandlers "backuplib/data_handlers"
 	"backuplib/encoder"
 	infoclient "backuplib/info_client"
-	"backuplib/models"
 	"errors"
 	"io"
 	"time"
@@ -12,16 +11,90 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-type Encoder interface {
-	EncodeRecord(v *models.Record) ([]byte, error)
-	EncodeUDF(v *models.UDF) ([]byte, error)
-	EncodeSIndex(v *models.SecondaryIndex) ([]byte, error)
+const (
+	PARTITIONS = 4096
+)
+
+// **** Generic Backup Handler ****
+
+type AerospikePolicies struct {
+	InfoPolicy *a.InfoPolicy
 }
 
-type EncoderBuilder interface {
-	CreateEncoder() (Encoder, error)
-	SetDestination(dest io.Writer)
+type BackupOpts struct {
+	Set      string
+	Parallel int
+	Policies AerospikePolicies
 }
+
+type BackupStatus struct {
+	Active      bool
+	RecordCount int
+}
+
+type backupHandler struct {
+	namespace string
+	status    BackupStatus
+	opts      BackupOpts
+	// TODO this should be a backuplib client which means handlers need to move to the backuplib package
+	aeroClient *a.Client
+	worker     workHandler
+}
+
+func newBackupHandler(args BackupOpts, ac *a.Client, namespace string) *backupHandler {
+	wh := newWorkHandler()
+
+	handler := &backupHandler{
+		namespace:  namespace,
+		opts:       args,
+		aeroClient: ac,
+		worker:     *wh,
+	}
+
+	return handler
+}
+
+func (bh *backupHandler) run(writers []DataWriter) error {
+	readers := make([]DataReader, bh.opts.Parallel)
+	for i := 0; i < bh.opts.Parallel; i++ {
+		begin := (i * PARTITIONS) / bh.opts.Parallel
+		count := PARTITIONS / bh.opts.Parallel // TODO verify no off by 1 error
+
+		ARCFG := &datahandlers.ARRConfig{
+			Namespace:      bh.namespace,
+			Set:            bh.opts.Set,
+			FirstPartition: begin,
+			NumPartitions:  count,
+		}
+
+		dataReader := datahandlers.NewAerospikeRecordReader(
+			ARCFG,
+			bh.aeroClient,
+		)
+
+		readers[i] = dataReader
+	}
+
+	processors := make([]DataProcessor, bh.opts.Parallel)
+	for i := 0; i < bh.opts.Parallel; i++ {
+		processor := datahandlers.NewNOOPProcessor()
+		processors[i] = processor
+	}
+
+	job := NewDataPipeline(
+		readers,
+		processors,
+		writers,
+	)
+
+	return bh.worker.doJob(job)
+}
+
+func (bh *backupHandler) GetStats() (BackupStatus, error) {
+	return BackupStatus{}, errors.New("UNIMPLEMENTED")
+}
+
+// **** Backup To Writer Handler ****
 
 type BackupToWriterOpts struct {
 	BackupOpts
@@ -39,21 +112,18 @@ type BackupToWriterHandler struct {
 	backupHandler
 }
 
-func NewBackupToWriterHandler(args BackupToWriterOpts, ac *a.Client, enc EncoderBuilder, namespace string, writers []io.Writer) *BackupToWriterHandler {
-	backupHandler := newBackupHandler(args.BackupOpts, ac, namespace)
+func newBackupToWriterHandler(opts BackupToWriterOpts, ac *a.Client, enc EncoderBuilder, namespace string, writers []io.Writer) *BackupToWriterHandler {
+	backupHandler := newBackupHandler(opts.BackupOpts, ac, namespace)
 
 	return &BackupToWriterHandler{
-		opts:          args,
+		opts:          opts,
 		enc:           enc,
 		writers:       writers,
 		backupHandler: *backupHandler,
 	}
 }
 
-// TODO don't expose this by moving it to the backuplib package
-// we don't want users calling Run directly
-// TODO support passing in a context
-func (bwh *BackupToWriterHandler) Run(writers []io.Writer) <-chan error {
+func (bwh *BackupToWriterHandler) run(writers []io.Writer) <-chan error {
 	errors := make(chan error)
 
 	go func(errChan chan<- error) {
@@ -89,7 +159,7 @@ func (bwh *BackupToWriterHandler) Run(writers []io.Writer) <-chan error {
 				}
 			}
 
-			err := bwh.backupHandler.Run(dataWriters)
+			err := bwh.backupHandler.run(dataWriters)
 			if err != nil {
 				errChan <- err
 				return
@@ -126,7 +196,7 @@ func (bwh *BackupToWriterHandler) createOneShotPipeline(dw DataWriter) (*DataPip
 	}
 
 	// TODO add UDF reader
-	firstReader := datahandlers.NewAerospikeSIndexReader(infoclient, bwh.namespace)
+	firstReader := datahandlers.NewSIndexReader(infoclient, bwh.namespace)
 
 	firstJob := NewDataPipeline(
 		[]DataReader{firstReader},

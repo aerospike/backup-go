@@ -2,7 +2,6 @@ package backuplib
 
 import (
 	"backuplib/decoder"
-	"backuplib/handlers"
 	"io"
 )
 
@@ -18,6 +17,6 @@ func (f *ASBDecoderBuilder) SetSource(src io.Reader) {
 	f.src = src
 }
 
-func (f *ASBDecoderBuilder) CreateDecoder() (handlers.Decoder, error) {
+func (f *ASBDecoderBuilder) CreateDecoder() (Decoder, error) {
 	return decoder.NewASBDecoder(f.src)
 }

@@ -1,6 +1,15 @@
 package models
 
-// TODO make this a unique type
+import (
+	a "github.com/aerospike/aerospike-client-go/v7"
+)
+
+// **** Records ****
+
+type Record = a.Record
+
+// **** SIndexes ****
+
 type SIPathBinType byte
 
 const (
@@ -27,10 +36,24 @@ type SIndexPath struct {
 	B64Context string
 }
 
-type SecondaryIndex struct {
+type SIndex struct {
 	Namespace string
 	Set       string
 	Name      string
 	IndexType SIndexType
 	Path      SIndexPath
+}
+
+// **** UDFs ****
+
+type UDFType byte
+
+const (
+	LUAUDFType UDFType = 'L'
+)
+
+type UDF struct {
+	UDFType UDFType
+	Name    string
+	Content []byte
 }

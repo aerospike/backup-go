@@ -1,7 +1,7 @@
 package backuplib
 
 import (
-	"backuplib/handlers"
+	"backuplib/models"
 	"errors"
 	"io"
 
@@ -30,14 +30,14 @@ func NewClient(ac *a.Client, cc Config) (*Client, error) {
 	}, nil
 }
 
-// TODO IMPORTANT: implement Backup and Restore io.Reader and io.Writer methods
-// these can serve as the basis for the file methods and all other methods
-// under this paradigm, the file methods would only need to handle file opening and closing
-// pipelines should be created at generic/io.reader/writer backup and read Run time so that the file methods
-// just repetadly call the Run method of the generic handler with new io.readers/writers
+type Encoder interface {
+	EncodeRecord(*models.Record) ([]byte, error)
+	EncodeUDF(*models.UDF) ([]byte, error)
+	EncodeSIndex(*models.SIndex) ([]byte, error)
+}
 
 type EncoderBuilder interface {
-	CreateEncoder() (handlers.Encoder, error)
+	CreateEncoder() (Encoder, error)
 	SetDestination(dest io.Writer)
 }
 
@@ -48,21 +48,25 @@ type BackupToWriterOptions struct {
 	Parallel int
 }
 
-func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderBuilder, namespace string, opts BackupToWriterOptions) (*handlers.BackupToWriterHandler, <-chan error) {
-	args := handlers.BackupToWriterOpts{
-		BackupOpts: handlers.BackupOpts{
+func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderBuilder, namespace string, opts BackupToWriterOptions) (*BackupToWriterHandler, <-chan error) {
+	args := BackupToWriterOpts{
+		BackupOpts: BackupOpts{
 			Parallel: opts.Parallel,
 		},
 	}
 
-	handler := handlers.NewBackupToWriterHandler(args, c.aerospikeClient, enc, namespace, writers)
-	errors := handler.Run(writers)
+	handler := newBackupToWriterHandler(args, c.aerospikeClient, enc, namespace, writers)
+	errors := handler.run(writers)
 
 	return handler, errors
 }
 
+type Decoder interface {
+	NextToken() (any, error)
+}
+
 type DecoderBuilder interface {
-	CreateDecoder() (handlers.Decoder, error)
+	CreateDecoder() (Decoder, error)
 	SetSource(src io.Reader)
 }
 
@@ -70,14 +74,14 @@ type RestoreFromReaderOptions struct {
 	Parallel int
 }
 
-func (c *Client) RestoreFromReader(readers []io.Reader, dec DecoderBuilder, opts RestoreFromReaderOptions) (*handlers.RestoreFromReaderHandler, <-chan error) {
-	args := handlers.RestoreFromReaderArgs{
-		RestoreArgs: handlers.RestoreArgs{
+func (c *Client) RestoreFromReader(readers []io.Reader, dec DecoderBuilder, opts RestoreFromReaderOptions) (*RestoreFromReaderHandler, <-chan error) {
+	args := RestoreFromReaderOpts{
+		RestoreOpts: RestoreOpts{
 			Parallel: opts.Parallel,
 		},
 	}
 
-	handler := handlers.NewRestoreFromReaderHandler(args, c.aerospikeClient, dec, readers)
+	handler := NewRestoreFromReaderHandler(args, c.aerospikeClient, dec, readers)
 	errors := handler.Run(readers)
 
 	return handler, errors

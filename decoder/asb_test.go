@@ -228,7 +228,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 	type test struct {
 		name    string
 		fields  fields
-		want    *models.SecondaryIndex
+		want    *models.SIndex
 		wantErr bool
 	}
 
@@ -240,7 +240,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 					ByteScanner: strings.NewReader(" userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "testSet1",
 				Name:      "sindex1",
@@ -259,7 +259,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 					ByteScanner: strings.NewReader(" userdata1  sindex1 N 1 bin1 N\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "",
 				Name:      "sindex1",
@@ -278,7 +278,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 					ByteScanner: strings.NewReader(" userdata1  sindex1 N 1 bin1 N context\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "",
 				Name:      "sindex1",
@@ -298,7 +298,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 					ByteScanner: strings.NewReader(" userdata1 testSet1 sindex1 L 1 bin1 S\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "testSet1",
 				Name:      "sindex1",
@@ -317,7 +317,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 					ByteScanner: strings.NewReader(" userdata1 testSet1 sindex1 K 1 bin1 G\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "testSet1",
 				Name:      "sindex1",
@@ -336,7 +336,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 					ByteScanner: strings.NewReader(" userdata1 testSet1 sindex1 V 1 bin1 B\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "testSet1",
 				Name:      "sindex1",
@@ -3430,7 +3430,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 					ByteScanner: strings.NewReader("* i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "testSet1",
 				Name:      "sindex1",
@@ -3554,7 +3554,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					ByteScanner: strings.NewReader("* i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 				},
 			},
-			want: &models.SecondaryIndex{
+			want: &models.SIndex{
 				Namespace: "userdata1",
 				Set:       "testSet1",
 				Name:      "sindex1",

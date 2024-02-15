@@ -5,19 +5,19 @@ import (
 	"io"
 )
 
-type ASBEncoderFactory struct {
+type ASBEncoderBuilder struct {
 	dst io.Writer
 }
 
-func NewASBEncoderFactory() *ASBEncoderFactory {
-	return &ASBEncoderFactory{}
+func NewASBEncoderBuilder() *ASBEncoderBuilder {
+	return &ASBEncoderBuilder{}
 }
 
-func (f *ASBEncoderFactory) SetDestination(dst io.Writer) {
+func (f *ASBEncoderBuilder) SetDestination(dst io.Writer) {
 	f.dst = dst
 }
 
-func (f *ASBEncoderFactory) CreateEncoder() (Encoder, error) {
+func (f *ASBEncoderBuilder) CreateEncoder() (Encoder, error) {
 	return encoder.NewASBEncoder(
 		f.dst,
 	)

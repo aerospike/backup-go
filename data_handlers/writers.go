@@ -74,9 +74,7 @@ func (w *GenericWriter) Write(v any) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the GenericWriter
-func (w *GenericWriter) Cancel() error {
-	return nil
-}
+func (w *GenericWriter) Cancel() {}
 
 // **** Aerospike Backup Writer ****
 
@@ -220,6 +218,4 @@ func (rw *RestoreWriter) writeUDF(udf *models.UDF) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter
-func (rw *RestoreWriter) Cancel() error {
-	return nil
-}
+func (rw *RestoreWriter) Cancel() {}

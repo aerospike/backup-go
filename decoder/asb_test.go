@@ -1835,7 +1835,7 @@ func TestASBReader_readRecord(t *testing.T) {
 				t.Errorf("ASBReader.readRecord() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// TODO don't use cmp.Diff here
+			// TODO don't use cmp.Diff here, use testify instead
 			if diff := cmp.Diff(got, tt.want, keyCmp); diff != "" {
 				t.Errorf("ASBReader.readRecord() mismatch:\n%s", diff)
 			}

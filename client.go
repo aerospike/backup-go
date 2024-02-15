@@ -14,24 +14,16 @@ type BackupMarshaller interface {
 
 type Config struct{}
 
-// DBClient is an interface the encapsulates the aerospike Go client
-// APIs used by the backuplib.
-// In order to use an Aerospike client with the backuplib, it can
-// be wrapped by NewWrappedAerospikeClient()
-//
-//go:generate mockery --name DBClient
-type DBClient interface {
-	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
-	ScanPartitions(*a.ScanPolicy, *a.PartitionFilter, string, string, ...string) (*a.Recordset, a.Error)
-	RequestInfo(*a.InfoPolicy, ...string) (map[string]string, error)
+type Policies struct {
+	InfoPolicy *a.InfoPolicy
 }
 
 type Client struct {
-	aerospikeClient DBClient
+	aerospikeClient *a.Client
 	config          Config
 }
 
-func NewClient(ac DBClient, cc Config) (*Client, error) {
+func NewClient(ac *a.Client, cc Config) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}
@@ -60,9 +52,19 @@ type BackupToWriterOptions struct {
 	Parallel int
 }
 
-func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderBuilder, namespace string, opts BackupToWriterOptions) (*BackupToWriterHandler, <-chan error) {
-	args := BackupToWriterOpts{
-		BackupOpts: BackupOpts{
+func NewDefaultBackupToWriterOptions() *BackupToWriterOptions {
+	return &BackupToWriterOptions{
+		Parallel: 1,
+	}
+}
+
+func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderBuilder, namespace string, opts *BackupToWriterOptions) (*BackupToWriterHandler, <-chan error) {
+	if opts == nil {
+		opts = NewDefaultBackupToWriterOptions()
+	}
+
+	args := backupToWriterOpts{
+		backupOpts: backupOpts{
 			Parallel: opts.Parallel,
 		},
 	}
@@ -87,13 +89,13 @@ type RestoreFromReaderOptions struct {
 }
 
 func (c *Client) RestoreFromReader(readers []io.Reader, dec DecoderBuilder, opts RestoreFromReaderOptions) (*RestoreFromReaderHandler, <-chan error) {
-	args := RestoreFromReaderOpts{
-		RestoreOpts: RestoreOpts{
+	args := restoreFromReaderOpts{
+		restoreOpts: restoreOpts{
 			Parallel: opts.Parallel,
 		},
 	}
 
-	handler := NewRestoreFromReaderHandler(args, c.aerospikeClient, dec, readers)
+	handler := newRestoreFromReaderHandler(args, c.aerospikeClient, dec, readers)
 	errors := handler.run(readers)
 
 	return handler, errors

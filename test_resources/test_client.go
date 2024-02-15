@@ -23,7 +23,7 @@ func NewTestClient(asc *a.Client) *TestClient {
 }
 
 // TODO allow passing in bins
-func (tc *TestClient) WriteRecords(n int, namespace, set string, recs []*a.Record) error {
+func (tc *TestClient) WriteRecords(namespace, set string, recs []*a.Record) error {
 	for _, rec := range recs {
 		err := tc.asc.Put(nil, rec.Key, rec.Bins)
 		if err != nil {

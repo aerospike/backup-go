@@ -94,7 +94,7 @@ func newReaderError(offset uint64, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading asb file at character %d: %w", offset, err)
+	return fmt.Errorf("error while reading asb file at character, %d: %w", offset, err)
 }
 
 func newSectionError(section string, err error) error {
@@ -104,7 +104,7 @@ func newSectionError(section string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading section: %s: %w", section, err)
+	return fmt.Errorf("error while reading section: %s, %w", section, err)
 }
 
 func newLineError(lineType string, err error) error {
@@ -114,7 +114,7 @@ func newLineError(lineType string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading line type: %s: %w", lineType, err)
+	return fmt.Errorf("error while reading line type: %s, %w", lineType, err)
 }
 
 type countingByteScanner struct {

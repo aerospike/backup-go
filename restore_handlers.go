@@ -8,7 +8,7 @@ import (
 
 // **** Generic Restore Handler ****
 
-type RestoreOpts struct {
+type restoreOpts struct {
 	Parallel int
 }
 
@@ -30,12 +30,12 @@ type worker interface {
 
 type restoreHandler struct {
 	status   RestoreStatus
-	args     RestoreOpts
+	args     restoreOpts
 	dbClient DBRestoreClient
 	worker   worker
 }
 
-func newRestoreHandler(opts RestoreOpts, ac DBRestoreClient, w worker) *restoreHandler {
+func newRestoreHandler(opts restoreOpts, ac DBRestoreClient, w worker) *restoreHandler {
 	return &restoreHandler{
 		args:     opts,
 		dbClient: ac,
@@ -72,8 +72,8 @@ func (*restoreHandler) GetStats() (RestoreStatus, error) {
 
 // **** Restore From Reader Handler ****
 
-type RestoreFromReaderOpts struct {
-	RestoreOpts
+type restoreFromReaderOpts struct {
+	restoreOpts
 }
 
 type RestoreFromReaderStatus struct {
@@ -82,16 +82,16 @@ type RestoreFromReaderStatus struct {
 
 type RestoreFromReaderHandler struct {
 	status  RestoreFromReaderStatus
-	args    RestoreFromReaderOpts
+	args    restoreFromReaderOpts
 	dec     DecoderBuilder
 	readers []io.Reader
 	restoreHandler
 }
 
-func NewRestoreFromReaderHandler(opts RestoreFromReaderOpts, ac DBRestoreClient, dec DecoderBuilder, readers []io.Reader) *RestoreFromReaderHandler {
+func newRestoreFromReaderHandler(opts restoreFromReaderOpts, ac DBRestoreClient, dec DecoderBuilder, readers []io.Reader) *RestoreFromReaderHandler {
 	worker := newWorkHandler()
 
-	restoreHandler := newRestoreHandler(opts.RestoreOpts, ac, worker)
+	restoreHandler := newRestoreHandler(opts.restoreOpts, ac, worker)
 
 	return &RestoreFromReaderHandler{
 		args:           opts,
@@ -101,8 +101,6 @@ func NewRestoreFromReaderHandler(opts RestoreFromReaderOpts, ac DBRestoreClient,
 	}
 }
 
-// TODO don't expose this by moving it to the backuplib package
-// we don't want users calling run directly
 func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) <-chan error {
 	errors := make(chan error)
 

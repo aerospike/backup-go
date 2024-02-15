@@ -8,21 +8,29 @@ import (
 )
 
 // Reader is an interface for reading data
+//
+//go:generate mockery --name Reader
 type Reader interface {
 	// Read must return io.EOF when there is no more data to read
 	Read() (any, error)
 	// Cancel tells the reader to clean up its resources
 	// usually this is a no-op
-	Cancel() error
+	Cancel()
 }
 
+// Writer is an interface for writing data
+//
+//go:generate mockery --name Writer
 type Writer interface {
 	Write(any) error
 	// Cancel tells the writer to clean up its resources
 	// usually this is a no-op
-	Cancel() error
+	Cancel()
 }
 
+// Processor is an interface for processing data
+//
+//go:generate mockery --name Processor
 type Processor interface {
 	Process(any) (any, error)
 }
@@ -36,6 +44,9 @@ type DataPipeline struct {
 }
 
 func NewDataPipeline(r []Reader, p []Processor, w []Writer) *DataPipeline {
+	if len(r) == 0 || len(p) == 0 || len(w) == 0 {
+		return nil
+	}
 
 	chanSize := int(math.Max(math.Max(float64(len(r)), float64(len(p))), float64(len(w))))
 
@@ -169,7 +180,6 @@ type processStage struct {
 	receive chan any
 }
 
-// TODO support passing in a context
 func (ps *processStage) Run(ctx context.Context) error {
 	for {
 		var (

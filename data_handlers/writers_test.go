@@ -67,8 +67,7 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	suite.NotNil(err)
 	suite.Equal("rec,si,udf", output.String())
 
-	err = writer.Cancel()
-	suite.Nil(err)
+	writer.Cancel()
 
 	mockEncoder.AssertExpectations(suite.T())
 
@@ -138,8 +137,7 @@ func (suite *writersTestSuite) TestASBWriter() {
 	suite.Nil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,udf", output.String())
 
-	err = writer.Cancel()
-	suite.Nil(err)
+	writer.Cancel()
 
 	mockEncoder.AssertExpectations(suite.T())
 
@@ -180,8 +178,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	err := writer.Write(expRecord)
 	suite.Nil(err)
 
-	err = writer.Cancel()
-	suite.Nil(err)
+	writer.Cancel()
 
 	mockDBWriter.AssertExpectations(suite.T())
 

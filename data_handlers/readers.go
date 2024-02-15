@@ -43,9 +43,7 @@ func (dr *GenericReader) Read() (any, error) {
 
 // Cancel satisfies the DataReader interface
 // but is a no-op for the GenericReader
-func (dr *GenericReader) Cancel() error {
-	return nil
-}
+func (dr *GenericReader) Cancel() {}
 
 // **** Aerospike DB Reader ****
 
@@ -120,12 +118,11 @@ func (j *AerospikeRecordReader) Read() (any, error) {
 
 // Cancel cancels the Aerospike scan used to read records
 // if it was started
-func (j *AerospikeRecordReader) Cancel() error {
+func (j *AerospikeRecordReader) Cancel() {
 	j.status.started = false
 	if j.recSet != nil {
-		return j.recSet.Close()
+		j.recSet.Close()
 	}
-	return nil
 }
 
 func startScan(j *AerospikeRecordReader) (<-chan *a.Result, error) {
@@ -203,6 +200,4 @@ func (r *SIndexReader) Read() (any, error) {
 
 // Cancel satisfies the DataReader interface
 // but is a no-op for the SIndexReader
-func (r *SIndexReader) Cancel() error {
-	return nil
-}
+func (r *SIndexReader) Cancel() {}

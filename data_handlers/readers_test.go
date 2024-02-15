@@ -29,8 +29,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	suite.Nil(err)
 	suite.Equal("hi", v)
 
-	err = reader.Cancel()
-	suite.Nil(err)
+	reader.Cancel()
 
 	mockDecoder.AssertExpectations(suite.T())
 }
@@ -197,8 +196,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	}
 
 	recover()
-	err = reader.Cancel()
-	suite.Nil(err)
+	reader.Cancel()
 	suite.False(reader.status.started)
 
 }
@@ -235,8 +233,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	suite.Equal(err, io.EOF)
 	suite.Nil(v)
 
-	err = reader.Cancel()
-	suite.Nil(err)
+	reader.Cancel()
 
 	mockSIndexGetter.AssertExpectations(suite.T())
 

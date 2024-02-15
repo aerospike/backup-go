@@ -131,9 +131,11 @@ func binToASB(k string, v any) ([]byte, error) {
 	case string:
 		return []byte(fmt.Sprintf("- S %s %d %s\n", binName, len(v), v)), nil
 	case a.HLLValue:
-		return []byte(fmt.Sprintf("- Y %s %d %s\n", binName, len(v), base64Encode(v))), nil
+		encoded := base64Encode(v)
+		return []byte(fmt.Sprintf("- Y %s %d %s\n", binName, len(encoded), encoded)), nil
 	case []byte:
-		return []byte(fmt.Sprintf("- B %s %d %s\n", binName, len(v), base64Encode(v))), nil
+		encoded := base64Encode(v)
+		return []byte(fmt.Sprintf("- B %s %d %s\n", binName, len(encoded), encoded)), nil
 	case map[any]any:
 		return nil, errors.New("map bin not supported")
 	case []any:
@@ -201,7 +203,8 @@ func userKeyToASB(userKey a.Value) ([]byte, error) {
 	case string:
 		data = []byte(fmt.Sprintf("+ k S %d %s\n", len(v), v))
 	case []byte:
-		data = []byte(fmt.Sprintf("+ k B %d %s\n", len(v), base64Encode(v)))
+		encoded := base64Encode(v)
+		data = []byte(fmt.Sprintf("+ k B %d %s\n", len(encoded), encoded))
 	default:
 		return nil, fmt.Errorf("invalid user key type: %T", v)
 	}

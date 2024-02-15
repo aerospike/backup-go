@@ -199,6 +199,7 @@ func Test__SIndexToASB(t *testing.T) {
 }
 
 func Test_binToASB(t *testing.T) {
+	encVal := base64Encode(a.HLLValue("hello"))
 	type args struct {
 		k string
 		v any
@@ -279,7 +280,7 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: a.HLLValue("hello"),
 			},
-			want: []byte("- Y binName 5 " + base64Encode(a.HLLValue("hello")) + "\n"),
+			want: []byte(fmt.Sprintf("- Y binName %d %s\n", len(encVal), encVal)),
 		},
 		{
 			name: "positive bytes bin",
@@ -287,7 +288,7 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: []byte("hello"),
 			},
-			want: []byte("- B binName 5 " + base64Encode([]byte("hello")) + "\n"),
+			want: []byte(fmt.Sprintf("- B binName %d %s\n", len(encVal), encVal)),
 		},
 		{
 			name: "negative map bin",
@@ -414,6 +415,7 @@ func sortBinOutput(s string) []byte {
 }
 
 func Test_userKeyToASB(t *testing.T) {
+	encVal := base64Encode([]byte("hello"))
 	type args struct {
 		userKey a.Value
 	}
@@ -463,7 +465,7 @@ func Test_userKeyToASB(t *testing.T) {
 			args: args{
 				userKey: a.NewValue([]byte("hello")),
 			},
-			want: []byte("+ k B 5 " + base64Encode([]byte("hello")) + "\n"),
+			want: []byte(fmt.Sprintf("+ k B %d %s\n", len(encVal), encVal)),
 		},
 		{
 			name: "positive nil user key",

@@ -6,7 +6,6 @@ import (
 	infoclient "backuplib/info_client"
 	"errors"
 	"io"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -37,25 +36,30 @@ type backupHandler struct {
 	status    BackupStatus
 	opts      BackupOpts
 	// TODO this should be a backuplib client which means handlers need to move to the backuplib package
-	aeroClient *a.Client
-	worker     workHandler
+	dbClient DBBackupClient
+	worker   workHandler
 }
 
-func newBackupHandler(args BackupOpts, ac *a.Client, namespace string) *backupHandler {
+type DBBackupClient interface {
+	datahandlers.Scanner
+	infoclient.InfoGetter
+}
+
+func newBackupHandler(args BackupOpts, ac DBBackupClient, namespace string) *backupHandler {
 	wh := newWorkHandler()
 
 	handler := &backupHandler{
-		namespace:  namespace,
-		opts:       args,
-		aeroClient: ac,
-		worker:     *wh,
+		namespace: namespace,
+		opts:      args,
+		dbClient:  ac,
+		worker:    *wh,
 	}
 
 	return handler
 }
 
-func (bh *backupHandler) run(writers []DataWriter) error {
-	readers := make([]DataReader, bh.opts.Parallel)
+func (bh *backupHandler) run(writers []datahandlers.Writer) error {
+	readers := make([]datahandlers.Reader, bh.opts.Parallel)
 	for i := 0; i < bh.opts.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.opts.Parallel
 		count := PARTITIONS / bh.opts.Parallel // TODO verify no off by 1 error
@@ -69,25 +73,25 @@ func (bh *backupHandler) run(writers []DataWriter) error {
 
 		dataReader := datahandlers.NewAerospikeRecordReader(
 			ARCFG,
-			bh.aeroClient,
+			bh.dbClient,
 		)
 
 		readers[i] = dataReader
 	}
 
-	processors := make([]DataProcessor, bh.opts.Parallel)
+	processors := make([]datahandlers.Processor, bh.opts.Parallel)
 	for i := 0; i < bh.opts.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
 	}
 
-	job := NewDataPipeline(
+	job := datahandlers.NewDataPipeline(
 		readers,
 		processors,
 		writers,
 	)
 
-	return bh.worker.doJob(job)
+	return bh.worker.DoJob(job)
 }
 
 func (bh *backupHandler) GetStats() (BackupStatus, error) {
@@ -112,7 +116,7 @@ type BackupToWriterHandler struct {
 	backupHandler
 }
 
-func newBackupToWriterHandler(opts BackupToWriterOpts, ac *a.Client, enc EncoderBuilder, namespace string, writers []io.Writer) *BackupToWriterHandler {
+func newBackupToWriterHandler(opts BackupToWriterOpts, ac DBBackupClient, enc EncoderBuilder, namespace string, writers []io.Writer) *BackupToWriterHandler {
 	backupHandler := newBackupHandler(opts.BackupOpts, ac, namespace)
 
 	return &BackupToWriterHandler{
@@ -132,7 +136,7 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) <-chan error {
 		for i, writer := range writers {
 
 			numDataWriters := bwh.opts.Parallel
-			dataWriters := make([]DataWriter, numDataWriters)
+			dataWriters := make([]datahandlers.Writer, numDataWriters)
 
 			for j := 0; j < numDataWriters; j++ {
 				dw, err := getDataWriter(bwh.enc, writer, bwh.namespace, i == 0)
@@ -152,7 +156,7 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) <-chan error {
 					return
 				}
 
-				err = bwh.worker.doJob(oneShotJob)
+				err = bwh.worker.DoJob(oneShotJob)
 				if err != nil {
 					errChan <- err
 					return
@@ -175,39 +179,27 @@ func (bwh *BackupToWriterHandler) GetStats() (BackupToWriterStatus, error) {
 	return BackupToWriterStatus{}, errors.New("UNIMPLEMENTED")
 }
 
-func (bwh *BackupToWriterHandler) createOneShotPipeline(dw DataWriter) (*DataPipeline, error) {
+func (bwh *BackupToWriterHandler) createOneShotPipeline(dw datahandlers.Writer) (*datahandlers.DataPipeline, error) {
 	// SIndex and UDF work is done "first" because parallelizing it
 	// would scramble which writers receive the data
 	firstWriter := dw
 	firstProcessor := datahandlers.NewNOOPProcessor()
 
-	var timeout time.Duration
-	if bwh.opts.Policies.InfoPolicy != nil {
-		timeout = bwh.opts.Policies.InfoPolicy.Timeout
-	}
-
-	infoOpts := infoclient.InfoClientOpts{
-		InfoTimeout: timeout,
-	}
-
-	infoclient, err := infoclient.NewInfoClientFromAerospike(bwh.aeroClient, &infoOpts)
-	if err != nil {
-		return nil, err
-	}
+	infoclient := infoclient.NewInfoClient(bwh.dbClient, bwh.opts.Policies.InfoPolicy)
 
 	// TODO add UDF reader
 	firstReader := datahandlers.NewSIndexReader(infoclient, bwh.namespace)
 
-	firstJob := NewDataPipeline(
-		[]DataReader{firstReader},
-		[]DataProcessor{firstProcessor},
-		[]DataWriter{firstWriter},
+	firstJob := datahandlers.NewDataPipeline(
+		[]datahandlers.Reader{firstReader},
+		[]datahandlers.Processor{firstProcessor},
+		[]datahandlers.Writer{firstWriter},
 	)
 
 	return firstJob, nil
 }
 
-func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (DataWriter, error) {
+func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (datahandlers.Writer, error) {
 	eb.SetDestination(w)
 	enc, err := eb.CreateEncoder()
 	if err != nil {

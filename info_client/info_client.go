@@ -15,8 +15,8 @@ const (
 	defaultTimeout = time.Second * 2
 )
 
-type Connection interface {
-	RequestInfo(names ...string) (map[string]string, error)
+type InfoGetter interface {
+	RequestInfo(infoPolicy *a.InfoPolicy, names ...string) (map[string]string, error)
 }
 
 type wrappedAerospikeConnection struct {
@@ -55,61 +55,37 @@ func (av AerospikeVersion) IsGreaterThan(other AerospikeVersion) bool {
 	return true
 }
 
-type InfoClientOpts struct {
-	InfoTimeout time.Duration
-}
-
-func NewDefaultInfoClientOpts() *InfoClientOpts {
-	return &InfoClientOpts{
-		InfoTimeout: defaultTimeout,
-	}
-}
-
 type InfoClient struct {
-	conn Connection
-	opts *InfoClientOpts
+	conn       InfoGetter
+	infoPolicy *a.InfoPolicy
 }
 
-func NewInfoClient(conn Connection, opts *InfoClientOpts) *InfoClient {
+func NewInfoClient(conn InfoGetter, infoPolicy *a.InfoPolicy) *InfoClient {
 	ic := &InfoClient{
-		conn: conn,
-	}
-
-	if opts == nil {
-		opts = NewDefaultInfoClientOpts()
+		conn:       conn,
+		infoPolicy: infoPolicy,
 	}
 
 	return ic
 }
 
-func NewInfoClientFromAerospike(aeroClient *a.Client, opts *InfoClientOpts) (*InfoClient, error) {
-	conn, err := aeroClient.GetNodes()[0].GetConnection(opts.InfoTimeout)
-	if err != nil {
-		return nil, err
-	}
-
-	wrappedClient := &wrappedAerospikeConnection{conn: conn}
-
-	return NewInfoClient(wrappedClient, opts), nil
-}
-
 func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
-	return ic.conn.RequestInfo(names...)
+	return ic.conn.RequestInfo(ic.infoPolicy, names...)
 }
 
 func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
-	return getAerospikeVersion(ic.conn)
+	return getAerospikeVersion(ic.infoPolicy, ic.conn)
 }
 
 func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
-	return getSIndexes(ic.conn, namespace)
+	return getSIndexes(ic.infoPolicy, ic.conn, namespace)
 }
 
 // ***** Utility functions *****
 
-func getSIndexes(conn Connection, namespace string) ([]*models.SIndex, error) {
+func getSIndexes(infoPolicy *a.InfoPolicy, conn InfoGetter, namespace string) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersion{6, 1, 0}
-	version, err := getAerospikeVersion(conn)
+	version, err := getAerospikeVersion(infoPolicy, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
@@ -117,7 +93,7 @@ func getSIndexes(conn Connection, namespace string) ([]*models.SIndex, error) {
 	getCtx := version.IsGreaterThan(supportsSIndexCTX) || version == supportsSIndexCTX
 	cmd := buildSindexCmd(namespace, getCtx)
 
-	response, err := conn.RequestInfo(cmd)
+	response, err := conn.RequestInfo(infoPolicy, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sindexes: %w", err)
 	}
@@ -138,8 +114,8 @@ func buildSindexCmd(namespace string, getCtx bool) string {
 	return cmd
 }
 
-func getAerospikeVersion(conn Connection) (AerospikeVersion, error) {
-	versionResp, err := conn.RequestInfo("build")
+func getAerospikeVersion(infoPolicy *a.InfoPolicy, conn InfoGetter) (AerospikeVersion, error) {
+	versionResp, err := conn.RequestInfo(infoPolicy, "build")
 	if err != nil {
 		return AerospikeVersion{}, err
 	}

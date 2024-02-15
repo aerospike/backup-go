@@ -4,8 +4,6 @@ import (
 	datahandlers "backuplib/data_handlers"
 	"errors"
 	"io"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 // **** Generic Restore Handler ****
@@ -19,44 +17,53 @@ type RestoreStatus struct {
 	RecordCount int
 }
 
-type restoreHandler struct {
-	status     RestoreStatus
-	args       RestoreOpts
-	aeroClient *a.Client
-	worker     workHandler
+// DBRestoreClient is an interface for writing data to a database
+// The Aerospike Go client satisfies this interface
+type DBRestoreClient interface {
+	datahandlers.DBWriter
 }
 
-func newRestoreHandler(opts RestoreOpts, ac *a.Client) *restoreHandler {
-	wh := newWorkHandler()
+// worker is an interface for running a job
+type worker interface {
+	DoJob(*datahandlers.DataPipeline) error
+}
 
+type restoreHandler struct {
+	status   RestoreStatus
+	args     RestoreOpts
+	dbClient DBRestoreClient
+	worker   worker
+}
+
+func newRestoreHandler(opts RestoreOpts, ac DBRestoreClient, w worker) *restoreHandler {
 	return &restoreHandler{
-		args:       opts,
-		aeroClient: ac,
-		worker:     *wh,
+		args:     opts,
+		dbClient: ac,
+		worker:   w,
 	}
 }
 
-func (rh *restoreHandler) Run(readers []DataReader) error {
+func (rh *restoreHandler) run(readers []datahandlers.Reader) error {
 
-	processors := make([]DataProcessor, rh.args.Parallel)
+	processors := make([]datahandlers.Processor, rh.args.Parallel)
 	for i := 0; i < rh.args.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
 	}
 
-	writers := make([]DataWriter, rh.args.Parallel)
+	writers := make([]datahandlers.Writer, rh.args.Parallel)
 	for i := 0; i < rh.args.Parallel; i++ {
-		writer := datahandlers.NewRestoreWriter(rh.aeroClient)
+		writer := datahandlers.NewRestoreWriter(rh.dbClient)
 		writers[i] = writer
 	}
 
-	job := NewDataPipeline(
+	job := datahandlers.NewDataPipeline(
 		readers,
 		processors,
 		writers,
 	)
 
-	return rh.worker.doJob(job)
+	return rh.worker.DoJob(job)
 }
 
 func (*restoreHandler) GetStats() (RestoreStatus, error) {
@@ -81,8 +88,10 @@ type RestoreFromReaderHandler struct {
 	restoreHandler
 }
 
-func NewRestoreFromReaderHandler(opts RestoreFromReaderOpts, ac *a.Client, dec DecoderBuilder, readers []io.Reader) *RestoreFromReaderHandler {
-	restoreHandler := newRestoreHandler(opts.RestoreOpts, ac)
+func NewRestoreFromReaderHandler(opts RestoreFromReaderOpts, ac DBRestoreClient, dec DecoderBuilder, readers []io.Reader) *RestoreFromReaderHandler {
+	worker := newWorkHandler()
+
+	restoreHandler := newRestoreHandler(opts.RestoreOpts, ac, worker)
 
 	return &RestoreFromReaderHandler{
 		args:           opts,
@@ -93,8 +102,8 @@ func NewRestoreFromReaderHandler(opts RestoreFromReaderOpts, ac *a.Client, dec D
 }
 
 // TODO don't expose this by moving it to the backuplib package
-// we don't want users calling Run directly
-func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
+// we don't want users calling run directly
+func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) <-chan error {
 	errors := make(chan error)
 
 	go func(errChan chan<- error) {
@@ -103,7 +112,7 @@ func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
 		for _, reader := range readers {
 
 			numDataReaders := rrh.args.Parallel
-			dataReaders := make([]DataReader, numDataReaders)
+			dataReaders := make([]datahandlers.Reader, numDataReaders)
 
 			for i := 0; i < numDataReaders; i++ {
 				rrh.dec.SetSource(reader)
@@ -116,7 +125,7 @@ func (rrh *RestoreFromReaderHandler) Run(readers []io.Reader) <-chan error {
 				dataReaders[i] = datahandlers.NewGenericReader(decoder)
 			}
 
-			err := rrh.restoreHandler.Run(dataReaders)
+			err := rrh.restoreHandler.run(dataReaders)
 			if err != nil {
 				errChan <- err
 				return

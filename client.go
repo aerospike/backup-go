@@ -14,12 +14,24 @@ type BackupMarshaller interface {
 
 type Config struct{}
 
+// DBClient is an interface the encapsulates the aerospike Go client
+// APIs used by the backuplib.
+// In order to use an Aerospike client with the backuplib, it can
+// be wrapped by NewWrappedAerospikeClient()
+//
+//go:generate mockery --name DBClient
+type DBClient interface {
+	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
+	ScanPartitions(*a.ScanPolicy, *a.PartitionFilter, string, string, ...string) (*a.Recordset, a.Error)
+	RequestInfo(*a.InfoPolicy, ...string) (map[string]string, error)
+}
+
 type Client struct {
-	aerospikeClient *a.Client
+	aerospikeClient DBClient
 	config          Config
 }
 
-func NewClient(ac *a.Client, cc Config) (*Client, error) {
+func NewClient(ac DBClient, cc Config) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}
@@ -82,7 +94,7 @@ func (c *Client) RestoreFromReader(readers []io.Reader, dec DecoderBuilder, opts
 	}
 
 	handler := NewRestoreFromReaderHandler(args, c.aerospikeClient, dec, readers)
-	errors := handler.Run(readers)
+	errors := handler.run(readers)
 
 	return handler, errors
 }

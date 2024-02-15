@@ -1,14 +1,13 @@
 package backuplib
 
-type workHandler struct {
-	currentJob *DataPipeline
-}
+import datahandlers "backuplib/data_handlers"
+
+type workHandler struct{}
 
 func newWorkHandler() *workHandler {
 	return &workHandler{}
 }
 
-func (wh *workHandler) doJob(job *DataPipeline) error {
-	wh.currentJob = job
-	return wh.currentJob.run()
+func (wh *workHandler) DoJob(job *datahandlers.DataPipeline) error {
+	return job.Run()
 }

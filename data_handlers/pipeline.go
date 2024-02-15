@@ -1,4 +1,4 @@
-package backuplib
+package datahandlers
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"sync"
 )
 
-// DataReader is an interface for reading data
-type DataReader interface {
+// Reader is an interface for reading data
+type Reader interface {
 	// Read must return io.EOF when there is no more data to read
 	Read() (any, error)
 	// Cancel tells the reader to clean up its resources
@@ -16,14 +16,14 @@ type DataReader interface {
 	Cancel() error
 }
 
-type DataWriter interface {
+type Writer interface {
 	Write(any) error
 	// Cancel tells the writer to clean up its resources
 	// usually this is a no-op
 	Cancel() error
 }
 
-type DataProcessor interface {
+type Processor interface {
 	Process(any) (any, error)
 }
 
@@ -35,7 +35,7 @@ type DataPipeline struct {
 	processSendChan chan any
 }
 
-func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPipeline {
+func NewDataPipeline(r []Reader, p []Processor, w []Writer) *DataPipeline {
 
 	chanSize := int(math.Max(math.Max(float64(len(r)), float64(len(p))), float64(len(w))))
 
@@ -75,8 +75,14 @@ func NewDataPipeline(r []DataReader, p []DataProcessor, w []DataWriter) *DataPip
 	}
 }
 
-func (dp *DataPipeline) run() error {
-	errc := make(chan error, len(dp.readers)+len(dp.processors)+len(dp.writers))
+func (dp *DataPipeline) Run() error {
+	chanLen := len(dp.readers) + len(dp.processors) + len(dp.writers)
+
+	if chanLen == 0 {
+		return nil
+	}
+
+	errc := make(chan error, chanLen)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -134,7 +140,7 @@ func (dp *DataPipeline) run() error {
 }
 
 type readStage struct {
-	r    DataReader
+	r    Reader
 	send chan any
 }
 
@@ -158,7 +164,7 @@ func (rs *readStage) Run(ctx context.Context) error {
 }
 
 type processStage struct {
-	p       DataProcessor
+	p       Processor
 	send    chan any
 	receive chan any
 }
@@ -191,7 +197,7 @@ func (ps *processStage) Run(ctx context.Context) error {
 }
 
 type writeStage struct {
-	w       DataWriter
+	w       Writer
 	receive chan any
 }
 

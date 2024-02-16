@@ -7,15 +7,35 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-type BackupMarshaller interface {
-	MarshalRecord(*a.Record) ([]byte, error)
-}
+// Client is the main entry point for the backuplib package
+// It wraps an aerospike client and provides methods to start backup and restore operations
+// It contains a Config object that can be used to set default policies for the backup and restore operations
+// If the Policies field is nil, the aerospike client's default policies will be used
+// These policies will be used as defaults for any backup and restore operations started by the client
+// Example usage:
+// 	asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
+// 	if aerr != nil {
+// 		// handle error
+// 	}
+// 	backupCFG := backuplib.NewConfig()	// create a backuplib config
+// 	backupClient, err := backuplib.NewClient(asc, backupCFG)	// create a backuplib client
+// 	if err != nil {
+// 		// handle error
+// 	}
+// 	// use the backup client to start backup and restore operations
+// 	backupHandler, err := backupClient.BackupToWriter(writers, nil)
+// 	if err != nil {
+// 		// handle error
+//  }
+// 	// use the backupHandler to wait for the backup operation to finish
+// 	// err = backupHandler.Wait()
 
 type Client struct {
 	aerospikeClient *a.Client
 	config          Config
 }
 
+// NewClient creates a new backuplib client
 func NewClient(ac *a.Client, cc Config) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
@@ -27,6 +47,9 @@ func NewClient(ac *a.Client, cc Config) (*Client, error) {
 	}, nil
 }
 
+// getUsablePolicy returns the policies to be used for the backup and restore operations
+// If the input policies are nil, the client's default policies will be used
+// If the client's default policies are nil, the aerospike client's default policies will be used
 func (c *Client) getUsablePolicy(p *Policies) *Policies {
 	policies := p
 	if policies == nil {
@@ -51,6 +74,7 @@ func (c *Client) getUsablePolicy(p *Policies) *Policies {
 	return policies
 }
 
+// BackupToWriter starts a backup operation to a set of io.writers
 func (c *Client) BackupToWriter(writers []io.Writer, config *BackupToWriterConfig) (*BackupToWriterHandler, error) {
 	if config == nil {
 		config = NewBackupToWriterConfig()
@@ -67,6 +91,7 @@ func (c *Client) BackupToWriter(writers []io.Writer, config *BackupToWriterConfi
 	return handler, nil
 }
 
+// RestoreFromReader starts a restore operation from a set of io.readers
 func (c *Client) RestoreFromReader(readers []io.Reader, config *RestoreFromReaderConfig) (*RestoreFromReaderHandler, error) {
 	if config == nil {
 		config = NewRestoreFromReaderConfig()

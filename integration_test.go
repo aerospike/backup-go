@@ -66,18 +66,16 @@ func (suite *backupRestoreTestSuite) TearDownTest() {
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
-	// Write some records to the database
-	// b64Blob := base64.StdEncoding.EncodeToString([]byte("bytes"))
-	numRec := 100
+	numRec := 1000
 	bins := a.BinMap{
 		"IntBin":    1,
 		"FloatBin":  1.1,
 		"StringBin": "string",
 		"BoolBin":   true,
 		"BlobBin":   []byte("bytes"),
-		// "HLLBin":    a.NewHLLValue([]byte{}),
-		// "bin5": a.NewList(1, "string", true, []byte("bytes")),
-		// "bin6": a.NewMap(map[interface{}]interface{}{}),
+		// TODO "HLLBin":    a.NewHLLValue([]byte{}),
+		// TODO "MapBin": a.NewList(1, "string", true, []byte("bytes")),
+		// TODO "ListBin": a.NewMap(map[interface{}]interface{}{}),
 	}
 	expectedRecs := genRecords(namespace, set, numRec, bins)
 
@@ -87,42 +85,36 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	}
 
 	dst := bytes.NewBuffer([]byte{})
-	enc := backuplib.NewASBEncoderBuilder()
 
-	bh, errors := suite.backupClient.BackupToWriter(
+	bh, err := suite.backupClient.BackupToWriter(
 		[]io.Writer{dst},
-		enc,
-		"test",
 		nil,
 	)
-	suite.Assert().NotNil(bh)
+	suite.Nil(err)
+	suite.NotNil(bh)
 
-	err = <-errors
-	suite.Assert().Nil(err)
+	err = bh.Wait()
+	suite.Nil(err)
 
 	suite.testClient.Truncate(namespace, set)
 
 	reader := bytes.NewReader(dst.Bytes())
-	dec := backuplib.NewASBDecoderBuilder()
 
-	rh, errors := suite.backupClient.RestoreFromReader(
+	rh, err := suite.backupClient.RestoreFromReader(
 		[]io.Reader{reader},
-		dec,
-		backuplib.RestoreFromReaderOptions{
-			Parallel: 1,
-		},
+		nil,
 	)
-	suite.Assert().NotNil(rh)
+	suite.Nil(err)
+	suite.NotNil(rh)
 
-	err = <-errors
-	suite.Assert().Nil(err)
+	err = rh.Wait()
+	suite.Nil(err)
 
 	err = suite.testClient.ValidateRecords(expectedRecs, numRec, namespace, set)
-	suite.Assert().Nil(err)
+	suite.Nil(err)
 }
 
 func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
-	//b64Blob := base64.StdEncoding.EncodeToString([]byte("bytes"))
 	userKeys := []any{1, "string", []byte("bytes")}
 	recs := make([]*a.Record, numRec)
 	for i := 0; i < numRec; i++ {
@@ -133,7 +125,7 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 		case string:
 			userKey = k + fmt.Sprint(i)
 		case []byte:
-			userKey = append(k, byte(i))
+			userKey = append(k, []byte(fmt.Sprint(i))...)
 		}
 		key, err := a.NewKey(namespace, set, userKey)
 		if err != nil {

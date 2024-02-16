@@ -2,6 +2,7 @@ package backuplib
 
 import datahandlers "backuplib/data_handlers"
 
+// workHandler is a generic worker for running a data pipeline (job)
 type workHandler struct{}
 
 func newWorkHandler() *workHandler {

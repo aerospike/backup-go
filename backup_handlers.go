@@ -15,43 +15,23 @@ const (
 
 // **** Generic Backup Handler ****
 
-type backupOpts struct {
-	Set      string
-	Parallel int
-	Policies Policies
-}
-
-func newDefaultBackupOpts() *backupOpts {
-	return &backupOpts{
-		Set:      "",
-		Parallel: 1,
-		// TODO get the default policy from the aerospike client
-		Policies: Policies{
-			InfoPolicy: nil,
-		},
-	}
-}
-
-type BackupStatus struct {
-	Active      bool
-	RecordCount int
-}
+// TODO fill this out
+type BackupStatus struct{}
 
 type backupHandler struct {
-	namespace string
-	status    BackupStatus
-	opts      backupOpts
-	// TODO this should be a backuplib client which means handlers need to move to the backuplib package
+	namespace       string
+	status          *BackupStatus
+	config          *BackupBaseConfig
 	aerospikeClient *a.Client
 	worker          workHandler
 }
 
-func newBackupHandler(args backupOpts, ac *a.Client, namespace string) *backupHandler {
+func newBackupHandler(config *BackupBaseConfig, ac *a.Client, namespace string) *backupHandler {
 	wh := newWorkHandler()
 
 	handler := &backupHandler{
 		namespace:       namespace,
-		opts:            args,
+		config:          config,
 		aerospikeClient: ac,
 		worker:          *wh,
 	}
@@ -60,28 +40,28 @@ func newBackupHandler(args backupOpts, ac *a.Client, namespace string) *backupHa
 }
 
 func (bh *backupHandler) run(writers []datahandlers.Writer) error {
-	readers := make([]datahandlers.Reader, bh.opts.Parallel)
-	for i := 0; i < bh.opts.Parallel; i++ {
-		begin := (i * PARTITIONS) / bh.opts.Parallel
-		count := PARTITIONS / bh.opts.Parallel // TODO verify no off by 1 error
+	readers := make([]datahandlers.Reader, bh.config.Parallel)
+	for i := 0; i < bh.config.Parallel; i++ {
+		begin := (i * PARTITIONS) / bh.config.Parallel
+		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
 
-		ARCFG := &datahandlers.ARRConfig{
+		ARRCFG := &datahandlers.ARRConfig{
 			Namespace:      bh.namespace,
-			Set:            bh.opts.Set,
+			Set:            bh.config.Set,
 			FirstPartition: begin,
 			NumPartitions:  count,
 		}
 
 		dataReader := datahandlers.NewAerospikeRecordReader(
-			ARCFG,
+			ARRCFG,
 			bh.aerospikeClient,
 		)
 
 		readers[i] = dataReader
 	}
 
-	processors := make([]datahandlers.Processor, bh.opts.Parallel)
-	for i := 0; i < bh.opts.Parallel; i++ {
+	processors := make([]datahandlers.Processor, bh.config.Parallel)
+	for i := 0; i < bh.config.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
 	}
@@ -101,74 +81,76 @@ func (bh *backupHandler) GetStats() (BackupStatus, error) {
 
 // **** Backup To Writer Handler ****
 
-type backupToWriterOpts struct {
-	backupOpts
-}
-
-func newDefaultBackupToWriterOpts() *backupToWriterOpts {
-	return &backupToWriterOpts{
-		backupOpts: *newDefaultBackupOpts(),
-	}
-}
-
 type BackupToWriterStatus struct {
 	BackupStatus
 }
 
 type BackupToWriterHandler struct {
-	status  BackupToWriterStatus
-	opts    backupToWriterOpts
-	enc     EncoderBuilder
+	status  *BackupToWriterStatus
+	config  *BackupToWriterConfig
 	writers []io.Writer
+	errors  chan error
 	backupHandler
 }
 
-func newBackupToWriterHandler(opts backupToWriterOpts, ac *a.Client, enc EncoderBuilder, namespace string, writers []io.Writer) *BackupToWriterHandler {
-	backupHandler := newBackupHandler(opts.backupOpts, ac, namespace)
+func newBackupToWriterHandler(config *BackupToWriterConfig, ac *a.Client, writers []io.Writer) *BackupToWriterHandler {
+	namespace := config.Namespace
+	backupHandler := newBackupHandler(&config.BackupBaseConfig, ac, namespace)
 
 	return &BackupToWriterHandler{
-		opts:          opts,
-		enc:           enc,
+		config:        config,
 		writers:       writers,
 		backupHandler: *backupHandler,
 	}
 }
 
-func (bwh *BackupToWriterHandler) run(writers []io.Writer) <-chan error {
-	errors := make(chan error)
+// run runs the backup job
+// currently this should only be run once
+func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
+	bwh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
 		defer close(errChan)
 
+		batchSize := bwh.config.Parallel
+		dataWriters := []datahandlers.Writer{}
+
 		for i, writer := range writers {
 
-			numDataWriters := bwh.opts.Parallel
-			dataWriters := make([]datahandlers.Writer, numDataWriters)
-
-			for j := 0; j < numDataWriters; j++ {
-				dw, err := getDataWriter(bwh.enc, writer, bwh.namespace, i == 0)
-				if err != nil {
-					errChan <- err
-					return
-				}
-
-				dataWriters[j] = dw
-			}
-
-			err := bwh.backupHandler.run(dataWriters)
+			dw, err := getDataWriter(bwh.config.EncoderBuilder, writer, bwh.namespace, i == 0)
 			if err != nil {
 				errChan <- err
 				return
 			}
+
+			dataWriters = append(dataWriters, dw)
+			// if we have not reached the batch size and we have more writers
+			// continue to the next writer
+			// if we are at the end of writers then run no matter what
+			if i < len(writers)-1 && len(dataWriters) < batchSize {
+				continue
+			}
+
+			err = bwh.backupHandler.run(dataWriters)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			clear(dataWriters)
 		}
 
-	}(errors)
-
-	return errors
+	}(bwh.errors)
 }
 
+// GetStats returns the stats of the backup job
 func (bwh *BackupToWriterHandler) GetStats() (BackupToWriterStatus, error) {
 	return BackupToWriterStatus{}, errors.New("UNIMPLEMENTED")
+}
+
+// Wait waits for the restore job to complete and returns an error if the job failed
+func (bwh *BackupToWriterHandler) Wait() error {
+	return <-bwh.errors
 }
 
 func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (datahandlers.Writer, error) {

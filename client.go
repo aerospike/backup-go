@@ -1,7 +1,6 @@
 package backuplib
 
 import (
-	"backuplib/models"
 	"errors"
 	"io"
 
@@ -10,12 +9,6 @@ import (
 
 type BackupMarshaller interface {
 	MarshalRecord(*a.Record) ([]byte, error)
-}
-
-type Config struct{}
-
-type Policies struct {
-	InfoPolicy *a.InfoPolicy
 }
 
 type Client struct {
@@ -34,69 +27,58 @@ func NewClient(ac *a.Client, cc Config) (*Client, error) {
 	}, nil
 }
 
-type Encoder interface {
-	EncodeRecord(*models.Record) ([]byte, error)
-	EncodeUDF(*models.UDF) ([]byte, error)
-	EncodeSIndex(*models.SIndex) ([]byte, error)
-}
-
-type EncoderBuilder interface {
-	CreateEncoder() (Encoder, error)
-	SetDestination(dest io.Writer)
-}
-
-// TODO make default constructor for these argument structs
-// TODO rename these to options and make this struct contain only optional flags
-// required ones should be arguments to the method
-type BackupToWriterOptions struct {
-	Parallel int
-}
-
-func NewDefaultBackupToWriterOptions() *BackupToWriterOptions {
-	return &BackupToWriterOptions{
-		Parallel: 1,
+func (c *Client) getUsablePolicy(p *Policies) *Policies {
+	policies := p
+	if policies == nil {
+		policies = c.config.Policies
 	}
-}
-
-func (c *Client) BackupToWriter(writers []io.Writer, enc EncoderBuilder, namespace string, opts *BackupToWriterOptions) (*BackupToWriterHandler, <-chan error) {
-	if opts == nil {
-		opts = NewDefaultBackupToWriterOptions()
+	if policies == nil {
+		policies = &Policies{}
 	}
 
-	args := backupToWriterOpts{
-		backupOpts: backupOpts{
-			Parallel: opts.Parallel,
-		},
+	if policies.InfoPolicy == nil {
+		policies.InfoPolicy = c.aerospikeClient.DefaultInfoPolicy
 	}
 
-	handler := newBackupToWriterHandler(args, c.aerospikeClient, enc, namespace, writers)
-	errors := handler.run(writers)
-
-	return handler, errors
-}
-
-type Decoder interface {
-	NextToken() (any, error)
-}
-
-type DecoderBuilder interface {
-	CreateDecoder() (Decoder, error)
-	SetSource(src io.Reader)
-}
-
-type RestoreFromReaderOptions struct {
-	Parallel int
-}
-
-func (c *Client) RestoreFromReader(readers []io.Reader, dec DecoderBuilder, opts RestoreFromReaderOptions) (*RestoreFromReaderHandler, <-chan error) {
-	args := restoreFromReaderOpts{
-		restoreOpts: restoreOpts{
-			Parallel: opts.Parallel,
-		},
+	if policies.WritePolicy == nil {
+		policies.WritePolicy = c.aerospikeClient.DefaultWritePolicy
 	}
 
-	handler := newRestoreFromReaderHandler(args, c.aerospikeClient, dec, readers)
-	errors := handler.run(readers)
+	if policies.ScanPolicy == nil {
+		policies.ScanPolicy = c.aerospikeClient.DefaultScanPolicy
+	}
 
-	return handler, errors
+	return policies
+}
+
+func (c *Client) BackupToWriter(writers []io.Writer, config *BackupToWriterConfig) (*BackupToWriterHandler, error) {
+	if config == nil {
+		config = NewBackupToWriterConfig()
+	}
+	config.Policies = c.getUsablePolicy(config.Policies)
+
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	handler := newBackupToWriterHandler(config, c.aerospikeClient, writers)
+	handler.run(writers)
+
+	return handler, nil
+}
+
+func (c *Client) RestoreFromReader(readers []io.Reader, config *RestoreFromReaderConfig) (*RestoreFromReaderHandler, error) {
+	if config == nil {
+		config = NewRestoreFromReaderConfig()
+	}
+	config.Policies = c.getUsablePolicy(config.Policies)
+
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	handler := newRestoreFromReaderHandler(config, c.aerospikeClient, readers)
+	handler.run(readers)
+
+	return handler, nil
 }

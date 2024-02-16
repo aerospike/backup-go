@@ -723,7 +723,6 @@ var bytesToType = map[byte]struct{}{
 	'L': {},
 }
 
-// TODO make this use bytesBinTypes
 var binTypes = map[byte]struct{}{
 	// basic types
 	'N': {}, // nil
@@ -739,7 +738,7 @@ var binTypes = map[byte]struct{}{
 	'R': {}, // ruby bytes
 	'H': {}, // php bytes
 	'E': {}, // erlang bytes
-	// bytes but parsed as another type TODO can these be compressed?
+	// bytes but parsed as another type
 	'Y': {}, // HLL bytes
 	'M': {}, // map bytes
 	'L': {}, // list bytes
@@ -997,7 +996,7 @@ var getTimeNow = time.Now
 // readExpiration reads an expiration line from the asb file
 // it expects that r has been advanced past the expiration line marker '+ t '
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
-// TODO expireation needs to be updated based on how mmuch time has passed since the backup.
+// TODO expiration needs to be updated based on how much time has passed since the backup.
 // I think that should be done in a processor though, not here
 func (r *ASBDecoder) readExpiration() (uint32, error) {
 	exp, err := _readInteger(r, '\n')

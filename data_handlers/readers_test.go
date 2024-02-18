@@ -195,7 +195,6 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		},
 	}
 
-	recover()
 	reader.Cancel()
 	suite.False(reader.status.started)
 

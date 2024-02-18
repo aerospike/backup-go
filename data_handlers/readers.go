@@ -121,7 +121,9 @@ func (j *AerospikeRecordReader) Read() (any, error) {
 func (j *AerospikeRecordReader) Cancel() {
 	j.status.started = false
 	if j.recSet != nil {
-		j.recSet.Close()
+		// ignore this error, it only happens if the scan is already closed
+		// and this method can not return an error anyway
+		_ = j.recSet.Close() // nolint: errcheck
 	}
 }
 

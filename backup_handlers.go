@@ -3,7 +3,6 @@ package backuplib
 import (
 	datahandlers "backuplib/data_handlers"
 	"backuplib/encoder"
-	"errors"
 	"io"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -15,12 +14,12 @@ const (
 
 // **** Generic Backup Handler ****
 
+// BackupStatus is the status of a backup job
 // TODO fill this out
 type BackupStatus struct{}
 
 type backupHandler struct {
 	namespace       string
-	status          *BackupStatus
 	config          *BackupBaseConfig
 	aerospikeClient *a.Client
 	worker          workHandler
@@ -75,16 +74,14 @@ func (bh *backupHandler) run(writers []datahandlers.Writer) error {
 	return bh.worker.DoJob(job)
 }
 
-func (bh *backupHandler) GetStats() (BackupStatus, error) {
-	return BackupStatus{}, errors.New("UNIMPLEMENTED")
-}
-
 // **** Backup To Writer Handler ****
 
+// BackupToWriterStatus stores the status of a backup to writer job
 type BackupToWriterStatus struct {
 	BackupStatus
 }
 
+// BackupToWriterHandler handles a backup job to a set of io.writers
 type BackupToWriterHandler struct {
 	status  *BackupToWriterStatus
 	config  *BackupToWriterConfig
@@ -145,10 +142,10 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 
 // GetStats returns the stats of the backup job
 func (bwh *BackupToWriterHandler) GetStats() (BackupToWriterStatus, error) {
-	return BackupToWriterStatus{}, errors.New("UNIMPLEMENTED")
+	return *bwh.status, nil
 }
 
-// Wait waits for the restore job to complete and returns an error if the job failed
+// Wait waits for the backup job to complete and returns an error if the job failed
 func (bwh *BackupToWriterHandler) Wait() error {
 	return <-bwh.errors
 }
@@ -163,8 +160,8 @@ func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool)
 	switch encT := enc.(type) {
 	case *encoder.ASBEncoder:
 		asbw := datahandlers.NewASBWriter(encT, w)
-		asbw.Init(namespace, first)
-		return asbw, nil
+		err := asbw.Init(namespace, first)
+		return asbw, err
 	default:
 		return datahandlers.NewGenericWriter(encT, w), nil
 	}

@@ -2,15 +2,14 @@ package backuplib
 
 import (
 	datahandlers "backuplib/data_handlers"
-	"errors"
 	"io"
 )
 
 // **** Generic Restore Handler ****
 
-type RestoreStatus struct {
-	Active bool
-}
+// RestoreStatus stores the status of a restore job
+// TODO fill this out
+type RestoreStatus struct{}
 
 // DBRestoreClient is an interface for writing data to a database
 // The Aerospike Go client satisfies this interface
@@ -26,7 +25,6 @@ type worker interface {
 // restoreHandler handles generic restore jobs on data readers
 // most other restore handlers can wrap this one to add additional functionality
 type restoreHandler struct {
-	status   *RestoreStatus
 	config   *RestoreBaseConfig
 	dbClient DBRestoreClient
 	worker   worker
@@ -65,11 +63,6 @@ func (rh *restoreHandler) run(readers []datahandlers.Reader) error {
 	return rh.worker.DoJob(job)
 }
 
-// GetStats returns the status of the restore job
-func (*restoreHandler) GetStats() (RestoreStatus, error) {
-	return RestoreStatus{}, errors.New("UNIMPLEMENTED")
-}
-
 // **** Restore From Reader Handler ****
 
 // RestoreFromReaderStatus stores the status of a restore from reader job
@@ -77,7 +70,7 @@ type RestoreFromReaderStatus struct {
 	RestoreStatus
 }
 
-// RestoreFromReaderHandler handles restore jobs from a set of io.readers
+// RestoreFromReaderHandler handles a restore job from a set of io.readers
 type RestoreFromReaderHandler struct {
 	status  *RestoreFromReaderStatus
 	config  *RestoreFromReaderConfig
@@ -141,7 +134,7 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 
 // GetStats returns the stats of the restore job
 func (rrh *RestoreFromReaderHandler) GetStats() (RestoreFromReaderStatus, error) {
-	return RestoreFromReaderStatus{}, errors.New("UNIMPLEMENTED")
+	return *rrh.status, nil
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

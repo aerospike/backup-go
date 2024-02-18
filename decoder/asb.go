@@ -10,7 +10,6 @@ import (
 	"io"
 	"math"
 	"strconv"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -75,11 +74,6 @@ const (
 // escape character
 const (
 	asbEscape = '\\'
-)
-
-// constants
-const (
-	citrusLeafEpoch = 1262304000 // pulled from C client cf_clock.h
 )
 
 // TODO maybe use error functions for each asb level, reader, section, line type
@@ -989,9 +983,6 @@ func (r *ASBDecoder) readBinCount() (uint16, error) {
 	return uint16(binCount), nil
 
 }
-
-// function pointer for time.Now allows for testing
-var getTimeNow = time.Now
 
 // readExpiration reads an expiration line from the asb file
 // it expects that r has been advanced past the expiration line marker '+ t '

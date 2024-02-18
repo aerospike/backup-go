@@ -65,11 +65,17 @@ func (suite *backupRestoreTestSuite) TearDownSuite() {
 }
 
 func (suite *backupRestoreTestSuite) SetupTest() {
-	suite.testClient.Truncate(namespace, set)
+	err := suite.testClient.Truncate(namespace, set)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (suite *backupRestoreTestSuite) TearDownTest() {
-	suite.testClient.Truncate(namespace, set)
+	err := suite.testClient.Truncate(namespace, set)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
@@ -103,7 +109,10 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	err = bh.Wait()
 	suite.Nil(err)
 
-	suite.testClient.Truncate(namespace, set)
+	err = suite.testClient.Truncate(namespace, set)
+	if err != nil {
+		panic(err)
+	}
 
 	reader := bytes.NewReader(dst.Bytes())
 

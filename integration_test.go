@@ -29,6 +29,12 @@ type backupRestoreTestSuite struct {
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
+	// TODO update testutils to use v7 go client
+	// testutils.Image = "aerospike/aerospike-server-enterprise:7.0.0.2"
+
+	// clusterSize := 1
+	// testutils.Start(clusterSize)
+
 	asc, aerr := a.NewClientWithPolicy(
 		a.NewClientPolicy(),
 		Host,
@@ -55,6 +61,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 
 func (suite *backupRestoreTestSuite) TearDownSuite() {
 	suite.Aeroclient.Close()
+	// testutils.Stop()
 }
 
 func (suite *backupRestoreTestSuite) SetupTest() {

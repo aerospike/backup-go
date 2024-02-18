@@ -25,7 +25,6 @@ type backupRestoreTestSuite struct {
 	Aeroclient   *a.Client
 	testClient   *testresources.TestClient
 	backupClient *backuplib.Client
-	policies     *backuplib.Policies
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {

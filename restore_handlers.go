@@ -112,7 +112,12 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 	rrh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
+
+		// NOTE: order is important here
+		// if we close the errChan before we handle the panic
+		// the panic will attempt to send on a closed channel
 		defer close(errChan)
+		defer handlePanic(errChan)
 
 		batchSize := rrh.config.Parallel
 		dataReaders := []datahandlers.Reader{}

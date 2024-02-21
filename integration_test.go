@@ -16,7 +16,7 @@ package backuplib_test
 
 import (
 	"backuplib"
-	testresources "backuplib/test_resources"
+	testresources "backuplib/test"
 	"bytes"
 	"fmt"
 	"io"
@@ -63,6 +63,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
 	}
+	defer asc.Close()
 
 	privs := []a.Privilege{
 		{Code: a.Read},
@@ -85,7 +86,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 
 	aeroClientPolicy.User = "backupTester"
 	aeroClientPolicy.Password = "changeme"
-	asc, aerr = a.NewClientWithPolicy(
+	testAeroClient, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
 		host,
 		port,
@@ -94,13 +95,13 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 		suite.FailNow(aerr.Error())
 	}
 
-	suite.Aeroclient = asc
+	suite.Aeroclient = testAeroClient
 
-	testClient := testresources.NewTestClient(asc)
+	testClient := testresources.NewTestClient(testAeroClient)
 	suite.testClient = testClient
 
 	backupCFG := backuplib.Config{}
-	backupClient, err := backuplib.NewClient(asc, backupCFG)
+	backupClient, err := backuplib.NewClient(testAeroClient, backupCFG)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -109,7 +110,10 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 }
 
 func (suite *backupRestoreTestSuite) TearDownSuite() {
+	defer testutils.Stop()
+
 	asc := suite.Aeroclient
+	defer asc.Close()
 
 	aerr := asc.DropRole(nil, "testBackup")
 	if aerr != nil {
@@ -120,10 +124,6 @@ func (suite *backupRestoreTestSuite) TearDownSuite() {
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
 	}
-
-	asc.Close()
-
-	testutils.Stop()
 }
 
 func (suite *backupRestoreTestSuite) SetupTest() {

@@ -23,14 +23,18 @@ import (
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
 )
 
 const (
-	Host          = "127.0.0.1"
-	Port          = 3000
-	namespace     = "test"
-	set           = ""
+	host      = "127.0.0.1"
+	port      = 10000
+	user      = "admin"
+	password  = "admin"
+	namespace = "test"
+	set       = ""
+
 	BackupDirPath = "./test_resources/backup"
 )
 
@@ -42,20 +46,52 @@ type backupRestoreTestSuite struct {
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
-	// TODO update testutils to use v7 go client
-	// testutils.Image = "aerospike/aerospike-server-enterprise:7.0.0.2"
+	testutils.Image = "aerospike/aerospike-server-enterprise:7.0.0.2"
 
-	// clusterSize := 1
-	// testutils.Start(clusterSize)
+	clusterSize := 1
+	testutils.Start(clusterSize)
+
+	aeroClientPolicy := a.NewClientPolicy()
+	aeroClientPolicy.User = user
+	aeroClientPolicy.Password = password
 
 	asc, aerr := a.NewClientWithPolicy(
-		a.NewClientPolicy(),
-		Host,
-		Port,
+		aeroClientPolicy,
+		host,
+		port,
 	)
-
 	if aerr != nil {
-		panic(aerr)
+		suite.FailNow(aerr.Error())
+	}
+
+	privs := []a.Privilege{
+		{Code: a.Read},
+		{Code: a.Write},
+		{Code: a.Truncate},
+		{Code: a.UserAdmin},
+	}
+
+	aerr = asc.CreateRole(nil, "testBackup", privs, nil, 0, 0)
+	if aerr != nil {
+		suite.FailNow(aerr.Error())
+	}
+
+	aerr = asc.CreateUser(nil, "backupTester", "changeme", []string{"testBackup"})
+	if aerr != nil {
+		suite.FailNow(aerr.Error())
+	}
+
+	asc.Close()
+
+	aeroClientPolicy.User = "backupTester"
+	aeroClientPolicy.Password = "changeme"
+	asc, aerr = a.NewClientWithPolicy(
+		aeroClientPolicy,
+		host,
+		port,
+	)
+	if aerr != nil {
+		suite.FailNow(aerr.Error())
 	}
 
 	suite.Aeroclient = asc
@@ -66,28 +102,41 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	backupCFG := backuplib.Config{}
 	backupClient, err := backuplib.NewClient(asc, backupCFG)
 	if err != nil {
-		panic(err)
+		suite.FailNow(err.Error())
 	}
 
 	suite.backupClient = backupClient
 }
 
 func (suite *backupRestoreTestSuite) TearDownSuite() {
-	suite.Aeroclient.Close()
-	// testutils.Stop()
+	asc := suite.Aeroclient
+
+	aerr := asc.DropRole(nil, "testBackup")
+	if aerr != nil {
+		suite.FailNow(aerr.Error())
+	}
+
+	aerr = asc.DropUser(nil, "backupTester")
+	if aerr != nil {
+		suite.FailNow(aerr.Error())
+	}
+
+	asc.Close()
+
+	testutils.Stop()
 }
 
 func (suite *backupRestoreTestSuite) SetupTest() {
 	err := suite.testClient.Truncate(namespace, set)
 	if err != nil {
-		panic(err)
+		suite.FailNow(err.Error())
 	}
 }
 
 func (suite *backupRestoreTestSuite) TearDownTest() {
 	err := suite.testClient.Truncate(namespace, set)
 	if err != nil {
-		panic(err)
+		suite.FailNow(err.Error())
 	}
 }
 

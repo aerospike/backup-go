@@ -49,7 +49,10 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	testutils.Image = "aerospike/aerospike-server-enterprise:7.0.0.2"
 
 	clusterSize := 1
-	testutils.Start(clusterSize)
+	err := testutils.Start(clusterSize)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
 
 	aeroClientPolicy := a.NewClientPolicy()
 	aeroClientPolicy.User = user
@@ -110,7 +113,12 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 }
 
 func (suite *backupRestoreTestSuite) TearDownSuite() {
-	defer testutils.Stop()
+	defer func() {
+		err := testutils.Stop()
+		if err != nil {
+			suite.FailNow(err.Error())
+		}
+	}()
 
 	asc := suite.Aeroclient
 	defer asc.Close()

@@ -196,6 +196,7 @@ func keyToASB(k *a.Key) ([]byte, error) {
 
 	return data, nil
 }
+
 func base64Encode(b []byte) string {
 	return base64.StdEncoding.EncodeToString(b)
 }

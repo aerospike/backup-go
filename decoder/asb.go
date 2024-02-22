@@ -31,45 +31,45 @@ import (
 
 // section names
 const (
-	undefinedS = ""
-	headerS    = "header"
-	metadataS  = "meta-data"
-	globalS    = "global"
-	recordS    = "records"
+	sectionUndefined = ""
+	sectionHeader    = "header"
+	sectionMetadata  = "meta-data"
+	sectionGlobal    = "global"
+	sectionRecord    = "records"
 )
 
 // section markers
 const (
-	globalSectionMarker   byte = '*'
-	metadataSectionMarker byte = '#'
-	recordHeaderMarker    byte = '+'
-	recordBinsMarker      byte = '-'
+	markerGlobalSection   byte = '*'
+	markerMetadataSection byte = '#'
+	markerRecordHeader    byte = '+'
+	markerRecordBins      byte = '-'
 )
 
 // line names
 const (
-	undefinedLT    = ""
-	versionLT      = "version"
-	namespaceLT    = "namespace"
-	UDFLT          = "UDF"
-	sindexLT       = "sindex"
-	recordHeaderLT = "record header"
-	recordBinsLT   = "record bins"
-	binLT          = "bin"
-	keyLT          = "key"
-	digestLT       = "digest"
-	setLT          = "set"
-	genLT          = "generation"
-	expirationLT   = "expiration"
-	binCountLT     = "bin count"
-	firstLT        = "first"
+	lineTypeUndefined    = ""
+	lineTypeVersion      = "version"
+	lineTypeNamespace    = "namespace"
+	lineTypeUDF          = "UDF"
+	lineTypeSindex       = "sindex"
+	lineTypeRecordHeader = "record header"
+	lineTypeRecordBins   = "record bins"
+	lineTypeBin          = "bin"
+	lineTypeKey          = "key"
+	lineTypeDigest       = "digest"
+	lineTypesSet         = "set"
+	lineTypeGen          = "generation"
+	lineTypeExpiration   = "expiration"
+	lineTypeBinCount     = "bin count"
+	lineTypeFirst        = "first"
 )
 
 // literal asb tokens
 const (
-	namespaceToken  = "namespace"
-	firstFileToken  = "first-file"
-	asbVersionToken = "Version"
+	tokenNamespace  = "namespace"
+	tokenFirstFile  = "first-file"
+	toeknASBVersion = "Version"
 )
 
 // value bounds
@@ -97,7 +97,7 @@ const (
 // and would allow the reader to be used in a more generic way making tests easier
 
 func newReaderError(offset uint64, err error) error {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return err
 	} else if err == nil {
 		return nil
@@ -202,12 +202,12 @@ func (r *ASBDecoder) NextToken() (any, error) {
 		var v any
 
 		switch b {
-		case globalSectionMarker:
+		case markerGlobalSection:
 			v, err = r.readGlobals()
-			err = newSectionError(globalS, err)
-		case recordHeaderMarker:
+			err = newSectionError(sectionGlobal, err)
+		case markerRecordHeader:
 			v, err = r.readRecord()
-			err = newSectionError(recordS, err)
+			err = newSectionError(sectionRecord, err)
 		default:
 			v, err = nil, fmt.Errorf("read invalid line start character %c", b)
 		}
@@ -229,7 +229,7 @@ type header struct {
 func (r *ASBDecoder) readHeader() (*header, error) {
 	var res header
 
-	if err := _expectToken(r, asbVersionToken); err != nil {
+	if err := _expectToken(r, toeknASBVersion); err != nil {
 		return nil, err
 	}
 
@@ -263,11 +263,11 @@ func (r *ASBDecoder) readMetadata() (*metaData, error) {
 		}
 
 		// the metadata section is optional
-		if startC != metadataSectionMarker {
+		if startC != markerMetadataSection {
 			break
 		}
 
-		if err := _expectChar(r, metadataSectionMarker); err != nil {
+		if err := _expectChar(r, markerMetadataSection); err != nil {
 			return nil, err
 		}
 
@@ -281,21 +281,21 @@ func (r *ASBDecoder) readMetadata() (*metaData, error) {
 		}
 
 		switch string(metaToken) {
-		case namespaceToken:
+		case tokenNamespace:
 			if err := _expectChar(r, ' '); err != nil {
 				return nil, err
 			}
 
 			val, err := r.readNamespace()
 			if err != nil {
-				return nil, newLineError(namespaceLT, err)
+				return nil, newLineError(lineTypeNamespace, err)
 			}
 			res.Namespace = val
 
-		case firstFileToken:
+		case tokenFirstFile:
 			val, err := r.readFirst()
 			if err != nil {
-				return nil, newLineError(firstLT, err)
+				return nil, newLineError(lineTypeFirst, err)
 			}
 			res.First = val
 
@@ -332,7 +332,7 @@ func (r *ASBDecoder) readFirst() (bool, error) {
 func (r *ASBDecoder) readGlobals() (any, error) {
 	var res any
 
-	if err := _expectChar(r, globalSectionMarker); err != nil {
+	if err := _expectChar(r, markerGlobalSection); err != nil {
 		return nil, err
 	}
 
@@ -349,12 +349,12 @@ func (r *ASBDecoder) readGlobals() (any, error) {
 	case 'i':
 		res, err = r.readSIndex()
 		if err != nil {
-			return nil, newLineError(sindexLT, err)
+			return nil, newLineError(lineTypeSindex, err)
 		}
 	case 'u':
 		res, err = r.readUDF()
 		if err != nil {
-			return nil, newLineError(UDFLT, err)
+			return nil, newLineError(lineTypeUDF, err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid global line type %c", b)
@@ -582,7 +582,7 @@ func (r *ASBDecoder) readRecord() (*models.Record, error) {
 
 	for i := 0; i < len(expectedRecordHeaderTypes); i++ {
 
-		if err := _expectChar(r, recordHeaderMarker); err != nil {
+		if err := _expectChar(r, markerRecordHeader); err != nil {
 			return nil, err
 		}
 
@@ -612,14 +612,14 @@ func (r *ASBDecoder) readRecord() (*models.Record, error) {
 		case 0:
 			key, err := r.readUserKey()
 			if err != nil {
-				return nil, newLineError(keyLT, err)
+				return nil, newLineError(lineTypeKey, err)
 			}
 			recData.userKey = key
 
 		case 1:
 			namespace, err := r.readNamespace()
 			if err != nil {
-				return nil, newLineError(namespaceLT, err)
+				return nil, newLineError(lineTypeNamespace, err)
 			}
 
 			recData.namespace = string(namespace)
@@ -627,35 +627,35 @@ func (r *ASBDecoder) readRecord() (*models.Record, error) {
 		case 2:
 			digest, err := r.readDigest()
 			if err != nil {
-				return nil, newLineError(digestLT, err)
+				return nil, newLineError(lineTypeDigest, err)
 			}
 			recData.digest = digest
 
 		case 3:
 			set, err := r.readSet()
 			if err != nil {
-				return nil, newLineError(setLT, err)
+				return nil, newLineError(lineTypesSet, err)
 			}
 			recData.set = set
 
 		case 4:
 			gen, err := r.readGeneration()
 			if err != nil {
-				return nil, newLineError(genLT, err)
+				return nil, newLineError(lineTypeGen, err)
 			}
 			recData.generation = gen
 
 		case 5:
 			exp, err := r.readExpiration()
 			if err != nil {
-				return nil, newLineError(expirationLT, err)
+				return nil, newLineError(lineTypeExpiration, err)
 			}
 			recData.expiration = exp
 
 		case 6:
 			binCount, err := r.readBinCount()
 			if err != nil {
-				return nil, newLineError(binCountLT, err)
+				return nil, newLineError(lineTypeBinCount, err)
 			}
 			recData.binCount = binCount
 
@@ -669,7 +669,7 @@ func (r *ASBDecoder) readRecord() (*models.Record, error) {
 
 	bins, err := r.readBins(recData.binCount)
 	if err != nil {
-		return nil, newLineError(recordBinsLT, err)
+		return nil, newLineError(lineTypeRecordBins, err)
 	}
 	rec.Bins = bins
 
@@ -694,7 +694,7 @@ func (r *ASBDecoder) readBins(count uint16) (a.BinMap, error) {
 	bins := make(a.BinMap, count)
 
 	for i := uint16(0); i < count; i++ {
-		if err := _expectChar(r, recordBinsMarker); err != nil {
+		if err := _expectChar(r, markerRecordBins); err != nil {
 			return nil, err
 		}
 

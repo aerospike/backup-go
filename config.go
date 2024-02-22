@@ -80,10 +80,10 @@ type BackupBaseConfig struct {
 	// Parallel is the number of parallel scans to run against the Aerospike cluster
 	// during a backup operation
 	Parallel int
-	// Set is the Aerospike set to backup
-	Set string
 	// Namespace is the Aerospike namespace to backup
 	Namespace string
+	// Set is the Aerospike set to backup
+	Set string
 	// EncoderBuilder is used to specify the encoder with which to encode the backup data
 	// If nil, the default encoder will be used
 	EncoderBuilder EncoderBuilder

@@ -153,8 +153,8 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 }
 
 // GetStats returns the stats of the restore job
-func (rrh *RestoreFromReaderHandler) GetStats() (RestoreFromReaderStatus, error) {
-	return *rrh.status, nil
+func (rrh *RestoreFromReaderHandler) GetStats() RestoreFromReaderStatus {
+	return *rrh.status
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

@@ -161,8 +161,8 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 }
 
 // GetStats returns the stats of the backup job
-func (bwh *BackupToWriterHandler) GetStats() (BackupToWriterStatus, error) {
-	return *bwh.status, nil
+func (bwh *BackupToWriterHandler) GetStats() BackupToWriterStatus {
+	return *bwh.status
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed

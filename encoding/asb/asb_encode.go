@@ -27,33 +27,33 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-type ASBEncoder struct{}
+type Encoder struct{}
 
-func NewASBEncoder() (*ASBEncoder, error) {
-	return &ASBEncoder{}, nil
+func NewEncoder() (*Encoder, error) {
+	return &Encoder{}, nil
 }
 
-func (o *ASBEncoder) EncodeRecord(rec *models.Record) ([]byte, error) {
+func (o *Encoder) EncodeRecord(rec *models.Record) ([]byte, error) {
 	return recordToASB(rec)
 }
 
-func (o *ASBEncoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
+func (o *Encoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
 	return nil, fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }
 
-func (o *ASBEncoder) EncodeSIndex(sindex *models.SIndex) ([]byte, error) {
+func (o *Encoder) EncodeSIndex(sindex *models.SIndex) ([]byte, error) {
 	return _SIndexToASB(sindex)
 }
 
-func (o *ASBEncoder) GetVersionText() []byte {
+func (o *Encoder) GetVersionText() []byte {
 	return []byte(fmt.Sprintf("Version %s\n", ASBFormatVersion))
 }
 
-func (o *ASBEncoder) GetNamespaceMetaText(namespace string) []byte {
+func (o *Encoder) GetNamespaceMetaText(namespace string) []byte {
 	return []byte(fmt.Sprintf("%c namespace %s\n", markerMetadataSection, escapeASBS(namespace)))
 }
 
-func (o *ASBEncoder) GetFirstMetaText() []byte {
+func (o *Encoder) GetFirstMetaText() []byte {
 	return []byte(fmt.Sprintf("%c first-file\n", markerMetadataSection))
 }
 

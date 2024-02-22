@@ -34,7 +34,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder, err := NewASBEncoder()
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder, err := NewASBEncoder()
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -697,7 +697,7 @@ func Test_recordToASB(t *testing.T) {
 }
 
 func TestGetFirstMetaText(t *testing.T) {
-	enc := &ASBEncoder{}
+	enc := &Encoder{}
 	tests := []struct {
 		name string
 		want []byte
@@ -717,7 +717,7 @@ func TestGetFirstMetaText(t *testing.T) {
 }
 
 func TestGetNamespaceMetaText(t *testing.T) {
-	enc := &ASBEncoder{}
+	enc := &Encoder{}
 	type args struct {
 		namespace string
 	}
@@ -751,7 +751,7 @@ func TestGetNamespaceMetaText(t *testing.T) {
 }
 
 func TestGetVersionText(t *testing.T) {
-	enc := &ASBEncoder{}
+	enc := &Encoder{}
 	tests := []struct {
 		name string
 		want []byte

@@ -177,7 +177,7 @@ func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool)
 	}
 
 	switch encT := enc.(type) {
-	case *asb.ASBEncoder:
+	case *asb.Encoder:
 		asbw := datahandlers.NewASBWriter(encT, w)
 		err := asbw.Init(namespace, first)
 		return asbw, err

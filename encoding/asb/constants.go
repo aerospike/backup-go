@@ -56,7 +56,7 @@ const (
 const (
 	tokenNamespace  = "namespace"
 	tokenFirstFile  = "first-file"
-	toeknASBVersion = "Version"
+	tokenASBVersion = "Version"
 )
 
 // value bounds

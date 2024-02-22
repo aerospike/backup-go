@@ -34,5 +34,5 @@ func NewASBEncoderBuilder() *ASBEncoderBuilder {
 // CreateEncoder creates a new ASBEncoder
 // This method is called by the backup client to create a new encoder
 func (f *ASBEncoderBuilder) CreateEncoder() (Encoder, error) {
-	return asb.NewASBEncoder()
+	return asb.NewEncoder()
 }

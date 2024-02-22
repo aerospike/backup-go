@@ -41,5 +41,5 @@ func (f *ASBDecoderBuilder) SetSource(src io.Reader) {
 // CreateDecoder creates a new ASBDecoder
 // This method is called by the backup client to create a new decoder
 func (f *ASBDecoderBuilder) CreateDecoder() (Decoder, error) {
-	return asb.NewASBDecoder(f.src)
+	return asb.NewDecoder(f.src)
 }

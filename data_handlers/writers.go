@@ -209,7 +209,7 @@ func (rw *RestoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 	// 	//TODO compare sindexes
 	// }
 
-	return errors.New("UNIMPLEMENTED")
+	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }
 
 // writeUDF writes a UDF to Aerospike
@@ -228,7 +228,7 @@ func (rw *RestoreWriter) writeUDF(udf *models.UDF) error {
 	// _, err := rw.asc.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)
 	// return err
 
-	return errors.New("UNIMPLEMENTED")
+	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }
 
 // Cancel satisfies the DataWriter interface

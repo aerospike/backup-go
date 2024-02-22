@@ -41,7 +41,7 @@ func (o *ASBEncoder) EncodeRecord(rec *models.Record) ([]byte, error) {
 }
 
 func (o *ASBEncoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
-	return nil, errors.New("UNIMPLEMENTED")
+	return nil, fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }
 
 func (o *ASBEncoder) EncodeSIndex(sindex *models.SIndex) ([]byte, error) {

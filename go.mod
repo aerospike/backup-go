@@ -1,7 +1,7 @@
 module backuplib
 
-go 1.21.4
 go 1.21
+
 require (
 	github.com/aerospike/aerospike-client-go/v7 v7.1.0
 	github.com/aerospike/tools-common-go v0.0.0-20240221001721-c09b7e250b16

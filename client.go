@@ -46,11 +46,15 @@ import (
 
 type Client struct {
 	aerospikeClient *a.Client
-	config          Config
+	config          *Config
 }
 
 // NewClient creates a new backuplib client
-func NewClient(ac *a.Client, cc Config) (*Client, error) {
+func NewClient(ac *a.Client, cc *Config) (*Client, error) {
+	if cc == nil {
+		cc = NewConfig()
+	}
+
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}

@@ -17,7 +17,7 @@ package backuplib
 import (
 	"io"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/encoder"
+	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
 )
 
 // ASBEncoderBuilder satisfies the EncoderBuilder interface
@@ -34,5 +34,5 @@ func NewASBEncoderBuilder() *ASBEncoderBuilder {
 // CreateEncoder creates a new ASBEncoder
 // This method is called by the backup client to create a new encoder
 func (f *ASBEncoderBuilder) CreateEncoder() (Encoder, error) {
-	return encoder.NewASBEncoder()
+	return asb.NewASBEncoder()
 }

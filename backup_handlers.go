@@ -18,7 +18,7 @@ import (
 	"io"
 
 	datahandlers "github.com/aerospike/aerospike-tools-backup-lib/data_handlers"
-	"github.com/aerospike/aerospike-tools-backup-lib/encoder"
+	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -177,7 +177,7 @@ func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool)
 	}
 
 	switch encT := enc.(type) {
-	case *encoder.ASBEncoder:
+	case *asb.ASBEncoder:
 		asbw := datahandlers.NewASBWriter(encT, w)
 		err := asbw.Init(namespace, first)
 		return asbw, err

@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package encoder
+package asb
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -24,10 +25,6 @@ import (
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-)
-
-const (
-	ASBFormatVersion = "3.1"
 )
 
 type ASBEncoder struct{}
@@ -53,20 +50,14 @@ func (o *ASBEncoder) GetVersionText() []byte {
 }
 
 func (o *ASBEncoder) GetNamespaceMetaText(namespace string) []byte {
-	return []byte(fmt.Sprintf("# namespace %s\n", escapeASBS(namespace)))
+	return []byte(fmt.Sprintf("%c namespace %s\n", markerMetadataSection, escapeASBS(namespace)))
 }
 
 func (o *ASBEncoder) GetFirstMetaText() []byte {
-	return []byte("# first-file\n")
+	return []byte(fmt.Sprintf("%c first-file\n", markerMetadataSection))
 }
 
 // **** RECORD ****
-
-const (
-	citrusLeafEpoch = 1262304000 // pulled from C client cf_clock.h
-	asbTrue         = 'T'
-	asbFalse        = 'F'
-)
 
 // function pointer for time.Now to allow for testing
 var getTimeNow = time.Now
@@ -84,14 +75,14 @@ func recordToASB(r *models.Record) ([]byte, error) {
 	}
 	data = append(data, keyText...)
 
-	generationText := fmt.Sprintf("+ g %d\n", r.Generation)
+	generationText := fmt.Sprintf("%c g %d\n", markerRecordHeader, r.Generation)
 	data = append(data, generationText...)
 
 	exprTime := getExpirationTime(r.Expiration, getTimeNow().Unix())
-	expirationText := fmt.Sprintf("+ t %d\n", exprTime)
+	expirationText := fmt.Sprintf("%c t %d\n", markerRecordHeader, exprTime)
 	data = append(data, expirationText...)
 
-	binCountText := fmt.Sprintf("+ b %d\n", len(r.Bins))
+	binCountText := fmt.Sprintf("%c b %d\n", markerRecordHeader, len(r.Bins))
 	data = append(data, binCountText...)
 
 	binsText, err := binsToASB(r.Bins)
@@ -127,41 +118,45 @@ func binsToASB(bins a.BinMap) ([]byte, error) {
 }
 
 func binToASB(k string, v any) ([]byte, error) {
-	var res []byte
+	var res bytes.Buffer
+
+	res.Write([]byte{markerRecordBins, ' '})
 
 	binName := escapeASBS(k)
 
 	switch v := v.(type) {
 	case bool:
-		return []byte(fmt.Sprintf("- Z %s %c\n", binName, boolToASB(v))), nil
+		res.Write([]byte(fmt.Sprintf("Z %s %c\n", binName, boolToASB(v))))
 	case int64, int32, int16, int8, int:
-		return []byte(fmt.Sprintf("- I %s %d\n", binName, v)), nil
+		res.Write([]byte(fmt.Sprintf("I %s %d\n", binName, v)))
 	case float64:
-		return []byte(fmt.Sprintf("- D %s %f\n", binName, v)), nil
+		res.Write([]byte(fmt.Sprintf("D %s %f\n", binName, v)))
 	case string:
-		return []byte(fmt.Sprintf("- S %s %d %s\n", binName, len(v), v)), nil
+		res.Write([]byte(fmt.Sprintf("S %s %d %s\n", binName, len(v), v)))
 	case a.HLLValue:
 		encoded := base64Encode(v)
-		return []byte(fmt.Sprintf("- Y %s %d %s\n", binName, len(encoded), encoded)), nil
+		res.Write([]byte(fmt.Sprintf("Y %s %d %s\n", binName, len(encoded), encoded)))
 	case []byte:
 		encoded := base64Encode(v)
-		return []byte(fmt.Sprintf("- B %s %d %s\n", binName, len(encoded), encoded)), nil
+		res.Write([]byte(fmt.Sprintf("B %s %d %s\n", binName, len(encoded), encoded)))
 	case map[any]any:
 		return nil, errors.New("map bin not supported")
 	case []any:
 		return nil, errors.New("list bin not supported")
 	case nil:
-		return []byte(fmt.Sprintf("- N %s\n", binName)), nil
+		res.Write([]byte(fmt.Sprintf("N %s\n", binName)))
 	default:
-		return res, fmt.Errorf("unknown user key type: %T, key: %s", v, k)
+		return nil, fmt.Errorf("unknown user key type: %T, key: %s", v, k)
 	}
+
+	return res.Bytes(), nil
 }
 
 func boolToASB(b bool) byte {
 	if b {
-		return asbTrue
+		return boolTrueByte
 	}
-	return asbFalse
+	return boolFalseByte
 }
 
 func keyToASB(k *a.Key) ([]byte, error) {
@@ -177,15 +172,15 @@ func keyToASB(k *a.Key) ([]byte, error) {
 	}
 	data = append(data, userKeyText...)
 
-	namespaceText := fmt.Sprintf("+ n %s\n", escapeASBS(k.Namespace()))
+	namespaceText := fmt.Sprintf("%c n %s\n", markerRecordHeader, escapeASBS(k.Namespace()))
 	data = append(data, namespaceText...)
 
 	b64Digest := base64Encode(k.Digest())
-	digestText := fmt.Sprintf("+ d %s\n", b64Digest)
+	digestText := fmt.Sprintf("%c d %s\n", markerRecordHeader, b64Digest)
 	data = append(data, digestText...)
 
 	if k.SetName() != "" {
-		setnameText := fmt.Sprintf("+ s %s\n", escapeASBS(k.SetName()))
+		setnameText := fmt.Sprintf("%c s %s\n", markerRecordHeader, escapeASBS(k.SetName()))
 		data = append(data, setnameText...)
 	}
 
@@ -197,7 +192,7 @@ func base64Encode(b []byte) string {
 }
 
 func userKeyToASB(userKey a.Value) ([]byte, error) {
-	var data []byte
+	var data bytes.Buffer
 
 	// user key is optional
 	if userKey == nil {
@@ -208,19 +203,19 @@ func userKeyToASB(userKey a.Value) ([]byte, error) {
 
 	switch v := val.(type) {
 	case int64, int32, int16, int8, int:
-		data = []byte(fmt.Sprintf("+ k I %d\n", v))
+		data.Write([]byte(fmt.Sprintf("%c k I %d\n", markerRecordHeader, v)))
 	case float64:
-		data = []byte(fmt.Sprintf("+ k D %f\n", v))
+		data.Write([]byte(fmt.Sprintf("%c k D %f\n", markerRecordHeader, v)))
 	case string:
-		data = []byte(fmt.Sprintf("+ k S %d %s\n", len(v), v))
+		data.Write([]byte(fmt.Sprintf("%c k S %d %s\n", markerRecordHeader, len(v), v)))
 	case []byte:
 		encoded := base64Encode(v)
-		data = []byte(fmt.Sprintf("+ k B %d %s\n", len(encoded), encoded))
+		data.Write([]byte(fmt.Sprintf("%c k B %d %s\n", markerRecordHeader, len(encoded), encoded)))
 	default:
 		return nil, fmt.Errorf("invalid user key type: %T", v)
 	}
 
-	return data, nil
+	return data.Bytes(), nil
 }
 
 func getExpirationTime(ttl uint32, unix_now int64) uint32 {
@@ -235,12 +230,6 @@ func getExpirationTime(ttl uint32, unix_now int64) uint32 {
 
 // **** SINDEX ****
 
-// line markers
-const (
-	globalChar byte = '*'
-	sindexChar byte = 'i'
-)
-
 // control characters
 var asbEscapedChars = map[byte]struct{}{
 	'\\': {},
@@ -253,7 +242,7 @@ func escapeASBS(s string) string {
 	v := []byte{}
 	for _, c := range in {
 		if _, ok := asbEscapedChars[c]; ok {
-			v = append(v, '\\')
+			v = append(v, asbEscape)
 		}
 		v = append(v, c)
 	}
@@ -261,7 +250,6 @@ func escapeASBS(s string) string {
 	return string(v)
 }
 
-// TODO support escaped tokens
 func _SIndexToASB(sindex *models.SIndex) ([]byte, error) {
 	if sindex == nil {
 		return nil, errors.New("sindex is nil")
@@ -272,8 +260,8 @@ func _SIndexToASB(sindex *models.SIndex) ([]byte, error) {
 
 	v := fmt.Sprintf(
 		"%c %c %s %s %s %c %d %s %c",
-		globalChar,
-		sindexChar,
+		markerGlobalSection,
+		'i',
 		escapeASBS(sindex.Namespace),
 		escapeASBS(sindex.Set),
 		escapeASBS(sindex.Name),
@@ -283,7 +271,6 @@ func _SIndexToASB(sindex *models.SIndex) ([]byte, error) {
 		byte(sindex.Path.BinType),
 	)
 
-	// TODO does this need to be base64 encoded?
 	if sindex.Path.B64Context != "" {
 		v = fmt.Sprintf("%s %s", v, sindex.Path.B64Context)
 	}

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package decoder
+package asb
 
 import (
 	"bufio"
@@ -27,68 +27,6 @@ import (
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-)
-
-// section names
-const (
-	sectionUndefined = ""
-	sectionHeader    = "header"
-	sectionMetadata  = "meta-data"
-	sectionGlobal    = "global"
-	sectionRecord    = "records"
-)
-
-// section markers
-const (
-	markerGlobalSection   byte = '*'
-	markerMetadataSection byte = '#'
-	markerRecordHeader    byte = '+'
-	markerRecordBins      byte = '-'
-)
-
-// line names
-const (
-	lineTypeUndefined    = ""
-	lineTypeVersion      = "version"
-	lineTypeNamespace    = "namespace"
-	lineTypeUDF          = "UDF"
-	lineTypeSindex       = "sindex"
-	lineTypeRecordHeader = "record header"
-	lineTypeRecordBins   = "record bins"
-	lineTypeBin          = "bin"
-	lineTypeKey          = "key"
-	lineTypeDigest       = "digest"
-	lineTypesSet         = "set"
-	lineTypeGen          = "generation"
-	lineTypeExpiration   = "expiration"
-	lineTypeBinCount     = "bin count"
-	lineTypeFirst        = "first"
-)
-
-// literal asb tokens
-const (
-	tokenNamespace  = "namespace"
-	tokenFirstFile  = "first-file"
-	toeknASBVersion = "Version"
-)
-
-// value bounds
-const (
-	maxNamespaceLength = 31
-	maxTokenSize       = 1000
-	maxGeneration      = math.MaxUint16
-	maxBinCount        = math.MaxUint16
-)
-
-// asb boolean encoding
-const (
-	boolTrueByte  = 'T'
-	boolFalseByte = 'F'
-)
-
-// escape character
-const (
-	asbEscape = '\\'
 )
 
 // TODO maybe use error functions for each asb level, reader, section, line type

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package encoder
+package asb
 
 import (
 	"fmt"
@@ -356,14 +356,14 @@ func Test_boolToASB(t *testing.T) {
 			args: args{
 				b: true,
 			},
-			want: asbTrue,
+			want: boolTrueByte,
 		},
 		{
 			name: "positive false",
 			args: args{
 				b: false,
 			},
-			want: asbFalse,
+			want: boolFalseByte,
 		},
 	}
 	for _, tt := range tests {

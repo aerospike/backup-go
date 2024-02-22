@@ -34,8 +34,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	dst := &strings.Builder{}
-	encoder, err := NewASBEncoder(dst)
+	encoder, err := NewASBEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -70,8 +69,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	dst := &strings.Builder{}
-	encoder, err := NewASBEncoder(dst)
+	encoder, err := NewASBEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}

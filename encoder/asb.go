@@ -18,7 +18,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"time"
 
@@ -31,14 +30,10 @@ const (
 	ASBFormatVersion = "3.1"
 )
 
-type ASBEncoder struct {
-	writer io.Writer
-}
+type ASBEncoder struct{}
 
-func NewASBEncoder(w io.Writer) (*ASBEncoder, error) {
-	return &ASBEncoder{
-		writer: w,
-	}, nil
+func NewASBEncoder() (*ASBEncoder, error) {
+	return &ASBEncoder{}, nil
 }
 
 func (o *ASBEncoder) EncodeRecord(rec *models.Record) ([]byte, error) {

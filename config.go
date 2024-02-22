@@ -73,7 +73,6 @@ type Encoder interface {
 
 type EncoderBuilder interface {
 	CreateEncoder() (Encoder, error)
-	SetDestination(dest io.Writer)
 }
 
 // BackupBaseConfig contains shared configuration for backup operations

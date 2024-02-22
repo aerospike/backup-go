@@ -171,7 +171,6 @@ func (bwh *BackupToWriterHandler) Wait() error {
 }
 
 func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (datahandlers.Writer, error) {
-	eb.SetDestination(w)
 	enc, err := eb.CreateEncoder()
 	if err != nil {
 		return nil, err

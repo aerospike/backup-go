@@ -15,7 +15,6 @@
 package encoder
 
 import (
-	"backuplib/models"
 	"fmt"
 	"math"
 	"reflect"
@@ -23,6 +22,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/suite"

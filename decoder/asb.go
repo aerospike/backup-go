@@ -15,7 +15,6 @@
 package decoder
 
 import (
-	"backuplib/models"
 	"bufio"
 	"bytes"
 	"encoding/base64"
@@ -24,6 +23,8 @@ import (
 	"io"
 	"math"
 	"strconv"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )

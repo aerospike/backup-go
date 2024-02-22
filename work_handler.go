@@ -14,7 +14,7 @@
 
 package backuplib
 
-import datahandlers "backuplib/data_handlers"
+import datahandlers "github.com/aerospike/aerospike-tools-backup-lib/data_handlers"
 
 // workHandler is a generic worker for running a data pipeline (job)
 type workHandler struct{}

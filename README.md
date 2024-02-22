@@ -36,7 +36,7 @@ func main() {
 		panic(err)
 	}
 
-	backupErrors := make(chan error, 5)
+	backupHandlers := make()
 
     // start 5 backup jobs
 	for i := 0; i < 5; i++ {
@@ -47,19 +47,22 @@ func main() {
 		}
 		defer file.Close()
 
-		backupOpts := backuplib.NewDefaultBackupToWriterOptions()
-		backupOpts.Parallel = 4
-        backupOpts.Namespace = "test"
+		backupCfg := backuplib.NewBackupToWriterConfig()
+		backupCfg.Parallel = 4
+        backupCfg.Namespace = "test"
 
 		writers := []io.Writer{file}
 
-		handler, errChan := backupClient.BackupToWriter(writers, backupOpts)
+		handler, err := backupClient.BackupToWriter(writers, backupCfg)
+		if err != nil {
+			panic(err)
+		}
         // optionally check the status of the backup job
 		stats := handler.GetStatus()
-		// error channel closes when the backup is done
-		err = <-errChan
+		// use handler.Wait() to wait for the job to finish or fail
+		err = handler.Wait()
 		if err != nil {
-			backupErrors <- err
+			panic(err)
 		}
 	}
 
@@ -68,7 +71,10 @@ func main() {
 		panic(err)
 	}
 
-	// TODO Restore is similar
+	restoreErrors := make(chan error, 5)
+
+	// start 5 restore jobs from the files we backed up
+
 ```
 ### Prerequisites
 

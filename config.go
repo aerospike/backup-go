@@ -15,9 +15,10 @@
 package backuplib
 
 import (
-	"backuplib/models"
 	"fmt"
 	"io"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )

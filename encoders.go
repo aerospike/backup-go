@@ -15,8 +15,9 @@
 package backuplib
 
 import (
-	"backuplib/encoder"
 	"io"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/encoder"
 )
 
 // ASBEncoderBuilder satisfies the EncoderBuilder interface

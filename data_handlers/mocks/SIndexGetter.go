@@ -3,8 +3,7 @@
 package mocks
 
 import (
-	models "backuplib/models"
-
+	models "github.com/aerospike/aerospike-tools-backup-lib/models"
 	mock "github.com/stretchr/testify/mock"
 )
 

@@ -15,9 +15,10 @@
 package backuplib
 
 import (
-	datahandlers "backuplib/data_handlers"
-	"backuplib/encoder"
 	"io"
+
+	datahandlers "github.com/aerospike/aerospike-tools-backup-lib/data_handlers"
+	"github.com/aerospike/aerospike-tools-backup-lib/encoder"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )

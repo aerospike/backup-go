@@ -15,13 +15,14 @@
 package encoder
 
 import (
-	"backuplib/models"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"time"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )

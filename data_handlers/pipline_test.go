@@ -15,11 +15,12 @@
 package datahandlers
 
 import (
-	"backuplib/data_handlers/mocks"
 	"context"
 	"errors"
 	"io"
 	"testing"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/data_handlers/mocks"
 
 	"github.com/stretchr/testify/suite"
 )

@@ -15,7 +15,6 @@
 package decoder
 
 import (
-	"backuplib/models"
 	"bufio"
 	"encoding/base64"
 	"fmt"
@@ -24,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/google/go-cmp/cmp"

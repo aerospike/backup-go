@@ -15,12 +15,14 @@
 package backuplib_test
 
 import (
-	"backuplib"
-	testresources "backuplib/test"
 	"bytes"
 	"fmt"
 	"io"
 	"testing"
+
+	testresources "github.com/aerospike/aerospike-tools-backup-lib/test"
+
+	backuplib "github.com/aerospike/aerospike-tools-backup-lib"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/tools-common-go/testutils"

@@ -15,8 +15,9 @@
 package backuplib
 
 import (
-	"backuplib/decoder"
 	"io"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/decoder"
 )
 
 // ASBDecoderBuilder satisfies the DecoderBuilder interface

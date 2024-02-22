@@ -15,8 +15,9 @@
 package datahandlers
 
 import (
-	"backuplib/models"
 	"io"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )

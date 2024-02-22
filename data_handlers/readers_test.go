@@ -21,8 +21,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"backuplib/data_handlers/mocks"
-	"backuplib/models"
+	"github.com/aerospike/aerospike-tools-backup-lib/data_handlers/mocks"
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/suite"

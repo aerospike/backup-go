@@ -15,8 +15,9 @@
 package backuplib
 
 import (
-	datahandlers "backuplib/data_handlers"
 	"io"
+
+	datahandlers "github.com/aerospike/aerospike-tools-backup-lib/data_handlers"
 )
 
 // **** Generic Restore Handler ****

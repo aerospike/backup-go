@@ -15,14 +15,15 @@ This Aerospike backup package is built around the (Aerospike Go client)[https://
 The following is a simple example using a backup client to start backup and restore jobs. Errors should be properly handled in production code.
 ```Go
 package main
-package backuplib
 
 import (
 	"io"
+	"log"
 	"os"
+	"sync"
 
 	"github.com/aerospike/aerospike-client-go/v7"
-    "github.com/aerospike/aerospike-tools-backup-lib"
+	backuplib "github.com/aerospike/aerospike-tools-backup-lib"
 )
 
 func main() {
@@ -31,50 +32,74 @@ func main() {
 		panic(aerr)
 	}
 
-	backupClient, err := backuplib.NewClient(aerospikeClient, Config{})
+	backupClientConfig := backuplib.NewConfig()
+
+	backupClient, err := backuplib.NewClient(aerospikeClient, backupClientConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	backupHandlers := make()
-
-    // start 5 backup jobs
+	backupWaitGroup := sync.WaitGroup{}
+	// start 5 backup jobs
 	for i := 0; i < 5; i++ {
-		fname := "file" + string(i)
-		file, err := os.Open(fname)
-		if err != nil {
-			panic(err)
-		}
-		defer file.Close()
+		backupWaitGroup.Add(1)
+		go func(i int) {
+			defer backupWaitGroup.Done()
 
-		backupCfg := backuplib.NewBackupToWriterConfig()
-		backupCfg.Parallel = 4
-        backupCfg.Namespace = "test"
+			fname := "file" + string(i)
+			file, err := os.Open(fname)
+			if err != nil {
+				panic(err)
+			}
+			defer file.Close()
 
-		writers := []io.Writer{file}
-
-		handler, err := backupClient.BackupToWriter(writers, backupCfg)
-		if err != nil {
-			panic(err)
-		}
-        // optionally check the status of the backup job
-		stats := handler.GetStatus()
-		// use handler.Wait() to wait for the job to finish or fail
-		err = handler.Wait()
-		if err != nil {
-			panic(err)
-		}
+			writers := []io.Writer{file}
+			backupCfg := backuplib.NewBackupToWriterConfig()
+			backupCfg.Namespace = "test"
+			handler, err := backupClient.BackupToWriter(writers, backupCfg)
+			if err != nil {
+				panic(err)
+			}
+			// optionally check the stats of the backup job
+			_ = handler.GetStats()
+			// use handler.Wait() to wait for the job to finish or fail
+			err = handler.Wait()
+			if err != nil {
+				log.Printf("Backup %d failed: %v", i, err)
+			}
+		}(i)
 	}
 
-	err = <-backupErrors
-	if err != nil {
-		panic(err)
-	}
-
-	restoreErrors := make(chan error, 5)
-
+	restoreWaitGroup := sync.WaitGroup{}
 	// start 5 restore jobs from the files we backed up
+	for i := 0; i < 5; i++ {
+		restoreWaitGroup.Add(1)
+		go func(i int) {
+			defer restoreWaitGroup.Done()
 
+			fname := "file" + string(i)
+			file, err := os.Open(fname)
+			if err != nil {
+				panic(err)
+			}
+			defer file.Close()
+
+			readers := []io.Reader{file}
+			restoreCfg := backuplib.NewRestoreFromReaderConfig()
+			handler, err := backupClient.RestoreFromReader(readers, restoreCfg)
+			if err != nil {
+				panic(err)
+			}
+			// optionally check the stats of the restore job
+			_ = handler.GetStats()
+			// use handler.Wait() to wait for the job to finish or fail
+			err = handler.Wait()
+			if err != nil {
+				log.Printf("Restore %d failed: %v", i, err)
+			}
+		}(i)
+	}
+}
 ```
 ### Prerequisites
 

@@ -23,6 +23,7 @@ func newWorkHandler() *workHandler {
 	return &workHandler{}
 }
 
-func (wh *workHandler) DoJob(job *datahandlers.DataPipeline) error {
+// TODO change the any typed pipeline to a message or token type
+func (wh *workHandler) DoJob(job *datahandlers.DataPipeline[any]) error {
 	return job.Run()
 }

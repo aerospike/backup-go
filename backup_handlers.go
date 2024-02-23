@@ -53,8 +53,9 @@ func newBackupHandler(config *BackupBaseConfig, ac *a.Client, namespace string) 
 	return handler
 }
 
-func (bh *backupHandler) run(writers []datahandlers.Writer) error {
-	readers := make([]datahandlers.Reader, bh.config.Parallel)
+// TODO change the any typed pipeline to a message or token type
+func (bh *backupHandler) run(writers []datahandlers.Writer[any]) error {
+	readers := make([]datahandlers.Reader[any], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.config.Parallel
 		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
@@ -74,7 +75,8 @@ func (bh *backupHandler) run(writers []datahandlers.Writer) error {
 		readers[i] = dataReader
 	}
 
-	processors := make([]datahandlers.Processor, bh.config.Parallel)
+	// TODO change the any typed pipeline to a message or token type
+	processors := make([]datahandlers.Processor[any], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
@@ -130,7 +132,8 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 		defer handlePanic(errChan)
 
 		batchSize := bwh.config.Parallel
-		dataWriters := []datahandlers.Writer{}
+		// TODO change the any typed pipeline to a message or token type
+		dataWriters := []datahandlers.Writer[any]{}
 
 		for i, writer := range writers {
 
@@ -170,7 +173,8 @@ func (bwh *BackupToWriterHandler) Wait() error {
 	return <-bwh.errors
 }
 
-func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (datahandlers.Writer, error) {
+// TODO change the any typed pipeline to a message or token type
+func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (datahandlers.Writer[any], error) {
 	enc, err := eb.CreateEncoder()
 	if err != nil {
 		return nil, err

@@ -34,7 +34,8 @@ type DBRestoreClient interface {
 
 // worker is an interface for running a job
 type worker interface {
-	DoJob(*datahandlers.DataPipeline) error
+	// TODO change the any typed pipeline to a message or token type
+	DoJob(*datahandlers.DataPipeline[any]) error
 }
 
 // restoreHandler handles generic restore jobs on data readers
@@ -55,15 +56,18 @@ func newRestoreHandler(config *RestoreBaseConfig, ac DBRestoreClient, w worker) 
 }
 
 // run runs the restore job
-func (rh *restoreHandler) run(readers []datahandlers.Reader) error {
+// TODO change the any typed pipeline to a message or token type
+func (rh *restoreHandler) run(readers []datahandlers.Reader[any]) error {
 
-	processors := make([]datahandlers.Processor, rh.config.Parallel)
+	// TODO change the any typed pipeline to a message or token type
+	processors := make([]datahandlers.Processor[any], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
 		processors[i] = processor
 	}
 
-	writers := make([]datahandlers.Writer, rh.config.Parallel)
+	// TODO change the any typed pipeline to a message or token type
+	writers := make([]datahandlers.Writer[any], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
 		writer := datahandlers.NewRestoreWriter(rh.dbClient)
 		writers[i] = writer
@@ -121,7 +125,8 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 		defer handlePanic(errChan)
 
 		batchSize := rrh.config.Parallel
-		dataReaders := []datahandlers.Reader{}
+		// TODO change the any type to a message or token type
+		dataReaders := []datahandlers.Reader[any]{}
 
 		for i, reader := range readers {
 

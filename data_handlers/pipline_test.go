@@ -30,42 +30,42 @@ type pipelineTestSuite struct {
 }
 
 func (suite *pipelineTestSuite) TestNewDataPipeline() {
-	reader := mocks.NewReader(suite.T())
-	processor := mocks.NewProcessor(suite.T())
-	writer := mocks.NewWriter(suite.T())
+	reader := mocks.NewReader[string](suite.T())
+	processor := mocks.NewProcessor[string](suite.T())
+	writer := mocks.NewWriter[string](suite.T())
 
-	readers := []Reader{reader}
-	processors := []Processor{processor}
-	writers := []Writer{writer}
+	readers := []Reader[string]{reader}
+	processors := []Processor[string]{processor}
+	writers := []Writer[string]{writer}
 
 	pipeline := NewDataPipeline(readers, processors, writers)
 	suite.NotNil(pipeline)
 }
 
 func (suite *pipelineTestSuite) TestNewDataPipelineNoArgs() {
-	pipeline := NewDataPipeline(nil, nil, nil)
+	pipeline := NewDataPipeline[string](nil, nil, nil)
 	suite.Nil(pipeline)
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineRun() {
-	reader := mocks.NewReader(suite.T())
-	processor := mocks.NewProcessor(suite.T())
-	writer := mocks.NewWriter(suite.T())
+	reader := mocks.NewReader[string](suite.T())
+	processor := mocks.NewProcessor[string](suite.T())
+	writer := mocks.NewWriter[string](suite.T())
 
-	readers := []Reader{reader}
-	processors := []Processor{processor}
-	writers := []Writer{writer}
+	readers := []Reader[string]{reader}
+	processors := []Processor[string]{processor}
+	writers := []Writer[string]{writer}
 
 	pipeline := NewDataPipeline(readers, processors, writers)
 	suite.NotNil(pipeline)
 
 	readCalls := 0
-	reader.EXPECT().Read().RunAndReturn(func() (any, error) {
+	reader.EXPECT().Read().RunAndReturn(func() (string, error) {
 		readCalls++
 		if readCalls <= 3 {
 			return "hi", nil
 		}
-		return nil, io.EOF
+		return "", io.EOF
 	})
 	reader.EXPECT().Cancel()
 
@@ -79,24 +79,24 @@ func (suite *pipelineTestSuite) TestDataPipelineRun() {
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineReaderFails() {
-	reader := mocks.NewReader(suite.T())
-	processor := mocks.NewProcessor(suite.T())
-	writer := mocks.NewWriter(suite.T())
+	reader := mocks.NewReader[string](suite.T())
+	processor := mocks.NewProcessor[string](suite.T())
+	writer := mocks.NewWriter[string](suite.T())
 
-	readers := []Reader{reader}
-	processors := []Processor{processor}
-	writers := []Writer{writer}
+	readers := []Reader[string]{reader}
+	processors := []Processor[string]{processor}
+	writers := []Writer[string]{writer}
 
 	pipeline := NewDataPipeline(readers, processors, writers)
 	suite.NotNil(pipeline)
 
 	readCalls := 0
-	reader.EXPECT().Read().RunAndReturn(func() (any, error) {
+	reader.EXPECT().Read().RunAndReturn(func() (string, error) {
 		readCalls++
 		if readCalls <= 3 {
 			return "hi", nil
 		}
-		return nil, errors.New("error")
+		return "", errors.New("error")
 	})
 	reader.EXPECT().Cancel()
 
@@ -110,24 +110,24 @@ func (suite *pipelineTestSuite) TestDataPipelineReaderFails() {
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineProcessorFails() {
-	reader := mocks.NewReader(suite.T())
-	processor := mocks.NewProcessor(suite.T())
-	writer := mocks.NewWriter(suite.T())
+	reader := mocks.NewReader[string](suite.T())
+	processor := mocks.NewProcessor[string](suite.T())
+	writer := mocks.NewWriter[string](suite.T())
 
-	readers := []Reader{reader}
-	processors := []Processor{processor}
-	writers := []Writer{writer}
+	readers := []Reader[string]{reader}
+	processors := []Processor[string]{processor}
+	writers := []Writer[string]{writer}
 
 	reader.EXPECT().Read().Return("hi", nil)
 	reader.EXPECT().Cancel()
 
 	processCalls := 0
-	processor.EXPECT().Process("hi").RunAndReturn(func(any) (any, error) {
+	processor.EXPECT().Process("hi").RunAndReturn(func(string) (string, error) {
 		processCalls++
 		if processCalls <= 3 {
 			return "hi", nil
 		}
-		return nil, errors.New("error")
+		return "", errors.New("error")
 	})
 
 	writer.EXPECT().Write("hi").Return(nil)
@@ -141,13 +141,13 @@ func (suite *pipelineTestSuite) TestDataPipelineProcessorFails() {
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineWriterFails() {
-	reader := mocks.NewReader(suite.T())
-	processor := mocks.NewProcessor(suite.T())
-	writer := mocks.NewWriter(suite.T())
+	reader := mocks.NewReader[string](suite.T())
+	processor := mocks.NewProcessor[string](suite.T())
+	writer := mocks.NewWriter[string](suite.T())
 
-	readers := []Reader{reader}
-	processors := []Processor{processor}
-	writers := []Writer{writer}
+	readers := []Reader[string]{reader}
+	processors := []Processor[string]{processor}
+	writers := []Writer[string]{writer}
 
 	reader.EXPECT().Read().Return("hi", nil)
 	reader.EXPECT().Cancel()
@@ -155,7 +155,7 @@ func (suite *pipelineTestSuite) TestDataPipelineWriterFails() {
 	processor.EXPECT().Process("hi").Return("hi", nil)
 
 	writeCalls := 0
-	writer.EXPECT().Write("hi").RunAndReturn(func(any) error {
+	writer.EXPECT().Write("hi").RunAndReturn(func(string) error {
 		writeCalls++
 		if writeCalls <= 3 {
 			return nil
@@ -174,13 +174,13 @@ func (suite *pipelineTestSuite) TestDataPipelineWriterFails() {
 func (suite *pipelineTestSuite) TestReadStageRun() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	reader := mocks.NewReader(suite.T())
+	reader := mocks.NewReader[string](suite.T())
 	reader.EXPECT().Read().Return("hi", nil)
 	reader.EXPECT().Cancel()
 
-	stage := readStage{
+	stage := readStage[string]{
 		r:    reader,
-		send: make(chan any),
+		send: make(chan string),
 	}
 
 	errChan := make(chan error)
@@ -196,13 +196,13 @@ func (suite *pipelineTestSuite) TestReadStageRun() {
 
 func (suite *pipelineTestSuite) TestReadStageRunEOF() {
 	ctx := context.Background()
-	reader := mocks.NewReader(suite.T())
-	reader.EXPECT().Read().Return(nil, io.EOF)
+	reader := mocks.NewReader[string](suite.T())
+	reader.EXPECT().Read().Return("", io.EOF)
 	reader.EXPECT().Cancel()
 
-	stage := readStage{
+	stage := readStage[string]{
 		r:    reader,
-		send: make(chan any),
+		send: make(chan string),
 	}
 
 	errChan := make(chan error)
@@ -217,13 +217,13 @@ func (suite *pipelineTestSuite) TestReadStageRunEOF() {
 
 func (suite *pipelineTestSuite) TestReadStageError() {
 	ctx := context.Background()
-	reader := mocks.NewReader(suite.T())
-	reader.EXPECT().Read().Return(nil, errors.New("error"))
+	reader := mocks.NewReader[string](suite.T())
+	reader.EXPECT().Read().Return("", errors.New("error"))
 	reader.EXPECT().Cancel()
 
-	stage := readStage{
+	stage := readStage[string]{
 		r:    reader,
-		send: make(chan any),
+		send: make(chan string),
 	}
 
 	errChan := make(chan error)

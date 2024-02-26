@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datahandlers
+package backuplib
 
 import "context"
 
@@ -24,37 +24,37 @@ import "context"
 // DataProcessor is an interface for processing data
 //
 //go:generate mockery --name DataProcessor
-type DataProcessor interface {
-	Process(any) (any, error)
+type DataProcessor[T any] interface {
+	Process(T) (T, error)
 }
 
 // ProcessorWorker implements the pipeline.Worker interface
 // It wraps a DataProcessor and processes data with it
-type ProcessorWorker struct {
-	processor DataProcessor
-	receive   <-chan any
-	send      chan<- any
+type ProcessorWorker[T any] struct {
+	processor DataProcessor[T]
+	receive   <-chan T
+	send      chan<- T
 }
 
 // NewProcessorWorker creates a new ProcessorWorker
-func NewProcessorWorker(processor DataProcessor) *ProcessorWorker {
-	return &ProcessorWorker{
+func NewProcessorWorker[T any](processor DataProcessor[T]) *ProcessorWorker[T] {
+	return &ProcessorWorker[T]{
 		processor: processor,
 	}
 }
 
 // SetReceiveChan sets the receive channel for the ProcessorWorker
-func (w *ProcessorWorker) SetReceiveChan(c <-chan any) {
+func (w *ProcessorWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
 }
 
 // SetSendChan sets the send channel for the ProcessorWorker
-func (w *ProcessorWorker) SetSendChan(c chan<- any) {
+func (w *ProcessorWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
 // Run starts the ProcessorWorker
-func (w *ProcessorWorker) Run(ctx context.Context) error {
+func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -90,7 +90,7 @@ func NewNOOPProcessor() *NOOPProcessor {
 }
 
 // Process processes the data
-func (p *NOOPProcessor) Process(data any) (any, error) {
+func (p *NOOPProcessor) Process(data *token) (*token, error) {
 	return data, nil
 }
 

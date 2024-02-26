@@ -18,8 +18,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
-
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
@@ -64,12 +62,6 @@ func NewConfig() *Config {
 }
 
 // **** Backup ****
-
-type Encoder interface {
-	EncodeRecord(*models.Record) ([]byte, error)
-	EncodeUDF(*models.UDF) ([]byte, error)
-	EncodeSIndex(*models.SIndex) ([]byte, error)
-}
 
 type EncoderBuilder interface {
 	CreateEncoder() (Encoder, error)
@@ -131,10 +123,6 @@ func NewBackupToWriterConfig() *BackupToWriterConfig {
 }
 
 // **** Restore ****
-
-type Decoder interface {
-	NextToken() (any, error)
-}
 
 type DecoderBuilder interface {
 	CreateDecoder() (Decoder, error)

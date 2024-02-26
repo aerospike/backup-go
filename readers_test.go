@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datahandlers
+package backuplib
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/data_handlers/mocks"
+	"github.com/aerospike/aerospike-tools-backup-lib/mocks"
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -36,10 +36,10 @@ type readersTestSuite struct {
 }
 
 func (suite *readersTestSuite) TestReadWorker() {
-	mockReader := mocks.NewDataReader(suite.T())
+	mockReader := mocks.NewDataReader[string](suite.T())
 
 	readCalls := 0
-	mockReader.EXPECT().Read().RunAndReturn(func() (any, error) {
+	mockReader.EXPECT().Read().RunAndReturn(func() (string, error) {
 		readCalls++
 		if readCalls <= 3 {
 			return "hi", nil
@@ -51,7 +51,7 @@ func (suite *readersTestSuite) TestReadWorker() {
 	worker := NewReadWorker[string](mockReader)
 	suite.NotNil(worker)
 
-	send := make(chan any, 3)
+	send := make(chan string, 3)
 	worker.SetSendChan(send)
 
 	ctx := context.Background()
@@ -66,7 +66,7 @@ func (suite *readersTestSuite) TestReadWorker() {
 }
 
 func (suite *readersTestSuite) TestReadWorkerCancel() {
-	mockReader := mocks.NewDataReader(suite.T())
+	mockReader := mocks.NewDataReader[string](suite.T())
 	mockReader.EXPECT().Read().Return("hi", nil)
 	mockReader.EXPECT().Cancel()
 
@@ -90,15 +90,28 @@ func (suite *readersTestSuite) TestReadWorkerCancel() {
 }
 
 func (suite *readersTestSuite) TestGenericReader() {
+	key, aerr := a.NewKey("test", "", "key")
+	if aerr != nil {
+		panic(aerr)
+	}
+
+	mockRec := &models.Record{
+		Bins: a.BinMap{
+			"key": "hi",
+		},
+		Key: key,
+	}
+
 	mockDecoder := mocks.NewDecoder(suite.T())
-	mockDecoder.EXPECT().NextToken().Return("hi", nil)
+	mockDecoder.EXPECT().NextToken().Return(mockRec, nil)
 
 	reader := NewGenericReader(mockDecoder)
 	suite.NotNil(reader)
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	suite.Equal("hi", v)
+	expectedRecToken := newRecordToken(mockRec)
+	suite.Equal(expectedRecToken, v)
 
 	reader.Cancel()
 
@@ -152,7 +165,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	suite.Equal(mockRec, v)
+	expectedRecToken := newRecordToken(mockRec)
+	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 
 	// positive channel closed
@@ -276,7 +290,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	namespace := "test"
 
 	mockSIndexGetter := mocks.NewSIndexGetter(suite.T())
-	expectedSIndexes := []*models.SIndex{
+	mockSIndexes := []*models.SIndex{
 		{
 			Namespace: namespace,
 			Set:       "set",
@@ -284,20 +298,25 @@ func (suite *readersTestSuite) TestSIndexReader() {
 		{},
 	}
 	mockSIndexGetter.EXPECT().GetSIndexes(namespace).Return(
-		expectedSIndexes,
+		mockSIndexes,
 		nil,
 	)
 
 	reader := NewSIndexReader(mockSIndexGetter, namespace)
 	suite.NotNil(reader)
 
+	expectedSIndexTokens := []*token{}
+	for _, sindex := range mockSIndexes {
+		expectedSIndexTokens = append(expectedSIndexTokens, newSIndexToken(sindex))
+	}
+
 	v, err := reader.Read()
 	suite.Nil(err)
-	suite.Equal(v, expectedSIndexes[0])
+	suite.Equal(v, expectedSIndexTokens[0])
 
 	v, err = reader.Read()
 	suite.Nil(err)
-	suite.Equal(v, expectedSIndexes[1])
+	suite.Equal(v, expectedSIndexTokens[1])
 
 	v, err = reader.Read()
 	suite.Equal(err, io.EOF)

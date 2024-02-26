@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datahandlers
+package backuplib
 
 import (
 	"context"
@@ -32,20 +32,20 @@ import (
 // DataReader is an interface for reading data from a source.
 //
 //go:generate mockery --name DataReader
-type DataReader interface {
-	Read() (any, error)
+type DataReader[T any] interface {
+	Read() (T, error)
 	Cancel()
 }
 
 // ReadWorker implements the pipeline.Worker interface
 // It wraps a DataReader and reads data from it
 type ReadWorker[T any] struct {
-	reader DataReader
-	send   chan<- any
+	reader DataReader[T]
+	send   chan<- T
 }
 
 // NewReadWorker creates a new ReadWorker
-func NewReadWorker[T any](reader DataReader) *ReadWorker[T] {
+func NewReadWorker[T any](reader DataReader[T]) *ReadWorker[T] {
 	return &ReadWorker[T]{
 		reader: reader,
 	}
@@ -53,12 +53,12 @@ func NewReadWorker[T any](reader DataReader) *ReadWorker[T] {
 
 // SetReceiveChan satisfies the pipeline.Worker interface
 // but is a no-op for the ReadWorker
-func (w *ReadWorker[T]) SetReceiveChan(c <-chan any) {
+func (w *ReadWorker[T]) SetReceiveChan(c <-chan T) {
 	// no-op
 }
 
 // SetSendChan sets the send channel for the ReadWorker
-func (w *ReadWorker[T]) SetSendChan(c chan<- any) {
+func (w *ReadWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
@@ -108,8 +108,22 @@ func NewGenericReader(decoder Decoder) *GenericReader {
 }
 
 // Read reads the next token from the decoder
-func (dr *GenericReader) Read() (any, error) {
-	return dr.decoder.NextToken()
+func (dr *GenericReader) Read() (*token, error) {
+	data, err := dr.decoder.NextToken()
+	if err != nil {
+		return nil, err
+	}
+
+	switch v := data.(type) {
+	case *models.Record:
+		return newRecordToken(v), nil
+	case *models.UDF:
+		return newUDFToken(v), nil
+	case *models.SIndex:
+		return newSIndexToken(v), nil
+	default:
+		return nil, errors.New("unsupported token type")
+	}
 }
 
 // Cancel satisfies the DataReader interface
@@ -164,7 +178,7 @@ func NewAerospikeRecordReader(cfg *ARRConfig, client Scanner) *AerospikeRecordRe
 }
 
 // Read reads the next record from the Aerospike database
-func (j *AerospikeRecordReader) Read() (any, error) {
+func (j *AerospikeRecordReader) Read() (*token, error) {
 	if !j.status.started {
 		var err error
 		j.recResChan, err = startScan(j)
@@ -183,8 +197,9 @@ func (j *AerospikeRecordReader) Read() (any, error) {
 	}
 
 	rec := (*models.Record)(res.Record)
+	recToken := newRecordToken(rec)
 
-	return rec, nil
+	return recToken, nil
 }
 
 // Cancel cancels the Aerospike scan used to read records
@@ -251,7 +266,7 @@ func NewSIndexReader(client SIndexGetter, namespace string) *SIndexReader {
 }
 
 // Read reads the next secondary index from the SIndexGetter
-func (r *SIndexReader) Read() (any, error) {
+func (r *SIndexReader) Read() (*token, error) {
 	// grab all the sindexes on the first run
 	if r.sindexes == nil {
 		sindexes, err := r.client.GetSIndexes(r.namespace)
@@ -265,7 +280,8 @@ func (r *SIndexReader) Read() (any, error) {
 	}
 
 	if len(r.sindexes) > 0 {
-		return <-r.sindexes, nil
+		SIToken := newSIndexToken(<-r.sindexes)
+		return SIToken, nil
 	}
 
 	return nil, io.EOF

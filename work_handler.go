@@ -27,8 +27,7 @@ func newWorkHandler() *workHandler {
 	return &workHandler{}
 }
 
-// TODO change the any typed pipeline to a message or token type
-func (wh *workHandler) DoJob(job *pipeline.Pipeline[any]) error {
+func (wh *workHandler) DoJob(job *pipeline.Pipeline[*token]) error {
 	// TODO allow for context to be passed in
 	ctx := context.Background()
 	return job.Run(ctx)

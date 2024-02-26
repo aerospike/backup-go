@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datahandlers
+package backuplib
 
 import (
 	"bytes"
@@ -34,38 +34,38 @@ import (
 // DataWriter is an interface for writing data to a destination.
 //
 //go:generate mockery --name DataWriter
-type DataWriter interface {
-	Write(any) error
+type DataWriter[T any] interface {
+	Write(T) error
 	Cancel()
 }
 
 // WriteWorker implements the pipeline.Worker interface
 // It wraps a DataWriter and writes data to it
-type WriteWorker struct {
-	writer  DataWriter
-	receive <-chan any
+type WriteWorker[T any] struct {
+	writer  DataWriter[T]
+	receive <-chan T
 }
 
 // NewWriteWorker creates a new WriteWorker
-func NewWriteWorker(writer DataWriter) *WriteWorker {
-	return &WriteWorker{
+func NewWriteWorker[T any](writer DataWriter[T]) *WriteWorker[T] {
+	return &WriteWorker[T]{
 		writer: writer,
 	}
 }
 
 // SetReceiveChan sets the receive channel for the WriteWorker
-func (w *WriteWorker) SetReceiveChan(c <-chan any) {
+func (w *WriteWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
 }
 
 // SetSendChan satisfies the pipeline.Worker interface
 // but is a no-op for the WriteWorker
-func (w *WriteWorker) SetSendChan(c chan<- any) {
+func (w *WriteWorker[T]) SetSendChan(c chan<- T) {
 	// no-op
 }
 
 // Run runs the WriteWorker
-func (w *WriteWorker) Run(ctx context.Context) error {
+func (w *WriteWorker[T]) Run(ctx context.Context) error {
 	for {
 		defer w.writer.Cancel()
 		select {
@@ -98,9 +98,6 @@ type Encoder interface {
 // GenericWriter satisfies the DataWriter interface
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
-// While the input type is `any`, the actual types written should
-// only be the types exposed by the models package.
-// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
 type GenericWriter struct {
 	encoder Encoder
 	output  io.Writer
@@ -117,21 +114,21 @@ func NewGenericWriter(encoder Encoder, output io.Writer) *GenericWriter {
 // Write encodes v and writes it to the output
 // TODO let the encoder handle the type checking
 // TODO maybe restrict the types that can be written to this
-func (w *GenericWriter) Write(v any) error {
+func (w *GenericWriter) Write(v *token) error {
 	var (
 		err  error
 		data []byte
 	)
 
-	switch v := v.(type) {
-	case *models.Record:
-		data, err = w.encoder.EncodeRecord(v)
-	case *models.UDF:
-		data, err = w.encoder.EncodeUDF(v)
-	case *models.SIndex:
-		data, err = w.encoder.EncodeSIndex(v)
+	switch v.Type {
+	case tokenTypeRecord:
+		data, err = w.encoder.EncodeRecord(v.Record)
+	case tokenTypeUDF:
+		data, err = w.encoder.EncodeUDF(v.UDF)
+	case tokenTypeSIndex:
+		data, err = w.encoder.EncodeSIndex(v.SIndex)
 	default:
-		return fmt.Errorf("unsupported type: %T", v)
+		return fmt.Errorf("unsupported token type: %v", v.Type)
 	}
 
 	if err != nil {
@@ -219,19 +216,16 @@ func NewRestoreWriter(asc DBWriter) *RestoreWriter {
 }
 
 // Write writes the types from modes to an Aerospike DB.
-// While the input type is `any`, the actual types written should
-// only be the types exposed by the models package.
-// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
 // TODO support write policy
 // TODO support batch writes
-func (rw *RestoreWriter) Write(data any) error {
-	switch d := data.(type) {
-	case *models.Record:
-		return rw.asc.Put(nil, d.Key, d.Bins)
-	case *models.UDF:
-		return rw.writeUDF(d)
-	case *models.SIndex:
-		return rw.writeSecondaryIndex(d)
+func (rw *RestoreWriter) Write(data *token) error {
+	switch data.Type {
+	case tokenTypeRecord:
+		return rw.asc.Put(nil, data.Record.Key, data.Record.Bins)
+	case tokenTypeUDF:
+		return rw.writeUDF(data.UDF)
+	case tokenTypeSIndex:
+		return rw.writeSecondaryIndex(data.SIndex)
 	default:
 		return nil
 	}

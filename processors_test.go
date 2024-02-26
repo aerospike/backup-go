@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datahandlers
+package backuplib
 
 import (
 	"context"
@@ -21,7 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/data_handlers/mocks"
+	"github.com/aerospike/aerospike-tools-backup-lib/mocks"
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -30,19 +31,19 @@ type proccessorTestSuite struct {
 }
 
 func (suite *proccessorTestSuite) TestProcessorWorker() {
-	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
-	receiver := make(chan any, 1)
+	receiver := make(chan string, 1)
 	receiver <- "test"
 	close(receiver)
 
 	worker.SetReceiveChan(receiver)
 
-	sender := make(chan any, 1)
+	sender := make(chan string, 1)
 	worker.SetSendChan(sender)
 
 	ctx := context.Background()
@@ -54,18 +55,18 @@ func (suite *proccessorTestSuite) TestProcessorWorker() {
 }
 
 func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
-	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
-	receiver := make(chan any, 1)
+	receiver := make(chan string, 1)
 	receiver <- "test"
 
 	worker.SetReceiveChan(receiver)
 
-	sender := make(chan any, 1)
+	sender := make(chan string, 1)
 	worker.SetSendChan(sender)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -92,18 +93,18 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
 }
 
 func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
-	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
-	receiver := make(chan any, 1)
+	receiver := make(chan string, 1)
 	receiver <- "test"
 
 	worker.SetReceiveChan(receiver)
 
-	sender := make(chan any)
+	sender := make(chan string)
 	worker.SetSendChan(sender)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,19 +128,19 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
 }
 
 func (suite *proccessorTestSuite) TestProcessorWorkerReceiveClosed() {
-	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
-	receiver := make(chan any, 1)
+	receiver := make(chan string, 1)
 	receiver <- "test"
 	close(receiver)
 
 	worker.SetReceiveChan(receiver)
 
-	sender := make(chan any, 1)
+	sender := make(chan string, 1)
 	worker.SetSendChan(sender)
 
 	ctx := context.Background()
@@ -148,19 +149,19 @@ func (suite *proccessorTestSuite) TestProcessorWorkerReceiveClosed() {
 }
 
 func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
-	mockProcessor := mocks.NewDataProcessor(suite.T())
-	mockProcessor.EXPECT().Process("test").Return(nil, errors.New("test"))
+	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor.EXPECT().Process("test").Return("", errors.New("test"))
 
 	worker := NewProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
-	receiver := make(chan any, 1)
+	receiver := make(chan string, 1)
 	receiver <- "test"
 	close(receiver)
 
 	worker.SetReceiveChan(receiver)
 
-	sender := make(chan any, 1)
+	sender := make(chan string, 1)
 	worker.SetSendChan(sender)
 
 	ctx := context.Background()
@@ -172,7 +173,10 @@ func (suite *proccessorTestSuite) TestNOOPProcessor() {
 	noop := NewNOOPProcessor()
 	suite.NotNil(noop)
 
-	data := "test"
+	data := &token{
+		Type:   tokenTypeRecord,
+		Record: &models.Record{},
+	}
 	processed, err := noop.Process(data)
 	suite.Nil(err)
 	suite.Equal(data, processed)

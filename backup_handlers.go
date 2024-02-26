@@ -17,7 +17,6 @@ package backuplib
 import (
 	"io"
 
-	datahandlers "github.com/aerospike/aerospike-tools-backup-lib/data_handlers"
 	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
 	"github.com/aerospike/aerospike-tools-backup-lib/pipeline"
 
@@ -54,41 +53,39 @@ func newBackupHandler(config *BackupBaseConfig, ac *a.Client, namespace string) 
 	return handler
 }
 
-// TODO change the any typed pipeline to a message or token type
-func (bh *backupHandler) run(writers []*datahandlers.WriteWorker) error {
-	readWorkers := make([]pipeline.Worker[any], bh.config.Parallel)
+func (bh *backupHandler) run(writers []*WriteWorker[*token]) error {
+	readWorkers := make([]pipeline.Worker[*token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.config.Parallel
 		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
 
-		ARRCFG := &datahandlers.ARRConfig{
+		ARRCFG := &ARRConfig{
 			Namespace:      bh.namespace,
 			Set:            bh.config.Set,
 			FirstPartition: begin,
 			NumPartitions:  count,
 		}
 
-		dataReader := datahandlers.NewAerospikeRecordReader(
+		recordReader := NewAerospikeRecordReader(
 			ARRCFG,
 			bh.aerospikeClient,
 		)
 
-		readWorkers[i] = datahandlers.NewReadWorker[any](dataReader)
+		readWorkers[i] = NewReadWorker(recordReader)
 	}
 
-	// TODO change the any typed pipeline to a message or token type
-	processorWorkers := make([]pipeline.Worker[any], bh.config.Parallel)
+	processorWorkers := make([]pipeline.Worker[*token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
-		processor := datahandlers.NewNOOPProcessor()
-		processorWorkers[i] = datahandlers.NewProcessorWorker(processor)
+		processor := NewNOOPProcessor()
+		processorWorkers[i] = NewProcessorWorker(processor)
 	}
 
-	writeWorkers := make([]pipeline.Worker[any], len(writers))
+	writeWorkers := make([]pipeline.Worker[*token], len(writers))
 	for i, w := range writers {
 		writeWorkers[i] = w
 	}
 
-	job := pipeline.NewPipeline(
+	job := pipeline.NewPipeline[*token](
 		readWorkers,
 		processorWorkers,
 		writeWorkers,
@@ -139,7 +136,7 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 
 		batchSize := bwh.config.Parallel
 		// TODO change the any typed pipeline to a message or token type
-		dataWriters := []*datahandlers.WriteWorker{}
+		dataWriters := []*WriteWorker[*token]{}
 
 		for i, writer := range writers {
 
@@ -179,8 +176,7 @@ func (bwh *BackupToWriterHandler) Wait() error {
 	return <-bwh.errors
 }
 
-// TODO change the any typed pipeline to a message or token type
-func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*datahandlers.WriteWorker, error) {
+func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*WriteWorker[*token], error) {
 	enc, err := eb.CreateEncoder()
 	if err != nil {
 		return nil, err
@@ -188,19 +184,19 @@ func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool)
 
 	switch encT := enc.(type) {
 	case *asb.Encoder:
-		asbw := datahandlers.NewASBWriter(encT, w)
+		asbw := NewASBWriter(encT, w)
 		err := asbw.Init(namespace, first)
 		if err != nil {
 			return nil, err
 		}
 
-		worker := datahandlers.NewWriteWorker(asbw)
+		worker := NewWriteWorker(asbw)
 
 		return worker, err
 
 	default:
-		gw := datahandlers.NewGenericWriter(encT, w)
-		worker := datahandlers.NewWriteWorker(gw)
+		gw := NewGenericWriter(encT, w)
+		worker := NewWriteWorker(gw)
 
 		return worker, nil
 	}

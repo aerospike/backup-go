@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datahandlers
+package backuplib
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/data_handlers/mocks"
+	"github.com/aerospike/aerospike-tools-backup-lib/mocks"
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -32,14 +32,14 @@ type writersTestSuite struct {
 }
 
 func (suite *writersTestSuite) TestWriteWorker() {
-	mockWriter := mocks.NewDataWriter(suite.T())
+	mockWriter := mocks.NewDataWriter[string](suite.T())
 	mockWriter.EXPECT().Write("test").Return(nil)
 	mockWriter.EXPECT().Cancel()
 
 	worker := NewWriteWorker(mockWriter)
 	suite.NotNil(worker)
 
-	receiver := make(chan any, 1)
+	receiver := make(chan string, 1)
 	receiver <- "test"
 	close(receiver)
 
@@ -51,7 +51,7 @@ func (suite *writersTestSuite) TestWriteWorker() {
 }
 
 func (suite *writersTestSuite) TestWriteWorkerCancel() {
-	mockWriter := mocks.NewDataWriter(suite.T())
+	mockWriter := mocks.NewDataWriter[string](suite.T())
 	mockWriter.EXPECT().Cancel()
 
 	worker := NewWriteWorker(mockWriter)
@@ -65,14 +65,14 @@ func (suite *writersTestSuite) TestWriteWorkerCancel() {
 }
 
 func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
-	mockWriter := mocks.NewDataWriter(suite.T())
+	mockWriter := mocks.NewDataWriter[string](suite.T())
 	mockWriter.EXPECT().Write("test").Return(errors.New("error"))
 	mockWriter.EXPECT().Cancel()
 
 	worker := NewWriteWorker(mockWriter)
 	suite.NotNil(worker)
 
-	receiver := make(chan any, 1)
+	receiver := make(chan string, 1)
 	receiver <- "test"
 	close(receiver)
 
@@ -99,14 +99,17 @@ func (suite *writersTestSuite) TestGenericWriter() {
 			"key1": 1,
 		},
 	}
+	recToken := newRecordToken(expRecord)
 
 	expUDF := &models.UDF{
 		Name: "udf",
 	}
+	UDFToken := newUDFToken(expUDF)
 
 	expSIndex := &models.SIndex{
 		Name: "sindex",
 	}
+	SIndexToken := newSIndexToken(expSIndex)
 
 	mockEncoder := mocks.NewEncoder(suite.T())
 	mockEncoder.EXPECT().EncodeRecord(expRecord).Return([]byte("rec,"), nil)
@@ -118,19 +121,19 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	writer := NewGenericWriter(mockEncoder, output)
 	suite.NotNil(writer)
 
-	err := writer.Write(expRecord)
+	err := writer.Write(recToken)
 	suite.Nil(err)
 	suite.Equal("rec,", output.String())
 
-	err = writer.Write(expSIndex)
+	err = writer.Write(SIndexToken)
 	suite.Nil(err)
 	suite.Equal("rec,si,", output.String())
 
-	err = writer.Write(expUDF)
+	err = writer.Write(UDFToken)
 	suite.Nil(err)
 	suite.Equal("rec,si,udf", output.String())
 
-	err = writer.Write("bad_type")
+	err = writer.Write(&token{Type: tokenTypeInvalid})
 	suite.NotNil(err)
 	suite.Equal("rec,si,udf", output.String())
 
@@ -141,8 +144,9 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	// Encoder failed
 
 	failRec := &models.Record{}
+	failRecToken := newRecordToken(failRec)
 	mockEncoder.EXPECT().EncodeRecord(failRec).Return(nil, errors.New("error"))
-	err = writer.Write(failRec)
+	err = writer.Write(failRecToken)
 	suite.NotNil(err)
 	suite.Equal("rec,si,udf", output.String())
 
@@ -166,14 +170,17 @@ func (suite *writersTestSuite) TestASBWriter() {
 			"key1": 1,
 		},
 	}
+	recToken := newRecordToken(expRecord)
 
 	expUDF := &models.UDF{
 		Name: "udf",
 	}
+	UDFToken := newUDFToken(expUDF)
 
 	expSIndex := &models.SIndex{
 		Name: "sindex",
 	}
+	SIndexToken := newSIndexToken(expSIndex)
 
 	mockEncoder := mocks.NewASBEncoder(suite.T())
 	mockEncoder.EXPECT().GetVersionText().Return([]byte("Version 3.1\n"))
@@ -192,15 +199,15 @@ func (suite *writersTestSuite) TestASBWriter() {
 	suite.Nil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\n", output.String())
 
-	err = writer.Write(expRecord)
+	err = writer.Write(recToken)
 	suite.Nil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,", output.String())
 
-	err = writer.Write(expSIndex)
+	err = writer.Write(SIndexToken)
 	suite.Nil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,", output.String())
 
-	err = writer.Write(expUDF)
+	err = writer.Write(UDFToken)
 	suite.Nil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,udf", output.String())
 
@@ -211,8 +218,9 @@ func (suite *writersTestSuite) TestASBWriter() {
 	// Encoder failed
 
 	failRec := &models.Record{}
+	failRecToken := newRecordToken(failRec)
 	mockEncoder.EXPECT().EncodeRecord(failRec).Return(nil, errors.New("error"))
-	err = writer.Write(failRec)
+	err = writer.Write(failRecToken)
 	suite.NotNil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,udf", output.String())
 
@@ -235,6 +243,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 			"key1": 1,
 		},
 	}
+	recToken := newRecordToken(expRecord)
 
 	mockDBWriter := mocks.NewDBWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
@@ -242,7 +251,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	writer := NewRestoreWriter(mockDBWriter)
 	suite.NotNil(writer)
 
-	err := writer.Write(expRecord)
+	err := writer.Write(recToken)
 	suite.Nil(err)
 
 	writer.Cancel()
@@ -252,8 +261,9 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	// DBWriter failed
 
 	failRec := &models.Record{}
+	failRecToken := newRecordToken(failRec)
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), failRec.Key, failRec.Bins).Return(a.ErrInvalidParam)
-	err = writer.Write(failRec)
+	err = writer.Write(failRecToken)
 	suite.NotNil(err)
 
 	mockDBWriter.AssertExpectations(suite.T())

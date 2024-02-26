@@ -14,8 +14,69 @@
 
 package datahandlers
 
+import "context"
+
 // processors.go contains the implementations of the DataProcessor interface
 // used by dataPipelines in the backuplib package
+
+// **** Processor Worker ****
+
+// DataProcessor is an interface for processing data
+//
+//go:generate mockery --name DataProcessor
+type DataProcessor interface {
+	Process(any) (any, error)
+}
+
+// ProcessorWorker implements the pipeline.Worker interface
+// It wraps a DataProcessor and processes data with it
+type ProcessorWorker struct {
+	processor DataProcessor
+	receive   <-chan any
+	send      chan<- any
+}
+
+// NewProcessorWorker creates a new ProcessorWorker
+func NewProcessorWorker(processor DataProcessor) *ProcessorWorker {
+	return &ProcessorWorker{
+		processor: processor,
+	}
+}
+
+// SetReceiveChan sets the receive channel for the ProcessorWorker
+func (w *ProcessorWorker) SetReceiveChan(c <-chan any) {
+	w.receive = c
+}
+
+// SetSendChan sets the send channel for the ProcessorWorker
+func (w *ProcessorWorker) SetSendChan(c chan<- any) {
+	w.send = c
+}
+
+// Run starts the ProcessorWorker
+func (w *ProcessorWorker) Run(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case data, active := <-w.receive:
+			if !active {
+				return nil
+			}
+
+			processed, err := w.processor.Process(data)
+			if err != nil {
+				return err
+			}
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case w.send <- processed:
+			}
+		}
+	}
+}
 
 // **** NOOP Processor ****
 

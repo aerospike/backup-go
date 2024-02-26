@@ -16,6 +16,7 @@ package datahandlers
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"testing"
 
@@ -28,6 +29,58 @@ import (
 
 type writersTestSuite struct {
 	suite.Suite
+}
+
+func (suite *writersTestSuite) TestWriteWorker() {
+	mockWriter := mocks.NewDataWriter(suite.T())
+	mockWriter.EXPECT().Write("test").Return(nil)
+	mockWriter.EXPECT().Cancel()
+
+	worker := NewWriteWorker(mockWriter)
+	suite.NotNil(worker)
+
+	receiver := make(chan any, 1)
+	receiver <- "test"
+	close(receiver)
+
+	worker.SetReceiveChan(receiver)
+
+	ctx := context.Background()
+	err := worker.Run(ctx)
+	suite.Nil(err)
+}
+
+func (suite *writersTestSuite) TestWriteWorkerCancel() {
+	mockWriter := mocks.NewDataWriter(suite.T())
+	mockWriter.EXPECT().Cancel()
+
+	worker := NewWriteWorker(mockWriter)
+	suite.NotNil(worker)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := worker.Run(ctx)
+	suite.NotNil(err)
+}
+
+func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
+	mockWriter := mocks.NewDataWriter(suite.T())
+	mockWriter.EXPECT().Write("test").Return(errors.New("error"))
+	mockWriter.EXPECT().Cancel()
+
+	worker := NewWriteWorker(mockWriter)
+	suite.NotNil(worker)
+
+	receiver := make(chan any, 1)
+	receiver <- "test"
+	close(receiver)
+
+	worker.SetReceiveChan(receiver)
+
+	ctx := context.Background()
+	err := worker.Run(ctx)
+	suite.NotNil(err)
 }
 
 func (suite *writersTestSuite) TestGenericWriter() {

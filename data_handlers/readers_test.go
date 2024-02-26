@@ -15,10 +15,13 @@
 package datahandlers
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/data_handlers/mocks"
@@ -30,6 +33,60 @@ import (
 
 type readersTestSuite struct {
 	suite.Suite
+}
+
+func (suite *readersTestSuite) TestReadWorker() {
+	mockReader := mocks.NewDataReader(suite.T())
+
+	readCalls := 0
+	mockReader.EXPECT().Read().RunAndReturn(func() (any, error) {
+		readCalls++
+		if readCalls <= 3 {
+			return "hi", nil
+		}
+		return "", io.EOF
+	})
+	mockReader.EXPECT().Cancel()
+
+	worker := NewReadWorker[string](mockReader)
+	suite.NotNil(worker)
+
+	send := make(chan any, 3)
+	worker.SetSendChan(send)
+
+	ctx := context.Background()
+	worker.Run(ctx)
+	close(send)
+
+	suite.Equal(3, len(send))
+
+	for v := range send {
+		suite.Equal("hi", v)
+	}
+}
+
+func (suite *readersTestSuite) TestReadWorkerCancel() {
+	mockReader := mocks.NewDataReader(suite.T())
+	mockReader.EXPECT().Read().Return("hi", nil)
+	mockReader.EXPECT().Cancel()
+
+	worker := NewReadWorker[string](mockReader)
+	suite.NotNil(worker)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		worker.Run(ctx)
+	}()
+
+	// give the worker some time to start
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+	wg.Wait()
 }
 
 func (suite *readersTestSuite) TestGenericReader() {

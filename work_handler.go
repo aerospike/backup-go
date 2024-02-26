@@ -14,7 +14,11 @@
 
 package backuplib
 
-import datahandlers "github.com/aerospike/aerospike-tools-backup-lib/data_handlers"
+import (
+	"context"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/pipeline"
+)
 
 // workHandler is a generic worker for running a data pipeline (job)
 type workHandler struct{}
@@ -24,6 +28,8 @@ func newWorkHandler() *workHandler {
 }
 
 // TODO change the any typed pipeline to a message or token type
-func (wh *workHandler) DoJob(job *datahandlers.DataPipeline[any]) error {
-	return job.Run()
+func (wh *workHandler) DoJob(job *pipeline.Pipeline[any]) error {
+	// TODO allow for context to be passed in
+	ctx := context.Background()
+	return job.Run(ctx)
 }

@@ -16,6 +16,7 @@ package datahandlers
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,60 @@ import (
 
 // writers.go contains the implementations of the DataWriter interface
 // used by dataPipelines in the backuplib package
+
+// **** Write Worker ****
+
+// DataWriter is an interface for writing data to a destination.
+//
+//go:generate mockery --name DataWriter
+type DataWriter interface {
+	Write(any) error
+	Cancel()
+}
+
+// WriteWorker implements the pipeline.Worker interface
+// It wraps a DataWriter and writes data to it
+type WriteWorker struct {
+	writer  DataWriter
+	receive <-chan any
+}
+
+// NewWriteWorker creates a new WriteWorker
+func NewWriteWorker(writer DataWriter) *WriteWorker {
+	return &WriteWorker{
+		writer: writer,
+	}
+}
+
+// SetReceiveChan sets the receive channel for the WriteWorker
+func (w *WriteWorker) SetReceiveChan(c <-chan any) {
+	w.receive = c
+}
+
+// SetSendChan satisfies the pipeline.Worker interface
+// but is a no-op for the WriteWorker
+func (w *WriteWorker) SetSendChan(c chan<- any) {
+	// no-op
+}
+
+// Run runs the WriteWorker
+func (w *WriteWorker) Run(ctx context.Context) error {
+	for {
+		defer w.writer.Cancel()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case data, active := <-w.receive:
+			if !active {
+				return nil
+			}
+
+			if err := w.writer.Write(data); err != nil {
+				return err
+			}
+		}
+	}
+}
 
 // **** Generic Writer ****
 

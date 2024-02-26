@@ -18,6 +18,7 @@ import (
 	"io"
 
 	datahandlers "github.com/aerospike/aerospike-tools-backup-lib/data_handlers"
+	"github.com/aerospike/aerospike-tools-backup-lib/pipeline"
 )
 
 // **** Generic Restore Handler ****
@@ -35,7 +36,7 @@ type DBRestoreClient interface {
 // worker is an interface for running a job
 type worker interface {
 	// TODO change the any typed pipeline to a message or token type
-	DoJob(*datahandlers.DataPipeline[any]) error
+	DoJob(*pipeline.Pipeline[any]) error
 }
 
 // restoreHandler handles generic restore jobs on data readers
@@ -57,26 +58,31 @@ func newRestoreHandler(config *RestoreBaseConfig, ac DBRestoreClient, w worker) 
 
 // run runs the restore job
 // TODO change the any typed pipeline to a message or token type
-func (rh *restoreHandler) run(readers []datahandlers.Reader[any]) error {
+func (rh *restoreHandler) run(readers []*datahandlers.ReadWorker[any]) error {
 
 	// TODO change the any typed pipeline to a message or token type
-	processors := make([]datahandlers.Processor[any], rh.config.Parallel)
+	processorWorkers := make([]pipeline.Worker[any], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
 		processor := datahandlers.NewNOOPProcessor()
-		processors[i] = processor
+		processorWorkers[i] = datahandlers.NewProcessorWorker(processor)
 	}
 
 	// TODO change the any typed pipeline to a message or token type
-	writers := make([]datahandlers.Writer[any], rh.config.Parallel)
+	writeWorkers := make([]pipeline.Worker[any], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
 		writer := datahandlers.NewRestoreWriter(rh.dbClient)
-		writers[i] = writer
+		writeWorkers[i] = datahandlers.NewWriteWorker(writer)
 	}
 
-	job := datahandlers.NewDataPipeline(
-		readers,
-		processors,
-		writers,
+	readWorkers := make([]pipeline.Worker[any], len(readers))
+	for i, r := range readers {
+		readWorkers[i] = r
+	}
+
+	job := pipeline.NewPipeline(
+		readWorkers,
+		processorWorkers,
+		writeWorkers,
 	)
 
 	return rh.worker.DoJob(job)
@@ -126,7 +132,7 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 
 		batchSize := rrh.config.Parallel
 		// TODO change the any type to a message or token type
-		dataReaders := []datahandlers.Reader[any]{}
+		dataReaders := []*datahandlers.ReadWorker[any]{}
 
 		for i, reader := range readers {
 
@@ -138,7 +144,8 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 			}
 
 			dr := datahandlers.NewGenericReader(decoder)
-			dataReaders = append(dataReaders, dr)
+			readWorker := datahandlers.NewReadWorker[any](dr)
+			dataReaders = append(dataReaders, readWorker)
 			// if we have not reached the batch size and we have more readers
 			// continue to the next reader
 			// if we are at the end of readers then run no matter what

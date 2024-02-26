@@ -15,13 +15,157 @@
 package datahandlers
 
 import (
+	"context"
+	"errors"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/aerospike/aerospike-tools-backup-lib/data_handlers/mocks"
 	"github.com/stretchr/testify/suite"
 )
 
 type proccessorTestSuite struct {
 	suite.Suite
+}
+
+func (suite *proccessorTestSuite) TestProcessorWorker() {
+	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor.EXPECT().Process("test").Return("test", nil)
+
+	worker := NewProcessorWorker(mockProcessor)
+	suite.NotNil(worker)
+
+	receiver := make(chan any, 1)
+	receiver <- "test"
+	close(receiver)
+
+	worker.SetReceiveChan(receiver)
+
+	sender := make(chan any, 1)
+	worker.SetSendChan(sender)
+
+	ctx := context.Background()
+	err := worker.Run(ctx)
+	suite.Nil(err)
+
+	data := <-sender
+	suite.Equal("test", data)
+}
+
+func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
+	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor.EXPECT().Process("test").Return("test", nil)
+
+	worker := NewProcessorWorker(mockProcessor)
+	suite.NotNil(worker)
+
+	receiver := make(chan any, 1)
+	receiver <- "test"
+
+	worker.SetReceiveChan(receiver)
+
+	sender := make(chan any, 1)
+	worker.SetSendChan(sender)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	errors := make(chan error, 1)
+	go func() {
+		defer wg.Done()
+		err := worker.Run(ctx)
+		errors <- err
+	}()
+
+	// give the worker some time to start
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+	wg.Wait()
+
+	err := <-errors
+	suite.NotNil(err)
+
+	data := <-sender
+	suite.Equal("test", data)
+}
+
+func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
+	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor.EXPECT().Process("test").Return("test", nil)
+
+	worker := NewProcessorWorker(mockProcessor)
+	suite.NotNil(worker)
+
+	receiver := make(chan any, 1)
+	receiver <- "test"
+
+	worker.SetReceiveChan(receiver)
+
+	sender := make(chan any)
+	worker.SetSendChan(sender)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	errors := make(chan error, 1)
+	go func() {
+		defer wg.Done()
+		err := worker.Run(ctx)
+		errors <- err
+	}()
+
+	// give the worker some time to start
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+	wg.Wait()
+
+	err := <-errors
+	suite.NotNil(err)
+}
+
+func (suite *proccessorTestSuite) TestProcessorWorkerReceiveClosed() {
+	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor.EXPECT().Process("test").Return("test", nil)
+
+	worker := NewProcessorWorker(mockProcessor)
+	suite.NotNil(worker)
+
+	receiver := make(chan any, 1)
+	receiver <- "test"
+	close(receiver)
+
+	worker.SetReceiveChan(receiver)
+
+	sender := make(chan any, 1)
+	worker.SetSendChan(sender)
+
+	ctx := context.Background()
+	err := worker.Run(ctx)
+	suite.Nil(err)
+}
+
+func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
+	mockProcessor := mocks.NewDataProcessor(suite.T())
+	mockProcessor.EXPECT().Process("test").Return(nil, errors.New("test"))
+
+	worker := NewProcessorWorker(mockProcessor)
+	suite.NotNil(worker)
+
+	receiver := make(chan any, 1)
+	receiver <- "test"
+	close(receiver)
+
+	worker.SetReceiveChan(receiver)
+
+	sender := make(chan any, 1)
+	worker.SetSendChan(sender)
+
+	ctx := context.Background()
+	err := worker.Run(ctx)
+	suite.NotNil(err)
 }
 
 func (suite *proccessorTestSuite) TestNOOPProcessor() {

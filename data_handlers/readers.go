@@ -15,6 +15,8 @@
 package datahandlers
 
 import (
+	"context"
+	"errors"
 	"io"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
@@ -24,6 +26,60 @@ import (
 
 // readers.go contains the implementations of the DataReader interface
 // used by dataPipelines in the backuplib package
+
+// **** Read Worker ****
+
+// DataReader is an interface for reading data from a source.
+//
+//go:generate mockery --name DataReader
+type DataReader interface {
+	Read() (any, error)
+	Cancel()
+}
+
+// ReadWorker implements the pipeline.Worker interface
+// It wraps a DataReader and reads data from it
+type ReadWorker[T any] struct {
+	reader DataReader
+	send   chan<- any
+}
+
+// NewReadWorker creates a new ReadWorker
+func NewReadWorker[T any](reader DataReader) *ReadWorker[T] {
+	return &ReadWorker[T]{
+		reader: reader,
+	}
+}
+
+// SetReceiveChan satisfies the pipeline.Worker interface
+// but is a no-op for the ReadWorker
+func (w *ReadWorker[T]) SetReceiveChan(c <-chan any) {
+	// no-op
+}
+
+// SetSendChan sets the send channel for the ReadWorker
+func (w *ReadWorker[T]) SetSendChan(c chan<- any) {
+	w.send = c
+}
+
+// Run runs the ReadWorker
+func (w *ReadWorker[T]) Run(ctx context.Context) error {
+	for {
+		defer w.reader.Cancel()
+		data, err := w.reader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case w.send <- data:
+		}
+	}
+}
 
 // Decoder is an interface for reading backup data as tokens.
 // It is used to support different data formats.

@@ -131,7 +131,7 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 
 		for i, reader := range readers {
 
-			decoder, err := rrh.config.DecoderBuilder.CreateDecoder(reader)
+			decoder, err := rrh.config.DecoderFactory.CreateDecoder(reader)
 			if err != nil {
 				errChan <- err
 				return

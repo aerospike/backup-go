@@ -137,7 +137,7 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 
 		for i, writer := range writers {
 
-			dw, err := getDataWriter(bwh.config.EncoderBuilder, writer, bwh.namespace, i == 0)
+			dw, err := getDataWriter(bwh.config.EncoderFactory, writer, bwh.namespace, i == 0)
 			if err != nil {
 				errChan <- err
 				return
@@ -178,7 +178,7 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
-func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*writeWorker[*models.Token], error) {
+func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool) (*writeWorker[*models.Token], error) {
 	enc, err := eb.CreateEncoder()
 	if err != nil {
 		return nil, err

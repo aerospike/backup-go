@@ -27,8 +27,8 @@ const (
 )
 
 var (
-	defaultEncoderBuilder = NewASBEncoderFactory()
-	defaultDecoderBuilder = NewASBDecoderFactory()
+	defaultEncoderFactory = NewASBEncoderFactory()
+	defaultDecoderFactory = NewASBDecoderFactory()
 )
 
 // **** Policies ****
@@ -57,7 +57,7 @@ func NewConfig() *Config {
 
 // **** Backup ****
 
-type EncoderBuilder interface {
+type EncoderFactory interface {
 	CreateEncoder() (Encoder, error)
 }
 
@@ -70,9 +70,9 @@ type BackupBaseConfig struct {
 	Namespace string
 	// Set is the Aerospike set to backup
 	Set string
-	// EncoderBuilder is used to specify the encoder with which to encode the backup data
+	// EncoderFactory is used to specify the encoder with which to encode the backup data
 	// If nil, the default encoder will be used
-	EncoderBuilder EncoderBuilder
+	EncoderFactory EncoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup
 	// If nil, the backup client's policy will be used, if that is nil, the aerospike client's default policy will be used
 	InfoPolicy *a.InfoPolicy
@@ -95,7 +95,7 @@ func NewBackupBaseConfig() *BackupBaseConfig {
 		Parallel:       1,
 		Set:            "",
 		Namespace:      "test",
-		EncoderBuilder: defaultEncoderBuilder,
+		EncoderFactory: defaultEncoderFactory,
 	}
 }
 
@@ -129,9 +129,9 @@ type RestoreBaseConfig struct {
 	// Parallel is the number of parallel writers to run against the Aerospike cluster
 	// during a restore operation
 	Parallel int
-	// DecoderBuilder is used to specify the decoder with which to decode backup data during restores
+	// DecoderFactory is used to specify the decoder with which to decode backup data during restores
 	// If nil, the default decoder will be used
-	DecoderBuilder DecoderFactory
+	DecoderFactory DecoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during restore
 	// If nil, the Aerospike client's default policy will be used, if that is nil, the aerospike client's default policy will be used
 	InfoPolicy *a.InfoPolicy
@@ -151,7 +151,7 @@ func (c *RestoreBaseConfig) validate() error {
 func NewRestoreBaseConfig() *RestoreBaseConfig {
 	return &RestoreBaseConfig{
 		Parallel:       4,
-		DecoderBuilder: defaultDecoderBuilder,
+		DecoderFactory: defaultDecoderFactory,
 	}
 }
 

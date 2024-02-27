@@ -170,16 +170,17 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		panic(err)
 	}
 
+	ctx := context.Background()
 	dst := bytes.NewBuffer([]byte{})
 
 	bh, err := suite.backupClient.Backup(
+		ctx,
 		[]io.Writer{dst},
 		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
 
-	ctx := context.Background()
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
@@ -191,6 +192,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	reader := bytes.NewReader(dst.Bytes())
 
 	rh, err := suite.backupClient.Restore(
+		ctx,
 		[]io.Reader{reader},
 		nil,
 	)
@@ -202,6 +204,44 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 
 	err = suite.testClient.ValidateRecords(expectedRecs, numRec, namespace, set)
 	suite.Nil(err)
+}
+
+func (suite *backupRestoreTestSuite) TestBackupContext() {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	dst := bytes.NewBuffer([]byte{})
+
+	bh, err := suite.backupClient.Backup(
+		ctx,
+		[]io.Writer{dst},
+		nil,
+	)
+	suite.NotNil(bh)
+	suite.Nil(err)
+
+	ctx = context.Background()
+	err = bh.Wait(ctx)
+	suite.NotNil(err)
+}
+
+func (suite *backupRestoreTestSuite) TestRestoreContext() {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	reader := bytes.NewReader([]byte{})
+
+	rh, err := suite.backupClient.Restore(
+		ctx,
+		[]io.Reader{reader},
+		nil,
+	)
+	suite.NotNil(rh)
+	suite.Nil(err)
+
+	ctx = context.Background()
+	err = rh.Wait(ctx)
+	suite.NotNil(err)
 }
 
 func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {

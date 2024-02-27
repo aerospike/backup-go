@@ -28,8 +28,6 @@ func newWorkHandler() *workHandler {
 	return &workHandler{}
 }
 
-func (wh *workHandler) DoJob(job *pipeline.Pipeline[*models.Token]) error {
-	// TODO allow for context to be passed in
-	ctx := context.Background()
+func (wh *workHandler) DoJob(ctx context.Context, job *pipeline.Pipeline[*models.Token]) error {
 	return job.Run(ctx)
 }

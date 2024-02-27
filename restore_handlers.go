@@ -33,7 +33,7 @@ type DBRestoreClient interface {
 // worker is an interface for running a job
 type worker interface {
 	// TODO change the any typed pipeline to a message or token type
-	DoJob(*pipeline.Pipeline[*models.Token]) error
+	DoJob(context.Context, *pipeline.Pipeline[*models.Token]) error
 }
 
 // restoreHandlerBase handles generic restore jobs on data readers
@@ -54,7 +54,7 @@ func newRestoreHandlerBase(config *RestoreBaseConfig, ac DBRestoreClient, w work
 }
 
 // run runs the restore job
-func (rh *restoreHandlerBase) run(readers []*ReadWorker[*models.Token]) error {
+func (rh *restoreHandlerBase) run(ctx context.Context, readers []*ReadWorker[*models.Token]) error {
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
@@ -79,7 +79,7 @@ func (rh *restoreHandlerBase) run(readers []*ReadWorker[*models.Token]) error {
 		writeWorkers,
 	)
 
-	return rh.worker.DoJob(job)
+	return rh.worker.DoJob(ctx, job)
 }
 
 // **** Restore From Reader Handler ****
@@ -111,7 +111,7 @@ func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.R
 
 // run runs the restore job
 // currently this should only be run once
-func (rrh *RestoreHandler) run(readers []io.Reader) {
+func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 	rrh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
@@ -145,7 +145,7 @@ func (rrh *RestoreHandler) run(readers []io.Reader) {
 				continue
 			}
 
-			err = rrh.restoreHandlerBase.run(dataReaders)
+			err = rrh.restoreHandlerBase.run(ctx, dataReaders)
 			if err != nil {
 				errChan <- err
 				return

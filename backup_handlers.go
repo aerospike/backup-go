@@ -51,7 +51,7 @@ func newBackupHandlerBase(config *BackupBaseConfig, ac *a.Client, namespace stri
 	return handler
 }
 
-func (bh *backupHandlerBase) run(writers []*WriteWorker[*models.Token]) error {
+func (bh *backupHandlerBase) run(ctx context.Context, writers []*WriteWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.config.Parallel
@@ -89,7 +89,7 @@ func (bh *backupHandlerBase) run(writers []*WriteWorker[*models.Token]) error {
 		writeWorkers,
 	)
 
-	return bh.worker.DoJob(job)
+	return bh.worker.DoJob(ctx, job)
 }
 
 // **** Backup To Writer Handler ****
@@ -120,7 +120,7 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *
 
 // run runs the backup job
 // currently this should only be run once
-func (bwh *BackupHandler) run(writers []io.Writer) {
+func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 	bwh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
@@ -150,7 +150,7 @@ func (bwh *BackupHandler) run(writers []io.Writer) {
 				continue
 			}
 
-			err = bwh.backupHandlerBase.run(dataWriters)
+			err = bwh.backupHandlerBase.run(ctx, dataWriters)
 			if err != nil {
 				errChan <- err
 				return

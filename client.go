@@ -15,6 +15,7 @@
 package backuplib
 
 import (
+	"context"
 	"errors"
 	"io"
 
@@ -93,7 +94,7 @@ func (c *Client) getUsablePolicy(p *Policies) *Policies {
 }
 
 // Backup starts a backup operation to a set of io.writers
-func (c *Client) Backup(writers []io.Writer, config *BackupConfig) (*BackupHandler, error) {
+func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *BackupConfig) (*BackupHandler, error) {
 	if config == nil {
 		config = NewBackupConfig()
 	}
@@ -104,13 +105,13 @@ func (c *Client) Backup(writers []io.Writer, config *BackupConfig) (*BackupHandl
 	}
 
 	handler := newBackupHandler(config, c.aerospikeClient, writers)
-	handler.run(writers)
+	handler.run(ctx, writers)
 
 	return handler, nil
 }
 
 // Restore starts a restore operation from a set of io.readers
-func (c *Client) Restore(readers []io.Reader, config *RestoreConfig) (*RestoreHandler, error) {
+func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *RestoreConfig) (*RestoreHandler, error) {
 	if config == nil {
 		config = NewRestoreConfig()
 	}
@@ -121,7 +122,7 @@ func (c *Client) Restore(readers []io.Reader, config *RestoreConfig) (*RestoreHa
 	}
 
 	handler := newRestoreHandler(config, c.aerospikeClient, readers)
-	handler.run(readers)
+	handler.run(ctx, readers)
 
 	return handler, nil
 }

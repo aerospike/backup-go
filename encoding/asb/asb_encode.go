@@ -55,7 +55,7 @@ func (o *Encoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
 }
 
 func (o *Encoder) EncodeSIndex(sindex *models.SIndex) ([]byte, error) {
-	return _SIndexToASB(sindex)
+	return sindexToASB(sindex)
 }
 
 func (o *Encoder) GetVersionText() []byte {
@@ -263,7 +263,7 @@ func escapeASBS(s string) string {
 	return string(v)
 }
 
-func _SIndexToASB(sindex *models.SIndex) ([]byte, error) {
+func sindexToASB(sindex *models.SIndex) ([]byte, error) {
 	if sindex == nil {
 		return nil, errors.New("sindex is nil")
 	}

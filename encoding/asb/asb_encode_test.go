@@ -244,7 +244,7 @@ func Test__SIndexToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := _SIndexToASB(tt.args.sindex)
+			got, err := sindexToASB(tt.args.sindex)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeSIndexToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -27,17 +27,17 @@ type Encoder interface {
 	EncodeToken(*models.Token) ([]byte, error)
 }
 
-// ASBEncoderBuilder satisfies the EncoderBuilder interface
+// ASBEncoderFactory satisfies the EncoderBuilder interface
 // It creates a new ASB format encoder
-type ASBEncoderBuilder struct{}
+type ASBEncoderFactory struct{}
 
-// NewASBEncoderBuilder returns a new ASBEncoderBuilder
-func NewASBEncoderBuilder() *ASBEncoderBuilder {
-	return &ASBEncoderBuilder{}
+// NewASBEncoderFactory returns a new ASBEncoderBuilder
+func NewASBEncoderFactory() *ASBEncoderFactory {
+	return &ASBEncoderFactory{}
 }
 
 // CreateEncoder creates a new ASBEncoder
 // This method is called by the backup client to create a new encoder
-func (f *ASBEncoderBuilder) CreateEncoder() (Encoder, error) {
+func (f *ASBEncoderFactory) CreateEncoder() (Encoder, error) {
 	return asb.NewEncoder()
 }

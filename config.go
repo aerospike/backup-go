@@ -27,8 +27,8 @@ const (
 )
 
 var (
-	defaultEncoderBuilder = NewASBEncoderBuilder()
-	defaultDecoderBuilder = NewASBDecoderBuilder()
+	defaultEncoderBuilder = NewASBEncoderFactory()
+	defaultDecoderBuilder = NewASBDecoderFactory()
 )
 
 // **** Policies ****
@@ -120,9 +120,8 @@ func NewBackupConfig() *BackupConfig {
 
 // **** Restore ****
 
-type DecoderBuilder interface {
-	CreateDecoder() (Decoder, error)
-	SetSource(src io.Reader)
+type DecoderFactory interface {
+	CreateDecoder(src io.Reader) (Decoder, error)
 }
 
 // RestoreBaseConfig contains shared configuration for restore operations
@@ -132,7 +131,7 @@ type RestoreBaseConfig struct {
 	Parallel int
 	// DecoderBuilder is used to specify the decoder with which to decode backup data during restores
 	// If nil, the default decoder will be used
-	DecoderBuilder DecoderBuilder
+	DecoderBuilder DecoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during restore
 	// If nil, the Aerospike client's default policy will be used, if that is nil, the aerospike client's default policy will be used
 	InfoPolicy *a.InfoPolicy

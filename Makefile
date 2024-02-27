@@ -1,3 +1,7 @@
+.PHONY: mocks
+mocks: $(MOCKERY)
+	go generate ./...
+
 .PHONY: test
 test: test_deps
 	go test -v ./...
@@ -21,7 +25,3 @@ test_deps: $(MOCKERY) generate
 # Install mockery for generating test mocks
 $(MOCKERY):
 	go install github.com/vektra/mockery/v2@v2.42.0
-
-.PHONY: generate
-generate:
-	go generate ./...

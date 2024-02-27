@@ -13,6 +13,7 @@ coverage:
 clean:
 	rm -f coverage.cov
 	rm -rf mocks
+	rm -rf pipeline/mocks
 
 .PHONY: test_deps
 test_deps: $(MOCKERY) generate

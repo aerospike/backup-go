@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
@@ -144,6 +145,7 @@ type ASBWriter struct {
 	encoder   ASBEncoder
 	namespace string
 	first     bool
+	once      *sync.Once
 }
 
 // NewASBWriter creates a new ASBWriter
@@ -151,22 +153,27 @@ func NewASBWriter(encoder ASBEncoder, output io.Writer) *ASBWriter {
 	return &ASBWriter{
 		GenericWriter: *NewGenericWriter(encoder, output),
 		encoder:       encoder,
+		once:          &sync.Once{},
 	}
 }
 
 // Init initializes the ASBWriter and writes
 // the ASB header and metadata to the output.
 func (w *ASBWriter) Init(namespace string, first bool) error {
-	w.namespace = namespace
-	w.first = first
+	var err error
 
-	header := bytes.Buffer{}
-	header.Write(w.encoder.GetVersionText())
-	header.Write(w.encoder.GetNamespaceMetaText(namespace))
-	if first {
-		header.Write(w.encoder.GetFirstMetaText())
-	}
-	_, err := w.output.Write(header.Bytes())
+	w.once.Do(func() {
+		w.namespace = namespace
+		w.first = first
+
+		header := bytes.Buffer{}
+		header.Write(w.encoder.GetVersionText())
+		header.Write(w.encoder.GetNamespaceMetaText(namespace))
+		if first {
+			header.Write(w.encoder.GetFirstMetaText())
+		}
+		_, err = w.output.Write(header.Bytes())
+	})
 
 	return err
 }

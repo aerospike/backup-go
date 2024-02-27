@@ -38,12 +38,16 @@ import (
 // 		// handle error
 // 	}
 // 	// use the backup client to start backup and restore operations
-// 	backupHandler, err := backupClient.BackupToWriter(writers, nil)
+//  ctx := context.Background()
+// 	backupHandler, err := backupClient.Backup(ctx, writers, nil)
 // 	if err != nil {
 // 		// handle error
 //  }
+//  // optionally, check the stats of the backup operation
+// 	stats := backupHandler.Stats()
 // 	// use the backupHandler to wait for the backup operation to finish
-// 	// err = backupHandler.Wait()
+//  ctx := context.Background()
+// 	// err = backupHandler.Wait(ctx)
 
 type Client struct {
 	aerospikeClient *a.Client
@@ -66,31 +70,34 @@ func NewClient(ac *a.Client, cc *Config) (*Client, error) {
 	}, nil
 }
 
-// getUsablePolicy returns the policies to be used for the backup and restore operations
-// If the input policies are nil, the client's default policies will be used
-// If the client's default policies are nil, the aerospike client's default policies will be used
-func (c *Client) getUsablePolicy(p *Policies) *Policies {
-	policies := p
-	if policies == nil {
-		policies = c.config.Policies
+func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
+	if p == nil {
+		p = c.config.InfoPolicy
 	}
-	if policies == nil {
-		policies = &Policies{}
+	if p == nil {
+		p = c.aerospikeClient.DefaultInfoPolicy
 	}
+	return p
+}
 
-	if policies.InfoPolicy == nil {
-		policies.InfoPolicy = c.aerospikeClient.DefaultInfoPolicy
+func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
+	if p == nil {
+		p = c.config.WritePolicy
 	}
-
-	if policies.WritePolicy == nil {
-		policies.WritePolicy = c.aerospikeClient.DefaultWritePolicy
+	if p == nil {
+		p = c.aerospikeClient.DefaultWritePolicy
 	}
+	return p
+}
 
-	if policies.ScanPolicy == nil {
-		policies.ScanPolicy = c.aerospikeClient.DefaultScanPolicy
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
+	if p == nil {
+		p = c.config.ScanPolicy
 	}
-
-	return policies
+	if p == nil {
+		p = c.aerospikeClient.DefaultScanPolicy
+	}
+	return p
 }
 
 // Backup starts a backup operation to a set of io.writers
@@ -98,7 +105,8 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 	if config == nil {
 		config = NewBackupConfig()
 	}
-	config.Policies = c.getUsablePolicy(config.Policies)
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
 		return nil, err
@@ -115,7 +123,8 @@ func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *Resto
 	if config == nil {
 		config = NewRestoreConfig()
 	}
-	config.Policies = c.getUsablePolicy(config.Policies)
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
 
 	if err := config.validate(); err != nil {
 		return nil, err

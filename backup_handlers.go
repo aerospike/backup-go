@@ -67,7 +67,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,
 			ARRCFG,
-			bh.config.Policies.ScanPolicy,
+			bh.config.ScanPolicy,
 		)
 
 		readWorkers[i] = newReadWorker(recordReader)
@@ -95,12 +95,12 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 
 // **** Backup To Writer Handler ****
 
-// BackupStatus stores the status of a backup job
-type BackupStatus struct{}
+// BackupStats stores the status of a backup job
+type BackupStats struct{}
 
 // BackupHandler handles a backup job to a set of io.writers
 type BackupHandler struct {
-	status  *BackupStatus
+	stats   *BackupStats
 	config  *BackupConfig
 	writers []io.Writer
 	errors  chan error
@@ -164,8 +164,8 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 }
 
 // GetStats returns the stats of the backup job
-func (bwh *BackupHandler) GetStats() BackupStatus {
-	return *bwh.status
+func (bwh *BackupHandler) GetStats() BackupStats {
+	return *bwh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed

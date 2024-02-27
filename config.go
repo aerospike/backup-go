@@ -33,9 +33,13 @@ var (
 
 // **** Policies ****
 
-// Policies contains the Aerospike policies used during backup and restore operations
-type Policies struct {
-	// InfoPolicy applies to Aerospike Info requests made
+// **** Client ****
+
+// Config contains configuration for the backup client
+// Policies defined here will be used as defaults for any
+// backup and restore operations started by the client
+type Config struct {
+	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used
 	InfoPolicy *a.InfoPolicy
 	// WritePolicy applies to Aerospike write operations made during backup and restore
@@ -44,16 +48,6 @@ type Policies struct {
 	// ScanPolicy applies to Aerospike scan operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used
 	ScanPolicy *a.ScanPolicy
-}
-
-// **** Client ****
-
-// Config contains configuration for the backup client
-type Config struct {
-	// Policies contains the Aerospike policies used during backup and restore operations
-	// If nil, the Aerospike client's default policies will be used
-	// These policies will be used as defaults for the backup and restore operations
-	Policies *Policies
 }
 
 // NewConfig returns a new client Config
@@ -79,10 +73,12 @@ type BackupBaseConfig struct {
 	// EncoderBuilder is used to specify the encoder with which to encode the backup data
 	// If nil, the default encoder will be used
 	EncoderBuilder EncoderBuilder
-	// Policies contains the Aerospike policies used during backup operations
-	// These policies override the default policies from the backup client's configuration
-	// If nil, the backup client's policies will be used
-	Policies *Policies
+	// InfoPolicy applies to Aerospike Info requests made during backup
+	// If nil, the backup client's policy will be used, if that is nil, the aerospike client's default policy will be used
+	InfoPolicy *a.InfoPolicy
+	// ScanPolicy applies to Aerospike scan operations made during backup
+	// If nil, the backup client's policy will be used, if that is nil, the aerospike client's default policy will be used
+	ScanPolicy *a.ScanPolicy
 }
 
 func (c *BackupBaseConfig) validate() error {
@@ -137,10 +133,12 @@ type RestoreBaseConfig struct {
 	// DecoderBuilder is used to specify the decoder with which to decode backup data during restores
 	// If nil, the default decoder will be used
 	DecoderBuilder DecoderBuilder
-	// Policies contains the Aerospike policies used during restore operations
-	// These policies override the default policies from the backup client's configuration
-	// If nil, the backup client's policies will be used
-	Policies *Policies
+	// InfoPolicy applies to Aerospike Info requests made during restore
+	// If nil, the Aerospike client's default policy will be used, if that is nil, the aerospike client's default policy will be used
+	InfoPolicy *a.InfoPolicy
+	// WritePolicy applies to Aerospike write operations made during restore
+	// If nil, the Aerospike client's default policy will be used, if that is nil, the aerospike client's default policy will be used
+	WritePolicy *a.WritePolicy
 }
 
 func (c *RestoreBaseConfig) validate() error {

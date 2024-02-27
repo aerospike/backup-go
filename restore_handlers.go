@@ -66,7 +66,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	for i := 0; i < rh.config.Parallel; i++ {
 		writer := newRestoreWriter(
 			rh.dbClient,
-			rh.config.Policies.WritePolicy,
+			rh.config.WritePolicy,
 		)
 		writeWorkers[i] = newWriteWorker(writer)
 	}
@@ -87,12 +87,12 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 // **** Restore From Reader Handler ****
 
-// RestoreStatus stores the status of a restore from reader job
-type RestoreStatus struct{}
+// RestoreStats stores the status of a restore from reader job
+type RestoreStats struct{}
 
 // RestoreHandler handles a restore job from a set of io.readers
 type RestoreHandler struct {
-	status  *RestoreStatus
+	stats   *RestoreStats
 	config  *RestoreConfig
 	readers []io.Reader
 	errors  chan error
@@ -160,8 +160,8 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 }
 
 // GetStats returns the stats of the restore job
-func (rrh *RestoreHandler) GetStats() RestoreStatus {
-	return *rrh.status
+func (rrh *RestoreHandler) GetStats() RestoreStats {
+	return *rrh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

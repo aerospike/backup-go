@@ -55,7 +55,8 @@ func (suite *readersTestSuite) TestReadWorker() {
 	worker.SetSendChan(send)
 
 	ctx := context.Background()
-	worker.Run(ctx)
+	err := worker.Run(ctx)
+	suite.Nil(err)
 	close(send)
 
 	suite.Equal(3, len(send))
@@ -79,7 +80,8 @@ func (suite *readersTestSuite) TestReadWorkerCancel() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		worker.Run(ctx)
+		err := worker.Run(ctx)
+		suite.NotNil(err)
 	}()
 
 	// give the worker some time to start

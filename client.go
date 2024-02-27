@@ -92,10 +92,10 @@ func (c *Client) getUsablePolicy(p *Policies) *Policies {
 	return policies
 }
 
-// BackupToWriter starts a backup operation to a set of io.writers
-func (c *Client) BackupToWriter(writers []io.Writer, config *BackupToWriterConfig) (*BackupToWriterHandler, error) {
+// Backup starts a backup operation to a set of io.writers
+func (c *Client) Backup(writers []io.Writer, config *BackupConfig) (*BackupHandler, error) {
 	if config == nil {
-		config = NewBackupToWriterConfig()
+		config = NewBackupConfig()
 	}
 	config.Policies = c.getUsablePolicy(config.Policies)
 
@@ -103,16 +103,16 @@ func (c *Client) BackupToWriter(writers []io.Writer, config *BackupToWriterConfi
 		return nil, err
 	}
 
-	handler := newBackupToWriterHandler(config, c.aerospikeClient, writers)
+	handler := newBackupHandler(config, c.aerospikeClient, writers)
 	handler.run(writers)
 
 	return handler, nil
 }
 
-// RestoreFromReader starts a restore operation from a set of io.readers
-func (c *Client) RestoreFromReader(readers []io.Reader, config *RestoreFromReaderConfig) (*RestoreFromReaderHandler, error) {
+// Restore starts a restore operation from a set of io.readers
+func (c *Client) Restore(readers []io.Reader, config *RestoreConfig) (*RestoreHandler, error) {
 	if config == nil {
-		config = NewRestoreFromReaderConfig()
+		config = NewRestoreConfig()
 	}
 	config.Policies = c.getUsablePolicy(config.Policies)
 
@@ -120,7 +120,7 @@ func (c *Client) RestoreFromReader(readers []io.Reader, config *RestoreFromReade
 		return nil, err
 	}
 
-	handler := newRestoreFromReaderHandler(config, c.aerospikeClient, readers)
+	handler := newRestoreHandler(config, c.aerospikeClient, readers)
 	handler.run(readers)
 
 	return handler, nil

@@ -171,7 +171,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 
 	dst := bytes.NewBuffer([]byte{})
 
-	bh, err := suite.backupClient.BackupToWriter(
+	bh, err := suite.backupClient.Backup(
 		[]io.Writer{dst},
 		nil,
 	)
@@ -188,7 +188,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 
 	reader := bytes.NewReader(dst.Bytes())
 
-	rh, err := suite.backupClient.RestoreFromReader(
+	rh, err := suite.backupClient.Restore(
 		[]io.Reader{reader},
 		nil,
 	)

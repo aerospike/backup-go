@@ -28,23 +28,19 @@ const (
 	PARTITIONS = 4096
 )
 
-// **** Generic Backup Handler ****
+// **** Base Backup Handler ****
 
-// BackupStatus is the status of a backup job
-// TODO fill this out
-type BackupStatus struct{}
-
-type backupHandler struct {
+type backupHandlerBase struct {
 	namespace       string
 	config          *BackupBaseConfig
 	aerospikeClient *a.Client
 	worker          workHandler
 }
 
-func newBackupHandler(config *BackupBaseConfig, ac *a.Client, namespace string) *backupHandler {
+func newBackupHandlerBase(config *BackupBaseConfig, ac *a.Client, namespace string) *backupHandlerBase {
 	wh := newWorkHandler()
 
-	handler := &backupHandler{
+	handler := &backupHandlerBase{
 		namespace:       namespace,
 		config:          config,
 		aerospikeClient: ac,
@@ -54,7 +50,7 @@ func newBackupHandler(config *BackupBaseConfig, ac *a.Client, namespace string) 
 	return handler
 }
 
-func (bh *backupHandler) run(writers []*WriteWorker[*models.Token]) error {
+func (bh *backupHandlerBase) run(writers []*WriteWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.config.Parallel
@@ -97,34 +93,33 @@ func (bh *backupHandler) run(writers []*WriteWorker[*models.Token]) error {
 
 // **** Backup To Writer Handler ****
 
-// BackupToWriterStatus stores the status of a backup to writer job
-type BackupToWriterStatus struct {
-	BackupStatus
-}
+// BackupStatus stores the status of a backup job
+type BackupStatus struct{}
 
-// BackupToWriterHandler handles a backup job to a set of io.writers
-type BackupToWriterHandler struct {
-	status  *BackupToWriterStatus
-	config  *BackupToWriterConfig
+// BackupHandler handles a backup job to a set of io.writers
+type BackupHandler struct {
+	status  *BackupStatus
+	config  *BackupConfig
 	writers []io.Writer
 	errors  chan error
-	backupHandler
+	backupHandlerBase
 }
 
-func newBackupToWriterHandler(config *BackupToWriterConfig, ac *a.Client, writers []io.Writer) *BackupToWriterHandler {
+// newBackupHandler creates a new BackupHandler
+func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *BackupHandler {
 	namespace := config.Namespace
-	backupHandler := newBackupHandler(&config.BackupBaseConfig, ac, namespace)
+	backupHandler := newBackupHandlerBase(&config.BackupBaseConfig, ac, namespace)
 
-	return &BackupToWriterHandler{
-		config:        config,
-		writers:       writers,
-		backupHandler: *backupHandler,
+	return &BackupHandler{
+		config:            config,
+		writers:           writers,
+		backupHandlerBase: *backupHandler,
 	}
 }
 
 // run runs the backup job
 // currently this should only be run once
-func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
+func (bwh *BackupHandler) run(writers []io.Writer) {
 	bwh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
@@ -136,7 +131,6 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 		defer handlePanic(errChan)
 
 		batchSize := bwh.config.Parallel
-		// TODO change the any typed pipeline to a message or token type
 		dataWriters := []*WriteWorker[*models.Token]{}
 
 		for i, writer := range writers {
@@ -155,7 +149,7 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 				continue
 			}
 
-			err = bwh.backupHandler.run(dataWriters)
+			err = bwh.backupHandlerBase.run(dataWriters)
 			if err != nil {
 				errChan <- err
 				return
@@ -168,12 +162,12 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 }
 
 // GetStats returns the stats of the backup job
-func (bwh *BackupToWriterHandler) GetStats() BackupToWriterStatus {
+func (bwh *BackupHandler) GetStats() BackupStatus {
 	return *bwh.status
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
-func (bwh *BackupToWriterHandler) Wait() error {
+func (bwh *BackupHandler) Wait() error {
 	return <-bwh.errors
 }
 

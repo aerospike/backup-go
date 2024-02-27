@@ -103,21 +103,21 @@ func NewBackupBaseConfig() *BackupBaseConfig {
 	}
 }
 
-// BackupToWriterConfig contains configuration for the backup to writer operation
-type BackupToWriterConfig struct {
+// BackupConfig contains configuration for the backup to writer operation
+type BackupConfig struct {
 	BackupBaseConfig
 }
 
-func (c *BackupToWriterConfig) validate() error {
+func (c *BackupConfig) validate() error {
 	if err := c.BackupBaseConfig.validate(); err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewBackupToWriterConfig returns a new BackupToWriterConfig with default values
-func NewBackupToWriterConfig() *BackupToWriterConfig {
-	return &BackupToWriterConfig{
+// NewBackupConfig returns a new BackupToWriterConfig with default values
+func NewBackupConfig() *BackupConfig {
+	return &BackupConfig{
 		BackupBaseConfig: *NewBackupBaseConfig(),
 	}
 }
@@ -158,21 +158,21 @@ func NewRestoreBaseConfig() *RestoreBaseConfig {
 	}
 }
 
-// RestoreFromReaderConfig contains configuration for the restore from reader operation
-type RestoreFromReaderConfig struct {
+// RestoreConfig contains configuration for the restore from reader operation
+type RestoreConfig struct {
 	RestoreBaseConfig
 }
 
-func (c *RestoreFromReaderConfig) validate() error {
+func (c *RestoreConfig) validate() error {
 	if err := c.RestoreBaseConfig.validate(); err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewRestoreFromReaderConfig returns a new RestoreFromReaderConfig with default values
-func NewRestoreFromReaderConfig() *RestoreFromReaderConfig {
-	return &RestoreFromReaderConfig{
+// NewRestoreConfig returns a new RestoreFromReaderConfig with default values
+func NewRestoreConfig() *RestoreConfig {
+	return &RestoreConfig{
 		RestoreBaseConfig: *NewRestoreBaseConfig(),
 	}
 }

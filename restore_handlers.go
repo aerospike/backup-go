@@ -23,10 +23,6 @@ import (
 
 // **** Generic Restore Handler ****
 
-// RestoreStatus stores the status of a restore job
-// TODO fill this out
-type RestoreStatus struct{}
-
 // DBRestoreClient is an interface for writing data to a database
 // The Aerospike Go client satisfies this interface
 type DBRestoreClient interface {
@@ -39,17 +35,17 @@ type worker interface {
 	DoJob(*pipeline.Pipeline[*models.Token]) error
 }
 
-// restoreHandler handles generic restore jobs on data readers
+// restoreHandlerBase handles generic restore jobs on data readers
 // most other restore handlers can wrap this one to add additional functionality
-type restoreHandler struct {
+type restoreHandlerBase struct {
 	config   *RestoreBaseConfig
 	dbClient DBRestoreClient
 	worker   worker
 }
 
-// newRestoreHandler creates a new restoreHandler
-func newRestoreHandler(config *RestoreBaseConfig, ac DBRestoreClient, w worker) *restoreHandler {
-	return &restoreHandler{
+// newRestoreHandlerBase creates a new restoreHandler
+func newRestoreHandlerBase(config *RestoreBaseConfig, ac DBRestoreClient, w worker) *restoreHandlerBase {
+	return &restoreHandlerBase{
 		config:   config,
 		dbClient: ac,
 		worker:   w,
@@ -57,7 +53,7 @@ func newRestoreHandler(config *RestoreBaseConfig, ac DBRestoreClient, w worker) 
 }
 
 // run runs the restore job
-func (rh *restoreHandler) run(readers []*ReadWorker[*models.Token]) error {
+func (rh *restoreHandlerBase) run(readers []*ReadWorker[*models.Token]) error {
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
@@ -87,36 +83,34 @@ func (rh *restoreHandler) run(readers []*ReadWorker[*models.Token]) error {
 
 // **** Restore From Reader Handler ****
 
-// RestoreFromReaderStatus stores the status of a restore from reader job
-type RestoreFromReaderStatus struct {
-	RestoreStatus
-}
+// RestoreStatus stores the status of a restore from reader job
+type RestoreStatus struct{}
 
-// RestoreFromReaderHandler handles a restore job from a set of io.readers
-type RestoreFromReaderHandler struct {
-	status  *RestoreFromReaderStatus
-	config  *RestoreFromReaderConfig
+// RestoreHandler handles a restore job from a set of io.readers
+type RestoreHandler struct {
+	status  *RestoreStatus
+	config  *RestoreConfig
 	readers []io.Reader
 	errors  chan error
-	restoreHandler
+	restoreHandlerBase
 }
 
-// newRestoreFromReaderHandler creates a new RestoreFromReaderHandler
-func newRestoreFromReaderHandler(config *RestoreFromReaderConfig, ac DBRestoreClient, readers []io.Reader) *RestoreFromReaderHandler {
+// newRestoreHandler creates a new RestoreHandler
+func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.Reader) *RestoreHandler {
 	worker := newWorkHandler()
 
-	restoreHandler := newRestoreHandler(&config.RestoreBaseConfig, ac, worker)
+	restoreHandler := newRestoreHandlerBase(&config.RestoreBaseConfig, ac, worker)
 
-	return &RestoreFromReaderHandler{
-		config:         config,
-		readers:        readers,
-		restoreHandler: *restoreHandler,
+	return &RestoreHandler{
+		config:             config,
+		readers:            readers,
+		restoreHandlerBase: *restoreHandler,
 	}
 }
 
 // run runs the restore job
 // currently this should only be run once
-func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
+func (rrh *RestoreHandler) run(readers []io.Reader) {
 	rrh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
@@ -150,7 +144,7 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 				continue
 			}
 
-			err = rrh.restoreHandler.run(dataReaders)
+			err = rrh.restoreHandlerBase.run(dataReaders)
 			if err != nil {
 				errChan <- err
 				return
@@ -162,11 +156,11 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 }
 
 // GetStats returns the stats of the restore job
-func (rrh *RestoreFromReaderHandler) GetStats() RestoreFromReaderStatus {
+func (rrh *RestoreHandler) GetStats() RestoreStatus {
 	return *rrh.status
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed
-func (rrh *RestoreFromReaderHandler) Wait() error {
+func (rrh *RestoreHandler) Wait() error {
 	return <-rrh.errors
 }

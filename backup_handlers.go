@@ -15,6 +15,7 @@
 package backuplib
 
 import (
+	"context"
 	"io"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
@@ -167,8 +168,13 @@ func (bwh *BackupHandler) GetStats() BackupStatus {
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
-func (bwh *BackupHandler) Wait() error {
-	return <-bwh.errors
+func (bwh *BackupHandler) Wait(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-bwh.errors:
+		return err
+	}
 }
 
 func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*WriteWorker[*models.Token], error) {

@@ -15,6 +15,7 @@
 package backuplib
 
 import (
+	"context"
 	"io"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
@@ -161,6 +162,11 @@ func (rrh *RestoreHandler) GetStats() RestoreStatus {
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed
-func (rrh *RestoreHandler) Wait() error {
-	return <-rrh.errors
+func (rrh *RestoreHandler) Wait(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-rrh.errors:
+		return err
+	}
 }

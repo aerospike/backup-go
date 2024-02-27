@@ -16,6 +16,7 @@ package backuplib_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -178,7 +179,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	suite.Nil(err)
 	suite.NotNil(bh)
 
-	err = bh.Wait()
+	ctx := context.Background()
+	err = bh.Wait(ctx)
 	suite.Nil(err)
 
 	err = suite.testClient.Truncate(namespace, set)
@@ -195,7 +197,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	suite.Nil(err)
 	suite.NotNil(rh)
 
-	err = rh.Wait()
+	err = rh.Wait(ctx)
 	suite.Nil(err)
 
 	err = suite.testClient.ValidateRecords(expectedRecs, numRec, namespace, set)

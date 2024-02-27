@@ -24,14 +24,11 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-// readers.go contains the implementations of the DataReader interface
-// used by dataPipelines in the backuplib package
-
 // **** Read Worker ****
 
 // dataReader is an interface for reading data from a source.
 //
-//go:generate mockery --name DataReader
+//go:generate mockery --name dataReader
 type dataReader[T any] interface {
 	Read() (T, error)
 	Cancel()
@@ -138,7 +135,7 @@ type arrStatus struct {
 // scanner is an interface for scanning Aerospike records
 // the Aerospike go client satisfies this interface
 //
-//go:generate mockery --name Scanner
+//go:generate mockery --name scanner
 type scanner interface {
 	ScanPartitions(*a.ScanPolicy, *a.PartitionFilter, string, string, ...string) (*a.Recordset, a.Error)
 }
@@ -231,7 +228,7 @@ func startScan(j *aerospikeRecordReader) (<-chan *a.Result, error) {
 
 // sindexGetter is an interface for getting secondary indexes
 //
-//go:generate mockery --name SIndexGetter
+//go:generate mockery --name sindexGetter
 type sindexGetter interface {
 	GetSIndexes(namespace string) ([]*models.SIndex, error)
 }

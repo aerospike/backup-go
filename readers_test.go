@@ -349,7 +349,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 
 	namespace := "test"
 
-	mockSIndexGetter := mocks.NewSIndexGetter(suite.T())
+	mockSIndexGetter := mocks.NewSindexGetter(suite.T())
 	mockSIndexes := []*models.SIndex{
 		{
 			Namespace: namespace,
@@ -388,7 +388,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 
 	// negative GetSindexes fails
 
-	mockSIndexGetter = mocks.NewSIndexGetter(suite.T())
+	mockSIndexGetter = mocks.NewSindexGetter(suite.T())
 	mockSIndexGetter.EXPECT().GetSIndexes(namespace).Return(
 		nil,
 		fmt.Errorf("error"),

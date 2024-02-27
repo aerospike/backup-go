@@ -3,10 +3,10 @@ test: test_deps
 	go test -v ./...
 
 .PHONY: coverage
-coverage:
-	go test ./... -coverprofile to_filter.cov -coverpkg ./... || true
+coverage: test_deps
+	go test ./... -coverprofile to_filter.cov -coverpkg ./...
 	grep -v "test_resources\|mocks" to_filter.cov > coverage.cov
-	rm to_filter.cov || true
+	rm -f to_filter.cov
 	go tool cover -func coverage.cov
 
 .PHONY: clean
@@ -16,12 +16,13 @@ clean:
 	rm -rf pipeline/mocks
 
 .PHONY: test_deps
-test_deps: $(MOCKERY) mocks
+test_deps: mocks
 
 .PHONY: mocks
-mocks: $(MOCKERY)
+mocks: mockery
 	go generate ./...
 
 # Install mockery for generating test mocks
-$(MOCKERY):
+.PHONY: mockery
+mockery:
 	go install github.com/vektra/mockery/v2@v2.42.0

@@ -20,14 +20,11 @@ import (
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 )
 
-// processors.go contains the implementations of the DataProcessor interface
-// used by dataPipelines in the backuplib package
-
 // **** Processor Worker ****
 
 // dataProcessor is an interface for processing data
 //
-//go:generate mockery --name DataProcessor
+//go:generate mockery --name dataProcessor
 type dataProcessor[T any] interface {
 	Process(T) (T, error)
 }

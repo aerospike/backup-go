@@ -185,7 +185,7 @@ func (suite *writersTestSuite) TestASBWriter() {
 	}
 	SIndexToken := models.NewSIndexToken(expSIndex)
 
-	mockEncoder := mocks.NewASBEncoder(suite.T())
+	mockEncoder := mocks.NewAsbEncoder(suite.T())
 	mockEncoder.EXPECT().GetVersionText().Return([]byte("Version 3.1\n"))
 	mockEncoder.EXPECT().GetNamespaceMetaText(namespace).Return([]byte("# namespace test\n"))
 	mockEncoder.EXPECT().GetFirstMetaText().Return([]byte("# first-file\n"))
@@ -248,7 +248,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	}
 	recToken := models.NewRecordToken(expRecord)
 
-	mockDBWriter := mocks.NewDBWriter(suite.T())
+	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
 
 	writer := newRestoreWriter(mockDBWriter, nil)
@@ -292,7 +292,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 
 	policy := a.NewWritePolicy(1, 0)
 
-	mockDBWriter := mocks.NewDBWriter(suite.T())
+	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	writer := newRestoreWriter(mockDBWriter, policy)

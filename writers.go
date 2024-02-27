@@ -27,14 +27,11 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-// writers.go contains the implementations of the DataWriter interface
-// used by dataPipelines in the backuplib package
-
 // **** Write Worker ****
 
 // dataWriter is an interface for writing data to a destination.
 //
-//go:generate mockery --name DataWriter
+//go:generate mockery --name dataWriter
 type dataWriter[T any] interface {
 	Write(T) error
 	Cancel()
@@ -129,7 +126,7 @@ func (w *genericWriter) Cancel() {}
 // asbEncoder is an interface for encoding the types from the models package into ASB format.
 // It extends the Encoder interface.
 //
-//go:generate mockery --name ASBEncoder
+//go:generate mockery --name asbEncoder
 type asbEncoder interface {
 	Encoder
 	GetVersionText() []byte
@@ -183,7 +180,7 @@ func (w *asbWriter) Init(namespace string, first bool) error {
 // dbWriter is an interface for writing data to an Aerospike cluster.
 // The Aerospike Go client satisfies this interface.
 //
-//go:generate mockery --name DBWriter
+//go:generate mockery --name dbWriter
 type dbWriter interface {
 	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
 }

@@ -111,10 +111,13 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	}
 	SIndexToken := models.NewSIndexToken(expSIndex)
 
+	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
+
 	mockEncoder := mocks.NewEncoder(suite.T())
-	mockEncoder.EXPECT().EncodeRecord(expRecord).Return([]byte("rec,"), nil)
-	mockEncoder.EXPECT().EncodeSIndex(expSIndex).Return([]byte("si,"), nil)
-	mockEncoder.EXPECT().EncodeUDF(expUDF).Return([]byte("udf"), nil)
+	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("rec,"), nil)
+	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("si,"), nil)
+	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("udf"), nil)
+	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
 	output := &bytes.Buffer{}
 
@@ -145,7 +148,7 @@ func (suite *writersTestSuite) TestGenericWriter() {
 
 	failRec := &models.Record{}
 	failRecToken := models.NewRecordToken(failRec)
-	mockEncoder.EXPECT().EncodeRecord(failRec).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
 	suite.NotNil(err)
 	suite.Equal("rec,si,udf", output.String())
@@ -186,9 +189,9 @@ func (suite *writersTestSuite) TestASBWriter() {
 	mockEncoder.EXPECT().GetVersionText().Return([]byte("Version 3.1\n"))
 	mockEncoder.EXPECT().GetNamespaceMetaText(namespace).Return([]byte("# namespace test\n"))
 	mockEncoder.EXPECT().GetFirstMetaText().Return([]byte("# first-file\n"))
-	mockEncoder.EXPECT().EncodeRecord(expRecord).Return([]byte("rec,"), nil)
-	mockEncoder.EXPECT().EncodeSIndex(expSIndex).Return([]byte("si,"), nil)
-	mockEncoder.EXPECT().EncodeUDF(expUDF).Return([]byte("udf"), nil)
+	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("rec,"), nil)
+	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("si,"), nil)
+	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("udf"), nil)
 
 	output := &bytes.Buffer{}
 
@@ -219,7 +222,7 @@ func (suite *writersTestSuite) TestASBWriter() {
 
 	failRec := &models.Record{}
 	failRecToken := models.NewRecordToken(failRec)
-	mockEncoder.EXPECT().EncodeRecord(failRec).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
 	suite.NotNil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,udf", output.String())

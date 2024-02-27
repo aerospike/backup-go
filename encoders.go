@@ -24,9 +24,7 @@ import (
 //
 //go:generate mockery --name Encoder
 type Encoder interface {
-	EncodeRecord(v *models.Record) ([]byte, error)
-	EncodeUDF(v *models.UDF) ([]byte, error)
-	EncodeSIndex(v *models.SIndex) ([]byte, error)
+	EncodeToken(*models.Token) ([]byte, error)
 }
 
 // ASBEncoderBuilder satisfies the EncoderBuilder interface

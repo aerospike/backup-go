@@ -110,17 +110,7 @@ func (w *GenericWriter) Write(v *models.Token) error {
 		data []byte
 	)
 
-	switch v.Type {
-	case models.TokenTypeRecord:
-		data, err = w.encoder.EncodeRecord(v.Record)
-	case models.TokenTypeUDF:
-		data, err = w.encoder.EncodeUDF(v.UDF)
-	case models.TokenTypeSIndex:
-		data, err = w.encoder.EncodeSIndex(v.SIndex)
-	default:
-		return fmt.Errorf("unsupported token type: %v", v.Type)
-	}
-
+	data, err = w.encoder.EncodeToken(v)
 	if err != nil {
 		return err
 	}

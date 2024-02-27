@@ -1,7 +1,3 @@
-.PHONY: mocks
-mocks: $(MOCKERY)
-	go generate ./...
-
 .PHONY: test
 test: test_deps
 	go test -v ./...
@@ -20,7 +16,11 @@ clean:
 	rm -rf pipeline/mocks
 
 .PHONY: test_deps
-test_deps: $(MOCKERY) generate
+test_deps: $(MOCKERY) mocks
+
+.PHONY: mocks
+mocks: $(MOCKERY)
+	go generate ./...
 
 # Install mockery for generating test mocks
 $(MOCKERY):

@@ -32,41 +32,41 @@ import (
 
 // **** Write Worker ****
 
-// DataWriter is an interface for writing data to a destination.
+// dataWriter is an interface for writing data to a destination.
 //
 //go:generate mockery --name DataWriter
-type DataWriter[T any] interface {
+type dataWriter[T any] interface {
 	Write(T) error
 	Cancel()
 }
 
-// WriteWorker implements the pipeline.Worker interface
+// writeWorker implements the pipeline.Worker interface
 // It wraps a DataWriter and writes data to it
-type WriteWorker[T any] struct {
-	writer  DataWriter[T]
+type writeWorker[T any] struct {
+	writer  dataWriter[T]
 	receive <-chan T
 }
 
-// NewWriteWorker creates a new WriteWorker
-func NewWriteWorker[T any](writer DataWriter[T]) *WriteWorker[T] {
-	return &WriteWorker[T]{
+// newWriteWorker creates a new WriteWorker
+func newWriteWorker[T any](writer dataWriter[T]) *writeWorker[T] {
+	return &writeWorker[T]{
 		writer: writer,
 	}
 }
 
 // SetReceiveChan sets the receive channel for the WriteWorker
-func (w *WriteWorker[T]) SetReceiveChan(c <-chan T) {
+func (w *writeWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
 }
 
 // SetSendChan satisfies the pipeline.Worker interface
 // but is a no-op for the WriteWorker
-func (w *WriteWorker[T]) SetSendChan(c chan<- T) {
+func (w *writeWorker[T]) SetSendChan(c chan<- T) {
 	// no-op
 }
 
 // Run runs the WriteWorker
-func (w *WriteWorker[T]) Run(ctx context.Context) error {
+func (w *writeWorker[T]) Run(ctx context.Context) error {
 	for {
 		defer w.writer.Cancel()
 		select {
@@ -86,17 +86,17 @@ func (w *WriteWorker[T]) Run(ctx context.Context) error {
 
 // **** Generic Writer ****
 
-// GenericWriter satisfies the DataWriter interface
+// genericWriter satisfies the DataWriter interface
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
-type GenericWriter struct {
+type genericWriter struct {
 	encoder Encoder
 	output  io.Writer
 }
 
-// NewGenericWriter creates a new GenericWriter
-func NewGenericWriter(encoder Encoder, output io.Writer) *GenericWriter {
-	return &GenericWriter{
+// newGenericWriter creates a new GenericWriter
+func newGenericWriter(encoder Encoder, output io.Writer) *genericWriter {
+	return &genericWriter{
 		encoder: encoder,
 		output:  output,
 	}
@@ -105,7 +105,7 @@ func NewGenericWriter(encoder Encoder, output io.Writer) *GenericWriter {
 // Write encodes v and writes it to the output
 // TODO let the encoder handle the type checking
 // TODO maybe restrict the types that can be written to this
-func (w *GenericWriter) Write(v *models.Token) error {
+func (w *genericWriter) Write(v *models.Token) error {
 	var (
 		err  error
 		data []byte
@@ -122,36 +122,36 @@ func (w *GenericWriter) Write(v *models.Token) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the GenericWriter
-func (w *GenericWriter) Cancel() {}
+func (w *genericWriter) Cancel() {}
 
 // **** Aerospike Backup Writer ****
 
-// ASBEncoder is an interface for encoding the types from the models package into ASB format.
+// asbEncoder is an interface for encoding the types from the models package into ASB format.
 // It extends the Encoder interface.
 //
 //go:generate mockery --name ASBEncoder
-type ASBEncoder interface {
+type asbEncoder interface {
 	Encoder
 	GetVersionText() []byte
 	GetNamespaceMetaText(namespace string) []byte
 	GetFirstMetaText() []byte
 }
 
-// ASBWriter satisfies the DataWriter interface
+// asbWriter satisfies the DataWriter interface
 // It writes the types from the models package as data encoded in ASB format
 // to an io.Writer. It uses an ASBEncoder to encode the data.
-type ASBWriter struct {
-	GenericWriter
-	encoder   ASBEncoder
+type asbWriter struct {
+	genericWriter
+	encoder   asbEncoder
 	namespace string
 	first     bool
 	once      *sync.Once
 }
 
-// NewASBWriter creates a new ASBWriter
-func NewASBWriter(encoder ASBEncoder, output io.Writer) *ASBWriter {
-	return &ASBWriter{
-		GenericWriter: *NewGenericWriter(encoder, output),
+// newAsbWriter creates a new ASBWriter
+func newAsbWriter(encoder asbEncoder, output io.Writer) *asbWriter {
+	return &asbWriter{
+		genericWriter: *newGenericWriter(encoder, output),
 		encoder:       encoder,
 		once:          &sync.Once{},
 	}
@@ -159,7 +159,7 @@ func NewASBWriter(encoder ASBEncoder, output io.Writer) *ASBWriter {
 
 // Init initializes the ASBWriter and writes
 // the ASB header and metadata to the output.
-func (w *ASBWriter) Init(namespace string, first bool) error {
+func (w *asbWriter) Init(namespace string, first bool) error {
 	var err error
 
 	w.once.Do(func() {
@@ -180,25 +180,25 @@ func (w *ASBWriter) Init(namespace string, first bool) error {
 
 // **** Aerospike Restore Writer ****
 
-// DBWriter is an interface for writing data to an Aerospike cluster.
+// dbWriter is an interface for writing data to an Aerospike cluster.
 // The Aerospike Go client satisfies this interface.
 //
 //go:generate mockery --name DBWriter
-type DBWriter interface {
+type dbWriter interface {
 	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
 }
 
-// RestoreWriter satisfies the DataWriter interface
+// restoreWriter satisfies the DataWriter interface
 // It writes the types from the models package to an Aerospike client
 // It is used to restore data from a backup.
-type RestoreWriter struct {
-	asc         DBWriter
+type restoreWriter struct {
+	asc         dbWriter
 	writePolicy *a.WritePolicy
 }
 
-// NewRestoreWriter creates a new RestoreWriter
-func NewRestoreWriter(asc DBWriter, writePolicy *a.WritePolicy) *RestoreWriter {
-	return &RestoreWriter{
+// newRestoreWriter creates a new RestoreWriter
+func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy) *restoreWriter {
+	return &restoreWriter{
 		asc:         asc,
 		writePolicy: writePolicy,
 	}
@@ -207,7 +207,7 @@ func NewRestoreWriter(asc DBWriter, writePolicy *a.WritePolicy) *RestoreWriter {
 // Write writes the types from the models package to an Aerospike DB.
 // TODO support write policy
 // TODO support batch writes
-func (rw *RestoreWriter) Write(data *models.Token) error {
+func (rw *restoreWriter) Write(data *models.Token) error {
 	switch data.Type {
 	case models.TokenTypeRecord:
 		return rw.asc.Put(rw.writePolicy, data.Record.Key, data.Record.Bins)
@@ -223,7 +223,7 @@ func (rw *RestoreWriter) Write(data *models.Token) error {
 // writeSecondaryIndex writes a secondary index to Aerospike
 // TODO check that this does not overwrite existing sindexes
 // TODO support write policy
-func (rw *RestoreWriter) writeSecondaryIndex(si *models.SIndex) error {
+func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 
 	// var sindexType a.IndexType
 	// switch si.Path.BinType {
@@ -253,7 +253,7 @@ func (rw *RestoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 // writeUDF writes a UDF to Aerospike
 // TODO check that this does not overwrite existing UDFs
 // TODO support write policy
-func (rw *RestoreWriter) writeUDF(udf *models.UDF) error {
+func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
 
 	// var UDFLang a.Language
 	// switch udf.UDFType {
@@ -271,4 +271,4 @@ func (rw *RestoreWriter) writeUDF(udf *models.UDF) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter
-func (rw *RestoreWriter) Cancel() {}
+func (rw *restoreWriter) Cancel() {}

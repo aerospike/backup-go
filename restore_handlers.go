@@ -27,7 +27,7 @@ import (
 // DBRestoreClient is an interface for writing data to a database
 // The Aerospike Go client satisfies this interface
 type DBRestoreClient interface {
-	DBWriter
+	dbWriter
 }
 
 // worker is an interface for running a job
@@ -54,21 +54,21 @@ func newRestoreHandlerBase(config *RestoreBaseConfig, ac DBRestoreClient, w work
 }
 
 // run runs the restore job
-func (rh *restoreHandlerBase) run(ctx context.Context, readers []*ReadWorker[*models.Token]) error {
+func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*models.Token]) error {
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		processor := NewNoOpProcessor()
-		processorWorkers[i] = NewProcessorWorker(processor)
+		processor := newNoOpProcessor()
+		processorWorkers[i] = newProcessorWorker(processor)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		writer := NewRestoreWriter(
+		writer := newRestoreWriter(
 			rh.dbClient,
 			rh.config.Policies.WritePolicy,
 		)
-		writeWorkers[i] = NewWriteWorker(writer)
+		writeWorkers[i] = newWriteWorker(writer)
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
@@ -127,7 +127,7 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 
 		batchSize := rrh.config.Parallel
 		// TODO change the any type to a message or token type
-		dataReaders := []*ReadWorker[*models.Token]{}
+		dataReaders := []*readWorker[*models.Token]{}
 
 		for i, reader := range readers {
 
@@ -138,8 +138,8 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 				return
 			}
 
-			dr := NewGenericReader(decoder)
-			readWorker := NewReadWorker(dr)
+			dr := newGenericReader(decoder)
+			readWorker := newReadWorker(dr)
 			dataReaders = append(dataReaders, readWorker)
 			// if we have not reached the batch size and we have more readers
 			// continue to the next reader

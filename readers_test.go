@@ -48,7 +48,7 @@ func (suite *readersTestSuite) TestReadWorker() {
 	})
 	mockReader.EXPECT().Cancel()
 
-	worker := NewReadWorker[string](mockReader)
+	worker := newReadWorker[string](mockReader)
 	suite.NotNil(worker)
 
 	send := make(chan string, 3)
@@ -70,7 +70,7 @@ func (suite *readersTestSuite) TestReadWorkerCancel() {
 	mockReader.EXPECT().Read().Return("hi", nil)
 	mockReader.EXPECT().Cancel()
 
-	worker := NewReadWorker[string](mockReader)
+	worker := newReadWorker[string](mockReader)
 	suite.NotNil(worker)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -106,7 +106,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	mockDecoder := mocks.NewDecoder(suite.T())
 	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
 
-	reader := NewGenericReader(mockDecoder)
+	reader := newGenericReader(mockDecoder)
 	suite.NotNil(reader)
 
 	v, err := reader.Read()
@@ -152,9 +152,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		nil,
 	)
 
-	reader := NewAerospikeRecordReader(
+	reader := newAerospikeRecordReader(
 		mockScanner,
-		ARRConfig{
+		arrConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
@@ -184,9 +184,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		nil,
 	)
 
-	reader = NewAerospikeRecordReader(
+	reader = newAerospikeRecordReader(
 		mockScanner,
-		ARRConfig{
+		arrConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
@@ -214,9 +214,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		a.ErrInvalidParam,
 	)
 
-	reader = NewAerospikeRecordReader(
+	reader = newAerospikeRecordReader(
 		mockScanner,
-		ARRConfig{
+		arrConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
@@ -259,9 +259,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		nil,
 	)
 
-	reader = NewAerospikeRecordReader(
+	reader = newAerospikeRecordReader(
 		mockScanner,
-		ARRConfig{
+		arrConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
@@ -278,8 +278,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	// test cancel not started
 
-	reader = &AerospikeRecordReader{
-		status: ARRStatus{
+	reader = &aerospikeRecordReader{
+		status: arrStatus{
 			started: false,
 		},
 	}
@@ -326,9 +326,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 		nil,
 	)
 
-	reader := NewAerospikeRecordReader(
+	reader := newAerospikeRecordReader(
 		mockScanner,
-		ARRConfig{
+		arrConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
@@ -362,7 +362,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 		nil,
 	)
 
-	reader := NewSIndexReader(mockSIndexGetter, namespace)
+	reader := newSIndexReader(mockSIndexGetter, namespace)
 	suite.NotNil(reader)
 
 	expectedSIndexTokens := []*models.Token{}
@@ -394,7 +394,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 		fmt.Errorf("error"),
 	)
 
-	reader = NewSIndexReader(mockSIndexGetter, namespace)
+	reader = newSIndexReader(mockSIndexGetter, namespace)
 	suite.NotNil(reader)
 
 	v, err = reader.Read()

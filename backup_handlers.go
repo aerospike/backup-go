@@ -51,32 +51,32 @@ func newBackupHandlerBase(config *BackupBaseConfig, ac *a.Client, namespace stri
 	return handler
 }
 
-func (bh *backupHandlerBase) run(ctx context.Context, writers []*WriteWorker[*models.Token]) error {
+func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.config.Parallel
 		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
 
-		ARRCFG := ARRConfig{
+		ARRCFG := arrConfig{
 			Namespace:      bh.namespace,
 			Set:            bh.config.Set,
 			FirstPartition: begin,
 			NumPartitions:  count,
 		}
 
-		recordReader := NewAerospikeRecordReader(
+		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,
 			ARRCFG,
 			bh.config.Policies.ScanPolicy,
 		)
 
-		readWorkers[i] = NewReadWorker(recordReader)
+		readWorkers[i] = newReadWorker(recordReader)
 	}
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
-		processor := NewNoOpProcessor()
-		processorWorkers[i] = NewProcessorWorker(processor)
+		processor := newNoOpProcessor()
+		processorWorkers[i] = newProcessorWorker(processor)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
@@ -133,7 +133,7 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 		defer handlePanic(errChan)
 
 		batchSize := bwh.config.Parallel
-		dataWriters := []*WriteWorker[*models.Token]{}
+		dataWriters := []*writeWorker[*models.Token]{}
 
 		for i, writer := range writers {
 
@@ -178,7 +178,7 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
-func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*WriteWorker[*models.Token], error) {
+func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*writeWorker[*models.Token], error) {
 	enc, err := eb.CreateEncoder()
 	if err != nil {
 		return nil, err
@@ -186,19 +186,19 @@ func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool)
 
 	switch encT := enc.(type) {
 	case *asb.Encoder:
-		asbw := NewASBWriter(encT, w)
+		asbw := newAsbWriter(encT, w)
 		err := asbw.Init(namespace, first)
 		if err != nil {
 			return nil, err
 		}
 
-		worker := NewWriteWorker(asbw)
+		worker := newWriteWorker(asbw)
 
 		return worker, err
 
 	default:
-		gw := NewGenericWriter(encT, w)
-		worker := NewWriteWorker(gw)
+		gw := newGenericWriter(encT, w)
+		worker := newWriteWorker(gw)
 
 		return worker, nil
 	}

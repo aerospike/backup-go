@@ -34,7 +34,7 @@ func (suite *proccessorTestSuite) TestProcessorWorker() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := NewProcessorWorker(mockProcessor)
+	worker := newProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -58,7 +58,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := NewProcessorWorker(mockProcessor)
+	worker := newProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -96,7 +96,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := NewProcessorWorker(mockProcessor)
+	worker := newProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -131,7 +131,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerReceiveClosed() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := NewProcessorWorker(mockProcessor)
+	worker := newProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -152,7 +152,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("", errors.New("test"))
 
-	worker := NewProcessorWorker(mockProcessor)
+	worker := newProcessorWorker(mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -170,7 +170,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 }
 
 func (suite *proccessorTestSuite) TestNOOPProcessor() {
-	noop := NewNoOpProcessor()
+	noop := newNoOpProcessor()
 	suite.NotNil(noop)
 
 	data := &models.Token{

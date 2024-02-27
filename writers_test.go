@@ -36,7 +36,7 @@ func (suite *writersTestSuite) TestWriteWorker() {
 	mockWriter.EXPECT().Write("test").Return(nil)
 	mockWriter.EXPECT().Cancel()
 
-	worker := NewWriteWorker(mockWriter)
+	worker := newWriteWorker(mockWriter)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -54,7 +54,7 @@ func (suite *writersTestSuite) TestWriteWorkerCancel() {
 	mockWriter := mocks.NewDataWriter[string](suite.T())
 	mockWriter.EXPECT().Cancel()
 
-	worker := NewWriteWorker(mockWriter)
+	worker := newWriteWorker(mockWriter)
 	suite.NotNil(worker)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -69,7 +69,7 @@ func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
 	mockWriter.EXPECT().Write("test").Return(errors.New("error"))
 	mockWriter.EXPECT().Cancel()
 
-	worker := NewWriteWorker(mockWriter)
+	worker := newWriteWorker(mockWriter)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -121,7 +121,7 @@ func (suite *writersTestSuite) TestGenericWriter() {
 
 	output := &bytes.Buffer{}
 
-	writer := NewGenericWriter(mockEncoder, output)
+	writer := newGenericWriter(mockEncoder, output)
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
@@ -195,7 +195,7 @@ func (suite *writersTestSuite) TestASBWriter() {
 
 	output := &bytes.Buffer{}
 
-	writer := NewASBWriter(mockEncoder, output)
+	writer := newAsbWriter(mockEncoder, output)
 	suite.NotNil(writer)
 
 	err := writer.Init(namespace, true)
@@ -251,7 +251,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	mockDBWriter := mocks.NewDBWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := NewRestoreWriter(mockDBWriter, nil)
+	writer := newRestoreWriter(mockDBWriter, nil)
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
@@ -295,7 +295,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	mockDBWriter := mocks.NewDBWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := NewRestoreWriter(mockDBWriter, policy)
+	writer := newRestoreWriter(mockDBWriter, policy)
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)

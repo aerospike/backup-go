@@ -29,41 +29,41 @@ import (
 
 // **** Read Worker ****
 
-// DataReader is an interface for reading data from a source.
+// dataReader is an interface for reading data from a source.
 //
 //go:generate mockery --name DataReader
-type DataReader[T any] interface {
+type dataReader[T any] interface {
 	Read() (T, error)
 	Cancel()
 }
 
-// ReadWorker implements the pipeline.Worker interface
+// readWorker implements the pipeline.Worker interface
 // It wraps a DataReader and reads data from it
-type ReadWorker[T any] struct {
-	reader DataReader[T]
+type readWorker[T any] struct {
+	reader dataReader[T]
 	send   chan<- T
 }
 
-// NewReadWorker creates a new ReadWorker
-func NewReadWorker[T any](reader DataReader[T]) *ReadWorker[T] {
-	return &ReadWorker[T]{
+// newReadWorker creates a new ReadWorker
+func newReadWorker[T any](reader dataReader[T]) *readWorker[T] {
+	return &readWorker[T]{
 		reader: reader,
 	}
 }
 
 // SetReceiveChan satisfies the pipeline.Worker interface
 // but is a no-op for the ReadWorker
-func (w *ReadWorker[T]) SetReceiveChan(c <-chan T) {
+func (w *readWorker[T]) SetReceiveChan(c <-chan T) {
 	// no-op
 }
 
 // SetSendChan sets the send channel for the ReadWorker
-func (w *ReadWorker[T]) SetSendChan(c chan<- T) {
+func (w *readWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
 // Run runs the ReadWorker
-func (w *ReadWorker[T]) Run(ctx context.Context) error {
+func (w *readWorker[T]) Run(ctx context.Context) error {
 	for {
 		defer w.reader.Cancel()
 		data, err := w.reader.Read()
@@ -83,21 +83,21 @@ func (w *ReadWorker[T]) Run(ctx context.Context) error {
 
 // **** Generic Reader ****
 
-// GenericReader satisfies the DataReader interface
+// genericReader satisfies the DataReader interface
 // It reads data as tokens using a Decoder
-type GenericReader struct {
+type genericReader struct {
 	decoder Decoder
 }
 
-// NewGenericReader creates a new GenericReader
-func NewGenericReader(decoder Decoder) *GenericReader {
-	return &GenericReader{
+// newGenericReader creates a new GenericReader
+func newGenericReader(decoder Decoder) *genericReader {
+	return &genericReader{
 		decoder: decoder,
 	}
 }
 
 // Read reads the next token from the decoder
-func (dr *GenericReader) Read() (*models.Token, error) {
+func (dr *genericReader) Read() (*models.Token, error) {
 	data, err := dr.decoder.NextToken()
 	if err != nil {
 		return nil, err
@@ -117,49 +117,49 @@ func (dr *GenericReader) Read() (*models.Token, error) {
 
 // Cancel satisfies the DataReader interface
 // but is a no-op for the GenericReader
-func (dr *GenericReader) Cancel() {}
+func (dr *genericReader) Cancel() {}
 
 // **** Aerospike DB Reader ****
 
-// ARRConfig is the configuration for an AerospikeRecordReader
-type ARRConfig struct {
+// arrConfig is the configuration for an AerospikeRecordReader
+type arrConfig struct {
 	Namespace      string
 	Set            string
 	FirstPartition int
 	NumPartitions  int
 }
 
-// ARRStatus is the status of an AerospikeRecordReader
-type ARRStatus struct {
+// arrStatus is the status of an AerospikeRecordReader
+type arrStatus struct {
 	partitionFilter *a.PartitionFilter
 	started         bool
 }
 
-// Scanner is an interface for scanning Aerospike records
+// scanner is an interface for scanning Aerospike records
 // the Aerospike go client satisfies this interface
 //
 //go:generate mockery --name Scanner
-type Scanner interface {
+type scanner interface {
 	ScanPartitions(*a.ScanPolicy, *a.PartitionFilter, string, string, ...string) (*a.Recordset, a.Error)
 }
 
-// AerospikeRecordReader satisfies the DataReader interface
+// aerospikeRecordReader satisfies the DataReader interface
 // It reads records from an Aerospike database and returns them as *models.Record
-type AerospikeRecordReader struct {
-	config     ARRConfig
-	status     ARRStatus
+type aerospikeRecordReader struct {
+	config     arrConfig
+	status     arrStatus
 	scanPolicy *a.ScanPolicy
-	client     Scanner
+	client     scanner
 	recResChan <-chan *a.Result
 	recSet     *a.Recordset
 }
 
-// NewAerospikeRecordReader creates a new AerospikeRecordReader
-func NewAerospikeRecordReader(client Scanner, cfg ARRConfig, scanPolicy *a.ScanPolicy) *AerospikeRecordReader {
-	job := &AerospikeRecordReader{
+// newAerospikeRecordReader creates a new AerospikeRecordReader
+func newAerospikeRecordReader(client scanner, cfg arrConfig, scanPolicy *a.ScanPolicy) *aerospikeRecordReader {
+	job := &aerospikeRecordReader{
 		config:     cfg,
 		client:     client,
-		status:     ARRStatus{},
+		status:     arrStatus{},
 		scanPolicy: scanPolicy,
 		recResChan: nil,
 	}
@@ -168,7 +168,7 @@ func NewAerospikeRecordReader(client Scanner, cfg ARRConfig, scanPolicy *a.ScanP
 }
 
 // Read reads the next record from the Aerospike database
-func (j *AerospikeRecordReader) Read() (*models.Token, error) {
+func (j *aerospikeRecordReader) Read() (*models.Token, error) {
 	if !j.status.started {
 		var err error
 		j.recResChan, err = startScan(j)
@@ -194,7 +194,7 @@ func (j *AerospikeRecordReader) Read() (*models.Token, error) {
 
 // Cancel cancels the Aerospike scan used to read records
 // if it was started
-func (j *AerospikeRecordReader) Cancel() {
+func (j *aerospikeRecordReader) Cancel() {
 	j.status.started = false
 	if j.recSet != nil {
 		// ignore this error, it only happens if the scan is already closed
@@ -203,7 +203,7 @@ func (j *AerospikeRecordReader) Cancel() {
 	}
 }
 
-func startScan(j *AerospikeRecordReader) (<-chan *a.Result, error) {
+func startScan(j *aerospikeRecordReader) (<-chan *a.Result, error) {
 
 	j.recResChan = make(chan *a.Result)
 
@@ -229,31 +229,31 @@ func startScan(j *AerospikeRecordReader) (<-chan *a.Result, error) {
 
 // **** Aerospike SIndex Reader ****
 
-// SIndexGetter is an interface for getting secondary indexes
+// sindexGetter is an interface for getting secondary indexes
 //
 //go:generate mockery --name SIndexGetter
-type SIndexGetter interface {
+type sindexGetter interface {
 	GetSIndexes(namespace string) ([]*models.SIndex, error)
 }
 
-// SIndexReader satisfies the DataReader interface
+// sindexReader satisfies the DataReader interface
 // It reads secondary indexes from a SIndexGetter and returns them as *models.SecondaryIndex
-type SIndexReader struct {
-	client    SIndexGetter
+type sindexReader struct {
+	client    sindexGetter
 	namespace string
 	sindexes  chan *models.SIndex
 }
 
-// NewSIndexReader creates a new SIndexReader
-func NewSIndexReader(client SIndexGetter, namespace string) *SIndexReader {
-	return &SIndexReader{
+// newSIndexReader creates a new SIndexReader
+func newSIndexReader(client sindexGetter, namespace string) *sindexReader {
+	return &sindexReader{
 		client:    client,
 		namespace: namespace,
 	}
 }
 
 // Read reads the next secondary index from the SIndexGetter
-func (r *SIndexReader) Read() (*models.Token, error) {
+func (r *sindexReader) Read() (*models.Token, error) {
 	// grab all the sindexes on the first run
 	if r.sindexes == nil {
 		sindexes, err := r.client.GetSIndexes(r.namespace)
@@ -276,4 +276,4 @@ func (r *SIndexReader) Read() (*models.Token, error) {
 
 // Cancel satisfies the DataReader interface
 // but is a no-op for the SIndexReader
-func (r *SIndexReader) Cancel() {}
+func (r *sindexReader) Cancel() {}

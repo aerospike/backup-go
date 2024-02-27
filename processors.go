@@ -25,40 +25,40 @@ import (
 
 // **** Processor Worker ****
 
-// DataProcessor is an interface for processing data
+// dataProcessor is an interface for processing data
 //
 //go:generate mockery --name DataProcessor
-type DataProcessor[T any] interface {
+type dataProcessor[T any] interface {
 	Process(T) (T, error)
 }
 
-// ProcessorWorker implements the pipeline.Worker interface
+// processorWorker implements the pipeline.Worker interface
 // It wraps a DataProcessor and processes data with it
-type ProcessorWorker[T any] struct {
-	processor DataProcessor[T]
+type processorWorker[T any] struct {
+	processor dataProcessor[T]
 	receive   <-chan T
 	send      chan<- T
 }
 
-// NewProcessorWorker creates a new ProcessorWorker
-func NewProcessorWorker[T any](processor DataProcessor[T]) *ProcessorWorker[T] {
-	return &ProcessorWorker[T]{
+// newProcessorWorker creates a new ProcessorWorker
+func newProcessorWorker[T any](processor dataProcessor[T]) *processorWorker[T] {
+	return &processorWorker[T]{
 		processor: processor,
 	}
 }
 
 // SetReceiveChan sets the receive channel for the ProcessorWorker
-func (w *ProcessorWorker[T]) SetReceiveChan(c <-chan T) {
+func (w *processorWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
 }
 
 // SetSendChan sets the send channel for the ProcessorWorker
-func (w *ProcessorWorker[T]) SetSendChan(c chan<- T) {
+func (w *processorWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
 // Run starts the ProcessorWorker
-func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
+func (w *processorWorker[T]) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -84,16 +84,16 @@ func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 
 // **** NoOp Processor ****
 
-// NoOpProcessor satisfies the DataProcessor interface
+// noOpProcessor satisfies the DataProcessor interface
 // It does nothing to the data
-type NoOpProcessor struct{}
+type noOpProcessor struct{}
 
-// NewNoOpProcessor creates a new NOOPProcessor
-func NewNoOpProcessor() *NoOpProcessor {
-	return &NoOpProcessor{}
+// newNoOpProcessor creates a new NOOPProcessor
+func newNoOpProcessor() *noOpProcessor {
+	return &noOpProcessor{}
 }
 
 // Process processes the data
-func (p *NoOpProcessor) Process(data *models.Token) (*models.Token, error) {
+func (p *noOpProcessor) Process(data *models.Token) (*models.Token, error) {
 	return data, nil
 }

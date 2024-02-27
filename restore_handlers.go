@@ -64,7 +64,10 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*ReadWorker[*mo
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		writer := NewRestoreWriter(rh.dbClient)
+		writer := NewRestoreWriter(
+			rh.dbClient,
+			rh.config.Policies.WritePolicy,
+		)
 		writeWorkers[i] = NewWriteWorker(writer)
 	}
 

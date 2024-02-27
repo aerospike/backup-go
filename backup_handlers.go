@@ -57,7 +57,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*WriteWorker[*mo
 		begin := (i * PARTITIONS) / bh.config.Parallel
 		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
 
-		ARRCFG := &ARRConfig{
+		ARRCFG := ARRConfig{
 			Namespace:      bh.namespace,
 			Set:            bh.config.Set,
 			FirstPartition: begin,
@@ -65,8 +65,9 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*WriteWorker[*mo
 		}
 
 		recordReader := NewAerospikeRecordReader(
-			ARRCFG,
 			bh.aerospikeClient,
+			ARRCFG,
+			bh.config.Policies.ScanPolicy,
 		)
 
 		readWorkers[i] = NewReadWorker(recordReader)

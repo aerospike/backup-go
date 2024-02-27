@@ -192,23 +192,25 @@ type DBWriter interface {
 // It writes the types from the models package to an Aerospike client
 // It is used to restore data from a backup.
 type RestoreWriter struct {
-	asc DBWriter
+	asc         DBWriter
+	writePolicy *a.WritePolicy
 }
 
 // NewRestoreWriter creates a new RestoreWriter
-func NewRestoreWriter(asc DBWriter) *RestoreWriter {
+func NewRestoreWriter(asc DBWriter, writePolicy *a.WritePolicy) *RestoreWriter {
 	return &RestoreWriter{
-		asc: asc,
+		asc:         asc,
+		writePolicy: writePolicy,
 	}
 }
 
-// Write writes the types from modes to an Aerospike DB.
+// Write writes the types from the models package to an Aerospike DB.
 // TODO support write policy
 // TODO support batch writes
 func (rw *RestoreWriter) Write(data *models.Token) error {
 	switch data.Type {
 	case models.TokenTypeRecord:
-		return rw.asc.Put(nil, data.Record.Key, data.Record.Bins)
+		return rw.asc.Put(rw.writePolicy, data.Record.Key, data.Record.Bins)
 	case models.TokenTypeUDF:
 		return rw.writeUDF(data.UDF)
 	case models.TokenTypeSIndex:

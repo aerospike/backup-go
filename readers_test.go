@@ -143,7 +143,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		a.NewScanPolicy(),
+		(*a.ScanPolicy)(nil),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -153,13 +153,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	)
 
 	reader := NewAerospikeRecordReader(
-		&ARRConfig{
+		mockScanner,
+		ARRConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		mockScanner,
+		nil,
 	)
 	suite.NotNil(reader)
 
@@ -174,7 +175,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockScanner = mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		a.NewScanPolicy(),
+		(*a.ScanPolicy)(nil),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -184,13 +185,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	)
 
 	reader = NewAerospikeRecordReader(
-		&ARRConfig{
+		mockScanner,
+		ARRConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		mockScanner,
+		nil,
 	)
 	suite.NotNil(reader)
 
@@ -203,7 +205,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockScanner = mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		a.NewScanPolicy(),
+		(*a.ScanPolicy)(nil),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -213,13 +215,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	)
 
 	reader = NewAerospikeRecordReader(
-		&ARRConfig{
+		mockScanner,
+		ARRConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		mockScanner,
+		nil,
 	)
 	suite.NotNil(reader)
 
@@ -247,7 +250,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockScanner = mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		a.NewScanPolicy(),
+		(*a.ScanPolicy)(nil),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -257,13 +260,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	)
 
 	reader = NewAerospikeRecordReader(
-		&ARRConfig{
+		mockScanner,
+		ARRConfig{
 			Namespace:      namespace,
 			Set:            set,
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		mockScanner,
+		nil,
 	)
 	suite.NotNil(reader)
 
@@ -275,7 +279,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	// test cancel not started
 
 	reader = &AerospikeRecordReader{
-		status: &ARRStatus{
+		status: ARRStatus{
 			started: false,
 		},
 	}
@@ -283,6 +287,62 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	reader.Cancel()
 	suite.False(reader.status.started)
 
+}
+
+func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
+	namespace := "test"
+	set := ""
+
+	key, aerr := a.NewKey(namespace, set, "key")
+	if aerr != nil {
+		panic(aerr)
+	}
+
+	mockRecordSet := &a.Recordset{}
+	mockResults := make(chan *a.Result, 1)
+	mockRec := &a.Record{
+		Bins: a.BinMap{
+			"key": "hi",
+		},
+		Key: key,
+	}
+	mockRes := &a.Result{
+		Record: mockRec,
+	}
+	mockResults <- mockRes
+	setFieldValue(mockRecordSet, "records", mockResults)
+
+	policy := a.NewScanPolicy()
+	policy.MaxRecords = 10
+
+	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner.EXPECT().ScanPartitions(
+		policy,
+		a.NewPartitionFilterByRange(0, 4096),
+		namespace,
+		set,
+	).Return(
+		mockRecordSet,
+		nil,
+	)
+
+	reader := NewAerospikeRecordReader(
+		mockScanner,
+		ARRConfig{
+			Namespace:      namespace,
+			Set:            set,
+			FirstPartition: 0,
+			NumPartitions:  4096,
+		},
+		policy,
+	)
+	suite.NotNil(reader)
+
+	v, err := reader.Read()
+	suite.Nil(err)
+	expectedRecToken := models.NewRecordToken(mockRec)
+	suite.Equal(expectedRecToken, v)
+	mockScanner.AssertExpectations(suite.T())
 }
 
 func (suite *readersTestSuite) TestSIndexReader() {

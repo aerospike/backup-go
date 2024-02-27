@@ -251,7 +251,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	mockDBWriter := mocks.NewDBWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := NewRestoreWriter(mockDBWriter)
+	writer := NewRestoreWriter(mockDBWriter, nil)
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
@@ -270,6 +270,38 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	suite.NotNil(err)
 
 	mockDBWriter.AssertExpectations(suite.T())
+}
+
+func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
+	namespace := "test"
+	set := ""
+
+	key, aerr := a.NewKey(namespace, set, "key")
+	if aerr != nil {
+		panic(aerr)
+	}
+
+	expRecord := &models.Record{
+		Key: key,
+		Bins: a.BinMap{
+			"key0": "hi",
+			"key1": 1,
+		},
+	}
+	recToken := models.NewRecordToken(expRecord)
+
+	policy := a.NewWritePolicy(1, 0)
+
+	mockDBWriter := mocks.NewDBWriter(suite.T())
+	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
+
+	writer := NewRestoreWriter(mockDBWriter, policy)
+	suite.NotNil(writer)
+
+	err := writer.Write(recToken)
+	suite.Nil(err)
+
+	writer.Cancel()
 }
 
 func TestWriters(t *testing.T) {

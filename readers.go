@@ -133,7 +133,6 @@ type ARRConfig struct {
 type ARRStatus struct {
 	partitionFilter *a.PartitionFilter
 	started         bool
-	scanPolicy      *a.ScanPolicy
 }
 
 // Scanner is an interface for scanning Aerospike records
@@ -147,19 +146,21 @@ type Scanner interface {
 // AerospikeRecordReader satisfies the DataReader interface
 // It reads records from an Aerospike database and returns them as *models.Record
 type AerospikeRecordReader struct {
-	config     *ARRConfig
-	status     *ARRStatus
+	config     ARRConfig
+	status     ARRStatus
+	scanPolicy *a.ScanPolicy
 	client     Scanner
 	recResChan <-chan *a.Result
 	recSet     *a.Recordset
 }
 
 // NewAerospikeRecordReader creates a new AerospikeRecordReader
-func NewAerospikeRecordReader(cfg *ARRConfig, client Scanner) *AerospikeRecordReader {
+func NewAerospikeRecordReader(client Scanner, cfg ARRConfig, scanPolicy *a.ScanPolicy) *AerospikeRecordReader {
 	job := &AerospikeRecordReader{
 		config:     cfg,
 		client:     client,
-		status:     &ARRStatus{},
+		status:     ARRStatus{},
+		scanPolicy: scanPolicy,
 		recResChan: nil,
 	}
 
@@ -211,11 +212,8 @@ func startScan(j *AerospikeRecordReader) (<-chan *a.Result, error) {
 		j.config.NumPartitions,
 	)
 
-	policy := a.NewScanPolicy()
-	j.status.scanPolicy = policy
-
 	recSet, err := j.client.ScanPartitions(
-		j.status.scanPolicy,
+		j.scanPolicy,
 		j.status.partitionFilter,
 		j.config.Namespace,
 		j.config.Set,

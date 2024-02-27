@@ -17,6 +17,7 @@ package backuplib
 import (
 	"context"
 
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 	"github.com/aerospike/aerospike-tools-backup-lib/pipeline"
 )
 
@@ -27,7 +28,7 @@ func newWorkHandler() *workHandler {
 	return &workHandler{}
 }
 
-func (wh *workHandler) DoJob(job *pipeline.Pipeline[*token]) error {
+func (wh *workHandler) DoJob(job *pipeline.Pipeline[*models.Token]) error {
 	// TODO allow for context to be passed in
 	ctx := context.Background()
 	return job.Run(ctx)

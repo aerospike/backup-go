@@ -3559,7 +3559,7 @@ func TestASBReader_NextToken(t *testing.T) {
 	tests := []struct {
 		name    string
 		fields  fields
-		want    any
+		want    *models.Token
 		wantErr bool
 	}{
 		{
@@ -3569,7 +3569,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					ByteScanner: strings.NewReader("* i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 				},
 			},
-			want: &models.SIndex{
+			want: models.NewSIndexToken(&models.SIndex{
 				Namespace: "userdata1",
 				Set:       "testSet1",
 				Name:      "sindex1",
@@ -3578,7 +3578,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					BinName: "bin1",
 					BinType: models.NumericSIDataType,
 				},
-			},
+			}),
 			wantErr: false,
 		},
 		{
@@ -3598,7 +3598,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					),
 				},
 			},
-			want: &models.Record{
+			want: models.NewRecordToken(&models.Record{
 				Key: intKey,
 				Bins: map[string]any{
 					"bin1": nil,
@@ -3606,7 +3606,7 @@ func TestASBReader_NextToken(t *testing.T) {
 				},
 				Generation: 10,
 				Expiration: 10,
-			},
+			}),
 		},
 		{
 			name: "negative EOF",

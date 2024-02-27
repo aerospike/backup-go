@@ -15,16 +15,23 @@
 package backuplib
 
 import (
-	"io"
-
 	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 )
+
+// Encoder is an interface for encoding the types from the models package.
+// It is used to support different data formats.
+//
+//go:generate mockery --name Encoder
+type Encoder interface {
+	EncodeRecord(v *models.Record) ([]byte, error)
+	EncodeUDF(v *models.UDF) ([]byte, error)
+	EncodeSIndex(v *models.SIndex) ([]byte, error)
+}
 
 // ASBEncoderBuilder satisfies the EncoderBuilder interface
 // It creates a new ASB format encoder
-type ASBEncoderBuilder struct {
-	dst io.Writer
-}
+type ASBEncoderBuilder struct{}
 
 // NewASBEncoderBuilder returns a new ASBEncoderBuilder
 func NewASBEncoderBuilder() *ASBEncoderBuilder {

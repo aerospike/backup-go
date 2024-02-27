@@ -33,6 +33,19 @@ func NewEncoder() (*Encoder, error) {
 	return &Encoder{}, nil
 }
 
+func (o *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
+	switch token.Type {
+	case models.TokenTypeRecord:
+		return o.EncodeRecord(token.Record)
+	case models.TokenTypeUDF:
+		return o.EncodeUDF(token.UDF)
+	case models.TokenTypeSIndex:
+		return o.EncodeSIndex(token.SIndex)
+	default:
+		return nil, fmt.Errorf("invalid token type: %v", token.Type)
+	}
+}
+
 func (o *Encoder) EncodeRecord(rec *models.Record) ([]byte, error) {
 	return recordToASB(rec)
 }

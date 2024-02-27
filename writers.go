@@ -85,16 +85,6 @@ func (w *WriteWorker[T]) Run(ctx context.Context) error {
 
 // **** Generic Writer ****
 
-// Encoder is an interface for encoding the types from the models package.
-// It is used to support different data formats.
-//
-//go:generate mockery --name Encoder
-type Encoder interface {
-	EncodeRecord(v *models.Record) ([]byte, error)
-	EncodeUDF(v *models.UDF) ([]byte, error)
-	EncodeSIndex(v *models.SIndex) ([]byte, error)
-}
-
 // GenericWriter satisfies the DataWriter interface
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
@@ -114,18 +104,18 @@ func NewGenericWriter(encoder Encoder, output io.Writer) *GenericWriter {
 // Write encodes v and writes it to the output
 // TODO let the encoder handle the type checking
 // TODO maybe restrict the types that can be written to this
-func (w *GenericWriter) Write(v *token) error {
+func (w *GenericWriter) Write(v *models.Token) error {
 	var (
 		err  error
 		data []byte
 	)
 
 	switch v.Type {
-	case tokenTypeRecord:
+	case models.TokenTypeRecord:
 		data, err = w.encoder.EncodeRecord(v.Record)
-	case tokenTypeUDF:
+	case models.TokenTypeUDF:
 		data, err = w.encoder.EncodeUDF(v.UDF)
-	case tokenTypeSIndex:
+	case models.TokenTypeSIndex:
 		data, err = w.encoder.EncodeSIndex(v.SIndex)
 	default:
 		return fmt.Errorf("unsupported token type: %v", v.Type)
@@ -218,13 +208,13 @@ func NewRestoreWriter(asc DBWriter) *RestoreWriter {
 // Write writes the types from modes to an Aerospike DB.
 // TODO support write policy
 // TODO support batch writes
-func (rw *RestoreWriter) Write(data *token) error {
+func (rw *RestoreWriter) Write(data *models.Token) error {
 	switch data.Type {
-	case tokenTypeRecord:
+	case models.TokenTypeRecord:
 		return rw.asc.Put(nil, data.Record.Key, data.Record.Bins)
-	case tokenTypeUDF:
+	case models.TokenTypeUDF:
 		return rw.writeUDF(data.UDF)
-	case tokenTypeSIndex:
+	case models.TokenTypeSIndex:
 		return rw.writeSecondaryIndex(data.SIndex)
 	default:
 		return nil

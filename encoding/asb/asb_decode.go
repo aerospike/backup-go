@@ -96,6 +96,7 @@ type metaData struct {
 	First     bool
 }
 
+// Decoder is used to decode an asb file
 type Decoder struct {
 	countingByteScanner
 	header   *header
@@ -130,7 +131,7 @@ func NewDecoder(src io.Reader) (*Decoder, error) {
 
 }
 
-func (r *Decoder) NextToken() (any, error) {
+func (r *Decoder) NextToken() (*models.Token, error) {
 	v, err := func() (any, error) {
 		b, err := _peek(r)
 		if err != nil {
@@ -157,7 +158,16 @@ func (r *Decoder) NextToken() (any, error) {
 		return nil, newDecoderError(r.count, err)
 	}
 
-	return v, nil
+	switch v := v.(type) {
+	case *models.SIndex:
+		return models.NewSIndexToken(v), nil
+	case *models.UDF:
+		return models.NewUDFToken(v), nil
+	case *models.Record:
+		return models.NewRecordToken(v), nil
+	default:
+		return nil, fmt.Errorf("unsupported token type %T", v)
+	}
 }
 
 type header struct {

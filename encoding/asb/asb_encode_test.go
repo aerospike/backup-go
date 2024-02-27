@@ -33,6 +33,51 @@ type asbEncoderTestSuite struct {
 	suite.Suite
 }
 
+func (suite *asbEncoderTestSuite) TestEncodeToken() {
+	encoder, err := NewEncoder()
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	key, err := a.NewKey("test", "demo", "1234")
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	token := &models.Token{
+		Type: models.TokenTypeRecord,
+		Record: &models.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"bin1": 0,
+			},
+		},
+	}
+
+	expected, err := encoder.EncodeRecord(token.Record)
+	suite.Assert().NoError(err)
+
+	actual, err := encoder.EncodeToken(token)
+	suite.Assert().NoError(err)
+	suite.Assert().Equal(expected, actual)
+
+	token.Type = models.TokenTypeUDF
+	actual, err = encoder.EncodeToken(token)
+	suite.Assert().Error(err)
+	suite.Assert().Nil(actual)
+
+	token.Type = models.TokenTypeSIndex
+	actual, err = encoder.EncodeToken(token)
+	suite.Assert().Error(err)
+	suite.Assert().Nil(actual)
+
+	token.Type = models.TokenTypeInvalid
+	actual, err = encoder.EncodeToken(token)
+	suite.Assert().Error(err)
+	suite.Assert().Nil(actual)
+
+}
+
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 	encoder, err := NewEncoder()
 	if err != nil {

@@ -81,17 +81,6 @@ func (w *ReadWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// Decoder is an interface for reading backup data as tokens.
-// It is used to support different data formats.
-// While the return type is `any`, the actual types returned should
-// only be the types exposed by the models package.
-// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
-//
-//go:generate mockery --name Decoder
-type Decoder interface {
-	NextToken() (any, error)
-}
-
 // **** Generic Reader ****
 
 // GenericReader satisfies the DataReader interface
@@ -108,19 +97,19 @@ func NewGenericReader(decoder Decoder) *GenericReader {
 }
 
 // Read reads the next token from the decoder
-func (dr *GenericReader) Read() (*token, error) {
+func (dr *GenericReader) Read() (*models.Token, error) {
 	data, err := dr.decoder.NextToken()
 	if err != nil {
 		return nil, err
 	}
 
-	switch v := data.(type) {
-	case *models.Record:
-		return newRecordToken(v), nil
-	case *models.UDF:
-		return newUDFToken(v), nil
-	case *models.SIndex:
-		return newSIndexToken(v), nil
+	switch data.Type {
+	case models.TokenTypeRecord:
+		return models.NewRecordToken(data.Record), nil
+	case models.TokenTypeUDF:
+		return models.NewUDFToken(data.UDF), nil
+	case models.TokenTypeSIndex:
+		return models.NewSIndexToken(data.SIndex), nil
 	default:
 		return nil, errors.New("unsupported token type")
 	}
@@ -178,7 +167,7 @@ func NewAerospikeRecordReader(cfg *ARRConfig, client Scanner) *AerospikeRecordRe
 }
 
 // Read reads the next record from the Aerospike database
-func (j *AerospikeRecordReader) Read() (*token, error) {
+func (j *AerospikeRecordReader) Read() (*models.Token, error) {
 	if !j.status.started {
 		var err error
 		j.recResChan, err = startScan(j)
@@ -197,7 +186,7 @@ func (j *AerospikeRecordReader) Read() (*token, error) {
 	}
 
 	rec := (*models.Record)(res.Record)
-	recToken := newRecordToken(rec)
+	recToken := models.NewRecordToken(rec)
 
 	return recToken, nil
 }
@@ -266,7 +255,7 @@ func NewSIndexReader(client SIndexGetter, namespace string) *SIndexReader {
 }
 
 // Read reads the next secondary index from the SIndexGetter
-func (r *SIndexReader) Read() (*token, error) {
+func (r *SIndexReader) Read() (*models.Token, error) {
 	// grab all the sindexes on the first run
 	if r.sindexes == nil {
 		sindexes, err := r.client.GetSIndexes(r.namespace)
@@ -280,7 +269,7 @@ func (r *SIndexReader) Read() (*token, error) {
 	}
 
 	if len(r.sindexes) > 0 {
-		SIToken := newSIndexToken(<-r.sindexes)
+		SIToken := models.NewSIndexToken(<-r.sindexes)
 		return SIToken, nil
 	}
 

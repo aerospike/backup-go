@@ -101,16 +101,16 @@ func (suite *readersTestSuite) TestGenericReader() {
 		},
 		Key: key,
 	}
+	expectedRecToken := models.NewRecordToken(mockRec)
 
 	mockDecoder := mocks.NewDecoder(suite.T())
-	mockDecoder.EXPECT().NextToken().Return(mockRec, nil)
+	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
 
 	reader := NewGenericReader(mockDecoder)
 	suite.NotNil(reader)
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	expectedRecToken := newRecordToken(mockRec)
 	suite.Equal(expectedRecToken, v)
 
 	reader.Cancel()
@@ -165,7 +165,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	expectedRecToken := newRecordToken(mockRec)
+	expectedRecToken := models.NewRecordToken(mockRec)
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 
@@ -305,9 +305,9 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	reader := NewSIndexReader(mockSIndexGetter, namespace)
 	suite.NotNil(reader)
 
-	expectedSIndexTokens := []*token{}
+	expectedSIndexTokens := []*models.Token{}
 	for _, sindex := range mockSIndexes {
-		expectedSIndexTokens = append(expectedSIndexTokens, newSIndexToken(sindex))
+		expectedSIndexTokens = append(expectedSIndexTokens, models.NewSIndexToken(sindex))
 	}
 
 	v, err := reader.Read()

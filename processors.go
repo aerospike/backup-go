@@ -14,7 +14,11 @@
 
 package backuplib
 
-import "context"
+import (
+	"context"
+
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
+)
 
 // processors.go contains the implementations of the DataProcessor interface
 // used by dataPipelines in the backuplib package
@@ -90,7 +94,7 @@ func NewNOOPProcessor() *NOOPProcessor {
 }
 
 // Process processes the data
-func (p *NOOPProcessor) Process(data *token) (*token, error) {
+func (p *NOOPProcessor) Process(data *models.Token) (*models.Token, error) {
 	return data, nil
 }
 

@@ -99,17 +99,17 @@ func (suite *writersTestSuite) TestGenericWriter() {
 			"key1": 1,
 		},
 	}
-	recToken := newRecordToken(expRecord)
+	recToken := models.NewRecordToken(expRecord)
 
 	expUDF := &models.UDF{
 		Name: "udf",
 	}
-	UDFToken := newUDFToken(expUDF)
+	UDFToken := models.NewUDFToken(expUDF)
 
 	expSIndex := &models.SIndex{
 		Name: "sindex",
 	}
-	SIndexToken := newSIndexToken(expSIndex)
+	SIndexToken := models.NewSIndexToken(expSIndex)
 
 	mockEncoder := mocks.NewEncoder(suite.T())
 	mockEncoder.EXPECT().EncodeRecord(expRecord).Return([]byte("rec,"), nil)
@@ -133,7 +133,7 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	suite.Nil(err)
 	suite.Equal("rec,si,udf", output.String())
 
-	err = writer.Write(&token{Type: tokenTypeInvalid})
+	err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
 	suite.NotNil(err)
 	suite.Equal("rec,si,udf", output.String())
 
@@ -144,7 +144,7 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	// Encoder failed
 
 	failRec := &models.Record{}
-	failRecToken := newRecordToken(failRec)
+	failRecToken := models.NewRecordToken(failRec)
 	mockEncoder.EXPECT().EncodeRecord(failRec).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
 	suite.NotNil(err)
@@ -170,17 +170,17 @@ func (suite *writersTestSuite) TestASBWriter() {
 			"key1": 1,
 		},
 	}
-	recToken := newRecordToken(expRecord)
+	recToken := models.NewRecordToken(expRecord)
 
 	expUDF := &models.UDF{
 		Name: "udf",
 	}
-	UDFToken := newUDFToken(expUDF)
+	UDFToken := models.NewUDFToken(expUDF)
 
 	expSIndex := &models.SIndex{
 		Name: "sindex",
 	}
-	SIndexToken := newSIndexToken(expSIndex)
+	SIndexToken := models.NewSIndexToken(expSIndex)
 
 	mockEncoder := mocks.NewASBEncoder(suite.T())
 	mockEncoder.EXPECT().GetVersionText().Return([]byte("Version 3.1\n"))
@@ -218,7 +218,7 @@ func (suite *writersTestSuite) TestASBWriter() {
 	// Encoder failed
 
 	failRec := &models.Record{}
-	failRecToken := newRecordToken(failRec)
+	failRecToken := models.NewRecordToken(failRec)
 	mockEncoder.EXPECT().EncodeRecord(failRec).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
 	suite.NotNil(err)
@@ -243,7 +243,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 			"key1": 1,
 		},
 	}
-	recToken := newRecordToken(expRecord)
+	recToken := models.NewRecordToken(expRecord)
 
 	mockDBWriter := mocks.NewDBWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
@@ -261,7 +261,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	// DBWriter failed
 
 	failRec := &models.Record{}
-	failRecToken := newRecordToken(failRec)
+	failRecToken := models.NewRecordToken(failRec)
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), failRec.Key, failRec.Bins).Return(a.ErrInvalidParam)
 	err = writer.Write(failRecToken)
 	suite.NotNil(err)

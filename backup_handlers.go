@@ -18,6 +18,7 @@ import (
 	"io"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 	"github.com/aerospike/aerospike-tools-backup-lib/pipeline"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -53,8 +54,8 @@ func newBackupHandler(config *BackupBaseConfig, ac *a.Client, namespace string) 
 	return handler
 }
 
-func (bh *backupHandler) run(writers []*WriteWorker[*token]) error {
-	readWorkers := make([]pipeline.Worker[*token], bh.config.Parallel)
+func (bh *backupHandler) run(writers []*WriteWorker[*models.Token]) error {
+	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.config.Parallel
 		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
@@ -74,18 +75,18 @@ func (bh *backupHandler) run(writers []*WriteWorker[*token]) error {
 		readWorkers[i] = NewReadWorker(recordReader)
 	}
 
-	processorWorkers := make([]pipeline.Worker[*token], bh.config.Parallel)
+	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
 		processor := NewNOOPProcessor()
 		processorWorkers[i] = NewProcessorWorker(processor)
 	}
 
-	writeWorkers := make([]pipeline.Worker[*token], len(writers))
+	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
 	for i, w := range writers {
 		writeWorkers[i] = w
 	}
 
-	job := pipeline.NewPipeline[*token](
+	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
 		processorWorkers,
 		writeWorkers,
@@ -136,7 +137,7 @@ func (bwh *BackupToWriterHandler) run(writers []io.Writer) {
 
 		batchSize := bwh.config.Parallel
 		// TODO change the any typed pipeline to a message or token type
-		dataWriters := []*WriteWorker[*token]{}
+		dataWriters := []*WriteWorker[*models.Token]{}
 
 		for i, writer := range writers {
 
@@ -176,7 +177,7 @@ func (bwh *BackupToWriterHandler) Wait() error {
 	return <-bwh.errors
 }
 
-func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*WriteWorker[*token], error) {
+func getDataWriter(eb EncoderBuilder, w io.Writer, namespace string, first bool) (*WriteWorker[*models.Token], error) {
 	enc, err := eb.CreateEncoder()
 	if err != nil {
 		return nil, err

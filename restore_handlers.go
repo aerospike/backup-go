@@ -17,6 +17,7 @@ package backuplib
 import (
 	"io"
 
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 	"github.com/aerospike/aerospike-tools-backup-lib/pipeline"
 )
 
@@ -35,7 +36,7 @@ type DBRestoreClient interface {
 // worker is an interface for running a job
 type worker interface {
 	// TODO change the any typed pipeline to a message or token type
-	DoJob(*pipeline.Pipeline[*token]) error
+	DoJob(*pipeline.Pipeline[*models.Token]) error
 }
 
 // restoreHandler handles generic restore jobs on data readers
@@ -56,21 +57,21 @@ func newRestoreHandler(config *RestoreBaseConfig, ac DBRestoreClient, w worker) 
 }
 
 // run runs the restore job
-func (rh *restoreHandler) run(readers []*ReadWorker[*token]) error {
+func (rh *restoreHandler) run(readers []*ReadWorker[*models.Token]) error {
 
-	processorWorkers := make([]pipeline.Worker[*token], rh.config.Parallel)
+	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
 		processor := NewNOOPProcessor()
 		processorWorkers[i] = NewProcessorWorker(processor)
 	}
 
-	writeWorkers := make([]pipeline.Worker[*token], rh.config.Parallel)
+	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
 		writer := NewRestoreWriter(rh.dbClient)
 		writeWorkers[i] = NewWriteWorker(writer)
 	}
 
-	readWorkers := make([]pipeline.Worker[*token], len(readers))
+	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 	for i, r := range readers {
 		readWorkers[i] = r
 	}
@@ -128,7 +129,7 @@ func (rrh *RestoreFromReaderHandler) run(readers []io.Reader) {
 
 		batchSize := rrh.config.Parallel
 		// TODO change the any type to a message or token type
-		dataReaders := []*ReadWorker[*token]{}
+		dataReaders := []*ReadWorker[*models.Token]{}
 
 		for i, reader := range readers {
 

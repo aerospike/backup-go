@@ -173,8 +173,8 @@ func (suite *proccessorTestSuite) TestNOOPProcessor() {
 	noop := NewNOOPProcessor()
 	suite.NotNil(noop)
 
-	data := &token{
-		Type:   tokenTypeRecord,
+	data := &models.Token{
+		Type:   models.TokenTypeRecord,
 		Record: &models.Record{},
 	}
 	processed, err := noop.Process(data)

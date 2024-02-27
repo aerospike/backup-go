@@ -71,3 +71,47 @@ type UDF struct {
 	Name    string
 	Content []byte
 }
+
+// **** Token ****
+
+type TokenType uint8
+
+const (
+	TokenTypeInvalid TokenType = iota
+	TokenTypeRecord
+	TokenTypeSIndex
+	TokenTypeUDF
+)
+
+// Token encompasses the other data models
+// fields should be accessed based on the tokenType
+type Token struct {
+	Record *Record
+	SIndex *SIndex
+	UDF    *UDF
+	Type   TokenType
+}
+
+// NewRecordToken creates a new token with the given record
+func NewRecordToken(r *Record) *Token {
+	return &Token{
+		Record: r,
+		Type:   TokenTypeRecord,
+	}
+}
+
+// NewSIndexToken creates a new token with the given secondary index
+func NewSIndexToken(s *SIndex) *Token {
+	return &Token{
+		SIndex: s,
+		Type:   TokenTypeSIndex,
+	}
+}
+
+// NewUDFToken creates a new token with the given UDF
+func NewUDFToken(u *UDF) *Token {
+	return &Token{
+		UDF:  u,
+		Type: TokenTypeUDF,
+	}
+}

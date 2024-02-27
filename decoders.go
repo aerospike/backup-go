@@ -18,7 +18,19 @@ import (
 	"io"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
+	"github.com/aerospike/aerospike-tools-backup-lib/models"
 )
+
+// Decoder is an interface for reading backup data as tokens.
+// It is used to support different data formats.
+// While the return type is `any`, the actual types returned should
+// only be the types exposed by the models package.
+// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
+//
+//go:generate mockery --name Decoder
+type Decoder interface {
+	NextToken() (*models.Token, error)
+}
 
 // ASBDecoderBuilder satisfies the DecoderBuilder interface
 // It creates a new ASB format decoder

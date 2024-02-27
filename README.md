@@ -17,6 +17,7 @@ The following is a simple example using a backup client to start backup and rest
 package main
 
 import (
+	"context"
 	"io"
 	"log"
 	"os"
@@ -54,16 +55,22 @@ func main() {
 			defer file.Close()
 
 			writers := []io.Writer{file}
-			backupCfg := backuplib.NewBackupToWriterConfig()
+
+			backupCfg := backuplib.NewBackupConfig()
 			backupCfg.Namespace = "test"
-			handler, err := backupClient.BackupToWriter(writers, backupCfg)
+
+			ctx := context.Background()
+			handler, err := backupClient.Backup(ctx, writers, backupCfg)
 			if err != nil {
 				panic(err)
 			}
+
 			// optionally check the stats of the backup job
 			_ = handler.GetStats()
+
 			// use handler.Wait() to wait for the job to finish or fail
-			err = handler.Wait()
+			ctx = context.Background()
+			err = handler.Wait(ctx)
 			if err != nil {
 				log.Printf("Backup %d failed: %v", i, err)
 			}
@@ -85,15 +92,20 @@ func main() {
 			defer file.Close()
 
 			readers := []io.Reader{file}
-			restoreCfg := backuplib.NewRestoreFromReaderConfig()
-			handler, err := backupClient.RestoreFromReader(readers, restoreCfg)
+			restoreCfg := backuplib.NewRestoreConfig()
+
+			ctx := context.Background()
+			handler, err := backupClient.Restore(ctx, readers, restoreCfg)
 			if err != nil {
 				panic(err)
 			}
+
 			// optionally check the stats of the restore job
 			_ = handler.GetStats()
+
 			// use handler.Wait() to wait for the job to finish or fail
-			err = handler.Wait()
+			ctx = context.Background()
+			err = handler.Wait(ctx)
 			if err != nil {
 				log.Printf("Restore %d failed: %v", i, err)
 			}

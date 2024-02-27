@@ -55,9 +55,11 @@ type Client struct {
 }
 
 // NewClient creates a new backuplib client
-func NewClient(ac *a.Client, cc *Config) (*Client, error) {
-	if cc == nil {
-		cc = NewConfig()
+// ac is the aerospike client to use for backup and restore operations
+// config is the configuration for the backuplib client
+func NewClient(ac *a.Client, config *Config) (*Client, error) {
+	if config == nil {
+		config = NewConfig()
 	}
 
 	if ac == nil {
@@ -66,7 +68,7 @@ func NewClient(ac *a.Client, cc *Config) (*Client, error) {
 
 	return &Client{
 		aerospikeClient: ac,
-		config:          cc,
+		config:          config,
 	}, nil
 }
 
@@ -101,6 +103,9 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 }
 
 // Backup starts a backup operation to a set of io.writers
+// ctx can be used to cancel the backup operation
+// writers is a set of io.writers to write the backup data to
+// config is the configuration for the backup operation
 func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *BackupConfig) (*BackupHandler, error) {
 	if config == nil {
 		config = NewBackupConfig()
@@ -119,6 +124,9 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 }
 
 // Restore starts a restore operation from a set of io.readers
+// ctx can be used to cancel the restore operation
+// readers is a set of io.readers to read the backup data from
+// config is the configuration for the restore operation
 func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *RestoreConfig) (*RestoreHandler, error) {
 	if config == nil {
 		config = NewRestoreConfig()

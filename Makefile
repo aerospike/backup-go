@@ -1,5 +1,5 @@
 .PHONY: test
-test:
+test: test_deps
 	go test -v ./...
 
 .PHONY: coverage
@@ -11,4 +11,16 @@ coverage:
 
 .PHONY: clean
 clean:
-	rm coverage.cov
+	rm -f coverage.cov
+	rm -rf mocks
+
+.PHONY: test_deps
+test_deps: $(MOCKERY) generate
+
+# Install mockery for generating test mocks
+$(MOCKERY):
+	go install github.com/vektra/mockery/v2@v2.42.0
+
+.PHONY: generate
+generate:
+	go generate ./...

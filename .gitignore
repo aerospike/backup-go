@@ -21,4 +21,4 @@
 go.work
 
 # Generated files
-mocks
+mocks/

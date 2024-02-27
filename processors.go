@@ -82,20 +82,18 @@ func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// **** NOOP Processor ****
+// **** NoOp Processor ****
 
-// NOOPProcessor satisfies the DataProcessor interface
+// NoOpProcessor satisfies the DataProcessor interface
 // It does nothing to the data
-type NOOPProcessor struct{}
+type NoOpProcessor struct{}
 
-// NewNOOPProcessor creates a new NOOPProcessor
-func NewNOOPProcessor() *NOOPProcessor {
-	return &NOOPProcessor{}
+// NewNoOpProcessor creates a new NOOPProcessor
+func NewNoOpProcessor() *NoOpProcessor {
+	return &NoOpProcessor{}
 }
 
 // Process processes the data
-func (p *NOOPProcessor) Process(data *models.Token) (*models.Token, error) {
+func (p *NoOpProcessor) Process(data *models.Token) (*models.Token, error) {
 	return data, nil
 }
-
-type NOOPProcessorFactory struct{}

@@ -170,7 +170,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 }
 
 func (suite *proccessorTestSuite) TestNOOPProcessor() {
-	noop := NewNOOPProcessor()
+	noop := NewNoOpProcessor()
 	suite.NotNil(noop)
 
 	data := &models.Token{

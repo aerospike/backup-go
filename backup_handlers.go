@@ -77,7 +77,7 @@ func (bh *backupHandler) run(writers []*WriteWorker[*models.Token]) error {
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	for i := 0; i < bh.config.Parallel; i++ {
-		processor := NewNOOPProcessor()
+		processor := NewNoOpProcessor()
 		processorWorkers[i] = NewProcessorWorker(processor)
 	}
 

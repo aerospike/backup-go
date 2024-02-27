@@ -61,7 +61,7 @@ func (rh *restoreHandler) run(readers []*ReadWorker[*models.Token]) error {
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		processor := NewNOOPProcessor()
+		processor := NewNoOpProcessor()
 		processorWorkers[i] = NewProcessorWorker(processor)
 	}
 

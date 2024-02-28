@@ -58,11 +58,11 @@ run:
   issues-exit-code: 1
 
 # Test exclusion examples
-# issues:
-#   exclude-rules:
-    # - path: '(.+)test\.go'
-    #   linters:
-    #   - govet # Test code field alignment for sake of space is not a concern
-    #   - dupl
-    # - path: '(.+)test\.go'
-    #   text: importShadow
+issues:
+  exclude-rules:
+    - path: '(.+)test\.go'
+      linters:
+      - govet # Test code field alignment for sake of space is not a concern
+      - dupl
+    - path: '(.+)test\.go'
+      text: importShadow

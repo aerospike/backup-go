@@ -33,12 +33,12 @@ const (
 
 type backupHandlerBase struct {
 	worker          workHandler
-	config          *backupBaseConfig
+	config          *BackupConfig
 	aerospikeClient *a.Client
 	namespace       string
 }
 
-func newBackupHandlerBase(config *backupBaseConfig, ac *a.Client, namespace string) *backupHandlerBase {
+func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) *backupHandlerBase {
 	wh := newWorkHandler()
 
 	handler := &backupHandlerBase{
@@ -105,7 +105,7 @@ type BackupHandler struct {
 // newBackupHandler creates a new BackupHandler
 func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *BackupHandler {
 	namespace := config.Namespace
-	backupHandler := newBackupHandlerBase(&config.backupBaseConfig, ac, namespace)
+	backupHandler := newBackupHandlerBase(config, ac, namespace)
 
 	return &BackupHandler{
 		config:            config,

@@ -50,8 +50,8 @@ type EncoderFactory interface {
 	CreateEncoder() (encoding.Encoder, error)
 }
 
-// backupBaseConfig contains shared configuration for backup operations
-type backupBaseConfig struct {
+// BackupConfig contains configuration for the backup operation
+type BackupConfig struct {
 	// EncoderFactory is used to specify the encoder with which to encode the backup data
 	// if nil, the default encoder factory will be used
 	EncoderFactory EncoderFactory
@@ -69,7 +69,7 @@ type backupBaseConfig struct {
 	Parallel int
 }
 
-func (c *backupBaseConfig) validate() error {
+func (c *BackupConfig) validate() error {
 	if c.Parallel < minParallel || c.Parallel > maxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
@@ -77,33 +77,13 @@ func (c *backupBaseConfig) validate() error {
 	return nil
 }
 
-// newBackupBaseConfig returns a new BackupBaseConfig with default values
-func newBackupBaseConfig() *backupBaseConfig {
-	return &backupBaseConfig{
+// NewBackupConfig returns a new BackupConfig with default values
+func NewBackupConfig() *BackupConfig {
+	return &BackupConfig{
 		Parallel:       1,
 		Set:            "",
 		Namespace:      "test",
 		EncoderFactory: defaultEncoderFactory,
-	}
-}
-
-// BackupConfig contains configuration for the backup to writer operation
-type BackupConfig struct {
-	backupBaseConfig
-}
-
-func (c *BackupConfig) validate() error {
-	if err := c.backupBaseConfig.validate(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// NewBackupConfig returns a new BackupToWriterConfig with default values
-func NewBackupConfig() *BackupConfig {
-	return &BackupConfig{
-		backupBaseConfig: *newBackupBaseConfig(),
 	}
 }
 
@@ -113,8 +93,8 @@ type DecoderFactory interface {
 	CreateDecoder(src io.Reader) (encoding.Decoder, error)
 }
 
-// restoreBaseConfig contains shared configuration for restore operations
-type restoreBaseConfig struct {
+// RestoreConfig contains configuration for the restore operation
+type RestoreConfig struct {
 	// DecoderFactory is used to specify the decoder with which to decode the backup data
 	// if nil, the default decoder factory will be used
 	DecoderFactory DecoderFactory
@@ -128,7 +108,7 @@ type restoreBaseConfig struct {
 	Parallel int
 }
 
-func (c *restoreBaseConfig) validate() error {
+func (c *RestoreConfig) validate() error {
 	if c.Parallel < minParallel || c.Parallel > maxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
@@ -136,30 +116,10 @@ func (c *restoreBaseConfig) validate() error {
 	return nil
 }
 
-// newRestoreBaseConfig returns a new RestoreBaseConfig with default values
-func newRestoreBaseConfig() *restoreBaseConfig {
-	return &restoreBaseConfig{
-		Parallel:       4,
-		DecoderFactory: defaultDecoderFactory,
-	}
-}
-
-// RestoreConfig contains configuration for the restore from reader operation
-type RestoreConfig struct {
-	restoreBaseConfig
-}
-
-func (c *RestoreConfig) validate() error {
-	if err := c.restoreBaseConfig.validate(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// NewRestoreConfig returns a new RestoreFromReaderConfig with default values
+// NewRestoreConfig returns a new RestoreConfig with default values
 func NewRestoreConfig() *RestoreConfig {
 	return &RestoreConfig{
-		restoreBaseConfig: *newRestoreBaseConfig(),
+		Parallel:       4,
+		DecoderFactory: defaultDecoderFactory,
 	}
 }

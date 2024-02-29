@@ -39,13 +39,13 @@ type worker interface {
 // restoreHandlerBase handles generic restore jobs on data readers
 // most other restore handlers can wrap this one to add additional functionality
 type restoreHandlerBase struct {
-	config   *restoreBaseConfig
+	config   *RestoreConfig
 	dbClient DBRestoreClient
 	worker   worker
 }
 
 // newRestoreHandlerBase creates a new restoreHandler
-func newRestoreHandlerBase(config *restoreBaseConfig, ac DBRestoreClient, w worker) *restoreHandlerBase {
+func newRestoreHandlerBase(config *RestoreConfig, ac DBRestoreClient, w worker) *restoreHandlerBase {
 	return &restoreHandlerBase{
 		config:   config,
 		dbClient: ac,
@@ -96,7 +96,7 @@ type RestoreHandler struct {
 func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.Reader) *RestoreHandler {
 	worker := newWorkHandler()
 
-	restoreHandler := newRestoreHandlerBase(&config.restoreBaseConfig, ac, worker)
+	restoreHandler := newRestoreHandlerBase(config, ac, worker)
 
 	return &RestoreHandler{
 		config:             config,

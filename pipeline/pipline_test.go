@@ -142,6 +142,8 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 	err := pipeline.Run(ctx)
 	suite.Nil(err)
 
+	suite.Equal(2, len(send))
+
 	var count int
 	for res := range send {
 		suite.Equal(strconv.Itoa(count), res, "expected %s to be %s", res, strconv.Itoa(count))

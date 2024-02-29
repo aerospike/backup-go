@@ -31,21 +31,20 @@ import (
 )
 
 const (
-	host      = "127.0.0.1"
-	port      = 10000
-	user      = "admin"
-	password  = "admin"
-	namespace = "test"
-	set       = ""
-
 	BackupDirPath = "./test_resources/backup"
 )
 
 type backupRestoreTestSuite struct {
 	suite.Suite
-	Aeroclient   *a.Client
-	testClient   *testresources.TestClient
-	backupClient *backuplib.Client
+	aerospikeIP       string
+	aerospikePort     int
+	aerospikePassword string
+	aerospikeUser     string
+	namespace         string
+	set               string
+	Aeroclient        *a.Client
+	testClient        *testresources.TestClient
+	backupClient      *backuplib.Client
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -58,13 +57,13 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	}
 
 	aeroClientPolicy := a.NewClientPolicy()
-	aeroClientPolicy.User = user
-	aeroClientPolicy.Password = password
+	aeroClientPolicy.User = suite.aerospikeUser
+	aeroClientPolicy.Password = suite.aerospikePassword
 
 	asc, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
-		host,
-		port,
+		suite.aerospikeIP,
+		suite.aerospikePort,
 	)
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
@@ -94,8 +93,8 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	aeroClientPolicy.Password = "changeme"
 	testAeroClient, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
-		host,
-		port,
+		suite.aerospikeIP,
+		suite.aerospikePort,
 	)
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
@@ -138,14 +137,14 @@ func (suite *backupRestoreTestSuite) TearDownSuite() {
 }
 
 func (suite *backupRestoreTestSuite) SetupTest() {
-	err := suite.testClient.Truncate(namespace, set)
+	err := suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 }
 
 func (suite *backupRestoreTestSuite) TearDownTest() {
-	err := suite.testClient.Truncate(namespace, set)
+	err := suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -163,7 +162,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		// TODO "MapBin": a.NewList(1, "string", true, []byte("bytes")),
 		// TODO "ListBin": a.NewMap(map[interface{}]interface{}{}),
 	}
-	expectedRecs := genRecords(namespace, set, numRec, bins)
+	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
 	if err != nil {
@@ -184,7 +183,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
-	err = suite.testClient.Truncate(namespace, set)
+	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {
 		panic(err)
 	}
@@ -202,7 +201,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	err = suite.testClient.ValidateRecords(expectedRecs, numRec, namespace, set)
+	err = suite.testClient.ValidateRecords(expectedRecs, numRec, suite.namespace, suite.set)
 	suite.Nil(err)
 }
 
@@ -271,5 +270,14 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 }
 
 func TestBackupRestoreTestSuite(t *testing.T) {
-	suite.Run(t, new(backupRestoreTestSuite))
+	testSuite := backupRestoreTestSuite{
+		aerospikeIP:       testutils.IP,
+		aerospikePort:     testutils.PortStart,
+		aerospikePassword: testutils.Password,
+		aerospikeUser:     testutils.User,
+		namespace:         "test",
+		set:               "",
+	}
+
+	suite.Run(t, &testSuite)
 }

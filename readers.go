@@ -170,19 +170,17 @@ func newAerospikeRecordReader(client scanner, cfg arrConfig, scanPolicy *a.ScanP
 }
 
 // Read reads the next record from the Aerospike database
-func (j *aerospikeRecordReader) Read() (*models.Token, error) {
-	if !j.status.started {
-		var err error
-
-		err = j.startScan()
+func (arr *aerospikeRecordReader) Read() (*models.Token, error) {
+	if !arr.status.started {
+		err := arr.startScan()
 		if err != nil {
 			return nil, err
 		}
 
-		j.status.started = true
+		arr.status.started = true
 	}
 
-	res, active := <-j.recResChan
+	res, active := <-arr.recResChan
 	if !active {
 		return nil, io.EOF
 	}
@@ -199,12 +197,12 @@ func (j *aerospikeRecordReader) Read() (*models.Token, error) {
 
 // Cancel cancels the Aerospike scan used to read records
 // if it was started
-func (j *aerospikeRecordReader) Close() {
-	j.status.started = false
-	if j.recSet != nil {
+func (arr *aerospikeRecordReader) Close() {
+	arr.status.started = false
+	if arr.recSet != nil {
 		// ignore this error, it only happens if the scan is already closed
 		// and this method can not return an error anyway
-		_ = j.recSet.Close()
+		_ = arr.recSet.Close()
 	}
 }
 

@@ -157,9 +157,6 @@ func binToASB(k string, v any) ([]byte, error) {
 		res.Write([]byte(fmt.Sprintf("%c %s %f\n", binTypeFloat, binName, v)))
 	case string:
 		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeString, binName, len(v), v)))
-	case a.HLLValue:
-		encoded := base64Encode(v)
-		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeBytesHLL, binName, len(encoded), encoded)))
 	case []byte:
 		encoded := base64Encode(v)
 		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeBytes, binName, len(encoded), encoded)))
@@ -167,10 +164,15 @@ func binToASB(k string, v any) ([]byte, error) {
 		return nil, errors.New("map bin not supported")
 	case []any:
 		return nil, errors.New("list bin not supported")
+	case a.HLLValue:
+		encoded := base64Encode(v)
+		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeBytesHLL, binName, len(encoded), encoded)))
+	case a.GeoJSONValue:
+		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeGeoJSON, binName, len(v), v)))
 	case nil:
 		res.Write([]byte(fmt.Sprintf("%c %s\n", binTypeNil, binName)))
 	default:
-		return nil, fmt.Errorf("unknown user key type: %T, key: %s", v, k)
+		return nil, fmt.Errorf("unknown bin type: %T, key: %s", v, k)
 	}
 
 	return res.Bytes(), nil

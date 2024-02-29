@@ -86,7 +86,7 @@ func (tc *TestClient) ValidateRecords(expectedRecs []*a.Record, expCount int, na
 		}
 
 		if !reflect.DeepEqual(expRec.Bins, actual.Bins) {
-			return fmt.Errorf("wanted bins: %v\n got bins: %v", expRec.Bins, actual.Bins)
+			return fmt.Errorf("wanted bins: %#v\n got bins: %#v", expRec.Bins, actual.Bins)
 		}
 	}
 

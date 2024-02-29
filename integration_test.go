@@ -153,11 +153,12 @@ func (suite *backupRestoreTestSuite) TearDownTest() {
 func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	numRec := 1000
 	bins := a.BinMap{
-		"IntBin":    1,
-		"FloatBin":  1.1,
-		"StringBin": "string",
-		"BoolBin":   true,
-		"BlobBin":   []byte("bytes"),
+		"IntBin":     1,
+		"FloatBin":   1.1,
+		"StringBin":  "string",
+		"BoolBin":    true,
+		"BlobBin":    []byte("bytes"),
+		"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
 		// TODO "HLLBin":    a.NewHLLValue([]byte{}),
 		// TODO "MapBin": a.NewList(1, "string", true, []byte("bytes")),
 		// TODO "ListBin": a.NewMap(map[interface{}]interface{}{}),

@@ -787,7 +787,7 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		}
 
 		binVal = string(val)
-	case 'G':
+	case binTypeGeoJSON:
 		binVal, binErr = _readGeoJSON(r, ' ')
 	}
 
@@ -803,17 +803,17 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		// bytes special cases
 		if _, ok := isMsgPackBytes[binType]; ok {
 			switch binType {
-			case 'Y':
+			case binTypeBytesHLL:
 				// HLLs are treated as bytes by the client so no decode is needed
 				binVal = a.NewHLLValue(val)
-			case 'M':
+			case binTypeBytesMap:
 				// maps need to be decoded so that the go client will write them as maps and not blobs
 				return errors.New("map bins are not supported yet")
 				//nolint:gocritic // will use this later
 				// var m map[any]any
 				// binErr = msgpack.Unmarshal(val, &m)
 				// binVal = m
-			case 'L':
+			case binTypeBytesList:
 				// lists are decoded for the same reason as maps
 				return errors.New("list bins are not supported yet")
 				//nolint:gocritic // will use this later

@@ -258,6 +258,7 @@ func Test__SIndexToASB(t *testing.T) {
 
 func Test_binToASB(t *testing.T) {
 	encVal := base64Encode(a.HLLValue("hello"))
+	geoJSONStr := `{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [0,0]]]}`
 	type args struct {
 		v any
 		k string
@@ -339,6 +340,14 @@ func Test_binToASB(t *testing.T) {
 				v: a.HLLValue("hello"),
 			},
 			want: []byte(fmt.Sprintf("- Y binName %d %s\n", len(encVal), encVal)),
+		},
+		{
+			name: "positive GeoJSON bin",
+			args: args{
+				k: "binName",
+				v: a.GeoJSONValue(geoJSONStr),
+			},
+			want: []byte(fmt.Sprintf("- G binName %d %s\n", len(geoJSONStr), geoJSONStr)),
 		},
 		{
 			name: "positive bytes bin",

@@ -91,14 +91,21 @@ func recordToASB(r *models.Record) ([]byte, error) {
 
 	data = append(data, keyText...)
 
-	generationText := fmt.Sprintf("%c g %d\n", markerRecordHeader, r.Generation)
+	lineStart := []byte{markerRecordHeader, ' '}
+	data = append(data, lineStart...)
+
+	generationText := fmt.Sprintf("%c %d\n", recordHeaderTypeGen, r.Generation)
 	data = append(data, generationText...)
 
+	data = append(data, lineStart...)
+
 	exprTime := getExpirationTime(r.Expiration, getTimeNow().Unix())
-	expirationText := fmt.Sprintf("%c t %d\n", markerRecordHeader, exprTime)
+	expirationText := fmt.Sprintf("%c %d\n", recordHeaderTypeExpiration, exprTime)
 	data = append(data, expirationText...)
 
-	binCountText := fmt.Sprintf("%c b %d\n", markerRecordHeader, len(r.Bins))
+	data = append(data, lineStart...)
+
+	binCountText := fmt.Sprintf("%c %d\n", recordHeaderTypeBinCount, len(r.Bins))
 	data = append(data, binCountText...)
 
 	binsText, err := binsToASB(r.Bins)
@@ -143,25 +150,25 @@ func binToASB(k string, v any) ([]byte, error) {
 
 	switch v := v.(type) {
 	case bool:
-		res.Write([]byte(fmt.Sprintf("Z %s %c\n", binName, boolToASB(v))))
+		res.Write([]byte(fmt.Sprintf("%c %s %c\n", binTypeBool, binName, boolToASB(v))))
 	case int64, int32, int16, int8, int:
-		res.Write([]byte(fmt.Sprintf("I %s %d\n", binName, v)))
+		res.Write([]byte(fmt.Sprintf("%c %s %d\n", binTypeInt, binName, v)))
 	case float64:
-		res.Write([]byte(fmt.Sprintf("D %s %f\n", binName, v)))
+		res.Write([]byte(fmt.Sprintf("%c %s %f\n", binTypeFloat, binName, v)))
 	case string:
-		res.Write([]byte(fmt.Sprintf("S %s %d %s\n", binName, len(v), v)))
+		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeString, binName, len(v), v)))
 	case a.HLLValue:
 		encoded := base64Encode(v)
-		res.Write([]byte(fmt.Sprintf("Y %s %d %s\n", binName, len(encoded), encoded)))
+		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeBytesHLL, binName, len(encoded), encoded)))
 	case []byte:
 		encoded := base64Encode(v)
-		res.Write([]byte(fmt.Sprintf("B %s %d %s\n", binName, len(encoded), encoded)))
+		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeBytes, binName, len(encoded), encoded)))
 	case map[any]any:
 		return nil, errors.New("map bin not supported")
 	case []any:
 		return nil, errors.New("list bin not supported")
 	case nil:
-		res.Write([]byte(fmt.Sprintf("N %s\n", binName)))
+		res.Write([]byte(fmt.Sprintf("%c %s\n", binTypeNil, binName)))
 	default:
 		return nil, fmt.Errorf("unknown user key type: %T, key: %s", v, k)
 	}
@@ -186,20 +193,26 @@ func keyToASB(k *a.Key) ([]byte, error) {
 
 	userKeyText, err := userKeyToASB(k.Value())
 	if err != nil {
-		return data, err
+		return nil, err
 	}
 
 	data = append(data, userKeyText...)
 
-	namespaceText := fmt.Sprintf("%c n %s\n", markerRecordHeader, escapeASBS(k.Namespace()))
+	lineStart := []byte{markerRecordHeader, ' '}
+	data = append(data, lineStart...)
+
+	namespaceText := fmt.Sprintf("%c %s\n", recordHeaderTypeNamespace, escapeASBS(k.Namespace()))
 	data = append(data, namespaceText...)
 
+	data = append(data, lineStart...)
+
 	b64Digest := base64Encode(k.Digest())
-	digestText := fmt.Sprintf("%c d %s\n", markerRecordHeader, b64Digest)
+	digestText := fmt.Sprintf("%c %s\n", recordHeaderTypeDigest, b64Digest)
 	data = append(data, digestText...)
 
 	if k.SetName() != "" {
-		setnameText := fmt.Sprintf("%c s %s\n", markerRecordHeader, escapeASBS(k.SetName()))
+		data = append(data, lineStart...)
+		setnameText := fmt.Sprintf("%c %s\n", recordHeaderTypeSet, escapeASBS(k.SetName()))
 		data = append(data, setnameText...)
 	}
 
@@ -218,18 +231,20 @@ func userKeyToASB(userKey a.Value) ([]byte, error) {
 		return nil, nil
 	}
 
-	val := userKey.GetObject()
+	linStart := []byte{markerRecordHeader, ' ', recordHeaderTypeKey, ' '}
+	data.Write(linStart)
 
+	val := userKey.GetObject()
 	switch v := val.(type) {
 	case int64, int32, int16, int8, int:
-		data.Write([]byte(fmt.Sprintf("%c k I %d\n", markerRecordHeader, v)))
+		data.Write([]byte(fmt.Sprintf("%c %d\n", keyTypeInt, v)))
 	case float64:
-		data.Write([]byte(fmt.Sprintf("%c k D %f\n", markerRecordHeader, v)))
+		data.Write([]byte(fmt.Sprintf("%c %f\n", keyTypeFloat, v)))
 	case string:
-		data.Write([]byte(fmt.Sprintf("%c k S %d %s\n", markerRecordHeader, len(v), v)))
+		data.Write([]byte(fmt.Sprintf("%c %d %s\n", keyTypeString, len(v), v)))
 	case []byte:
 		encoded := base64Encode(v)
-		data.Write([]byte(fmt.Sprintf("%c k B %d %s\n", markerRecordHeader, len(encoded), encoded)))
+		data.Write([]byte(fmt.Sprintf("%c %d %s\n", keyTypeBytes, len(encoded), encoded)))
 	default:
 		return nil, fmt.Errorf("invalid user key type: %T", v)
 	}
@@ -283,7 +298,7 @@ func sindexToASB(sindex *models.SIndex) ([]byte, error) {
 	v := fmt.Sprintf(
 		"%c %c %s %s %s %c %d %s %c",
 		markerGlobalSection,
-		'i',
+		globalTypeSIndex,
 		escapeASBS(sindex.Namespace),
 		escapeASBS(sindex.Set),
 		escapeASBS(sindex.Name),

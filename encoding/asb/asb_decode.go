@@ -29,11 +29,6 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-// TODO maybe use error functions for each asb level, reader, section, line type
-// that way you don't have to track section and line type in the reader
-// this would allow passing an interface for the reader to most functions
-// and would allow the reader to be used in a more generic way making tests easier
-
 func newDecoderError(offset uint64, err error) error {
 	if errors.Is(err, io.EOF) {
 		return err
@@ -294,12 +289,12 @@ func (r *Decoder) readGlobals() (any, error) {
 	}
 
 	switch b {
-	case 'i':
+	case globalTypeSIndex:
 		res, err = r.readSIndex()
 		if err != nil {
 			return nil, newLineError(lineTypeSindex, err)
 		}
-	case 'u':
+	case globalTypeUDF:
 		res, err = r.readUDF()
 		if err != nil {
 			return nil, newLineError(lineTypeUDF, err)
@@ -359,13 +354,13 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 	}
 
 	switch b {
-	case 'N':
+	case sindexTypeBin:
 		res.IndexType = models.BinSIndex
-	case 'L':
+	case sindexTypeList:
 		res.IndexType = models.ListElementSIndex
-	case 'K':
+	case sindexTypeMapKey:
 		res.IndexType = models.MapKeySIndex
-	case 'V':
+	case sindexTypeMapVal:
 		res.IndexType = models.MapValueSIndex
 	default:
 		return nil, fmt.Errorf("invalid secondary index type %c", b)
@@ -409,13 +404,13 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 	}
 
 	switch b {
-	case 'S':
+	case sindexBinTypeString:
 		path.BinType = models.StringSIDataType
-	case 'N':
+	case sindexBinTypeNumeric:
 		path.BinType = models.NumericSIDataType
-	case 'G':
+	case sindexBinTypeGEO2D:
 		path.BinType = models.GEO2DSphereSIDataType
-	case 'B':
+	case sindexBinTypeBlob:
 		path.BinType = models.BlobSIDataType
 	default:
 		return nil, fmt.Errorf("invalid sindex path type %c", b)
@@ -510,15 +505,6 @@ func (r *Decoder) readUDF() (*models.UDF, error) {
 	return &res, nil
 }
 
-type KeyType = byte
-
-const (
-	KeyTypeInteger KeyType = 'I'
-	KeyTypeFloat   KeyType = 'D'
-	KeyTypeString  KeyType = 'S'
-	KeyTypeBlob    KeyType = 'B'
-)
-
 type recordData struct {
 	userKey    any
 	namespace  string
@@ -529,7 +515,15 @@ type recordData struct {
 	binCount   uint16
 }
 
-var expectedRecordHeaderTypes = []byte{'k', 'n', 'd', 's', 'g', 't', 'b'}
+var expectedRecordHeaderTypes = []byte{
+	recordHeaderTypeKey,
+	recordHeaderTypeNamespace,
+	recordHeaderTypeDigest,
+	recordHeaderTypeSet,
+	recordHeaderTypeGen,
+	recordHeaderTypeExpiration,
+	recordHeaderTypeBinCount,
+}
 
 func (r *Decoder) readRecord() (*models.Record, error) {
 	var recData recordData
@@ -673,48 +667,48 @@ func (r *Decoder) readBins(count uint16) (a.BinMap, error) {
 }
 
 var bytesBinTypes = map[byte]struct{}{
-	'B': {},
-	'J': {},
-	'C': {},
-	'P': {},
-	'R': {},
-	'H': {},
-	'E': {},
-	'Y': {},
-	'M': {},
-	'L': {},
+	binTypeBytes:       {},
+	binTypeBytesJava:   {},
+	binTypeBytesCSharp: {},
+	binTypeBytesPython: {},
+	binTypeBytesRuby:   {},
+	binTypeBytesPHP:    {},
+	binTypeBytesErlang: {},
+	binTypeBytesHLL:    {},
+	binTypeBytesMap:    {},
+	binTypeBytesList:   {},
 }
 
 // these are types that are stored as msgPack encoded bytes
-var bytesToType = map[byte]struct{}{
-	'Y': {},
-	'M': {},
-	'L': {},
+var isMsgPackBytes = map[byte]struct{}{
+	binTypeBytesHLL:  {},
+	binTypeBytesMap:  {},
+	binTypeBytesList: {},
 }
 
 var binTypes = map[byte]struct{}{
 	// basic types
-	'N': {}, // nil
-	'Z': {}, // bool
-	'I': {}, // int64
-	'D': {}, // float64
-	'S': {}, // string
+	binTypeNil:    {},
+	binTypeBool:   {},
+	binTypeInt:    {},
+	binTypeFloat:  {},
+	binTypeString: {},
 	// bytes types
-	'B': {}, // bytes
-	'J': {}, // java bytes
-	'C': {}, // c# bytes
-	'P': {}, // python bytes
-	'R': {}, // ruby bytes
-	'H': {}, // php bytes
-	'E': {}, // erlang bytes
+	binTypeBytes:       {},
+	binTypeBytesJava:   {},
+	binTypeBytesCSharp: {},
+	binTypeBytesPython: {},
+	binTypeBytesRuby:   {},
+	binTypeBytesPHP:    {},
+	binTypeBytesErlang: {},
 	// bytes but parsed as another type
-	'Y': {}, // HLL bytes
-	'M': {}, // map bytes
-	'L': {}, // list bytes
+	binTypeBytesHLL:  {},
+	binTypeBytesMap:  {},
+	binTypeBytesList: {},
 	// end bytes types
-	'U': {}, // LDT
-	'X': {}, // base64 encoded string
-	'G': {}, // geojson
+	binTypeLDT:          {},
+	binTypeStringBase64: {},
+	binTypeGeoJSON:      {},
 }
 
 func (r *Decoder) readBin(bins a.BinMap) error {
@@ -760,8 +754,8 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		binErr error
 	)
 
-	// 'N' is a special case where the line ends after the bin name
-	if binType == 'N' {
+	// binTypeNil is a special case where the line ends after the bin name
+	if binType == binTypeNil {
 		if err := _expectChar(r, '\n'); err != nil {
 			return err
 		}
@@ -776,17 +770,17 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 	}
 
 	switch binType {
-	case 'Z':
+	case binTypeBool:
 		binVal, binErr = _readBool(r)
-	case 'I':
+	case binTypeInt:
 		binVal, binErr = _readInteger(r, '\n')
-	case 'D':
+	case binTypeFloat:
 		binVal, binErr = _readFloat(r, '\n')
-	case 'S':
+	case binTypeString:
 		binVal, binErr = _readStringSized(r, ' ')
-	case 'U':
+	case binTypeLDT:
 		return errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
-	case 'X':
+	case binTypeStringBase64:
 		val, err := _readBase64BytesSized(r, ' ')
 		if err != nil {
 			return err
@@ -807,7 +801,7 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		}
 
 		// bytes special cases
-		if _, ok := bytesToType[binType]; ok {
+		if _, ok := isMsgPackBytes[binType]; ok {
 			switch binType {
 			case 'Y':
 				// HLLs are treated as bytes by the client so no decode is needed
@@ -848,11 +842,11 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 }
 
 var asbKeyTypes = map[byte]struct{}{
-	'I': {}, // int64
-	'D': {}, // float64
-	'S': {}, // string
-	'X': {}, // base64 encoded string
-	'B': {}, // bytes
+	keyTypeInt:          {}, // int64
+	keyTypeFloat:        {}, // float64
+	keyTypeString:       {}, // string
+	keyTypeStringBase64: {}, // base64 encoded string
+	keyTypeBytes:        {}, // bytes
 }
 
 // readUserKey reads a record key line from the asb file
@@ -892,7 +886,7 @@ func (r *Decoder) readUserKey() (any, error) {
 	}
 
 	switch keyTypeChar {
-	case 'I':
+	case keyTypeInt:
 		keyVal, err := _readInteger(r, '\n')
 		if err != nil {
 			return nil, err
@@ -900,7 +894,7 @@ func (r *Decoder) readUserKey() (any, error) {
 
 		res = keyVal
 
-	case 'D':
+	case keyTypeFloat:
 		keyVal, err := _readFloat(r, '\n')
 		if err != nil {
 			return nil, err
@@ -908,7 +902,7 @@ func (r *Decoder) readUserKey() (any, error) {
 
 		res = keyVal
 
-	case 'S':
+	case keyTypeString:
 		keyVal, err := _readStringSized(r, ' ')
 		if err != nil {
 			return nil, err
@@ -916,7 +910,7 @@ func (r *Decoder) readUserKey() (any, error) {
 
 		res = keyVal
 
-	case 'X':
+	case keyTypeStringBase64:
 		keyVal, err := _readBase64BytesSized(r, ' ')
 		if err != nil {
 			return nil, err
@@ -924,7 +918,7 @@ func (r *Decoder) readUserKey() (any, error) {
 
 		res = string(keyVal)
 
-	case 'B':
+	case keyTypeBytes:
 		var keyVal []byte
 		if base64Encoded {
 			keyVal, err = _readBase64BytesSized(r, ' ')

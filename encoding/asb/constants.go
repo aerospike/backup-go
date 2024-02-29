@@ -52,6 +52,70 @@ const (
 	lineTypeFirst        = "first"
 )
 
+// global line types
+const (
+	globalTypeSIndex byte = 'i'
+	globalTypeUDF    byte = 'u'
+)
+
+// key types
+const (
+	keyTypeInt          byte = 'I'
+	keyTypeFloat        byte = 'D'
+	keyTypeString       byte = 'S'
+	keyTypeStringBase64 byte = 'X'
+	keyTypeBytes        byte = 'B'
+)
+
+// record header types
+const (
+	recordHeaderTypeKey        byte = 'k'
+	recordHeaderTypeNamespace  byte = 'n'
+	recordHeaderTypeDigest     byte = 'd'
+	recordHeaderTypeSet        byte = 's'
+	recordHeaderTypeGen        byte = 'g'
+	recordHeaderTypeExpiration byte = 't'
+	recordHeaderTypeBinCount   byte = 'b'
+)
+
+// bin types
+const (
+	binTypeNil          byte = 'N'
+	binTypeBool         byte = 'Z'
+	binTypeInt          byte = 'I'
+	binTypeFloat        byte = 'D'
+	binTypeString       byte = 'S'
+	binTypeBytes        byte = 'B'
+	binTypeBytesJava    byte = 'J'
+	binTypeBytesCSharp  byte = 'C'
+	binTypeBytesPython  byte = 'P'
+	binTypeBytesRuby    byte = 'R'
+	binTypeBytesPHP     byte = 'H'
+	binTypeBytesErlang  byte = 'E'
+	binTypeBytesHLL     byte = 'Y'
+	binTypeBytesMap     byte = 'M'
+	binTypeBytesList    byte = 'L'
+	binTypeLDT          byte = 'U'
+	binTypeStringBase64 byte = 'X'
+	binTypeGeoJSON      byte = 'G'
+)
+
+// sindex types
+const (
+	sindexTypeBin    byte = 'N'
+	sindexTypeList   byte = 'L'
+	sindexTypeMapKey byte = 'K'
+	sindexTypeMapVal byte = 'V'
+)
+
+// sindex bin types
+const (
+	sindexBinTypeString  byte = 'S'
+	sindexBinTypeNumeric byte = 'N'
+	sindexBinTypeGEO2D   byte = 'G'
+	sindexBinTypeBlob    byte = 'B'
+)
+
 // literal asb tokens
 const (
 	tokenNamespace  = "namespace"

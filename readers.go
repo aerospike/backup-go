@@ -174,8 +174,7 @@ func (j *aerospikeRecordReader) Read() (*models.Token, error) {
 	if !j.status.started {
 		var err error
 
-		j.recResChan, err = startScan(j)
-
+		err = j.startScan()
 		if err != nil {
 			return nil, err
 		}
@@ -209,27 +208,29 @@ func (j *aerospikeRecordReader) Close() {
 	}
 }
 
-func startScan(j *aerospikeRecordReader) (<-chan *a.Result, error) {
-	j.recResChan = make(chan *a.Result)
+// startScan starts the scan for aerospikeRecordReader
+func (arr *aerospikeRecordReader) startScan() error {
+	arr.recResChan = make(chan *a.Result)
 
-	j.status.partitionFilter = a.NewPartitionFilterByRange(
-		j.config.FirstPartition,
-		j.config.NumPartitions,
+	arr.status.partitionFilter = a.NewPartitionFilterByRange(
+		arr.config.FirstPartition,
+		arr.config.NumPartitions,
 	)
 
-	recSet, err := j.client.ScanPartitions(
-		j.scanPolicy,
-		j.status.partitionFilter,
-		j.config.Namespace,
-		j.config.Set,
+	recSet, err := arr.client.ScanPartitions(
+		arr.scanPolicy,
+		arr.status.partitionFilter,
+		arr.config.Namespace,
+		arr.config.Set,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	j.recSet = recSet
+	arr.recSet = recSet
+	arr.recResChan = recSet.Results()
 
-	return recSet.Results(), nil
+	return nil
 }
 
 // **** Aerospike SIndex Reader ****

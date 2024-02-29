@@ -108,7 +108,7 @@ func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.R
 // run runs the restore job
 // currently this should only be run once
 func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
-	rrh.errors = make(chan error)
+	rrh.errors = make(chan error, 1)
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here

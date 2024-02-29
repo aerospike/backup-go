@@ -117,7 +117,7 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *
 // run runs the backup job
 // currently this should only be run once
 func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
-	bwh.errors = make(chan error)
+	bwh.errors = make(chan error, 1)
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here

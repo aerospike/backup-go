@@ -14,8 +14,24 @@
 
 package backuplib
 
+import (
+	"fmt"
+	"runtime/debug"
+)
+
 func handlePanic(errors chan<- error) {
 	if r := recover(); r != nil {
-		errors <- r.(error)
+		var err error
+
+		panicMsg := "a backuplib operation has panicked:"
+		if _, ok := r.(error); ok {
+			err = fmt.Errorf(panicMsg+" caused by this error: \"%w\"\n", r.(error))
+		} else {
+			err = fmt.Errorf(panicMsg+" caused by: \"%v\"\n", r)
+		}
+
+		err = fmt.Errorf("%w, with stacktrace: \"%s\"", err, debug.Stack())
+
+		errors <- err
 	}
 }

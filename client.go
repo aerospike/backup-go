@@ -74,10 +74,6 @@ func NewClient(ac *a.Client, config *Config) (*Client, error) {
 
 func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 	if p == nil {
-		p = c.config.InfoPolicy
-	}
-
-	if p == nil {
 		p = c.aerospikeClient.DefaultInfoPolicy
 	}
 
@@ -86,10 +82,6 @@ func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 
 func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
 	if p == nil {
-		p = c.config.WritePolicy
-	}
-
-	if p == nil {
 		p = c.aerospikeClient.DefaultWritePolicy
 	}
 
@@ -97,10 +89,6 @@ func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
 }
 
 func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
-	if p == nil {
-		p = c.config.ScanPolicy
-	}
-
 	if p == nil {
 		p = c.aerospikeClient.DefaultScanPolicy
 	}

@@ -37,19 +37,7 @@ var (
 // **** Client ****
 
 // Config contains configuration for the backup client
-// Policies defined here will be used as defaults for any
-// backup and restore operations started by the client
-type Config struct {
-	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
-	InfoPolicy *a.InfoPolicy
-	// WritePolicy applies to Aerospike write operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
-	WritePolicy *a.WritePolicy
-	// ScanPolicy applies to Aerospike scan operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
-	ScanPolicy *a.ScanPolicy
-}
+type Config struct{}
 
 // NewConfig returns a new client Config
 func NewConfig() *Config {
@@ -64,12 +52,21 @@ type EncoderFactory interface {
 
 // BackupBaseConfig contains shared configuration for backup operations
 type BackupBaseConfig struct {
+	// EncoderFactory is used to specify the encoder with which to encode the backup data
+	// if nil, the default encoder factory will be used
 	EncoderFactory EncoderFactory
-	InfoPolicy     *a.InfoPolicy
-	ScanPolicy     *a.ScanPolicy
-	Namespace      string
-	Set            string
-	Parallel       int
+	// InfoPolicy applies to Aerospike Info requests made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	InfoPolicy *a.InfoPolicy
+	// ScanPolicy applies to Aerospike scan operations made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	ScanPolicy *a.ScanPolicy
+	// Namespace is the Aerospike namespace to backup.
+	Namespace string
+	// Set is the Aerospike set to backup.
+	Set string
+	// parallel is the number of concurrent scans to run against the Aerospike cluster.
+	Parallel int
 }
 
 func (c *BackupBaseConfig) validate() error {
@@ -118,10 +115,17 @@ type DecoderFactory interface {
 
 // RestoreBaseConfig contains shared configuration for restore operations
 type RestoreBaseConfig struct {
+	// DecoderFactory is used to specify the decoder with which to decode the backup data
+	// if nil, the default decoder factory will be used
 	DecoderFactory DecoderFactory
-	InfoPolicy     *a.InfoPolicy
-	WritePolicy    *a.WritePolicy
-	Parallel       int
+	// InfoPolicy applies to Aerospike Info requests made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	InfoPolicy *a.InfoPolicy
+	// WritePolicy applies to Aerospike write operations made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	WritePolicy *a.WritePolicy
+	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.
+	Parallel int
 }
 
 func (c *RestoreBaseConfig) validate() error {

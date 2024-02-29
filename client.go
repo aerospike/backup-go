@@ -17,10 +17,32 @@ package backuplib
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-tools-backup-lib/encoding"
 )
+
+const (
+	minParallel = 1
+	maxParallel = 1024
+)
+
+var (
+	defaultEncoderFactory = encoding.NewASBEncoderFactory()
+	defaultDecoderFactory = encoding.NewASBDecoderFactory()
+)
+
+// **** Client ****
+
+// Config contains configuration for the backup client
+type Config struct{}
+
+// NewConfig returns a new client Config
+func NewConfig() *Config {
+	return &Config{}
+}
 
 // Client is the main entry point for the backuplib package
 // It wraps an aerospike client and provides methods to start backup and restore operations
@@ -28,27 +50,27 @@ import (
 // If the Policies field is nil, the aerospike client's default policies will be used
 // These policies will be used as defaults for any backup and restore operations started by the client
 // Example usage:
-// 	asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
-// 	if aerr != nil {
-// 		// handle error
-// 	}
-// 	backupCFG := backuplib.NewConfig()	// create a backuplib config
-// 	backupClient, err := backuplib.NewClient(asc, backupCFG)	// create a backuplib client
-// 	if err != nil {
-// 		// handle error
-// 	}
-// 	// use the backup client to start backup and restore operations
-//  ctx := context.Background()
-// 	backupHandler, err := backupClient.Backup(ctx, writers, nil)
-// 	if err != nil {
-// 		// handle error
-//  }
-//  // optionally, check the stats of the backup operation
-// 	stats := backupHandler.Stats()
-// 	// use the backupHandler to wait for the backup operation to finish
-//  ctx := context.Background()
-// 	// err = backupHandler.Wait(ctx)
-
+//
+//		asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
+//		if aerr != nil {
+//			// handle error
+//		}
+//		backupCFG := backuplib.NewConfig()	// create a backuplib config
+//		backupClient, err := backuplib.NewClient(asc, backupCFG)	// create a backuplib client
+//		if err != nil {
+//			// handle error
+//		}
+//		// use the backup client to start backup and restore operations
+//	 ctx := context.Background()
+//		backupHandler, err := backupClient.Backup(ctx, writers, nil)
+//		if err != nil {
+//			// handle error
+//	 }
+//	 // optionally, check the stats of the backup operation
+//		stats := backupHandler.Stats()
+//		// use the backupHandler to wait for the backup operation to finish
+//	 ctx := context.Background()
+//		// err = backupHandler.Wait(ctx)
 type Client struct {
 	aerospikeClient *a.Client
 	config          *Config
@@ -96,6 +118,51 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	return p
 }
 
+// **** Backup ****
+
+// EncoderFactory is used to specify the encoder with which to encode the backup data
+// if nil, the default encoder factory will be used
+type EncoderFactory interface {
+	CreateEncoder() (encoding.Encoder, error)
+}
+
+// BackupConfig contains configuration for the backup operation
+type BackupConfig struct {
+	// EncoderFactory is used to specify the encoder with which to encode the backup data
+	// if nil, the default encoder factory will be used
+	EncoderFactory EncoderFactory
+	// InfoPolicy applies to Aerospike Info requests made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	InfoPolicy *a.InfoPolicy
+	// ScanPolicy applies to Aerospike scan operations made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	ScanPolicy *a.ScanPolicy
+	// Namespace is the Aerospike namespace to backup.
+	Namespace string
+	// Set is the Aerospike set to backup.
+	Set string
+	// parallel is the number of concurrent scans to run against the Aerospike cluster.
+	Parallel int
+}
+
+func (c *BackupConfig) validate() error {
+	if c.Parallel < minParallel || c.Parallel > maxParallel {
+		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
+	}
+
+	return nil
+}
+
+// NewBackupConfig returns a new BackupConfig with default values
+func NewBackupConfig() *BackupConfig {
+	return &BackupConfig{
+		Parallel:       1,
+		Set:            "",
+		Namespace:      "test",
+		EncoderFactory: defaultEncoderFactory,
+	}
+}
+
 // Backup starts a backup operation to a set of io.writers
 // ctx can be used to cancel the backup operation
 // writers is a set of io.writers to write the backup data to
@@ -116,6 +183,45 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 	handler.run(ctx, writers)
 
 	return handler, nil
+}
+
+// **** Restore ****
+
+// DecoderFactory is used to specify the decoder with which to decode the backup data
+// if nil, the default decoder factory will be used
+type DecoderFactory interface {
+	CreateDecoder(src io.Reader) (encoding.Decoder, error)
+}
+
+// RestoreConfig contains configuration for the restore operation
+type RestoreConfig struct {
+	// DecoderFactory is used to specify the decoder with which to decode the backup data
+	// if nil, the default decoder factory will be used
+	DecoderFactory DecoderFactory
+	// InfoPolicy applies to Aerospike Info requests made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	InfoPolicy *a.InfoPolicy
+	// WritePolicy applies to Aerospike write operations made during backup and restore
+	// If nil, the Aerospike client's default policy will be used
+	WritePolicy *a.WritePolicy
+	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.
+	Parallel int
+}
+
+func (c *RestoreConfig) validate() error {
+	if c.Parallel < minParallel || c.Parallel > maxParallel {
+		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
+	}
+
+	return nil
+}
+
+// NewRestoreConfig returns a new RestoreConfig with default values
+func NewRestoreConfig() *RestoreConfig {
+	return &RestoreConfig{
+		Parallel:       4,
+		DecoderFactory: defaultDecoderFactory,
+	}
 }
 
 // Restore starts a restore operation from a set of io.readers

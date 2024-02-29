@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	enc_mocks "github.com/aerospike/aerospike-tools-backup-lib/encoding/mocks"
 	"github.com/aerospike/aerospike-tools-backup-lib/mocks"
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
@@ -113,7 +114,7 @@ func (suite *writersTestSuite) TestGenericWriter() {
 
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-	mockEncoder := mocks.NewEncoder(suite.T())
+	mockEncoder := enc_mocks.NewEncoder(suite.T())
 	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("rec,"), nil)
 	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("si,"), nil)
 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("udf"), nil)

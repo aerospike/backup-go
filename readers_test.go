@@ -24,6 +24,7 @@ import (
 	"time"
 	"unsafe"
 
+	enc_mocks "github.com/aerospike/aerospike-tools-backup-lib/encoding/mocks"
 	"github.com/aerospike/aerospike-tools-backup-lib/mocks"
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
@@ -105,7 +106,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	}
 	expectedRecToken := models.NewRecordToken(mockRec)
 
-	mockDecoder := mocks.NewDecoder(suite.T())
+	mockDecoder := enc_mocks.NewDecoder(suite.T())
 	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
 
 	reader := newGenericReader(mockDecoder)

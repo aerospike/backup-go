@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	PARTITIONS = 4096
+	partitions = 4096
 )
 
 // **** Base Backup Handler ****
@@ -55,8 +55,8 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
 	for i := 0; i < bh.config.Parallel; i++ {
-		begin := (i * PARTITIONS) / bh.config.Parallel
-		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
+		begin := (i * partitions) / bh.config.Parallel
+		count := partitions / bh.config.Parallel // TODO verify no off by 1 error
 
 		ARRCFG := arrConfig{
 			Namespace:      bh.namespace,

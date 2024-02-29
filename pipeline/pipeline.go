@@ -31,18 +31,20 @@ type Worker[T any] interface {
 	Run(context.Context) error
 }
 
-// Pipeline is a generic pipeline for reading, processing, and writing data.
-// Pipelines are created with slices of Readers, Processors, and Writers.
-// The Run method starts the pipeline.
-// Each reader, writer, and processor runs in its own goroutine.
-// Each type of stage (read, process, write) is connected by a single channel.
+// Pipeline runs a series of workers in parallel.
+// All workers run at the same time in separate goroutines.
+// Each stage of workers are connected by a single channel that is
+// the size of the number of workers in the stage.
+// The pipeline stops when a worker returns an error or all workers are done.
+// workers should not close the send channel, the pipeline stages handle that.
+// Pipelines can be chained together by using them as workers.
 type Pipeline[T any] struct {
 	receive <-chan T
 	send    chan<- T
 	stages  []*stage[T]
 }
 
-// NewPipeline creates a new DataPipeline
+// NewPipeline creates a new DataPipeline.
 func NewPipeline[T any](workGroups ...[]Worker[T]) *Pipeline[T] {
 	stages := make([]*stage[T], len(workGroups))
 
@@ -55,25 +57,25 @@ func NewPipeline[T any](workGroups ...[]Worker[T]) *Pipeline[T] {
 	}
 }
 
-// SetReceiveChan sets the receive channel for the pipeline
-// The receive channel is used as the input to the first stage
-// This satisfies the Worker interface so that pipelines can be chained together
-// Usually users will not need to call this method
+// SetReceiveChan sets the receive channel for the pipeline.
+// The receive channel is used as the input to the first stage.
+// This satisfies the Worker interface so that pipelines can be chained together.
+// Usually users will not need to call this method.
 func (dp *Pipeline[T]) SetReceiveChan(c <-chan T) {
 	dp.receive = c
 }
 
-// SetSendChan sets the send channel for the pipeline
-// The send channel is used as the output from the last stage
-// This satisfies the Worker interface so that pipelines can be chained together
-// Usually users will not need to call this method
+// SetSendChan sets the send channel for the pipeline.
+// The send channel is used as the output from the last stage.
+// This satisfies the Worker interface so that pipelines can be chained together.
+// Usually users will not need to call this method.
 func (dp *Pipeline[T]) SetSendChan(c chan<- T) {
 	dp.send = c
 }
 
-// Run starts the pipeline
+// Run starts the pipeline.
 // The pipeline stops when a worker returns an error,
-// all workers are done, or the context is canceled
+// all workers are done, or the context is canceled.
 func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	if len(dp.stages) == 0 {
 		return nil

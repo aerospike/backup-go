@@ -19,6 +19,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/aerospike/aerospike-tools-backup-lib/encoding"
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -86,11 +87,11 @@ func (w *readWorker[T]) Run(ctx context.Context) error {
 // genericReader satisfies the DataReader interface
 // It reads data as tokens using a Decoder
 type genericReader struct {
-	decoder Decoder
+	decoder encoding.Decoder
 }
 
 // newGenericReader creates a new GenericReader
-func newGenericReader(decoder Decoder) *genericReader {
+func newGenericReader(decoder encoding.Decoder) *genericReader {
 	return &genericReader{
 		decoder: decoder,
 	}

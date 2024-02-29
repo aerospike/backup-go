@@ -22,6 +22,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/aerospike/aerospike-tools-backup-lib/encoding"
 	"github.com/aerospike/aerospike-tools-backup-lib/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -88,12 +89,12 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
 type genericWriter struct {
-	encoder Encoder
+	encoder encoding.Encoder
 	output  io.Writer
 }
 
 // newGenericWriter creates a new GenericWriter
-func newGenericWriter(encoder Encoder, output io.Writer) *genericWriter {
+func newGenericWriter(encoder encoding.Encoder, output io.Writer) *genericWriter {
 	return &genericWriter{
 		encoder: encoder,
 		output:  output,
@@ -130,7 +131,7 @@ func (w *genericWriter) Close() {}
 //
 //go:generate mockery --name asbEncoder
 type asbEncoder interface {
-	Encoder
+	encoding.Encoder
 	GetVersionText() []byte
 	GetNamespaceMetaText(namespace string) []byte
 	GetFirstMetaText() []byte

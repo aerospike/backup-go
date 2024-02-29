@@ -19,6 +19,7 @@ import (
 	"io"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-tools-backup-lib/encoding"
 )
 
 const (
@@ -27,8 +28,8 @@ const (
 )
 
 var (
-	defaultEncoderFactory = NewASBEncoderFactory()
-	defaultDecoderFactory = NewASBDecoderFactory()
+	defaultEncoderFactory = encoding.NewASBEncoderFactory()
+	defaultDecoderFactory = encoding.NewASBDecoderFactory()
 )
 
 // **** Policies ****
@@ -58,7 +59,7 @@ func NewConfig() *Config {
 // **** Backup ****
 
 type EncoderFactory interface {
-	CreateEncoder() (Encoder, error)
+	CreateEncoder() (encoding.Encoder, error)
 }
 
 // BackupBaseConfig contains shared configuration for backup operations
@@ -112,7 +113,7 @@ func NewBackupConfig() *BackupConfig {
 // **** Restore ****
 
 type DecoderFactory interface {
-	CreateDecoder(src io.Reader) (Decoder, error)
+	CreateDecoder(src io.Reader) (encoding.Decoder, error)
 }
 
 // RestoreBaseConfig contains shared configuration for restore operations

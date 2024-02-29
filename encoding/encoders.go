@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backuplib
+package encoding
 
 import (
 	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"

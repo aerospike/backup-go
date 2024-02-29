@@ -16,8 +16,6 @@ package backuplib
 
 import (
 	"context"
-
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
 )
 
 // **** Processor Worker ****
@@ -77,20 +75,4 @@ func (w *processorWorker[T]) Run(ctx context.Context) error {
 			}
 		}
 	}
-}
-
-// **** NoOp Processor ****
-
-// noOpProcessor satisfies the DataProcessor interface
-// It does nothing to the data
-type noOpProcessor struct{}
-
-// newNoOpProcessor creates a new NOOPProcessor
-func newNoOpProcessor() *noOpProcessor {
-	return &noOpProcessor{}
-}
-
-// Process processes the data
-func (p *noOpProcessor) Process(data *models.Token) (*models.Token, error) {
-	return data, nil
 }

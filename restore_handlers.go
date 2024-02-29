@@ -55,13 +55,6 @@ func newRestoreHandlerBase(config *RestoreBaseConfig, ac DBRestoreClient, w work
 
 // run runs the restore job
 func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*models.Token]) error {
-	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
-
-	for i := 0; i < rh.config.Parallel; i++ {
-		processor := newNoOpProcessor()
-		processorWorkers[i] = newProcessorWorker(processor)
-	}
-
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
@@ -79,7 +72,6 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 	job := pipeline.NewPipeline(
 		readWorkers,
-		processorWorkers,
 		writeWorkers,
 	)
 

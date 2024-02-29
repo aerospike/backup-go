@@ -74,13 +74,6 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		readWorkers[i] = newReadWorker(recordReader)
 	}
 
-	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
-
-	for i := 0; i < bh.config.Parallel; i++ {
-		processor := newNoOpProcessor()
-		processorWorkers[i] = newProcessorWorker(processor)
-	}
-
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
 
 	for i, w := range writers {
@@ -89,7 +82,6 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
-		processorWorkers,
 		writeWorkers,
 	)
 

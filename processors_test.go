@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/aerospike/aerospike-tools-backup-lib/mocks"
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -167,19 +166,6 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 	ctx := context.Background()
 	err := worker.Run(ctx)
 	suite.NotNil(err)
-}
-
-func (suite *proccessorTestSuite) TestNOOPProcessor() {
-	noop := newNoOpProcessor()
-	suite.NotNil(noop)
-
-	data := &models.Token{
-		Type:   models.TokenTypeRecord,
-		Record: &models.Record{},
-	}
-	processed, err := noop.Process(data)
-	suite.Nil(err)
-	suite.Equal(data, processed)
 }
 
 func TestProcessors(t *testing.T) {

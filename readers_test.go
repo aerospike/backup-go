@@ -46,7 +46,7 @@ func (suite *readersTestSuite) TestReadWorker() {
 		}
 		return "", io.EOF
 	})
-	mockReader.EXPECT().Cancel()
+	mockReader.EXPECT().Close()
 
 	worker := newReadWorker[string](mockReader)
 	suite.NotNil(worker)
@@ -66,10 +66,10 @@ func (suite *readersTestSuite) TestReadWorker() {
 	}
 }
 
-func (suite *readersTestSuite) TestReadWorkerCancel() {
+func (suite *readersTestSuite) TestReadWorkerClose() {
 	mockReader := mocks.NewDataReader[string](suite.T())
 	mockReader.EXPECT().Read().Return("hi", nil)
-	mockReader.EXPECT().Cancel()
+	mockReader.EXPECT().Close()
 
 	worker := newReadWorker[string](mockReader)
 	suite.NotNil(worker)
@@ -115,7 +115,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	suite.Nil(err)
 	suite.Equal(expectedRecToken, v)
 
-	reader.Cancel()
+	reader.Close()
 
 	mockDecoder.AssertExpectations(suite.T())
 }
@@ -286,7 +286,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		},
 	}
 
-	reader.Cancel()
+	reader.Close()
 	suite.False(reader.status.started)
 }
 
@@ -381,7 +381,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	suite.Equal(err, io.EOF)
 	suite.Nil(v)
 
-	reader.Cancel()
+	reader.Close()
 
 	mockSIndexGetter.AssertExpectations(suite.T())
 

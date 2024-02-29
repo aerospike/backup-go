@@ -34,7 +34,7 @@ type writersTestSuite struct {
 func (suite *writersTestSuite) TestWriteWorker() {
 	mockWriter := mocks.NewDataWriter[string](suite.T())
 	mockWriter.EXPECT().Write("test").Return(nil)
-	mockWriter.EXPECT().Cancel()
+	mockWriter.EXPECT().Close()
 
 	worker := newWriteWorker(mockWriter)
 	suite.NotNil(worker)
@@ -50,9 +50,9 @@ func (suite *writersTestSuite) TestWriteWorker() {
 	suite.Nil(err)
 }
 
-func (suite *writersTestSuite) TestWriteWorkerCancel() {
+func (suite *writersTestSuite) TestWriteWorkerClose() {
 	mockWriter := mocks.NewDataWriter[string](suite.T())
-	mockWriter.EXPECT().Cancel()
+	mockWriter.EXPECT().Close()
 
 	worker := newWriteWorker(mockWriter)
 	suite.NotNil(worker)
@@ -67,7 +67,7 @@ func (suite *writersTestSuite) TestWriteWorkerCancel() {
 func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
 	mockWriter := mocks.NewDataWriter[string](suite.T())
 	mockWriter.EXPECT().Write("test").Return(errors.New("error"))
-	mockWriter.EXPECT().Cancel()
+	mockWriter.EXPECT().Close()
 
 	worker := newWriteWorker(mockWriter)
 	suite.NotNil(worker)
@@ -140,7 +140,7 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	suite.NotNil(err)
 	suite.Equal("rec,si,udf", output.String())
 
-	writer.Cancel()
+	writer.Close()
 
 	mockEncoder.AssertExpectations(suite.T())
 
@@ -213,7 +213,7 @@ func (suite *writersTestSuite) TestASBWriter() {
 	suite.Nil(err)
 	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,udf", output.String())
 
-	writer.Cancel()
+	writer.Close()
 
 	mockEncoder.AssertExpectations(suite.T())
 
@@ -256,7 +256,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	err := writer.Write(recToken)
 	suite.Nil(err)
 
-	writer.Cancel()
+	writer.Close()
 
 	mockDBWriter.AssertExpectations(suite.T())
 
@@ -300,7 +300,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	err := writer.Write(recToken)
 	suite.Nil(err)
 
-	writer.Cancel()
+	writer.Close()
 }
 
 func TestWriters(t *testing.T) {

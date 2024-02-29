@@ -31,7 +31,7 @@ import (
 //go:generate mockery --name dataReader
 type dataReader[T any] interface {
 	Read() (T, error)
-	Cancel()
+	Close()
 }
 
 // readWorker implements the pipeline.Worker interface
@@ -61,7 +61,7 @@ func (w *readWorker[T]) SetSendChan(c chan<- T) {
 
 // Run runs the ReadWorker
 func (w *readWorker[T]) Run(ctx context.Context) error {
-	defer w.reader.Cancel()
+	defer w.reader.Close()
 
 	for {
 		data, err := w.reader.Read()
@@ -119,7 +119,7 @@ func (dr *genericReader) Read() (*models.Token, error) {
 
 // Cancel satisfies the DataReader interface
 // but is a no-op for the GenericReader
-func (dr *genericReader) Cancel() {}
+func (dr *genericReader) Close() {}
 
 // **** Aerospike DB Reader ****
 
@@ -200,7 +200,7 @@ func (j *aerospikeRecordReader) Read() (*models.Token, error) {
 
 // Cancel cancels the Aerospike scan used to read records
 // if it was started
-func (j *aerospikeRecordReader) Cancel() {
+func (j *aerospikeRecordReader) Close() {
 	j.status.started = false
 	if j.recSet != nil {
 		// ignore this error, it only happens if the scan is already closed
@@ -282,4 +282,4 @@ func (r *sindexReader) Read() (*models.Token, error) {
 
 // Cancel satisfies the DataReader interface
 // but is a no-op for the SIndexReader
-func (r *sindexReader) Cancel() {}
+func (r *sindexReader) Close() {}

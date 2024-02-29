@@ -34,7 +34,7 @@ import (
 //go:generate mockery --name dataWriter
 type dataWriter[T any] interface {
 	Write(T) error
-	Cancel()
+	Close()
 }
 
 // writeWorker implements the pipeline.Worker interface
@@ -64,7 +64,7 @@ func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
 
 // Run runs the WriteWorker
 func (w *writeWorker[T]) Run(ctx context.Context) error {
-	defer w.writer.Cancel()
+	defer w.writer.Close()
 
 	for {
 		select {
@@ -121,7 +121,7 @@ func (w *genericWriter) Write(v *models.Token) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the GenericWriter
-func (w *genericWriter) Cancel() {}
+func (w *genericWriter) Close() {}
 
 // **** Aerospike Backup Writer ****
 
@@ -274,4 +274,4 @@ func (rw *restoreWriter) writeUDF(_ *models.UDF) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter
-func (rw *restoreWriter) Cancel() {}
+func (rw *restoreWriter) Close() {}

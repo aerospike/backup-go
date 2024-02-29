@@ -165,7 +165,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	}
 	expectedRecs := genRecords(namespace, set, numRec, bins)
 
-	err := suite.testClient.WriteRecords(namespace, set, expectedRecs)
+	err := suite.testClient.WriteRecords(expectedRecs)
 	if err != nil {
 		panic(err)
 	}
@@ -255,7 +255,8 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 		case string:
 			userKey = k + fmt.Sprint(i)
 		case []byte:
-			userKey = append(k, []byte(fmt.Sprint(i))...)
+			k = append(k, []byte(fmt.Sprint(i))...)
+			userKey = k
 		}
 		key, err := a.NewKey(namespace, set, userKey)
 		if err != nil {

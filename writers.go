@@ -58,14 +58,15 @@ func (w *writeWorker[T]) SetReceiveChan(c <-chan T) {
 
 // SetSendChan satisfies the pipeline.Worker interface
 // but is a no-op for the WriteWorker
-func (w *writeWorker[T]) SetSendChan(c chan<- T) {
+func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
 	// no-op
 }
 
 // Run runs the WriteWorker
 func (w *writeWorker[T]) Run(ctx context.Context) error {
+	defer w.writer.Cancel()
+
 	for {
-		defer w.writer.Cancel()
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -114,6 +115,7 @@ func (w *genericWriter) Write(v *models.Token) error {
 	}
 
 	_, err = w.output.Write(data)
+
 	return err
 }
 
@@ -140,9 +142,9 @@ type asbEncoder interface {
 type asbWriter struct {
 	genericWriter
 	encoder   asbEncoder
+	once      *sync.Once
 	namespace string
 	first     bool
-	once      *sync.Once
 }
 
 // newAsbWriter creates a new ASBWriter
@@ -166,9 +168,11 @@ func (w *asbWriter) Init(namespace string, first bool) error {
 		header := bytes.Buffer{}
 		header.Write(w.encoder.GetVersionText())
 		header.Write(w.encoder.GetNamespaceMetaText(namespace))
+
 		if first {
 			header.Write(w.encoder.GetFirstMetaText())
 		}
+
 		_, err = w.output.Write(header.Bytes())
 	})
 
@@ -212,16 +216,19 @@ func (rw *restoreWriter) Write(data *models.Token) error {
 		return rw.writeUDF(data.UDF)
 	case models.TokenTypeSIndex:
 		return rw.writeSecondaryIndex(data.SIndex)
+	case models.TokenTypeInvalid:
+		return errors.New("invalid token")
 	default:
-		return nil
+		return errors.New("unsupported token type")
 	}
 }
 
 // writeSecondaryIndex writes a secondary index to Aerospike
 // TODO check that this does not overwrite existing sindexes
 // TODO support write policy
-func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
-
+func (rw *restoreWriter) writeSecondaryIndex(_ *models.SIndex) error {
+	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
+	//nolint:gocritic // this code will be used to support SIndex backup
 	// var sindexType a.IndexType
 	// switch si.Path.BinType {
 	// case models.NumericSIDataType:
@@ -236,6 +243,7 @@ func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 	// 	return nil
 	// }
 
+	//nolint:gocritic // this code will be used to support SIndex backup
 	// binName := si.Path.BinName
 	// _, err := rw.asc.CreateIndex(nil, si.Namespace, si.Set, si.Name, binName, sindexType)
 
@@ -243,15 +251,14 @@ func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 	// case err.Matches(atypes.INDEX_FOUND):
 	// 	//TODO compare sindexes
 	// }
-
-	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
-}
+} //nolint:wsl // comments need to be kept and should not trigger whitespace warnings
 
 // writeUDF writes a UDF to Aerospike
 // TODO check that this does not overwrite existing UDFs
 // TODO support write policy
-func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
-
+func (rw *restoreWriter) writeUDF(_ *models.UDF) error {
+	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
+	//nolint:gocritic // this code will be used to support UDF backup
 	// var UDFLang a.Language
 	// switch udf.UDFType {
 	// case models.LUAUDFType:
@@ -260,11 +267,10 @@ func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
 	// 	return fmt.Errorf("invalid UDF language: %c", udf.UDFType)
 	// }
 
+	//nolint:gocritic // this code will be used to support UDF backup
 	// _, err := rw.asc.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)
 	// return err
-
-	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
-}
+} //nolint:wsl // comments need to be kept and should not trigger whitespace warnings
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter

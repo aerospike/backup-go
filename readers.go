@@ -50,7 +50,7 @@ func newReadWorker[T any](reader dataReader[T]) *readWorker[T] {
 
 // SetReceiveChan satisfies the pipeline.Worker interface
 // but is a no-op for the ReadWorker
-func (w *readWorker[T]) SetReceiveChan(c <-chan T) {
+func (w *readWorker[T]) SetReceiveChan(_ <-chan T) {
 	// no-op
 }
 
@@ -61,15 +61,18 @@ func (w *readWorker[T]) SetSendChan(c chan<- T) {
 
 // Run runs the ReadWorker
 func (w *readWorker[T]) Run(ctx context.Context) error {
+	defer w.reader.Cancel()
+
 	for {
-		defer w.reader.Cancel()
 		data, err := w.reader.Read()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return nil
 			}
+
 			return err
 		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -107,6 +110,8 @@ func (dr *genericReader) Read() (*models.Token, error) {
 		return models.NewUDFToken(data.UDF), nil
 	case models.TokenTypeSIndex:
 		return models.NewSIndexToken(data.SIndex), nil
+	case models.TokenTypeInvalid:
+		return nil, errors.New("invalid token")
 	default:
 		return nil, errors.New("unsupported token type")
 	}
@@ -143,12 +148,12 @@ type scanner interface {
 // aerospikeRecordReader satisfies the DataReader interface
 // It reads records from an Aerospike database and returns them as *models.Record
 type aerospikeRecordReader struct {
-	config     arrConfig
-	status     arrStatus
-	scanPolicy *a.ScanPolicy
 	client     scanner
+	scanPolicy *a.ScanPolicy
 	recResChan <-chan *a.Result
 	recSet     *a.Recordset
+	status     arrStatus
+	config     arrConfig
 }
 
 // newAerospikeRecordReader creates a new AerospikeRecordReader
@@ -168,10 +173,13 @@ func newAerospikeRecordReader(client scanner, cfg arrConfig, scanPolicy *a.ScanP
 func (j *aerospikeRecordReader) Read() (*models.Token, error) {
 	if !j.status.started {
 		var err error
+
 		j.recResChan, err = startScan(j)
+
 		if err != nil {
 			return nil, err
 		}
+
 		j.status.started = true
 	}
 
@@ -179,11 +187,12 @@ func (j *aerospikeRecordReader) Read() (*models.Token, error) {
 	if !active {
 		return nil, io.EOF
 	}
+
 	if res.Err != nil {
 		return nil, res.Err
 	}
 
-	rec := (*models.Record)(res.Record)
+	rec := res.Record
 	recToken := models.NewRecordToken(rec)
 
 	return recToken, nil
@@ -196,12 +205,11 @@ func (j *aerospikeRecordReader) Cancel() {
 	if j.recSet != nil {
 		// ignore this error, it only happens if the scan is already closed
 		// and this method can not return an error anyway
-		_ = j.recSet.Close() // nolint: errcheck
+		_ = j.recSet.Close()
 	}
 }
 
 func startScan(j *aerospikeRecordReader) (<-chan *a.Result, error) {
-
 	j.recResChan = make(chan *a.Result)
 
 	j.status.partitionFilter = a.NewPartitionFilterByRange(
@@ -237,8 +245,8 @@ type sindexGetter interface {
 // It reads secondary indexes from a SIndexGetter and returns them as *models.SecondaryIndex
 type sindexReader struct {
 	client    sindexGetter
-	namespace string
 	sindexes  chan *models.SIndex
+	namespace string
 }
 
 // newSIndexReader creates a new SIndexReader
@@ -257,6 +265,7 @@ func (r *sindexReader) Read() (*models.Token, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		r.sindexes = make(chan *models.SIndex, len(sindexes))
 		for _, sindex := range sindexes {
 			r.sindexes <- sindex

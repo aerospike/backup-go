@@ -63,22 +63,12 @@ type EncoderFactory interface {
 
 // BackupBaseConfig contains shared configuration for backup operations
 type BackupBaseConfig struct {
-	// Parallel is the number of parallel scans to run against the Aerospike cluster
-	// during a backup operation
-	Parallel int
-	// Namespace is the Aerospike namespace to backup
-	Namespace string
-	// Set is the Aerospike set to backup
-	Set string
-	// EncoderFactory is used to specify the encoder with which to encode the backup data
-	// If nil, the default encoder will be used
 	EncoderFactory EncoderFactory
-	// InfoPolicy applies to Aerospike Info requests made during backup
-	// If nil, the backup client's policy will be used, if that is nil, the aerospike client's default policy will be used
-	InfoPolicy *a.InfoPolicy
-	// ScanPolicy applies to Aerospike scan operations made during backup
-	// If nil, the backup client's policy will be used, if that is nil, the aerospike client's default policy will be used
-	ScanPolicy *a.ScanPolicy
+	InfoPolicy     *a.InfoPolicy
+	ScanPolicy     *a.ScanPolicy
+	Namespace      string
+	Set            string
+	Parallel       int
 }
 
 func (c *BackupBaseConfig) validate() error {
@@ -108,6 +98,7 @@ func (c *BackupConfig) validate() error {
 	if err := c.BackupBaseConfig.validate(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -126,24 +117,17 @@ type DecoderFactory interface {
 
 // RestoreBaseConfig contains shared configuration for restore operations
 type RestoreBaseConfig struct {
-	// Parallel is the number of parallel writers to run against the Aerospike cluster
-	// during a restore operation
-	Parallel int
-	// DecoderFactory is used to specify the decoder with which to decode backup data during restores
-	// If nil, the default decoder will be used
 	DecoderFactory DecoderFactory
-	// InfoPolicy applies to Aerospike Info requests made during restore
-	// If nil, the Aerospike client's default policy will be used, if that is nil, the aerospike client's default policy will be used
-	InfoPolicy *a.InfoPolicy
-	// WritePolicy applies to Aerospike write operations made during restore
-	// If nil, the Aerospike client's default policy will be used, if that is nil, the aerospike client's default policy will be used
-	WritePolicy *a.WritePolicy
+	InfoPolicy     *a.InfoPolicy
+	WritePolicy    *a.WritePolicy
+	Parallel       int
 }
 
 func (c *RestoreBaseConfig) validate() error {
 	if c.Parallel < minParallel || c.Parallel > maxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
+
 	return nil
 }
 
@@ -164,6 +148,7 @@ func (c *RestoreConfig) validate() error {
 	if err := c.RestoreBaseConfig.validate(); err != nil {
 		return err
 	}
+
 	return nil
 }
 

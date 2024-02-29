@@ -22,7 +22,6 @@ linters:
   enable:
     - bodyclose
     - unused
-    - depguard
     - dogsled
     - dupl
     - errcheck
@@ -60,9 +59,14 @@ run:
 # Test exclusion examples
 issues:
   exclude-rules:
+    - text: 'shadow: declaration of "(err|ctx)" shadows declaration at' # Allow idiomatic shadowing of err and ctx
+      linters: 
+      - govet
     - path: '(.+)test\.go'
       linters:
       - govet # Test code field alignment for sake of space is not a concern
       - dupl
+      - goconst # Many test cases are small and have repeated strings that don't need to be constants
+      - wsl # Test code should be allowed to cuddle if statements, generated tests do this
     - path: '(.+)test\.go'
       text: importShadow

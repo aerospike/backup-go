@@ -37,7 +37,7 @@ func NewTestClient(asc *a.Client) *TestClient {
 }
 
 // TODO allow passing in bins
-func (tc *TestClient) WriteRecords(namespace, set string, recs []*a.Record) error {
+func (tc *TestClient) WriteRecords(recs []*a.Record) error {
 	for _, rec := range recs {
 		err := tc.asc.Put(nil, rec.Key, rec.Bins)
 		if err != nil {
@@ -50,8 +50,8 @@ func (tc *TestClient) WriteRecords(namespace, set string, recs []*a.Record) erro
 
 func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 	records := make(RecordMap)
-
 	stmt := a.NewStatement(namespace, set)
+
 	rset, err := tc.asc.Query(nil, stmt)
 	if err != nil {
 		return nil, err
@@ -84,6 +84,7 @@ func (tc *TestClient) ValidateRecords(expectedRecs []*a.Record, expCount int, na
 		if !ok {
 			return errors.New("missing record")
 		}
+
 		if !reflect.DeepEqual(expRec.Bins, actual.Bins) {
 			return fmt.Errorf("wanted bins: %v\n got bins: %v", expRec.Bins, actual.Bins)
 		}

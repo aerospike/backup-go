@@ -37,9 +37,9 @@ type Worker[T any] interface {
 // Each reader, writer, and processor runs in its own goroutine.
 // Each type of stage (read, process, write) is connected by a single channel.
 type Pipeline[T any] struct {
-	stages  []*stage[T]
 	receive <-chan T
 	send    chan<- T
+	stages  []*stage[T]
 }
 
 // NewPipeline creates a new DataPipeline
@@ -47,7 +47,7 @@ func NewPipeline[T any](workGroups ...[]Worker[T]) *Pipeline[T] {
 	stages := make([]*stage[T], len(workGroups))
 
 	for i, workers := range workGroups {
-		stages[i] = NewStage(workers...)
+		stages[i] = newStage(workers...)
 	}
 
 	return &Pipeline[T]{
@@ -79,12 +79,13 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 		return nil
 	}
 
-	errors := make(chan error, len(dp.stages))
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	errors := make(chan error, len(dp.stages))
+
 	var lastSend chan T
+
 	for i, s := range dp.stages {
 		var (
 			send chan T
@@ -109,19 +110,22 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	wg := &sync.WaitGroup{}
 	for _, s := range dp.stages {
 		wg.Add(1)
+
 		go func(s *stage[T]) {
 			defer wg.Done()
+
 			err := s.Run(ctx)
 			if err != nil {
 				errors <- err
+
 				cancel()
 			}
 		}(s)
 	}
 
 	wg.Wait()
-
 	close(errors)
+
 	if len(errors) > 0 {
 		return <-errors
 	}
@@ -130,9 +134,9 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 }
 
 type stage[T any] struct {
-	workers []Worker[T]
 	receive <-chan T
 	send    chan<- T
+	workers []Worker[T]
 }
 
 func (s *stage[T]) SetReceiveChan(c <-chan T) {
@@ -143,7 +147,7 @@ func (s *stage[T]) SetSendChan(c chan<- T) {
 	s.send = c
 }
 
-func NewStage[T any](workers ...Worker[T]) *stage[T] {
+func newStage[T any](workers ...Worker[T]) *stage[T] {
 	s := stage[T]{
 		workers: workers,
 	}
@@ -169,22 +173,27 @@ func (s *stage[T]) Run(ctx context.Context) error {
 	wg := &sync.WaitGroup{}
 	for _, w := range s.workers {
 		wg.Add(1)
+
 		go func(w Worker[T]) {
 			defer wg.Done()
+
 			err := w.Run(ctx)
 			if err != nil {
 				errors <- err
+
 				cancel()
 			}
 		}(w)
 	}
 
 	wg.Wait()
+
 	if s.send != nil {
 		close(s.send)
 	}
 
 	close(errors)
+
 	if len(errors) > 0 {
 		return <-errors
 	}

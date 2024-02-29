@@ -55,14 +55,15 @@ func newRestoreHandlerBase(config *RestoreBaseConfig, ac DBRestoreClient, w work
 
 // run runs the restore job
 func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*models.Token]) error {
-
 	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+
 	for i := 0; i < rh.config.Parallel; i++ {
 		processor := newNoOpProcessor()
 		processorWorkers[i] = newProcessorWorker(processor)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+
 	for i := 0; i < rh.config.Parallel; i++ {
 		writer := newRestoreWriter(
 			rh.dbClient,
@@ -92,11 +93,11 @@ type RestoreStats struct{}
 
 // RestoreHandler handles a restore job from a set of io.readers
 type RestoreHandler struct {
+	restoreHandlerBase
 	stats   *RestoreStats
 	config  *RestoreConfig
-	readers []io.Reader
 	errors  chan error
-	restoreHandlerBase
+	readers []io.Reader
 }
 
 // newRestoreHandler creates a new RestoreHandler
@@ -118,7 +119,6 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 	rrh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
-
 		// NOTE: order is important here
 		// if we close the errChan before we handle the panic
 		// the panic will attempt to send on a closed channel
@@ -130,7 +130,6 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 		dataReaders := []*readWorker[*models.Token]{}
 
 		for i, reader := range readers {
-
 			decoder, err := rrh.config.DecoderFactory.CreateDecoder(reader)
 			if err != nil {
 				errChan <- err

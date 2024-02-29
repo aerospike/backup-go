@@ -41,6 +41,8 @@ func (o *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 		return o.EncodeUDF(token.UDF)
 	case models.TokenTypeSIndex:
 		return o.EncodeSIndex(token.SIndex)
+	case models.TokenTypeInvalid:
+		return nil, errors.New("invalid token")
 	default:
 		return nil, fmt.Errorf("invalid token type: %v", token.Type)
 	}
@@ -50,7 +52,7 @@ func (o *Encoder) EncodeRecord(rec *models.Record) ([]byte, error) {
 	return recordToASB(rec)
 }
 
-func (o *Encoder) EncodeUDF(udf *models.UDF) ([]byte, error) {
+func (o *Encoder) EncodeUDF(_ *models.UDF) ([]byte, error) {
 	return nil, fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }
 
@@ -86,6 +88,7 @@ func recordToASB(r *models.Record) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	data = append(data, keyText...)
 
 	generationText := fmt.Sprintf("%c g %d\n", markerRecordHeader, r.Generation)
@@ -102,6 +105,7 @@ func recordToASB(r *models.Record) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	data = append(data, binsText...)
 
 	return data, nil
@@ -169,6 +173,7 @@ func boolToASB(b bool) byte {
 	if b {
 		return boolTrueByte
 	}
+
 	return boolFalseByte
 }
 
@@ -183,6 +188,7 @@ func keyToASB(k *a.Key) ([]byte, error) {
 	if err != nil {
 		return data, err
 	}
+
 	data = append(data, userKeyText...)
 
 	namespaceText := fmt.Sprintf("%c n %s\n", markerRecordHeader, escapeASBS(k.Namespace()))
@@ -231,13 +237,14 @@ func userKeyToASB(userKey a.Value) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func getExpirationTime(ttl uint32, unix_now int64) uint32 {
+func getExpirationTime(ttl uint32, unixNow int64) uint32 {
 	// math.MaxUint32 (-1) means never expire
 	if ttl == math.MaxUint32 {
 		return 0
 	}
 
-	timeSinceCE := unix_now - citrusLeafEpoch
+	timeSinceCE := unixNow - citrusLeafEpoch
+
 	return uint32(timeSinceCE) + ttl
 }
 
@@ -253,10 +260,12 @@ var asbEscapedChars = map[byte]struct{}{
 func escapeASBS(s string) string {
 	in := []byte(s)
 	v := []byte{}
+
 	for _, c := range in {
 		if _, ok := asbEscapedChars[c]; ok {
 			v = append(v, asbEscape)
 		}
+
 		v = append(v, c)
 	}
 

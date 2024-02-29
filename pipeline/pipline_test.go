@@ -68,12 +68,13 @@ func (suite *pipelineTestSuite) TestDataPipelineRun() {
 }
 
 type mockWorker struct {
-	mocks.Worker[string]
 	receive <-chan string
 	send    chan<- string
+	mocks.Worker[string]
 }
 
 func newMockWorker(t *testing.T) *mockWorker {
+	t.Helper()
 	return &mockWorker{
 		Worker: *mocks.NewWorker[string](t),
 	}

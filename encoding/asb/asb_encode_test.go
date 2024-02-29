@@ -75,7 +75,6 @@ func (suite *asbEncoderTestSuite) TestEncodeToken() {
 	actual, err = encoder.EncodeToken(token)
 	suite.Assert().Error(err)
 	suite.Assert().Nil(actual)
-
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
@@ -101,7 +100,8 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 		Expiration: uint32(recExpr),
 	}
 
-	expected := fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 1\n- I bin1 0\n", base64Encode(key.Digest()), expExpr)
+	recTemplate := "+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 1\n- I bin1 0\n"
+	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), expExpr)
 
 	actual, err := encoder.EncodeRecord(rec)
 	suite.Assert().NoError(err)
@@ -259,8 +259,8 @@ func Test__SIndexToASB(t *testing.T) {
 func Test_binToASB(t *testing.T) {
 	encVal := base64Encode(a.HLLValue("hello"))
 	type args struct {
-		k string
 		v any
+		k string
 	}
 	tests := []struct {
 		name    string
@@ -613,8 +613,8 @@ func Test_keyToASB(t *testing.T) {
 
 func Test_getExpirationTime(t *testing.T) {
 	type args struct {
-		ttl      uint32
-		unix_now int64
+		ttl     uint32
+		unixNow int64
 	}
 	tests := []struct {
 		name string
@@ -624,8 +624,8 @@ func Test_getExpirationTime(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				ttl:      123,
-				unix_now: citrusLeafEpoch,
+				ttl:     123,
+				unixNow: citrusLeafEpoch,
 			},
 			want: 123,
 		},
@@ -639,7 +639,7 @@ func Test_getExpirationTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getExpirationTime(tt.args.ttl, tt.args.unix_now); got != tt.want {
+			if got := getExpirationTime(tt.args.ttl, tt.args.unixNow); got != tt.want {
 				t.Errorf("getExpirationTime() = %v, want %v", got, tt.want)
 			}
 		})
@@ -679,7 +679,8 @@ func Test_recordToASB(t *testing.T) {
 					Expiration: uint32(recExpr),
 				},
 			},
-			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), expExpr)),
+			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ "+
+				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), expExpr)),
 		},
 		{
 			name: "positive escaped key",
@@ -694,7 +695,8 @@ func Test_recordToASB(t *testing.T) {
 					Expiration: uint32(recExpr),
 				},
 			},
-			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\\\n\n+ d %s\n+ s de\\ mo\n+ g 1234\n+ t %d\n+ b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), expExpr)),
+			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\\\n\n+ d %s\n+ s de\\ mo\n+ g 1234\n+ t %d\n+ "+
+				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), expExpr)),
 		},
 		{
 			name: "negative record is nil",

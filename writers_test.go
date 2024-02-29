@@ -154,7 +154,6 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	suite.Equal("rec,si,udf", output.String())
 
 	mockEncoder.AssertExpectations(suite.T())
-
 }
 
 func (suite *writersTestSuite) TestASBWriter() {

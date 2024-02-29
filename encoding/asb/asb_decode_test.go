@@ -32,14 +32,14 @@ import (
 
 func TestASBReader_readHeader(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
-		name    string
 		fields  fields
 		want    *header
+		name    string
 		wantErr bool
 	}{
 		{
@@ -106,14 +106,14 @@ func TestASBReader_readHeader(t *testing.T) {
 
 func TestASBReader_readMetadata(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
-		name    string
 		fields  fields
 		want    *metaData
+		name    string
 		wantErr bool
 	}{
 		{
@@ -235,15 +235,15 @@ func TestASBReader_readMetadata(t *testing.T) {
 
 func TestASBReader_readSIndex(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 
 	type test struct {
-		name    string
 		fields  fields
 		want    *models.SIndex
+		name    string
 		wantErr bool
 	}
 
@@ -509,15 +509,15 @@ func TestASBReader_readSIndex(t *testing.T) {
 
 func TestASBReader_readUDF(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 
 	type test struct {
-		name    string
 		fields  fields
 		want    *models.UDF
+		name    string
 		wantErr bool
 	}
 
@@ -683,15 +683,15 @@ func TestASBReader_readUDF(t *testing.T) {
 
 func TestASBReader_readBin(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 
 	type test struct {
-		name    string
 		fields  fields
 		want    map[string]any
+		name    string
 		wantErr bool
 	}
 
@@ -846,7 +846,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive base64 string bin",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("X base64-str %d %s\n", base64.StdEncoding.EncodedLen(7), base64.StdEncoding.EncodeToString([]byte("str\ning")))),
+					ByteScanner: strings.NewReader(
+						fmt.Sprintf("X base64-str %d %s\n",
+							base64.StdEncoding.EncodedLen(7),
+							base64.StdEncoding.EncodeToString([]byte("str\ning"))),
+					),
 				},
 			},
 			want: map[string]any{
@@ -890,7 +894,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive blob bin",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("B blob-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"B blob-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -934,7 +942,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive java bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("J java-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"J java-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -946,7 +958,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive java bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("J java-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"J java-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -958,7 +974,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive c# bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("C c#-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"C c#-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -970,7 +990,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive python bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("P python-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"P python-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -982,7 +1006,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive ruby bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("R ruby-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(
+						fmt.Sprintf("R ruby-bin %d %s\n",
+							base64.StdEncoding.EncodedLen(4),
+							base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -994,7 +1022,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive php bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("H php-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"H php-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -1006,7 +1038,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive erlang bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("E erlang-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"E erlang-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -1018,7 +1054,11 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "positive HLL bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("Y hll-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"Y hll-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+					),
 				},
 			},
 			want: map[string]any{
@@ -1030,7 +1070,10 @@ func TestASBReader_readBin(t *testing.T) {
 			name: "negative HLL bytes",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("Y hll-bin %d %s\n", base64.StdEncoding.EncodedLen(100), base64.StdEncoding.EncodeToString([]byte{0, 1, 2}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"Y hll-bin %d %s\n", base64.StdEncoding.EncodedLen(100),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+					),
 				},
 			},
 			want:    map[string]any{},
@@ -1041,7 +1084,8 @@ func TestASBReader_readBin(t *testing.T) {
 		// 	name: "positive list bin",
 		// 	fields: fields{
 		// 		countingByteScanner: countingByteScanner{
-		// 			ByteScanner: strings.NewReader(fmt.Sprintf("L list-bin %d %s\n", base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte("ab")))),
+		// 			ByteScanner: strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
+		// base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte("ab")))),
 		// 		},
 		// 	},
 		// 	want: map[string]any{
@@ -1053,7 +1097,8 @@ func TestASBReader_readBin(t *testing.T) {
 		// 	name: "positive base64 encoded map bin",
 		// 	fields: fields{
 		// 		countingByteScanner: countingByteScanner{
-		// 			ByteScanner: strings.NewReader(fmt.Sprintf("M map-bin %d %s\n", len(base64MsgPackTMap), base64MsgPackTMap)),
+		// 			ByteScanner: strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
+		// len(base64MsgPackTMap), base64MsgPackTMap)),
 		// 		},
 		// 	},
 		// 	want: map[string]any{
@@ -1150,15 +1195,15 @@ func TestASBReader_readBin(t *testing.T) {
 
 func TestASBReader_readKey(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 
 	type test struct {
-		name    string
 		fields  fields
 		want    any
+		name    string
 		wantErr bool
 	}
 
@@ -1197,7 +1242,11 @@ func TestASBReader_readKey(t *testing.T) {
 			name: "positive base64 string key",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("X %d %s\n", base64.StdEncoding.EncodedLen(6), base64.StdEncoding.EncodeToString([]byte("string")))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"X %d %s\n",
+						base64.StdEncoding.EncodedLen(6),
+						base64.StdEncoding.EncodeToString([]byte("string"))),
+					),
 				},
 			},
 			want:    "string",
@@ -1207,7 +1256,10 @@ func TestASBReader_readKey(t *testing.T) {
 			name: "positive blob key",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("B %d %s\n", base64.StdEncoding.EncodedLen(3), base64.StdEncoding.EncodeToString([]byte{0, 1, 2}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"B %d %s\n", base64.StdEncoding.EncodedLen(3),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+					),
 				},
 			},
 			want:    []byte{0, 1, 2},
@@ -1287,7 +1339,11 @@ func TestASBReader_readKey(t *testing.T) {
 			name: "negative missing line feed after base64 string key value",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("X %d %s", base64.StdEncoding.EncodedLen(6), base64.StdEncoding.EncodeToString([]byte("string")))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"X %d %s",
+						base64.StdEncoding.EncodedLen(6),
+						base64.StdEncoding.EncodeToString([]byte("string"))),
+					),
 				},
 			},
 			want:    nil,
@@ -1297,7 +1353,11 @@ func TestASBReader_readKey(t *testing.T) {
 			name: "negative missing line feed after blob key value",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("B %d %s", base64.StdEncoding.EncodedLen(3), base64.StdEncoding.EncodeToString([]byte{0, 1, 2}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"B %d %s",
+						base64.StdEncoding.EncodedLen(3),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+					),
 				},
 			},
 			want:    nil,
@@ -1327,7 +1387,10 @@ func TestASBReader_readKey(t *testing.T) {
 			name: "negative missing space after base64 string size",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("X %d%s\n", base64.StdEncoding.EncodedLen(6), base64.StdEncoding.EncodeToString([]byte("string")))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"X %d%s\n", base64.StdEncoding.EncodedLen(6),
+						base64.StdEncoding.EncodeToString([]byte("string"))),
+					),
 				},
 			},
 			want:    nil,
@@ -1337,7 +1400,11 @@ func TestASBReader_readKey(t *testing.T) {
 			name: "negative missing space after blob size",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("B %d%s\n", base64.StdEncoding.EncodedLen(3), base64.StdEncoding.EncodeToString([]byte{0, 1, 2}))),
+					ByteScanner: strings.NewReader(fmt.Sprintf(
+						"B %d%s\n",
+						base64.StdEncoding.EncodedLen(3),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+					),
 				},
 			},
 			want:    nil,
@@ -1366,15 +1433,15 @@ func TestASBReader_readKey(t *testing.T) {
 
 func TestASBReader_readRecord(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 
 	type test struct {
-		name    string
 		fields  fields
 		want    *models.Record
+		name    string
 		wantErr bool
 	}
 
@@ -1860,13 +1927,13 @@ func TestASBReader_readRecord(t *testing.T) {
 
 func TestASBReader_readBinCount(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
-		name    string
 		fields  fields
+		name    string
 		want    uint16
 		wantErr bool
 	}{
@@ -1942,13 +2009,13 @@ func TestASBReader_readBinCount(t *testing.T) {
 
 func TestASBReader_readExpiration(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
-		name    string
 		fields  fields
+		name    string
 		want    uint32
 		wantErr bool
 	}{
@@ -2024,13 +2091,13 @@ func TestASBReader_readExpiration(t *testing.T) {
 
 func TestASBReader_readGeneration(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
-		name    string
 		fields  fields
+		name    string
 		want    uint32
 		wantErr bool
 	}{
@@ -2106,9 +2173,9 @@ func TestASBReader_readGeneration(t *testing.T) {
 
 func TestASBReader_readSet(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
 		name    string
@@ -2167,14 +2234,13 @@ func TestASBReader_readSet(t *testing.T) {
 }
 
 func TestASBReader_readDigest(t *testing.T) {
-
 	digest := []byte("12345678901234567890")
 	encodedDigest := base64.StdEncoding.EncodeToString(digest)
 
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
 		name    string
@@ -2544,8 +2610,8 @@ func Test_readBool(t *testing.T) {
 		src io.ByteScanner
 	}
 	tests := []struct {
-		name    string
 		args    args
+		name    string
 		want    bool
 		wantErr bool
 	}{
@@ -2848,8 +2914,8 @@ func Test_readUntilAny(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		args    args
 		want    []byte
+		args    args
 		wantErr bool
 	}{
 		{
@@ -3183,8 +3249,8 @@ func Test_peek(t *testing.T) {
 		src io.ByteScanner
 	}
 	tests := []struct {
-		name    string
 		args    args
+		name    string
 		want    byte
 		wantErr bool
 	}{
@@ -3221,18 +3287,18 @@ func Test_peek(t *testing.T) {
 
 func TestASBReader_readBins(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	type args struct {
 		count uint16
 	}
 	tests := []struct {
-		name    string
 		fields  fields
-		args    args
 		want    a.BinMap
+		name    string
+		args    args
 		wantErr bool
 	}{
 		{
@@ -3280,7 +3346,7 @@ func TestASBReader_readBins(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "negative missing bin line start chracter",
+			name: "negative missing bin line start character",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader("I bin1 20\n"),
@@ -3428,14 +3494,14 @@ func Test_readHLL(t *testing.T) {
 
 func TestASBReader_readGlobals(t *testing.T) {
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
-		name    string
 		fields  fields
 		want    any
+		name    string
 		wantErr bool
 	}{
 		{
@@ -3542,7 +3608,6 @@ func TestASBReader_readGlobals(t *testing.T) {
 }
 
 func TestASBReader_NextToken(t *testing.T) {
-
 	digest := []byte("12345678901234567890")
 	encodedDigest := base64.StdEncoding.EncodeToString(digest)
 
@@ -3552,14 +3617,14 @@ func TestASBReader_NextToken(t *testing.T) {
 	}
 
 	type fields struct {
-		countingByteScanner countingByteScanner
 		header              *header
 		metaData            *metaData
+		countingByteScanner countingByteScanner
 	}
 	tests := []struct {
-		name    string
 		fields  fields
 		want    *models.Token
+		name    string
 		wantErr bool
 	}{
 		{
@@ -3663,9 +3728,9 @@ func TestNewASBReader(t *testing.T) {
 		src io.Reader
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    *Decoder
+		name    string
 		wantErr bool
 	}{
 		{

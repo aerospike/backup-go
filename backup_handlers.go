@@ -32,10 +32,10 @@ const (
 // **** Base Backup Handler ****
 
 type backupHandlerBase struct {
-	namespace       string
+	worker          workHandler
 	config          *BackupBaseConfig
 	aerospikeClient *a.Client
-	worker          workHandler
+	namespace       string
 }
 
 func newBackupHandlerBase(config *BackupBaseConfig, ac *a.Client, namespace string) *backupHandlerBase {
@@ -53,6 +53,7 @@ func newBackupHandlerBase(config *BackupBaseConfig, ac *a.Client, namespace stri
 
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
+
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * PARTITIONS) / bh.config.Parallel
 		count := PARTITIONS / bh.config.Parallel // TODO verify no off by 1 error
@@ -74,12 +75,14 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 	}
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
+
 	for i := 0; i < bh.config.Parallel; i++ {
 		processor := newNoOpProcessor()
 		processorWorkers[i] = newProcessorWorker(processor)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
+
 	for i, w := range writers {
 		writeWorkers[i] = w
 	}
@@ -100,11 +103,11 @@ type BackupStats struct{}
 
 // BackupHandler handles a backup job to a set of io.writers
 type BackupHandler struct {
-	stats   *BackupStats
-	config  *BackupConfig
-	writers []io.Writer
-	errors  chan error
+	stats  *BackupStats
+	config *BackupConfig
+	errors chan error
 	backupHandlerBase
+	writers []io.Writer
 }
 
 // newBackupHandler creates a new BackupHandler
@@ -125,7 +128,6 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 	bwh.errors = make(chan error)
 
 	go func(errChan chan<- error) {
-
 		// NOTE: order is important here
 		// if we close the errChan before we handle the panic
 		// the panic will attempt to send on a closed channel
@@ -136,7 +138,6 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 		dataWriters := []*writeWorker[*models.Token]{}
 
 		for i, writer := range writers {
-
 			dw, err := getDataWriter(bwh.config.EncoderFactory, writer, bwh.namespace, i == 0)
 			if err != nil {
 				errChan <- err
@@ -159,7 +160,6 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 
 			clear(dataWriters)
 		}
-
 	}(bwh.errors)
 }
 
@@ -187,6 +187,7 @@ func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool)
 	switch encT := enc.(type) {
 	case *asb.Encoder:
 		asbw := newAsbWriter(encT, w)
+
 		err := asbw.Init(namespace, first)
 		if err != nil {
 			return nil, err

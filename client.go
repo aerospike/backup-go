@@ -76,9 +76,11 @@ func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 	if p == nil {
 		p = c.config.InfoPolicy
 	}
+
 	if p == nil {
 		p = c.aerospikeClient.DefaultInfoPolicy
 	}
+
 	return p
 }
 
@@ -86,9 +88,11 @@ func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
 	if p == nil {
 		p = c.config.WritePolicy
 	}
+
 	if p == nil {
 		p = c.aerospikeClient.DefaultWritePolicy
 	}
+
 	return p
 }
 
@@ -96,9 +100,11 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	if p == nil {
 		p = c.config.ScanPolicy
 	}
+
 	if p == nil {
 		p = c.aerospikeClient.DefaultScanPolicy
 	}
+
 	return p
 }
 
@@ -110,6 +116,7 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 	if config == nil {
 		config = NewBackupConfig()
 	}
+
 	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
@@ -131,6 +138,7 @@ func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *Resto
 	if config == nil {
 		config = NewRestoreConfig()
 	}
+
 	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
 

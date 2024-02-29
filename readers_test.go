@@ -288,7 +288,6 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	reader.Cancel()
 	suite.False(reader.status.started)
-
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
@@ -348,9 +347,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 }
 
 func (suite *readersTestSuite) TestSIndexReader() {
-
 	namespace := "test"
-
 	mockSIndexGetter := mocks.NewSindexGetter(suite.T())
 	mockSIndexes := []*models.SIndex{
 		{

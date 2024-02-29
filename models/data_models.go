@@ -46,16 +46,16 @@ const (
 
 type SIndexPath struct {
 	BinName    string
-	BinType    SIPathBinType
 	B64Context string
+	BinType    SIPathBinType
 }
 
 type SIndex struct {
 	Namespace string
 	Set       string
 	Name      string
-	IndexType SIndexType
 	Path      SIndexPath
+	IndexType SIndexType
 }
 
 // **** UDFs ****
@@ -67,9 +67,9 @@ const (
 )
 
 type UDF struct {
-	UDFType UDFType
 	Name    string
 	Content []byte
+	UDFType UDFType
 }
 
 // **** Token ****

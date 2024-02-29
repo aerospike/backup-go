@@ -88,26 +88,19 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 
 	var lastSend chan T
 
-	for i, s := range dp.stages {
-		var (
-			send chan T
-		)
+	for _, s := range dp.stages {
+		send := make(chan T, len(s.workers))
+		s.SetSendChan(send)
 
-		if i == len(dp.stages)-1 {
-			s.SetSendChan(dp.send)
-		} else {
-			send = make(chan T, len(s.workers))
-			s.SetSendChan(send)
-		}
-
-		if i == 0 {
-			s.SetReceiveChan(dp.receive)
-		} else {
-			s.SetReceiveChan(lastSend)
-		}
+		s.SetReceiveChan(lastSend)
 
 		lastSend = send
 	}
+
+	// set the receive and send channels for first
+	// and last stages to the pipeline's receive and send channels
+	dp.stages[0].SetReceiveChan(dp.receive)
+	dp.stages[len(dp.stages)-1].SetSendChan(dp.send)
 
 	wg := &sync.WaitGroup{}
 	for _, s := range dp.stages {

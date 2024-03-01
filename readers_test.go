@@ -172,11 +172,44 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	expectedRecToken := models.NewRecordToken(mockRec)
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
+}
 
-	// positive channel closed
-	close(mockResults)
+func (suite *readersTestSuite) TestAerospikeRecordReaderNotStarted() {
+	reader := &aerospikeRecordReader{
+		status: arrStatus{
+			started: false,
+		},
+	}
 
-	mockScanner = mocks.NewScanner(suite.T())
+	reader.Close()
+	suite.False(reader.status.started)
+}
+
+func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
+	namespace := "test"
+	set := ""
+
+	key, aerr := a.NewKey(namespace, set, "key")
+	if aerr != nil {
+		panic(aerr)
+	}
+
+	mockRecordSet := &a.Recordset{}
+	mockResults := make(chan *a.Result, 1)
+	mockRec := &a.Record{
+		Bins: a.BinMap{
+			"key": "hi",
+		},
+		Key: key,
+	}
+	mockRes := &a.Result{
+		Record: mockRec,
+		Err:    a.ErrInvalidParam,
+	}
+	mockResults <- mockRes
+	setFieldValue(mockRecordSet, "records", mockResults)
+
+	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		(*a.ScanPolicy)(nil),
 		a.NewPartitionFilterByRange(0, 4096),
@@ -187,7 +220,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		nil,
 	)
 
-	reader = newAerospikeRecordReader(
+	reader := newAerospikeRecordReader(
 		mockScanner,
 		arrConfig{
 			Namespace:      namespace,
@@ -199,14 +232,56 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	)
 	suite.NotNil(reader)
 
-	v, err = reader.Read()
-	suite.Equal(err, io.EOF)
+	v, err := reader.Read()
+	suite.NotNil(err)
 	suite.Nil(v)
 	mockScanner.AssertExpectations(suite.T())
+}
 
-	// negative startScan fails
+func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
+	namespace := "test"
+	set := ""
 
-	mockScanner = mocks.NewScanner(suite.T())
+	mockRecordSet := &a.Recordset{}
+	mockResults := make(chan *a.Result, 1)
+	setFieldValue(mockRecordSet, "records", mockResults)
+
+	close(mockResults)
+
+	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner.EXPECT().ScanPartitions(
+		(*a.ScanPolicy)(nil),
+		a.NewPartitionFilterByRange(0, 4096),
+		namespace,
+		set,
+	).Return(
+		mockRecordSet,
+		nil,
+	)
+
+	reader := newAerospikeRecordReader(
+		mockScanner,
+		arrConfig{
+			Namespace:      namespace,
+			Set:            set,
+			FirstPartition: 0,
+			NumPartitions:  4096,
+		},
+		nil,
+	)
+	suite.NotNil(reader)
+
+	v, err := reader.Read()
+	suite.Equal(io.EOF, err)
+	suite.Nil(v)
+	mockScanner.AssertExpectations(suite.T())
+}
+
+func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
+	namespace := "test"
+	set := ""
+
+	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		(*a.ScanPolicy)(nil),
 		a.NewPartitionFilterByRange(0, 4096),
@@ -217,7 +292,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		a.ErrInvalidParam,
 	)
 
-	reader = newAerospikeRecordReader(
+	reader := newAerospikeRecordReader(
 		mockScanner,
 		arrConfig{
 			Namespace:      namespace,
@@ -229,66 +304,10 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	)
 	suite.NotNil(reader)
 
-	v, err = reader.Read()
+	v, err := reader.Read()
 	suite.NotNil(err)
 	suite.Nil(v)
 	mockScanner.AssertExpectations(suite.T())
-
-	// negative record res error
-
-	mockRecordSet = &a.Recordset{}
-	mockResults = make(chan *a.Result, 1)
-	mockRec = &a.Record{
-		Bins: a.BinMap{
-			"key": "hi",
-		},
-		Key: key,
-	}
-	mockRes = &a.Result{
-		Record: mockRec,
-		Err:    a.ErrInvalidParam,
-	}
-	mockResults <- mockRes
-	setFieldValue(mockRecordSet, "records", mockResults)
-
-	mockScanner = mocks.NewScanner(suite.T())
-	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
-		a.NewPartitionFilterByRange(0, 4096),
-		namespace,
-		set,
-	).Return(
-		mockRecordSet,
-		nil,
-	)
-
-	reader = newAerospikeRecordReader(
-		mockScanner,
-		arrConfig{
-			Namespace:      namespace,
-			Set:            set,
-			FirstPartition: 0,
-			NumPartitions:  4096,
-		},
-		nil,
-	)
-	suite.NotNil(reader)
-
-	v, err = reader.Read()
-	suite.NotNil(err)
-	suite.Nil(v)
-	mockScanner.AssertExpectations(suite.T())
-
-	// test cancel not started
-
-	reader = &aerospikeRecordReader{
-		status: arrStatus{
-			started: false,
-		},
-	}
-
-	reader.Close()
-	suite.False(reader.status.started)
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {

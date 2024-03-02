@@ -91,13 +91,9 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 // **** Backup To Writer Handler ****
 
 // BackupStats stores the status of a backup job
-//
-//nolint:revive // ignore name stuttering, this package also includes restore config
 type BackupStats struct{}
 
 // BackupHandler handles a backup job to a set of io.writers
-//
-//nolint:revive // ignore name stuttering, this package also includes restore handlers
 type BackupHandler struct {
 	stats  *BackupStats
 	config *BackupConfig

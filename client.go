@@ -127,8 +127,6 @@ type EncoderFactory interface {
 }
 
 // BackupConfig contains configuration for the backup operation
-//
-//nolint:revive // ignore name stuttering, this package also includes restore config
 type BackupConfig struct {
 	// EncoderFactory is used to specify the encoder with which to encode the backup data
 	// if nil, the default encoder factory will be used

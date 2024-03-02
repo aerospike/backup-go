@@ -430,6 +430,8 @@ func TestReaders(t *testing.T) {
 // setFieldValue is a hack to set the value of an unexported struct field
 // it's useful to mock fields in the aerospike go client
 // using this lets us avoid mocking the entire client
+//
+//nolint:unparam // don't complain about the fieldname param always getting "records" it could be any field
 func setFieldValue(target any, fieldName string, value any) {
 	rv := reflect.ValueOf(target)
 	for rv.Kind() == reflect.Ptr && !rv.IsNil() {

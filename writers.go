@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backuplib
+package backup
 
 import (
 	"bytes"
@@ -22,8 +22,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/encoding"
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
+	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )

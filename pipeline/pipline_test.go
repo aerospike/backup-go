@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/pipeline/mocks"
+	"github.com/aerospike/backup-go/pipeline/mocks"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"

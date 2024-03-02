@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backuplib
+package backup
 
 import (
 	"context"
 	"io"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
-	"github.com/aerospike/aerospike-tools-backup-lib/pipeline"
+	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // **** Generic Restore Handler ****

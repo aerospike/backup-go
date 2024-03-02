@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backuplib
+package backup
 
 import (
 	"context"
@@ -24,9 +24,9 @@ import (
 	"time"
 	"unsafe"
 
-	enc_mocks "github.com/aerospike/aerospike-tools-backup-lib/encoding/mocks"
-	"github.com/aerospike/aerospike-tools-backup-lib/mocks"
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
+	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
+	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/suite"

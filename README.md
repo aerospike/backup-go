@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/aerospike/aerospike-client-go/v7"
-	backuplib "github.com/aerospike/aerospike-tools-backup-lib"
+	backup "github.com/aerospike/backup-go"
 )
 
 func main() {
@@ -33,9 +33,9 @@ func main() {
 		panic(aerr)
 	}
 
-	backupClientConfig := backuplib.NewConfig()
+	backupClientConfig := backup.NewConfig()
 
-	backupClient, err := backuplib.NewClient(aerospikeClient, backupClientConfig)
+	backupClient, err := backup.NewClient(aerospikeClient, backupClientConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +56,7 @@ func main() {
 
 			writers := []io.Writer{file}
 
-			backupCfg := backuplib.NewBackupConfig()
+			backupCfg := backup.NewBackupConfig()
 			backupCfg.Namespace = "test"
 
 			ctx := context.Background()
@@ -92,7 +92,7 @@ func main() {
 			defer file.Close()
 
 			readers := []io.Reader{file}
-			restoreCfg := backuplib.NewRestoreConfig()
+			restoreCfg := backup.NewRestoreConfig()
 
 			ctx := context.Background()
 			handler, err := backupClient.Restore(ctx, readers, restoreCfg)
@@ -127,7 +127,7 @@ Testing Requirements
 ### Installation
 
 1. Install requirements.
-2. Use `go get https://github.com/aerospike/aerospike-tools-backup-lib`
+2. Use `go get https://github.com/aerospike/backup-go`
 
 ### License
 

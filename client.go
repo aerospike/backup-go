@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backuplib
+package backup
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 	"io"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/aerospike-tools-backup-lib/encoding"
+	"github.com/aerospike/backup-go/encoding"
 )
 
 const (
@@ -44,7 +44,7 @@ func NewConfig() *Config {
 	return &Config{}
 }
 
-// Client is the main entry point for the backuplib package
+// Client is the main entry point for the backup package
 // It wraps an aerospike client and provides methods to start backup and restore operations
 // It contains a Config object that can be used to set default policies for the backup and restore operations
 // If the Policies field is nil, the aerospike client's default policies will be used
@@ -55,8 +55,8 @@ func NewConfig() *Config {
 //		if aerr != nil {
 //			// handle error
 //		}
-//		backupCFG := backuplib.NewConfig()	// create a backuplib config
-//		backupClient, err := backuplib.NewClient(asc, backupCFG)	// create a backuplib client
+//		backupCFG := backup.NewConfig()	// create a backup config
+//		backupClient, err := backup.NewClient(asc, backupCFG)	// create a backup client
 //		if err != nil {
 //			// handle error
 //		}
@@ -76,9 +76,9 @@ type Client struct {
 	config          *Config
 }
 
-// NewClient creates a new backuplib client
+// NewClient creates a new backup client
 // ac is the aerospike client to use for backup and restore operations
-// config is the configuration for the backuplib client
+// config is the configuration for the backup client
 func NewClient(ac *a.Client, config *Config) (*Client, error) {
 	if config == nil {
 		config = NewConfig()

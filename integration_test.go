@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backuplib_test
+package backup_test
 
 import (
 	"bytes"
@@ -21,9 +21,9 @@ import (
 	"io"
 	"testing"
 
-	testresources "github.com/aerospike/aerospike-tools-backup-lib/test"
+	testresources "github.com/aerospike/backup-go/test"
 
-	backuplib "github.com/aerospike/aerospike-tools-backup-lib"
+	backup "github.com/aerospike/backup-go"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/tools-common-go/testutils"
@@ -44,7 +44,7 @@ type backupRestoreTestSuite struct {
 	set               string
 	Aeroclient        *a.Client
 	testClient        *testresources.TestClient
-	backupClient      *backuplib.Client
+	backupClient      *backup.Client
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -105,8 +105,8 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	testClient := testresources.NewTestClient(testAeroClient)
 	suite.testClient = testClient
 
-	backupCFG := backuplib.Config{}
-	backupClient, err := backuplib.NewClient(testAeroClient, &backupCFG)
+	backupCFG := backup.Config{}
+	backupClient, err := backup.NewClient(testAeroClient, &backupCFG)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}

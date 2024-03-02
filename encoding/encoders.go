@@ -15,8 +15,8 @@
 package encoding
 
 import (
-	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
+	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/models"
 )
 
 // Encoder is an interface for encoding the types from the models package.

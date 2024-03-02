@@ -17,8 +17,8 @@ package encoding
 import (
 	"io"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/encoding/asb"
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
+	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/models"
 )
 
 // Decoder is an interface for reading backup data as tokens.

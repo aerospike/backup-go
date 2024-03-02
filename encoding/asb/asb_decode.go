@@ -24,7 +24,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/aerospike/aerospike-tools-backup-lib/models"
+	"github.com/aerospike/backup-go/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )

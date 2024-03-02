@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backuplib
+package backup
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ func handlePanic(errors chan<- error) {
 	if r := recover(); r != nil {
 		var err error
 
-		panicMsg := "a backuplib operation has panicked:"
+		panicMsg := "a backup operation has panicked:"
 		if _, ok := r.(error); ok {
 			err = fmt.Errorf(panicMsg+" caused by this error: \"%w\"\n", r.(error))
 		} else {

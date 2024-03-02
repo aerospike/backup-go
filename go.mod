@@ -1,4 +1,4 @@
-module github.com/aerospike/aerospike-tools-backup-lib
+module github.com/aerospike/backup-go
 
 go 1.21
 

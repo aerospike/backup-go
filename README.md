@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/aerospike/aerospike-client-go/v7"
-	backup "github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go"
 )
 
 func main() {

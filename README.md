@@ -1,4 +1,4 @@
-# aerospike-tools-backup-lib
+# backup-go
 
 A library for backing up and restoring Aerospike data.
 

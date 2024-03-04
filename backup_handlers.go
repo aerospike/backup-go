@@ -54,15 +54,19 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) 
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
-	for i := 0; i < bh.config.Parallel; i++ {
-		begin := (i * partitions) / bh.config.Parallel
-		count := partitions / bh.config.Parallel // TODO verify no off by 1 error
+	partitions := bh.config.Partitions.Count - bh.config.Partitions.Begin
 
+	partitionRanges, err := splitPartitions(partitions, bh.config.Parallel)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < bh.config.Parallel; i++ {
 		ARRCFG := arrConfig{
 			Namespace:      bh.namespace,
 			Set:            bh.config.Set,
-			FirstPartition: begin,
-			NumPartitions:  count,
+			FirstPartition: partitionRanges[i].Begin,
+			NumPartitions:  partitionRanges[i].Count,
 		}
 
 		recordReader := newAerospikeRecordReader(

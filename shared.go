@@ -35,3 +35,21 @@ func handlePanic(errors chan<- error) {
 		errors <- err
 	}
 }
+
+func splitPartitions(numPartitions, numWorkers int) ([]PartitionRange, error) {
+	if numWorkers < 1 {
+		return nil, fmt.Errorf("numWorkers is less than 1, cannot split partitions")
+	}
+
+	if numPartitions < 1 {
+		return nil, fmt.Errorf("numPartitions is less than 1, cannot split partitions")
+	}
+
+	pSpecs := make([]PartitionRange, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		pSpecs[i].Begin = (i * numPartitions) / numWorkers
+		pSpecs[i].Count = (((i + 1) * numPartitions) / numWorkers) - pSpecs[i].Begin
+	}
+
+	return pSpecs, nil
+}

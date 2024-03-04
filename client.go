@@ -126,6 +126,28 @@ type EncoderFactory interface {
 	CreateEncoder() (encoding.Encoder, error)
 }
 
+// PartitionRange specifies a range of Aerospike partitions
+type PartitionRange struct {
+	Begin int
+	Count int
+}
+
+func NewPartitionRange(begin, count int) PartitionRange {
+	return PartitionRange{begin, count}
+}
+
+func (p PartitionRange) validate() error {
+	if p.Begin < 0 || p.Begin >= partitions {
+		return fmt.Errorf("begin must be between 0 and %d, got %d", partitions-1, p.Begin)
+	}
+
+	if p.Count < 1 || p.Count > partitions {
+		return fmt.Errorf("count must be between 1 and %d, got %d", partitions, p.Count)
+	}
+
+	return nil
+}
+
 // BackupConfig contains configuration for the backup operation
 type BackupConfig struct {
 	// EncoderFactory is used to specify the encoder with which to encode the backup data
@@ -141,6 +163,8 @@ type BackupConfig struct {
 	Namespace string
 	// Set is the Aerospike set to backup.
 	Set string
+	// Partitions specifies the Aerospike partitions to backup.
+	Partitions PartitionRange
 	// parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int
 }
@@ -150,12 +174,18 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
 
+	err := c.Partitions.validate()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // NewBackupConfig returns a new BackupConfig with default values
 func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
+		Partitions:     PartitionRange{0, partitions},
 		Parallel:       1,
 		Set:            "",
 		Namespace:      "test",

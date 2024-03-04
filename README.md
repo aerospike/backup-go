@@ -4,7 +4,7 @@ A library for backing up and restoring Aerospike data.
 
 ### Design
 
-This Aerospike backup package is built around the (Aerospike Go client)[https://github.com/aerospike/aerospike-client-go] . The package uses a client structure to start backup and restore jobs. The client structure is thread safe, backup and restore jobs can be started by multiple threads. When the client is used to start backup and restore jobs, a handler is immediately returned that is used to check the job's status, errors, and wait for it to finish. Here is how to use the package at a high level.
+This Aerospike backup package is built around the [Aerospike Go client](https://github.com/aerospike/aerospike-client-go). The package uses a client structure to start backup and restore jobs. The client structure is thread safe, backup and restore jobs can be started by multiple threads. When the client is used to start backup and restore jobs, a handler is immediately returned that is used to check the job's status, errors, and wait for it to finish. Here is how to use the package at a high level.
 
 - Wrap Aerospike Go clients with the backup package Client object.
 - Start backup and restore jobs using that backup client. These client methods return a handler which is used to monitor the started job. Started jobs run in parallel.
@@ -113,16 +113,17 @@ func main() {
 	}
 }
 ```
+
 ### Prerequisites
 
 Requirements
 
-- (Go)[https://go.dev/] version v1.21+
-- (Aerospike Go client v7)[https://github.com/aerospike/aerospike-client-go]
+- [Go](https://go.dev/) version v1.21+
+- [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v7
 
 Testing Requirements
 
-- (Only if you need to re-generate test mocks) (mockery)[https://github.com/vektra/mockery]
+- [Mockery](https://github.com/vektra/mockery) to generate test mocks
 
 ### Installation
 

@@ -16,6 +16,11 @@ package backup
 
 import (
 	"context"
+	"fmt"
+	"math"
+
+	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
+	"github.com/aerospike/backup-go/models"
 )
 
 // **** Processor Worker ****
@@ -75,4 +80,89 @@ func (w *processorWorker[T]) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// **** TTL Processor ****
+
+// ProcessorTTL is a dataProcessor that sets the TTL of a record based on its VoidTime
+type ProcessorTTL struct {
+	// getNow returns the current time since the citrusleaf epoch
+	// It is a field so that it can be mocked in tests
+	getNow func() cltime.CLTime
+}
+
+// newProcessorTTL creates a new TTLProcessor
+func newProcessorTTL() *ProcessorTTL {
+	return &ProcessorTTL{
+		getNow: cltime.Now,
+	}
+}
+
+// Process sets the TTL of a record based on its VoidTime
+func (p *ProcessorTTL) Process(token *models.Token) (*models.Token, error) {
+	// if the token is not a record, we don't need to process it
+	if token.Type != models.TokenTypeRecord {
+		return token, nil
+	}
+
+	record := &token.Record
+	now := p.getNow()
+
+	switch {
+	case record.VoidTime > 0:
+		ttl := record.VoidTime - now.Seconds
+		if ttl <= 0 {
+			// the record is expired
+			// TODO call a callback to handle expired records
+			// for now, filter out expired records
+			return nil, nil
+		}
+
+		if ttl > math.MaxUint32 {
+			return nil, fmt.Errorf("calculated TTL %d is too large", ttl)
+		}
+
+		record.Expiration = uint32(ttl)
+	case record.VoidTime == 0:
+		record.Expiration = models.ExpirationNever
+	default:
+		return nil, fmt.Errorf("invalid void time %d", record.VoidTime)
+	}
+
+	return token, nil
+}
+
+// **** VoidTime Processor ****
+
+// processorVoidTime is a dataProcessor that sets the VoidTime of a record based on its TTL
+type processorVoidTime struct {
+	// getNow returns the current time since the citrusleaf epoch
+	// It is a field so that it can be mocked in tests
+	getNow func() cltime.CLTime
+}
+
+// newProcessorVoidTime creates a new VoidTimeProcessor
+func newProcessorVoidTime() *processorVoidTime {
+	return &processorVoidTime{
+		getNow: cltime.Now,
+	}
+}
+
+// Process sets the VoidTime of a record based on its TTL
+func (p *processorVoidTime) Process(token *models.Token) (*models.Token, error) {
+	// if the token is not a record, we don't need to process it
+	if token.Type != models.TokenTypeRecord {
+		return token, nil
+	}
+
+	record := &token.Record
+	now := p.getNow()
+
+	if record.Expiration == models.ExpirationNever {
+		record.VoidTime = models.VoidTimeNeverExpire
+	} else {
+		record.VoidTime = now.Seconds + int64(record.Expiration)
+	}
+
+	return token, nil
 }

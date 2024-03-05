@@ -1484,13 +1484,15 @@ func TestASBReader_readRecord(t *testing.T) {
 				},
 			},
 			want: &models.Record{
-				Key: intKey,
-				Bins: map[string]any{
-					"bin1": nil,
-					"bin2": int64(2),
+				Record: &a.Record{
+					Key: intKey,
+					Bins: map[string]any{
+						"bin1": nil,
+						"bin2": int64(2),
+					},
+					Generation: 10,
 				},
-				Generation: 10,
-				Expiration: 10,
+				VoidTime: 10,
 			},
 			wantErr: false,
 		},
@@ -1511,13 +1513,15 @@ func TestASBReader_readRecord(t *testing.T) {
 				},
 			},
 			want: &models.Record{
-				Key: keyNoUserVal,
-				Bins: map[string]any{
-					"bin1": nil,
-					"bin2": int64(2),
+				Record: &a.Record{
+					Key: keyNoUserVal,
+					Bins: map[string]any{
+						"bin1": nil,
+						"bin2": int64(2),
+					},
+					Generation: 10,
 				},
-				Generation: 10,
-				Expiration: 10,
+				VoidTime: 10,
 			},
 			wantErr: false,
 		},
@@ -1537,13 +1541,15 @@ func TestASBReader_readRecord(t *testing.T) {
 				},
 			},
 			want: &models.Record{
-				Key: keyNoUserValOrSet,
-				Bins: map[string]any{
-					"bin1": nil,
-					"bin2": int64(2),
+				Record: &a.Record{
+					Key: keyNoUserValOrSet,
+					Bins: map[string]any{
+						"bin1": nil,
+						"bin2": int64(2),
+					},
+					Generation: 10,
 				},
-				Generation: 10,
-				Expiration: 10,
+				VoidTime: 10,
 			},
 			wantErr: false,
 		},
@@ -2016,7 +2022,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 	tests := []struct {
 		fields  fields
 		name    string
-		want    uint32
+		want    int64
 		wantErr bool
 	}{
 		{
@@ -2036,7 +2042,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 					ByteScanner: strings.NewReader("0\n"),
 				},
 			},
-			want:    math.MaxUint32,
+			want:    0,
 			wantErr: false,
 		},
 		{
@@ -2044,16 +2050,6 @@ func TestASBReader_readExpiration(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader("notanint\n"),
-				},
-			},
-			want:    0,
-			wantErr: true,
-		},
-		{
-			name: "negative expiration too large",
-			fields: fields{
-				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader(fmt.Sprintf("%d\n", math.MaxUint32+1)),
 				},
 			},
 			want:    0,
@@ -3663,14 +3659,16 @@ func TestASBReader_NextToken(t *testing.T) {
 					),
 				},
 			},
-			want: models.NewRecordToken(&models.Record{
-				Key: intKey,
-				Bins: map[string]any{
-					"bin1": nil,
-					"bin2": int64(2),
+			want: models.NewRecordToken(models.Record{
+				Record: &a.Record{
+					Key: intKey,
+					Bins: map[string]any{
+						"bin1": nil,
+						"bin2": int64(2),
+					},
+					Generation: 10,
 				},
-				Generation: 10,
-				Expiration: 10,
+				VoidTime: 10,
 			}),
 		},
 		{

@@ -98,11 +98,13 @@ func (suite *readersTestSuite) TestGenericReader() {
 		panic(aerr)
 	}
 
-	mockRec := &models.Record{
-		Bins: a.BinMap{
-			"key": "hi",
+	mockRec := models.Record{
+		Record: &a.Record{
+			Bins: a.BinMap{
+				"key": "hi",
+			},
+			Key: key,
 		},
-		Key: key,
 	}
 	expectedRecToken := models.NewRecordToken(mockRec)
 
@@ -132,14 +134,17 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockRecordSet := &a.Recordset{}
 	mockResults := make(chan *a.Result, 1)
-	mockRec := &a.Record{
+	rec := &a.Record{
 		Bins: a.BinMap{
 			"key": "hi",
 		},
 		Key: key,
 	}
 	mockRes := &a.Result{
-		Record: mockRec,
+		Record: rec,
+	}
+	mockRec := models.Record{
+		Record: rec,
 	}
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
@@ -321,14 +326,17 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 
 	mockRecordSet := &a.Recordset{}
 	mockResults := make(chan *a.Result, 1)
-	mockRec := &a.Record{
+	rec := &a.Record{
 		Bins: a.BinMap{
 			"key": "hi",
 		},
 		Key: key,
 	}
 	mockRes := &a.Result{
-		Record: mockRec,
+		Record: rec,
+	}
+	mockRec := models.Record{
+		Record: rec,
 	}
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)

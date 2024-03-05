@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"strconv"
 
 	"github.com/aerospike/backup-go/models"
@@ -158,7 +157,7 @@ func (r *Decoder) NextToken() (*models.Token, error) {
 	case *models.UDF:
 		return models.NewUDFToken(v), nil
 	case *models.Record:
-		return models.NewRecordToken(v), nil
+		return models.NewRecordToken(*v), nil
 	default:
 		return nil, fmt.Errorf("unsupported token type %T", v)
 	}
@@ -511,8 +510,8 @@ type recordData struct {
 	set        string
 	digest     []byte
 	generation uint32
-	expiration uint32
 	binCount   uint16
+	voidTime   int64
 }
 
 var expectedRecordHeaderTypes = []byte{
@@ -603,7 +602,7 @@ func (r *Decoder) readRecord() (*models.Record, error) {
 				return nil, newLineError(lineTypeExpiration, err)
 			}
 
-			recData.expiration = exp
+			recData.voidTime = exp
 
 		case 6:
 			binCount, err := r.readBinCount()
@@ -619,14 +618,14 @@ func (r *Decoder) readRecord() (*models.Record, error) {
 		}
 	}
 
-	var rec models.Record
+	var arec a.Record
 
 	bins, err := r.readBins(recData.binCount)
 	if err != nil {
 		return nil, newLineError(lineTypeRecordBins, err)
 	}
 
-	rec.Bins = bins
+	arec.Bins = bins
 
 	key, err := a.NewKeyWithDigest(
 		recData.namespace,
@@ -638,9 +637,13 @@ func (r *Decoder) readRecord() (*models.Record, error) {
 		return nil, err
 	}
 
-	rec.Key = key
-	rec.Expiration = recData.expiration
-	rec.Generation = recData.generation
+	arec.Key = key
+	arec.Generation = recData.generation
+
+	rec := models.Record{
+		Record:   &arec,
+		VoidTime: recData.voidTime,
+	}
 
 	return &rec, nil
 }
@@ -966,7 +969,7 @@ func (r *Decoder) readBinCount() (uint16, error) {
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 // TODO expiration needs to be updated based on how much time has passed since the backup.
 // I think that should be done in a processor though, not here
-func (r *Decoder) readExpiration() (uint32, error) {
+func (r *Decoder) readExpiration() (int64, error) {
 	exp, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -976,18 +979,11 @@ func (r *Decoder) readExpiration() (uint32, error) {
 		return 0, err
 	}
 
-	if exp == 0 {
-		// 0 is a special value that means never expire
-		// the asb format stores this value as 0 but the server
-		// needs (uint32)-1
-		return math.MaxUint32, nil
-	}
-
-	if exp < 0 || exp > math.MaxUint32 {
+	if exp < 0 {
 		return 0, fmt.Errorf("invalid expiration time %d", exp)
 	}
 
-	return uint32(exp), nil
+	return exp, nil
 }
 
 func (r *Decoder) readGeneration() (uint32, error) {

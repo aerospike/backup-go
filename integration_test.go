@@ -233,14 +233,16 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	// backup half the partitions
-	partitions := backup.NewPartitionRange(0, 2056)
+	startPartition := 256
+	partitionCount := 2056
+	partitions := backup.NewPartitionRange(startPartition, partitionCount)
 
 	// reset the expected record count
 	numRec = 0
 
 	expectedRecs = []*a.Record{}
 	for pid, recs := range recsByPartition {
-		if pid >= 0 && pid < 2056 {
+		if pid >= startPartition && pid < startPartition+partitionCount {
 			numRec += len(recs)
 			expectedRecs = append(expectedRecs, recs...)
 		}

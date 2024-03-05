@@ -21,8 +21,9 @@ import (
 
 func Test_splitPartitions(t *testing.T) {
 	type args struct {
-		numPartitions int
-		numWorkers    int
+		startPartition int
+		numPartitions  int
+		numWorkers     int
 	}
 	tests := []struct {
 		name    string
@@ -33,8 +34,9 @@ func Test_splitPartitions(t *testing.T) {
 		{
 			name: "Test positive splitPartitions",
 			args: args{
-				numPartitions: 10,
-				numWorkers:    2,
+				startPartition: 0,
+				numPartitions:  10,
+				numWorkers:     2,
 			},
 			want: []PartitionRange{
 				{
@@ -48,90 +50,125 @@ func Test_splitPartitions(t *testing.T) {
 			},
 		},
 		{
-			name: "Test positive splitPartitions with uneven partitions",
+			name: "Test positive splitPartitions with start",
 			args: args{
-				numPartitions: 11,
-				numWorkers:    3,
+				startPartition: 5,
+				numPartitions:  10,
+				numWorkers:     2,
 			},
 			want: []PartitionRange{
 				{
-					Begin: 0,
-					Count: 3,
+					Begin: 5,
+					Count: 5,
 				},
 				{
-					Begin: 3,
-					Count: 4,
+					Begin: 10,
+					Count: 5,
+				},
+			},
+		},
+		{
+			name: "Test positive splitPartitions with start uneven",
+			args: args{
+				startPartition: 5,
+				numPartitions:  20,
+				numWorkers:     3,
+			},
+			want: []PartitionRange{
+				{
+					Begin: 5,
+					Count: 6,
 				},
 				{
-					Begin: 7,
-					Count: 4,
+					Begin: 11,
+					Count: 7,
+				},
+				{
+					Begin: 18,
+					Count: 7,
 				},
 			},
 		},
 		{
 			name: "Test positive splitPartitions with 4096 partitions",
 			args: args{
-				numPartitions: 4096,
-				numWorkers:    5,
+				startPartition: 0,
+				numPartitions:  4096,
+				numWorkers:     4,
 			},
 			want: []PartitionRange{
 				{
 					Begin: 0,
-					Count: 819,
+					Count: 1024,
 				},
 				{
-					Begin: 819,
-					Count: 819,
+					Begin: 1024,
+					Count: 1024,
 				},
 				{
-					Begin: 1638,
-					Count: 819,
+					Begin: 2048,
+					Count: 1024,
 				},
 				{
-					Begin: 2457,
-					Count: 819,
-				},
-				{
-					Begin: 3276,
-					Count: 820,
+					Begin: 3072,
+					Count: 1024,
 				},
 			},
 		},
 		{
-			name: "Test positive splitPartitions with 1 numPartitions",
+			name: "Test positive splitPartitions with 4096 partitions and 1 worker",
 			args: args{
-				numPartitions: 1,
-				numWorkers:    1,
+				startPartition: 0,
+				numPartitions:  4096,
+				numWorkers:     1,
 			},
 			want: []PartitionRange{
 				{
 					Begin: 0,
-					Count: 1,
+					Count: 4096,
 				},
 			},
 		},
 		{
-			name: "Test negative splitPartitions with 0 numPartitions",
+			name: "Test negative splitPartitions with startPartition + numPartitions > partitions",
 			args: args{
-				numPartitions: 0,
-				numWorkers:    2,
+				startPartition: 200,
+				numPartitions:  4096,
+				numWorkers:     3,
 			},
-			want:    nil,
 			wantErr: true,
 		},
 		{
-			name: "Test negative splitPartitions with 0 numWorkers",
+			name: "Test negative splitPartitions with numWorkers < 1",
 			args: args{
-				numPartitions: 10,
-				numWorkers:    0,
+				startPartition: 200,
+				numPartitions:  1,
+				numWorkers:     0,
 			},
-			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Test negative splitPartitions with numPartitions < 1",
+			args: args{
+				startPartition: 0,
+				numPartitions:  0,
+				numWorkers:     1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Test negative splitPartitions with startPartitions < 0",
+			args: args{
+				startPartition: -1,
+				numPartitions:  1,
+				numWorkers:     1,
+			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := splitPartitions(tt.args.numPartitions, tt.args.numWorkers)
+			got, err := splitPartitions(tt.args.startPartition, tt.args.numPartitions, tt.args.numWorkers)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("splitPartitions() error = %v, wantErr %v", err, tt.wantErr)
 				return

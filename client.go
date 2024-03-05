@@ -145,6 +145,10 @@ func (p PartitionRange) validate() error {
 		return fmt.Errorf("count must be between 1 and %d, got %d", partitions, p.Count)
 	}
 
+	if p.Begin+p.Count > partitions {
+		return fmt.Errorf("begin + count is greater than the max partitions count of %d", partitions)
+	}
+
 	return nil
 }
 

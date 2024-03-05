@@ -84,22 +84,23 @@ func (w *processorWorker[T]) Run(ctx context.Context) error {
 
 // **** TTL Processor ****
 
-// ProcessorTTL is a dataProcessor that sets the TTL of a record based on its VoidTime
-type ProcessorTTL struct {
+// processorTTL is a dataProcessor that sets the TTL of a record based on its VoidTime.
+// It is used during restore to set the TTL of records from their backed up VoidTime.
+type processorTTL struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
 	getNow func() cltime.CLTime
 }
 
 // newProcessorTTL creates a new TTLProcessor
-func newProcessorTTL() *ProcessorTTL {
-	return &ProcessorTTL{
+func newProcessorTTL() *processorTTL {
+	return &processorTTL{
 		getNow: cltime.Now,
 	}
 }
 
 // Process sets the TTL of a record based on its VoidTime
-func (p *ProcessorTTL) Process(token *models.Token) (*models.Token, error) {
+func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
 		return token, nil
@@ -135,6 +136,8 @@ func (p *ProcessorTTL) Process(token *models.Token) (*models.Token, error) {
 // **** VoidTime Processor ****
 
 // processorVoidTime is a dataProcessor that sets the VoidTime of a record based on its TTL
+// It is used during backup to set the VoidTime of records from their TTL
+// The VoidTime is the time at which the record will expire and is usually what is encoded in backups
 type processorVoidTime struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests

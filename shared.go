@@ -37,8 +37,8 @@ func handlePanic(errors chan<- error) {
 }
 
 func splitPartitions(startPartition, numPartitions, numWorkers int) ([]PartitionRange, error) {
-	if startPartition+numPartitions > partitions {
-		return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitions count of %d", partitions)
+	if startPartition+numPartitions > maxPartitions {
+		return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitions count of %d", maxPartitions)
 	}
 
 	if numWorkers < 1 {

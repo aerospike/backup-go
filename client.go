@@ -137,16 +137,16 @@ func NewPartitionRange(begin, count int) PartitionRange {
 }
 
 func (p PartitionRange) validate() error {
-	if p.Begin < 0 || p.Begin >= partitions {
-		return fmt.Errorf("begin must be between 0 and %d, got %d", partitions-1, p.Begin)
+	if p.Begin < 0 || p.Begin >= maxPartitions {
+		return fmt.Errorf("begin must be between 0 and %d, got %d", maxPartitions-1, p.Begin)
 	}
 
-	if p.Count < 1 || p.Count > partitions {
-		return fmt.Errorf("count must be between 1 and %d, got %d", partitions, p.Count)
+	if p.Count < 1 || p.Count > maxPartitions {
+		return fmt.Errorf("count must be between 1 and %d, got %d", maxPartitions, p.Count)
 	}
 
-	if p.Begin+p.Count > partitions {
-		return fmt.Errorf("begin + count is greater than the max partitions count of %d", partitions)
+	if p.Begin+p.Count > maxPartitions {
+		return fmt.Errorf("begin + count is greater than the max partitions count of %d", maxPartitions)
 	}
 
 	return nil
@@ -189,7 +189,7 @@ func (c *BackupConfig) validate() error {
 // NewBackupConfig returns a new BackupConfig with default values
 func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
-		Partitions:     PartitionRange{0, partitions},
+		Partitions:     PartitionRange{0, maxPartitions},
 		Parallel:       1,
 		Set:            "",
 		Namespace:      "test",

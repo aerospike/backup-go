@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	partitions = 4096
+	maxPartitions = 4096
 )
 
 // **** Base Backup Handler ****

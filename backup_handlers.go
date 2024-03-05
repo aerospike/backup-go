@@ -54,10 +54,11 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) 
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
-	partitions := bh.config.Partitions.Count
-	startPartition := bh.config.Partitions.Begin
-
-	partitionRanges, err := splitPartitions(startPartition, partitions, bh.config.Parallel)
+	partitionRanges, err := splitPartitions(
+		bh.config.Partitions.Begin,
+		bh.config.Partitions.Count,
+		bh.config.Parallel,
+	)
 	if err != nil {
 		return err
 	}

@@ -95,7 +95,7 @@ type BackupStats struct{}
 
 // BackupHandler handles a backup job to a set of io.writers
 type BackupHandler struct {
-	stats  *BackupStats
+	stats  BackupStats
 	config *BackupConfig
 	errors chan error
 	backupHandlerBase
@@ -157,7 +157,7 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 
 // GetStats returns the stats of the backup job
 func (bwh *BackupHandler) GetStats() BackupStats {
-	return *bwh.stats
+	return bwh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed

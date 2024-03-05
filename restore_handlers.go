@@ -32,7 +32,6 @@ type DBRestoreClient interface {
 
 // worker is an interface for running a job
 type worker interface {
-	// TODO change the any typed pipeline to a message or token type
 	DoJob(context.Context, *pipeline.Pipeline[*models.Token]) error
 }
 
@@ -118,7 +117,6 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 		defer handlePanic(errChan)
 
 		batchSize := rrh.config.Parallel
-		// TODO change the any type to a message or token type
 		dataReaders := []*readWorker[*models.Token]{}
 
 		for i, reader := range readers {

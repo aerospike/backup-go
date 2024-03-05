@@ -15,11 +15,8 @@
 package testutils
 
 import (
-	"errors"
-	"fmt"
-	"reflect"
-
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/stretchr/testify/assert"
 )
 
 type TestClient struct {
@@ -36,7 +33,6 @@ func NewTestClient(asc *a.Client) *TestClient {
 	}
 }
 
-// TODO allow passing in bins
 func (tc *TestClient) WriteRecords(recs []*a.Record) error {
 	for _, rec := range recs {
 		err := tc.asc.Put(nil, rec.Key, rec.Bins)
@@ -69,28 +65,25 @@ func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 	return records, nil
 }
 
-func (tc *TestClient) ValidateRecords(expectedRecs []*a.Record, expCount int, namespace, set string) error {
+func (tc *TestClient) ValidateRecords(
+	t assert.TestingT, expectedRecs []*a.Record, expCount int, namespace, set string) {
 	actualRecs, err := tc.ReadAllRecords(namespace, set)
 	if err != nil {
-		return err
+		t.Errorf("Error reading records: %v", err)
 	}
 
 	if len(actualRecs) != expCount {
-		return errors.New("unexpected number of records")
+		t.Errorf("Expected %d records, got %d", expCount, len(actualRecs))
 	}
 
 	for _, expRec := range expectedRecs {
 		actual, ok := actualRecs[string(expRec.Key.Digest())]
 		if !ok {
-			return errors.New("missing record")
+			t.Errorf("Expected record not found: %v", expRec.Key)
 		}
 
-		if !reflect.DeepEqual(expRec.Bins, actual.Bins) {
-			return fmt.Errorf("wanted bins: %#v\n got bins: %#v", expRec.Bins, actual.Bins)
-		}
+		assert.Equal(t, expRec.Bins, actual.Bins)
 	}
-
-	return nil
 }
 
 func (tc *TestClient) Truncate(namespace, set string) error {

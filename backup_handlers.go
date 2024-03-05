@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -54,6 +55,14 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) 
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
+	ARRScanPolicy := *bh.config.ScanPolicy
+
+	// if we are using the asb encoder, we need to set the RawCDT flag
+	// in the scan policy so that maps and lists are returned as raw blob bins
+	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
+		ARRScanPolicy.RawCDT = true
+	}
+
 	for i := 0; i < bh.config.Parallel; i++ {
 		begin := (i * partitions) / bh.config.Parallel
 		count := partitions / bh.config.Parallel // TODO verify no off by 1 error
@@ -68,7 +77,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,
 			ARRCFG,
-			bh.config.ScanPolicy,
+			&ARRScanPolicy,
 		)
 
 		readWorkers[i] = newReadWorker(recordReader)

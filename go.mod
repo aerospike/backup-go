@@ -3,7 +3,7 @@ module github.com/aerospike/backup-go
 go 1.21
 
 require (
-	github.com/aerospike/aerospike-client-go/v7 v7.1.0
+	github.com/aerospike/aerospike-client-go/v7 v7.1.1-0.20240225194236-bdaabc277666
 	github.com/aerospike/tools-common-go v0.0.0-20240221001721-c09b7e250b16
 	github.com/google/go-cmp v0.6.0
 	github.com/stretchr/testify v1.8.4

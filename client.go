@@ -94,28 +94,28 @@ func NewClient(ac *a.Client, config *Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
+func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultInfoPolicy
 	}
 
-	return p
+	return *p
 }
 
-func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
+func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultWritePolicy
 	}
 
-	return p
+	return *p
 }
 
-func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultScanPolicy
 	}
 
-	return p
+	return *p
 }
 
 // **** Backup ****
@@ -172,8 +172,12 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 		config = NewBackupConfig()
 	}
 
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
-	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
+	config.ScanPolicy = &scanPolicy
 
 	if err := config.validate(); err != nil {
 		return nil, err
@@ -233,8 +237,12 @@ func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *Resto
 		config = NewRestoreConfig()
 	}
 
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
-	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	writePolicy := c.getUsableWritePolicy(config.WritePolicy)
+	config.WritePolicy = &writePolicy
 
 	if err := config.validate(); err != nil {
 		return nil, err

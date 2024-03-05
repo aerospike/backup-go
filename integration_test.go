@@ -31,7 +31,9 @@ import (
 )
 
 const (
-	BackupDirPath = "./test_resources/backup"
+	// got this from hllop := a.HLLAddOp(hllpol, "hll", []a.Value{a.NewIntegerValue(1)}, 4, 12)
+	//nolint:lll // can't split this up without making it a raw quote which will cause the escaped bytes to be interpreted literally
+	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 )
 
 type backupRestoreTestSuite struct {
@@ -159,9 +161,18 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		"BoolBin":    true,
 		"BlobBin":    []byte("bytes"),
 		"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
-		// TODO "HLLBin":    a.NewHLLValue([]byte{}),
-		// TODO "MapBin": a.NewList(1, "string", true, []byte("bytes")),
-		// TODO "ListBin": a.NewMap(map[interface{}]interface{}{}),
+		"HLLBin":     a.NewHLLValue([]byte(hllValue)),
+		"MapBin": map[any]any{
+			"IntBin":    1,
+			"StringBin": "hi",
+			"listBin":   []any{1, 2, 3},
+		},
+		"ListBin": []any{
+			1,
+			"string",
+			[]byte("bytes"),
+			map[any]any{1: 1},
+		},
 	}
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
@@ -202,8 +213,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	err = suite.testClient.ValidateRecords(expectedRecs, numRec, suite.namespace, suite.set)
-	suite.Nil(err)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
 }
 
 func (suite *backupRestoreTestSuite) TestBackupContext() {

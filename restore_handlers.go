@@ -94,7 +94,7 @@ type RestoreStats struct{}
 // RestoreHandler handles a restore job from a set of io.readers
 type RestoreHandler struct {
 	restoreHandlerBase
-	stats   *RestoreStats
+	stats   RestoreStats
 	config  *RestoreConfig
 	errors  chan error
 	readers []io.Reader
@@ -159,7 +159,7 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 
 // GetStats returns the stats of the restore job
 func (rrh *RestoreHandler) GetStats() RestoreStats {
-	return *rrh.stats
+	return rrh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

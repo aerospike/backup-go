@@ -53,6 +53,7 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) 
 
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
+	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
 	partitionRanges, err := splitPartitions(
 		bh.config.Partitions.Begin,
@@ -78,6 +79,9 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		)
 
 		readWorkers[i] = newReadWorker(recordReader)
+
+		ttlSetter := newProcessorTTL()
+		processorWorkers[i] = newProcessorWorker(ttlSetter)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
@@ -88,6 +92,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
+		processorWorkers,
 		writeWorkers,
 	)
 

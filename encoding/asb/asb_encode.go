@@ -19,8 +19,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math"
-	"time"
 
 	"github.com/aerospike/backup-go/models"
 
@@ -36,7 +34,7 @@ func NewEncoder() (*Encoder, error) {
 func (o *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 	switch token.Type {
 	case models.TokenTypeRecord:
-		return o.EncodeRecord(token.Record)
+		return o.EncodeRecord(&token.Record)
 	case models.TokenTypeUDF:
 		return o.EncodeUDF(token.UDF)
 	case models.TokenTypeSIndex:
@@ -74,9 +72,6 @@ func (o *Encoder) GetFirstMetaText() []byte {
 
 // **** RECORD ****
 
-// function pointer for time.Now to allow for testing
-var getTimeNow = time.Now
-
 func recordToASB(r *models.Record) ([]byte, error) {
 	var data []byte
 
@@ -99,7 +94,7 @@ func recordToASB(r *models.Record) ([]byte, error) {
 
 	data = append(data, lineStart...)
 
-	exprTime := getExpirationTime(r.Expiration, getTimeNow().Unix())
+	exprTime := r.VoidTime
 	expirationText := fmt.Sprintf("%c %d\n", recordHeaderTypeExpiration, exprTime)
 	data = append(data, expirationText...)
 
@@ -252,17 +247,6 @@ func userKeyToASB(userKey a.Value) ([]byte, error) {
 	}
 
 	return data.Bytes(), nil
-}
-
-func getExpirationTime(ttl uint32, unixNow int64) uint32 {
-	// math.MaxUint32 (-1) means never expire
-	if ttl == math.MaxUint32 {
-		return 0
-	}
-
-	timeSinceCE := unixNow - citrusLeafEpoch
-
-	return uint32(timeSinceCE) + ttl
 }
 
 // **** SINDEX ****

@@ -15,12 +15,26 @@
 package models
 
 import (
+	"math"
+
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 // **** Records ****
 
-type Record = a.Record
+const (
+	// VoidTimeNeverExpire is used when a record should never expire
+	VoidTimeNeverExpire int64 = 0
+	// ExpirationNever is the Aerospike server's special TTL value for records that should never expire
+	ExpirationNever uint32 = math.MaxUint32
+)
+
+type Record struct {
+	*a.Record
+
+	// VoidTime is the time in seconds since the citrusleaf epoch when the record will expire.
+	VoidTime int64
+}
 
 // **** SIndexes ****
 
@@ -86,14 +100,14 @@ const (
 // Token encompasses the other data models
 // fields should be accessed based on the tokenType
 type Token struct {
-	Record *Record
 	SIndex *SIndex
 	UDF    *UDF
+	Record Record
 	Type   TokenType
 }
 
 // NewRecordToken creates a new token with the given record
-func NewRecordToken(r *Record) *Token {
+func NewRecordToken(r Record) *Token {
 	return &Token{
 		Record: r,
 		Type:   TokenTypeRecord,

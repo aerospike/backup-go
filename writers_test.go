@@ -93,11 +93,13 @@ func (suite *writersTestSuite) TestGenericWriter() {
 		panic(aerr)
 	}
 
-	expRecord := &models.Record{
-		Key: key,
-		Bins: a.BinMap{
-			"key0": "hi",
-			"key1": 1,
+	expRecord := models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
 		},
 	}
 	recToken := models.NewRecordToken(expRecord)
@@ -147,7 +149,9 @@ func (suite *writersTestSuite) TestGenericWriter() {
 
 	// Encoder failed
 
-	failRec := &models.Record{}
+	failRec := models.Record{
+		Record: &a.Record{},
+	}
 	failRecToken := models.NewRecordToken(failRec)
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
@@ -166,11 +170,13 @@ func (suite *writersTestSuite) TestASBWriter() {
 		panic(aerr)
 	}
 
-	expRecord := &models.Record{
-		Key: key,
-		Bins: a.BinMap{
-			"key0": "hi",
-			"key1": 1,
+	expRecord := models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
 		},
 	}
 	recToken := models.NewRecordToken(expRecord)
@@ -220,7 +226,9 @@ func (suite *writersTestSuite) TestASBWriter() {
 
 	// Encoder failed
 
-	failRec := &models.Record{}
+	failRec := models.Record{
+		Record: &a.Record{},
+	}
 	failRecToken := models.NewRecordToken(failRec)
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
@@ -239,11 +247,13 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 		panic(aerr)
 	}
 
-	expRecord := &models.Record{
-		Key: key,
-		Bins: a.BinMap{
-			"key0": "hi",
-			"key1": 1,
+	expRecord := models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
 		},
 	}
 	recToken := models.NewRecordToken(expRecord)
@@ -263,7 +273,9 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 
 	// DBWriter failed
 
-	failRec := &models.Record{}
+	failRec := models.Record{
+		Record: &a.Record{},
+	}
 	failRecToken := models.NewRecordToken(failRec)
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), failRec.Key, failRec.Bins).Return(a.ErrInvalidParam)
 	err = writer.Write(failRecToken)
@@ -281,11 +293,13 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 		panic(aerr)
 	}
 
-	expRecord := &models.Record{
-		Key: key,
-		Bins: a.BinMap{
-			"key0": "hi",
-			"key1": 1,
+	expRecord := models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
 		},
 	}
 	recToken := models.NewRecordToken(expRecord)

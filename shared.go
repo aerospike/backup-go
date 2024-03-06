@@ -57,9 +57,6 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 	for i := 0; i < numWorkers; i++ {
 		pSpecs[i].Begin = (i * numPartitions) / numWorkers
 		pSpecs[i].Count = (((i + 1) * numPartitions) / numWorkers) - pSpecs[i].Begin
-	}
-
-	for i := 0; i < numWorkers; i++ {
 		pSpecs[i].Begin += startPartition
 	}
 

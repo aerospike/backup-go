@@ -105,19 +105,12 @@ func newGenericWriter(encoder encoding.Encoder, output io.Writer) *genericWriter
 // TODO let the encoder handle the type checking
 // TODO maybe restrict the types that can be written to this
 func (w *genericWriter) Write(v *models.Token) error {
-	var (
-		err  error
-		data []byte
-	)
-
-	data, err = w.encoder.EncodeToken(v)
+	n, err := w.encoder.EncodeToken(v)
 	if err != nil {
-		return err
+		return fmt.Errorf("error encoding token: %w, at byte %d", err, n)
 	}
 
-	_, err = w.output.Write(data)
-
-	return err
+	return nil
 }
 
 // Cancel satisfies the DataWriter interface

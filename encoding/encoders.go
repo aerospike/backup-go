@@ -15,6 +15,8 @@
 package encoding
 
 import (
+	"io"
+
 	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/models"
 )
@@ -24,7 +26,7 @@ import (
 //
 //go:generate mockery --name Encoder
 type Encoder interface {
-	EncodeToken(*models.Token) ([]byte, error)
+	EncodeToken(*models.Token) (int, error)
 }
 
 // ASBEncoderFactory satisfies the EncoderBuilder interface
@@ -38,6 +40,6 @@ func NewASBEncoderFactory() *ASBEncoderFactory {
 
 // CreateEncoder creates a new ASBEncoder
 // This method is called by the backup client to create a new encoder
-func (f *ASBEncoderFactory) CreateEncoder() (Encoder, error) {
-	return asb.NewEncoder()
+func (f *ASBEncoderFactory) CreateEncoder(dst io.Writer) (Encoder, error) {
+	return asb.NewEncoder(dst)
 }

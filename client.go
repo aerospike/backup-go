@@ -123,7 +123,7 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 // EncoderFactory is used to specify the encoder with which to encode the backup data
 // if nil, the default encoder factory will be used
 type EncoderFactory interface {
-	CreateEncoder() (encoding.Encoder, error)
+	CreateEncoder(dst io.Writer) (encoding.Encoder, error)
 }
 
 // PartitionRange specifies a range of Aerospike partitions

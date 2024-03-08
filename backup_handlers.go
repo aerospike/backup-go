@@ -182,7 +182,7 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 }
 
 func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool) (*writeWorker[*models.Token], error) {
-	enc, err := eb.CreateEncoder()
+	enc, err := eb.CreateEncoder(w)
 	if err != nil {
 		return nil, err
 	}

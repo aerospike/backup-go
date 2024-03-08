@@ -35,7 +35,7 @@ func newDecoderError(offset uint64, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading asb file at character, %d: %w", offset, err)
+	return fmt.Errorf("error while reading asb data at byte %d: %w", offset, err)
 }
 
 func newSectionError(section string, err error) error {

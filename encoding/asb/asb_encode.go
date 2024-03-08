@@ -365,18 +365,30 @@ var asbEscapedChars = map[byte]struct{}{
 
 // TODO improve performance maybe by writing directly to a buffer
 func escapeASBS(s string) string {
-	in := []byte(s)
-	v := []byte{}
-
-	for _, c := range in {
-		if _, ok := asbEscapedChars[c]; ok {
-			v = append(v, asbEscape)
+	escapeCount := 0
+	for _, c := range s {
+		if _, ok := asbEscapedChars[byte(c)]; ok {
+			escapeCount++
 		}
-
-		v = append(v, c)
 	}
 
-	return string(v)
+	if escapeCount == 0 {
+		return s
+	}
+
+	escaped := make([]byte, len(s)+escapeCount)
+	i := 0
+
+	for _, c := range s {
+		if _, ok := asbEscapedChars[byte(c)]; ok {
+			escaped[i] = '\\'
+			i++
+		}
+		escaped[i] = byte(c)
+		i++
+	}
+
+	return string(escaped)
 }
 
 func sindexToASB(sindex *models.SIndex) ([]byte, error) {

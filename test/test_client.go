@@ -19,20 +19,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestClient is a wrapper around the Aerospike client that provides
+// convenience methods for testing.
 type TestClient struct {
 	asc *a.Client
 }
 
 type digest = string
 
+// RecordMap is a map of record digests to records.
+// It is used to compare expected and actual records.
+// The digest is a string representation of the record's key digest.
 type RecordMap map[digest]*a.Record
 
+// NewTestClient creates a new TestClient.
 func NewTestClient(asc *a.Client) *TestClient {
 	return &TestClient{
 		asc: asc,
 	}
 }
 
+// WriteRecords writes the given records to the database.
 func (tc *TestClient) WriteRecords(recs []*a.Record) error {
 	for _, rec := range recs {
 		err := tc.asc.Put(nil, rec.Key, rec.Bins)
@@ -44,6 +51,7 @@ func (tc *TestClient) WriteRecords(recs []*a.Record) error {
 	return nil
 }
 
+// ReadAllRecords reads all records from the given namespace and set.
 func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 	records := make(RecordMap)
 	stmt := a.NewStatement(namespace, set)
@@ -65,6 +73,13 @@ func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 	return records, nil
 }
 
+// ValidateRecords compares the expected records to the actual records in the database.
+// It fails if the number of records in the namespace and set does not match the length of
+// the expected records, or if any unexpected records are found in the database.
+// It does this by reading all records in the database namespace and set, then comparing
+// their digests and bins to the expected records' digests and bins.
+// Currently, it does not compare the records' metadata, only their digests and bins.
+// TODO compare metadata and user keys, maybe in another method
 func (tc *TestClient) ValidateRecords(
 	t assert.TestingT, expectedRecs []*a.Record, expCount int, namespace, set string) {
 	actualRecs, err := tc.ReadAllRecords(namespace, set)
@@ -86,6 +101,7 @@ func (tc *TestClient) ValidateRecords(
 	}
 }
 
+// Truncate deletes all records in the given namespace and set.
 func (tc *TestClient) Truncate(namespace, set string) error {
 	return tc.asc.Truncate(nil, namespace, set, nil)
 }

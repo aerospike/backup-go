@@ -166,12 +166,14 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 			"IntBin":    1,
 			"StringBin": "hi",
 			"listBin":   []any{1, 2, 3},
+			"mapBin":    map[any]any{1: 1},
 		},
 		"ListBin": []any{
 			1,
 			"string",
 			[]byte("bytes"),
 			map[any]any{1: 1},
+			[]any{1, 2, 3},
 		},
 	}
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)

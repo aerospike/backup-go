@@ -683,9 +683,6 @@ func TestASBReader_readUDF(t *testing.T) {
 }
 
 func TestASBReader_readBin(t *testing.T) {
-	data := "123"
-	encData := base64.StdEncoding.EncodeToString([]byte(data))
-
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -1088,11 +1085,12 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
-						len(encData), encData)),
+						len(base64.StdEncoding.EncodeToString([]byte("123"))),
+						base64.StdEncoding.EncodeToString([]byte("123")))),
 				},
 			},
 			want: map[string]any{
-				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte(data)),
+				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte("123")),
 			},
 			wantErr: false,
 		},
@@ -1101,11 +1099,11 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader(fmt.Sprintf("L! list-bin %d %s\n",
-						len(data), data)),
+						len("123"), []byte("123"))),
 				},
 			},
 			want: map[string]any{
-				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte(data)),
+				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte("123")),
 			},
 			wantErr: false,
 		},
@@ -1114,7 +1112,7 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
-						500, encData)),
+						500, "123")),
 				},
 			},
 			want:    map[string]any{},
@@ -1125,11 +1123,12 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
-						len(encData), encData)),
+						len(base64.StdEncoding.EncodeToString([]byte("123"))),
+						base64.StdEncoding.EncodeToString([]byte("123")))),
 				},
 			},
 			want: map[string]any{
-				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte(data)),
+				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte("123")),
 			},
 			wantErr: false,
 		},
@@ -1138,11 +1137,11 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader(fmt.Sprintf("M! map-bin %d %s\n",
-						len(data), data)),
+						len("123"), "123")),
 				},
 			},
 			want: map[string]any{
-				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte(data)),
+				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte("123")),
 			},
 			wantErr: false,
 		},
@@ -1151,7 +1150,7 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
-						500, encData)),
+						500, "abcd")),
 				},
 			},
 			want:    map[string]any{},

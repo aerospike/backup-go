@@ -55,12 +55,12 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) 
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
-	ARRScanPolicy := *bh.config.ScanPolicy
+	scanPolicy := *bh.config.ScanPolicy
 
 	// if we are using the asb encoder, we need to set the RawCDT flag
 	// in the scan policy so that maps and lists are returned as raw blob bins
 	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
-		ARRScanPolicy.RawCDT = true
+		scanPolicy.RawCDT = true
 	}
 
 	for i := 0; i < bh.config.Parallel; i++ {
@@ -77,7 +77,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,
 			ARRCFG,
-			&ARRScanPolicy,
+			&scanPolicy,
 		)
 
 		readWorkers[i] = newReadWorker(recordReader)

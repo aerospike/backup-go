@@ -63,16 +63,48 @@ func (o *Encoder) EncodeSIndex(sindex *models.SIndex) (int, error) {
 	return sindexToASB(sindex, o.output)
 }
 
-func (o *Encoder) GetVersionText() []byte {
-	return []byte(fmt.Sprintf("Version %s\n", ASBFormatVersion))
+func (o *Encoder) WriteHeader(namespace string, firstFile bool) (int, error) {
+	// bytes written
+	var bw int
+
+	n, err := writeVersionText(ASBFormatVersion, o.output)
+	bw += n
+
+	if err != nil {
+		return bw, err
+	}
+
+	n, err = writeNamespaceMetaText(namespace, o.output)
+	bw += n
+
+	if err != nil {
+		return bw, err
+	}
+
+	if firstFile {
+		n, err = writeFirstMetaText(o.output)
+		bw += n
+
+		if err != nil {
+			return bw, err
+		}
+	}
+
+	return bw, nil
 }
 
-func (o *Encoder) GetNamespaceMetaText(namespace string) []byte {
-	return []byte(fmt.Sprintf("%c namespace %s\n", markerMetadataSection, escapeASBS(namespace)))
+// **** META DATA ****
+
+func writeVersionText(asbVersion string, w io.Writer) (int, error) {
+	return fmt.Fprintf(w, "Version %s\n", asbVersion)
 }
 
-func (o *Encoder) GetFirstMetaText() []byte {
-	return []byte(fmt.Sprintf("%c first-file\n", markerMetadataSection))
+func writeNamespaceMetaText(namespace string, w io.Writer) (int, error) {
+	return fmt.Fprintf(w, "%c namespace %s\n", markerMetadataSection, escapeASBS(namespace))
+}
+
+func writeFirstMetaText(w io.Writer) (int, error) {
+	return fmt.Fprintf(w, "%c first-file\n", markerMetadataSection)
 }
 
 // **** RECORD ****

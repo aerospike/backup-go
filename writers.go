@@ -15,11 +15,9 @@
 package backup
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 
 	"github.com/aerospike/backup-go/encoding"
@@ -90,20 +88,16 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 // to an io.Writer. It uses an Encoder to encode the data.
 type genericWriter struct {
 	encoder encoding.Encoder
-	output  io.Writer
 }
 
 // newGenericWriter creates a new GenericWriter
-func newGenericWriter(encoder encoding.Encoder, output io.Writer) *genericWriter {
+func newGenericWriter(encoder encoding.Encoder) *genericWriter {
 	return &genericWriter{
 		encoder: encoder,
-		output:  output,
 	}
 }
 
 // Write encodes v and writes it to the output
-// TODO let the encoder handle the type checking
-// TODO maybe restrict the types that can be written to this
 func (w *genericWriter) Write(v *models.Token) error {
 	n, err := w.encoder.EncodeToken(v)
 	if err != nil {
@@ -125,14 +119,14 @@ func (w *genericWriter) Close() {}
 //go:generate mockery --name asbEncoder
 type asbEncoder interface {
 	encoding.Encoder
-	GetVersionText() []byte
-	GetNamespaceMetaText(namespace string) []byte
-	GetFirstMetaText() []byte
+	WriteHeader(namespace string, firstFile bool) (int, error)
 }
 
 // asbWriter satisfies the DataWriter interface
 // It writes the types from the models package as data encoded in ASB format
 // to an io.Writer. It uses an ASBEncoder to encode the data.
+// asbWriter also writes the ASB header and metadata to the output
+// when Init is called.
 type asbWriter struct {
 	genericWriter
 	encoder   asbEncoder
@@ -142,9 +136,9 @@ type asbWriter struct {
 }
 
 // newAsbWriter creates a new ASBWriter
-func newAsbWriter(encoder asbEncoder, output io.Writer) *asbWriter {
+func newAsbWriter(encoder asbEncoder) *asbWriter {
 	return &asbWriter{
-		genericWriter: *newGenericWriter(encoder, output),
+		genericWriter: *newGenericWriter(encoder),
 		encoder:       encoder,
 		once:          &sync.Once{},
 	}
@@ -159,15 +153,13 @@ func (w *asbWriter) Init(namespace string, first bool) error {
 		w.namespace = namespace
 		w.first = first
 
-		header := bytes.Buffer{}
-		header.Write(w.encoder.GetVersionText())
-		header.Write(w.encoder.GetNamespaceMetaText(namespace))
+		// bytes written
+		var n int
 
-		if first {
-			header.Write(w.encoder.GetFirstMetaText())
+		n, err = w.encoder.WriteHeader(namespace, first)
+		if err != nil {
+			err = fmt.Errorf("error writing ASB header: %w at byte %d", err, n)
 		}
-
-		_, err = w.output.Write(header.Bytes())
 	})
 
 	return err

@@ -194,6 +194,36 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 	suite.Assert().Equal(expected, dst.Bytes())
 }
 
+func (suite *asbEncoderTestSuite) TestWriteHeaderFirst() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	expected := "Version 3.1\n# namespace test\n# first-file\n"
+
+	n, err := encoder.WriteHeader("test", true)
+	suite.Assert().Equal(len(expected), n)
+	suite.Assert().NoError(err)
+	suite.Assert().Equal(expected, dst.String())
+}
+
+func (suite *asbEncoderTestSuite) TestWriteHeader() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	expected := "Version 3.1\n# namespace test\n"
+
+	n, err := encoder.WriteHeader("test", false)
+	suite.Assert().Equal(len(expected), n)
+	suite.Assert().NoError(err)
+	suite.Assert().Equal(expected, dst.String())
+}
+
 func TestASBEncoderTestSuite(t *testing.T) {
 	suite.Run(t, new(asbEncoderTestSuite))
 }
@@ -748,80 +778,6 @@ func Test_recordToASB(t *testing.T) {
 			sortedWant := sortBinOutput(string(tt.want))
 			if !reflect.DeepEqual(sortedGot, sortedWant) {
 				t.Errorf("recordToASB() = %v, want %v", string(got), string(tt.want))
-			}
-		})
-	}
-}
-
-func TestGetFirstMetaText(t *testing.T) {
-	enc := &Encoder{}
-	tests := []struct {
-		name string
-		want []byte
-	}{
-		{
-			name: "positive simple",
-			want: []byte("# first-file\n"),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := enc.GetFirstMetaText(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetFirstMetaText() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGetNamespaceMetaText(t *testing.T) {
-	enc := &Encoder{}
-	type args struct {
-		namespace string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []byte
-	}{
-		{
-			name: "positive simple",
-			args: args{
-				namespace: "ns",
-			},
-			want: []byte(fmt.Sprintf("# namespace %s\n", "ns")),
-		},
-		{
-			name: "positive escaped",
-			args: args{
-				namespace: " n\ns\\",
-			},
-			want: []byte(fmt.Sprintf("# namespace %s\n", "\\ n\\\ns\\\\")),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := enc.GetNamespaceMetaText(tt.args.namespace); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetNamespaceMetaText() = %v, want %v", string(got), string(tt.want))
-			}
-		})
-	}
-}
-
-func TestGetVersionText(t *testing.T) {
-	enc := &Encoder{}
-	tests := []struct {
-		name string
-		want []byte
-	}{
-		{
-			name: "positive simple",
-			want: []byte(fmt.Sprintf("Version %s\n", ASBFormatVersion)),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := enc.GetVersionText(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetVersionText() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}
@@ -1636,4 +1592,119 @@ func genKey() *a.Key {
 	}
 
 	return key
+}
+
+func Test_writeVersionText(t *testing.T) {
+	type args struct {
+		asbVersion string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				asbVersion: "3.2",
+			},
+			want:  len("Version 3.2\n"),
+			wantW: "Version 3.2\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeVersionText(tt.args.asbVersion, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeVersionText() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeVersionText() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeVersionText() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeNamespaceMetaText(t *testing.T) {
+	type args struct {
+		namespace string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				namespace: "test",
+			},
+			want:  len("# namespace test\n"),
+			wantW: "# namespace test\n",
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				namespace: "t e\nst\\",
+			},
+			want:  len("# namespace t\\ e\\\nst\\\\\n"),
+			wantW: "# namespace t\\ e\\\nst\\\\\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeNamespaceMetaText(tt.args.namespace, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeNamespaceMetaText() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeNamespaceMetaText() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeNamespaceMetaText() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeFirstMetaText(t *testing.T) {
+	tests := []struct {
+		name    string
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name:  "positive simple",
+			want:  len("# first-file\n"),
+			wantW: "# first-file\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeFirstMetaText(w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeFirstMetaText() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeFirstMetaText() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeFirstMetaText() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
 }

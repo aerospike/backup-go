@@ -340,8 +340,8 @@ func Test_binToASB(t *testing.T) {
 				v: a.HLLValue("hello"),
 			},
 			want: []byte(fmt.Sprintf("- Y binName %d %s\n",
-				len(base64.StdEncoding.EncodeToString([]byte("123"))),
-				base64.StdEncoding.EncodeToString([]byte("123")))),
+				len(base64.StdEncoding.EncodeToString([]byte("hello"))),
+				base64.StdEncoding.EncodeToString([]byte("hello")))),
 		},
 		{
 			name: "positive GeoJSON bin",

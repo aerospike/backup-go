@@ -39,10 +39,11 @@ func (o *Encoder) EncodeToken(token *models.Token) (int, error) {
 	switch token.Type {
 	case models.TokenTypeRecord:
 		return o.EncodeRecord(&token.Record)
-	// case models.TokenTypeUDF:
-	// 	return o.EncodeUDF(token.UDF)
-	// case models.TokenTypeSIndex:
-	// 	return o.EncodeSIndex(token.SIndex)
+	case models.TokenTypeUDF:
+		data, err := o.EncodeUDF(token.UDF)
+		return len(data), err
+	case models.TokenTypeSIndex:
+		return o.EncodeSIndex(token.SIndex)
 	case models.TokenTypeInvalid:
 		return 0, errors.New("invalid token")
 	default:
@@ -58,8 +59,8 @@ func (o *Encoder) EncodeUDF(_ *models.UDF) ([]byte, error) {
 	return nil, fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }
 
-func (o *Encoder) EncodeSIndex(sindex *models.SIndex) ([]byte, error) {
-	return sindexToASB(sindex)
+func (o *Encoder) EncodeSIndex(sindex *models.SIndex) (int, error) {
+	return sindexToASB(sindex, o.output)
 }
 
 func (o *Encoder) GetVersionText() []byte {
@@ -79,14 +80,6 @@ func (o *Encoder) GetFirstMetaText() []byte {
 func recordToASB(r *models.Record, w io.Writer) (int, error) {
 	// bytes written
 	var bw int
-
-	// if r == nil {
-	// 	return nil, errors.New("record is nil")
-	// }
-
-	// if r.Key == nil {
-	// 	return bw, errors.New("record key is nil")
-	// }
 
 	n, err := keyToASB(r.Key, w)
 	bw += n
@@ -111,10 +104,6 @@ func recordToASB(r *models.Record, w io.Writer) (int, error) {
 	if err != nil {
 		return bw, err
 	}
-
-	// if len(r.Bins) < 1 {
-	// 	return bw, fmt.Errorf("ERR: empty binmap")
-	// }
 
 	n, err = binsToASB(r.Bins, w)
 	bw += n
@@ -169,33 +158,33 @@ func binToASB(k string, v any, w io.Writer) (int, error) {
 
 	switch v := v.(type) {
 	case bool:
-		bw, err = writeBoolBin(k, v, w)
+		bw, err = writeBinBool(k, v, w)
 	case int64:
-		bw, err = writeIntBin(k, v, w)
+		bw, err = writeBinInt(k, v, w)
 	case int32:
-		bw, err = writeIntBin(k, v, w)
+		bw, err = writeBinInt(k, v, w)
 	case int16:
-		bw, err = writeIntBin(k, v, w)
+		bw, err = writeBinInt(k, v, w)
 	case int8:
-		bw, err = writeIntBin(k, v, w)
+		bw, err = writeBinInt(k, v, w)
 	case int:
-		bw, err = writeIntBin(k, v, w)
+		bw, err = writeBinInt(k, v, w)
 	case float64:
-		bw, err = writeFloatBin(k, v, w)
+		bw, err = writeBinFloat(k, v, w)
 	case string:
-		bw, err = writeStringBin(k, v, w)
+		bw, err = writeBinString(k, v, w)
 	case []byte:
-		bw, err = writeBytesBin(k, v, w)
+		bw, err = writeBinBytes(k, v, w)
 	case map[any]any:
 		return bw, errors.New("map bin not supported")
 	case []any:
 		return bw, errors.New("list bin not supported")
 	case a.HLLValue:
-		bw, err = writeHLLBin(k, v, w)
+		bw, err = writeBinHLL(k, v, w)
 	case a.GeoJSONValue:
-		bw, err = writeGeoJSONBin(k, v, w)
+		bw, err = writeBinGeoJSON(k, v, w)
 	case nil:
-		bw, err = writeNilBin(k, w)
+		bw, err = writeBinNil(k, w)
 	default:
 		return bw, fmt.Errorf("unknown bin type: %T, key: %s", v, k)
 	}
@@ -203,41 +192,41 @@ func binToASB(k string, v any, w io.Writer) (int, error) {
 	return bw, err
 }
 
-func writeBoolBin(name string, v bool, w io.Writer) (int, error) {
+func writeBinBool(name string, v bool, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s %c\n", markerRecordBins, binTypeBool, escapeASBS(name), boolToASB(v))
 }
 
-type intBinTypes interface {
+type binTypesInt interface {
 	int64 | int32 | int16 | int8 | int
 }
 
-func writeIntBin[T intBinTypes](name string, v T, w io.Writer) (int, error) {
+func writeBinInt[T binTypesInt](name string, v T, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s %d\n", markerRecordBins, binTypeInt, escapeASBS(name), v)
 }
 
-func writeFloatBin(name string, v float64, w io.Writer) (int, error) {
+func writeBinFloat(name string, v float64, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s %f\n", markerRecordBins, binTypeFloat, escapeASBS(name), v)
 }
 
-func writeStringBin(name string, v string, w io.Writer) (int, error) {
+func writeBinString(name string, v string, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeString, escapeASBS(name), len(v), v)
 }
 
-func writeBytesBin(name string, v []byte, w io.Writer) (int, error) {
-	encoded := newBase64Encode(v)
+func writeBinBytes(name string, v []byte, w io.Writer) (int, error) {
+	encoded := base64Encode(v)
 	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytes, escapeASBS(name), len(encoded), encoded)
 }
 
-func writeHLLBin(name string, v a.HLLValue, w io.Writer) (int, error) {
-	encoded := newBase64Encode(v)
+func writeBinHLL(name string, v a.HLLValue, w io.Writer) (int, error) {
+	encoded := base64Encode(v)
 	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytesHLL, escapeASBS(name), len(encoded), encoded)
 }
 
-func writeGeoJSONBin(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
+func writeBinGeoJSON(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeGeoJSON, escapeASBS(name), len(v), v)
 }
 
-func writeNilBin(name string, w io.Writer) (int, error) {
+func writeBinNil(name string, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s\n", markerRecordBins, binTypeNil, escapeASBS(name))
 }
 
@@ -285,11 +274,7 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 	return bw, nil
 }
 
-func base64Encode(b []byte) string {
-	return base64.StdEncoding.EncodeToString(b)
-}
-
-func newBase64Encode(v []byte) []byte {
+func base64Encode(v []byte) []byte {
 	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(v)))
 	base64.StdEncoding.Encode(encoded, v)
 	return encoded
@@ -300,7 +285,7 @@ func writeRecordNamespace(namespace string, w io.Writer) (int, error) {
 }
 
 func writeRecordDigest(digest []byte, w io.Writer) (int, error) {
-	encoded := newBase64Encode(digest)
+	encoded := base64Encode(digest)
 	return fmt.Fprintf(w, "%c %c %s\n", markerRecordHeader, recordHeaderTypeDigest, encoded)
 }
 
@@ -313,44 +298,44 @@ func userKeyToASB(userKey a.Value, w io.Writer) (int, error) {
 	switch v := val.(type) {
 	// need the repeated int cases to satisfy the generic type checker
 	case int64:
-		return writeIntUserKey(v, w)
+		return writeUserKeyInt(v, w)
 	case int32:
-		return writeIntUserKey(v, w)
+		return writeUserKeyInt(v, w)
 	case int16:
-		return writeIntUserKey(v, w)
+		return writeUserKeyInt(v, w)
 	case int8:
-		return writeIntUserKey(v, w)
+		return writeUserKeyInt(v, w)
 	case int:
-		return writeIntUserKey(v, w)
+		return writeUserKeyInt(v, w)
 	case float64:
-		return writeFloatUserKey(v, w)
+		return writeUserKeyFloat(v, w)
 	case string:
-		return writeStringUserKey(v, w)
+		return writeUserKeyString(v, w)
 	case []byte:
-		return writeBytesUserKey(v, w)
+		return writeUserKeyBytes(v, w)
 	default:
 		return 0, fmt.Errorf("invalid user key type: %T", v)
 	}
 }
 
-type intUserKeyTypes interface {
+type UserKeyTypesInt interface {
 	int64 | int32 | int16 | int8 | int
 }
 
-func writeIntUserKey[T intUserKeyTypes](v T, w io.Writer) (int, error) {
+func writeUserKeyInt[T UserKeyTypesInt](v T, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %c %d\n", markerRecordHeader, recordHeaderTypeKey, keyTypeInt, v)
 }
 
-func writeFloatUserKey(v float64, w io.Writer) (int, error) {
+func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %c %f\n", markerRecordHeader, recordHeaderTypeKey, keyTypeFloat, v)
 }
 
-func writeStringUserKey(v string, w io.Writer) (int, error) {
+func writeUserKeyString(v string, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeString, len(v), v)
 }
 
-func writeBytesUserKey(v []byte, w io.Writer) (int, error) {
-	encoded := newBase64Encode(v)
+func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
+	encoded := base64Encode(v)
 	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeBytes, len(encoded), encoded)
 }
 
@@ -363,7 +348,6 @@ var asbEscapedChars = map[byte]struct{}{
 	'\n': {},
 }
 
-// TODO improve performance maybe by writing directly to a buffer
 func escapeASBS(s string) string {
 	escapeCount := 0
 	for _, c := range s {
@@ -391,15 +375,15 @@ func escapeASBS(s string) string {
 	return string(escaped)
 }
 
-func sindexToASB(sindex *models.SIndex) ([]byte, error) {
-	if sindex == nil {
-		return nil, errors.New("sindex is nil")
-	}
+func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
+	// bytes written
+	var bw int
 
 	// sindexes only ever use 1 path for now
 	numPaths := 1
 
-	v := fmt.Sprintf(
+	n, err := fmt.Fprintf(
+		w,
 		"%c %c %s %s %s %c %d %s %c",
 		markerGlobalSection,
 		globalTypeSIndex,
@@ -411,12 +395,21 @@ func sindexToASB(sindex *models.SIndex) ([]byte, error) {
 		escapeASBS(sindex.Path.BinName),
 		byte(sindex.Path.BinType),
 	)
-
-	if sindex.Path.B64Context != "" {
-		v = fmt.Sprintf("%s %s", v, sindex.Path.B64Context)
+	bw += n
+	if err != nil {
+		return bw, err
 	}
 
-	v += "\n"
+	if sindex.Path.B64Context != "" {
+		n, err = fmt.Fprintf(w, " %s", sindex.Path.B64Context)
+		bw += n
+		if err != nil {
+			return bw, err
+		}
+	}
 
-	return []byte(v), nil
+	n, err = fmt.Fprintf(w, "\n")
+	bw += n
+
+	return bw, err
 }

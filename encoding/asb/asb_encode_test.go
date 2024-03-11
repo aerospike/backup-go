@@ -258,8 +258,6 @@ func Test__SIndexToASB(t *testing.T) {
 }
 
 func Test_binToASB(t *testing.T) {
-	data := []byte("hello")
-	encData := base64.StdEncoding.EncodeToString(data)
 	geoJSONStr := `{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [0,0]]]}`
 	type args struct {
 		v any
@@ -341,7 +339,9 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: a.HLLValue("hello"),
 			},
-			want: []byte(fmt.Sprintf("- Y binName %d %s\n", len(encData), encData)),
+			want: []byte(fmt.Sprintf("- Y binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("123"))),
+				base64.StdEncoding.EncodeToString([]byte("123")))),
 		},
 		{
 			name: "positive GeoJSON bin",
@@ -355,9 +355,11 @@ func Test_binToASB(t *testing.T) {
 			name: "positive bytes bin",
 			args: args{
 				k: "binName",
-				v: data,
+				v: []byte("123"),
 			},
-			want: []byte(fmt.Sprintf("- B binName %d %s\n", len(encData), encData)),
+			want: []byte(fmt.Sprintf("- B binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("123"))),
+				base64.StdEncoding.EncodeToString([]byte("123")))),
 		},
 		{
 			name: "positive map raw blob bin",
@@ -365,10 +367,12 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: &a.RawBlobValue{
 					ParticleType: particleType.MAP,
-					Data:         data,
+					Data:         []byte("123"),
 				},
 			},
-			want: []byte(fmt.Sprintf("- M binName %d %s\n", len(encData), encData)),
+			want: []byte(fmt.Sprintf("- M binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("123"))),
+				base64.StdEncoding.EncodeToString([]byte("123")))),
 		},
 		{
 			name: "positive list raw blob bin",
@@ -376,10 +380,12 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: &a.RawBlobValue{
 					ParticleType: particleType.LIST,
-					Data:         data,
+					Data:         []byte("123"),
 				},
 			},
-			want: []byte(fmt.Sprintf("- L binName %d %s\n", len(encData), encData)),
+			want: []byte(fmt.Sprintf("- L binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("123"))),
+				base64.StdEncoding.EncodeToString([]byte("123")))),
 		},
 		{
 			name: "negative invalid raw bin type",

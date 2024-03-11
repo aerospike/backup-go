@@ -14,6 +14,7 @@ clean:
 	rm -f coverage.cov
 	rm -rf mocks
 	rm -rf pipeline/mocks
+	rm -rf encoding/mocks
 
 .PHONY: test_deps
 test_deps: mocks

@@ -83,30 +83,35 @@ func recordToASB(r *models.Record, w io.Writer) (int, error) {
 
 	n, err := keyToASB(r.Key, w)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
 
 	n, err = writeRecordHeaderGeneration(r.Generation, w)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
 
 	n, err = writeRecordHeaderExpiration(r.VoidTime, w)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
 
 	n, err = writeRecordHeaderBinCount(len(r.Bins), w)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
 
 	n, err = binsToASB(r.Bins, w)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
@@ -130,10 +135,6 @@ func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 	// bytes written
 	var bw int
 
-	if len(bins) < 1 {
-		return bw, fmt.Errorf("ERR: empty binmap")
-	}
-
 	// NOTE golang's random order map iteration
 	// means that any backup files that include
 	// multi element bin maps may not be identical
@@ -141,6 +142,7 @@ func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 	for k, v := range bins {
 		n, err := binToASB(k, v, w)
 		bw += n
+
 		if err != nil {
 			return bw, err
 		}
@@ -150,8 +152,8 @@ func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 }
 
 func binToASB(k string, v any, w io.Writer) (int, error) {
-	// bytes written
 	var (
+		// bytes written
 		bw  int
 		err error
 	)
@@ -208,7 +210,7 @@ func writeBinFloat(name string, v float64, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s %f\n", markerRecordBins, binTypeFloat, escapeASBS(name), v)
 }
 
-func writeBinString(name string, v string, w io.Writer) (int, error) {
+func writeBinString(name, v string, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeString, escapeASBS(name), len(v), v)
 }
 
@@ -246,6 +248,7 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 	if userKey != nil {
 		n, err := userKeyToASB(k.Value(), w)
 		bw += n
+
 		if err != nil {
 			return bw, err
 		}
@@ -253,12 +256,14 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 
 	n, err := writeRecordNamespace(k.Namespace(), w)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
 
 	n, err = writeRecordDigest(k.Digest(), w)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
@@ -266,6 +271,7 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 	if k.SetName() != "" {
 		n, err = writeRecordSet(k.SetName(), w)
 		bw += n
+
 		if err != nil {
 			return bw, err
 		}
@@ -277,6 +283,7 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 func base64Encode(v []byte) []byte {
 	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(v)))
 	base64.StdEncoding.Encode(encoded, v)
+
 	return encoded
 }
 
@@ -350,6 +357,7 @@ var asbEscapedChars = map[byte]struct{}{
 
 func escapeASBS(s string) string {
 	escapeCount := 0
+
 	for _, c := range s {
 		if _, ok := asbEscapedChars[byte(c)]; ok {
 			escapeCount++
@@ -368,6 +376,7 @@ func escapeASBS(s string) string {
 			escaped[i] = '\\'
 			i++
 		}
+
 		escaped[i] = byte(c)
 		i++
 	}
@@ -396,6 +405,7 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 		byte(sindex.Path.BinType),
 	)
 	bw += n
+
 	if err != nil {
 		return bw, err
 	}
@@ -403,6 +413,7 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 	if sindex.Path.B64Context != "" {
 		n, err = fmt.Fprintf(w, " %s", sindex.Path.B64Context)
 		bw += n
+
 		if err != nil {
 			return bw, err
 		}

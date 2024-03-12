@@ -217,8 +217,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	err = suite.testClient.ValidateRecords(expectedRecs, numRec, suite.namespace, suite.set)
-	suite.Nil(err)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {

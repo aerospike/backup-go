@@ -144,8 +144,6 @@ const (
 
 // misc constants
 const (
-	// citrusLeafEpoch is the number of seconds between the Unix epoch and the Aerospike epoch
-	citrusLeafEpoch = 1262304000 // pulled from C client cf_clock.h
 	// ASBFormatVersion is the current version of the ASB encoding format
 	ASBFormatVersion = "3.1"
 )

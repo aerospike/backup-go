@@ -17,11 +17,16 @@ package backup
 import (
 	"context"
 	"errors"
+	"math"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
+	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
 	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -170,4 +175,284 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 
 func TestProcessors(t *testing.T) {
 	suite.Run(t, new(proccessorTestSuite))
+}
+
+func TestProcessorTTL_Process(t *testing.T) {
+	type fields struct {
+		getNow func() cltime.CLTime
+	}
+	type args struct {
+		token *models.Token
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *models.Token
+		wantErr bool
+	}{
+		{
+			name: "Test positive Process expired",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 100}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record:   &a.Record{},
+						VoidTime: 100,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test positive Process expired v2",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 200}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record:   &a.Record{},
+						VoidTime: 100,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test positive token is not a record",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 200}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeSIndex,
+				},
+			},
+			want: &models.Token{
+				Type: models.TokenTypeSIndex,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test positive Process",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 50}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record:   &a.Record{},
+						VoidTime: 100,
+					},
+				},
+			},
+			want: &models.Token{
+				Type: models.TokenTypeRecord,
+				Record: models.Record{
+					Record: &a.Record{
+						Expiration: 50,
+					},
+					VoidTime: 100,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test positive Process never expire",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 50}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record:   &a.Record{},
+						VoidTime: models.VoidTimeNeverExpire,
+					},
+				},
+			},
+			want: &models.Token{
+				Type: models.TokenTypeRecord,
+				Record: models.Record{
+					Record: &a.Record{
+						Expiration: models.ExpirationNever,
+					},
+					VoidTime: models.VoidTimeNeverExpire,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test negative time difference too large",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 1}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record:   &a.Record{},
+						VoidTime: math.MaxInt64,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Test negative time difference too large",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 1}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record:   &a.Record{},
+						VoidTime: math.MaxInt64,
+					},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &processorTTL{
+				getNow: tt.fields.getNow,
+			}
+			got, err := p.Process(tt.args.token)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ProcessorTTL.Process() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ProcessorTTL.Process() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_processorVoidTime_Process(t *testing.T) {
+	type fields struct {
+		getNow func() cltime.CLTime
+	}
+	type args struct {
+		token *models.Token
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *models.Token
+		wantErr bool
+	}{
+		{
+			name: "Test positive Process",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 50}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record: &a.Record{
+							Expiration: 100,
+						},
+					},
+				},
+			},
+			want: &models.Token{
+				Type: models.TokenTypeRecord,
+				Record: models.Record{
+					Record: &a.Record{
+						Expiration: 100,
+					},
+					VoidTime: 150,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test positive never expire",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 50}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeRecord,
+					Record: models.Record{
+						Record: &a.Record{
+							Expiration: models.ExpirationNever,
+						},
+					},
+				},
+			},
+			want: &models.Token{
+				Type: models.TokenTypeRecord,
+				Record: models.Record{
+					Record: &a.Record{
+						Expiration: models.ExpirationNever,
+					},
+					VoidTime: models.VoidTimeNeverExpire,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test positive token is not a record",
+			fields: fields{
+				getNow: func() cltime.CLTime {
+					return cltime.CLTime{Seconds: 50}
+				},
+			},
+			args: args{
+				token: &models.Token{
+					Type: models.TokenTypeSIndex,
+				},
+			},
+			want: &models.Token{
+				Type: models.TokenTypeSIndex,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &processorVoidTime{
+				getNow: tt.fields.getNow,
+			}
+			got, err := p.Process(tt.args.token)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("processorVoidTime.Process() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("processorVoidTime.Process() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

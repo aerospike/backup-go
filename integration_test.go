@@ -186,10 +186,91 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	ctx := context.Background()
 	dst := bytes.NewBuffer([]byte{})
 
+	backupConfig := backup.NewBackupConfig()
+
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		[]io.Writer{dst},
+		backupConfig,
+	)
+	suite.Nil(err)
+	suite.NotNil(bh)
+
+	err = bh.Wait(ctx)
+	suite.Nil(err)
+
+	err = suite.testClient.Truncate(suite.namespace, suite.set)
+	if err != nil {
+		panic(err)
+	}
+
+	reader := bytes.NewReader(dst.Bytes())
+
+	rh, err := suite.backupClient.Restore(
+		ctx,
+		[]io.Reader{reader},
 		nil,
+	)
+	suite.Nil(err)
+	suite.NotNil(rh)
+
+	err = rh.Wait(ctx)
+	suite.Nil(err)
+
+	err = suite.testClient.ValidateRecords(expectedRecs, numRec, suite.namespace, suite.set)
+	suite.Nil(err)
+}
+
+func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
+	numRec := 1000
+	bins := a.BinMap{
+		"IntBin": 1,
+	}
+	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
+
+	err := suite.testClient.WriteRecords(expectedRecs)
+	if err != nil {
+		panic(err)
+	}
+
+	recsByPartition := make(map[int][]*a.Record)
+
+	for _, rec := range expectedRecs {
+		partitionID := rec.Key.PartitionId()
+
+		if _, ok := recsByPartition[partitionID]; !ok {
+			recsByPartition[partitionID] = []*a.Record{}
+		}
+
+		recsByPartition[partitionID] = append(recsByPartition[partitionID], rec)
+	}
+
+	// backup half the partitions
+	startPartition := 256
+	partitionCount := 2056
+	partitions := backup.NewPartitionRange(startPartition, partitionCount)
+
+	// reset the expected record count
+	numRec = 0
+
+	expectedRecs = []*a.Record{}
+	for pid, recs := range recsByPartition {
+		if pid >= startPartition && pid < startPartition+partitionCount {
+			numRec += len(recs)
+			expectedRecs = append(expectedRecs, recs...)
+		}
+	}
+
+	ctx := context.Background()
+	dst := bytes.NewBuffer([]byte{})
+
+	backupConfig := backup.NewBackupConfig()
+	backupConfig.Partitions = partitions
+
+	bh, err := suite.backupClient.Backup(
+		ctx,
+		[]io.Writer{dst},
+		backupConfig,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)

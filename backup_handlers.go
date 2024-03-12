@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	partitions = 4096
+	maxPartitions = 4096
 )
 
 // **** Base Backup Handler ****
@@ -54,6 +54,16 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) 
 
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
+	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
+
+	partitionRanges, err := splitPartitions(
+		bh.config.Partitions.Begin,
+		bh.config.Partitions.Count,
+		bh.config.Parallel,
+	)
+	if err != nil {
+		return err
+	}
 
 	scanPolicy := *bh.config.ScanPolicy
 
@@ -64,14 +74,11 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 	}
 
 	for i := 0; i < bh.config.Parallel; i++ {
-		begin := (i * partitions) / bh.config.Parallel
-		count := partitions / bh.config.Parallel // TODO verify no off by 1 error
-
 		ARRCFG := arrConfig{
 			Namespace:      bh.namespace,
 			Set:            bh.config.Set,
-			FirstPartition: begin,
-			NumPartitions:  count,
+			FirstPartition: partitionRanges[i].Begin,
+			NumPartitions:  partitionRanges[i].Count,
 		}
 
 		recordReader := newAerospikeRecordReader(
@@ -81,6 +88,9 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		)
 
 		readWorkers[i] = newReadWorker(recordReader)
+
+		ttlSetter := newProcessorTTL()
+		processorWorkers[i] = newProcessorWorker(ttlSetter)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
@@ -91,6 +101,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
+		processorWorkers,
 		writeWorkers,
 	)
 
@@ -104,7 +115,7 @@ type BackupStats struct{}
 
 // BackupHandler handles a backup job to a set of io.writers
 type BackupHandler struct {
-	stats  *BackupStats
+	stats  BackupStats
 	config *BackupConfig
 	errors chan error
 	backupHandlerBase
@@ -166,7 +177,7 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 
 // GetStats returns the stats of the backup job
 func (bwh *BackupHandler) GetStats() BackupStats {
-	return *bwh.stats
+	return bwh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed

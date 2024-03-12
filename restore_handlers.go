@@ -64,6 +64,13 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		writeWorkers[i] = newWriteWorker(writer)
 	}
 
+	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+
+	for i := 0; i < rh.config.Parallel; i++ {
+		voidTimeSetter := newProcessorVoidTime()
+		processorWorkers[i] = newProcessorWorker(voidTimeSetter)
+	}
+
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 	for i, r := range readers {
 		readWorkers[i] = r
@@ -71,6 +78,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 	job := pipeline.NewPipeline(
 		readWorkers,
+		processorWorkers,
 		writeWorkers,
 	)
 
@@ -85,7 +93,7 @@ type RestoreStats struct{}
 // RestoreHandler handles a restore job from a set of io.readers
 type RestoreHandler struct {
 	restoreHandlerBase
-	stats   *RestoreStats
+	stats   RestoreStats
 	config  *RestoreConfig
 	errors  chan error
 	readers []io.Reader
@@ -149,7 +157,7 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 
 // GetStats returns the stats of the restore job
 func (rrh *RestoreHandler) GetStats() RestoreStats {
-	return *rrh.stats
+	return rrh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

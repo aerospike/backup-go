@@ -17,12 +17,10 @@ package asb
 import (
 	"encoding/base64"
 	"fmt"
-	"math"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
@@ -47,15 +45,17 @@ func (suite *asbEncoderTestSuite) TestEncodeToken() {
 
 	token := &models.Token{
 		Type: models.TokenTypeRecord,
-		Record: &models.Record{
-			Key: key,
-			Bins: a.BinMap{
-				"bin1": 0,
+		Record: models.Record{
+			Record: &a.Record{
+				Key: key,
+				Bins: a.BinMap{
+					"bin1": 0,
+				},
 			},
 		},
 	}
 
-	expected, err := encoder.EncodeRecord(token.Record)
+	expected, err := encoder.EncodeRecord(&token.Record)
 	suite.Assert().NoError(err)
 
 	actual, err := encoder.EncodeToken(token)
@@ -84,25 +84,22 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 		suite.FailNow("unexpected error: %v", err)
 	}
 
-	now := time.Now()
-	nowUnix := now.Unix()
-	getTimeNow = func() time.Time { return now }
-	defer func() { getTimeNow = time.Now }()
-	recExpr := 10
-	expExpr := (nowUnix - citrusLeafEpoch) + int64(recExpr)
+	var recExpr int64 = 10
 
 	key, _ := a.NewKey("test", "demo", "1234")
 	rec := &models.Record{
-		Key: key,
-		Bins: a.BinMap{
-			"bin1": 0,
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"bin1": 0,
+			},
+			Generation: 1234,
 		},
-		Generation: 1234,
-		Expiration: uint32(recExpr),
+		VoidTime: recExpr,
 	}
 
 	recTemplate := "+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 1\n- I bin1 0\n"
-	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), expExpr)
+	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
 	actual, err := encoder.EncodeRecord(rec)
 	suite.Assert().NoError(err)
@@ -660,49 +657,8 @@ func Test_keyToASB(t *testing.T) {
 	}
 }
 
-func Test_getExpirationTime(t *testing.T) {
-	type args struct {
-		ttl     uint32
-		unixNow int64
-	}
-	tests := []struct {
-		name string
-		args args
-		want uint32
-	}{
-		{
-			name: "positive simple",
-			args: args{
-				ttl:     123,
-				unixNow: citrusLeafEpoch,
-			},
-			want: 123,
-		},
-		{
-			name: "positive never expire",
-			args: args{
-				ttl: math.MaxUint32,
-			},
-			want: 0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getExpirationTime(tt.args.ttl, tt.args.unixNow); got != tt.want {
-				t.Errorf("getExpirationTime() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_recordToASB(t *testing.T) {
-	now := time.Now()
-	nowUnix := now.Unix()
-	getTimeNow = func() time.Time { return now }
-	defer func() { getTimeNow = time.Now }()
-	recExpr := 10
-	expExpr := (nowUnix - citrusLeafEpoch) + int64(recExpr)
-
+	var recExpr int64 = 10
 	key, _ := a.NewKey("test", "demo", "1234")
 	escKey, _ := a.NewKey("test\n", "de mo", "1234")
 
@@ -719,33 +675,37 @@ func Test_recordToASB(t *testing.T) {
 			name: "positive simple",
 			args: args{
 				r: &models.Record{
-					Key: key,
-					Bins: a.BinMap{
-						"bin1": 0,
-						"bin2": "hello",
+					Record: &a.Record{
+						Key: key,
+						Bins: a.BinMap{
+							"bin1": 0,
+							"bin2": "hello",
+						},
+						Generation: 1234,
 					},
-					Generation: 1234,
-					Expiration: uint32(recExpr),
+					VoidTime: recExpr,
 				},
 			},
 			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ "+
-				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), expExpr)),
+				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), recExpr)),
 		},
 		{
 			name: "positive escaped key",
 			args: args{
 				r: &models.Record{
-					Key: escKey,
-					Bins: a.BinMap{
-						"bin1": 0,
-						"bin2": "hello",
+					Record: &a.Record{
+						Key: escKey,
+						Bins: a.BinMap{
+							"bin1": 0,
+							"bin2": "hello",
+						},
+						Generation: 1234,
 					},
-					Generation: 1234,
-					Expiration: uint32(recExpr),
+					VoidTime: recExpr,
 				},
 			},
 			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\\\n\n+ d %s\n+ s de\\ mo\n+ g 1234\n+ t %d\n+ "+
-				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), expExpr)),
+				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), recExpr)),
 		},
 		{
 			name: "negative record is nil",
@@ -758,7 +718,9 @@ func Test_recordToASB(t *testing.T) {
 			name: "negative key is nil",
 			args: args{
 				r: &models.Record{
-					Key: nil,
+					Record: &a.Record{
+						Key: nil,
+					},
 				},
 			},
 			wantErr: true,
@@ -767,10 +729,12 @@ func Test_recordToASB(t *testing.T) {
 			name: "negative bins is nil",
 			args: args{
 				r: &models.Record{
-					Key:        key,
-					Bins:       nil,
-					Expiration: uint32(recExpr),
-					Generation: 1234,
+					Record: &a.Record{
+						Key:        key,
+						Bins:       nil,
+						Expiration: uint32(recExpr),
+						Generation: 1234,
+					},
 				},
 			},
 			wantErr: true,

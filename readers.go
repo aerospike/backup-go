@@ -190,7 +190,9 @@ func (arr *aerospikeRecordReader) Read() (*models.Token, error) {
 		return nil, res.Err
 	}
 
-	rec := res.Record
+	rec := models.Record{
+		Record: res.Record,
+	}
 	recToken := models.NewRecordToken(rec)
 
 	return recToken, nil

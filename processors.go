@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 
@@ -57,6 +58,10 @@ func (w *processorWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
+// errFilteredOut is returned by a processor when a token
+// should be filtered out of the pipeline
+var errFilteredOut = errors.New("filtered out")
+
 // Run starts the ProcessorWorker
 func (w *processorWorker[T]) Run(ctx context.Context) error {
 	for {
@@ -69,7 +74,9 @@ func (w *processorWorker[T]) Run(ctx context.Context) error {
 			}
 
 			processed, err := w.processor.Process(data)
-			if err != nil {
+			if errors.Is(err, errFilteredOut) {
+				continue
+			} else if err != nil {
 				return err
 			}
 
@@ -84,20 +91,34 @@ func (w *processorWorker[T]) Run(ctx context.Context) error {
 
 // **** TTL Processor ****
 
+// statsSetterExpired is an interface for setting the number of expired records
+//
+//go:generate mockery --name statsSetterExpired --inpackage --exported=false
+type statsSetterExpired interface {
+	addRecordsExpired(uint64)
+}
+
 // processorTTL is a dataProcessor that sets the TTL of a record based on its VoidTime.
 // It is used during restore to set the TTL of records from their backed up VoidTime.
 type processorTTL struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
 	getNow func() cltime.CLTime
+	stats  statsSetterExpired
 }
 
 // newProcessorTTL creates a new TTLProcessor
-func newProcessorTTL() *processorTTL {
+func newProcessorTTL(stats statsSetterExpired) *processorTTL {
 	return &processorTTL{
 		getNow: cltime.Now,
+		stats:  stats,
 	}
 }
+
+// errExpiredRecord is returned when a record is expired
+// by embedding errFilteredOut, the processor worker will filter out the token
+// containing the expired record
+var errExpiredRecord = fmt.Errorf("%w, record is expired", errFilteredOut)
 
 // Process sets the TTL of a record based on its VoidTime
 func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
@@ -114,9 +135,8 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 		ttl := record.VoidTime - now.Seconds
 		if ttl <= 0 {
 			// the record is expired
-			// TODO call a callback to handle expired records
-			// for now, filter out expired records
-			return nil, nil
+			p.stats.addRecordsExpired(1)
+			return nil, errExpiredRecord
 		}
 
 		if ttl > math.MaxUint32 {

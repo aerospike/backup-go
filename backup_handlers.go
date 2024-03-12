@@ -80,8 +80,8 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 
 		readWorkers[i] = newReadWorker(recordReader)
 
-		ttlSetter := newProcessorTTL()
-		processorWorkers[i] = newProcessorWorker(ttlSetter)
+		voidTimeSetter := newProcessorVoidTime()
+		processorWorkers[i] = newProcessorWorker(voidTimeSetter)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
@@ -102,15 +102,18 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 // **** Backup To Writer Handler ****
 
 // BackupStats stores the status of a backup job
-type BackupStats struct{}
+// the stats are updated in realtime by backup jobs
+type BackupStats struct {
+	tokenStats
+}
 
 // BackupHandler handles a backup job to a set of io.writers
 type BackupHandler struct {
-	stats  BackupStats
 	config *BackupConfig
 	errors chan error
 	backupHandlerBase
 	writers []io.Writer
+	stats   BackupStats
 }
 
 // newBackupHandler creates a new BackupHandler
@@ -141,7 +144,7 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 		dataWriters := []*writeWorker[*models.Token]{}
 
 		for i, writer := range writers {
-			dw, err := getDataWriter(bwh.config.EncoderFactory, writer, bwh.namespace, i == 0)
+			dw, err := getTokenWriteWorker(bwh.config.EncoderFactory, writer, bwh.namespace, i == 0, &bwh.stats)
 			if err != nil {
 				errChan <- err
 				return
@@ -167,8 +170,8 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 }
 
 // GetStats returns the stats of the backup job
-func (bwh *BackupHandler) GetStats() BackupStats {
-	return bwh.stats
+func (bwh *BackupHandler) GetStats() *BackupStats {
+	return &bwh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
@@ -181,11 +184,25 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
-func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool) (*writeWorker[*models.Token], error) {
+func getTokenWriteWorker(eb EncoderFactory, w io.Writer, namespace string,
+	first bool, stats *BackupStats) (*tokenWriteWorker, error) {
+	writer, err := getTokenWriter(eb, w, namespace, first)
+	if err != nil {
+		return nil, err
+	}
+
+	writer = newWriterWithTokenStats(writer, stats)
+
+	return newWriteWorker(writer), nil
+}
+
+func getTokenWriter(eb EncoderFactory, w io.Writer, namespace string, first bool) (tokenWriter, error) {
 	enc, err := eb.CreateEncoder()
 	if err != nil {
 		return nil, err
 	}
+
+	var writer tokenWriter
 
 	switch encT := enc.(type) {
 	case *asb.Encoder:
@@ -196,14 +213,11 @@ func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool)
 			return nil, err
 		}
 
-		worker := newWriteWorker(asbw)
-
-		return worker, err
+		writer = asbw
 
 	default:
-		gw := newGenericWriter(encT, w)
-		worker := newWriteWorker(gw)
-
-		return worker, nil
+		writer = newGenericWriter(encT, w)
 	}
+
+	return writer, nil
 }

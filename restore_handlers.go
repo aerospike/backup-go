@@ -17,6 +17,7 @@ package backup
 import (
 	"context"
 	"io"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -42,14 +43,17 @@ type restoreHandlerBase struct {
 	config   *RestoreConfig
 	dbClient DBRestoreClient
 	worker   worker
+	stats    *RestoreStats
 }
 
 // newRestoreHandlerBase creates a new restoreHandler
-func newRestoreHandlerBase(config *RestoreConfig, ac DBRestoreClient, w worker) *restoreHandlerBase {
+func newRestoreHandlerBase(config *RestoreConfig, ac DBRestoreClient,
+	w worker, stats *RestoreStats) *restoreHandlerBase {
 	return &restoreHandlerBase{
 		config:   config,
 		dbClient: ac,
 		worker:   w,
+		stats:    stats,
 	}
 }
 
@@ -58,18 +62,20 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
-		writer := newRestoreWriter(
+		var writer tokenWriter = newRestoreWriter(
 			rh.dbClient,
 			rh.config.WritePolicy,
 		)
+
+		writer = newWriterWithTokenStats(writer, rh.stats)
 		writeWorkers[i] = newWriteWorker(writer)
 	}
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
-		voidTimeSetter := newProcessorVoidTime()
-		processorWorkers[i] = newProcessorWorker(voidTimeSetter)
+		TTLSetter := newProcessorTTL(rh.stats)
+		processorWorkers[i] = newProcessorWorker(TTLSetter)
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
@@ -88,29 +94,41 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 // **** Restore From Reader Handler ****
 
-// RestoreStats stores the status of a restore from reader job
-type RestoreStats struct{}
+// RestoreStats stores the stats of a restore from reader job
+type RestoreStats struct {
+	tokenStats
+	recordsExpired atomic.Uint64
+}
+
+func (rs *RestoreStats) GetRecordsExpired() uint64 {
+	return rs.recordsExpired.Load()
+}
+
+func (rs *RestoreStats) addRecordsExpired(num uint64) {
+	rs.recordsExpired.Add(num)
+}
 
 // RestoreHandler handles a restore job from a set of io.readers
 type RestoreHandler struct {
 	restoreHandlerBase
-	stats   RestoreStats
 	config  *RestoreConfig
 	errors  chan error
 	readers []io.Reader
+	stats   RestoreStats
 }
 
 // newRestoreHandler creates a new RestoreHandler
 func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.Reader) *RestoreHandler {
-	worker := newWorkHandler()
-
-	restoreHandler := newRestoreHandlerBase(config, ac, worker)
-
-	return &RestoreHandler{
-		config:             config,
-		readers:            readers,
-		restoreHandlerBase: *restoreHandler,
+	rh := &RestoreHandler{
+		config:  config,
+		readers: readers,
 	}
+
+	worker := newWorkHandler()
+	restoreHandler := newRestoreHandlerBase(config, ac, worker, &rh.stats)
+	rh.restoreHandlerBase = *restoreHandler
+
+	return rh
 }
 
 // run runs the restore job
@@ -158,8 +176,8 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 }
 
 // GetStats returns the stats of the restore job
-func (rrh *RestoreHandler) GetStats() RestoreStats {
-	return rrh.stats
+func (rrh *RestoreHandler) GetStats() *RestoreStats {
+	return &rrh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

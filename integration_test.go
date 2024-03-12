@@ -21,6 +21,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/models"
 	testresources "github.com/aerospike/backup-go/test"
 
 	backup "github.com/aerospike/backup-go"
@@ -206,6 +208,75 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 
 	err = suite.testClient.ValidateRecords(expectedRecs, numRec, suite.namespace, suite.set)
 	suite.Nil(err)
+
+	// validate backup statsBackup
+	statsBackup := bh.GetStats()
+	suite.NotNil(statsBackup)
+
+	suite.Equal(uint64(numRec), statsBackup.GetRecords())
+	suite.Equal(uint32(0), statsBackup.GetSIndexes())
+	suite.Equal(uint32(0), statsBackup.GetUDFs())
+
+	// validate stats for restore
+	statsRestore := rh.GetStats()
+	suite.NotNil(statsRestore)
+
+	suite.Equal(uint64(numRec), statsRestore.GetRecords())
+	suite.Equal(uint32(0), statsRestore.GetSIndexes())
+	suite.Equal(uint32(0), statsRestore.GetUDFs())
+	suite.Equal(uint64(0), statsRestore.GetRecordsExpired())
+}
+
+func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
+	numRec := 100
+	bins := a.BinMap{
+		"IntBin": 1,
+	}
+	recs := genRecords(suite.namespace, suite.set, numRec, bins)
+
+	data := &bytes.Buffer{}
+	encoder, err := asb.NewEncoder()
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	data.Write(encoder.GetVersionText())
+	data.Write(encoder.GetNamespaceMetaText(suite.namespace))
+	data.Write(encoder.GetFirstMetaText())
+
+	for _, rec := range recs {
+		modelRec := models.Record{
+			Record: rec,
+			// guaranteed to be expired
+			VoidTime: 1,
+		}
+		v, err := encoder.EncodeRecord(&modelRec)
+		if err != nil {
+			suite.FailNow(err.Error())
+		}
+
+		_, err = data.Write(v)
+		if err != nil {
+			suite.FailNow(err.Error())
+		}
+	}
+
+	ctx := context.Background()
+	reader := bytes.NewReader(data.Bytes())
+	rh, err := suite.backupClient.Restore(
+		ctx,
+		[]io.Reader{reader},
+		nil,
+	)
+	suite.Nil(err)
+
+	err = rh.Wait(ctx)
+	suite.Nil(err)
+
+	statsRestore := rh.GetStats()
+	suite.NotNil(statsRestore)
+	suite.Equal(uint64(0), statsRestore.GetRecords())
+	suite.Equal(uint64(numRec), statsRestore.GetRecordsExpired())
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {

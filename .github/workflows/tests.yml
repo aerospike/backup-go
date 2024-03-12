@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - '*'
+  workflow_call:
   pull_request:
     branches:
       - main
@@ -11,11 +12,11 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     - name: Get go version from go.mod
       run: |
         echo "GO_VERSION=$(grep '^go ' go.mod | cut -d " " -f 2)" >> $GITHUB_ENV
-    - uses: actions/setup-go@v5
+    - uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
     - name: Test with go 

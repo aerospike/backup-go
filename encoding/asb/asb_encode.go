@@ -23,6 +23,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
 )
 
 type Encoder struct{}
@@ -154,11 +155,19 @@ func binToASB(k string, v any) ([]byte, error) {
 		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeString, binName, len(v), v)))
 	case []byte:
 		encoded := base64Encode(v)
-		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeBytes, binName, len(encoded), encoded)))
+		data := blobBinToASB([]byte(encoded), binTypeBytes, binName)
+		res.Write(data)
+	case *a.RawBlobValue:
+		data, err := rawBlobBinToASB(v, k)
+		if err != nil {
+			return nil, err
+		}
+
+		res.Write(data)
 	case map[any]any:
-		return nil, errors.New("map bin not supported")
+		return nil, errors.New("maps are only supported in raw blob bins")
 	case []any:
-		return nil, errors.New("list bin not supported")
+		return nil, errors.New("lists are only supported in raw blob bins")
 	case a.HLLValue:
 		encoded := base64Encode(v)
 		res.Write([]byte(fmt.Sprintf("%c %s %d %s\n", binTypeBytesHLL, binName, len(encoded), encoded)))
@@ -171,6 +180,43 @@ func binToASB(k string, v any) ([]byte, error) {
 	}
 
 	return res.Bytes(), nil
+}
+
+func rawBlobBinToASB(cdt *a.RawBlobValue, name string) ([]byte, error) {
+	switch cdt.ParticleType {
+	case particleType.MAP:
+		return rawMapBinToASB(cdt, name), nil
+	case particleType.LIST:
+		return rawListBinToASB(cdt, name), nil
+	default:
+		return nil, fmt.Errorf("invalid raw blob bin particle type: %v", cdt.ParticleType)
+	}
+}
+
+func rawMapBinToASB(cdt *a.RawBlobValue, name string) []byte {
+	var res bytes.Buffer
+
+	binName := escapeASBS(name)
+	b64Bytes := base64Encode(cdt.Data)
+	data := blobBinToASB([]byte(b64Bytes), binTypeBytesMap, binName)
+	res.Write(data)
+
+	return res.Bytes()
+}
+
+func rawListBinToASB(cdt *a.RawBlobValue, name string) []byte {
+	var res bytes.Buffer
+
+	binName := escapeASBS(name)
+	b64Bytes := base64Encode(cdt.Data)
+	data := blobBinToASB([]byte(b64Bytes), binTypeBytesList, binName)
+	res.Write(data)
+
+	return res.Bytes()
+}
+
+func blobBinToASB(val []byte, bytesType byte, name string) []byte {
+	return []byte(fmt.Sprintf("%c %s %d %s\n", bytesType, name, len(val), val))
 }
 
 func boolToASB(b bool) byte {

@@ -102,8 +102,6 @@ func newGenericWriter(encoder encoding.Encoder, output io.Writer) *genericWriter
 }
 
 // Write encodes v and writes it to the output
-// TODO let the encoder handle the type checking
-// TODO maybe restrict the types that can be written to this
 func (w *genericWriter) Write(v *models.Token) error {
 	var (
 		err  error
@@ -207,7 +205,6 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy) *restoreWriter {
 }
 
 // Write writes the types from the models package to an Aerospike DB.
-// TODO support write policy
 // TODO support batch writes
 func (rw *restoreWriter) Write(data *models.Token) error {
 	switch data.Type {

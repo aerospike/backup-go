@@ -4,6 +4,9 @@ on:
     branches:
       - '*'
   workflow_call:
+  pull_request:
+    branches:
+      - main
   
 jobs:
   tests:

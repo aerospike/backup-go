@@ -64,7 +64,6 @@ func (o *Encoder) EncodeSIndex(sindex *models.SIndex) (int, error) {
 }
 
 func (o *Encoder) WriteHeader(namespace string, firstFile bool) (int, error) {
-	// bytes written
 	var bytesWritten int
 
 	n, err := writeVersionText(ASBFormatVersion, o.output)
@@ -110,7 +109,6 @@ func writeFirstMetaText(w io.Writer) (int, error) {
 // **** RECORD ****
 
 func recordToASB(r *models.Record, w io.Writer) (int, error) {
-	// bytes written
 	var bytesWritten int
 
 	n, err := keyToASB(r.Key, w)
@@ -164,7 +162,6 @@ func writeRecordHeaderBinCount(binCount int, w io.Writer) (int, error) {
 }
 
 func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
-	// bytes written
 	var bytesWritten int
 
 	// NOTE golang's random order map iteration
@@ -185,45 +182,44 @@ func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 
 func binToASB(k string, v any, w io.Writer) (int, error) {
 	var (
-		// bytes written
-		bw  int
-		err error
+		bytesWritten int
+		err          error
 	)
 
 	switch v := v.(type) {
 	case bool:
-		bw, err = writeBinBool(k, v, w)
+		bytesWritten, err = writeBinBool(k, v, w)
 	case int64:
-		bw, err = writeBinInt(k, v, w)
+		bytesWritten, err = writeBinInt(k, v, w)
 	case int32:
-		bw, err = writeBinInt(k, v, w)
+		bytesWritten, err = writeBinInt(k, v, w)
 	case int16:
-		bw, err = writeBinInt(k, v, w)
+		bytesWritten, err = writeBinInt(k, v, w)
 	case int8:
-		bw, err = writeBinInt(k, v, w)
+		bytesWritten, err = writeBinInt(k, v, w)
 	case int:
-		bw, err = writeBinInt(k, v, w)
+		bytesWritten, err = writeBinInt(k, v, w)
 	case float64:
-		bw, err = writeBinFloat(k, v, w)
+		bytesWritten, err = writeBinFloat(k, v, w)
 	case string:
-		bw, err = writeBinString(k, v, w)
+		bytesWritten, err = writeBinString(k, v, w)
 	case []byte:
-		bw, err = writeBinBytes(k, v, w)
+		bytesWritten, err = writeBinBytes(k, v, w)
 	case map[any]any:
-		return bw, errors.New("map bin not supported")
+		return bytesWritten, errors.New("map bin not supported")
 	case []any:
-		return bw, errors.New("list bin not supported")
+		return bytesWritten, errors.New("list bin not supported")
 	case a.HLLValue:
-		bw, err = writeBinHLL(k, v, w)
+		bytesWritten, err = writeBinHLL(k, v, w)
 	case a.GeoJSONValue:
-		bw, err = writeBinGeoJSON(k, v, w)
+		bytesWritten, err = writeBinGeoJSON(k, v, w)
 	case nil:
-		bw, err = writeBinNil(k, w)
+		bytesWritten, err = writeBinNil(k, w)
 	default:
-		return bw, fmt.Errorf("unknown bin type: %T, key: %s", v, k)
+		return bytesWritten, fmt.Errorf("unknown bin type: %T, key: %s", v, k)
 	}
 
-	return bw, err
+	return bytesWritten, err
 }
 
 func writeBinBool(name string, v bool, w io.Writer) (int, error) {
@@ -273,7 +269,6 @@ func boolToASB(b bool) byte {
 }
 
 func keyToASB(k *a.Key, w io.Writer) (int, error) {
-	// bytes written
 	var bytesWritten int
 
 	userKey := k.Value()
@@ -417,7 +412,6 @@ func escapeASB(s string) string {
 }
 
 func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
-	// bytes written
 	var bytesWritten int
 
 	// sindexes only ever use 1 path for now

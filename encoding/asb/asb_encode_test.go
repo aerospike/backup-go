@@ -254,7 +254,7 @@ func Test_escapeASBS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := escapeASBS(tt.args.s); !reflect.DeepEqual(got, tt.want) {
+			if got := escapeASB(tt.args.s); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("escapeASB() = %v, want %v", got, tt.want)
 			}
 		})

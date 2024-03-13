@@ -65,32 +65,32 @@ func (o *Encoder) EncodeSIndex(sindex *models.SIndex) (int, error) {
 
 func (o *Encoder) WriteHeader(namespace string, firstFile bool) (int, error) {
 	// bytes written
-	var bw int
+	var bytesWritten int
 
 	n, err := writeVersionText(ASBFormatVersion, o.output)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	n, err = writeNamespaceMetaText(namespace, o.output)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	if firstFile {
 		n, err = writeFirstMetaText(o.output)
-		bw += n
+		bytesWritten += n
 
 		if err != nil {
-			return bw, err
+			return bytesWritten, err
 		}
 	}
 
-	return bw, nil
+	return bytesWritten, nil
 }
 
 // **** META DATA ****
@@ -100,7 +100,7 @@ func writeVersionText(asbVersion string, w io.Writer) (int, error) {
 }
 
 func writeNamespaceMetaText(namespace string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c namespace %s\n", markerMetadataSection, escapeASBS(namespace))
+	return fmt.Fprintf(w, "%c namespace %s\n", markerMetadataSection, escapeASB(namespace))
 }
 
 func writeFirstMetaText(w io.Writer) (int, error) {
@@ -111,44 +111,44 @@ func writeFirstMetaText(w io.Writer) (int, error) {
 
 func recordToASB(r *models.Record, w io.Writer) (int, error) {
 	// bytes written
-	var bw int
+	var bytesWritten int
 
 	n, err := keyToASB(r.Key, w)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	n, err = writeRecordHeaderGeneration(r.Generation, w)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	n, err = writeRecordHeaderExpiration(r.VoidTime, w)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	n, err = writeRecordHeaderBinCount(len(r.Bins), w)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	n, err = binsToASB(r.Bins, w)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
-	return bw, nil
+	return bytesWritten, nil
 }
 
 func writeRecordHeaderGeneration(generation uint32, w io.Writer) (int, error) {
@@ -165,7 +165,7 @@ func writeRecordHeaderBinCount(binCount int, w io.Writer) (int, error) {
 
 func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 	// bytes written
-	var bw int
+	var bytesWritten int
 
 	// NOTE golang's random order map iteration
 	// means that any backup files that include
@@ -173,14 +173,14 @@ func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 	// over multiple backups even if the data is the same
 	for k, v := range bins {
 		n, err := binToASB(k, v, w)
-		bw += n
+		bytesWritten += n
 
 		if err != nil {
-			return bw, err
+			return bytesWritten, err
 		}
 	}
 
-	return bw, nil
+	return bytesWritten, nil
 }
 
 func binToASB(k string, v any, w io.Writer) (int, error) {
@@ -227,7 +227,7 @@ func binToASB(k string, v any, w io.Writer) (int, error) {
 }
 
 func writeBinBool(name string, v bool, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s %c\n", markerRecordBins, binTypeBool, escapeASBS(name), boolToASB(v))
+	return fmt.Fprintf(w, "%c %c %s %c\n", markerRecordBins, binTypeBool, escapeASB(name), boolToASB(v))
 }
 
 type binTypesInt interface {
@@ -235,33 +235,33 @@ type binTypesInt interface {
 }
 
 func writeBinInt[T binTypesInt](name string, v T, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s %d\n", markerRecordBins, binTypeInt, escapeASBS(name), v)
+	return fmt.Fprintf(w, "%c %c %s %d\n", markerRecordBins, binTypeInt, escapeASB(name), v)
 }
 
 func writeBinFloat(name string, v float64, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s %f\n", markerRecordBins, binTypeFloat, escapeASBS(name), v)
+	return fmt.Fprintf(w, "%c %c %s %f\n", markerRecordBins, binTypeFloat, escapeASB(name), v)
 }
 
 func writeBinString(name, v string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeString, escapeASBS(name), len(v), v)
+	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeString, escapeASB(name), len(v), v)
 }
 
 func writeBinBytes(name string, v []byte, w io.Writer) (int, error) {
 	encoded := base64Encode(v)
-	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytes, escapeASBS(name), len(encoded), encoded)
+	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytes, escapeASB(name), len(encoded), encoded)
 }
 
 func writeBinHLL(name string, v a.HLLValue, w io.Writer) (int, error) {
 	encoded := base64Encode(v)
-	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytesHLL, escapeASBS(name), len(encoded), encoded)
+	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytesHLL, escapeASB(name), len(encoded), encoded)
 }
 
 func writeBinGeoJSON(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeGeoJSON, escapeASBS(name), len(v), v)
+	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeGeoJSON, escapeASB(name), len(v), v)
 }
 
 func writeBinNil(name string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s\n", markerRecordBins, binTypeNil, escapeASBS(name))
+	return fmt.Fprintf(w, "%c %c %s\n", markerRecordBins, binTypeNil, escapeASB(name))
 }
 
 func boolToASB(b bool) byte {
@@ -274,42 +274,42 @@ func boolToASB(b bool) byte {
 
 func keyToASB(k *a.Key, w io.Writer) (int, error) {
 	// bytes written
-	var bw int
+	var bytesWritten int
 
 	userKey := k.Value()
 	if userKey != nil {
 		n, err := userKeyToASB(k.Value(), w)
-		bw += n
+		bytesWritten += n
 
 		if err != nil {
-			return bw, err
+			return bytesWritten, err
 		}
 	}
 
 	n, err := writeRecordNamespace(k.Namespace(), w)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	n, err = writeRecordDigest(k.Digest(), w)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	if k.SetName() != "" {
 		n, err = writeRecordSet(k.SetName(), w)
-		bw += n
+		bytesWritten += n
 
 		if err != nil {
-			return bw, err
+			return bytesWritten, err
 		}
 	}
 
-	return bw, nil
+	return bytesWritten, nil
 }
 
 func base64Encode(v []byte) []byte {
@@ -320,7 +320,7 @@ func base64Encode(v []byte) []byte {
 }
 
 func writeRecordNamespace(namespace string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s\n", markerRecordHeader, recordHeaderTypeNamespace, escapeASBS(namespace))
+	return fmt.Fprintf(w, "%c %c %s\n", markerRecordHeader, recordHeaderTypeNamespace, escapeASB(namespace))
 }
 
 func writeRecordDigest(digest []byte, w io.Writer) (int, error) {
@@ -329,7 +329,7 @@ func writeRecordDigest(digest []byte, w io.Writer) (int, error) {
 }
 
 func writeRecordSet(setName string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %s\n", markerRecordHeader, recordHeaderTypeSet, escapeASBS(setName))
+	return fmt.Fprintf(w, "%c %c %s\n", markerRecordHeader, recordHeaderTypeSet, escapeASB(setName))
 }
 
 func userKeyToASB(userKey a.Value, w io.Writer) (int, error) {
@@ -387,7 +387,7 @@ var asbEscapedChars = map[byte]struct{}{
 	'\n': {},
 }
 
-func escapeASBS(s string) string {
+func escapeASB(s string) string {
 	escapeCount := 0
 
 	for _, c := range s {
@@ -418,7 +418,7 @@ func escapeASBS(s string) string {
 
 func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 	// bytes written
-	var bw int
+	var bytesWritten int
 
 	// sindexes only ever use 1 path for now
 	numPaths := 1
@@ -428,31 +428,31 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 		"%c %c %s %s %s %c %d %s %c",
 		markerGlobalSection,
 		globalTypeSIndex,
-		escapeASBS(sindex.Namespace),
-		escapeASBS(sindex.Set),
-		escapeASBS(sindex.Name),
+		escapeASB(sindex.Namespace),
+		escapeASB(sindex.Set),
+		escapeASB(sindex.Name),
 		byte(sindex.IndexType),
 		numPaths,
-		escapeASBS(sindex.Path.BinName),
+		escapeASB(sindex.Path.BinName),
 		byte(sindex.Path.BinType),
 	)
-	bw += n
+	bytesWritten += n
 
 	if err != nil {
-		return bw, err
+		return bytesWritten, err
 	}
 
 	if sindex.Path.B64Context != "" {
 		n, err = fmt.Fprintf(w, " %s", sindex.Path.B64Context)
-		bw += n
+		bytesWritten += n
 
 		if err != nil {
-			return bw, err
+			return bytesWritten, err
 		}
 	}
 
 	n, err = fmt.Fprintf(w, "\n")
-	bw += n
+	bytesWritten += n
 
-	return bw, err
+	return bytesWritten, err
 }

@@ -16,6 +16,7 @@ package asb
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -24,6 +25,7 @@ import (
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/suite"
 )
@@ -343,7 +345,6 @@ func Test__SIndexToASB(t *testing.T) {
 }
 
 func Test_binToASB(t *testing.T) {
-	encVal := base64Encode(a.HLLValue("hello"))
 	geoJSONStr := `{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [0,0]]]}`
 	type args struct {
 		v any
@@ -425,7 +426,9 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: a.HLLValue("hello"),
 			},
-			want: []byte(fmt.Sprintf("- Y binName %d %s\n", len(encVal), encVal)),
+			want: []byte(fmt.Sprintf("- Y binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("hello"))),
+				base64.StdEncoding.EncodeToString([]byte("hello")))),
 		},
 		{
 			name: "positive GeoJSON bin",
@@ -439,9 +442,47 @@ func Test_binToASB(t *testing.T) {
 			name: "positive bytes bin",
 			args: args{
 				k: "binName",
-				v: []byte("hello"),
+				v: []byte("123"),
 			},
-			want: []byte(fmt.Sprintf("- B binName %d %s\n", len(encVal), encVal)),
+			want: []byte(fmt.Sprintf("- B binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("123"))),
+				base64.StdEncoding.EncodeToString([]byte("123")))),
+		},
+		{
+			name: "positive map raw blob bin",
+			args: args{
+				k: "binName",
+				v: &a.RawBlobValue{
+					ParticleType: particleType.MAP,
+					Data:         []byte("123"),
+				},
+			},
+			want: []byte(fmt.Sprintf("- M binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("123"))),
+				base64.StdEncoding.EncodeToString([]byte("123")))),
+		},
+		{
+			name: "positive list raw blob bin",
+			args: args{
+				k: "binName",
+				v: &a.RawBlobValue{
+					ParticleType: particleType.LIST,
+					Data:         []byte("123"),
+				},
+			},
+			want: []byte(fmt.Sprintf("- L binName %d %s\n",
+				len(base64.StdEncoding.EncodeToString([]byte("123"))),
+				base64.StdEncoding.EncodeToString([]byte("123")))),
+		},
+		{
+			name: "negative invalid raw bin type",
+			args: args{
+				k: "binName",
+				v: &a.RawBlobValue{
+					ParticleType: particleType.NULL,
+				},
+			},
+			wantErr: true,
 		},
 		{
 			name: "negative map bin",
@@ -1704,6 +1745,214 @@ func Test_writeFirstMetaText(t *testing.T) {
 			}
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("writeFirstMetaText() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_blobBinToASB(t *testing.T) {
+	type args struct {
+		val       []byte
+		bytesType byte
+		name      string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []byte
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				val:       []byte("hello"),
+				bytesType: 'B',
+				name:      "binName",
+			},
+			want: []byte(fmt.Sprintf("B binName %d %s\n", len([]byte("hello")), []byte("hello"))),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := blobBinToASB(tt.args.val, tt.args.bytesType, tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("blobBinToASB() = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_writeRawListBin(t *testing.T) {
+	data := []byte("hello")
+	b64Data := base64.StdEncoding.EncodeToString(data)
+	type args struct {
+		cdt  *a.RawBlobValue
+		name string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len(fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data),
+		},
+		{
+			name: "positive escaped bin name",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "b in\\Name\n",
+			},
+			want:  len(fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRawListBin(tt.args.cdt, tt.args.name, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRawListBin() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRawListBin() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRawListBin() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeRawMapBin(t *testing.T) {
+	data := []byte("hello")
+	b64Data := base64.StdEncoding.EncodeToString(data)
+	type args struct {
+		cdt  *a.RawBlobValue
+		name string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len(fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data),
+		},
+		{
+			name: "positive escaped bin name",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "b in\\Name\n",
+			},
+			want:  len(fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRawMapBin() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRawMapBin() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRawMapBin() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeRawBlobBin(t *testing.T) {
+	data := []byte("hello")
+	b64Data := base64.StdEncoding.EncodeToString(data)
+	type args struct {
+		cdt  *a.RawBlobValue
+		name string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive map",
+			args: args{
+				cdt: &a.RawBlobValue{
+					ParticleType: particleType.MAP,
+					Data:         data,
+				},
+				name: "binName",
+			},
+			want:  len(fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data),
+		},
+		{
+			name: "positive list",
+			args: args{
+				cdt: &a.RawBlobValue{
+					ParticleType: particleType.LIST,
+					Data:         data,
+				},
+				name: "binName",
+			},
+			want:  len(fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data),
+		},
+		{
+			name: "negative invalid particle type",
+			args: args{
+				cdt: &a.RawBlobValue{
+					ParticleType: particleType.NULL,
+					Data:         data,
+				},
+				name: "binName",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRawBlobBin(tt.args.cdt, tt.args.name, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRawBlobBin() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRawBlobBin() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRawBlobBin() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

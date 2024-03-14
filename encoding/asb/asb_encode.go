@@ -23,6 +23,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
 )
 
 type Encoder struct {
@@ -205,10 +206,8 @@ func binToASB(k string, v any, w io.Writer) (int, error) {
 		bytesWritten, err = writeBinString(k, v, w)
 	case []byte:
 		bytesWritten, err = writeBinBytes(k, v, w)
-	case map[any]any:
-		return bytesWritten, errors.New("map bin not supported")
-	case []any:
-		return bytesWritten, errors.New("list bin not supported")
+	case *a.RawBlobValue:
+		bytesWritten, err = writeRawBlobBin(v, k, w)
 	case a.HLLValue:
 		bytesWritten, err = writeBinHLL(k, v, w)
 	case a.GeoJSONValue:
@@ -258,6 +257,31 @@ func writeBinGeoJSON(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
 
 func writeBinNil(name string, w io.Writer) (int, error) {
 	return fmt.Fprintf(w, "%c %c %s\n", markerRecordBins, binTypeNil, escapeASB(name))
+}
+
+func writeRawBlobBin(cdt *a.RawBlobValue, name string, w io.Writer) (int, error) {
+	switch cdt.ParticleType {
+	case particleType.MAP:
+		return writeRawMapBin(cdt, name, w)
+	case particleType.LIST:
+		return writeRawListBin(cdt, name, w)
+	default:
+		return 0, fmt.Errorf("invalid raw blob bin particle type: %v", cdt.ParticleType)
+	}
+}
+
+func writeRawMapBin(cdt *a.RawBlobValue, name string, w io.Writer) (int, error) {
+	encoded := base64Encode(cdt.Data)
+	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytesMap, escapeASB(name), len(encoded), encoded)
+}
+
+func writeRawListBin(cdt *a.RawBlobValue, name string, w io.Writer) (int, error) {
+	encoded := base64Encode(cdt.Data)
+	return fmt.Fprintf(w, "%c %c %s %d %s\n", markerRecordBins, binTypeBytesList, escapeASB(name), len(encoded), encoded)
+}
+
+func blobBinToASB(val []byte, bytesType byte, name string) []byte {
+	return []byte(fmt.Sprintf("%c %s %d %s\n", bytesType, name, len(val), val))
 }
 
 func boolToASB(b bool) byte {

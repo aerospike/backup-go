@@ -27,6 +27,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -1079,33 +1080,82 @@ func TestASBReader_readBin(t *testing.T) {
 			want:    map[string]any{},
 			wantErr: true,
 		},
-		// TODO list and map bins
-		// {
-		// 	name: "positive list bin",
-		// 	fields: fields{
-		// 		countingByteScanner: countingByteScanner{
-		// 			ByteScanner: strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
-		// base64.StdEncoding.EncodedLen(4), base64.StdEncoding.EncodeToString([]byte("ab")))),
-		// 		},
-		// 	},
-		// 	want: map[string]any{
-		// 		"list-bin": []byte{1, 2, 3, '\n'},
-		// 	},
-		// 	wantErr: false,
-		// },
-		// {
-		// 	name: "positive base64 encoded map bin",
-		// 	fields: fields{
-		// 		countingByteScanner: countingByteScanner{
-		// 			ByteScanner: strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
-		// len(base64MsgPackTMap), base64MsgPackTMap)),
-		// 		},
-		// 	},
-		// 	want: map[string]any{
-		// 		"map-bin": tmap,
-		// 	},
-		// 	wantErr: false,
-		// },
+		{
+			name: "positive list bin",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
+						len(base64.StdEncoding.EncodeToString([]byte("123"))),
+						base64.StdEncoding.EncodeToString([]byte("123")))),
+				},
+			},
+			want: map[string]any{
+				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte("123")),
+			},
+			wantErr: false,
+		},
+		{
+			name: "positive plain text list bin",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("L! list-bin %d %s\n",
+						len("123"), []byte("123"))),
+				},
+			},
+			want: map[string]any{
+				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte("123")),
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative list bin",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
+						500, "123")),
+				},
+			},
+			want:    map[string]any{},
+			wantErr: true,
+		},
+		{
+			name: "positive map bin",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
+						len(base64.StdEncoding.EncodeToString([]byte("123"))),
+						base64.StdEncoding.EncodeToString([]byte("123")))),
+				},
+			},
+			want: map[string]any{
+				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte("123")),
+			},
+			wantErr: false,
+		},
+		{
+			name: "positive plain text map bin",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("M! map-bin %d %s\n",
+						len("123"), "123")),
+				},
+			},
+			want: map[string]any{
+				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte("123")),
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative map bin",
+			fields: fields{
+				countingByteScanner: countingByteScanner{
+					ByteScanner: strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
+						500, "abcd")),
+				},
+			},
+			want:    map[string]any{},
+			wantErr: true,
+		},
 		{
 			name: "positive escaped bin name",
 			fields: fields{

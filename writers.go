@@ -192,7 +192,6 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy) *restoreWriter {
 }
 
 // Write writes the types from the models package to an Aerospike DB.
-// TODO support write policy
 // TODO support batch writes
 func (rw *restoreWriter) Write(data *models.Token) error {
 	switch data.Type {

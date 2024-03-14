@@ -15,8 +15,10 @@
 package asb
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"sort"
 	"strings"
@@ -32,8 +34,9 @@ type asbEncoderTestSuite struct {
 	suite.Suite
 }
 
-func (suite *asbEncoderTestSuite) TestEncodeToken() {
-	encoder, err := NewEncoder()
+func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -55,31 +58,92 @@ func (suite *asbEncoderTestSuite) TestEncodeToken() {
 		},
 	}
 
-	expected, err := encoder.EncodeRecord(&token.Record)
+	_, err = encoder.EncodeRecord(&token.Record)
 	suite.Assert().NoError(err)
+	expected := dst.Bytes()
+	encoder.output = &bytes.Buffer{}
 
-	actual, err := encoder.EncodeToken(token)
+	n, err := encoder.EncodeToken(token)
 	suite.Assert().NoError(err)
+	actual := dst.Bytes()
+	suite.Assert().Equal(len(actual), n)
 	suite.Assert().Equal(expected, actual)
+	dst.Reset()
+}
 
+func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	token := &models.Token{
+		Type: models.TokenTypeUDF,
+		UDF:  &models.UDF{},
+	}
+
+	// TODO change this when UDFs are supported
 	token.Type = models.TokenTypeUDF
-	actual, err = encoder.EncodeToken(token)
+	n, err := encoder.EncodeToken(token)
 	suite.Assert().Error(err)
-	suite.Assert().Nil(actual)
+	suite.Assert().Equal(0, n)
+	dst.Reset()
+}
 
-	token.Type = models.TokenTypeSIndex
-	actual, err = encoder.EncodeToken(token)
-	suite.Assert().Error(err)
-	suite.Assert().Nil(actual)
+func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	token := &models.Token{
+		Type: models.TokenTypeSIndex,
+		SIndex: &models.SIndex{
+			Namespace: "ns",
+			Name:      "name",
+			IndexType: models.BinSIndex,
+			Path: models.SIndexPath{
+				BinName: "bin",
+				BinType: models.StringSIDataType,
+			},
+		},
+	}
+
+	_, err = encoder.EncodeSIndex(token.SIndex)
+	suite.Assert().NoError(err)
+	expected := dst.Bytes()
+	dst.Reset()
+
+	n, err := encoder.EncodeToken(token)
+	suite.Assert().NoError(err)
+	actual := dst.Bytes()
+	suite.Assert().Equal(len(actual), n)
+	suite.Assert().Equal(expected, actual)
+	dst.Reset()
+}
+
+func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	token := &models.Token{
+		Type: models.TokenTypeInvalid,
+	}
 
 	token.Type = models.TokenTypeInvalid
-	actual, err = encoder.EncodeToken(token)
+	n, err := encoder.EncodeToken(token)
 	suite.Assert().Error(err)
-	suite.Assert().Nil(actual)
+	suite.Assert().Equal(0, n)
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder, err := NewEncoder()
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -101,18 +165,16 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 	recTemplate := "+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 1\n- I bin1 0\n"
 	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
-	actual, err := encoder.EncodeRecord(rec)
+	n, err := encoder.EncodeRecord(rec)
 	suite.Assert().NoError(err)
-	actStr := string(actual)
-	suite.Assert().Equal(expected, actStr)
-
-	actual, err = encoder.EncodeRecord(nil)
-	suite.Assert().Error(err)
-	suite.Assert().Nil(actual)
+	actual := dst.Bytes()
+	suite.Assert().Equal(len(actual), n)
+	suite.Assert().Equal(expected, string(actual))
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder, err := NewEncoder()
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -128,13 +190,40 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 	}
 
 	expected := []byte("* i ns  name N 1 bin S\n")
-	actual, err := encoder.EncodeSIndex(sindex)
+	n, err := encoder.EncodeSIndex(sindex)
+	suite.Assert().Equal(len(expected), n)
 	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, actual)
+	suite.Assert().Equal(expected, dst.Bytes())
+}
 
-	actual, err = encoder.EncodeSIndex(nil)
-	suite.Assert().Error(err)
-	suite.Assert().Nil(actual)
+func (suite *asbEncoderTestSuite) TestWriteHeaderFirst() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	expected := "Version 3.1\n# namespace test\n# first-file\n"
+
+	n, err := encoder.WriteHeader("test", true)
+	suite.Assert().Equal(len(expected), n)
+	suite.Assert().NoError(err)
+	suite.Assert().Equal(expected, dst.String())
+}
+
+func (suite *asbEncoderTestSuite) TestWriteHeader() {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		suite.FailNow("unexpected error: %v", err)
+	}
+
+	expected := "Version 3.1\n# namespace test\n"
+
+	n, err := encoder.WriteHeader("test", false)
+	suite.Assert().Equal(len(expected), n)
+	suite.Assert().NoError(err)
+	suite.Assert().Equal(expected, dst.String())
 }
 
 func TestASBEncoderTestSuite(t *testing.T) {
@@ -167,7 +256,7 @@ func Test_escapeASBS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := escapeASBS(tt.args.s); !reflect.DeepEqual(got, tt.want) {
+			if got := escapeASB(tt.args.s); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("escapeASB() = %v, want %v", got, tt.want)
 			}
 		})
@@ -181,7 +270,8 @@ func Test__SIndexToASB(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []byte
+		want    int
+		wantW   string
 		wantErr bool
 	}{
 		{
@@ -197,7 +287,8 @@ func Test__SIndexToASB(t *testing.T) {
 					},
 				},
 			},
-			want: []byte("* i ns  name N 1 bin S\n"),
+			want:  len("* i ns  name N 1 bin S\n"),
+			wantW: "* i ns  name N 1 bin S\n",
 		},
 		{
 			name: "positive escaped sindex no context",
@@ -213,7 +304,8 @@ func Test__SIndexToASB(t *testing.T) {
 					},
 				},
 			},
-			want: []byte("* i n\\ s se\\\\t name\\\n N 1 \\ bin S\n"),
+			want:  len("* i n\\ s se\\\\t name\\\n N 1 \\ bin S\n"),
+			wantW: "* i n\\ s se\\\\t name\\\n N 1 \\ bin S\n",
 		},
 		{
 			name: "positive sindex with set and context",
@@ -230,25 +322,23 @@ func Test__SIndexToASB(t *testing.T) {
 					},
 				},
 			},
-			want: []byte("* i ns set name N 1 bin S context\n"),
-		},
-		{
-			name: "negative sindex is nil",
-			args: args{
-				sindex: nil,
-			},
-			wantErr: true,
+			want:  len("* i ns set name N 1 bin S context\n"),
+			wantW: "* i ns set name N 1 bin S context\n",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := sindexToASB(tt.args.sindex)
+			w := &bytes.Buffer{}
+			got, err := sindexToASB(tt.args.sindex, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeSIndexToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("encodeSIndexToASB() = %v, want %v", string(got), string(tt.want))
+			if got != tt.want {
+				t.Errorf("encodeSIndexToASB() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("encodeSIndexToASB() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
@@ -421,10 +511,15 @@ func Test_binToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := binToASB(tt.args.k, tt.args.v)
+			dst := &bytes.Buffer{}
+			n, err := binToASB(tt.args.k, tt.args.v, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeBinToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			got := dst.Bytes()
+			if n != len(got) {
+				t.Errorf("encodeBinToASB() bytes written = %v, want %v", n, len(got))
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("encodeBinToASB() = %v, want %v", string(got), string(tt.want))
@@ -498,10 +593,15 @@ func Test_binsToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := binsToASB(tt.args.bins)
+			dst := &bytes.Buffer{}
+			n, err := binsToASB(tt.args.bins, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeBinsToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			got := dst.Bytes()
+			if n != len(got) {
+				t.Errorf("encodeBinsToASB() bytes written = %v, want %v", n, len(got))
 			}
 			sortedGot := sortBinOutput(string(got))
 			sortedWant := sortBinOutput(string(tt.want))
@@ -572,13 +672,6 @@ func Test_userKeyToASB(t *testing.T) {
 			want: []byte(fmt.Sprintf("+ k B %d %s\n", len(encVal), encVal)),
 		},
 		{
-			name: "positive nil user key",
-			args: args{
-				userKey: nil,
-			},
-			want: nil,
-		},
-		{
 			name: "negative unknown user key",
 			args: args{
 				userKey: a.NewValue(true),
@@ -588,10 +681,15 @@ func Test_userKeyToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := userKeyToASB(tt.args.userKey)
+			dst := &bytes.Buffer{}
+			n, err := userKeyToASB(tt.args.userKey, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("userKeyToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			got := dst.Bytes()
+			if n != len(got) {
+				t.Errorf("userKeyToASB() bytes written = %v, want %v", n, len(got))
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("userKeyToASB() = %v, want %v", string(got), string(tt.want))
@@ -604,7 +702,6 @@ func Test_keyToASB(t *testing.T) {
 	NoSetKey, _ := a.NewKey("ns", "", 1)
 	stringKey, _ := a.NewKey("ns", "set", "hello")
 	escKey, _ := a.NewKey("\\n s", "set\n", "hello")
-
 	type args struct {
 		k *a.Key
 	}
@@ -635,20 +732,18 @@ func Test_keyToASB(t *testing.T) {
 			},
 			want: []byte(fmt.Sprintf("+ k S 5 hello\n+ n \\\\n\\ s\n+ d %s\n+ s set\\\n\n", base64Encode(escKey.Digest()))),
 		},
-		{
-			name: "negative key is nil",
-			args: args{
-				k: nil,
-			},
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := keyToASB(tt.args.k)
+			dst := &bytes.Buffer{}
+			n, err := keyToASB(tt.args.k, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("keyToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			got := dst.Bytes()
+			if n != len(got) {
+				t.Errorf("keyToASB() bytes written = %v, want %v", n, len(got))
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("keyToASB() = %v, want %v", string(got), string(tt.want))
@@ -707,45 +802,18 @@ func Test_recordToASB(t *testing.T) {
 			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\\\n\n+ d %s\n+ s de\\ mo\n+ g 1234\n+ t %d\n+ "+
 				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), recExpr)),
 		},
-		{
-			name: "negative record is nil",
-			args: args{
-				r: nil,
-			},
-			wantErr: true,
-		},
-		{
-			name: "negative key is nil",
-			args: args{
-				r: &models.Record{
-					Record: &a.Record{
-						Key: nil,
-					},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "negative bins is nil",
-			args: args{
-				r: &models.Record{
-					Record: &a.Record{
-						Key:        key,
-						Bins:       nil,
-						Expiration: uint32(recExpr),
-						Generation: 1234,
-					},
-				},
-			},
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := recordToASB(tt.args.r)
+			dst := &bytes.Buffer{}
+			n, err := recordToASB(tt.args.r, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("recordToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			got := dst.Bytes()
+			if n != len(got) {
+				t.Errorf("recordToASB() bytes written = %v, want %v", n, len(got))
 			}
 			sortedGot := sortBinOutput(string(got))
 			sortedWant := sortBinOutput(string(tt.want))
@@ -756,75 +824,927 @@ func Test_recordToASB(t *testing.T) {
 	}
 }
 
-func TestGetFirstMetaText(t *testing.T) {
-	enc := &Encoder{}
+func Test_writeRecordHeaderGeneration(t *testing.T) {
+	type args struct {
+		generation uint32
+	}
 	tests := []struct {
-		name string
-		want []byte
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
 	}{
 		{
 			name: "positive simple",
-			want: []byte("# first-file\n"),
+			args: args{
+				generation: 1234,
+			},
+			want:  len("+ g 1234\n"),
+			wantW: "+ g 1234\n",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := enc.GetFirstMetaText(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetFirstMetaText() = %v, want %v", got, tt.want)
+			w := &bytes.Buffer{}
+			got, err := writeRecordHeaderGeneration(tt.args.generation, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRecordHeaderGeneration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRecordHeaderGeneration() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRecordHeaderGeneration() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func TestGetNamespaceMetaText(t *testing.T) {
-	enc := &Encoder{}
+func Test_writeRecordHeaderExpiration(t *testing.T) {
+	type args struct {
+		expiration int64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				expiration: 1234,
+			},
+			want:  len("+ t 1234\n"),
+			wantW: "+ t 1234\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRecordHeaderExpiration(tt.args.expiration, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRecordHeaderExpiration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRecordHeaderExpiration() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRecordHeaderExpiration() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeRecordHeaderBinCount(t *testing.T) {
+	type args struct {
+		binCount int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				binCount: 1234,
+			},
+			want:  len("+ b 1234\n"),
+			wantW: "+ b 1234\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRecordHeaderBinCount(tt.args.binCount, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRecordHeaderBinCount() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRecordHeaderBinCount() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRecordHeaderBinCount() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeBinInt(t *testing.T) {
+	type args struct {
+		name string
+		v    int64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				name: "binName",
+				v:    1234,
+			},
+			want:  len("- I binName 1234\n"),
+			wantW: "- I binName 1234\n",
+		},
+		{
+			name: "positive simple",
+			args: args{
+				name: "b\nin\\Nam e",
+				v:    1234,
+			},
+			want:  len("- I b\\\nin\\\\Nam\\ e 1234\n"),
+			wantW: "- I b\\\nin\\\\Nam\\ e 1234\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeBinInt(tt.args.name, tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeBinInt() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeBinInt() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeBinInt() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeBinFloat(t *testing.T) {
+	type args struct {
+		name string
+		v    float64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				name: "binName",
+				v:    1234.5678,
+			},
+			want:  len("- D binName 1234.567800\n"),
+			wantW: "- D binName 1234.567800\n",
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				name: "b\nin\\Nam e",
+				v:    1234.5678,
+			},
+			want:  len("- D b\\\nin\\\\Nam\\ e 1234.567800\n"),
+			wantW: "- D b\\\nin\\\\Nam\\ e 1234.567800\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeBinFloat(tt.args.name, tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeBinFloat() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeBinFloat() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeBinFloat() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeBinString(t *testing.T) {
+	type args struct {
+		name string
+		v    string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				name: "binName",
+				v:    "hello",
+			},
+			want:  len("- S binName 5 hello\n"),
+			wantW: "- S binName 5 hello\n",
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				name: "b\nin\\Nam e",
+				v:    "hello",
+			},
+			want:  len("- S b\\\nin\\\\Nam\\ e 5 hello\n"),
+			wantW: "- S b\\\nin\\\\Nam\\ e 5 hello\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeBinString(tt.args.name, tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeBinString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeBinString() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeBinString() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeBinBytes(t *testing.T) {
+	type args struct {
+		name string
+		v    []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				name: "binName",
+				v:    []byte("hello"),
+			},
+			want: len(fmt.Sprintf("- B binName %d %s\n",
+				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello")))),
+			wantW: fmt.Sprintf("- B binName %d %s\n",
+				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello"))),
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				name: "b\nin\\Nam e",
+				v:    []byte("hello"),
+			},
+			want: len(fmt.Sprintf("- B b\\\nin\\\\Nam\\ e %d %s\n",
+				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello")))),
+			wantW: fmt.Sprintf("- B b\\\nin\\\\Nam\\ e %d %s\n",
+				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello"))),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeBinBytes(tt.args.name, tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeBinBytes() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeBinBytes() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeBinBytes() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeBinHLL(t *testing.T) {
+	type args struct {
+		name string
+		v    a.HLLValue
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				name: "binName",
+				v:    a.HLLValue("hello"),
+			},
+			want: len(fmt.Sprintf("- Y binName %d %s\n",
+				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello")))),
+			wantW: fmt.Sprintf("- Y binName %d %s\n",
+				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello"))),
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				name: "b\nin\\Nam e",
+				v:    a.HLLValue("hello"),
+			},
+			want: len(fmt.Sprintf("- Y b\\\nin\\\\Nam\\ e %d %s\n",
+				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello")))),
+			wantW: fmt.Sprintf("- Y b\\\nin\\\\Nam\\ e %d %s\n",
+				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello"))),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeBinHLL(tt.args.name, tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeBinHLL() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeBinHLL() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeBinHLL() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeBinGeoJSON(t *testing.T) {
+	type args struct {
+		name string
+		v    a.GeoJSONValue
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				name: "binName",
+				v:    a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+			},
+			want: len(fmt.Sprintf("- G binName %d %s\n",
+				len(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+				`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`)),
+			wantW: fmt.Sprintf("- G binName %d %s\n",
+				len(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+				`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				name: "b\nin\\Name ",
+				v:    a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+			},
+			want: len(fmt.Sprintf("- G b\\\nin\\\\Name\\  %d %s\n",
+				len(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+				`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`)),
+			wantW: fmt.Sprintf("- G b\\\nin\\\\Name\\  %d %s\n",
+				len(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+				`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeBinGeoJSON(tt.args.name, tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeBinGeoJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeBinGeoJSON() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeBinGeoJSON() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeBinNil(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				name: "binName",
+			},
+			want:  len("- N binName\n"),
+			wantW: "- N binName\n",
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				name: "b\nin\\Name ",
+			},
+			want:  len("- N b\\\nin\\\\Name\\ \n"),
+			wantW: "- N b\\\nin\\\\Name\\ \n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeBinNil(tt.args.name, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeBinNil() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeBinNil() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeBinNil() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeRecordNamespace(t *testing.T) {
 	type args struct {
 		namespace string
 	}
 	tests := []struct {
-		name string
-		args args
-		want []byte
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
 	}{
 		{
 			name: "positive simple",
 			args: args{
 				namespace: "ns",
 			},
-			want: []byte(fmt.Sprintf("# namespace %s\n", "ns")),
+			want:  len(fmt.Sprintf("+ n %s\n", "ns")),
+			wantW: fmt.Sprintf("+ n %s\n", "ns"),
 		},
 		{
 			name: "positive escaped",
 			args: args{
 				namespace: " n\ns\\",
 			},
-			want: []byte(fmt.Sprintf("# namespace %s\n", "\\ n\\\ns\\\\")),
+			want:  len(fmt.Sprintf("+ n %s\n", "\\ n\\\ns\\\\")),
+			wantW: fmt.Sprintf("+ n %s\n", "\\ n\\\ns\\\\"),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := enc.GetNamespaceMetaText(tt.args.namespace); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetNamespaceMetaText() = %v, want %v", string(got), string(tt.want))
+			w := &bytes.Buffer{}
+			got, err := writeRecordNamespace(tt.args.namespace, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRecordNamespace() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRecordNamespace() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRecordNamespace() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func TestGetVersionText(t *testing.T) {
-	enc := &Encoder{}
+func Test_writeRecordDigest(t *testing.T) {
+	type args struct {
+		digest []byte
+	}
 	tests := []struct {
-		name string
-		want []byte
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
 	}{
 		{
 			name: "positive simple",
-			want: []byte(fmt.Sprintf("Version %s\n", ASBFormatVersion)),
+			args: args{
+				digest: []byte("hello"),
+			},
+			want:  len(fmt.Sprintf("+ d %s\n", base64Encode([]byte("hello")))),
+			wantW: fmt.Sprintf("+ d %s\n", base64Encode([]byte("hello"))),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := enc.GetVersionText(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetVersionText() = %v, want %v", string(got), string(tt.want))
+			w := &bytes.Buffer{}
+			got, err := writeRecordDigest(tt.args.digest, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRecordDigest() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRecordDigest() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRecordDigest() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeRecordSet(t *testing.T) {
+	type args struct {
+		setName string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				setName: "set",
+			},
+			want:  len(fmt.Sprintf("+ s %s\n", "set")),
+			wantW: fmt.Sprintf("+ s %s\n", "set"),
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				setName: " s\net\\",
+			},
+			want:  len(fmt.Sprintf("+ s %s\n", "\\ s\\\net\\\\")),
+			wantW: fmt.Sprintf("+ s %s\n", "\\ s\\\net\\\\"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRecordSet(tt.args.setName, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRecordSet() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRecordSet() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRecordSet() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeUserKeyInt(t *testing.T) {
+	type args struct {
+		v int64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				v: 1234,
+			},
+			want:  len("+ k I 1234\n"),
+			wantW: "+ k I 1234\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeUserKeyInt(tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeUserKeyInt() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeUserKeyInt() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeUserKeyInt() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeUserKeyFloat(t *testing.T) {
+	type args struct {
+		v float64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				v: 1234.5678,
+			},
+			want:  len("+ k D 1234.567800\n"),
+			wantW: "+ k D 1234.567800\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeUserKeyFloat(tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeUserKeyFloat() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeUserKeyFloat() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeUserKeyFloat() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeUserKeyString(t *testing.T) {
+	type args struct {
+		v string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				v: "hello",
+			},
+			want:  len("+ k S 5 hello\n"),
+			wantW: "+ k S 5 hello\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeUserKeyString(tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeUserKeyString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeUserKeyString() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeUserKeyString() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeUserKeyBytes(t *testing.T) {
+	type args struct {
+		v []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				v: []byte("hello"),
+			},
+			want:  len(fmt.Sprintf("+ k B %d %s\n", len(base64Encode([]byte("hello"))), base64Encode([]byte("hello")))),
+			wantW: fmt.Sprintf("+ k B %d %s\n", len(base64Encode([]byte("hello"))), base64Encode([]byte("hello"))),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeUserKeyBytes(tt.args.v, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeUserKeyBytes() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeUserKeyBytes() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeUserKeyBytes() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+// **** Benchmarks ****
+
+func BenchmarkEncodeRecord(b *testing.B) {
+	dst := &bytes.Buffer{}
+	encoder, err := NewEncoder(dst)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+
+	key := genKey()
+	rec := &models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"IntBin":     1,
+				"FloatBin":   1.1,
+				"StringBin":  "string",
+				"BoolBin":    true,
+				"BlobBin":    []byte("bytes"),
+				"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+			},
+			Generation: 1234,
+		},
+		VoidTime: 10,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = encoder.EncodeRecord(rec)
+		dst.Reset()
+	}
+}
+
+func genKey() *a.Key {
+	var key *a.Key
+	var err error
+
+	i := rand.Intn(3)
+
+	userKeys := []any{1, "string", []byte("bytes")}
+	userKey := userKeys[i%len(userKeys)]
+
+	switch k := userKey.(type) {
+	case int:
+		userKey = i
+	case string:
+		userKey = k + fmt.Sprint(i)
+	case []byte:
+		k = append(k, []byte(fmt.Sprint(i))...)
+		userKey = k
+	}
+	key, err = a.NewKey("test", "demo", userKey)
+	if err != nil {
+		panic(err)
+	}
+
+	return key
+}
+
+func Test_writeVersionText(t *testing.T) {
+	type args struct {
+		asbVersion string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				asbVersion: "3.2",
+			},
+			want:  len("Version 3.2\n"),
+			wantW: "Version 3.2\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeVersionText(tt.args.asbVersion, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeVersionText() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeVersionText() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeVersionText() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeNamespaceMetaText(t *testing.T) {
+	type args struct {
+		namespace string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				namespace: "test",
+			},
+			want:  len("# namespace test\n"),
+			wantW: "# namespace test\n",
+		},
+		{
+			name: "positive escaped",
+			args: args{
+				namespace: "t e\nst\\",
+			},
+			want:  len("# namespace t\\ e\\\nst\\\\\n"),
+			wantW: "# namespace t\\ e\\\nst\\\\\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeNamespaceMetaText(tt.args.namespace, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeNamespaceMetaText() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeNamespaceMetaText() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeNamespaceMetaText() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeFirstMetaText(t *testing.T) {
+	tests := []struct {
+		name    string
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name:  "positive simple",
+			want:  len("# first-file\n"),
+			wantW: "# first-file\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeFirstMetaText(w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeFirstMetaText() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeFirstMetaText() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeFirstMetaText() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
@@ -860,92 +1780,7 @@ func Test_blobBinToASB(t *testing.T) {
 	}
 }
 
-func Test_rawListBinToASB(t *testing.T) {
-	data := []byte("hello")
-	b64Data := base64.StdEncoding.EncodeToString(data)
-	type args struct {
-		cdt  *a.RawBlobValue
-		name string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []byte
-	}{
-		{
-			name: "positive simple",
-			args: args{
-				cdt: &a.RawBlobValue{
-					Data: data,
-				},
-				name: "binName",
-			},
-			want: []byte(fmt.Sprintf("L %s %d %s\n", "binName", len(b64Data), b64Data)),
-		},
-		{
-			name: "positive escaped bin name",
-			args: args{
-				cdt: &a.RawBlobValue{
-					Data: data,
-				},
-				name: "b in\\Name\n",
-			},
-			want: []byte(fmt.Sprintf("L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := rawListBinToASB(tt.args.cdt, tt.args.name)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("rawListBinToASB() = %s, want %s", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_rawMapBinToASB(t *testing.T) {
-	data := []byte("hello")
-	b64Data := base64.StdEncoding.EncodeToString(data)
-	type args struct {
-		cdt  *a.RawBlobValue
-		name string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []byte
-	}{
-		{
-			name: "positive simple",
-			args: args{
-				cdt: &a.RawBlobValue{
-					Data: data,
-				},
-				name: "binName",
-			},
-			want: []byte(fmt.Sprintf("M %s %d %s\n", "binName", len(b64Data), b64Data)),
-		},
-		{
-			name: "positive escaped bin name",
-			args: args{
-				cdt: &a.RawBlobValue{
-					Data: data,
-				},
-				name: "b in\\Name\n",
-			},
-			want: []byte(fmt.Sprintf("M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := rawMapBinToASB(tt.args.cdt, tt.args.name); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("rawMapBinToASB() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_rawBlobBinToASB(t *testing.T) {
+func Test_writeRawListBin(t *testing.T) {
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
@@ -955,7 +1790,118 @@ func Test_rawBlobBinToASB(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []byte
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len(fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data),
+		},
+		{
+			name: "positive escaped bin name",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "b in\\Name\n",
+			},
+			want:  len(fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRawListBin(tt.args.cdt, tt.args.name, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRawListBin() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRawListBin() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRawListBin() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeRawMapBin(t *testing.T) {
+	data := []byte("hello")
+	b64Data := base64.StdEncoding.EncodeToString(data)
+	type args struct {
+		cdt  *a.RawBlobValue
+		name string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len(fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data),
+		},
+		{
+			name: "positive escaped bin name",
+			args: args{
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "b in\\Name\n",
+			},
+			want:  len(fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeRawMapBin() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("writeRawMapBin() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRawMapBin() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_writeRawBlobBin(t *testing.T) {
+	data := []byte("hello")
+	b64Data := base64.StdEncoding.EncodeToString(data)
+	type args struct {
+		cdt  *a.RawBlobValue
+		name string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
 		wantErr bool
 	}{
 		{
@@ -967,7 +1913,8 @@ func Test_rawBlobBinToASB(t *testing.T) {
 				},
 				name: "binName",
 			},
-			want: []byte(fmt.Sprintf("M %s %d %s\n", "binName", len(b64Data), b64Data)),
+			want:  len(fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- M %s %d %s\n", "binName", len(b64Data), b64Data),
 		},
 		{
 			name: "positive list",
@@ -978,7 +1925,8 @@ func Test_rawBlobBinToASB(t *testing.T) {
 				},
 				name: "binName",
 			},
-			want: []byte(fmt.Sprintf("L %s %d %s\n", "binName", len(b64Data), b64Data)),
+			want:  len(fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data)),
+			wantW: fmt.Sprintf("- L %s %d %s\n", "binName", len(b64Data), b64Data),
 		},
 		{
 			name: "negative invalid particle type",
@@ -994,13 +1942,17 @@ func Test_rawBlobBinToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := rawBlobBinToASB(tt.args.cdt, tt.args.name)
+			w := &bytes.Buffer{}
+			got, err := writeRawBlobBin(tt.args.cdt, tt.args.name, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("rawBlobBinToASB() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("writeRawBlobBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("rawBlobBinToASB() = %v, want %v", got, tt.want)
+			if got != tt.want {
+				t.Errorf("writeRawBlobBin() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("writeRawBlobBin() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

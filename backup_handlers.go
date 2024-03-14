@@ -191,14 +191,14 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 }
 
 func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool) (*writeWorker[*models.Token], error) {
-	enc, err := eb.CreateEncoder()
+	enc, err := eb.CreateEncoder(w)
 	if err != nil {
 		return nil, err
 	}
 
 	switch encT := enc.(type) {
 	case *asb.Encoder:
-		asbw := newAsbWriter(encT, w)
+		asbw := newAsbWriter(encT)
 
 		err := asbw.Init(namespace, first)
 		if err != nil {
@@ -210,7 +210,7 @@ func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool)
 		return worker, err
 
 	default:
-		gw := newGenericWriter(encT, w)
+		gw := newGenericWriter(encT)
 		worker := newWriteWorker(gw)
 
 		return worker, nil

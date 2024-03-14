@@ -73,3 +73,5 @@ issues:
       - wsl # Test code should be allowed to cuddle if statements, generated tests do this
     - path: '(.+)test\.go'
       text: importShadow
+    - path: '(.+)test\.go' # Test code doesn't need crypto strength random numbers
+      text: 'G404: Use of weak random number generator'

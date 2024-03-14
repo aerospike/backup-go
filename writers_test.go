@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -117,31 +116,25 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
 	mockEncoder := enc_mocks.NewEncoder(suite.T())
-	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("rec,"), nil)
-	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("si,"), nil)
-	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("udf"), nil)
-	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(recToken).Return(1, nil)
+	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return(2, nil)
+	mockEncoder.EXPECT().EncodeToken(UDFToken).Return(3, nil)
+	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(0, errors.New("error"))
 
-	output := &bytes.Buffer{}
-
-	writer := newGenericWriter(mockEncoder, output)
+	writer := newGenericWriter(mockEncoder)
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
 	suite.Nil(err)
-	suite.Equal("rec,", output.String())
 
 	err = writer.Write(SIndexToken)
 	suite.Nil(err)
-	suite.Equal("rec,si,", output.String())
 
 	err = writer.Write(UDFToken)
 	suite.Nil(err)
-	suite.Equal("rec,si,udf", output.String())
 
 	err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
 	suite.NotNil(err)
-	suite.Equal("rec,si,udf", output.String())
 
 	writer.Close()
 
@@ -153,10 +146,9 @@ func (suite *writersTestSuite) TestGenericWriter() {
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec)
-	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(0, errors.New("error"))
 	err = writer.Write(failRecToken)
 	suite.NotNil(err)
-	suite.Equal("rec,si,udf", output.String())
 
 	mockEncoder.AssertExpectations(suite.T())
 }
@@ -192,48 +184,44 @@ func (suite *writersTestSuite) TestASBWriter() {
 	SIndexToken := models.NewSIndexToken(expSIndex)
 
 	mockEncoder := mocks.NewAsbEncoder(suite.T())
-	mockEncoder.EXPECT().GetVersionText().Return([]byte("Version 3.1\n"))
-	mockEncoder.EXPECT().GetNamespaceMetaText(namespace).Return([]byte("# namespace test\n"))
-	mockEncoder.EXPECT().GetFirstMetaText().Return([]byte("# first-file\n"))
-	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("rec,"), nil)
-	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("si,"), nil)
-	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("udf"), nil)
+	mockEncoder.EXPECT().WriteHeader(namespace, true).Return(1, nil)
+	mockEncoder.EXPECT().EncodeToken(recToken).Return(2, nil)
+	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return(3, nil)
+	mockEncoder.EXPECT().EncodeToken(UDFToken).Return(4, nil)
 
-	output := &bytes.Buffer{}
-
-	writer := newAsbWriter(mockEncoder, output)
+	writer := newAsbWriter(mockEncoder)
 	suite.NotNil(writer)
 
 	err := writer.Init(namespace, true)
 	suite.Nil(err)
-	suite.Equal("Version 3.1\n# namespace test\n# first-file\n", output.String())
 
 	err = writer.Write(recToken)
 	suite.Nil(err)
-	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,", output.String())
 
 	err = writer.Write(SIndexToken)
 	suite.Nil(err)
-	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,", output.String())
 
 	err = writer.Write(UDFToken)
 	suite.Nil(err)
-	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,udf", output.String())
 
 	writer.Close()
 
 	mockEncoder.AssertExpectations(suite.T())
+}
 
-	// Encoder failed
+func (suite *writersTestSuite) TestASBWriterNegative() {
+	mockEncoder := mocks.NewAsbEncoder(suite.T())
+
+	writer := newAsbWriter(mockEncoder)
+	suite.NotNil(writer)
 
 	failRec := models.Record{
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec)
-	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
-	err = writer.Write(failRecToken)
+	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(0, errors.New("error"))
+	err := writer.Write(failRecToken)
 	suite.NotNil(err)
-	suite.Equal("Version 3.1\n# namespace test\n# first-file\nrec,si,udf", output.String())
 
 	mockEncoder.AssertExpectations(suite.T())
 }

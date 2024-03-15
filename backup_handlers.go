@@ -211,7 +211,8 @@ type BackupToDirectoryHandler struct {
 }
 
 // newBackupToDirectoryHandler creates a new BackupToDirectoryHandler
-func newBackupToDirectoryHandler(config *BackupToDirectoryConfig, ac *a.Client, directory string) *BackupToDirectoryHandler {
+func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
+	ac *a.Client, directory string) *BackupToDirectoryHandler {
 	return &BackupToDirectoryHandler{
 		config:          config,
 		aerospikeClient: ac,
@@ -243,17 +244,23 @@ func (bwh *BackupToDirectoryHandler) run(ctx context.Context) {
 			fileName := getBackupFileName(bwh.config.Namespace, i, bwh.config.EncoderFactory)
 			filePath := filepath.Join(bwh.directory, fileName)
 
-			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0666)
+			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 			if err != nil {
 				err = fmt.Errorf("failed to create backup file %s: %w", filePath, err)
 				errChan <- err
+
 				return
 			}
 
+			//nolint:gocritic // defer in loop is ok here,
+			// we want to close the file after the backup is done
 			defer file.Close()
 
 			// buffer writes for efficiency
 			bufferedFile := bufio.NewWriter(file)
+
+			//nolint:gocritic // defer in loop is ok here,
+			// we want to flush the buffer after the backup is done
 			defer bufferedFile.Flush()
 
 			writers[i] = bufferedFile
@@ -325,7 +332,7 @@ func prepareBackupDirectory(dir string) error {
 	DirInfo, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(dir, 0755)
+			err = os.MkdirAll(dir, 0o755)
 			if err != nil {
 				return fmt.Errorf("%w: failed to create backup directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
 			}
@@ -349,8 +356,7 @@ func prepareBackupDirectory(dir string) error {
 func getBackupFileName(namespace string, id int, encoder EncoderFactory) string {
 	name := fmt.Sprintf("%s_%d", namespace, id)
 
-	switch encoder.(type) {
-	case *encoding.ASBEncoderFactory:
+	if _, ok := encoder.(*encoding.ASBEncoderFactory); ok {
 		name += ".asb"
 	}
 

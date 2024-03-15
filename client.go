@@ -241,7 +241,8 @@ func NewBackupToDirectoryConfig() *BackupToDirectoryConfig {
 // ctx can be used to cancel the backup operation.
 // directory is the directory to write the backup data to.
 // config is the configuration for the backup operation.
-func (c *Client) BackupToDirectory(ctx context.Context, directory string, config *BackupToDirectoryConfig) (*BackupToDirectoryHandler, error) {
+func (c *Client) BackupToDirectory(ctx context.Context,
+	directory string, config *BackupToDirectoryConfig) (*BackupToDirectoryHandler, error) {
 	if config == nil {
 		config = NewBackupToDirectoryConfig()
 	}
@@ -348,7 +349,8 @@ func NewRestoreFromDirectoryConfig() *RestoreFromDirectoryConfig {
 // ctx can be used to cancel the restore operation.
 // directory is the directory to read the backup data from.
 // config is the configuration for the restore operation.
-func (c *Client) RestoreFromDirectory(ctx context.Context, directory string, config *RestoreFromDirectoryConfig) (*RestoreFromDirectoryHandler, error) {
+func (c *Client) RestoreFromDirectory(ctx context.Context,
+	directory string, config *RestoreFromDirectoryConfig) (*RestoreFromDirectoryHandler, error) {
 	if config == nil {
 		config = NewRestoreFromDirectoryConfig()
 	}

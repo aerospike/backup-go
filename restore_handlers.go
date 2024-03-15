@@ -194,7 +194,8 @@ type RestoreFromDirectoryHandler struct {
 }
 
 // newRestoreFromDirectoryHandler creates a new RestoreFromDirectoryHandler
-func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig, ac *a.Client, directory string) *RestoreFromDirectoryHandler {
+func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
+	ac *a.Client, directory string) *RestoreFromDirectoryHandler {
 	return &RestoreFromDirectoryHandler{
 		config:          config,
 		aerospikeClient: ac,
@@ -241,13 +242,17 @@ func (rrh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 
 		for i, file := range fileInfo {
 			filePath := filepath.Join(rrh.directory, file.Name())
+
 			reader, err := os.Open(filePath)
 			if err != nil {
 				err = fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
 				errChan <- err
+
 				return
 			}
 
+			//nolint:gocritic // defer in loop is ok here
+			// we want to close the readers after the restore is done
 			defer reader.Close()
 
 			// buffer the reader to save memory
@@ -271,7 +276,6 @@ func (rrh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 
 			clear(readers)
 		}
-
 	}(rrh.errors)
 }
 
@@ -318,7 +322,7 @@ func checkRestoreDirectory(dir string, decoding DecoderFactory) error {
 		return fmt.Errorf("%w: %s is empty", ErrRestoreDirectoryInvalid, dir)
 	}
 
-	if err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+	if err := filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("%w: failed reading restore file %s in %s: %v", ErrRestoreDirectoryInvalid, d.Name(), dir, err)
 		}
@@ -346,8 +350,7 @@ func checkRestoreDirectory(dir string, decoding DecoderFactory) error {
 }
 
 func verifyBackupFileExtension(fileName string, decoder DecoderFactory) error {
-	switch decoder.(type) {
-	case *encoding.ASBDecoderFactory:
+	if _, ok := decoder.(*encoding.ASBDecoderFactory); ok {
 		if filepath.Ext(fileName) != ".asb" {
 			return fmt.Errorf("%w, restore file %s is in an invalid format, expected extension: .asb, got: %s",
 				ErrRestoreDirectoryInvalid, fileName, filepath.Ext(fileName))

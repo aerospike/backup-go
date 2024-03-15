@@ -34,7 +34,7 @@ func (suite *prepareBackupDirectoryTestSuite) TestPrepareBackupDirectory_Positiv
 
 func (suite *prepareBackupDirectoryTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 	dir := suite.T().TempDir()
-	dir = dir + "/test"
+	dir += "/test"
 	err := prepareBackupDirectory(dir)
 	suite.NoError(err)
 	suite.DirExists(dir)

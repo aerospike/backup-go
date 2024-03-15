@@ -62,7 +62,7 @@ issues:
     - text: 'shadow: declaration of "(err|ctx)" shadows declaration at' # Allow idiomatic shadowing of err and ctx
       linters: 
       - govet
-    - text: 'exported: type name will be used as backup.(BackupStats|BackupHandler|BackupConfig) by other packages, and that stutters' # Allow stuttering for backup types
+    - text: 'exported: type name will be used as backup.(BackupStats|BackupHandler|BackupConfig|BackupToDirectoryConfig|BackupToDirectoryStats|BackupToDirectoryHandler) by other packages, and that stutters' # Allow stuttering for backup types
       linters: 
       - revive
     - path: '(.+)test\.go'

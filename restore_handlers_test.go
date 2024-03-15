@@ -102,7 +102,6 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_BadEx
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_NotADir() {
-
 	dir := suite.T().TempDir()
 	file, err := os.CreateTemp(dir, "")
 	if err != nil {
@@ -122,7 +121,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_Conta
 	file := "file1"
 	filePath := filepath.Join(dir, file)
 
-	err := os.Mkdir(filePath, 0755)
+	err := os.Mkdir(filePath, 0o755)
 	if err != nil {
 		suite.FailNow("Failed to create dir: %v", err)
 	}

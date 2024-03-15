@@ -15,8 +15,13 @@
 package backup
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
@@ -136,7 +141,7 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *
 
 // run runs the backup job
 // currently this should only be run once
-func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
+func (bwh *BackupHandler) run(ctx context.Context) {
 	bwh.errors = make(chan error, 1)
 
 	go func(errChan chan<- error) {
@@ -149,7 +154,7 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 		batchSize := bwh.config.Parallel
 		dataWriters := []*writeWorker[*models.Token]{}
 
-		for i, writer := range writers {
+		for i, writer := range bwh.writers {
 			dw, err := getDataWriter(bwh.config.EncoderFactory, writer, bwh.namespace, i == 0)
 			if err != nil {
 				errChan <- err
@@ -160,7 +165,7 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 			// if we have not reached the batch size and we have more writers
 			// continue to the next writer
 			// if we are at the end of writers then run no matter what
-			if i < len(writers)-1 && len(dataWriters) < batchSize {
+			if i < len(bwh.writers)-1 && len(dataWriters) < batchSize {
 				continue
 			}
 
@@ -190,6 +195,103 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
+// **** Backup To Directory Handler ****
+
+type BackupToDirectoryStats struct {
+	BackupStats
+}
+
+// BackupToDirectoryHandler handles a backup job to a directory
+type BackupToDirectoryHandler struct {
+	stats           BackupToDirectoryStats
+	config          *BackupToDirectoryConfig
+	aerospikeClient *a.Client
+	errors          chan error
+	directory       string
+}
+
+// newBackupToDirectoryHandler creates a new BackupToDirectoryHandler
+func newBackupToDirectoryHandler(config *BackupToDirectoryConfig, ac *a.Client, directory string) *BackupToDirectoryHandler {
+	return &BackupToDirectoryHandler{
+		config:          config,
+		aerospikeClient: ac,
+		directory:       directory,
+	}
+}
+
+// run runs the backup job
+// currently this should only be run once
+func (bwh *BackupToDirectoryHandler) run(ctx context.Context) {
+	bwh.errors = make(chan error, 1)
+
+	go func(errChan chan<- error) {
+		// NOTE: order is important here
+		// if we close the errChan before we handle the panic
+		// the panic will attempt to send on a closed channel
+		defer close(errChan)
+		defer handlePanic(errChan)
+
+		err := prepareBackupDirectory(bwh.directory)
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		writers := make([]io.Writer, bwh.config.Parallel)
+
+		for i := range bwh.config.Parallel {
+			fileName := getBackupFileName(bwh.config.Namespace, i, bwh.config.EncoderFactory)
+			filePath := filepath.Join(bwh.directory, fileName)
+
+			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0666)
+			if err != nil {
+				err = fmt.Errorf("failed to create backup file %s: %w", filePath, err)
+				errChan <- err
+				return
+			}
+
+			defer file.Close()
+
+			// buffer writes for efficiency
+			bufferedFile := bufio.NewWriter(file)
+			defer bufferedFile.Flush()
+
+			writers[i] = bufferedFile
+		}
+
+		handler := newBackupHandler(&bwh.config.BackupConfig, bwh.aerospikeClient, writers)
+		handler.run(ctx)
+
+		err = handler.Wait(ctx)
+		if err != nil {
+			errChan <- err
+			return
+		}
+	}(bwh.errors)
+}
+
+// GetStats returns the stats of the backup job
+func (bwh *BackupToDirectoryHandler) GetStats() BackupToDirectoryStats {
+	return bwh.stats
+}
+
+// Wait waits for the backup job to complete and returns an error if the job failed
+func (bwh *BackupToDirectoryHandler) Wait(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-bwh.errors:
+		return err
+	}
+}
+
+// **** Backup To Directory IO Writer ****
+
+// BackupToDirectoryWriter is an io.Writer that writes to a directory
+// when it's size limit is reached, it will create a new file and continue writing
+
+// **** Helper Functions ****
+
 func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool) (*writeWorker[*models.Token], error) {
 	enc, err := eb.CreateEncoder(w)
 	if err != nil {
@@ -215,4 +317,42 @@ func getDataWriter(eb EncoderFactory, w io.Writer, namespace string, first bool)
 
 		return worker, nil
 	}
+}
+
+var ErrBackupDirectoryInvalid = errors.New("backup directory is invalid")
+
+func prepareBackupDirectory(dir string) error {
+	DirInfo, err := os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				return fmt.Errorf("%w: failed to create backup directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
+			}
+		}
+	} else if !DirInfo.IsDir() {
+		return fmt.Errorf("%w: %s is not a directory", ErrBackupDirectoryInvalid, dir)
+	}
+
+	fileInfo, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("%w: failed to read %s: %w", ErrBackupDirectoryInvalid, dir, err)
+	}
+
+	if len(fileInfo) > 0 {
+		return fmt.Errorf("%w: %s is not empty", ErrBackupDirectoryInvalid, dir)
+	}
+
+	return nil
+}
+
+func getBackupFileName(namespace string, id int, encoder EncoderFactory) string {
+	name := fmt.Sprintf("%s_%d", namespace, id)
+
+	switch encoder.(type) {
+	case *encoding.ASBEncoderFactory:
+		name += ".asb"
+	}
+
+	return name
 }

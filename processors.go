@@ -118,7 +118,7 @@ func newProcessorTTL(stats statsSetterExpired) *processorTTL {
 // errExpiredRecord is returned when a record is expired
 // by embedding errFilteredOut, the processor worker will filter out the token
 // containing the expired record
-var errExpiredRecord = fmt.Errorf("%w, record is expired", errFilteredOut)
+var errExpiredRecord = fmt.Errorf("%w: record is expired", errFilteredOut)
 
 // Process sets the TTL of a record based on its VoidTime
 func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {

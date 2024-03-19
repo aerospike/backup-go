@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	// got this from hllop := a.HLLAddOp(hllpol, "hll", []a.Value{a.NewIntegerValue(1)}, 4, 12)
+	// got this from writing and reading back a.HLLAddOp(hllpol, "hll", []a.Value{a.NewIntegerValue(1)}, 4, 12)
 	//nolint:lll // can't split this up without making it a raw quote which will cause the escaped bytes to be interpreted literally
 	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 )
@@ -213,6 +213,78 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
+
+	err = rh.Wait(ctx)
+	suite.Nil(err)
+
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
+}
+
+func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
+	numRec := 1000
+	bins := a.BinMap{
+		"IntBin":     1,
+		"FloatBin":   1.1,
+		"StringBin":  "string",
+		"BoolBin":    true,
+		"BlobBin":    []byte("bytes"),
+		"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+		"HLLBin":     a.NewHLLValue([]byte(hllValue)),
+		"MapBin": map[any]any{
+			"IntBin":    1,
+			"StringBin": "hi",
+			"listBin":   []any{1, 2, 3},
+			"mapBin":    map[any]any{1: 1},
+		},
+		"ListBin": []any{
+			1,
+			"string",
+			[]byte("bytes"),
+			map[any]any{1: 1},
+			[]any{1, 2, 3},
+		},
+	}
+	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
+
+	err := suite.testClient.WriteRecords(expectedRecs)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+
+	backupConfig := backup.NewBackupToDirectoryConfig()
+	backupDir := suite.T().TempDir()
+
+	bh, err := suite.backupClient.BackupToDirectory(
+		ctx,
+		backupDir,
+		backupConfig,
+	)
+	suite.Nil(err)
+	suite.NotNil(bh)
+
+	backupStats := bh.GetStats()
+	suite.NotNil(backupStats)
+
+	err = bh.Wait(ctx)
+	suite.Nil(err)
+
+	err = suite.testClient.Truncate(suite.namespace, suite.set)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	rh, err := suite.backupClient.RestoreFromDirectory(
+		ctx,
+		backupDir,
+		nil,
+	)
+	suite.Nil(err)
+	suite.NotNil(rh)
+
+	restoreStats := rh.GetStats()
+	suite.NotNil(restoreStats)
 
 	err = rh.Wait(ctx)
 	suite.Nil(err)

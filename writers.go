@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
+	"io"
 
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/models"
@@ -83,87 +83,37 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 
 // **** Generic Writer ****
 
-// genericWriter satisfies the DataWriter interface
+// tokenWriter satisfies the DataWriter interface
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
-type genericWriter struct {
+type tokenWriter struct {
 	encoder encoding.Encoder
+	output  io.Writer
 }
 
-// newGenericWriter creates a new GenericWriter
-func newGenericWriter(encoder encoding.Encoder) *genericWriter {
-	return &genericWriter{
+// newTokenWriter creates a new GenericWriter
+func newTokenWriter(encoder encoding.Encoder, output io.Writer) *tokenWriter {
+	return &tokenWriter{
 		encoder: encoder,
+		output:  output,
 	}
 }
 
 // Write encodes v and writes it to the output
-func (w *genericWriter) Write(v *models.Token) error {
-	n, err := w.encoder.EncodeToken(v)
+func (w *tokenWriter) Write(v *models.Token) error {
+	data, err := w.encoder.EncodeToken(v)
 	if err != nil {
-		return fmt.Errorf("error encoding token: %w, at byte %d", err, n)
+		return fmt.Errorf("error encoding token: %w", err)
 	}
 
-	return nil
+	_, err = w.output.Write(data)
+
+	return err
 }
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the GenericWriter
-func (w *genericWriter) Close() {}
-
-// **** Aerospike Backup Writer ****
-
-// asbEncoder is an interface for encoding the types from the models package into ASB format.
-// It extends the Encoder interface.
-//
-//go:generate mockery --name asbEncoder
-type asbEncoder interface {
-	encoding.Encoder
-	WriteHeader(namespace string, firstFile bool) (int, error)
-}
-
-// asbWriter satisfies the DataWriter interface
-// It writes the types from the models package as data encoded in ASB format
-// to an io.Writer. It uses an ASBEncoder to encode the data.
-// asbWriter also writes the ASB header and metadata to the output
-// when Init is called.
-type asbWriter struct {
-	genericWriter
-	encoder   asbEncoder
-	once      *sync.Once
-	namespace string
-	first     bool
-}
-
-// newAsbWriter creates a new ASBWriter
-func newAsbWriter(encoder asbEncoder) *asbWriter {
-	return &asbWriter{
-		genericWriter: *newGenericWriter(encoder),
-		encoder:       encoder,
-		once:          &sync.Once{},
-	}
-}
-
-// Init initializes the ASBWriter and writes
-// the ASB header and metadata to the output.
-func (w *asbWriter) Init(namespace string, first bool) error {
-	var err error
-
-	w.once.Do(func() {
-		w.namespace = namespace
-		w.first = first
-
-		// bytes written
-		var n int
-
-		n, err = w.encoder.WriteHeader(namespace, first)
-		if err != nil {
-			err = fmt.Errorf("error writing ASB header: %w at byte %d", err, n)
-		}
-	})
-
-	return err
-}
+func (w *tokenWriter) Close() {}
 
 // **** Aerospike Restore Writer ****
 

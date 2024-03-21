@@ -15,6 +15,7 @@
 package asb
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -27,70 +28,83 @@ import (
 )
 
 type Encoder struct {
-	output io.Writer
+	buff bytes.Buffer
 }
 
-func NewEncoder(output io.Writer) (*Encoder, error) {
+func NewEncoder() (*Encoder, error) {
 	return &Encoder{
-		output: output,
+		buff: bytes.Buffer{},
 	}, nil
 }
 
-func (o *Encoder) EncodeToken(token *models.Token) (int, error) {
+// EncodeToken encodes a token to the ASB format.
+// It returns a byte slice of the encoded token
+// and an error if the encoding fails.
+// The returned byte slice is only valid until the next call to EncodeToken.
+func (o *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
+	var (
+		n   int
+		err error
+	)
+
+	o.buff.Reset()
+
 	switch token.Type {
 	case models.TokenTypeRecord:
-		return o.EncodeRecord(&token.Record)
+		n, err = o.encodeRecord(&token.Record)
 	case models.TokenTypeUDF:
-		data, err := o.EncodeUDF(token.UDF)
-		return len(data), err
+		data, UDFErr := o.encodeUDF(token.UDF)
+		n, err = len(data), UDFErr
 	case models.TokenTypeSIndex:
-		return o.EncodeSIndex(token.SIndex)
+		n, err = o.encodeSIndex(token.SIndex)
 	case models.TokenTypeInvalid:
-		return 0, errors.New("invalid token")
+		n, err = 0, errors.New("invalid token")
 	default:
-		return 0, fmt.Errorf("invalid token type: %v", token.Type)
+		n, err = 0, fmt.Errorf("invalid token type: %v", token.Type)
 	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error encoding token at byte %d: %w", n, err)
+	}
+
+	return o.buff.Bytes(), nil
 }
 
-func (o *Encoder) EncodeRecord(rec *models.Record) (int, error) {
-	return recordToASB(rec, o.output)
+func (o *Encoder) encodeRecord(rec *models.Record) (int, error) {
+	return recordToASB(rec, &o.buff)
 }
 
-func (o *Encoder) EncodeUDF(_ *models.UDF) ([]byte, error) {
+func (o *Encoder) encodeUDF(_ *models.UDF) ([]byte, error) {
 	return nil, fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }
 
-func (o *Encoder) EncodeSIndex(sindex *models.SIndex) (int, error) {
-	return sindexToASB(sindex, o.output)
+func (o *Encoder) encodeSIndex(sindex *models.SIndex) (int, error) {
+	return sindexToASB(sindex, &o.buff)
 }
 
-func (o *Encoder) WriteHeader(namespace string, firstFile bool) (int, error) {
-	var bytesWritten int
+func GetHeader(namespace string, firstFile bool) ([]byte, error) {
+	// capacity is arbitrary, just probably enough to avoid reallocations
+	data := make([]byte, 0, 256)
+	buff := bytes.NewBuffer(data)
 
-	n, err := writeVersionText(ASBFormatVersion, o.output)
-	bytesWritten += n
-
+	_, err := writeVersionText(ASBFormatVersion, buff)
 	if err != nil {
-		return bytesWritten, err
+		return nil, err
 	}
 
-	n, err = writeNamespaceMetaText(namespace, o.output)
-	bytesWritten += n
-
+	_, err = writeNamespaceMetaText(namespace, buff)
 	if err != nil {
-		return bytesWritten, err
+		return nil, err
 	}
 
 	if firstFile {
-		n, err = writeFirstMetaText(o.output)
-		bytesWritten += n
-
+		_, err = writeFirstMetaText(buff)
 		if err != nil {
-			return bytesWritten, err
+			return nil, err
 		}
 	}
 
-	return bytesWritten, nil
+	return buff.Bytes(), nil
 }
 
 // **** META DATA ****

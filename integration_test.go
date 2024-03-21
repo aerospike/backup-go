@@ -21,7 +21,8 @@ import (
 	"io"
 	"testing"
 
-	testresources "github.com/aerospike/backup-go/test"
+	"github.com/aerospike/backup-go/encoding"
+	testresources "github.com/aerospike/backup-go/internal/testutils"
 
 	backup "github.com/aerospike/backup-go"
 
@@ -35,6 +36,31 @@ const (
 	//nolint:lll // can't split this up without making it a raw quote which will cause the escaped bytes to be interpreted literally
 	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 )
+
+// testBins is a collection of all supported bin types
+// useful for testing backup and restore
+var testBins = a.BinMap{
+	"IntBin":     1,
+	"FloatBin":   1.1,
+	"StringBin":  "string",
+	"BoolBin":    true,
+	"BlobBin":    []byte("bytes"),
+	"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+	"HLLBin":     a.NewHLLValue([]byte(hllValue)),
+	"MapBin": map[any]any{
+		"IntBin":    1,
+		"StringBin": "hi",
+		"listBin":   []any{1, 2, 3},
+		"mapBin":    map[any]any{1: 1},
+	},
+	"ListBin": []any{
+		1,
+		"string",
+		[]byte("bytes"),
+		map[any]any{1: 1},
+		[]any{1, 2, 3},
+	},
+}
 
 type backupRestoreTestSuite struct {
 	suite.Suite
@@ -153,29 +179,49 @@ func (suite *backupRestoreTestSuite) TearDownTest() {
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
-	numRec := 1000
-	bins := a.BinMap{
-		"IntBin":     1,
-		"FloatBin":   1.1,
-		"StringBin":  "string",
-		"BoolBin":    true,
-		"BlobBin":    []byte("bytes"),
-		"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
-		"HLLBin":     a.NewHLLValue([]byte(hllValue)),
-		"MapBin": map[any]any{
-			"IntBin":    1,
-			"StringBin": "hi",
-			"listBin":   []any{1, 2, 3},
-			"mapBin":    map[any]any{1: 1},
+	type args struct {
+		backupConfig  *backup.BackupConfig
+		restoreConfig *backup.RestoreConfig
+		bins          a.BinMap
+	}
+	var tests = []struct {
+		name string
+		args args
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: backup.NewRestoreConfig(),
+				bins:          testBins,
+			},
 		},
-		"ListBin": []any{
-			1,
-			"string",
-			[]byte("bytes"),
-			map[any]any{1: 1},
-			[]any{1, 2, 3},
+		{
+			name: "with parallel backup",
+			args: args{
+				backupConfig: &backup.BackupConfig{
+					Partitions:     backup.NewPartitionRange(0, 4096),
+					Set:            suite.set,
+					Namespace:      suite.namespace,
+					Parallel:       4,
+					EncoderFactory: encoding.NewASBEncoderFactory(),
+				},
+				restoreConfig: backup.NewRestoreConfig(),
+				bins:          testBins,
+			},
 		},
 	}
+	for _, tt := range tests {
+		suite.SetupTest()
+		suite.Run(tt.name, func() {
+			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins)
+		})
+		suite.TearDownTest()
+	}
+}
+
+func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig, restoreConfig *backup.RestoreConfig, bins a.BinMap) {
+	numRec := 1000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
@@ -185,8 +231,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 
 	ctx := context.Background()
 	dst := bytes.NewBuffer([]byte{})
-
-	backupConfig := backup.NewBackupConfig()
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
@@ -209,7 +253,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		[]io.Reader{reader},
-		nil,
+		restoreConfig,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -221,29 +265,55 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
-	numRec := 1000
-	bins := a.BinMap{
-		"IntBin":     1,
-		"FloatBin":   1.1,
-		"StringBin":  "string",
-		"BoolBin":    true,
-		"BlobBin":    []byte("bytes"),
-		"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
-		"HLLBin":     a.NewHLLValue([]byte(hllValue)),
-		"MapBin": map[any]any{
-			"IntBin":    1,
-			"StringBin": "hi",
-			"listBin":   []any{1, 2, 3},
-			"mapBin":    map[any]any{1: 1},
+	type args struct {
+		backupConfig  *backup.BackupToDirectoryConfig
+		restoreConfig *backup.RestoreFromDirectoryConfig
+		bins          a.BinMap
+	}
+	var tests = []struct {
+		name string
+		args args
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  backup.NewBackupToDirectoryConfig(),
+				restoreConfig: backup.NewRestoreFromDirectoryConfig(),
+				bins:          testBins,
+			},
 		},
-		"ListBin": []any{
-			1,
-			"string",
-			[]byte("bytes"),
-			map[any]any{1: 1},
-			[]any{1, 2, 3},
+		{
+			name: "with file size limit",
+			args: args{
+				backupConfig: &backup.BackupToDirectoryConfig{
+					FileSizeLimit: 1024 * 1024,
+					BackupConfig: backup.BackupConfig{
+						Partitions:     backup.NewPartitionRange(0, 4096),
+						Set:            suite.set,
+						Namespace:      suite.namespace,
+						Parallel:       4,
+						EncoderFactory: encoding.NewASBEncoderFactory(),
+					},
+				},
+				restoreConfig: backup.NewRestoreFromDirectoryConfig(),
+				bins:          testBins,
+			},
 		},
 	}
+	for _, tt := range tests {
+		suite.SetupTest()
+		suite.Run(tt.name, func() {
+			runBackupRestoreDirectory(suite, tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins)
+		})
+		suite.TearDownTest()
+	}
+}
+
+func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
+	backupConfig *backup.BackupToDirectoryConfig,
+	restoreConfig *backup.RestoreFromDirectoryConfig,
+	bins a.BinMap) {
+	numRec := 1000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
@@ -253,7 +323,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 
 	ctx := context.Background()
 
-	backupConfig := backup.NewBackupToDirectoryConfig()
 	backupDir := suite.T().TempDir()
 
 	bh, err := suite.backupClient.BackupToDirectory(
@@ -278,7 +347,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 	rh, err := suite.backupClient.RestoreFromDirectory(
 		ctx,
 		backupDir,
-		nil,
+		restoreConfig,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)

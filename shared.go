@@ -16,7 +16,10 @@ package backup
 
 import (
 	"fmt"
+	"io"
 	"runtime/debug"
+
+	"github.com/aerospike/backup-go/encoding/asb"
 )
 
 func handlePanic(errors chan<- error) {
@@ -37,8 +40,8 @@ func handlePanic(errors chan<- error) {
 }
 
 func splitPartitions(startPartition, numPartitions, numWorkers int) ([]PartitionRange, error) {
-	if startPartition+numPartitions > maxPartitions {
-		return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitions count of %d", maxPartitions)
+	if startPartition+numPartitions > MaxPartitions {
+		return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitions count of %d", MaxPartitions)
 	}
 
 	if numWorkers < 1 {
@@ -61,4 +64,13 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 	}
 
 	return pSpecs, nil
+}
+
+func writeASBHeader(w io.Writer, namespace string, first bool) (int, error) {
+	header, err := asb.GetHeader(namespace, first)
+	if err != nil {
+		return 0, err
+	}
+
+	return w.Write(header)
 }

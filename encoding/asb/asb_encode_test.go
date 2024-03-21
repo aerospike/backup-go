@@ -35,8 +35,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -58,22 +57,17 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 		},
 	}
 
-	_, err = encoder.EncodeRecord(&token.Record)
+	_, err = encoder.encodeRecord(&token.Record)
 	suite.Assert().NoError(err)
-	expected := dst.Bytes()
-	encoder.output = &bytes.Buffer{}
+	expected := bytes.Clone(encoder.buff.Bytes())
 
-	n, err := encoder.EncodeToken(token)
+	actual, err := encoder.EncodeToken(token)
 	suite.Assert().NoError(err)
-	actual := dst.Bytes()
-	suite.Assert().Equal(len(actual), n)
 	suite.Assert().Equal(expected, actual)
-	dst.Reset()
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -85,15 +79,13 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 
 	// TODO change this when UDFs are supported
 	token.Type = models.TokenTypeUDF
-	n, err := encoder.EncodeToken(token)
+	actual, err := encoder.EncodeToken(token)
 	suite.Assert().Error(err)
-	suite.Assert().Equal(0, n)
-	dst.Reset()
+	suite.Assert().Nil(actual)
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -111,22 +103,17 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 		},
 	}
 
-	_, err = encoder.EncodeSIndex(token.SIndex)
+	_, err = encoder.encodeSIndex(token.SIndex)
 	suite.Assert().NoError(err)
-	expected := dst.Bytes()
-	dst.Reset()
+	expected := encoder.buff.Bytes()
 
-	n, err := encoder.EncodeToken(token)
+	actual, err := encoder.EncodeToken(token)
 	suite.Assert().NoError(err)
-	actual := dst.Bytes()
-	suite.Assert().Equal(len(actual), n)
 	suite.Assert().Equal(expected, actual)
-	dst.Reset()
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -136,14 +123,13 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 	}
 
 	token.Type = models.TokenTypeInvalid
-	n, err := encoder.EncodeToken(token)
+	actual, err := encoder.EncodeToken(token)
 	suite.Assert().Error(err)
-	suite.Assert().Equal(0, n)
+	suite.Assert().Nil(actual)
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -165,16 +151,15 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 	recTemplate := "+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 1\n- I bin1 0\n"
 	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
-	n, err := encoder.EncodeRecord(rec)
+	n, err := encoder.encodeRecord(rec)
 	suite.Assert().NoError(err)
-	actual := dst.Bytes()
+	actual := encoder.buff.Bytes()
 	suite.Assert().Equal(len(actual), n)
 	suite.Assert().Equal(expected, string(actual))
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
+	encoder, err := NewEncoder()
 	if err != nil {
 		suite.FailNow("unexpected error: %v", err)
 	}
@@ -190,40 +175,26 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 	}
 
 	expected := []byte("* i ns  name N 1 bin S\n")
-	n, err := encoder.EncodeSIndex(sindex)
+	n, err := encoder.encodeSIndex(sindex)
 	suite.Assert().Equal(len(expected), n)
 	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, dst.Bytes())
+	suite.Assert().Equal(expected, encoder.buff.Bytes())
 }
 
-func (suite *asbEncoderTestSuite) TestWriteHeaderFirst() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
-
+func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	n, err := encoder.WriteHeader("test", true)
-	suite.Assert().Equal(len(expected), n)
+	actual, err := GetHeader("test", true)
 	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, dst.String())
+	suite.Assert().Equal(expected, string(actual))
 }
 
-func (suite *asbEncoderTestSuite) TestWriteHeader() {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
-
+func (suite *asbEncoderTestSuite) TestGetHeader() {
 	expected := "Version 3.1\n# namespace test\n"
 
-	n, err := encoder.WriteHeader("test", false)
-	suite.Assert().Equal(len(expected), n)
+	actual, err := GetHeader("test", false)
 	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, dst.String())
+	suite.Assert().Equal(expected, string(actual))
 }
 
 func TestASBEncoderTestSuite(t *testing.T) {
@@ -1579,8 +1550,8 @@ func Test_writeUserKeyBytes(t *testing.T) {
 // **** Benchmarks ****
 
 func BenchmarkEncodeRecord(b *testing.B) {
-	dst := &bytes.Buffer{}
-	encoder, err := NewEncoder(dst)
+	output := &bytes.Buffer{}
+	encoder, err := NewEncoder()
 	if err != nil {
 		b.Fatalf("unexpected error: %v", err)
 	}
@@ -1604,8 +1575,9 @@ func BenchmarkEncodeRecord(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = encoder.EncodeRecord(rec)
-		dst.Reset()
+		_, _ = encoder.encodeRecord(rec)
+		output.Write(encoder.buff.Bytes())
+		encoder.buff.Reset()
 	}
 }
 

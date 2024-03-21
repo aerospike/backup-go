@@ -274,7 +274,7 @@ func (rrh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 				return
 			}
 
-			clear(readers)
+			readers = []io.Reader{}
 		}
 	}(rrh.errors)
 }

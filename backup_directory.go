@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -27,7 +28,9 @@ import (
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/internal/writers"
+	"github.com/aerospike/backup-go/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 )
 
 // **** Backup To Directory Handler ****
@@ -43,15 +46,23 @@ type BackupToDirectoryHandler struct {
 	aerospikeClient *a.Client
 	errors          chan error
 	directory       string
+	Id              string
+	logger          *slog.Logger
 }
 
 // newBackupToDirectoryHandler creates a new BackupToDirectoryHandler
 func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
-	ac *a.Client, directory string) *BackupToDirectoryHandler {
+	ac *a.Client, directory string, logger *slog.Logger) *BackupToDirectoryHandler {
+
+	id := uuid.NewString()
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackupDirectory)
+
 	return &BackupToDirectoryHandler{
 		config:          config,
 		aerospikeClient: ac,
 		directory:       directory,
+		Id:              id,
+		logger:          logger,
 	}
 }
 
@@ -59,6 +70,8 @@ func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
 // currently this should only be run once
 func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
+
+	bh.logger.Info("started job")
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here
@@ -76,6 +89,10 @@ func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
 
 		var (
+			// If we are using a file size limit,
+			// the writers will open new files as they hit the limit.
+			// Writers may be running in multiple threads, so we need to
+			// use atomics to keep track of the current file id.
 			fileID  atomic.Int32
 			encoder encoding.Encoder
 		)

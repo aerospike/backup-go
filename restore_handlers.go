@@ -17,9 +17,12 @@ package backup
 import (
 	"context"
 	"io"
+	"log/slog"
 
+	"github.com/aerospike/backup-go/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
+	"github.com/google/uuid"
 )
 
 // **** Generic Restore Handler ****
@@ -97,18 +100,24 @@ type RestoreHandler struct {
 	config  *RestoreConfig
 	errors  chan error
 	readers []io.Reader
+	logger  *slog.Logger
+	Id      string
 }
 
 // newRestoreHandler creates a new RestoreHandler
-func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.Reader) *RestoreHandler {
+func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.Reader, logger *slog.Logger) *RestoreHandler {
 	worker := newWorkHandler()
-
 	restoreHandler := newRestoreHandlerBase(config, ac, worker)
+
+	id := uuid.NewString()
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore)
 
 	return &RestoreHandler{
 		config:             config,
 		readers:            readers,
 		restoreHandlerBase: *restoreHandler,
+		logger:             logger,
+		Id:                 id,
 	}
 }
 
@@ -116,6 +125,8 @@ func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.R
 // currently this should only be run once
 func (rrh *RestoreHandler) run(ctx context.Context) {
 	rrh.errors = make(chan error, 1)
+
+	rrh.logger.Info("started job")
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here

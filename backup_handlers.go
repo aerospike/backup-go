@@ -17,18 +17,16 @@ package backup
 import (
 	"context"
 	"io"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
+	"github.com/google/uuid"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-)
-
-const (
-	// MaxPartitions is the maximum number of partitions in an Aerospike cluster.
-	MaxPartitions = 4096
 )
 
 // **** Base Backup Handler ****
@@ -121,17 +119,24 @@ type BackupHandler struct {
 	errors chan error
 	backupHandlerBase
 	writers []io.Writer
+	logger  *slog.Logger
+	Id      string
 }
 
 // newBackupHandler creates a new BackupHandler
-func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *BackupHandler {
+func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer, logger *slog.Logger) *BackupHandler {
 	namespace := config.Namespace
 	backupHandler := newBackupHandlerBase(config, ac, namespace)
+
+	id := uuid.NewString()
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup)
 
 	return &BackupHandler{
 		config:            config,
 		writers:           writers,
 		backupHandlerBase: *backupHandler,
+		logger:            logger,
+		Id:                id,
 	}
 }
 
@@ -139,6 +144,8 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *
 // currently this should only be run once
 func (bwh *BackupHandler) run(ctx context.Context) {
 	bwh.errors = make(chan error, 1)
+
+	bwh.logger.Info("started job")
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here

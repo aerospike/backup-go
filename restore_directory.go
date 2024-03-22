@@ -20,11 +20,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/logging"
+	"github.com/google/uuid"
 )
 
 // **** Restore From Directory Handler ****
@@ -41,15 +44,23 @@ type RestoreFromDirectoryHandler struct {
 	aerospikeClient *a.Client
 	errors          chan error
 	directory       string
+	Id              string
+	logger          *slog.Logger
 }
 
 // newRestoreFromDirectoryHandler creates a new RestoreFromDirectoryHandler
 func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
-	ac *a.Client, directory string) *RestoreFromDirectoryHandler {
+	ac *a.Client, directory string, logger *slog.Logger) *RestoreFromDirectoryHandler {
+
+	id := uuid.NewString()
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
+
 	return &RestoreFromDirectoryHandler{
 		config:          config,
 		aerospikeClient: ac,
 		directory:       directory,
+		Id:              id,
+		logger:          logger,
 	}
 }
 
@@ -57,6 +68,8 @@ func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
 // currently this should only be run once
 func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 	rh.errors = make(chan error, 1)
+
+	rh.logger.Info("started job")
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here
@@ -115,7 +128,8 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 				continue
 			}
 
-			restoreHandler := newRestoreHandler(&rh.config.RestoreConfig, rh.aerospikeClient, readers)
+			// TODO don't use a restore handler, use a base handler
+			restoreHandler := newRestoreHandler(&rh.config.RestoreConfig, rh.aerospikeClient, readers, rh.logger)
 			restoreHandler.run(ctx)
 
 			err = restoreHandler.Wait(ctx)

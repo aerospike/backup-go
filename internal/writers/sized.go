@@ -22,7 +22,7 @@ import "io"
 type Sized struct {
 	io.WriteCloser
 	open  func() (io.WriteCloser, error)
-	size  uint64
+	size  int64
 	limit uint64
 }
 
@@ -36,7 +36,7 @@ func NewSized(limit uint64, writer io.WriteCloser, open func() (io.WriteCloser, 
 }
 
 func (f *Sized) Write(p []byte) (n int, err error) {
-	if f.size >= f.limit {
+	if f.size >= int64(f.limit) {
 		f.WriteCloser.Close()
 
 		f.size = 0
@@ -48,7 +48,7 @@ func (f *Sized) Write(p []byte) (n int, err error) {
 	}
 
 	n, err = f.WriteCloser.Write(p)
-	f.size += uint64(n)
+	f.size += int64(n)
 
 	return n, err
 }

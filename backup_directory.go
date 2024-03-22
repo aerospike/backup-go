@@ -57,8 +57,8 @@ func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
 
 // run runs the backup job
 // currently this should only be run once
-func (bwh *BackupToDirectoryHandler) run(ctx context.Context) {
-	bwh.errors = make(chan error, 1)
+func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
+	bh.errors = make(chan error, 1)
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here
@@ -67,27 +67,27 @@ func (bwh *BackupToDirectoryHandler) run(ctx context.Context) {
 		defer close(errChan)
 		defer handlePanic(errChan)
 
-		err := prepareBackupDirectory(bwh.directory)
+		err := prepareBackupDirectory(bh.directory)
 		if err != nil {
 			errChan <- err
 			return
 		}
 
-		writeWorkers := make([]*writeWorker[*models.Token], bwh.config.Parallel)
+		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
 
 		var (
 			fileID  atomic.Int32
 			encoder encoding.Encoder
 		)
 
-		for i := range bwh.config.Parallel {
-			encoder, err = bwh.config.EncoderFactory.CreateEncoder()
+		for i := range bh.config.Parallel {
+			encoder, err = bh.config.EncoderFactory.CreateEncoder()
 			if err != nil {
 				errChan <- err
 				return
 			}
 
-			writer, err := makeBackupFile(bwh.directory, bwh.config.Namespace, encoder, bwh.config.FileSizeLimit, &fileID)
+			writer, err := makeBackupFile(bh.directory, bh.config.Namespace, encoder, bh.config.FileSizeLimit, &fileID)
 			if err != nil {
 				errChan <- err
 				return
@@ -101,27 +101,27 @@ func (bwh *BackupToDirectoryHandler) run(ctx context.Context) {
 			writeWorkers[i] = newWriteWorker(dataWriter)
 		}
 
-		handler := newBackupHandlerBase(&bwh.config.BackupConfig, bwh.aerospikeClient, bwh.config.Namespace)
+		handler := newBackupHandlerBase(&bh.config.BackupConfig, bh.aerospikeClient, bh.config.Namespace)
 
 		err = handler.run(ctx, writeWorkers)
 		if err != nil {
 			errChan <- err
 			return
 		}
-	}(bwh.errors)
+	}(bh.errors)
 }
 
 // GetStats returns the stats of the backup job
-func (bwh *BackupToDirectoryHandler) GetStats() BackupToDirectoryStats {
-	return bwh.stats
+func (bh *BackupToDirectoryHandler) GetStats() BackupToDirectoryStats {
+	return bh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
-func (bwh *BackupToDirectoryHandler) Wait(ctx context.Context) error {
+func (bh *BackupToDirectoryHandler) Wait(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-bwh.errors:
+	case err := <-bh.errors:
 		return err
 	}
 }
@@ -130,7 +130,7 @@ func (bwh *BackupToDirectoryHandler) Wait(ctx context.Context) error {
 
 // makeBackupFile creates a new backup file in the given directory.
 // The file name is based on the namespace and the id.
-// The files is returned in write mode.
+// The file is returned in write mode.
 // If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
 func makeBackupFile(dir, namespace string, encoder encoding.Encoder,
 	fileSizeLimit uint64, fileID *atomic.Int32) (io.WriteCloser, error) {

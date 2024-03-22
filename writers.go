@@ -81,7 +81,7 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// **** Generic Writer ****
+// **** Token Writer ****
 
 // tokenWriter satisfies the DataWriter interface
 // It writes the types from the models package as encoded data
@@ -91,7 +91,7 @@ type tokenWriter struct {
 	output  io.Writer
 }
 
-// newTokenWriter creates a new GenericWriter
+// newTokenWriter creates a new tokenWriter
 func newTokenWriter(encoder encoding.Encoder, output io.Writer) *tokenWriter {
 	return &tokenWriter{
 		encoder: encoder,
@@ -112,7 +112,7 @@ func (w *tokenWriter) Write(v *models.Token) error {
 }
 
 // Cancel satisfies the DataWriter interface
-// but is a no-op for the GenericWriter
+// but is a no-op for the tokenWriter
 func (w *tokenWriter) Close() {}
 
 // **** Aerospike Restore Writer ****

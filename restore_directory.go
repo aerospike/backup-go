@@ -55,8 +55,8 @@ func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
 
 // run runs the restore job
 // currently this should only be run once
-func (rrh *RestoreFromDirectoryHandler) run(ctx context.Context) {
-	rrh.errors = make(chan error, 1)
+func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
+	rh.errors = make(chan error, 1)
 
 	go func(errChan chan<- error) {
 		// NOTE: order is important here
@@ -75,23 +75,23 @@ func (rrh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 		// if there are more files, continue to the next batch
 		// if there are no more files, return
 
-		err := checkRestoreDirectory(rrh.directory, rrh.config.DecoderFactory)
+		err := checkRestoreDirectory(rh.directory, rh.config.DecoderFactory)
 		if err != nil {
 			errChan <- err
 			return
 		}
 
-		fileInfo, err := os.ReadDir(rrh.directory)
+		fileInfo, err := os.ReadDir(rh.directory)
 		if err != nil {
-			errChan <- fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, rrh.directory, err)
+			errChan <- fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, rh.directory, err)
 			return
 		}
 
-		batchSize := rrh.config.Parallel
+		batchSize := rh.config.Parallel
 		readers := []io.Reader{}
 
 		for i, file := range fileInfo {
-			filePath := filepath.Join(rrh.directory, file.Name())
+			filePath := filepath.Join(rh.directory, file.Name())
 
 			reader, err := os.Open(filePath)
 			if err != nil {
@@ -115,7 +115,7 @@ func (rrh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 				continue
 			}
 
-			restoreHandler := newRestoreHandler(&rrh.config.RestoreConfig, rrh.aerospikeClient, readers)
+			restoreHandler := newRestoreHandler(&rh.config.RestoreConfig, rh.aerospikeClient, readers)
 			restoreHandler.run(ctx)
 
 			err = restoreHandler.Wait(ctx)
@@ -126,20 +126,20 @@ func (rrh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 
 			readers = []io.Reader{}
 		}
-	}(rrh.errors)
+	}(rh.errors)
 }
 
 // GetStats returns the stats of the restore job
-func (rrh *RestoreFromDirectoryHandler) GetStats() RestoreFromDirectoryStats {
-	return rrh.stats
+func (rh *RestoreFromDirectoryHandler) GetStats() RestoreFromDirectoryStats {
+	return rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed
-func (rrh *RestoreFromDirectoryHandler) Wait(ctx context.Context) error {
+func (rh *RestoreFromDirectoryHandler) Wait(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-rrh.errors:
+	case err := <-rh.errors:
 		return err
 	}
 }

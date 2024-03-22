@@ -66,11 +66,13 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 	return pSpecs, nil
 }
 
-func writeASBHeader(w io.Writer, namespace string, first bool) (int, error) {
+func writeASBHeader(w io.Writer, namespace string, first bool) error {
 	header, err := asb.GetHeader(namespace, first)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return w.Write(header)
+	_, err = w.Write(header)
+
+	return err
 }

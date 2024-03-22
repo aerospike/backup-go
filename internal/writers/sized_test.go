@@ -23,9 +23,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type SizedTestSuite struct {
+type sizedTestSuite struct {
 	suite.Suite
-	namespace string
 }
 
 type mockWriteCloser struct {
@@ -38,7 +37,7 @@ func (m *mockWriteCloser) Close() error {
 	return nil
 }
 
-func (suite *SizedTestSuite) Test_writeCloserSized() {
+func (suite *sizedTestSuite) Test_writeCloserSized() {
 	writer := mockWriteCloser{
 		Writer: &bytes.Buffer{},
 	}
@@ -76,5 +75,5 @@ func (suite *SizedTestSuite) Test_writeCloserSized() {
 }
 
 func Test_SizedTestSuite(t *testing.T) {
-	suite.Run(t, new(SizedTestSuite))
+	suite.Run(t, new(sizedTestSuite))
 }

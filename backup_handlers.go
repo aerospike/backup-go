@@ -160,7 +160,11 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 			// asb files require a header, treat the
 			// passed in io.Writer like a fresh file and write the header
 			if _, ok := encoder.(*asb.Encoder); ok {
-				writeASBHeader(writer, bwh.config.Namespace, i == 0)
+				err := writeASBHeader(writer, bwh.config.Namespace, i == 0)
+				if err != nil {
+					errChan <- err
+					return
+				}
 			}
 
 			dataWriter := newTokenWriter(encoder, writer)
@@ -182,23 +186,6 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 			writeWorkers = []*writeWorker[*models.Token]{}
 		}
 	}(bwh.errors)
-}
-
-// sliceUpTo returns a slice of the first count elements of slice starting at start.
-// If start is greater than the length of slice, a nil slice is returned.
-// If count is greater than the length of slice, the entire slice is returned.
-// If start + count is greater than the length of slice, the slice up to the end is returned.
-func sliceUpTo[T any](slice []T, start, count int) []T {
-	if start >= len(slice) {
-		return nil
-	}
-
-	end := start + count
-	if end > len(slice) {
-		end = len(slice)
-	}
-
-	return slice[start:end]
 }
 
 // GetStats returns the stats of the backup job

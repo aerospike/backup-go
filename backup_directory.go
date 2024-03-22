@@ -102,6 +102,7 @@ func (bwh *BackupToDirectoryHandler) run(ctx context.Context) {
 		}
 
 		handler := newBackupHandlerBase(&bwh.config.BackupConfig, bwh.aerospikeClient, bwh.config.Namespace)
+
 		err = handler.run(ctx, writeWorkers)
 		if err != nil {
 			errChan <- err
@@ -131,7 +132,8 @@ func (bwh *BackupToDirectoryHandler) Wait(ctx context.Context) error {
 // The file name is based on the namespace and the id.
 // The files is returned in write mode.
 // If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
-func makeBackupFile(dir, namespace string, encoder encoding.Encoder, fileSizeLimit uint64, fileID *atomic.Int32) (io.WriteCloser, error) {
+func makeBackupFile(dir, namespace string, encoder encoding.Encoder,
+	fileSizeLimit uint64, fileID *atomic.Int32) (io.WriteCloser, error) {
 	var (
 		open func() (io.WriteCloser, error)
 	)
@@ -188,7 +190,7 @@ func prepareBackupDirectory(dir string) error {
 // getNewBackupFileGeneric creates a new backup file in the given directory.
 // The file name is based on the namespace and the id.
 // The files is returned in write mode.
-func getNewBackupFileGeneric(dir string, namespace string, id int) (*os.File, error) {
+func getNewBackupFileGeneric(dir, namespace string, id int) (*os.File, error) {
 	fileName := getBackupFileNameGeneric(namespace, id)
 	filePath := filepath.Join(dir, fileName)
 
@@ -199,7 +201,7 @@ func getNewBackupFileGeneric(dir string, namespace string, id int) (*os.File, er
 // The file name is based on the namespace and the id.
 // The files is returned in write mode.
 // The file is created with an ASB header and .asb extension.
-func getNewBackupFileASB(dir string, namespace string, id int) (*os.File, error) {
+func getNewBackupFileASB(dir, namespace string, id int) (*os.File, error) {
 	fileName := getBackupFileNameASB(namespace, id)
 	filePath := filepath.Join(dir, fileName)
 
@@ -208,8 +210,7 @@ func getNewBackupFileASB(dir string, namespace string, id int) (*os.File, error)
 		return nil, err
 	}
 
-	_, err = writeASBHeader(file, namespace, id == 1)
-	return file, err
+	return file, writeASBHeader(file, namespace, id == 1)
 }
 
 func openBackupFile(path string) (*os.File, error) {

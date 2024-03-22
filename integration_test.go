@@ -220,7 +220,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	}
 }
 
-func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig, restoreConfig *backup.RestoreConfig, bins a.BinMap) {
+func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
+	restoreConfig *backup.RestoreConfig, bins a.BinMap) {
 	numRec := 1000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 

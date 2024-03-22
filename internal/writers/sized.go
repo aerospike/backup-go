@@ -20,10 +20,10 @@ import "io"
 // when the size limit is reached, the io.WriteCloser is closed and a new one is created
 // using the open function.
 type Sized struct {
+	io.WriteCloser
+	open  func() (io.WriteCloser, error)
 	size  uint64
 	limit uint64
-	open  func() (io.WriteCloser, error)
-	io.WriteCloser
 }
 
 func NewSized(limit uint64, writer io.WriteCloser, open func() (io.WriteCloser, error)) *Sized {

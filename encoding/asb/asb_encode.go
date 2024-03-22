@@ -74,6 +74,7 @@ func (o *Encoder) encodeRecord(rec *models.Record) (int, error) {
 	return recordToASB(rec, &o.buff)
 }
 
+//nolint:unparam // UDF is not implemented yet, return value is nil for now.
 func (o *Encoder) encodeUDF(_ *models.UDF) ([]byte, error) {
 	return nil, fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
 }

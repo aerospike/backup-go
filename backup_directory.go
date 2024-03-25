@@ -133,7 +133,7 @@ func (bh *BackupToDirectoryHandler) Wait(ctx context.Context) error {
 // The file is returned in write mode.
 // If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
 func makeBackupFile(dir, namespace string, encoder encoding.Encoder,
-	fileSizeLimit uint64, fileID *atomic.Int32) (io.WriteCloser, error) {
+	fileSizeLimit int64, fileID *atomic.Int32) (io.WriteCloser, error) {
 	var (
 		open func() (io.WriteCloser, error)
 	)

@@ -27,7 +27,7 @@ type checkRestoreDirectoryTestSuite struct {
 	suite.Suite
 }
 
-func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Positive_SingleFile() {
+func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_SingleFile() {
 	dir := suite.T().TempDir()
 	file := "file1.asb"
 	filePath := filepath.Join(dir, file)
@@ -43,7 +43,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Positive_Singl
 	suite.NoError(err)
 }
 
-func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Positive_nilDecoder() {
+func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilDecoder() {
 	dir := suite.T().TempDir()
 	file := "file1"
 	filePath := filepath.Join(dir, file)
@@ -59,7 +59,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Positive_nilDe
 	suite.NoError(err)
 }
 
-func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Positive_MultipleFiles() {
+func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_MultipleFiles() {
 	dir := suite.T().TempDir()
 	file := "file1.asb"
 	filePath := filepath.Join(dir, file)
@@ -85,7 +85,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Positive_Multi
 	suite.NoError(err)
 }
 
-func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_BadExtension() {
+func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_BadExtension() {
 	dir := suite.T().TempDir()
 	file := "file1"
 	filePath := filepath.Join(dir, file)
@@ -101,7 +101,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_BadEx
 	suite.Error(err)
 }
 
-func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_NotADir() {
+func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_NotADir() {
 	dir := suite.T().TempDir()
 	file, err := os.CreateTemp(dir, "")
 	if err != nil {
@@ -116,7 +116,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_NotAD
 	suite.Error(err)
 }
 
-func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_ContainsDir() {
+func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_ContainsDir() {
 	dir := suite.T().TempDir()
 	file := "file1"
 	filePath := filepath.Join(dir, file)
@@ -130,13 +130,13 @@ func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_Conta
 	suite.Error(err)
 }
 
-func (suite *checkRestoreDirectoryTestSuite) TestRestoreDirectory_Negative_EmptyDir() {
+func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := suite.T().TempDir()
 	err := checkRestoreDirectory(dir, encoding.NewASBDecoderFactory())
 	suite.Error(err)
 }
 
-func TestRestoreDirectory(t *testing.T) {
+func TestCheckRestoreDirectory(t *testing.T) {
 	suite.Run(t, new(checkRestoreDirectoryTestSuite))
 }
 

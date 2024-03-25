@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -83,7 +84,7 @@ func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
 	suite.NotNil(err)
 }
 
-func (suite *writersTestSuite) TestGenericWriter() {
+func (suite *writersTestSuite) TestTokenWriter() {
 	namespace := "test"
 	set := ""
 
@@ -116,25 +117,30 @@ func (suite *writersTestSuite) TestGenericWriter() {
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
 	mockEncoder := enc_mocks.NewEncoder(suite.T())
-	mockEncoder.EXPECT().EncodeToken(recToken).Return(1, nil)
-	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return(2, nil)
-	mockEncoder.EXPECT().EncodeToken(UDFToken).Return(3, nil)
-	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(0, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
+	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
+	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)
+	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
-	writer := newGenericWriter(mockEncoder)
+	dst := bytes.Buffer{}
+	writer := newTokenWriter(mockEncoder, &dst)
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
 	suite.Nil(err)
+	suite.Equal("encoded rec ", dst.String())
 
 	err = writer.Write(SIndexToken)
 	suite.Nil(err)
+	suite.Equal("encoded rec encoded sindex ", dst.String())
 
 	err = writer.Write(UDFToken)
 	suite.Nil(err)
+	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
 
 	err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
 	suite.NotNil(err)
+	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
 
 	writer.Close()
 
@@ -146,81 +152,8 @@ func (suite *writersTestSuite) TestGenericWriter() {
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec)
-	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(0, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
-	suite.NotNil(err)
-
-	mockEncoder.AssertExpectations(suite.T())
-}
-
-func (suite *writersTestSuite) TestASBWriter() {
-	namespace := "test"
-	set := ""
-
-	key, aerr := a.NewKey(namespace, set, "key")
-	if aerr != nil {
-		panic(aerr)
-	}
-
-	expRecord := models.Record{
-		Record: &a.Record{
-			Key: key,
-			Bins: a.BinMap{
-				"key0": "hi",
-				"key1": 1,
-			},
-		},
-	}
-	recToken := models.NewRecordToken(expRecord)
-
-	expUDF := &models.UDF{
-		Name: "udf",
-	}
-	UDFToken := models.NewUDFToken(expUDF)
-
-	expSIndex := &models.SIndex{
-		Name: "sindex",
-	}
-	SIndexToken := models.NewSIndexToken(expSIndex)
-
-	mockEncoder := mocks.NewAsbEncoder(suite.T())
-	mockEncoder.EXPECT().WriteHeader(namespace, true).Return(1, nil)
-	mockEncoder.EXPECT().EncodeToken(recToken).Return(2, nil)
-	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return(3, nil)
-	mockEncoder.EXPECT().EncodeToken(UDFToken).Return(4, nil)
-
-	writer := newAsbWriter(mockEncoder)
-	suite.NotNil(writer)
-
-	err := writer.Init(namespace, true)
-	suite.Nil(err)
-
-	err = writer.Write(recToken)
-	suite.Nil(err)
-
-	err = writer.Write(SIndexToken)
-	suite.Nil(err)
-
-	err = writer.Write(UDFToken)
-	suite.Nil(err)
-
-	writer.Close()
-
-	mockEncoder.AssertExpectations(suite.T())
-}
-
-func (suite *writersTestSuite) TestASBWriterNegative() {
-	mockEncoder := mocks.NewAsbEncoder(suite.T())
-
-	writer := newAsbWriter(mockEncoder)
-	suite.NotNil(writer)
-
-	failRec := models.Record{
-		Record: &a.Record{},
-	}
-	failRecToken := models.NewRecordToken(failRec)
-	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(0, errors.New("error"))
-	err := writer.Write(failRecToken)
 	suite.NotNil(err)
 
 	mockEncoder.AssertExpectations(suite.T())

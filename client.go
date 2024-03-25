@@ -123,7 +123,7 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 // EncoderFactory is used to specify the encoder with which to encode the backup data
 // if nil, the default encoder factory will be used
 type EncoderFactory interface {
-	CreateEncoder(dst io.Writer) (encoding.Encoder, error)
+	CreateEncoder() (encoding.Encoder, error)
 }
 
 // PartitionRange specifies a range of Aerospike partitions
@@ -137,16 +137,16 @@ func NewPartitionRange(begin, count int) PartitionRange {
 }
 
 func (p PartitionRange) validate() error {
-	if p.Begin < 0 || p.Begin >= maxPartitions {
-		return fmt.Errorf("begin must be between 0 and %d, got %d", maxPartitions-1, p.Begin)
+	if p.Begin < 0 || p.Begin >= MaxPartitions {
+		return fmt.Errorf("begin must be between 0 and %d, got %d", MaxPartitions-1, p.Begin)
 	}
 
-	if p.Count < 1 || p.Count > maxPartitions {
-		return fmt.Errorf("count must be between 1 and %d, got %d", maxPartitions, p.Count)
+	if p.Count < 1 || p.Count > MaxPartitions {
+		return fmt.Errorf("count must be between 1 and %d, got %d", MaxPartitions, p.Count)
 	}
 
-	if p.Begin+p.Count > maxPartitions {
-		return fmt.Errorf("begin + count is greater than the max partitions count of %d", maxPartitions)
+	if p.Begin+p.Count > MaxPartitions {
+		return fmt.Errorf("begin + count is greater than the max partitions count of %d", MaxPartitions)
 	}
 
 	return nil
@@ -189,7 +189,7 @@ func (c *BackupConfig) validate() error {
 // NewBackupConfig returns a new BackupConfig with default values
 func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
-		Partitions:     PartitionRange{0, maxPartitions},
+		Partitions:     PartitionRange{0, MaxPartitions},
 		Parallel:       1,
 		Set:            "",
 		Namespace:      "test",
@@ -226,6 +226,12 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 // BackupToDirectoryConfig contains configuration for the backup to directory operation
 type BackupToDirectoryConfig struct {
 	BackupConfig
+	// FileSizeLimit is the maximum size of each backup file in bytes.
+	// If FileSizeLimit is 0, backup file size is unbounded.
+	// If non-zero, backup files will be split into multiple files if their size exceeds this limit.
+	// If non-zero, FileSizeLimit must be greater than or equal to 1MB.
+	// FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
+	FileSizeLimit int64
 }
 
 // NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values
@@ -233,6 +239,18 @@ func NewBackupToDirectoryConfig() *BackupToDirectoryConfig {
 	return &BackupToDirectoryConfig{
 		BackupConfig: *NewBackupConfig(),
 	}
+}
+
+func (c *BackupToDirectoryConfig) validate() error {
+	if c.FileSizeLimit > 0 && c.FileSizeLimit < 1024*1024 {
+		return fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", c.FileSizeLimit)
+	}
+
+	if c.FileSizeLimit < 0 {
+		return fmt.Errorf("file size limit must not be negative, got %d", c.FileSizeLimit)
+	}
+
+	return c.BackupConfig.validate()
 }
 
 // BackupToDirectory starts a backup operation

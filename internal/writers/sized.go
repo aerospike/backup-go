@@ -29,7 +29,6 @@ type Sized struct {
 // NewSized creates a new Sized writer with a size limit.
 // limit must be greater than 0.
 func NewSized(limit int64, writer io.WriteCloser, open func() (io.WriteCloser, error)) *Sized {
-
 	if limit <= 0 {
 		panic("limit must be greater than 0")
 	}

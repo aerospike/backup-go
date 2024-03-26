@@ -33,7 +33,6 @@ type DBRestoreClient interface {
 
 // worker is an interface for running a job
 type worker interface {
-	// TODO change the any typed pipeline to a message or token type
 	DoJob(context.Context, *pipeline.Pipeline[*models.Token]) error
 }
 
@@ -62,7 +61,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
-		var writer tokenWriter = newRestoreWriter(
+		var writer dataWriter[*models.Token] = newRestoreWriter(
 			rh.dbClient,
 			rh.config.WritePolicy,
 		)
@@ -133,7 +132,7 @@ func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient, readers []io.R
 
 // run runs the restore job
 // currently this should only be run once
-func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
+func (rrh *RestoreHandler) run(ctx context.Context) {
 	rrh.errors = make(chan error, 1)
 
 	go func(errChan chan<- error) {
@@ -144,23 +143,22 @@ func (rrh *RestoreHandler) run(ctx context.Context, readers []io.Reader) {
 		defer handlePanic(errChan)
 
 		batchSize := rrh.config.Parallel
-		// TODO change the any type to a message or token type
 		dataReaders := []*readWorker[*models.Token]{}
 
-		for i, reader := range readers {
+		for i, reader := range rrh.readers {
 			decoder, err := rrh.config.DecoderFactory.CreateDecoder(reader)
 			if err != nil {
 				errChan <- err
 				return
 			}
 
-			dr := newGenericReader(decoder)
+			dr := newTokenReader(decoder)
 			readWorker := newReadWorker(dr)
 			dataReaders = append(dataReaders, readWorker)
 			// if we have not reached the batch size and we have more readers
 			// continue to the next reader
 			// if we are at the end of readers then run no matter what
-			if i < len(readers)-1 && len(dataReaders) < batchSize {
+			if i < len(rrh.readers)-1 && len(dataReaders) < batchSize {
 				continue
 			}
 

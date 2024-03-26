@@ -21,9 +21,10 @@ import (
 	"io"
 	"testing"
 
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
+	testresources "github.com/aerospike/backup-go/internal/testutils"
 	"github.com/aerospike/backup-go/models"
-	testresources "github.com/aerospike/backup-go/test"
 
 	backup "github.com/aerospike/backup-go"
 
@@ -33,8 +34,35 @@ import (
 )
 
 const (
-	BackupDirPath = "./test_resources/backup"
+	// got this from writing and reading back a.HLLAddOp(hllpol, "hll", []a.Value{a.NewIntegerValue(1)}, 4, 12)
+	//nolint:lll // can't split this up without making it a raw quote which will cause the escaped bytes to be interpreted literally
+	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 )
+
+// testBins is a collection of all supported bin types
+// useful for testing backup and restore
+var testBins = a.BinMap{
+	"IntBin":     1,
+	"FloatBin":   1.1,
+	"StringBin":  "string",
+	"BoolBin":    true,
+	"BlobBin":    []byte("bytes"),
+	"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+	"HLLBin":     a.NewHLLValue([]byte(hllValue)),
+	"MapBin": map[any]any{
+		"IntBin":    1,
+		"StringBin": "hi",
+		"listBin":   []any{1, 2, 3},
+		"mapBin":    map[any]any{1: 1},
+	},
+	"ListBin": []any{
+		1,
+		"string",
+		[]byte("bytes"),
+		map[any]any{1: 1},
+		[]any{1, 2, 3},
+	},
+}
 
 type backupRestoreTestSuite struct {
 	suite.Suite
@@ -153,18 +181,50 @@ func (suite *backupRestoreTestSuite) TearDownTest() {
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
-	numRec := 1000
-	bins := a.BinMap{
-		"IntBin":     1,
-		"FloatBin":   1.1,
-		"StringBin":  "string",
-		"BoolBin":    true,
-		"BlobBin":    []byte("bytes"),
-		"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
-		// TODO "HLLBin":    a.NewHLLValue([]byte{}),
-		// TODO "MapBin": a.NewList(1, "string", true, []byte("bytes")),
-		// TODO "ListBin": a.NewMap(map[interface{}]interface{}{}),
+	type args struct {
+		backupConfig  *backup.BackupConfig
+		restoreConfig *backup.RestoreConfig
+		bins          a.BinMap
 	}
+	var tests = []struct {
+		name string
+		args args
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: backup.NewRestoreConfig(),
+				bins:          testBins,
+			},
+		},
+		{
+			name: "with parallel backup",
+			args: args{
+				backupConfig: &backup.BackupConfig{
+					Partitions:     backup.NewPartitionRange(0, 4096),
+					Set:            suite.set,
+					Namespace:      suite.namespace,
+					Parallel:       4,
+					EncoderFactory: encoding.NewASBEncoderFactory(),
+				},
+				restoreConfig: backup.NewRestoreConfig(),
+				bins:          testBins,
+			},
+		},
+	}
+	for _, tt := range tests {
+		suite.SetupTest()
+		suite.Run(tt.name, func() {
+			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins)
+		})
+		suite.TearDownTest()
+	}
+}
+
+func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
+	restoreConfig *backup.RestoreConfig, bins a.BinMap) {
+	numRec := 1000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
@@ -174,8 +234,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 
 	ctx := context.Background()
 	dst := bytes.NewBuffer([]byte{})
-
-	backupConfig := backup.NewBackupConfig()
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
@@ -198,7 +256,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		[]io.Reader{reader},
-		nil,
+		restoreConfig,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -206,20 +264,105 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	err = suite.testClient.ValidateRecords(expectedRecs, numRec, suite.namespace, suite.set)
-	suite.Nil(err)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
+}
 
-	// validate backup statsBackup
+func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
+	type args struct {
+		backupConfig  *backup.BackupToDirectoryConfig
+		restoreConfig *backup.RestoreFromDirectoryConfig
+		bins          a.BinMap
+	}
+	var tests = []struct {
+		name string
+		args args
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  backup.NewBackupToDirectoryConfig(),
+				restoreConfig: backup.NewRestoreFromDirectoryConfig(),
+				bins:          testBins,
+			},
+		},
+		{
+			name: "with file size limit",
+			args: args{
+				backupConfig: &backup.BackupToDirectoryConfig{
+					FileSizeLimit: 1024 * 1024,
+					BackupConfig: backup.BackupConfig{
+						Partitions:     backup.NewPartitionRange(0, 4096),
+						Set:            suite.set,
+						Namespace:      suite.namespace,
+						Parallel:       4,
+						EncoderFactory: encoding.NewASBEncoderFactory(),
+					},
+				},
+				restoreConfig: backup.NewRestoreFromDirectoryConfig(),
+				bins:          testBins,
+			},
+		},
+	}
+	for _, tt := range tests {
+		suite.SetupTest()
+		suite.Run(tt.name, func() {
+			runBackupRestoreDirectory(suite, tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins)
+		})
+		suite.TearDownTest()
+	}
+}
+
+func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
+	backupConfig *backup.BackupToDirectoryConfig,
+	restoreConfig *backup.RestoreFromDirectoryConfig,
+	bins a.BinMap) {
+	numRec := 1000
+	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
+
+	err := suite.testClient.WriteRecords(expectedRecs)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+
+	backupDir := suite.T().TempDir()
+
+	bh, err := suite.backupClient.BackupToDirectory(
+		ctx,
+		backupDir,
+		backupConfig,
+	)
+	suite.Nil(err)
+	suite.NotNil(bh)
+
 	statsBackup := bh.GetStats()
 	suite.NotNil(statsBackup)
+
+	err = bh.Wait(ctx)
+	suite.Nil(err)
 
 	suite.Equal(uint64(numRec), statsBackup.GetRecords())
 	suite.Equal(uint32(0), statsBackup.GetSIndexes())
 	suite.Equal(uint32(0), statsBackup.GetUDFs())
 
-	// validate stats for restore
+	err = suite.testClient.Truncate(suite.namespace, suite.set)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	rh, err := suite.backupClient.RestoreFromDirectory(
+		ctx,
+		backupDir,
+		restoreConfig,
+	)
+	suite.Nil(err)
+
 	statsRestore := rh.GetStats()
 	suite.NotNil(statsRestore)
+
+	err = rh.Wait(ctx)
+	suite.Nil(err)
 
 	suite.Equal(uint64(numRec), statsRestore.GetRecords())
 	suite.Equal(uint32(0), statsRestore.GetSIndexes())
@@ -240,9 +383,12 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 		suite.FailNow(err.Error())
 	}
 
-	data.Write(encoder.GetVersionText())
-	data.Write(encoder.GetNamespaceMetaText(suite.namespace))
-	data.Write(encoder.GetFirstMetaText())
+	header, err := asb.GetHeader(suite.namespace, true)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	data.Write(header)
 
 	for _, rec := range recs {
 		modelRec := models.Record{
@@ -250,7 +396,9 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 			// guaranteed to be expired
 			VoidTime: 1,
 		}
-		v, err := encoder.EncodeRecord(&modelRec)
+
+		token := models.NewRecordToken(modelRec)
+		v, err := encoder.EncodeToken(token)
 		if err != nil {
 			suite.FailNow(err.Error())
 		}
@@ -269,6 +417,10 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 		nil,
 	)
 	suite.Nil(err)
+	suite.NotNil(rh)
+
+	restoreStats := rh.GetStats()
+	suite.NotNil(restoreStats)
 
 	err = rh.Wait(ctx)
 	suite.Nil(err)
@@ -354,8 +506,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	err = suite.testClient.ValidateRecords(expectedRecs, numRec, suite.namespace, suite.set)
-	suite.Nil(err)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
 }
 
 func (suite *backupRestoreTestSuite) TestBackupContext() {

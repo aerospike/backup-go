@@ -15,12 +15,10 @@
 package backup
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/models"
@@ -83,13 +81,7 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// **** Token Write Worker ****
-
-type tokenWriteWorker = writeWorker[*models.Token]
-
-// **** Token Writer ****
-
-type tokenWriter = dataWriter[*models.Token]
+// **** Token Stats Writer ****
 
 // statsSetterToken is an interface for setting the stats of a backup job
 //
@@ -132,36 +124,29 @@ func (tw *tokenStatsWriter) Write(data *models.Token) error {
 	return nil
 }
 
-// **** Generic Writer ****
+// **** Token Writer ****
 
-// genericWriter satisfies the DataWriter interface
+// tokenWriter satisfies the DataWriter interface
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
-type genericWriter struct {
+type tokenWriter struct {
 	encoder encoding.Encoder
 	output  io.Writer
 }
 
-// newGenericWriter creates a new GenericWriter
-func newGenericWriter(encoder encoding.Encoder, output io.Writer) *genericWriter {
-	return &genericWriter{
+// newTokenWriter creates a new tokenWriter
+func newTokenWriter(encoder encoding.Encoder, output io.Writer) *tokenWriter {
+	return &tokenWriter{
 		encoder: encoder,
 		output:  output,
 	}
 }
 
 // Write encodes v and writes it to the output
-// TODO let the encoder handle the type checking
-// TODO maybe restrict the types that can be written to this
-func (w *genericWriter) Write(v *models.Token) error {
-	var (
-		err  error
-		data []byte
-	)
-
-	data, err = w.encoder.EncodeToken(v)
+func (w *tokenWriter) Write(v *models.Token) error {
+	data, err := w.encoder.EncodeToken(v)
 	if err != nil {
-		return err
+		return fmt.Errorf("error encoding token: %w", err)
 	}
 
 	_, err = w.output.Write(data)
@@ -170,64 +155,8 @@ func (w *genericWriter) Write(v *models.Token) error {
 }
 
 // Cancel satisfies the DataWriter interface
-// but is a no-op for the GenericWriter
-func (w *genericWriter) Close() {}
-
-// **** Aerospike Backup Writer ****
-
-// asbEncoder is an interface for encoding the types from the models package into ASB format.
-// It extends the Encoder interface.
-//
-//go:generate mockery --name asbEncoder
-type asbEncoder interface {
-	encoding.Encoder
-	GetVersionText() []byte
-	GetNamespaceMetaText(namespace string) []byte
-	GetFirstMetaText() []byte
-}
-
-// asbWriter satisfies the DataWriter interface
-// It writes the types from the models package as data encoded in ASB format
-// to an io.Writer. It uses an ASBEncoder to encode the data.
-type asbWriter struct {
-	genericWriter
-	encoder   asbEncoder
-	once      *sync.Once
-	namespace string
-	first     bool
-}
-
-// newAsbWriter creates a new ASBWriter
-func newAsbWriter(encoder asbEncoder, output io.Writer) *asbWriter {
-	return &asbWriter{
-		genericWriter: *newGenericWriter(encoder, output),
-		encoder:       encoder,
-		once:          &sync.Once{},
-	}
-}
-
-// Init initializes the ASBWriter and writes
-// the ASB header and metadata to the output.
-func (w *asbWriter) Init(namespace string, first bool) error {
-	var err error
-
-	w.once.Do(func() {
-		w.namespace = namespace
-		w.first = first
-
-		header := bytes.Buffer{}
-		header.Write(w.encoder.GetVersionText())
-		header.Write(w.encoder.GetNamespaceMetaText(namespace))
-
-		if first {
-			header.Write(w.encoder.GetFirstMetaText())
-		}
-
-		_, err = w.output.Write(header.Bytes())
-	})
-
-	return err
-}
+// but is a no-op for the tokenWriter
+func (w *tokenWriter) Close() {}
 
 // **** Aerospike Restore Writer ****
 
@@ -256,7 +185,6 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy) *restoreWriter {
 }
 
 // Write writes the types from the models package to an Aerospike DB.
-// TODO support write policy
 // TODO support batch writes
 func (rw *restoreWriter) Write(data *models.Token) error {
 	switch data.Type {

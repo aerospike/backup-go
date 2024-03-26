@@ -94,28 +94,28 @@ func NewClient(ac *a.Client, config *Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
+func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultInfoPolicy
 	}
 
-	return p
+	return *p
 }
 
-func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
+func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultWritePolicy
 	}
 
-	return p
+	return *p
 }
 
-func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultScanPolicy
 	}
 
-	return p
+	return *p
 }
 
 // **** Backup ****
@@ -137,16 +137,16 @@ func NewPartitionRange(begin, count int) PartitionRange {
 }
 
 func (p PartitionRange) validate() error {
-	if p.Begin < 0 || p.Begin >= maxPartitions {
-		return fmt.Errorf("begin must be between 0 and %d, got %d", maxPartitions-1, p.Begin)
+	if p.Begin < 0 || p.Begin >= MaxPartitions {
+		return fmt.Errorf("begin must be between 0 and %d, got %d", MaxPartitions-1, p.Begin)
 	}
 
-	if p.Count < 1 || p.Count > maxPartitions {
-		return fmt.Errorf("count must be between 1 and %d, got %d", maxPartitions, p.Count)
+	if p.Count < 1 || p.Count > MaxPartitions {
+		return fmt.Errorf("count must be between 1 and %d, got %d", MaxPartitions, p.Count)
 	}
 
-	if p.Begin+p.Count > maxPartitions {
-		return fmt.Errorf("begin + count is greater than the max partitions count of %d", maxPartitions)
+	if p.Begin+p.Count > MaxPartitions {
+		return fmt.Errorf("begin + count is greater than the max partitions count of %d", MaxPartitions)
 	}
 
 	return nil
@@ -189,7 +189,7 @@ func (c *BackupConfig) validate() error {
 // NewBackupConfig returns a new BackupConfig with default values
 func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
-		Partitions:     PartitionRange{0, maxPartitions},
+		Partitions:     PartitionRange{0, MaxPartitions},
 		Parallel:       1,
 		Set:            "",
 		Namespace:      "test",
@@ -206,15 +206,78 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 		config = NewBackupConfig()
 	}
 
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
-	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
+	config.ScanPolicy = &scanPolicy
 
 	if err := config.validate(); err != nil {
 		return nil, err
 	}
 
 	handler := newBackupHandler(config, c.aerospikeClient, writers)
-	handler.run(ctx, writers)
+	handler.run(ctx)
+
+	return handler, nil
+}
+
+// BackupToDirectoryConfig contains configuration for the backup to directory operation
+type BackupToDirectoryConfig struct {
+	BackupConfig
+	// FileSizeLimit is the maximum size of each backup file in bytes.
+	// If FileSizeLimit is 0, backup file size is unbounded.
+	// If non-zero, backup files will be split into multiple files if their size exceeds this limit.
+	// If non-zero, FileSizeLimit must be greater than or equal to 1MB.
+	// FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
+	FileSizeLimit int64
+}
+
+// NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values
+func NewBackupToDirectoryConfig() *BackupToDirectoryConfig {
+	return &BackupToDirectoryConfig{
+		BackupConfig: *NewBackupConfig(),
+	}
+}
+
+func (c *BackupToDirectoryConfig) validate() error {
+	if c.FileSizeLimit > 0 && c.FileSizeLimit < 1024*1024 {
+		return fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", c.FileSizeLimit)
+	}
+
+	if c.FileSizeLimit < 0 {
+		return fmt.Errorf("file size limit must not be negative, got %d", c.FileSizeLimit)
+	}
+
+	return c.BackupConfig.validate()
+}
+
+// BackupToDirectory starts a backup operation
+// that writes data to a local directory.
+// config.Parallel determines the number of files to write concurrently.
+// ctx can be used to cancel the backup operation.
+// directory is the directory to write the backup data to.
+// config is the configuration for the backup operation.
+func (c *Client) BackupToDirectory(ctx context.Context,
+	directory string, config *BackupToDirectoryConfig) (*BackupToDirectoryHandler, error) {
+	if config == nil {
+		config = NewBackupToDirectoryConfig()
+	}
+
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
+	config.ScanPolicy = &scanPolicy
+
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	handler := newBackupToDirectoryHandler(config, c.aerospikeClient, directory)
+	handler.run(ctx)
 
 	return handler, nil
 }
@@ -267,15 +330,62 @@ func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *Resto
 		config = NewRestoreConfig()
 	}
 
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
-	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	writePolicy := c.getUsableWritePolicy(config.WritePolicy)
+	config.WritePolicy = &writePolicy
 
 	if err := config.validate(); err != nil {
 		return nil, err
 	}
 
 	handler := newRestoreHandler(config, c.aerospikeClient, readers)
-	handler.run(ctx, readers)
+	handler.run(ctx)
+
+	return handler, nil
+}
+
+// RestoreFromDirectoryConfig contains configuration for the restore from directory operation
+type RestoreFromDirectoryConfig struct {
+	RestoreConfig
+}
+
+// NewRestoreFromDirectoryConfig returns a new RestoreFromDirectoryConfig with default values
+func NewRestoreFromDirectoryConfig() *RestoreFromDirectoryConfig {
+	return &RestoreFromDirectoryConfig{
+		RestoreConfig: *NewRestoreConfig(),
+	}
+}
+
+// RestoreFromDirectory starts a restore operation
+// that reads data from a local directory.
+// The backup data may be in a single file or multiple files.
+// config.Parallel determines the number of files to read concurrently.
+// All backup files in the directory must have been generated by the same backup operation.
+// ctx can be used to cancel the restore operation.
+// directory is the directory to read the backup data from.
+// config is the configuration for the restore operation.
+func (c *Client) RestoreFromDirectory(ctx context.Context,
+	directory string, config *RestoreFromDirectoryConfig) (*RestoreFromDirectoryHandler, error) {
+	if config == nil {
+		config = NewRestoreFromDirectoryConfig()
+	}
+
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	writePolicy := c.getUsableWritePolicy(config.WritePolicy)
+	config.WritePolicy = &writePolicy
+
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	handler := newRestoreFromDirectoryHandler(config, c.aerospikeClient, directory)
+	handler.run(ctx)
 
 	return handler, nil
 }

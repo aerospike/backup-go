@@ -5,7 +5,7 @@ test: test_deps
 .PHONY: coverage
 coverage: test_deps
 	go test ./... -coverprofile to_filter.cov -coverpkg ./...
-	grep -v "test_resources\|mocks" to_filter.cov > coverage.cov
+	grep -v "test\|mocks" to_filter.cov > coverage.cov
 	rm -f to_filter.cov
 	go tool cover -func coverage.cov
 
@@ -16,6 +16,7 @@ clean:
 	rm -rf pipeline/mocks
 	rm -f mock_statsSetterToken.go
 	rm -f mock_statsSetterExpired.go
+	rm -rf encoding/mocks
 
 .PHONY: test_deps
 test_deps: mocks

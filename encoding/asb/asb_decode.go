@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
 )
 
 func newDecoderError(offset uint64, err error) error {
@@ -35,7 +36,7 @@ func newDecoderError(offset uint64, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading asb file at character, %d: %w", offset, err)
+	return fmt.Errorf("error while reading asb data at byte %d: %w", offset, err)
 }
 
 func newSectionError(section string, err error) error {
@@ -810,19 +811,13 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 				// HLLs are treated as bytes by the client so no decode is needed
 				binVal = a.NewHLLValue(val)
 			case binTypeBytesMap:
-				// maps need to be decoded so that the go client will write them as maps and not blobs
-				return errors.New("map bins are not supported yet")
-				//nolint:gocritic // will use this later
-				// var m map[any]any
-				// binErr = msgpack.Unmarshal(val, &m)
-				// binVal = m
+				// map msgpack bytes can be sent as RawBlobValues
+				// with particle type MAP
+				binVal = a.NewRawBlobValue(particleType.MAP, val)
 			case binTypeBytesList:
-				// lists are decoded for the same reason as maps
-				return errors.New("list bins are not supported yet")
-				//nolint:gocritic // will use this later
-				// var l []any
-				// binErr = msgpack.Unmarshal(val, &l)
-				// binVal = l
+				// lists msgpack bytes can be sent as RawBlobValues
+				// with particle type LIST
+				binVal = a.NewRawBlobValue(particleType.LIST, val)
 			default:
 				return fmt.Errorf("invalid bytes to type bin type %d", binType)
 			}

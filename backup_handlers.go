@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -26,7 +27,8 @@ import (
 )
 
 const (
-	maxPartitions = 4096
+	// MaxPartitions is the maximum number of partitions in an Aerospike cluster.
+	MaxPartitions = 4096
 )
 
 // **** Base Backup Handler ****
@@ -64,6 +66,14 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		return err
 	}
 
+	scanPolicy := *bh.config.ScanPolicy
+
+	// if we are using the asb encoder, we need to set the RawCDT flag
+	// in the scan policy so that maps and lists are returned as raw blob bins
+	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
+		scanPolicy.RawCDT = true
+	}
+
 	for i := 0; i < bh.config.Parallel; i++ {
 		ARRCFG := arrConfig{
 			Namespace:      bh.namespace,
@@ -75,7 +85,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,
 			ARRCFG,
-			bh.config.ScanPolicy,
+			&scanPolicy,
 		)
 
 		readWorkers[i] = newReadWorker(recordReader)
@@ -130,7 +140,7 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer) *
 
 // run runs the backup job
 // currently this should only be run once
-func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
+func (bwh *BackupHandler) run(ctx context.Context) {
 	bwh.errors = make(chan error, 1)
 
 	go func(errChan chan<- error) {
@@ -141,30 +151,43 @@ func (bwh *BackupHandler) run(ctx context.Context, writers []io.Writer) {
 		defer handlePanic(errChan)
 
 		batchSize := bwh.config.Parallel
-		dataWriters := []*writeWorker[*models.Token]{}
+		writeWorkers := []*writeWorker[*models.Token]{}
 
-		for i, writer := range writers {
-			dw, err := getTokenWriteWorker(bwh.config.EncoderFactory, writer, bwh.namespace, i == 0, &bwh.stats)
+		for i, writer := range bwh.writers {
+			encoder, err := bwh.config.EncoderFactory.CreateEncoder()
 			if err != nil {
 				errChan <- err
 				return
 			}
 
-			dataWriters = append(dataWriters, dw)
+			// asb files require a header, treat the
+			// passed in io.Writer like a fresh file and write the header
+			if _, ok := encoder.(*asb.Encoder); ok {
+				err := writeASBHeader(writer, bwh.config.Namespace, i == 0)
+				if err != nil {
+					errChan <- err
+					return
+				}
+			}
+
+			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer)
+			dataWriter = newWriterWithTokenStats(dataWriter, &bwh.stats)
+			worker := newWriteWorker(dataWriter)
+			writeWorkers = append(writeWorkers, worker)
 			// if we have not reached the batch size and we have more writers
 			// continue to the next writer
 			// if we are at the end of writers then run no matter what
-			if i < len(writers)-1 && len(dataWriters) < batchSize {
+			if i < len(bwh.writers)-1 && len(writeWorkers) < batchSize {
 				continue
 			}
 
-			err = bwh.backupHandlerBase.run(ctx, dataWriters)
+			err = bwh.backupHandlerBase.run(ctx, writeWorkers)
 			if err != nil {
 				errChan <- err
 				return
 			}
 
-			clear(dataWriters)
+			writeWorkers = []*writeWorker[*models.Token]{}
 		}
 	}(bwh.errors)
 }
@@ -182,42 +205,4 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 	case err := <-bwh.errors:
 		return err
 	}
-}
-
-func getTokenWriteWorker(eb EncoderFactory, w io.Writer, namespace string,
-	first bool, stats *BackupStats) (*tokenWriteWorker, error) {
-	writer, err := getTokenWriter(eb, w, namespace, first)
-	if err != nil {
-		return nil, err
-	}
-
-	writer = newWriterWithTokenStats(writer, stats)
-
-	return newWriteWorker(writer), nil
-}
-
-func getTokenWriter(eb EncoderFactory, w io.Writer, namespace string, first bool) (tokenWriter, error) {
-	enc, err := eb.CreateEncoder()
-	if err != nil {
-		return nil, err
-	}
-
-	var writer tokenWriter
-
-	switch encT := enc.(type) {
-	case *asb.Encoder:
-		asbw := newAsbWriter(encT, w)
-
-		err := asbw.Init(namespace, first)
-		if err != nil {
-			return nil, err
-		}
-
-		writer = asbw
-
-	default:
-		writer = newGenericWriter(encT, w)
-	}
-
-	return writer, nil
 }

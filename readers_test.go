@@ -111,7 +111,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	mockDecoder := enc_mocks.NewDecoder(suite.T())
 	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
 
-	reader := newGenericReader(mockDecoder)
+	reader := newTokenReader(mockDecoder)
 	suite.NotNil(reader)
 
 	v, err := reader.Read()

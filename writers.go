@@ -39,14 +39,14 @@ type dataWriter[T any] interface {
 // writeWorker implements the pipeline.Worker interface
 // It wraps a DataWriter and writes data to it
 type writeWorker[T any] struct {
-	writer  dataWriter[T]
+	dataWriter[T]
 	receive <-chan T
 }
 
 // newWriteWorker creates a new WriteWorker
 func newWriteWorker[T any](writer dataWriter[T]) *writeWorker[T] {
 	return &writeWorker[T]{
-		writer: writer,
+		dataWriter: writer,
 	}
 }
 
@@ -63,7 +63,7 @@ func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
 
 // Run runs the WriteWorker
 func (w *writeWorker[T]) Run(ctx context.Context) error {
-	defer w.writer.Close()
+	defer w.Close()
 
 	for {
 		select {
@@ -74,11 +74,54 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 				return nil
 			}
 
-			if err := w.writer.Write(data); err != nil {
+			if err := w.Write(data); err != nil {
 				return err
 			}
 		}
 	}
+}
+
+// **** Token Stats Writer ****
+
+// statsSetterToken is an interface for setting the stats of a backup job
+//
+//go:generate mockery --name statsSetterToken --inpackage --exported=false
+type statsSetterToken interface {
+	addRecords(uint64)
+	addUDFs(uint32)
+	addSIndexes(uint32)
+}
+
+type tokenStatsWriter struct {
+	dataWriter[*models.Token]
+	stats statsSetterToken
+}
+
+func newWriterWithTokenStats(writer dataWriter[*models.Token], stats statsSetterToken) *tokenStatsWriter {
+	return &tokenStatsWriter{
+		dataWriter: writer,
+		stats:      stats,
+	}
+}
+
+func (tw *tokenStatsWriter) Write(data *models.Token) error {
+	err := tw.dataWriter.Write(data)
+	if err != nil {
+		return err
+	}
+
+	switch data.Type {
+	case models.TokenTypeRecord:
+		tw.stats.addRecords(1)
+	case models.TokenTypeUDF:
+		tw.stats.addUDFs(1)
+	case models.TokenTypeSIndex:
+		tw.stats.addSIndexes(1)
+	case models.TokenTypeInvalid:
+		return errors.New("invalid token")
+	}
+
+	return nil
 }
 
 // **** Token Writer ****

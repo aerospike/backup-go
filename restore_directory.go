@@ -25,6 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/models"
 )
 
 // **** Restore From Directory Handler ****
@@ -36,11 +37,11 @@ type RestoreFromDirectoryStats struct {
 
 // RestoreFromDirectoryHandler handles a restore job from a directory
 type RestoreFromDirectoryHandler struct {
-	stats           RestoreFromDirectoryStats
 	config          *RestoreFromDirectoryConfig
 	aerospikeClient *a.Client
 	errors          chan error
 	directory       string
+	stats           RestoreFromDirectoryStats
 }
 
 // newRestoreFromDirectoryHandler creates a new RestoreFromDirectoryHandler
@@ -115,10 +116,25 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 				continue
 			}
 
-			restoreHandler := newRestoreHandler(&rh.config.RestoreConfig, rh.aerospikeClient, readers)
-			restoreHandler.run(ctx)
+			readWorkers := make([]*readWorker[*models.Token], len(readers))
 
-			err = restoreHandler.Wait(ctx)
+			for i, reader := range readers {
+				decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				dr := newTokenReader(decoder)
+				readWorker := newReadWorker(dr)
+				readWorkers[i] = readWorker
+			}
+
+			restoreWorker := newWorkHandler()
+			restoreHandler := newRestoreHandlerBase(&rh.config.RestoreConfig,
+				rh.aerospikeClient, restoreWorker, &rh.stats.RestoreStats)
+
+			err = restoreHandler.run(ctx, readWorkers)
 			if err != nil {
 				errChan <- err
 				return
@@ -130,8 +146,8 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 }
 
 // GetStats returns the stats of the restore job
-func (rh *RestoreFromDirectoryHandler) GetStats() RestoreFromDirectoryStats {
-	return rh.stats
+func (rh *RestoreFromDirectoryHandler) GetStats() *RestoreFromDirectoryStats {
+	return &rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

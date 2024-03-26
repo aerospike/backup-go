@@ -82,23 +82,23 @@ func (w *readWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// **** Generic Reader ****
+// **** Token Reader ****
 
-// genericReader satisfies the DataReader interface
+// tokenReader satisfies the DataReader interface
 // It reads data as tokens using a Decoder
-type genericReader struct {
+type tokenReader struct {
 	decoder encoding.Decoder
 }
 
-// newGenericReader creates a new GenericReader
-func newGenericReader(decoder encoding.Decoder) *genericReader {
-	return &genericReader{
+// newTokenReader creates a new GenericReader
+func newTokenReader(decoder encoding.Decoder) *tokenReader {
+	return &tokenReader{
 		decoder: decoder,
 	}
 }
 
 // Read reads the next token from the decoder
-func (dr *genericReader) Read() (*models.Token, error) {
+func (dr *tokenReader) Read() (*models.Token, error) {
 	data, err := dr.decoder.NextToken()
 	if err != nil {
 		return nil, err
@@ -119,8 +119,8 @@ func (dr *genericReader) Read() (*models.Token, error) {
 }
 
 // Cancel satisfies the DataReader interface
-// but is a no-op for the GenericReader
-func (dr *genericReader) Close() {}
+// but is a no-op for the tokenReader
+func (dr *tokenReader) Close() {}
 
 // **** Aerospike DB Reader ****
 

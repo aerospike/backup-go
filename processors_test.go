@@ -58,6 +58,29 @@ func (suite *proccessorTestSuite) TestProcessorWorker() {
 	suite.Equal("test", data)
 }
 
+func (suite *proccessorTestSuite) TestProcessorWorkerFilteredOut() {
+	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor.EXPECT().Process("test").Return("test", errFilteredOut)
+
+	worker := newProcessorWorker(mockProcessor)
+	suite.NotNil(worker)
+
+	receiver := make(chan string, 1)
+	receiver <- "test"
+	close(receiver)
+
+	worker.SetReceiveChan(receiver)
+
+	sender := make(chan string, 1)
+	worker.SetSendChan(sender)
+
+	ctx := context.Background()
+	err := worker.Run(ctx)
+	suite.Nil(err)
+
+	suite.Equal(0, len(sender))
+}
+
 func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
@@ -178,8 +201,14 @@ func TestProcessors(t *testing.T) {
 }
 
 func TestProcessorTTL_Process(t *testing.T) {
+	mockStatsSetter := newMockStatsSetterExpired(t)
+	mockStatsSetter.EXPECT().addRecordsExpired(uint64(1))
+
+	mockStatsSetterNoExpectedCalls := newMockStatsSetterExpired(t)
+
 	type fields struct {
 		getNow func() cltime.CLTime
+		stats  statsSetterExpired
 	}
 	type args struct {
 		token *models.Token
@@ -197,6 +226,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				getNow: func() cltime.CLTime {
 					return cltime.CLTime{Seconds: 100}
 				},
+				stats: mockStatsSetter,
 			},
 			args: args{
 				token: &models.Token{
@@ -207,7 +237,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "Test positive Process expired v2",
@@ -215,6 +245,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				getNow: func() cltime.CLTime {
 					return cltime.CLTime{Seconds: 200}
 				},
+				stats: mockStatsSetter,
 			},
 			args: args{
 				token: &models.Token{
@@ -225,7 +256,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "Test positive token is not a record",
@@ -233,6 +264,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				getNow: func() cltime.CLTime {
 					return cltime.CLTime{Seconds: 200}
 				},
+				stats: mockStatsSetterNoExpectedCalls,
 			},
 			args: args{
 				token: &models.Token{
@@ -250,6 +282,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				getNow: func() cltime.CLTime {
 					return cltime.CLTime{Seconds: 50}
 				},
+				stats: mockStatsSetterNoExpectedCalls,
 			},
 			args: args{
 				token: &models.Token{
@@ -277,6 +310,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				getNow: func() cltime.CLTime {
 					return cltime.CLTime{Seconds: 50}
 				},
+				stats: mockStatsSetterNoExpectedCalls,
 			},
 			args: args{
 				token: &models.Token{
@@ -304,6 +338,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				getNow: func() cltime.CLTime {
 					return cltime.CLTime{Seconds: 1}
 				},
+				stats: mockStatsSetterNoExpectedCalls,
 			},
 			args: args{
 				token: &models.Token{
@@ -322,6 +357,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				getNow: func() cltime.CLTime {
 					return cltime.CLTime{Seconds: 1}
 				},
+				stats: mockStatsSetterNoExpectedCalls,
 			},
 			args: args{
 				token: &models.Token{
@@ -339,6 +375,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &processorTTL{
 				getNow: tt.fields.getNow,
+				stats:  tt.fields.stats,
 			}
 			got, err := p.Process(tt.args.token)
 			if (err != nil) != tt.wantErr {

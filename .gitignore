@@ -22,3 +22,4 @@ go.work
 
 # Generated files
 mocks/
+mock_*.go

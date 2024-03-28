@@ -19,10 +19,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/encoding/asb"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
+	"github.com/aerospike/backup-go/models"
 
 	backup "github.com/aerospike/backup-go"
 
@@ -134,7 +137,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	suite.testClient = testClient
 
 	backupCFG := backup.Config{}
-	backupClient, err := backup.NewClient(testAeroClient, &backupCFG)
+	backupClient, err := backup.NewClient(testAeroClient, "test_client", slog.Default(), &backupCFG)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -334,11 +337,15 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Nil(err)
 	suite.NotNil(bh)
 
-	backupStats := bh.GetStats()
-	suite.NotNil(backupStats)
+	statsBackup := bh.GetStats()
+	suite.NotNil(statsBackup)
 
 	err = bh.Wait(ctx)
 	suite.Nil(err)
+
+	suite.Equal(uint64(numRec), statsBackup.GetRecords())
+	suite.Equal(uint32(0), statsBackup.GetSIndexes())
+	suite.Equal(uint32(0), statsBackup.GetUDFs())
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {
@@ -351,6 +358,66 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		restoreConfig,
 	)
 	suite.Nil(err)
+
+	statsRestore := rh.GetStats()
+	suite.NotNil(statsRestore)
+
+	err = rh.Wait(ctx)
+	suite.Nil(err)
+
+	suite.Equal(uint64(numRec), statsRestore.GetRecords())
+	suite.Equal(uint32(0), statsRestore.GetSIndexes())
+	suite.Equal(uint32(0), statsRestore.GetUDFs())
+	suite.Equal(uint64(0), statsRestore.GetRecordsExpired())
+}
+
+func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
+	numRec := 100
+	bins := a.BinMap{
+		"IntBin": 1,
+	}
+	recs := genRecords(suite.namespace, suite.set, numRec, bins)
+
+	data := &bytes.Buffer{}
+	encoder, err := asb.NewEncoder()
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	header, err := asb.GetHeader(suite.namespace, true)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	data.Write(header)
+
+	for _, rec := range recs {
+		modelRec := models.Record{
+			Record: rec,
+			// guaranteed to be expired
+			VoidTime: 1,
+		}
+
+		token := models.NewRecordToken(modelRec)
+		v, err := encoder.EncodeToken(token)
+		if err != nil {
+			suite.FailNow(err.Error())
+		}
+
+		_, err = data.Write(v)
+		if err != nil {
+			suite.FailNow(err.Error())
+		}
+	}
+
+	ctx := context.Background()
+	reader := bytes.NewReader(data.Bytes())
+	rh, err := suite.backupClient.Restore(
+		ctx,
+		[]io.Reader{reader},
+		nil,
+	)
+	suite.Nil(err)
 	suite.NotNil(rh)
 
 	restoreStats := rh.GetStats()
@@ -359,7 +426,10 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
+	statsRestore := rh.GetStats()
+	suite.NotNil(statsRestore)
+	suite.Equal(uint64(0), statsRestore.GetRecords())
+	suite.Equal(uint64(numRec), statsRestore.GetRecordsExpired())
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {

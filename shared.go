@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"runtime/debug"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding/asb"
 )
@@ -64,6 +65,36 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 	}
 
 	return pSpecs, nil
+}
+
+type tokenStats struct {
+	records  atomic.Uint64
+	sIndexes atomic.Uint32
+	uDFs     atomic.Uint32
+}
+
+func (bs *tokenStats) GetRecords() uint64 {
+	return bs.records.Load()
+}
+
+func (bs *tokenStats) GetSIndexes() uint32 {
+	return bs.sIndexes.Load()
+}
+
+func (bs *tokenStats) GetUDFs() uint32 {
+	return bs.uDFs.Load()
+}
+
+func (bs *tokenStats) addRecords(num uint64) {
+	bs.records.Add(num)
+}
+
+func (bs *tokenStats) addSIndexes(num uint32) {
+	bs.sIndexes.Add(num)
+}
+
+func (bs *tokenStats) addUDFs(num uint32) {
+	bs.uDFs.Add(num)
 }
 
 func writeASBHeader(w io.Writer, namespace string, first bool) error {

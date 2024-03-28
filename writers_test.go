@@ -15,10 +15,12 @@
 package backup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
 
+	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 
@@ -82,148 +84,72 @@ func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
 	suite.NotNil(err)
 }
 
-// func (suite *writersTestSuite) TestGenericWriter() {
-// 	namespace := "test"
-// 	set := ""
+func (suite *writersTestSuite) TestTokenWriter() {
+	namespace := "test"
+	set := ""
 
-// 	key, aerr := a.NewKey(namespace, set, "key")
-// 	if aerr != nil {
-// 		panic(aerr)
-// 	}
+	key, aerr := a.NewKey(namespace, set, "key")
+	if aerr != nil {
+		panic(aerr)
+	}
 
-// 	expRecord := models.Record{
-// 		Record: &a.Record{
-// 			Key: key,
-// 			Bins: a.BinMap{
-// 				"key0": "hi",
-// 				"key1": 1,
-// 			},
-// 		},
-// 	}
-// 	recToken := models.NewRecordToken(expRecord)
+	expRecord := models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
+		},
+	}
+	recToken := models.NewRecordToken(expRecord)
 
-// 	expUDF := &models.UDF{
-// 		Name: "udf",
-// 	}
-// 	UDFToken := models.NewUDFToken(expUDF)
+	expUDF := &models.UDF{
+		Name: "udf",
+	}
+	UDFToken := models.NewUDFToken(expUDF)
 
-// 	expSIndex := &models.SIndex{
-// 		Name: "sindex",
-// 	}
-// 	SIndexToken := models.NewSIndexToken(expSIndex)
+	expSIndex := &models.SIndex{
+		Name: "sindex",
+	}
+	SIndexToken := models.NewSIndexToken(expSIndex)
 
-// 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
+	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-// 	mockEncoder := enc_mocks.NewEncoder(suite.T())
-// 	mockEncoder.EXPECT().EncodeToken(recToken).Return(1, nil)
-// 	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return(2, nil)
-// 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return(3, nil)
-// 	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(0, errors.New("error"))
+	mockEncoder := enc_mocks.NewEncoder(suite.T())
+	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
+	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
+	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)
+	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
-// 	writer := newGenericWriter(mockEncoder)
-// 	suite.NotNil(writer)
+	dst := bytes.Buffer{}
+	writer := newTokenWriter(mockEncoder, &dst)
+	suite.NotNil(writer)
 
-// 	err := writer.Write(recToken)
-// 	suite.Nil(err)
+	err := writer.Write(recToken)
+	suite.Nil(err)
+	suite.Equal("encoded rec ", dst.String())
 
-// 	err = writer.Write(SIndexToken)
-// 	suite.Nil(err)
+	err = writer.Write(SIndexToken)
+	suite.Nil(err)
+	suite.Equal("encoded rec encoded sindex ", dst.String())
 
-// 	err = writer.Write(UDFToken)
-// 	suite.Nil(err)
+	err = writer.Write(UDFToken)
+	suite.Nil(err)
+	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
 
-// 	err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
-// 	suite.NotNil(err)
+	err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
+	suite.NotNil(err)
+	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
 
-// 	writer.Close()
-
-// 	mockEncoder.AssertExpectations(suite.T())
-
-// 	// Encoder failed
-
-// 	failRec := models.Record{
-// 		Record: &a.Record{},
-// 	}
-// 	failRecToken := models.NewRecordToken(failRec)
-// 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(0, errors.New("error"))
-// 	err = writer.Write(failRecToken)
-// 	suite.NotNil(err)
-
-// 	mockEncoder.AssertExpectations(suite.T())
-// }
-
-// func (suite *writersTestSuite) TestASBWriter() {
-// 	namespace := "test"
-// 	set := ""
-
-// 	key, aerr := a.NewKey(namespace, set, "key")
-// 	if aerr != nil {
-// 		panic(aerr)
-// 	}
-
-// 	expRecord := models.Record{
-// 		Record: &a.Record{
-// 			Key: key,
-// 			Bins: a.BinMap{
-// 				"key0": "hi",
-// 				"key1": 1,
-// 			},
-// 		},
-// 	}
-// 	recToken := models.NewRecordToken(expRecord)
-
-// 	expUDF := &models.UDF{
-// 		Name: "udf",
-// 	}
-// 	UDFToken := models.NewUDFToken(expUDF)
-
-// 	expSIndex := &models.SIndex{
-// 		Name: "sindex",
-// 	}
-// 	SIndexToken := models.NewSIndexToken(expSIndex)
-
-// 	mockEncoder := mocks.NewAsbEncoder(suite.T())
-// 	mockEncoder.EXPECT().WriteHeader(namespace, true).Return(1, nil)
-// 	mockEncoder.EXPECT().EncodeToken(recToken).Return(2, nil)
-// 	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return(3, nil)
-// 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return(4, nil)
-
-// 	writer := newAsbWriter(mockEncoder)
-// 	suite.NotNil(writer)
-
-// 	err := writer.Init(namespace, true)
-// 	suite.Nil(err)
-
-// 	err = writer.Write(recToken)
-// 	suite.Nil(err)
-
-// 	err = writer.Write(SIndexToken)
-// 	suite.Nil(err)
-
-// 	err = writer.Write(UDFToken)
-// 	suite.Nil(err)
-
-// 	writer.Close()
-
-// 	mockEncoder.AssertExpectations(suite.T())
-// }
-
-// func (suite *writersTestSuite) TestASBWriterNegative() {
-// 	mockEncoder := mocks.NewAsbEncoder(suite.T())
-
-// 	writer := newAsbWriter(mockEncoder)
-// 	suite.NotNil(writer)
-
-// 	failRec := models.Record{
-// 		Record: &a.Record{},
-// 	}
-// 	failRecToken := models.NewRecordToken(failRec)
-// 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(0, errors.New("error"))
-// 	err := writer.Write(failRecToken)
-// 	suite.NotNil(err)
-
-// 	mockEncoder.AssertExpectations(suite.T())
-// }
+	failRec := models.Record{
+		Record: &a.Record{},
+	}
+	failRecToken := models.NewRecordToken(failRec)
+	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
+	err = writer.Write(failRecToken)
+	suite.NotNil(err)
+}
 
 func (suite *writersTestSuite) TestRestoreWriter() {
 	namespace := "test"
@@ -303,6 +229,50 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	suite.Nil(err)
 
 	writer.Close()
+}
+
+func (suite *writersTestSuite) TestTokenStatsWriter() {
+	mockWriter := mocks.NewDataWriter[*models.Token](suite.T())
+	mockWriter.EXPECT().Write(models.NewRecordToken(models.Record{})).Return(nil)
+	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{})).Return(nil)
+	mockWriter.EXPECT().Write(models.NewUDFToken(&models.UDF{})).Return(nil)
+	mockWriter.EXPECT().Write(&models.Token{Type: models.TokenTypeInvalid}).Return(errors.New("error"))
+	mockWriter.EXPECT().Close()
+
+	mockStats := newMockStatsSetterToken(suite.T())
+	mockStats.EXPECT().addRecords(uint64(1))
+	mockStats.EXPECT().addUDFs(uint32(1))
+	mockStats.EXPECT().addSIndexes(uint32(1))
+
+	writer := newWriterWithTokenStats(mockWriter, mockStats)
+	suite.NotNil(writer)
+
+	err := writer.Write(models.NewRecordToken(models.Record{}))
+	suite.Nil(err)
+
+	err = writer.Write(models.NewSIndexToken(&models.SIndex{}))
+	suite.Nil(err)
+
+	err = writer.Write(models.NewUDFToken(&models.UDF{}))
+	suite.Nil(err)
+
+	err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
+	suite.NotNil(err)
+
+	writer.Close()
+}
+
+func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
+	mockWriter := mocks.NewDataWriter[*models.Token](suite.T())
+	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{})).Return(errors.New("error"))
+
+	mockStats := newMockStatsSetterToken(suite.T())
+
+	writer := newWriterWithTokenStats(mockWriter, mockStats)
+	suite.NotNil(writer)
+
+	err := writer.Write(models.NewSIndexToken(&models.SIndex{}))
+	suite.Error(err)
 }
 
 func TestWriters(t *testing.T) {

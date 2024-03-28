@@ -244,7 +244,8 @@ type BackupToDirectoryConfig struct {
 	// If FileSizeLimit is 0, backup file size is unbounded.
 	// If non-zero, backup files will be split into multiple files if their size exceeds this limit.
 	// If non-zero, FileSizeLimit must be greater than or equal to 1MB.
-	FileSizeLimit uint64
+	// FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
+	FileSizeLimit int64
 }
 
 // NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values
@@ -259,10 +260,14 @@ func (c *BackupToDirectoryConfig) validate() error {
 		return fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", c.FileSizeLimit)
 	}
 
+	if c.FileSizeLimit < 0 {
+		return fmt.Errorf("file size limit must not be negative, got %d", c.FileSizeLimit)
+	}
+
 	return c.BackupConfig.validate()
 }
 
-// BackupToDirectory starts a backup operation.
+// BackupToDirectory starts a backup operation
 // that writes data to a local directory.
 // config.Parallel determines the number of files to write concurrently.
 // ctx can be used to cancel the backup operation.

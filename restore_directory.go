@@ -27,6 +27,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/logging"
+	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 )
 
@@ -39,19 +40,18 @@ type RestoreFromDirectoryStats struct {
 
 // RestoreFromDirectoryHandler handles a restore job from a directory
 type RestoreFromDirectoryHandler struct {
-	stats           RestoreFromDirectoryStats
 	config          *RestoreFromDirectoryConfig
 	aerospikeClient *a.Client
 	errors          chan error
-	directory       string
-	Id              string
 	logger          *slog.Logger
+	directory       string
+	id              string
+	stats           RestoreFromDirectoryStats
 }
 
 // newRestoreFromDirectoryHandler creates a new RestoreFromDirectoryHandler
 func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
 	ac *a.Client, directory string, logger *slog.Logger) *RestoreFromDirectoryHandler {
-
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
 
@@ -59,7 +59,7 @@ func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
 		config:          config,
 		aerospikeClient: ac,
 		directory:       directory,
-		Id:              id,
+		id:              id,
 		logger:          logger,
 	}
 }
@@ -128,11 +128,25 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 				continue
 			}
 
-			// TODO don't use a restore handler, use a base handler
-			restoreHandler := newRestoreHandler(&rh.config.RestoreConfig, rh.aerospikeClient, readers, rh.logger)
-			restoreHandler.run(ctx)
+			readWorkers := make([]*readWorker[*models.Token], len(readers))
 
-			err = restoreHandler.Wait(ctx)
+			for i, reader := range readers {
+				decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				dr := newTokenReader(decoder)
+				readWorker := newReadWorker(dr)
+				readWorkers[i] = readWorker
+			}
+
+			restoreWorker := newWorkHandler()
+			restoreHandler := newRestoreHandlerBase(&rh.config.RestoreConfig,
+				rh.aerospikeClient, restoreWorker, &rh.stats.RestoreStats)
+
+			err = restoreHandler.run(ctx, readWorkers)
 			if err != nil {
 				errChan <- err
 				return
@@ -144,8 +158,8 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 }
 
 // GetStats returns the stats of the restore job
-func (rh *RestoreFromDirectoryHandler) GetStats() RestoreFromDirectoryStats {
-	return rh.stats
+func (rh *RestoreFromDirectoryHandler) GetStats() *RestoreFromDirectoryStats {
+	return &rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed

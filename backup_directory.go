@@ -41,19 +41,18 @@ type BackupToDirectoryStats struct {
 
 // BackupToDirectoryHandler handles a backup job to a directory
 type BackupToDirectoryHandler struct {
-	stats           BackupToDirectoryStats
 	config          *BackupToDirectoryConfig
 	aerospikeClient *a.Client
 	errors          chan error
-	directory       string
-	Id              string
 	logger          *slog.Logger
+	directory       string
+	id              string
+	stats           BackupToDirectoryStats
 }
 
 // newBackupToDirectoryHandler creates a new BackupToDirectoryHandler
 func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
 	ac *a.Client, directory string, logger *slog.Logger) *BackupToDirectoryHandler {
-
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackupDirectory)
 
@@ -61,7 +60,7 @@ func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
 		config:          config,
 		aerospikeClient: ac,
 		directory:       directory,
-		Id:              id,
+		id:              id,
 		logger:          logger,
 	}
 }
@@ -114,7 +113,8 @@ func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 			// we want to close the file after the backup is done
 			defer writer.Close()
 
-			dataWriter := newTokenWriter(encoder, writer)
+			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer)
+			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats.BackupStats)
 			writeWorkers[i] = newWriteWorker(dataWriter)
 		}
 
@@ -129,8 +129,8 @@ func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 }
 
 // GetStats returns the stats of the backup job
-func (bh *BackupToDirectoryHandler) GetStats() BackupToDirectoryStats {
-	return bh.stats
+func (bh *BackupToDirectoryHandler) GetStats() *BackupToDirectoryStats {
+	return &bh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
@@ -150,7 +150,7 @@ func (bh *BackupToDirectoryHandler) Wait(ctx context.Context) error {
 // The file is returned in write mode.
 // If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
 func makeBackupFile(dir, namespace string, encoder encoding.Encoder,
-	fileSizeLimit uint64, fileID *atomic.Int32) (io.WriteCloser, error) {
+	fileSizeLimit int64, fileID *atomic.Int32) (io.WriteCloser, error) {
 	var (
 		open func() (io.WriteCloser, error)
 	)

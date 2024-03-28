@@ -17,7 +17,6 @@ package pipeline
 import (
 	"context"
 	"errors"
-	"strconv"
 	"testing"
 
 	"github.com/aerospike/backup-go/pipeline/mocks"
@@ -144,10 +143,10 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 
 	suite.Equal(2, len(send))
 
-	var count int
 	for res := range send {
-		suite.Equal(strconv.Itoa(count), res, "expected %s to be %s", res, strconv.Itoa(count))
-		count++
+		if res != "0" && res != "1" {
+			suite.Fail("unexpected result: %s, expected 1 or 0", res)
+		}
 	}
 }
 

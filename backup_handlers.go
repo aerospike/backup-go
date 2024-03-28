@@ -88,8 +88,8 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 
 		readWorkers[i] = newReadWorker(recordReader)
 
-		ttlSetter := newProcessorTTL()
-		processorWorkers[i] = newProcessorWorker(ttlSetter)
+		voidTimeSetter := newProcessorVoidTime()
+		processorWorkers[i] = newProcessorWorker(voidTimeSetter)
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
@@ -110,17 +110,20 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 // **** Backup To Writer Handler ****
 
 // BackupStats stores the status of a backup job
-type BackupStats struct{}
+// the stats are updated in realtime by backup jobs
+type BackupStats struct {
+	tokenStats
+}
 
 // BackupHandler handles a backup job to a set of io.writers
 type BackupHandler struct {
-	stats  BackupStats
 	config *BackupConfig
 	errors chan error
+	logger *slog.Logger
 	backupHandlerBase
+	id      string
 	writers []io.Writer
-	logger  *slog.Logger
-	Id      string
+	stats   BackupStats
 }
 
 // newBackupHandler creates a new BackupHandler
@@ -136,7 +139,7 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer, l
 		writers:           writers,
 		backupHandlerBase: *backupHandler,
 		logger:            logger,
-		Id:                id,
+		id:                id,
 	}
 }
 
@@ -174,7 +177,8 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 				}
 			}
 
-			dataWriter := newTokenWriter(encoder, writer)
+			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer)
+			dataWriter = newWriterWithTokenStats(dataWriter, &bwh.stats)
 			worker := newWriteWorker(dataWriter)
 			writeWorkers = append(writeWorkers, worker)
 			// if we have not reached the batch size and we have more writers
@@ -196,8 +200,8 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 }
 
 // GetStats returns the stats of the backup job
-func (bwh *BackupHandler) GetStats() BackupStats {
-	return bwh.stats
+func (bwh *BackupHandler) GetStats() *BackupStats {
+	return &bwh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed

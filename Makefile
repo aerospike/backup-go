@@ -14,6 +14,8 @@ clean:
 	rm -f coverage.cov
 	rm -rf mocks
 	rm -rf pipeline/mocks
+	rm -f mock_statsSetterToken.go
+	rm -f mock_statsSetterExpired.go
 	rm -rf encoding/mocks
 
 .PHONY: test_deps

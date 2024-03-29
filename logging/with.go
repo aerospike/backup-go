@@ -17,7 +17,8 @@ package logging
 import "log/slog"
 
 func WithClient(logger *slog.Logger, id string) *slog.Logger {
-	return logger.With("id", id).WithGroup("client")
+	group := slog.Group("client", "id", id)
+	return logger.With(group)
 }
 
 type HandlerType string
@@ -31,7 +32,8 @@ const (
 )
 
 func WithHandler(logger *slog.Logger, id string, handlerType HandlerType) *slog.Logger {
-	return logger.WithGroup("handler").With("id", id, "type", handlerType)
+	group := slog.Group("handler", "id", id, "type", handlerType)
+	return logger.With(group)
 }
 
 type ReaderType string
@@ -44,7 +46,8 @@ const (
 )
 
 func WithReader(logger *slog.Logger, id string, readerType ReaderType) *slog.Logger {
-	return logger.WithGroup("reader").With("id", id, "type", readerType)
+	group := slog.Group("reader", "id", id, "type", readerType)
+	return logger.With(group)
 }
 
 type ProcessorType string
@@ -56,7 +59,8 @@ const (
 )
 
 func WithProcessor(logger *slog.Logger, id string, processorType ProcessorType) *slog.Logger {
-	return logger.WithGroup("processor").With("id", id, "type", processorType)
+	group := slog.Group("processor", "id", id, "type", processorType)
+	return logger.With(group)
 }
 
 type WriterType string
@@ -69,5 +73,6 @@ const (
 )
 
 func WithWriter(logger *slog.Logger, id string, writerType WriterType) *slog.Logger {
-	return logger.WithGroup("writer").With("id", id, "type", writerType)
+	group := slog.Group("writer", "id", id, "type", writerType)
+	return logger.With(group)
 }

@@ -18,9 +18,12 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -88,12 +91,18 @@ func (w *readWorker[T]) Run(ctx context.Context) error {
 // It reads data as tokens using a Decoder
 type tokenReader struct {
 	decoder encoding.Decoder
+	logger  *slog.Logger
 }
 
 // newTokenReader creates a new GenericReader
-func newTokenReader(decoder encoding.Decoder) *tokenReader {
+func newTokenReader(decoder encoding.Decoder, logger *slog.Logger) *tokenReader {
+	id := uuid.NewString()
+	logger = logging.WithReader(logger, id, logging.ReaderTypeToken)
+	logger.Debug("created new token reader")
+
 	return &tokenReader{
 		decoder: decoder,
+		logger:  logger,
 	}
 }
 
@@ -120,7 +129,9 @@ func (dr *tokenReader) Read() (*models.Token, error) {
 
 // Cancel satisfies the DataReader interface
 // but is a no-op for the tokenReader
-func (dr *tokenReader) Close() {}
+func (dr *tokenReader) Close() {
+	dr.logger.Debug("closed token reader")
+}
 
 // **** Aerospike DB Reader ****
 
@@ -153,18 +164,23 @@ type aerospikeRecordReader struct {
 	scanPolicy *a.ScanPolicy
 	recResChan <-chan *a.Result
 	recSet     *a.Recordset
+	logger     *slog.Logger
 	status     arrStatus
 	config     arrConfig
 }
 
 // newAerospikeRecordReader creates a new AerospikeRecordReader
-func newAerospikeRecordReader(client scanner, cfg arrConfig, scanPolicy *a.ScanPolicy) *aerospikeRecordReader {
+func newAerospikeRecordReader(client scanner, cfg arrConfig,
+	scanPolicy *a.ScanPolicy, logger *slog.Logger) *aerospikeRecordReader {
+	id := uuid.NewString()
+	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
+	logger.Debug("created new aerospike record reader")
+
 	job := &aerospikeRecordReader{
 		config:     cfg,
 		client:     client,
-		status:     arrStatus{},
 		scanPolicy: scanPolicy,
-		recResChan: nil,
+		logger:     logger,
 	}
 
 	return job
@@ -183,10 +199,12 @@ func (arr *aerospikeRecordReader) Read() (*models.Token, error) {
 
 	res, active := <-arr.recResChan
 	if !active {
+		arr.logger.Debug("scan finished")
 		return nil, io.EOF
 	}
 
 	if res.Err != nil {
+		arr.logger.Error("error reading record", "error", res.Err)
 		return nil, res.Err
 	}
 
@@ -198,15 +216,18 @@ func (arr *aerospikeRecordReader) Read() (*models.Token, error) {
 	return recToken, nil
 }
 
-// Cancel cancels the Aerospike scan used to read records
+// Close cancels the Aerospike scan used to read records
 // if it was started
 func (arr *aerospikeRecordReader) Close() {
 	arr.status.started = false
 	if arr.recSet != nil {
 		// ignore this error, it only happens if the scan is already closed
 		// and this method can not return an error anyway
-		_ = arr.recSet.Close()
+		err := arr.recSet.Close()
+		arr.logger.Error("error while closing record set", "error", err)
 	}
+
+	arr.logger.Debug("closed aerospike record reader")
 }
 
 // startScan starts the scan for aerospikeRecordReader
@@ -248,14 +269,20 @@ type sindexGetter interface {
 type sindexReader struct {
 	client    sindexGetter
 	sindexes  chan *models.SIndex
+	logger    *slog.Logger
 	namespace string
 }
 
 // newSIndexReader creates a new SIndexReader
-func newSIndexReader(client sindexGetter, namespace string) *sindexReader {
+func newSIndexReader(client sindexGetter, namespace string, logger *slog.Logger) *sindexReader {
+	id := uuid.NewString()
+	logger = logging.WithReader(logger, id, logging.ReaderTypeSIndex)
+	logger.Debug("created new sindex reader")
+
 	return &sindexReader{
 		client:    client,
 		namespace: namespace,
+		logger:    logger,
 	}
 }
 
@@ -263,6 +290,8 @@ func newSIndexReader(client sindexGetter, namespace string) *sindexReader {
 func (r *sindexReader) Read() (*models.Token, error) {
 	// grab all the sindexes on the first run
 	if r.sindexes == nil {
+		r.logger.Debug("fetching all secondary indexes")
+
 		sindexes, err := r.client.GetSIndexes(r.namespace)
 		if err != nil {
 			return nil, err

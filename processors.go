@@ -18,10 +18,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
+	"github.com/aerospike/backup-go/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 )
 
 // **** Processor Worker ****
@@ -105,13 +108,19 @@ type processorTTL struct {
 	// It is a field so that it can be mocked in tests
 	getNow func() cltime.CLTime
 	stats  statsSetterExpired
+	logger *slog.Logger
 }
 
 // newProcessorTTL creates a new TTLProcessor
-func newProcessorTTL(stats statsSetterExpired) *processorTTL {
+func newProcessorTTL(stats statsSetterExpired, logger *slog.Logger) *processorTTL {
+	id := uuid.NewString()
+	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL).WithGroup("processor")
+	logger.Debug("created new TTL processor")
+
 	return &processorTTL{
 		getNow: cltime.Now,
 		stats:  stats,
+		logger: logger,
 	}
 }
 
@@ -135,7 +144,9 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 		ttl := record.VoidTime - now.Seconds
 		if ttl <= 0 {
 			// the record is expired
+			p.logger.Debug("record is expired", "digest", record.Key.Digest())
 			p.stats.addRecordsExpired(1)
+
 			return nil, errExpiredRecord
 		}
 
@@ -162,12 +173,18 @@ type processorVoidTime struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
 	getNow func() cltime.CLTime
+	logger *slog.Logger
 }
 
 // newProcessorVoidTime creates a new VoidTimeProcessor
-func newProcessorVoidTime() *processorVoidTime {
+func newProcessorVoidTime(logger *slog.Logger) *processorVoidTime {
+	id := uuid.NewString()
+	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeVoidTime).WithGroup("processor")
+	logger.Debug("created new VoidTime processor")
+
 	return &processorVoidTime{
 		getNow: cltime.Now,
+		logger: logger,
 	}
 }
 

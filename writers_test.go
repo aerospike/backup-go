@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 
 	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
@@ -123,7 +124,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
 	dst := bytes.Buffer{}
-	writer := newTokenWriter(mockEncoder, &dst)
+	writer := newTokenWriter(mockEncoder, &dst, slog.Default())
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
@@ -149,6 +150,8 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	err = writer.Write(failRecToken)
 	suite.NotNil(err)
+
+	writer.Close()
 }
 
 func (suite *writersTestSuite) TestRestoreWriter() {
@@ -174,7 +177,7 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := newRestoreWriter(mockDBWriter, nil)
+	writer := newRestoreWriter(mockDBWriter, nil, slog.Default())
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
@@ -187,7 +190,9 @@ func (suite *writersTestSuite) TestRestoreWriter() {
 	// DBWriter failed
 
 	failRec := models.Record{
-		Record: &a.Record{},
+		Record: &a.Record{
+			Key: key,
+		},
 	}
 	failRecToken := models.NewRecordToken(failRec)
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), failRec.Key, failRec.Bins).Return(a.ErrInvalidParam)
@@ -222,7 +227,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := newRestoreWriter(mockDBWriter, policy)
+	writer := newRestoreWriter(mockDBWriter, policy, slog.Default())
 	suite.NotNil(writer)
 
 	err := writer.Write(recToken)
@@ -244,7 +249,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockStats.EXPECT().addUDFs(uint32(1))
 	mockStats.EXPECT().addSIndexes(uint32(1))
 
-	writer := newWriterWithTokenStats(mockWriter, mockStats)
+	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
 	err := writer.Write(models.NewRecordToken(models.Record{}))
@@ -268,7 +273,7 @@ func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
 
 	mockStats := newMockStatsSetterToken(suite.T())
 
-	writer := newWriterWithTokenStats(mockWriter, mockStats)
+	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
 	err := writer.Write(models.NewSIndexToken(&models.SIndex{}))

@@ -70,19 +70,12 @@ func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
 func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
 
-	bh.logger.Info("started job")
-
-	go func(errChan chan<- error) {
-		// NOTE: order is important here
-		// if we close the errChan before we handle the panic
-		// the panic will attempt to send on a closed channel
-		defer close(errChan)
-		defer handlePanic(errChan)
+	go doWork(bh.errors, bh.logger, func() error {
+		bh.logger.Debug("preparing backup directory", "directory", bh.directory)
 
 		err := prepareBackupDirectory(bh.directory)
 		if err != nil {
-			errChan <- err
-			return
+			return err
 		}
 
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
@@ -99,33 +92,27 @@ func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 		for i := range bh.config.Parallel {
 			encoder, err = bh.config.EncoderFactory.CreateEncoder()
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			writer, err := makeBackupFile(bh.directory, bh.config.Namespace, encoder, bh.config.FileSizeLimit, &fileID)
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			//nolint:gocritic // defer in loop is ok here,
 			// we want to close the file after the backup is done
 			defer writer.Close()
 
-			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer)
-			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats.BackupStats)
+			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
+			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats.BackupStats, bh.logger)
 			writeWorkers[i] = newWriteWorker(dataWriter)
 		}
 
-		handler := newBackupHandlerBase(&bh.config.BackupConfig, bh.aerospikeClient, bh.config.Namespace)
+		handler := newBackupHandlerBase(&bh.config.BackupConfig, bh.aerospikeClient, bh.config.Namespace, bh.logger)
 
-		err = handler.run(ctx, writeWorkers)
-		if err != nil {
-			errChan <- err
-			return
-		}
-	}(bh.errors)
+		return handler.run(ctx, writeWorkers)
+	})
 }
 
 // GetStats returns the stats of the backup job

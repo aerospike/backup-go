@@ -35,10 +35,14 @@ type backupHandlerBase struct {
 	worker          workHandler
 	config          *BackupConfig
 	aerospikeClient *a.Client
+	logger          *slog.Logger
 	namespace       string
 }
 
-func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) *backupHandlerBase {
+func newBackupHandlerBase(config *BackupConfig, ac *a.Client,
+	namespace string, logger *slog.Logger) *backupHandlerBase {
+	logger.Debug("created new backup base handler")
+
 	wh := newWorkHandler()
 
 	handler := &backupHandlerBase{
@@ -46,6 +50,7 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client, namespace string) 
 		config:          config,
 		aerospikeClient: ac,
 		worker:          *wh,
+		logger:          logger,
 	}
 
 	return handler
@@ -84,11 +89,12 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 			bh.aerospikeClient,
 			ARRCFG,
 			&scanPolicy,
+			bh.logger,
 		)
 
 		readWorkers[i] = newReadWorker(recordReader)
 
-		voidTimeSetter := newProcessorVoidTime()
+		voidTimeSetter := newProcessorVoidTime(bh.logger)
 		processorWorkers[i] = newProcessorWorker(voidTimeSetter)
 	}
 
@@ -129,7 +135,7 @@ type BackupHandler struct {
 // newBackupHandler creates a new BackupHandler
 func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer, logger *slog.Logger) *BackupHandler {
 	namespace := config.Namespace
-	backupHandler := newBackupHandlerBase(config, ac, namespace)
+	backupHandler := newBackupHandlerBase(config, ac, namespace, logger)
 
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup)
@@ -148,23 +154,14 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer, l
 func (bwh *BackupHandler) run(ctx context.Context) {
 	bwh.errors = make(chan error, 1)
 
-	bwh.logger.Info("started job")
-
-	go func(errChan chan<- error) {
-		// NOTE: order is important here
-		// if we close the errChan before we handle the panic
-		// the panic will attempt to send on a closed channel
-		defer close(errChan)
-		defer handlePanic(errChan)
-
+	go doWork(bwh.errors, bwh.logger, func() error {
 		batchSize := bwh.config.Parallel
 		writeWorkers := []*writeWorker[*models.Token]{}
 
 		for i, writer := range bwh.writers {
 			encoder, err := bwh.config.EncoderFactory.CreateEncoder()
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			// asb files require a header, treat the
@@ -172,13 +169,12 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 			if _, ok := encoder.(*asb.Encoder); ok {
 				err := writeASBHeader(writer, bwh.config.Namespace, i == 0)
 				if err != nil {
-					errChan <- err
-					return
+					return err
 				}
 			}
 
-			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer)
-			dataWriter = newWriterWithTokenStats(dataWriter, &bwh.stats)
+			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bwh.logger)
+			dataWriter = newWriterWithTokenStats(dataWriter, &bwh.stats, bwh.logger)
 			worker := newWriteWorker(dataWriter)
 			writeWorkers = append(writeWorkers, worker)
 			// if we have not reached the batch size and we have more writers
@@ -190,13 +186,14 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 
 			err = bwh.backupHandlerBase.run(ctx, writeWorkers)
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			writeWorkers = []*writeWorker[*models.Token]{}
 		}
-	}(bwh.errors)
+
+		return nil
+	})
 }
 
 // GetStats returns the stats of the backup job

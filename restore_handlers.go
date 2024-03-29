@@ -48,37 +48,44 @@ type restoreHandlerBase struct {
 	dbClient DBRestoreClient
 	worker   worker
 	stats    *RestoreStats
+	logger   *slog.Logger
 }
 
 // newRestoreHandlerBase creates a new restoreHandler
 func newRestoreHandlerBase(config *RestoreConfig, ac DBRestoreClient,
-	w worker, stats *RestoreStats) *restoreHandlerBase {
+	w worker, stats *RestoreStats, logger *slog.Logger) *restoreHandlerBase {
+	logger.Debug("created new restore base handler")
+
 	return &restoreHandlerBase{
 		config:   config,
 		dbClient: ac,
 		worker:   w,
 		stats:    stats,
+		logger:   logger,
 	}
 }
 
 // run runs the restore job
 func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*models.Token]) error {
+	rh.logger.Debug("running restore base handler")
+
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
 		var writer dataWriter[*models.Token] = newRestoreWriter(
 			rh.dbClient,
 			rh.config.WritePolicy,
+			rh.logger,
 		)
 
-		writer = newWriterWithTokenStats(writer, rh.stats)
+		writer = newWriterWithTokenStats(writer, rh.stats, rh.logger)
 		writeWorkers[i] = newWriteWorker(writer)
 	}
 
 	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
-		TTLSetter := newProcessorTTL(rh.stats)
+		TTLSetter := newProcessorTTL(rh.stats, rh.logger)
 		processorWorkers[i] = newProcessorWorker(TTLSetter)
 	}
 
@@ -137,7 +144,7 @@ func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient,
 	}
 
 	worker := newWorkHandler()
-	restoreHandler := newRestoreHandlerBase(config, ac, worker, &rh.stats)
+	restoreHandler := newRestoreHandlerBase(config, ac, worker, &rh.stats, rh.logger)
 	rh.restoreHandlerBase = *restoreHandler
 
 	return &rh
@@ -148,26 +155,17 @@ func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient,
 func (rrh *RestoreHandler) run(ctx context.Context) {
 	rrh.errors = make(chan error, 1)
 
-	rrh.logger.Info("started job")
-
-	go func(errChan chan<- error) {
-		// NOTE: order is important here
-		// if we close the errChan before we handle the panic
-		// the panic will attempt to send on a closed channel
-		defer close(errChan)
-		defer handlePanic(errChan)
-
+	go doWork(rrh.errors, rrh.logger, func() error {
 		batchSize := rrh.config.Parallel
 		dataReaders := []*readWorker[*models.Token]{}
 
 		for i, reader := range rrh.readers {
 			decoder, err := rrh.config.DecoderFactory.CreateDecoder(reader)
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
-			dr := newTokenReader(decoder)
+			dr := newTokenReader(decoder, rrh.logger)
 			readWorker := newReadWorker(dr)
 			dataReaders = append(dataReaders, readWorker)
 			// if we have not reached the batch size and we have more readers
@@ -179,13 +177,14 @@ func (rrh *RestoreHandler) run(ctx context.Context) {
 
 			err = rrh.restoreHandlerBase.run(ctx, dataReaders)
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			clear(dataReaders)
 		}
-	}(rrh.errors)
+
+		return nil
+	})
 }
 
 // GetStats returns the stats of the restore job

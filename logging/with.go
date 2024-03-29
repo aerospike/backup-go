@@ -33,3 +33,41 @@ const (
 func WithHandler(logger *slog.Logger, id string, handlerType HandlerType) *slog.Logger {
 	return logger.With("id", id, "type", handlerType).WithGroup("handler")
 }
+
+type ReaderType string
+
+const (
+	ReaderTypeUnknown ReaderType = "unknown"
+	ReaderTypeToken   ReaderType = "token"
+	ReaderTypeRecord  ReaderType = "record"
+	ReaderTypeSIndex  ReaderType = "sindex"
+)
+
+func WithReader(logger *slog.Logger, id string, readerType ReaderType) *slog.Logger {
+	return logger.With("id", id, "type", readerType).WithGroup("reader")
+}
+
+type ProcessorType string
+
+const (
+	ProcessorTypeUnknown  ProcessorType = "unknown"
+	ProcessorTypeTTL      ProcessorType = "token"
+	ProcessorTypeVoidTime ProcessorType = "void_time"
+)
+
+func WithProcessor(logger *slog.Logger, id string, processorType ProcessorType) *slog.Logger {
+	return logger.With("id", id, "type", processorType).WithGroup("processor")
+}
+
+type WriterType string
+
+const (
+	WriterTypeUnknown    WriterType = "unknown"
+	WriterTypeTokenStats WriterType = "token_stats"
+	WriterTypeToken      WriterType = "token"
+	WriterTypeRestore    WriterType = "restore"
+)
+
+func WithWriter(logger *slog.Logger, id string, writerType WriterType) *slog.Logger {
+	return logger.With("id", id, "type", writerType).WithGroup("writer")
+}

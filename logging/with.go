@@ -31,7 +31,7 @@ const (
 )
 
 func WithHandler(logger *slog.Logger, id string, handlerType HandlerType) *slog.Logger {
-	return logger.With("id", id, "type", handlerType).WithGroup("handler")
+	return logger.WithGroup("handler").With("id", id, "type", handlerType)
 }
 
 type ReaderType string
@@ -44,7 +44,7 @@ const (
 )
 
 func WithReader(logger *slog.Logger, id string, readerType ReaderType) *slog.Logger {
-	return logger.With("id", id, "type", readerType).WithGroup("reader")
+	return logger.WithGroup("reader").With("id", id, "type", readerType)
 }
 
 type ProcessorType string
@@ -56,7 +56,7 @@ const (
 )
 
 func WithProcessor(logger *slog.Logger, id string, processorType ProcessorType) *slog.Logger {
-	return logger.With("id", id, "type", processorType).WithGroup("processor")
+	return logger.WithGroup("processor").With("id", id, "type", processorType)
 }
 
 type WriterType string
@@ -69,5 +69,5 @@ const (
 )
 
 func WithWriter(logger *slog.Logger, id string, writerType WriterType) *slog.Logger {
-	return logger.With("id", id, "type", writerType).WithGroup("writer")
+	return logger.WithGroup("writer").With("id", id, "type", writerType)
 }

@@ -54,6 +54,7 @@ func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
 	ac *a.Client, directory string, logger *slog.Logger) *RestoreFromDirectoryHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
+	logger.Debug("created new restore directory handler", "directory", directory)
 
 	return &RestoreFromDirectoryHandler{
 		config:          config,

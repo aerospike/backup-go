@@ -136,6 +136,7 @@ type BackupHandler struct {
 func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer, logger *slog.Logger) *BackupHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup)
+	logger.Debug("created new backup handler")
 
 	namespace := config.Namespace
 	backupHandler := newBackupHandlerBase(config, ac, namespace, logger)

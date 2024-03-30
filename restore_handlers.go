@@ -135,6 +135,7 @@ func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient,
 	readers []io.Reader, logger *slog.Logger) *RestoreHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore)
+	logger.Debug("created new restore handler")
 
 	rh := RestoreHandler{
 		config:  config,

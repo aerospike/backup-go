@@ -55,6 +55,7 @@ func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
 	ac *a.Client, directory string, logger *slog.Logger) *BackupToDirectoryHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackupDirectory)
+	logger.Debug("created new backup to directory handler", "directory", directory)
 
 	return &BackupToDirectoryHandler{
 		config:          config,

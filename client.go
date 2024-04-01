@@ -95,6 +95,10 @@ func NewClient(ac *a.Client, id string, logger *slog.Logger, config *Config) (*C
 		return nil, errors.New("aerospike client pointer is nil")
 	}
 
+	// qualify the logger with a backup lib group
+	logger = logger.WithGroup("backup")
+
+	// add a client group to the logger
 	logger = logging.WithClient(logger, id)
 
 	return &Client{

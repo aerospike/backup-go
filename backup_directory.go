@@ -103,7 +103,11 @@ func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 
 			//nolint:gocritic // defer in loop is ok here,
 			// we want to close the file after the backup is done
-			defer writer.Close()
+			defer func() {
+				if err := writer.Close(); err != nil {
+					bh.logger.Error("failed to close backup file", "error", err)
+				}
+			}()
 
 			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats.BackupStats, bh.logger)

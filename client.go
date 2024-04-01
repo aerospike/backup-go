@@ -42,19 +42,16 @@ var (
 
 // **** Client ****
 
-// Config contains configuration for the backup client
+// Config contains configuration for the backup client.
 type Config struct{}
 
-// NewConfig returns a new client Config
+// NewConfig returns a new client Config.
 func NewConfig() *Config {
 	return &Config{}
 }
 
-// Client is the main entry point for the backup package
-// It wraps an aerospike client and provides methods to start backup and restore operations
-// It contains a Config object that can be used to set default policies for the backup and restore operations
-// If the Policies field is nil, the aerospike client's default policies will be used
-// These policies will be used as defaults for any backup and restore operations started by the client
+// Client is the main entry point for the backup package.
+// It wraps an aerospike client and provides methods to start backup and restore operations.
 // Example usage:
 //
 //		asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
@@ -169,13 +166,13 @@ func (p PartitionRange) validate() error {
 // BackupConfig contains configuration for the backup operation.
 type BackupConfig struct {
 	// EncoderFactory is used to specify the encoder with which to encode the backup data
-	// if nil, the default encoder factory will be used
+	// if nil, the default EncoderFactory will be used.
 	EncoderFactory EncoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
+	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
 	// ScanPolicy applies to Aerospike scan operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
+	// If nil, the Aerospike client's default policy will be used.
 	ScanPolicy *a.ScanPolicy
 	// Namespace is the Aerospike namespace to backup.
 	Namespace string
@@ -248,7 +245,7 @@ type BackupToDirectoryConfig struct {
 	FileSizeLimit int64
 }
 
-// NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values
+// NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values.
 func NewBackupToDirectoryConfig() *BackupToDirectoryConfig {
 	return &BackupToDirectoryConfig{
 		BackupConfig: *NewBackupConfig(),
@@ -304,10 +301,10 @@ type DecoderFactory interface {
 	CreateDecoder(src io.Reader) (encoding.Decoder, error)
 }
 
-// RestoreConfig contains configuration for the restore operation
+// RestoreConfig contains configuration for the restore operation.
 type RestoreConfig struct {
 	// DecoderFactory is used to specify the decoder with which to decode the backup data
-	// if nil, the default decoder factory will be used.
+	// if nil, the default DecoderFactory will be used.
 	DecoderFactory DecoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.

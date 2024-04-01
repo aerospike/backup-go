@@ -114,7 +114,7 @@ type processorTTL struct {
 // newProcessorTTL creates a new TTLProcessor
 func newProcessorTTL(stats statsSetterExpired, logger *slog.Logger) *processorTTL {
 	id := uuid.NewString()
-	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL).WithGroup("processor")
+	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
 	logger.Debug("created new TTL processor")
 
 	return &processorTTL{
@@ -179,7 +179,7 @@ type processorVoidTime struct {
 // newProcessorVoidTime creates a new VoidTimeProcessor
 func newProcessorVoidTime(logger *slog.Logger) *processorVoidTime {
 	id := uuid.NewString()
-	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeVoidTime).WithGroup("processor")
+	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeVoidTime)
 	logger.Debug("created new VoidTime processor")
 
 	return &processorVoidTime{

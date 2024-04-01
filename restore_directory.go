@@ -104,7 +104,11 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 
 			//nolint:gocritic // defer in loop is ok here
 			// we want to close the readers after the restore is done
-			defer reader.Close()
+			defer func() {
+				if err := reader.Close(); err != nil {
+					rh.logger.Error("failed to close backup file", "file", filePath, "error", err)
+				}
+			}()
 
 			// buffer the reader to save memory
 			readers = append(readers, bufio.NewReader(reader))

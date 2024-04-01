@@ -43,20 +43,23 @@ func handlePanic(errors chan<- error, logger *slog.Logger) {
 }
 
 func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
-	defer logger.Info("job done")
 	// NOTE: order is important here
 	// if we close the errChan before we handle the panic
 	// the panic will attempt to send on a closed channel
 	defer close(errors)
 	defer handlePanic(errors, logger)
 
-	logger.Info("starting job")
+	logger.Info("job starting")
 
 	err := work()
 	if err != nil {
 		logger.Error("job failed", "error", err)
 		errors <- err
+
+		return
 	}
+
+	logger.Info("job done")
 }
 
 func splitPartitions(startPartition, numPartitions, numWorkers int) ([]PartitionRange, error) {

@@ -104,7 +104,7 @@ type tokenStatsWriter struct {
 func newWriterWithTokenStats(writer dataWriter[*models.Token],
 	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter {
 	id := uuid.NewString()
-	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats).WithGroup("writer")
+	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
 	logger.Debug("created new token stats writer")
 
 	return &tokenStatsWriter{
@@ -153,7 +153,7 @@ type tokenWriter struct {
 // newTokenWriter creates a new tokenWriter
 func newTokenWriter(encoder encoding.Encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
 	id := uuid.NewString()
-	logger = logging.WithWriter(logger, id, logging.WriterTypeToken).WithGroup("writer")
+	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
 	logger.Debug("created new token writer")
 
 	return &tokenWriter{
@@ -203,7 +203,7 @@ type restoreWriter struct {
 // newRestoreWriter creates a new RestoreWriter
 func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, logger *slog.Logger) *restoreWriter {
 	id := uuid.NewString()
-	logger = logging.WithWriter(logger, id, logging.WriterTypeRestore).WithGroup("writer")
+	logger = logging.WithWriter(logger, id, logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
 
 	return &restoreWriter{

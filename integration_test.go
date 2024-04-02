@@ -22,14 +22,12 @@ import (
 	"log/slog"
 	"testing"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
+	backup "github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
 	"github.com/aerospike/backup-go/models"
-
-	backup "github.com/aerospike/backup-go"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
 )

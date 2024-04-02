@@ -20,12 +20,11 @@ import (
 	"io"
 	"log/slog"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 // **** Read Worker ****

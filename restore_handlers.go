@@ -18,11 +18,9 @@ import (
 	"context"
 	"io"
 	"log/slog"
-
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/logging"
-
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"

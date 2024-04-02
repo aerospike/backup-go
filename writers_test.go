@@ -21,11 +21,10 @@ import (
 	"log/slog"
 	"testing"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
 	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/suite"
 )
 

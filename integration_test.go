@@ -19,16 +19,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"testing"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
+	backup "github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
 	"github.com/aerospike/backup-go/models"
-
-	backup "github.com/aerospike/backup-go"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
 )
@@ -136,7 +135,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	suite.testClient = testClient
 
 	backupCFG := backup.Config{}
-	backupClient, err := backup.NewClient(testAeroClient, &backupCFG)
+	backupClient, err := backup.NewClient(testAeroClient, "test_client", slog.Default(), &backupCFG)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}

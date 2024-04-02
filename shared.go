@@ -17,13 +17,14 @@ package backup
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"runtime/debug"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding/asb"
 )
 
-func handlePanic(errors chan<- error) {
+func handlePanic(errors chan<- error, logger *slog.Logger) {
 	if r := recover(); r != nil {
 		var err error
 
@@ -35,9 +36,30 @@ func handlePanic(errors chan<- error) {
 		}
 
 		err = fmt.Errorf("%w, with stacktrace: \"%s\"", err, debug.Stack())
+		logger.Error("job failed", "error", err)
 
 		errors <- err
 	}
+}
+
+func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
+	// NOTE: order is important here
+	// if we close the errChan before we handle the panic
+	// the panic will attempt to send on a closed channel
+	defer close(errors)
+	defer handlePanic(errors, logger)
+
+	logger.Info("job starting")
+
+	err := work()
+	if err != nil {
+		logger.Error("job failed", "error", err)
+		errors <- err
+
+		return
+	}
+
+	logger.Info("job done")
 }
 
 func splitPartitions(startPartition, numPartitions, numWorkers int) ([]PartitionRange, error) {

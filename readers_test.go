@@ -18,17 +18,17 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 	"unsafe"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
 	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
-
-	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -111,7 +111,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	mockDecoder := enc_mocks.NewDecoder(suite.T())
 	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
 
-	reader := newTokenReader(mockDecoder)
+	reader := newTokenReader(mockDecoder, slog.Default())
 	suite.NotNil(reader)
 
 	v, err := reader.Read()
@@ -169,6 +169,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 			NumPartitions:  4096,
 		},
 		nil,
+		slog.Default(),
 	)
 	suite.NotNil(reader)
 
@@ -184,6 +185,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderNotStarted() {
 		status: arrStatus{
 			started: false,
 		},
+		logger: slog.Default(),
 	}
 
 	reader.Close()
@@ -234,6 +236,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 			NumPartitions:  4096,
 		},
 		nil,
+		slog.Default(),
 	)
 	suite.NotNil(reader)
 
@@ -273,6 +276,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 			NumPartitions:  4096,
 		},
 		nil,
+		slog.Default(),
 	)
 	suite.NotNil(reader)
 
@@ -306,6 +310,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 			NumPartitions:  4096,
 		},
 		nil,
+		slog.Default(),
 	)
 	suite.NotNil(reader)
 
@@ -364,6 +369,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 			NumPartitions:  4096,
 		},
 		policy,
+		slog.Default(),
 	)
 	suite.NotNil(reader)
 
@@ -389,7 +395,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 		nil,
 	)
 
-	reader := newSIndexReader(mockSIndexGetter, namespace)
+	reader := newSIndexReader(mockSIndexGetter, namespace, slog.Default())
 	suite.NotNil(reader)
 
 	expectedSIndexTokens := []*models.Token{}
@@ -421,7 +427,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 		fmt.Errorf("error"),
 	)
 
-	reader = newSIndexReader(mockSIndexGetter, namespace)
+	reader = newSIndexReader(mockSIndexGetter, namespace, slog.Default())
 	suite.NotNil(reader)
 
 	v, err = reader.Read()

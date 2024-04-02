@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/pipeline/mocks"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )

@@ -20,12 +20,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 )
 
 // **** Restore From Directory Handler ****
@@ -40,17 +43,25 @@ type RestoreFromDirectoryHandler struct {
 	config          *RestoreFromDirectoryConfig
 	aerospikeClient *a.Client
 	errors          chan error
+	logger          *slog.Logger
 	directory       string
+	id              string
 	stats           RestoreFromDirectoryStats
 }
 
 // newRestoreFromDirectoryHandler creates a new RestoreFromDirectoryHandler
 func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
-	ac *a.Client, directory string) *RestoreFromDirectoryHandler {
+	ac *a.Client, directory string, logger *slog.Logger) *RestoreFromDirectoryHandler {
+	id := uuid.NewString()
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
+	logger.Debug("created new restore directory handler", "directory", directory)
+
 	return &RestoreFromDirectoryHandler{
 		config:          config,
 		aerospikeClient: ac,
 		directory:       directory,
+		id:              id,
+		logger:          logger,
 	}
 }
 
@@ -59,15 +70,8 @@ func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
 func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 	rh.errors = make(chan error, 1)
 
-	go func(errChan chan<- error) {
-		// NOTE: order is important here
-		// if we close the errChan before we handle the panic
-		// the panic will attempt to send on a closed channel
-		defer close(errChan)
-		defer handlePanic(errChan)
-
-		// Check that the restore directory is valid
-
+	go doWork(rh.errors, rh.logger, func() error {
+		// check that the restore directory is valid
 		// open the directory
 		// read the files rrh.config.Parallel at a time
 		// create a buffered reader for each file
@@ -75,17 +79,16 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 		// wait for the restore handler to finish
 		// if there are more files, continue to the next batch
 		// if there are no more files, return
+		rh.logger.Debug("checking restore directory", "directory", rh.directory)
 
 		err := checkRestoreDirectory(rh.directory, rh.config.DecoderFactory)
 		if err != nil {
-			errChan <- err
-			return
+			return err
 		}
 
 		fileInfo, err := os.ReadDir(rh.directory)
 		if err != nil {
-			errChan <- fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, rh.directory, err)
-			return
+			return fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, rh.directory, err)
 		}
 
 		batchSize := rh.config.Parallel
@@ -96,15 +99,16 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 
 			reader, err := os.Open(filePath)
 			if err != nil {
-				err = fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
-				errChan <- err
-
-				return
+				return fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
 			}
 
 			//nolint:gocritic // defer in loop is ok here
 			// we want to close the readers after the restore is done
-			defer reader.Close()
+			defer func() {
+				if err := reader.Close(); err != nil {
+					rh.logger.Error("failed to close backup file", "file", filePath, "error", err)
+				}
+			}()
 
 			// buffer the reader to save memory
 			readers = append(readers, bufio.NewReader(reader))
@@ -121,28 +125,28 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 			for i, reader := range readers {
 				decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
 				if err != nil {
-					errChan <- err
-					return
+					return err
 				}
 
-				dr := newTokenReader(decoder)
+				dr := newTokenReader(decoder, rh.logger)
 				readWorker := newReadWorker(dr)
 				readWorkers[i] = readWorker
 			}
 
 			restoreWorker := newWorkHandler()
 			restoreHandler := newRestoreHandlerBase(&rh.config.RestoreConfig,
-				rh.aerospikeClient, restoreWorker, &rh.stats.RestoreStats)
+				rh.aerospikeClient, restoreWorker, &rh.stats.RestoreStats, rh.logger)
 
 			err = restoreHandler.run(ctx, readWorkers)
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			readers = []io.Reader{}
 		}
-	}(rh.errors)
+
+		return nil
+	})
 }
 
 // GetStats returns the stats of the restore job

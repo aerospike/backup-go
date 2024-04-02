@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -26,8 +27,10 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 )
 
 // **** Backup To Directory Handler ****
@@ -41,17 +44,25 @@ type BackupToDirectoryHandler struct {
 	config          *BackupToDirectoryConfig
 	aerospikeClient *a.Client
 	errors          chan error
+	logger          *slog.Logger
 	directory       string
+	id              string
 	stats           BackupToDirectoryStats
 }
 
 // newBackupToDirectoryHandler creates a new BackupToDirectoryHandler
 func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
-	ac *a.Client, directory string) *BackupToDirectoryHandler {
+	ac *a.Client, directory string, logger *slog.Logger) *BackupToDirectoryHandler {
+	id := uuid.NewString()
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackupDirectory)
+	logger.Debug("created new backup to directory handler", "directory", directory)
+
 	return &BackupToDirectoryHandler{
 		config:          config,
 		aerospikeClient: ac,
 		directory:       directory,
+		id:              id,
+		logger:          logger,
 	}
 }
 
@@ -60,22 +71,21 @@ func newBackupToDirectoryHandler(config *BackupToDirectoryConfig,
 func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
 
-	go func(errChan chan<- error) {
-		// NOTE: order is important here
-		// if we close the errChan before we handle the panic
-		// the panic will attempt to send on a closed channel
-		defer close(errChan)
-		defer handlePanic(errChan)
+	go doWork(bh.errors, bh.logger, func() error {
+		bh.logger.Debug("preparing backup directory", "directory", bh.directory)
 
 		err := prepareBackupDirectory(bh.directory)
 		if err != nil {
-			errChan <- err
-			return
+			return err
 		}
 
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
 
 		var (
+			// If we are using a file size limit,
+			// the writers will open new files as they hit the limit.
+			// Writers may be running in multiple threads, so we need to
+			// use atomics to keep track of the current file id.
 			fileID  atomic.Int32
 			encoder encoding.Encoder
 		)
@@ -83,33 +93,31 @@ func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 		for i := range bh.config.Parallel {
 			encoder, err = bh.config.EncoderFactory.CreateEncoder()
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			writer, err := makeBackupFile(bh.directory, bh.config.Namespace, encoder, bh.config.FileSizeLimit, &fileID)
 			if err != nil {
-				errChan <- err
-				return
+				return err
 			}
 
 			//nolint:gocritic // defer in loop is ok here,
 			// we want to close the file after the backup is done
-			defer writer.Close()
+			defer func() {
+				if err := writer.Close(); err != nil {
+					bh.logger.Error("failed to close backup file", "error", err)
+				}
+			}()
 
-			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer)
-			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats.BackupStats)
+			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
+			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats.BackupStats, bh.logger)
 			writeWorkers[i] = newWriteWorker(dataWriter)
 		}
 
-		handler := newBackupHandlerBase(&bh.config.BackupConfig, bh.aerospikeClient, bh.config.Namespace)
+		handler := newBackupHandlerBase(&bh.config.BackupConfig, bh.aerospikeClient, bh.config.Namespace, bh.logger)
 
-		err = handler.run(ctx, writeWorkers)
-		if err != nil {
-			errChan <- err
-			return
-		}
-	}(bh.errors)
+		return handler.run(ctx, writeWorkers)
+	})
 }
 
 // GetStats returns the stats of the backup job

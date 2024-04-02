@@ -19,14 +19,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/logging"
 )
 
 const (
-	minParallel = 1
-	maxParallel = 1024
+	// MinParallel is the minimum number of workers to use during an operation.
+	MinParallel = 1
+	// MaxParallel is the maximum number of workers to use during an operation.
+	MaxParallel = 1024
+	// MaxPartitions is the maximum number of partitions in an Aerospike cluster.
+	MaxPartitions = 4096
 )
 
 var (
@@ -36,19 +42,16 @@ var (
 
 // **** Client ****
 
-// Config contains configuration for the backup client
+// Config contains configuration for the backup client.
 type Config struct{}
 
-// NewConfig returns a new client Config
+// NewConfig returns a new client Config.
 func NewConfig() *Config {
 	return &Config{}
 }
 
-// Client is the main entry point for the backup package
-// It wraps an aerospike client and provides methods to start backup and restore operations
-// It contains a Config object that can be used to set default policies for the backup and restore operations
-// If the Policies field is nil, the aerospike client's default policies will be used
-// These policies will be used as defaults for any backup and restore operations started by the client
+// Client is the main entry point for the backup package.
+// It wraps an aerospike client and provides methods to start backup and restore operations.
 // Example usage:
 //
 //		asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
@@ -74,12 +77,16 @@ func NewConfig() *Config {
 type Client struct {
 	aerospikeClient *a.Client
 	config          *Config
+	logger          *slog.Logger
+	id              string
 }
 
-// NewClient creates a new backup client
-// ac is the aerospike client to use for backup and restore operations
-// config is the configuration for the backup client
-func NewClient(ac *a.Client, config *Config) (*Client, error) {
+// NewClient creates a new backup client.
+// ac is the aerospike client to use for backup and restore operations.
+// id is an identifier for the client.
+// logger is the logger that this client will log to.
+// config is the configuration for the backup client.
+func NewClient(ac *a.Client, id string, logger *slog.Logger, config *Config) (*Client, error) {
 	if config == nil {
 		config = NewConfig()
 	}
@@ -88,9 +95,17 @@ func NewClient(ac *a.Client, config *Config) (*Client, error) {
 		return nil, errors.New("aerospike client pointer is nil")
 	}
 
+	// qualify the logger with a backup lib group
+	logger = logger.WithGroup("backup")
+
+	// add a client group to the logger
+	logger = logging.WithClient(logger, id)
+
 	return &Client{
 		aerospikeClient: ac,
+		id:              id,
 		config:          config,
+		logger:          logger,
 	}, nil
 }
 
@@ -121,12 +136,12 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 // **** Backup ****
 
 // EncoderFactory is used to specify the encoder with which to encode the backup data
-// if nil, the default encoder factory will be used
+// if nil, the default encoder factory will be used.
 type EncoderFactory interface {
 	CreateEncoder() (encoding.Encoder, error)
 }
 
-// PartitionRange specifies a range of Aerospike partitions
+// PartitionRange specifies a range of Aerospike partitions.
 type PartitionRange struct {
 	Begin int
 	Count int
@@ -152,16 +167,16 @@ func (p PartitionRange) validate() error {
 	return nil
 }
 
-// BackupConfig contains configuration for the backup operation
+// BackupConfig contains configuration for the backup operation.
 type BackupConfig struct {
 	// EncoderFactory is used to specify the encoder with which to encode the backup data
-	// if nil, the default encoder factory will be used
+	// if nil, the default EncoderFactory will be used.
 	EncoderFactory EncoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
+	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
 	// ScanPolicy applies to Aerospike scan operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
+	// If nil, the Aerospike client's default policy will be used.
 	ScanPolicy *a.ScanPolicy
 	// Namespace is the Aerospike namespace to backup.
 	Namespace string
@@ -174,7 +189,7 @@ type BackupConfig struct {
 }
 
 func (c *BackupConfig) validate() error {
-	if c.Parallel < minParallel || c.Parallel > maxParallel {
+	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
 
@@ -186,7 +201,7 @@ func (c *BackupConfig) validate() error {
 	return nil
 }
 
-// NewBackupConfig returns a new BackupConfig with default values
+// NewBackupConfig returns a new BackupConfig with default values.
 func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
 		Partitions:     PartitionRange{0, MaxPartitions},
@@ -197,10 +212,10 @@ func NewBackupConfig() *BackupConfig {
 	}
 }
 
-// Backup starts a backup operation to a set of io.writers
-// ctx can be used to cancel the backup operation
-// writers is a set of io.writers to write the backup data to
-// config is the configuration for the backup operation
+// Backup starts a backup operation to a set of io.writers.
+// ctx can be used to cancel the backup operation.
+// writers is a set of io.writers to write the backup data to.
+// config is the configuration for the backup operation.
 func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *BackupConfig) (*BackupHandler, error) {
 	if config == nil {
 		config = NewBackupConfig()
@@ -217,13 +232,13 @@ func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *Backup
 		return nil, err
 	}
 
-	handler := newBackupHandler(config, c.aerospikeClient, writers)
+	handler := newBackupHandler(config, c.aerospikeClient, writers, c.logger)
 	handler.run(ctx)
 
 	return handler, nil
 }
 
-// BackupToDirectoryConfig contains configuration for the backup to directory operation
+// BackupToDirectoryConfig contains configuration for the backup to directory operation.
 type BackupToDirectoryConfig struct {
 	BackupConfig
 	// FileSizeLimit is the maximum size of each backup file in bytes.
@@ -234,7 +249,7 @@ type BackupToDirectoryConfig struct {
 	FileSizeLimit int64
 }
 
-// NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values
+// NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values.
 func NewBackupToDirectoryConfig() *BackupToDirectoryConfig {
 	return &BackupToDirectoryConfig{
 		BackupConfig: *NewBackupConfig(),
@@ -276,7 +291,7 @@ func (c *Client) BackupToDirectory(ctx context.Context,
 		return nil, err
 	}
 
-	handler := newBackupToDirectoryHandler(config, c.aerospikeClient, directory)
+	handler := newBackupToDirectoryHandler(config, c.aerospikeClient, directory, c.logger)
 	handler.run(ctx)
 
 	return handler, nil
@@ -285,35 +300,35 @@ func (c *Client) BackupToDirectory(ctx context.Context,
 // **** Restore ****
 
 // DecoderFactory is used to specify the decoder with which to decode the backup data
-// if nil, the default decoder factory will be used
+// if nil, the default decoder factory will be used.
 type DecoderFactory interface {
 	CreateDecoder(src io.Reader) (encoding.Decoder, error)
 }
 
-// RestoreConfig contains configuration for the restore operation
+// RestoreConfig contains configuration for the restore operation.
 type RestoreConfig struct {
 	// DecoderFactory is used to specify the decoder with which to decode the backup data
-	// if nil, the default decoder factory will be used
+	// if nil, the default DecoderFactory will be used.
 	DecoderFactory DecoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
+	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
 	// WritePolicy applies to Aerospike write operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used
+	// If nil, the Aerospike client's default policy will be used.
 	WritePolicy *a.WritePolicy
 	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.
 	Parallel int
 }
 
 func (c *RestoreConfig) validate() error {
-	if c.Parallel < minParallel || c.Parallel > maxParallel {
+	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
 
 	return nil
 }
 
-// NewRestoreConfig returns a new RestoreConfig with default values
+// NewRestoreConfig returns a new RestoreConfig with default values.
 func NewRestoreConfig() *RestoreConfig {
 	return &RestoreConfig{
 		Parallel:       4,
@@ -321,10 +336,10 @@ func NewRestoreConfig() *RestoreConfig {
 	}
 }
 
-// Restore starts a restore operation from a set of io.readers
-// ctx can be used to cancel the restore operation
-// readers is a set of io.readers to read the backup data from
-// config is the configuration for the restore operation
+// Restore starts a restore operation from a set of io.readers.
+// ctx can be used to cancel the restore operation.
+// readers is a set of io.readers to read the backup data from.
+// config is the configuration for the restore operation.
 func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *RestoreConfig) (*RestoreHandler, error) {
 	if config == nil {
 		config = NewRestoreConfig()
@@ -341,18 +356,18 @@ func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *Resto
 		return nil, err
 	}
 
-	handler := newRestoreHandler(config, c.aerospikeClient, readers)
+	handler := newRestoreHandler(config, c.aerospikeClient, readers, c.logger)
 	handler.run(ctx)
 
 	return handler, nil
 }
 
-// RestoreFromDirectoryConfig contains configuration for the restore from directory operation
+// RestoreFromDirectoryConfig contains configuration for the restore from directory operation.
 type RestoreFromDirectoryConfig struct {
 	RestoreConfig
 }
 
-// NewRestoreFromDirectoryConfig returns a new RestoreFromDirectoryConfig with default values
+// NewRestoreFromDirectoryConfig returns a new RestoreFromDirectoryConfig with default values.
 func NewRestoreFromDirectoryConfig() *RestoreFromDirectoryConfig {
 	return &RestoreFromDirectoryConfig{
 		RestoreConfig: *NewRestoreConfig(),
@@ -384,7 +399,7 @@ func (c *Client) RestoreFromDirectory(ctx context.Context,
 		return nil, err
 	}
 
-	handler := newRestoreFromDirectoryHandler(config, c.aerospikeClient, directory)
+	handler := newRestoreFromDirectoryHandler(config, c.aerospikeClient, directory, c.logger)
 	handler.run(ctx)
 
 	return handler, nil

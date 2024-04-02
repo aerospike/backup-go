@@ -17,6 +17,7 @@ package backup
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"math"
 	"reflect"
 	"sync"
@@ -206,6 +207,11 @@ func TestProcessorTTL_Process(t *testing.T) {
 
 	mockStatsSetterNoExpectedCalls := newMockStatsSetterExpired(t)
 
+	key, aerr := a.NewKey("test", "test", "test")
+	if aerr != nil {
+		t.Fatal(aerr)
+	}
+
 	type fields struct {
 		getNow func() cltime.CLTime
 		stats  statsSetterExpired
@@ -232,7 +238,9 @@ func TestProcessorTTL_Process(t *testing.T) {
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
 					Record: models.Record{
-						Record:   &a.Record{},
+						Record: &a.Record{
+							Key: key,
+						},
 						VoidTime: 100,
 					},
 				},
@@ -251,7 +259,9 @@ func TestProcessorTTL_Process(t *testing.T) {
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
 					Record: models.Record{
-						Record:   &a.Record{},
+						Record: &a.Record{
+							Key: key,
+						},
 						VoidTime: 100,
 					},
 				},
@@ -288,7 +298,9 @@ func TestProcessorTTL_Process(t *testing.T) {
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
 					Record: models.Record{
-						Record:   &a.Record{},
+						Record: &a.Record{
+							Key: key,
+						},
 						VoidTime: 100,
 					},
 				},
@@ -298,6 +310,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				Record: models.Record{
 					Record: &a.Record{
 						Expiration: 50,
+						Key:        key,
 					},
 					VoidTime: 100,
 				},
@@ -316,7 +329,9 @@ func TestProcessorTTL_Process(t *testing.T) {
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
 					Record: models.Record{
-						Record:   &a.Record{},
+						Record: &a.Record{
+							Key: key,
+						},
 						VoidTime: models.VoidTimeNeverExpire,
 					},
 				},
@@ -326,6 +341,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 				Record: models.Record{
 					Record: &a.Record{
 						Expiration: models.ExpirationNever,
+						Key:        key,
 					},
 					VoidTime: models.VoidTimeNeverExpire,
 				},
@@ -344,7 +360,9 @@ func TestProcessorTTL_Process(t *testing.T) {
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
 					Record: models.Record{
-						Record:   &a.Record{},
+						Record: &a.Record{
+							Key: key,
+						},
 						VoidTime: math.MaxInt64,
 					},
 				},
@@ -363,7 +381,9 @@ func TestProcessorTTL_Process(t *testing.T) {
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
 					Record: models.Record{
-						Record:   &a.Record{},
+						Record: &a.Record{
+							Key: key,
+						},
 						VoidTime: math.MaxInt64,
 					},
 				},
@@ -376,6 +396,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			p := &processorTTL{
 				getNow: tt.fields.getNow,
 				stats:  tt.fields.stats,
+				logger: slog.Default(),
 			}
 			got, err := p.Process(tt.args.token)
 			if (err != nil) != tt.wantErr {

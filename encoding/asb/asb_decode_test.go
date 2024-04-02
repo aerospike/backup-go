@@ -24,10 +24,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aerospike/backup-go/models"
-
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
+	"github.com/aerospike/backup-go/models"
 	"github.com/google/go-cmp/cmp"
 )
 

@@ -19,11 +19,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/models"
+	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 )
 
 // **** Write Worker ****
@@ -93,19 +95,26 @@ type statsSetterToken interface {
 }
 
 type tokenStatsWriter struct {
-	dataWriter[*models.Token]
-	stats statsSetterToken
+	writer dataWriter[*models.Token]
+	stats  statsSetterToken
+	logger *slog.Logger
 }
 
-func newWriterWithTokenStats(writer dataWriter[*models.Token], stats statsSetterToken) *tokenStatsWriter {
+func newWriterWithTokenStats(writer dataWriter[*models.Token],
+	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter {
+	id := uuid.NewString()
+	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
+	logger.Debug("created new token stats writer")
+
 	return &tokenStatsWriter{
-		dataWriter: writer,
-		stats:      stats,
+		writer: writer,
+		stats:  stats,
+		logger: logger,
 	}
 }
 
 func (tw *tokenStatsWriter) Write(data *models.Token) error {
-	err := tw.dataWriter.Write(data)
+	err := tw.writer.Write(data)
 	if err != nil {
 		return err
 	}
@@ -124,6 +133,11 @@ func (tw *tokenStatsWriter) Write(data *models.Token) error {
 	return nil
 }
 
+func (tw *tokenStatsWriter) Close() {
+	tw.logger.Debug("closed token stats writer")
+	tw.writer.Close()
+}
+
 // **** Token Writer ****
 
 // tokenWriter satisfies the DataWriter interface
@@ -132,13 +146,19 @@ func (tw *tokenStatsWriter) Write(data *models.Token) error {
 type tokenWriter struct {
 	encoder encoding.Encoder
 	output  io.Writer
+	logger  *slog.Logger
 }
 
 // newTokenWriter creates a new tokenWriter
-func newTokenWriter(encoder encoding.Encoder, output io.Writer) *tokenWriter {
+func newTokenWriter(encoder encoding.Encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
+	id := uuid.NewString()
+	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
+	logger.Debug("created new token writer")
+
 	return &tokenWriter{
 		encoder: encoder,
 		output:  output,
+		logger:  logger,
 	}
 }
 
@@ -156,7 +176,9 @@ func (w *tokenWriter) Write(v *models.Token) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the tokenWriter
-func (w *tokenWriter) Close() {}
+func (w *tokenWriter) Close() {
+	w.logger.Debug("closed token writer")
+}
 
 // **** Aerospike Restore Writer ****
 
@@ -174,13 +196,19 @@ type dbWriter interface {
 type restoreWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
+	logger      *slog.Logger
 }
 
 // newRestoreWriter creates a new RestoreWriter
-func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy) *restoreWriter {
+func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, logger *slog.Logger) *restoreWriter {
+	id := uuid.NewString()
+	logger = logging.WithWriter(logger, id, logging.WriterTypeRestore)
+	logger.Debug("created new restore writer")
+
 	return &restoreWriter{
 		asc:         asc,
 		writePolicy: writePolicy,
+		logger:      logger,
 	}
 }
 
@@ -189,7 +217,7 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy) *restoreWriter {
 func (rw *restoreWriter) Write(data *models.Token) error {
 	switch data.Type {
 	case models.TokenTypeRecord:
-		return rw.asc.Put(rw.writePolicy, data.Record.Key, data.Record.Bins)
+		return rw.writeRecord(&data.Record)
 	case models.TokenTypeUDF:
 		return rw.writeUDF(data.UDF)
 	case models.TokenTypeSIndex:
@@ -199,6 +227,15 @@ func (rw *restoreWriter) Write(data *models.Token) error {
 	default:
 		return errors.New("unsupported token type")
 	}
+}
+
+func (rw *restoreWriter) writeRecord(record *models.Record) error {
+	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
+	if aerr != nil {
+		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)
+	}
+
+	return aerr
 }
 
 // writeSecondaryIndex writes a secondary index to Aerospike
@@ -252,4 +289,6 @@ func (rw *restoreWriter) writeUDF(_ *models.UDF) error {
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter
-func (rw *restoreWriter) Close() {}
+func (rw *restoreWriter) Close() {
+	rw.logger.Debug("closed restore writer")
+}

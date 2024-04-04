@@ -18,8 +18,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -35,7 +37,7 @@ func main() {
 
 	backupClientConfig := backup.NewConfig()
 
-	backupClient, err := backup.NewClient(aerospikeClient, backupClientConfig)
+	backupClient, err := backup.NewClient(aerospikeClient, "client_id", slog.Default(), backupClientConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -47,8 +49,8 @@ func main() {
 		go func(i int) {
 			defer backupWaitGroup.Done()
 
-			fname := "file" + string(i)
-			file, err := os.Open(fname)
+			fname := fmt.Sprintf("file%d.abs", i)
+			file, err := os.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 			if err != nil {
 				panic(err)
 			}
@@ -84,7 +86,7 @@ func main() {
 		go func(i int) {
 			defer restoreWaitGroup.Done()
 
-			fname := "file" + string(i)
+			fname := fmt.Sprintf("file%d.abs", i)
 			file, err := os.Open(fname)
 			if err != nil {
 				panic(err)

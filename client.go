@@ -59,7 +59,7 @@ func NewConfig() *Config {
 //			// handle error
 //		}
 //		backupCFG := backup.NewConfig()	// create a backup config
-//		backupClient, err := backup.NewClient(asc, backupCFG)	// create a backup client
+//		backupClient, err := backup.NewClient(asc, "id", nil, backupCFG)	// create a backup client
 //		if err != nil {
 //			// handle error
 //		}

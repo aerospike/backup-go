@@ -87,12 +87,16 @@ type Client struct {
 // logger is the logger that this client will log to.
 // config is the configuration for the backup client.
 func NewClient(ac *a.Client, id string, logger *slog.Logger, config *Config) (*Client, error) {
-	if config == nil {
-		config = NewConfig()
-	}
-
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
+	}
+
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	if config == nil {
+		config = NewConfig()
 	}
 
 	// qualify the logger with a backup lib group

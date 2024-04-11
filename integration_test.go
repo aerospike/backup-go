@@ -18,12 +18,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/aerospike/backup-go"
 	"io"
 	"log/slog"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	backup "github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
@@ -313,7 +313,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 
 func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	backupConfig *backup.BackupToDirectoryConfig,
-	restoreConfig *backup.RestoreFromDirectoryConfig,
+	restoreConfig *backup.RestoreConfig,
 	bins a.BinMap) {
 	numRec := 1000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
@@ -327,7 +327,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	backupDir := suite.T().TempDir()
 
-	bh, err := suite.backupClient.BackupToDirectory(
+	bh, err := suite.backupClient.BackupGeneric(
 		ctx,
 		backupDir,
 		backupConfig,
@@ -350,10 +350,10 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		suite.FailNow(err.Error())
 	}
 
-	rh, err := suite.backupClient.RestoreFromDirectory(
+	rh, err := suite.backupClient.RestoreGeneric(
 		ctx,
-		backupDir,
 		restoreConfig,
+		nil,
 	)
 	suite.Nil(err)
 

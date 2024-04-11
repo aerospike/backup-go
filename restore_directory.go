@@ -15,17 +15,11 @@
 package backup
 
 import (
-	"bufio"
 	"context"
-	"errors"
-	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
@@ -40,28 +34,27 @@ type RestoreFromDirectoryStats struct {
 
 // RestoreFromDirectoryHandler handles a restore job from a directory
 type RestoreFromDirectoryHandler struct {
-	config          *RestoreFromDirectoryConfig
+	config          *RestoreConfig
 	aerospikeClient *a.Client
 	errors          chan error
 	logger          *slog.Logger
-	directory       string
 	id              string
 	stats           RestoreFromDirectoryStats
+	readerFactory   ReaderFactory
 }
 
 // newRestoreFromDirectoryHandler creates a new RestoreFromDirectoryHandler
-func newRestoreFromDirectoryHandler(config *RestoreFromDirectoryConfig,
-	ac *a.Client, directory string, logger *slog.Logger) *RestoreFromDirectoryHandler {
+func newRestoreFromDirectoryHandler(config *RestoreConfig,
+	ac *a.Client, logger *slog.Logger, readerFactory ReaderFactory) *RestoreFromDirectoryHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
-	logger.Debug("created new restore directory handler", "directory", directory)
 
 	return &RestoreFromDirectoryHandler{
 		config:          config,
 		aerospikeClient: ac,
-		directory:       directory,
 		id:              id,
 		logger:          logger,
+		readerFactory:   readerFactory,
 	}
 }
 
@@ -74,55 +67,40 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 		// check that the restore directory is valid
 		// open the directory
 		// read the files rrh.config.Parallel at a time
-		// create a buffered reader for each file
+		// create a buffered reader for each reader
 		// hand the readers to a restore handler and run it
 		// wait for the restore handler to finish
 		// if there are more files, continue to the next batch
 		// if there are no more files, return
-		rh.logger.Debug("checking restore directory", "directory", rh.directory)
 
-		err := checkRestoreDirectory(rh.directory, rh.config.DecoderFactory)
+		readers, err := rh.readerFactory.Readers()
 		if err != nil {
 			return err
 		}
-
-		fileInfo, err := os.ReadDir(rh.directory)
-		if err != nil {
-			return fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, rh.directory, err)
-		}
-
 		batchSize := rh.config.Parallel
-		readers := []io.Reader{}
 
-		for i, file := range fileInfo {
-			filePath := filepath.Join(rh.directory, file.Name())
-
-			reader, err := os.Open(filePath)
-			if err != nil {
-				return fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
-			}
-
+		var readersBuffer []io.Reader
+		for i, reader := range readers {
 			//nolint:gocritic // defer in loop is ok here
 			// we want to close the readers after the restore is done
 			defer func() {
 				if err := reader.Close(); err != nil {
-					rh.logger.Error("failed to close backup file", "file", filePath, "error", err)
+					rh.logger.Error("failed to close backup reader", "error", err)
 				}
 			}()
 
-			// buffer the reader to save memory
-			readers = append(readers, bufio.NewReader(reader))
+			readersBuffer = append(readersBuffer, reader)
 
 			// if we have not reached the batch size and we have more readers
 			// continue to the next reader
 			// if we are at the end of readers then run no matter what
-			if i < len(fileInfo)-1 && len(readers) < batchSize {
+			if i < len(readersBuffer)-1 && len(readersBuffer) < batchSize {
 				continue
 			}
 
-			readWorkers := make([]*readWorker[*models.Token], len(readers))
+			readWorkers := make([]*readWorker[*models.Token], len(readersBuffer))
 
-			for i, reader := range readers {
+			for i, reader := range readersBuffer {
 				decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
 				if err != nil {
 					return err
@@ -134,7 +112,7 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 			}
 
 			restoreWorker := newWorkHandler()
-			restoreHandler := newRestoreHandlerBase(&rh.config.RestoreConfig,
+			restoreHandler := newRestoreHandlerBase(rh.config,
 				rh.aerospikeClient, restoreWorker, &rh.stats.RestoreStats, rh.logger)
 
 			err = restoreHandler.run(ctx, readWorkers)
@@ -142,7 +120,7 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 				return err
 			}
 
-			readers = []io.Reader{}
+			readersBuffer = []io.Reader{}
 		}
 
 		return nil
@@ -162,70 +140,4 @@ func (rh *RestoreFromDirectoryHandler) Wait(ctx context.Context) error {
 	case err := <-rh.errors:
 		return err
 	}
-}
-
-// **** Helper Functions ****
-
-var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
-
-// checkRestoreDirectory checks that the restore directory exists,
-// is a readable directory, and contains backup files of the correct format
-func checkRestoreDirectory(dir string, decoding DecoderFactory) error {
-	dirInfo, err := os.Stat(dir)
-	if err != nil {
-		// Handle the error
-		return fmt.Errorf("%w: failed to read %s: %w", ErrRestoreDirectoryInvalid, dir, err)
-	}
-
-	if !dirInfo.IsDir() {
-		// Handle the case when it's not a directory
-		return fmt.Errorf("%w: %s is not a directory", ErrRestoreDirectoryInvalid, dir)
-	}
-
-	fileInfo, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("%w: failed to read %s: %w", ErrRestoreDirectoryInvalid, dir, err)
-	}
-
-	// Check if the directory is empty
-	if len(fileInfo) == 0 {
-		return fmt.Errorf("%w: %s is empty", ErrRestoreDirectoryInvalid, dir)
-	}
-
-	if err := filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("%w: failed reading restore file %s in %s: %v", ErrRestoreDirectoryInvalid, d.Name(), dir, err)
-		}
-
-		// this function gets called on the directory itself
-		// we only want to check nested files so skip the root
-		if d.Name() == filepath.Base(dir) {
-			return nil
-		}
-
-		if d.IsDir() {
-			return fmt.Errorf("%w: found directory %s in %s", ErrRestoreDirectoryInvalid, d.Name(), dir)
-		}
-
-		return verifyBackupFileExtension(d.Name(), decoding)
-	}); err != nil {
-		if errors.Is(err, ErrRestoreDirectoryInvalid) {
-			return err
-		}
-
-		return fmt.Errorf("%w: failed to read %s: %v", ErrRestoreDirectoryInvalid, dir, err)
-	}
-
-	return nil
-}
-
-func verifyBackupFileExtension(fileName string, decoder DecoderFactory) error {
-	if _, ok := decoder.(*encoding.ASBDecoderFactory); ok {
-		if filepath.Ext(fileName) != ".asb" {
-			return fmt.Errorf("%w, restore file %s is in an invalid format, expected extension: .asb, got: %s",
-				ErrRestoreDirectoryInvalid, fileName, filepath.Ext(fileName))
-		}
-	}
-
-	return nil
 }

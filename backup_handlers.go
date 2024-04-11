@@ -35,17 +35,14 @@ type backupHandlerBase struct {
 	config          *BackupConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
-	namespace       string
 }
 
-func newBackupHandlerBase(config *BackupConfig, ac *a.Client,
-	namespace string, logger *slog.Logger) *backupHandlerBase {
+func newBackupHandlerBase(config *BackupConfig, ac *a.Client, logger *slog.Logger) *backupHandlerBase {
 	logger.Debug("created new backup base handler")
 
 	wh := newWorkHandler()
 
 	handler := &backupHandlerBase{
-		namespace:       namespace,
 		config:          config,
 		aerospikeClient: ac,
 		worker:          *wh,
@@ -55,6 +52,7 @@ func newBackupHandlerBase(config *BackupConfig, ac *a.Client,
 	return handler
 }
 
+// TODO: deprecated?
 func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
@@ -78,7 +76,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 
 	for i := 0; i < bh.config.Parallel; i++ {
 		ARRCFG := arrConfig{
-			Namespace:      bh.namespace,
+			Namespace:      bh.config.Namespace,
 			Set:            bh.config.Set,
 			FirstPartition: partitionRanges[i].Begin,
 			NumPartitions:  partitionRanges[i].Count,
@@ -137,8 +135,7 @@ func newBackupHandler(config *BackupConfig, ac *a.Client, writers []io.Writer, l
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup)
 	logger.Debug("created new backup handler")
 
-	namespace := config.Namespace
-	backupHandler := newBackupHandlerBase(config, ac, namespace, logger)
+	backupHandler := newBackupHandlerBase(config, ac, logger)
 
 	return &BackupHandler{
 		config:            config,

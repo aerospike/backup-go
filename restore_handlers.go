@@ -156,7 +156,7 @@ func (rrh *RestoreHandler) run(ctx context.Context) {
 
 	go doWork(rrh.errors, rrh.logger, func() error {
 		batchSize := rrh.config.Parallel
-		dataReaders := []*readWorker[*models.Token]{}
+		readWorkers := []*readWorker[*models.Token]{}
 
 		for i, reader := range rrh.readers {
 			decoder, err := rrh.config.DecoderFactory.CreateDecoder(reader)
@@ -165,21 +165,21 @@ func (rrh *RestoreHandler) run(ctx context.Context) {
 			}
 
 			dr := newTokenReader(decoder, rrh.logger)
-			readWorker := newReadWorker(dr)
-			dataReaders = append(dataReaders, readWorker)
+			worker := newReadWorker(dr)
+			readWorkers = append(readWorkers, worker)
 			// if we have not reached the batch size and we have more readers
 			// continue to the next reader
 			// if we are at the end of readers then run no matter what
-			if i < len(rrh.readers)-1 && len(dataReaders) < batchSize {
+			if i < len(rrh.readers)-1 && len(readWorkers) < batchSize {
 				continue
 			}
 
-			err = rrh.restoreHandlerBase.run(ctx, dataReaders)
+			err = rrh.restoreHandlerBase.run(ctx, readWorkers)
 			if err != nil {
 				return err
 			}
 
-			clear(dataReaders)
+			readWorkers = []*readWorker[*models.Token]{}
 		}
 
 		return nil

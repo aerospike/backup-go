@@ -26,6 +26,8 @@ import (
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
+
+	atypes "github.com/aerospike/aerospike-client-go/v7/types"
 )
 
 // **** Write Worker ****
@@ -188,6 +190,8 @@ func (w *tokenWriter) Close() {
 //go:generate mockery --name dbWriter
 type dbWriter interface {
 	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
+	CreateComplexIndex(policy *a.WritePolicy, namespace, set, indexName, binName string, indexType a.IndexType, indexCollectionType a.IndexCollectionType, ctx ...*a.CDTContext) (*a.IndexTask, a.Error)
+	DropIndex(policy *a.WritePolicy, namespace, set, indexName string) a.Error
 }
 
 // restoreWriter satisfies the DataWriter interface
@@ -241,32 +245,84 @@ func (rw *restoreWriter) writeRecord(record *models.Record) error {
 // writeSecondaryIndex writes a secondary index to Aerospike
 // TODO check that this does not overwrite existing sindexes
 // TODO support write policy
-func (rw *restoreWriter) writeSecondaryIndex(_ *models.SIndex) error {
-	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
-	//nolint:gocritic // this code will be used to support SIndex backup
-	// var sindexType a.IndexType
-	// switch si.Path.BinType {
-	// case models.NumericSIDataType:
-	// 	sindexType = a.NUMERIC
-	// case models.StringSIDataType:
-	// 	sindexType = a.STRING
-	// case models.BlobSIDataType:
-	// 	sindexType = a.BLOB
-	// case models.GEO2DSphereSIDataType:
-	// 	sindexType = a.GEO2DSPHERE
-	// default:
-	// 	return nil
-	// }
+func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
+	var sindexType a.IndexType
+	switch si.Path.BinType {
+	case models.NumericSIDataType:
+		sindexType = a.NUMERIC
+	case models.StringSIDataType:
+		sindexType = a.STRING
+	case models.BlobSIDataType:
+		sindexType = a.BLOB
+	case models.GEO2DSphereSIDataType:
+		sindexType = a.GEO2DSPHERE
+	default:
+		return fmt.Errorf("invalid sindex bin type: %c", si.Path.BinType)
+	}
 
-	//nolint:gocritic // this code will be used to support SIndex backup
-	// binName := si.Path.BinName
-	// _, err := rw.asc.CreateIndex(nil, si.Namespace, si.Set, si.Name, binName, sindexType)
+	var sindexCollectionType a.IndexCollectionType
+	switch si.IndexType {
+	case models.BinSIndex:
+		sindexCollectionType = a.ICT_DEFAULT
+	case models.ListElementSIndex:
+		sindexCollectionType = a.ICT_LIST
+	case models.MapKeySIndex:
+		sindexCollectionType = a.ICT_MAPKEYS
+	case models.MapValueSIndex:
+		sindexCollectionType = a.ICT_MAPVALUES
+	default:
+		return fmt.Errorf("invalid sindex collection type: %c", si.IndexType)
+	}
 
-	// switch {
-	// case err.Matches(atypes.INDEX_FOUND):
-	// 	//TODO compare sindexes
-	// }
-} //nolint:wsl // comments need to be kept and should not trigger whitespace warnings
+	var ctx []*a.CDTContext
+	if si.Path.B64Context != "" {
+		var err error
+		ctx, err = a.Base64ToCDTContext(si.Path.B64Context)
+		if err != nil {
+			rw.logger.Error("error decoding sindex context", "context", si.Path.B64Context, "error", err)
+			return err
+		}
+	}
+
+	job, err := rw.asc.CreateComplexIndex(nil, si.Namespace, si.Set, si.Name, si.Path.BinName, sindexType, sindexCollectionType, ctx...)
+	if err != nil {
+		// if the sindex already exists, replace it because
+		// the seconday index may have changed since the backup was taken
+		if err.Matches(atypes.INDEX_FOUND) {
+			rw.logger.Debug("index already exists, replacing it", "index", si.Name)
+			err = rw.asc.DropIndex(nil, si.Namespace, si.Set, si.Name)
+			if err != nil {
+				rw.logger.Error("error dropping sindex", "sindex", si.Name, "error", err)
+				return err
+			}
+
+			job, err = rw.asc.CreateComplexIndex(nil, si.Namespace, si.Set, si.Name, si.Path.BinName, sindexType, sindexCollectionType, ctx...)
+			if err != nil {
+				rw.logger.Error("error creating replacement sindex", "sindex", si.Name, "error", err)
+				return err
+			}
+		} else {
+			rw.logger.Error("error creating sindex", "sindex", si.Name, "error", err)
+			return err
+		}
+	}
+
+	if job == nil {
+		rw.logger.Debug("error creating sindex, job is nil", "sindex", si.Name)
+		return fmt.Errorf("error creating sindex: job is nil")
+	}
+
+	errs := job.OnComplete()
+	err = <-errs
+	if err != nil {
+		rw.logger.Error("error creating sindex", "sindex", si.Name, "error", err)
+		return err
+	}
+
+	rw.logger.Debug("created sindex", "sindex", si.Name)
+
+	return nil
+}
 
 // writeUDF writes a UDF to Aerospike
 // TODO check that this does not overwrite existing UDFs

@@ -29,7 +29,7 @@ import (
 	testresources "github.com/aerospike/backup-go/internal/testutils"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/testutils"
-	"github.com/stretchr/testify/suite"
+	testSutie "github.com/stretchr/testify/suite"
 )
 
 const (
@@ -64,7 +64,7 @@ var testBins = a.BinMap{
 }
 
 type backupRestoreTestSuite struct {
-	suite.Suite
+	testSutie.Suite
 	aerospikeIP       string
 	aerospikePort     int
 	aerospikePassword string
@@ -74,6 +74,7 @@ type backupRestoreTestSuite struct {
 	Aeroclient        *a.Client
 	testClient        *testresources.TestClient
 	backupClient      *backup.Client
+	expectedSIndexes  []*models.SIndex
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -104,6 +105,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 		{Code: a.Write},
 		{Code: a.Truncate},
 		{Code: a.UserAdmin},
+		{Code: a.SIndexAdmin},
 	}
 
 	aerr = asc.CreateRole(nil, "testBackup", privs, nil, 0, 0)
@@ -228,7 +230,12 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 
 	err := suite.testClient.WriteRecords(expectedRecs)
 	if err != nil {
-		panic(err)
+		suite.FailNow(err.Error())
+	}
+
+	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
+	if err != nil {
+		suite.FailNow(err.Error())
 	}
 
 	ctx := context.Background()
@@ -264,6 +271,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	suite.Nil(err)
 
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
+	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
@@ -323,6 +331,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		panic(err)
 	}
 
+	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
@@ -364,9 +377,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Nil(err)
 
 	suite.Equal(uint64(numRec), statsRestore.GetRecords())
-	suite.Equal(uint32(0), statsRestore.GetSIndexes())
+	suite.Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Equal(uint32(0), statsRestore.GetUDFs())
 	suite.Equal(uint64(0), statsRestore.GetRecordsExpired())
+
+	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
@@ -573,7 +588,7 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 }
 
 func TestBackupRestoreTestSuite(t *testing.T) {
-	testSuite := backupRestoreTestSuite{
+	ts := backupRestoreTestSuite{
 		aerospikeIP:       testutils.IP,
 		aerospikePort:     testutils.PortStart,
 		aerospikePassword: testutils.Password,
@@ -582,5 +597,97 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 		set:               "",
 	}
 
-	suite.Run(t, &testSuite)
+	listCtx, _ := a.CDTContextToBase64([]*a.CDTContext{a.CtxListValue(a.NewValue([]byte("hi")))})
+	mapKeyCTX, _ := a.CDTContextToBase64([]*a.CDTContext{a.CtxMapKey(a.NewValue(1))})
+	mapValueCTX, _ := a.CDTContextToBase64([]*a.CDTContext{a.CtxMapValue(a.NewValue("hi"))})
+
+	expectedSIndexes := []*models.SIndex{
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "IntBinIndex",
+			IndexType: models.BinSIndex,
+			Path: models.SIndexPath{
+				BinName: "IntBin",
+				BinType: models.NumericSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "StringBinIndex",
+			IndexType: models.BinSIndex,
+			Path: models.SIndexPath{
+				BinName: "StringBin",
+				BinType: models.StringSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "ListBinIndex",
+			IndexType: models.ListElementSIndex,
+			Path: models.SIndexPath{
+				BinName: "ListBin",
+				BinType: models.NumericSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "MapBinIndex",
+			IndexType: models.MapKeySIndex,
+			Path: models.SIndexPath{
+				BinName: "MapBin",
+				BinType: models.StringSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "GeoJSONBinIndex",
+			IndexType: models.BinSIndex,
+			Path: models.SIndexPath{
+				BinName: "GeoJSONBin",
+				BinType: models.GEO2DSphereSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "ListElemBinIndex",
+			IndexType: models.ListElementSIndex,
+			Path: models.SIndexPath{
+				BinName:    "ListBin",
+				BinType:    models.BlobSIDataType,
+				B64Context: listCtx,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "MapKeyBinIndex",
+			IndexType: models.MapKeySIndex,
+			Path: models.SIndexPath{
+				BinName:    "MapBin",
+				BinType:    models.NumericSIDataType,
+				B64Context: mapKeyCTX,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "MapValBinIndex",
+			IndexType: models.MapValueSIndex,
+			Path: models.SIndexPath{
+				BinName:    "MapBin",
+				BinType:    models.StringSIDataType,
+				B64Context: mapValueCTX,
+			},
+		},
+	}
+
+	ts.expectedSIndexes = expectedSIndexes
+
+	testSutie.Run(t, &ts)
 }

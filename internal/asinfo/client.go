@@ -87,6 +87,7 @@ func NewInfoClientFromAerospike(aeroClient *a.Client, policy *a.InfoPolicy) (*In
 	if err != nil {
 		return nil, err
 	}
+
 	return NewInfoClient(node, policy), nil
 }
 

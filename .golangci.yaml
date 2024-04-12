@@ -27,7 +27,6 @@ linters:
     - dupl
     - errcheck
     - exportloopref
-    - exhaustive
     - goconst
     - gocritic
     - gofmt

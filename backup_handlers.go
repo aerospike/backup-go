@@ -225,7 +225,13 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
-func backupSIndexes(ctx context.Context, ac *a.Client, config *BackupConfig, writer io.Writer, logger *slog.Logger) error {
+func backupSIndexes(
+	ctx context.Context,
+	ac *a.Client,
+	config *BackupConfig,
+	writer io.Writer,
+	logger *slog.Logger,
+) error {
 	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
 	if err != nil {
 		return err

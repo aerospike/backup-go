@@ -17,6 +17,7 @@ clean:
 	rm -f mock_statsSetterToken.go
 	rm -f mock_statsSetterExpired.go
 	rm -rf encoding/mocks
+	rm -rf internal/asinfo/mocks
 
 .PHONY: test_deps
 test_deps: mocks

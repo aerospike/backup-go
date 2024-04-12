@@ -40,6 +40,7 @@ type RecordMap map[digest]*a.Record
 // NewTestClient creates a new TestClient.
 func NewTestClient(asc *a.Client) *TestClient {
 	infoPolicy := a.NewInfoPolicy()
+
 	infoClient, err := asinfo.NewInfoClientFromAerospike(asc, infoPolicy)
 	if err != nil {
 		panic(err)
@@ -54,8 +55,8 @@ func NewTestClient(asc *a.Client) *TestClient {
 // WriteSIndex writes a secondary index to the database.
 func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 	for _, sindex := range sindexes {
-
 		var sindexType a.IndexType
+
 		switch sindex.Path.BinType {
 		case models.NumericSIDataType:
 			sindexType = a.NUMERIC
@@ -70,6 +71,7 @@ func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 		}
 
 		var sindexCollectionType a.IndexCollectionType
+
 		switch sindex.IndexType {
 		case models.BinSIndex:
 			sindexCollectionType = a.ICT_DEFAULT
@@ -84,8 +86,10 @@ func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 		}
 
 		var ctx []*a.CDTContext
+
 		if sindex.Path.B64Context != "" {
 			var err error
+
 			ctx, err = a.Base64ToCDTContext(sindex.Path.B64Context)
 			if err != nil {
 				return err
@@ -107,11 +111,13 @@ func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 		}
 
 		errs := task.OnComplete()
+
 		err = <-errs
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 

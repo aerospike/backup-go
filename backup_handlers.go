@@ -21,6 +21,7 @@ import (
 
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -174,6 +175,19 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 				}
 			}
 
+			// backup secondary indexes on the first writer
+			// this is done to match the behavior of the
+			// backup c tool and keep the backup files more consistent
+			// at some point we may want to treat the secondary indexes
+			// like records and back them up as part of the same pipeline
+			// but doing so would cause them to be mixed in with records in the backup file(s)
+			if i == 0 {
+				err = backupSIndexes(ctx, bwh.aerospikeClient, bwh.config, writer, bwh.logger)
+				if err != nil {
+					return err
+				}
+			}
+
 			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bwh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bwh.stats, bwh.logger)
 			worker := newWriteWorker(dataWriter)
@@ -210,4 +224,34 @@ func (bwh *BackupHandler) Wait(ctx context.Context) error {
 	case err := <-bwh.errors:
 		return err
 	}
+}
+
+func backupSIndexes(ctx context.Context, ac *a.Client, config *BackupConfig, writer io.Writer, logger *slog.Logger) error {
+	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
+	if err != nil {
+		return err
+	}
+
+	sindexReader := newSIndexReader(infoClient, config.Namespace, logger)
+	sindexReadWorker := newReadWorker(sindexReader)
+
+	sindexEncoder, err := config.EncoderFactory.CreateEncoder()
+	if err != nil {
+		return err
+	}
+
+	sindexWriter := newTokenWriter(sindexEncoder, writer, logger)
+	sindexWriteWorker := newWriteWorker(sindexWriter)
+
+	sindexPipeline := pipeline.NewPipeline[*models.Token](
+		[]pipeline.Worker[*models.Token]{sindexReadWorker},
+		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
+	)
+
+	err = sindexPipeline.Run(ctx)
+	if err != nil {
+		logger.Error("failed to backup secondary indexes: %v", err)
+	}
+
+	return err
 }

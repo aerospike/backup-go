@@ -109,6 +109,19 @@ func (bh *BackupToDirectoryHandler) run(ctx context.Context) {
 				}
 			}()
 
+			// backup secondary indexes on the first writer
+			// this is done to match the behavior of the
+			// backup c tool and keep the backup files more consistent
+			// at some point we may want to treat the secondary indexes
+			// like records and back them up as part of the same pipeline
+			// but doing so would cause them to be mixed in with records in the backup file(s)
+			if i == 0 {
+				err = backupSIndexes(ctx, bh.aerospikeClient, &bh.config.BackupConfig, writer, bh.logger)
+				if err != nil {
+					return err
+				}
+			}
+
 			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats.BackupStats, bh.logger)
 			writeWorkers[i] = newWriteWorker(dataWriter)

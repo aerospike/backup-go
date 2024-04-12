@@ -20,6 +20,7 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+    - gci
     - bodyclose
     - unused
     - dogsled
@@ -71,6 +72,7 @@ issues:
       - dupl
       - goconst # Many test cases are small and have repeated strings that don't need to be constants
       - wsl # Test code should be allowed to cuddle if statements, generated tests do this
+      - lll # Test data is often long and can make less sense when wrapped
     - path: '(.+)test\.go'
       text: importShadow
     - path: '(.+)test\.go' # Test code doesn't need crypto strength random numbers

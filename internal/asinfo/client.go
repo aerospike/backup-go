@@ -114,7 +114,7 @@ func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*mo
 		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
 
-	getCtx := version.IsGreater(supportsSIndexCTX) || version == supportsSIndexCTX
+	getCtx := version.IsGreaterOrEqual(supportsSIndexCTX)
 	cmd := buildSindexCmd(namespace, getCtx)
 
 	response, err := node.RequestInfo(policy, cmd)

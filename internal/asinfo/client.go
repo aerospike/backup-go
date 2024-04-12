@@ -29,7 +29,7 @@ const (
 	defaultTimeout = time.Second * 2
 )
 
-var aerospikeVersionRegex = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+var aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
 
 type AerospikeVersion struct {
 	Major int

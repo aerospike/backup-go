@@ -94,7 +94,10 @@ func NewInfoClient(cg infoGetter, opts *a.InfoPolicy) *InfoClient {
 }
 
 func NewInfoClientFromAerospike(aeroClient *a.Client, opts *a.InfoPolicy) (*InfoClient, error) {
-	node := aeroClient.GetNodes()[0]
+	node, err := aeroClient.Cluster().GetRandomNode()
+	if err != nil {
+		return nil, err
+	}
 	return NewInfoClient(node, opts), nil
 }
 

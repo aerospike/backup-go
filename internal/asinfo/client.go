@@ -19,14 +19,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/models"
-)
-
-const (
-	defaultTimeout = time.Second * 2
 )
 
 var aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
@@ -41,7 +36,7 @@ func (av AerospikeVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d", av.Major, av.Minor, av.Patch)
 }
 
-func (av AerospikeVersion) IsGreaterThan(other AerospikeVersion) bool {
+func (av AerospikeVersion) IsGreater(other AerospikeVersion) bool {
 	if av.Major > other.Major {
 		return true
 	}
@@ -61,6 +56,10 @@ func (av AerospikeVersion) IsGreaterThan(other AerospikeVersion) bool {
 	return false
 }
 
+func (av AerospikeVersion) IsGreaterOrEqual(other AerospikeVersion) bool {
+	return av.IsGreater(other) || av == other
+}
+
 // infoGetter defines the methods for doing info requests
 // with the Aerospike database.
 //
@@ -69,61 +68,53 @@ type infoGetter interface {
 	RequestInfo(infoPolicy *a.InfoPolicy, commands ...string) (map[string]string, a.Error)
 }
 
-type InfoClientOpts struct {
-	InfoTimeout time.Duration
-}
-
-func NewDefaultInfoClientOpts() *InfoClientOpts {
-	return &InfoClientOpts{
-		InfoTimeout: defaultTimeout,
-	}
-}
-
 type InfoClient struct {
-	node infoGetter
-	opts *a.InfoPolicy
+	node   infoGetter
+	policy *a.InfoPolicy
 }
 
-func NewInfoClient(cg infoGetter, opts *a.InfoPolicy) *InfoClient {
+func NewInfoClient(cg infoGetter, policy *a.InfoPolicy) *InfoClient {
 	ic := &InfoClient{
-		node: cg,
-		opts: opts,
+		node:   cg,
+		policy: policy,
 	}
 
 	return ic
 }
 
-func NewInfoClientFromAerospike(aeroClient *a.Client, opts *a.InfoPolicy) (*InfoClient, error) {
+func NewInfoClientFromAerospike(aeroClient *a.Client, policy *a.InfoPolicy) (*InfoClient, error) {
 	node, err := aeroClient.Cluster().GetRandomNode()
 	if err != nil {
 		return nil, err
 	}
-	return NewInfoClient(node, opts), nil
+	return NewInfoClient(node, policy), nil
 }
 
 func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
-	return ic.node.RequestInfo(ic.opts, names...)
+	return ic.node.RequestInfo(ic.policy, names...)
 }
 
 func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
-	return getAerospikeVersion(ic.node, ic.opts)
+	return getAerospikeVersion(ic.node, ic.policy)
 }
 
 func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
-	return getSIndexes(ic.node, namespace, ic.opts)
+	return getSIndexes(ic.node, namespace, ic.policy)
 }
 
 // ***** Utility functions *****
 
+var AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
+
 func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
-	supportsSIndexCTX := AerospikeVersion{6, 1, 0}
+	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext
 	version, err := getAerospikeVersion(node, policy)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
 
-	getCtx := version.IsGreaterThan(supportsSIndexCTX) || version == supportsSIndexCTX
+	getCtx := version.IsGreater(supportsSIndexCTX) || version == supportsSIndexCTX
 	cmd := buildSindexCmd(namespace, getCtx)
 
 	response, err := node.RequestInfo(policy, cmd)
@@ -152,7 +143,10 @@ func getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (AerospikeVersio
 		return AerospikeVersion{}, err
 	}
 
-	versionStr := versionResp["build"]
+	versionStr, ok := versionResp["build"]
+	if !ok {
+		return AerospikeVersion{}, fmt.Errorf("failed to get Aerospike version, info response missing 'build' key")
+	}
 
 	return parseAerospikeVersion(versionStr)
 }

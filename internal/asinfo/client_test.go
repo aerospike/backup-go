@@ -251,7 +251,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Minor: tt.fields.Minor,
 				Patch: tt.fields.Patch,
 			}
-			if got := av.IsGreaterThan(tt.args.other); got != tt.want {
+			if got := av.IsGreater(tt.args.other); got != tt.want {
 				t.Errorf("AerospikeVersion.IsGreaterThan() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1165,6 +1165,84 @@ func Test_parseSIndexResponse(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseSIndexResponse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
+	type fields struct {
+		Major int
+		Minor int
+		Patch int
+	}
+	type args struct {
+		other AerospikeVersion
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{
+			name: "positive greater",
+			fields: fields{
+				Major: 5,
+				Minor: 6,
+				Patch: 0,
+			},
+			args: args{
+				other: AerospikeVersion{
+					Major: 4,
+					Minor: 1,
+					Patch: 0,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "positive equal",
+			fields: fields{
+				Major: 5,
+				Minor: 6,
+				Patch: 0,
+			},
+			args: args{
+				other: AerospikeVersion{
+					Major: 5,
+					Minor: 6,
+					Patch: 0,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "positive less",
+			fields: fields{
+				Major: 4,
+				Minor: 0,
+				Patch: 0,
+			},
+			args: args{
+				other: AerospikeVersion{
+					Major: 4,
+					Minor: 1,
+					Patch: 0,
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			av := AerospikeVersion{
+				Major: tt.fields.Major,
+				Minor: tt.fields.Minor,
+				Patch: tt.fields.Patch,
+			}
+			if got := av.IsGreaterOrEqual(tt.args.other); got != tt.want {
+				t.Errorf("AerospikeVersion.IsGreaterOrEqual() = %v, want %v", got, tt.want)
 			}
 		})
 	}

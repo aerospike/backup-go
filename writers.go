@@ -339,8 +339,9 @@ func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 	}
 
 	if job == nil {
-		rw.logger.Debug("error creating sindex, job is nil", "sindex", si.Name)
-		return fmt.Errorf("error creating sindex: job is nil")
+		msg := "error creating sindex: job is nil"
+		rw.logger.Debug(msg, "sindex", si.Name)
+		return fmt.Errorf(msg)
 	}
 
 	errs := job.OnComplete()

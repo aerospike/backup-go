@@ -310,7 +310,7 @@ func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 		// if the sindex already exists, replace it because
 		// the seconday index may have changed since the backup was taken
 		if err.Matches(atypes.INDEX_FOUND) {
-			rw.logger.Debug("index already exists, replacing it", "index", si.Name)
+			rw.logger.Debug("index already exists, replacing it", "sindex", si.Name)
 
 			err = rw.asc.DropIndex(nil, si.Namespace, si.Set, si.Name)
 			if err != nil {

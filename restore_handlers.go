@@ -16,14 +16,11 @@ package backup
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
-	"github.com/google/uuid"
 )
 
 // **** Generic Restore Handler ****
@@ -115,88 +112,4 @@ func (rs *RestoreStats) GetRecordsExpired() uint64 {
 
 func (rs *RestoreStats) addRecordsExpired(num uint64) {
 	rs.recordsExpired.Add(num)
-}
-
-// RestoreHandler handles a restore job from a set of io.readers
-type RestoreHandler struct {
-	restoreHandlerBase
-	config  *RestoreConfig
-	errors  chan error
-	logger  *slog.Logger
-	id      string
-	readers []io.Reader
-	stats   RestoreStats
-}
-
-// newRestoreHandler creates a new RestoreHandler
-func newRestoreHandler(config *RestoreConfig, ac DBRestoreClient,
-	readers []io.Reader, logger *slog.Logger) *RestoreHandler {
-	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore)
-	logger.Debug("created new restore handler")
-
-	rh := RestoreHandler{
-		config:  config,
-		readers: readers,
-		logger:  logger,
-		id:      id,
-	}
-
-	worker := newWorkHandler()
-	restoreHandler := newRestoreHandlerBase(config, ac, worker, &rh.stats, rh.logger)
-	rh.restoreHandlerBase = *restoreHandler
-
-	return &rh
-}
-
-// run runs the restore job
-// currently this should only be run once
-func (rrh *RestoreHandler) run(ctx context.Context) {
-	rrh.errors = make(chan error, 1)
-
-	go doWork(rrh.errors, rrh.logger, func() error {
-		batchSize := rrh.config.Parallel
-		dataReaders := []*readWorker[*models.Token]{}
-
-		for i, reader := range rrh.readers {
-			decoder, err := rrh.config.DecoderFactory.CreateDecoder(reader)
-			if err != nil {
-				return err
-			}
-
-			dr := newTokenReader(decoder, rrh.logger)
-			readWorker := newReadWorker(dr)
-			dataReaders = append(dataReaders, readWorker)
-			// if we have not reached the batch size and we have more readers
-			// continue to the next reader
-			// if we are at the end of readers then run no matter what
-			if i < len(rrh.readers)-1 && len(dataReaders) < batchSize {
-				continue
-			}
-
-			err = rrh.restoreHandlerBase.run(ctx, dataReaders)
-			if err != nil {
-				return err
-			}
-
-			clear(dataReaders)
-		}
-
-		return nil
-	})
-}
-
-// GetStats returns the stats of the restore job
-func (rrh *RestoreHandler) GetStats() *RestoreStats {
-	return &rrh.stats
-}
-
-// Wait waits for the restore job to complete and returns an error if the job failed
-func (rrh *RestoreHandler) Wait(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-rrh.errors:
-		return err
-	}
 }

@@ -284,33 +284,7 @@ func NewRestoreConfig() *RestoreConfig {
 	}
 }
 
-// Restore starts a restore operation from a set of io.readers.
-// ctx can be used to cancel the restore operation.
-// readers is a set of io.readers to read the backup data from.
-// config is the configuration for the restore operation.
-func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *RestoreConfig) (*RestoreHandler, error) {
-	if config == nil {
-		config = NewRestoreConfig()
-	}
-
-	// copy the policies so we don't modify the original
-	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
-	config.InfoPolicy = &infoPolicy
-
-	writePolicy := c.getUsableWritePolicy(config.WritePolicy)
-	config.WritePolicy = &writePolicy
-
-	if err := config.validate(); err != nil {
-		return nil, err
-	}
-
-	handler := newRestoreHandler(config, c.aerospikeClient, readers, c.logger)
-	handler.run(ctx)
-
-	return handler, nil
-}
-
-// RestoreGeneric starts a restore operation
+// Restore starts a restore operation
 // that reads data from a local directory.
 // The backup data may be in a single file or multiple files.
 // config.Parallel determines the number of files to read concurrently.
@@ -318,7 +292,7 @@ func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *Resto
 // ctx can be used to cancel the restore operation.
 // directory is the directory to read the backup data from.
 // config is the configuration for the restore operation.
-func (c *Client) RestoreGeneric(ctx context.Context, config *RestoreConfig, rf ReaderFactory) (*RestoreFromDirectoryHandler, error) {
+func (c *Client) Restore(ctx context.Context, config *RestoreConfig, rf ReaderFactory) (*RestoreHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")
 	}
@@ -334,7 +308,7 @@ func (c *Client) RestoreGeneric(ctx context.Context, config *RestoreConfig, rf R
 		return nil, err
 	}
 
-	handler := newRestoreFromDirectoryHandler(config, c.aerospikeClient, c.logger, rf)
+	handler := newRestoreHandler(config, c.aerospikeClient, c.logger, rf)
 	handler.run(ctx)
 
 	return handler, nil

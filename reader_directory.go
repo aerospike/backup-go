@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func NewFileReaderFactory(dir string, decoder DecoderFactory) ReaderFactory {
+func NewFileReaderFactory(dir string, decoder DecoderFactory) *FileReader {
 	return &FileReader{dir: dir, decoder: decoder}
 }
 

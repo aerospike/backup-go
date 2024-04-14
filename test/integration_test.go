@@ -86,7 +86,7 @@ func runBackup(t *testing.T, backupClient *backup.Client, factory backup.WriteFa
 
 func runRestore(t *testing.T, backupClient *backup.Client, readers backup.ReaderFactory) {
 	ctx := context.Background()
-	restoreHandler, err := backupClient.RestoreGeneric(ctx, restoreConfig, readers)
+	restoreHandler, err := backupClient.Restore(ctx, restoreConfig, readers)
 	assert.NoError(t, err)
 	err = restoreHandler.Wait(ctx)
 	assert.NoError(t, err)

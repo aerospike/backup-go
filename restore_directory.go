@@ -32,8 +32,8 @@ type RestoreFromDirectoryStats struct {
 	RestoreStats
 }
 
-// RestoreFromDirectoryHandler handles a restore job from a directory
-type RestoreFromDirectoryHandler struct {
+// RestoreHandler handles a restore job from a directory
+type RestoreHandler struct {
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	errors          chan error
@@ -43,13 +43,13 @@ type RestoreFromDirectoryHandler struct {
 	readerFactory   ReaderFactory
 }
 
-// newRestoreFromDirectoryHandler creates a new RestoreFromDirectoryHandler
-func newRestoreFromDirectoryHandler(config *RestoreConfig,
-	ac *a.Client, logger *slog.Logger, readerFactory ReaderFactory) *RestoreFromDirectoryHandler {
+// newRestoreHandler creates a new RestoreHandler
+func newRestoreHandler(config *RestoreConfig,
+	ac *a.Client, logger *slog.Logger, readerFactory ReaderFactory) *RestoreHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
 
-	return &RestoreFromDirectoryHandler{
+	return &RestoreHandler{
 		config:          config,
 		aerospikeClient: ac,
 		id:              id,
@@ -60,7 +60,7 @@ func newRestoreFromDirectoryHandler(config *RestoreConfig,
 
 // run runs the restore job
 // currently this should only be run once
-func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
+func (rh *RestoreHandler) run(ctx context.Context) {
 	rh.errors = make(chan error, 1)
 
 	go doWork(rh.errors, rh.logger, func() error {
@@ -128,12 +128,12 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 }
 
 // GetStats returns the stats of the restore job
-func (rh *RestoreFromDirectoryHandler) GetStats() *RestoreFromDirectoryStats {
+func (rh *RestoreHandler) GetStats() *RestoreFromDirectoryStats {
 	return &rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed
-func (rh *RestoreFromDirectoryHandler) Wait(ctx context.Context) error {
+func (rh *RestoreHandler) Wait(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

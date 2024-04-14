@@ -25,8 +25,8 @@ import (
 
 // **** Backup To Directory Handler ****
 
-// BackupGenericHandler handles a backup job to a directory
-type BackupGenericHandler struct {
+// BackupHandler handles a backup job to a directory
+type BackupHandler struct {
 	config          *BackupConfig
 	aerospikeClient *a.Client
 	errors          chan error
@@ -36,13 +36,19 @@ type BackupGenericHandler struct {
 	writeFactory    WriteFactory
 }
 
-// newBackupGenericHandler creates a new BackupGenericHandler
+// BackupStats stores the status of a backup job
+// the stats are updated in realtime by backup jobs
+type BackupStats struct {
+	tokenStats
+}
+
+// newBackupGenericHandler creates a new BackupHandler
 func newBackupGenericHandler(config *BackupConfig,
-	ac *a.Client, logger *slog.Logger, writeFactory WriteFactory) *BackupGenericHandler {
+	ac *a.Client, logger *slog.Logger, writeFactory WriteFactory) *BackupHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackupDirectory)
 
-	return &BackupGenericHandler{
+	return &BackupHandler{
 		config:          config,
 		aerospikeClient: ac,
 		id:              id,
@@ -53,7 +59,7 @@ func newBackupGenericHandler(config *BackupConfig,
 
 // run runs the backup job
 // currently this should only be run once
-func (bh *BackupGenericHandler) run(ctx context.Context) {
+func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
 	go doWork(bh.errors, bh.logger, func() error {
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
@@ -88,12 +94,12 @@ func (bh *BackupGenericHandler) run(ctx context.Context) {
 }
 
 // GetStats returns the stats of the backup job
-func (bh *BackupGenericHandler) GetStats() *BackupStats {
+func (bh *BackupHandler) GetStats() *BackupStats {
 	return &bh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
-func (bh *BackupGenericHandler) Wait(ctx context.Context) error {
+func (bh *BackupHandler) Wait(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

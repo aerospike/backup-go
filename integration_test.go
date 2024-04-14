@@ -327,7 +327,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	backupDir := suite.T().TempDir()
 
-	bh, err := suite.backupClient.BackupGeneric(
+	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupDir,
 		backupConfig,

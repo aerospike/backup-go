@@ -26,12 +26,12 @@ type S3WriteFactory struct {
 	encoder encoding.Encoder
 }
 
-func NewS3WriterFactory(config *S3Config, encoder encoding.Encoder) (*S3WriteFactory, error) {
+func NewS3WriterFactory(config *S3Config, encoder encoding.Encoder) *S3WriteFactory {
 	return &S3WriteFactory{
 		config:  config,
 		fileID:  &atomic.Int32{},
 		encoder: encoder,
-	}, nil
+	}
 }
 
 func (s *S3WriteFactory) NewWriter(namespace string) (io.WriteCloser, error) {

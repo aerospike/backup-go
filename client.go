@@ -216,40 +216,14 @@ func NewBackupConfig() *BackupConfig {
 	}
 }
 
-// Backup starts a backup operation to a set of io.writers.
-// ctx can be used to cancel the backup operation.
-// writers is a set of io.writers to write the backup data to.
-// config is the configuration for the backup operation.
-func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *BackupConfig) (*BackupHandler, error) {
-	if config == nil {
-		config = NewBackupConfig()
-	}
-
-	// copy the policies so we don't modify the original
-	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
-	config.InfoPolicy = &infoPolicy
-
-	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
-	config.ScanPolicy = &scanPolicy
-
-	if err := config.validate(); err != nil {
-		return nil, err
-	}
-
-	handler := newBackupHandler(config, c.aerospikeClient, writers, c.logger)
-	handler.run(ctx)
-
-	return handler, nil
-}
-
-// BackupGeneric starts a backup operation
+// Backup starts a backup operation
 // that writes data to a local directory.
 // config.Parallel determines the number of files to write concurrently.
 // ctx can be used to cancel the backup operation.
 // directory is the directory to write the backup data to.
 // config is the configuration for the backup operation.
-func (c *Client) BackupGeneric(ctx context.Context, config *BackupConfig, writer WriteFactory) (
-	*BackupGenericHandler, error) {
+func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteFactory) (
+	*BackupHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("backup config required")
 	}

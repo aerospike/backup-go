@@ -9,19 +9,20 @@ import (
 	"path/filepath"
 )
 
-func NewFileReaderFactory(dir string, decoding DecoderFactory) (ReaderFactory, error) {
-	err := checkRestoreDirectory(dir, decoding)
-	if err != nil {
-		return nil, err
-	}
-	return &FileReader{dir: dir}, nil
+func NewFileReaderFactory(dir string, decoder DecoderFactory) ReaderFactory {
+	return &FileReader{dir: dir, decoder: decoder}
 }
 
 type FileReader struct {
-	dir string
+	dir     string
+	decoder DecoderFactory
 }
 
 func (f *FileReader) Readers() ([]io.ReadCloser, error) {
+	err := f.checkRestoreDirectory()
+	if err != nil {
+		return nil, err
+	}
 	fileInfo, err := os.ReadDir(f.dir)
 	if err != nil {
 		return nil, fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, f.dir, err)
@@ -45,7 +46,9 @@ var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format
-func checkRestoreDirectory(dir string, decoding DecoderFactory) error {
+func (f *FileReader) checkRestoreDirectory() error {
+	dir := f.dir
+	decoding := f.decoder
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
 		// Handle the error

@@ -3,10 +3,11 @@ package backup
 import (
 	"errors"
 	"fmt"
-	"github.com/aerospike/backup-go/encoding"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/aerospike/backup-go/encoding"
 )
 
 func NewFileReaderFactory(dir string, decoder DecoderFactory) *FileReader {
@@ -23,20 +24,25 @@ func (f *FileReader) Readers() ([]io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	fileInfo, err := os.ReadDir(f.dir)
 	if err != nil {
 		return nil, fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, f.dir, err)
 	}
-	var readers []io.ReadCloser
+
+	readers := make([]io.ReadCloser, 0, len(fileInfo))
 
 	for _, file := range fileInfo {
 		filePath := filepath.Join(f.dir, file.Name())
+
 		reader, err := os.Open(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
 		}
+
 		readers = append(readers, reader)
 	}
+
 	return readers, nil
 }
 
@@ -49,6 +55,7 @@ var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 func (f *FileReader) checkRestoreDirectory() error {
 	dir := f.dir
 	decoding := f.decoder
+
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
 		// Handle the error

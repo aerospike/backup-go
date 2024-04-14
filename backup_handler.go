@@ -16,11 +16,12 @@ package backup
 
 import (
 	"context"
+	"log/slog"
+
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
-	"log/slog"
 )
 
 // **** Backup To Directory Handler ****
@@ -63,6 +64,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
 	go doWork(bh.errors, bh.logger, func() error {
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
+
 		for i := range bh.config.Parallel {
 			encoder, err := bh.config.EncoderFactory.CreateEncoder()
 			if err != nil {

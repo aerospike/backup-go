@@ -16,11 +16,15 @@ package backup
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"sync/atomic"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
+	"github.com/google/uuid"
 )
 
 // **** Generic Restore Handler ****
@@ -44,6 +48,115 @@ type restoreHandlerBase struct {
 	worker   worker
 	stats    *RestoreStats
 	logger   *slog.Logger
+}
+
+// RestoreHandler handles a restore job from a directory
+type RestoreHandler struct {
+	stats           RestoreStats
+	readerFactory   ReaderFactory
+	config          *RestoreConfig
+	aerospikeClient *a.Client
+	logger          *slog.Logger
+	id              string
+	errors          chan error
+}
+
+// newRestoreHandler creates a new RestoreHandler
+func newRestoreHandler(config *RestoreConfig,
+	ac *a.Client, logger *slog.Logger, readerFactory ReaderFactory) *RestoreHandler {
+	id := uuid.NewString()
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
+
+	return &RestoreHandler{
+		config:          config,
+		aerospikeClient: ac,
+		id:              id,
+		logger:          logger,
+		readerFactory:   readerFactory,
+	}
+}
+
+// run runs the restore job
+// currently this should only be run once
+func (rh *RestoreHandler) run(ctx context.Context) {
+	rh.errors = make(chan error, 1)
+
+	go doWork(rh.errors, rh.logger, func() error {
+		// check that the restore directory is valid
+		// open the directory
+		// read the files rrh.config.Parallel at a time
+		// create a buffered reader for each reader
+		// hand the readers to a restore handler and run it
+		// wait for the restore handler to finish
+		// if there are more files, continue to the next batch
+		// if there are no more files, return
+		var readersBuffer []io.Reader
+
+		readers, err := rh.readerFactory.Readers()
+		if err != nil {
+			return err
+		}
+
+		for i, reader := range readers {
+			//nolint:gocritic // defer in loop is ok here
+			// we want to close the readers after the restore is done
+			defer func() {
+				if err := reader.Close(); err != nil {
+					rh.logger.Error("failed to close backup reader", "error", err)
+				}
+			}()
+
+			readersBuffer = append(readersBuffer, reader)
+
+			// if we have not reached the batch size and we have more readers
+			// continue to the next reader
+			// if we are at the end of readers then run no matter what
+			if i < len(readers)-1 && len(readersBuffer) < rh.config.Parallel {
+				continue
+			}
+
+			readWorkers := make([]*readWorker[*models.Token], len(readersBuffer))
+
+			for i, reader := range readersBuffer {
+				decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
+				if err != nil {
+					return err
+				}
+
+				dr := newTokenReader(decoder, rh.logger)
+				readWorker := newReadWorker(dr)
+				readWorkers[i] = readWorker
+			}
+
+			restoreWorker := newWorkHandler()
+			restoreHandler := newRestoreHandlerBase(rh.config,
+				rh.aerospikeClient, restoreWorker, &rh.stats, rh.logger)
+
+			err = restoreHandler.run(ctx, readWorkers)
+			if err != nil {
+				return err
+			}
+
+			readersBuffer = []io.Reader{}
+		}
+
+		return nil
+	})
+}
+
+// GetStats returns the stats of the restore job
+func (rh *RestoreHandler) GetStats() *RestoreStats {
+	return &rh.stats
+}
+
+// Wait waits for the restore job to complete and returns an error if the job failed
+func (rh *RestoreHandler) Wait(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-rh.errors:
+		return err
+	}
 }
 
 // newRestoreHandlerBase creates a new restoreHandler

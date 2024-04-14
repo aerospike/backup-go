@@ -3,13 +3,14 @@ package backup
 import (
 	"errors"
 	"fmt"
-	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/encoding/asb"
-	"github.com/aerospike/backup-go/internal/writers"
 	"io"
 	"os"
 	"path/filepath"
 	"sync/atomic"
+
+	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/internal/writers"
 )
 
 type DirectoryWriterFactory struct {
@@ -27,7 +28,8 @@ type DirectoryWriterFactory struct {
 // If non-zero, backup files will be split into multiple files if their size exceeds this limit.
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
 // FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
-func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder encoding.Encoder) (*DirectoryWriterFactory, error) {
+func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder encoding.Encoder,
+) (*DirectoryWriterFactory, error) {
 	if fileSizeLimit > 0 && fileSizeLimit < 1024*1024 {
 		return nil, fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", fileSizeLimit)
 	}
@@ -40,6 +42,7 @@ func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder encoding
 	if err != nil {
 		return nil, err
 	}
+
 	return &DirectoryWriterFactory{
 		directory:     dir,
 		fileID:        &atomic.Int32{},
@@ -112,7 +115,6 @@ func (f *DirectoryWriterFactory) getNewBackupFileGeneric(namespace string, id in
 	filePath := filepath.Join(f.directory, fileName)
 
 	return openBackupFile(filePath)
-
 }
 
 // getNewBackupFileASB creates a new backup file in the given directory.
@@ -122,6 +124,7 @@ func (f *DirectoryWriterFactory) getNewBackupFileGeneric(namespace string, id in
 func (f *DirectoryWriterFactory) getNewBackupFileASB(namespace string, id int) (io.WriteCloser, error) {
 	fileName := getBackupFileNameASB(namespace, id)
 	filePath := filepath.Join(f.directory, fileName)
+
 	file, err := openBackupFile(filePath)
 	if err != nil {
 		return nil, err

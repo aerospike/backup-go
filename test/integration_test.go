@@ -56,7 +56,7 @@ func TestBackupRestore(t *testing.T) {
 
 	for _, tc := range test {
 		t.Run(tc.name, func(t *testing.T) {
-			values := prepareData()
+			values := prepareData(t)
 			runBackup(t, backupClient, tc.writerFactory)
 			_ = aerospikeClient.Truncate(nil, backupCfg.Namespace, "", nil)
 			runRestore(t, backupClient, tc.readers)
@@ -65,7 +65,8 @@ func TestBackupRestore(t *testing.T) {
 	}
 }
 
-func prepareData() map[*aerospike.Key]*aerospike.Bin {
+func prepareData(t *testing.T) map[*aerospike.Key]*aerospike.Bin {
+	t.Helper()
 	var values = make(map[*aerospike.Key]*aerospike.Bin)
 	_ = aerospikeClient.Truncate(nil, backupCfg.Namespace, "", nil)
 	for i := range RecordNumber {
@@ -78,6 +79,7 @@ func prepareData() map[*aerospike.Key]*aerospike.Bin {
 }
 
 func runBackup(t *testing.T, backupClient *backup.Client, factory backup.WriteFactory) {
+	t.Helper()
 	ctx := context.Background()
 	handler, err := backupClient.Backup(ctx, backupCfg, factory)
 	assert.NoError(t, err)
@@ -85,6 +87,7 @@ func runBackup(t *testing.T, backupClient *backup.Client, factory backup.WriteFa
 }
 
 func runRestore(t *testing.T, backupClient *backup.Client, readers backup.ReaderFactory) {
+	t.Helper()
 	ctx := context.Background()
 	restoreHandler, err := backupClient.Restore(ctx, restoreConfig, readers)
 	assert.NoError(t, err)
@@ -94,6 +97,7 @@ func runRestore(t *testing.T, backupClient *backup.Client, readers backup.Reader
 }
 
 func validateData(t *testing.T, values map[*aerospike.Key]*aerospike.Bin) {
+	t.Helper()
 	for key, val := range values {
 		record, err := aerospikeClient.Get(nil, key, binName)
 		assert.NoError(t, err)

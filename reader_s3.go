@@ -1,11 +1,12 @@
 package backup
 
 import (
+	"io"
+
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"io"
 )
 
 type S3ReaderFactory struct {
@@ -17,6 +18,7 @@ func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := s3.New(sess).ListObjectsV2(&s3.ListObjectsV2Input{
 		Bucket: aws.String(f.config.Bucket),
 		Prefix: aws.String(f.config.Prefix),
@@ -25,18 +27,21 @@ func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 		return nil, err
 	}
 
-	var readers []io.ReadCloser
+	readers := make([]io.ReadCloser, 0, len(resp.Contents))
+
 	for _, item := range resp.Contents {
 		reader, err := NewS3Reader(f.config, *item.Key)
 		if err != nil {
 			return nil, err
 		}
+
 		readers = append(readers, reader)
 	}
+
 	return readers, nil
 }
 
-func NewS3ReaderFactory(config *S3Config, decoder *encoding.ASBDecoderFactory) *S3ReaderFactory {
+func NewS3ReaderFactory(config *S3Config, _ *encoding.ASBDecoderFactory) *S3ReaderFactory {
 	// TODO: use decoder to filter files.
 	return &S3ReaderFactory{config: config}
 }
@@ -55,10 +60,9 @@ func NewS3Reader(config *S3Config, key string) (*S3Reader, error) {
 		return nil, err
 	}
 
-	downloader := s3manager.NewDownloader(sess)
 	return &S3Reader{
 		config:     config,
-		downloader: downloader,
+		downloader: s3manager.NewDownloader(sess),
 		buffer:     aws.NewWriteAtBuffer([]byte{}),
 		key:        key,
 	}, nil
@@ -82,6 +86,7 @@ func (r *S3Reader) Read(p []byte) (int, error) {
 	if len(b) == 0 {
 		return 0, io.EOF
 	}
+
 	n := copy(p, b)
 	b = b[n:]
 	r.buffer = aws.NewWriteAtBuffer(b)

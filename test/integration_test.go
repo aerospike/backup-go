@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"log/slog"
 	"math/rand"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/stretchr/testify/assert"
 )
 
 const RecordNumber uint64 = 100
@@ -63,7 +63,6 @@ func TestBackupRestore(t *testing.T) {
 			validateData(t, values)
 		})
 	}
-
 }
 
 func prepareData() map[*aerospike.Key]*aerospike.Bin {

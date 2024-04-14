@@ -94,7 +94,7 @@ func (rh *RestoreFromDirectoryHandler) run(ctx context.Context) {
 			// if we have not reached the batch size and we have more readers
 			// continue to the next reader
 			// if we are at the end of readers then run no matter what
-			if i < len(readersBuffer)-1 && len(readersBuffer) < batchSize {
+			if i < len(readers)-1 && len(readersBuffer) < batchSize {
 				continue
 			}
 

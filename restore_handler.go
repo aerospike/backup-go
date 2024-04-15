@@ -49,6 +49,12 @@ type restoreHandlerBase struct {
 	logger   *slog.Logger
 }
 
+// ReaderFactory provide access to data that should be restored
+type ReaderFactory interface {
+	Readers() ([]io.ReadCloser, error) //TODO: use lazy creation
+	GetType() logging.HandlerType
+}
+
 // RestoreHandler handles a restore job from given readerFactory
 type RestoreHandler struct {
 	readerFactory   ReaderFactory

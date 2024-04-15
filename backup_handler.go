@@ -27,6 +27,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// WriteFactory provide access to back up storage
+type WriteFactory interface {
+	NewWriter(namespace string) (io.WriteCloser, error)
+	GetType() logging.HandlerType
+}
+
 // BackupHandler handles a backup job
 type BackupHandler struct {
 	writeFactory           WriteFactory

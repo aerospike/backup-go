@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 	"testing"
 
@@ -97,6 +98,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	)
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
+		return
 	}
 	defer asc.Close()
 
@@ -270,13 +272,13 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			},
 		},
 		{
-			name: "with file size limit",
+			name: "with parallel backup",
 			args: args{
 				backupConfig: &backup.BackupConfig{
 					Partitions:     backup.NewPartitionRange(0, 4096),
 					Set:            suite.set,
 					Namespace:      suite.namespace,
-					Parallel:       4,
+					Parallel:       100,
 					EncoderFactory: encoding.NewASBEncoderFactory(),
 				},
 				restoreConfig: backup.NewRestoreConfig(),
@@ -327,6 +329,9 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Equal(uint64(numRec), statsBackup.GetRecords())
 	suite.Equal(uint32(0), statsBackup.GetSIndexes())
 	suite.Equal(uint32(0), statsBackup.GetUDFs())
+
+	backupFiles, _ := os.ReadDir(backupDir)
+	suite.Equal(backupConfig.Parallel, len(backupFiles))
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {

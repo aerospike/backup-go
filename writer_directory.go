@@ -9,13 +9,12 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/internal/writers"
 )
 
 type DirectoryWriterFactory struct {
 	fileID    *atomic.Int32
-	encoder   encoding.Encoder
+	encoder   EncoderFactory
 	directory string
 
 	fileSizeLimit int64
@@ -28,7 +27,7 @@ type DirectoryWriterFactory struct {
 // If non-zero, backup files will be split into multiple files if their size exceeds this limit.
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
 // FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
-func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder encoding.Encoder,
+func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderFactory,
 ) (*DirectoryWriterFactory, error) {
 	if fileSizeLimit > 0 && fileSizeLimit < 1024*1024 {
 		return nil, fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", fileSizeLimit)
@@ -85,7 +84,7 @@ func prepareBackupDirectory(dir string) error {
 func (f *DirectoryWriterFactory) NewWriter(namespace string) (io.WriteCloser, error) {
 	var open func() (io.WriteCloser, error)
 
-	if _, ok := f.encoder.(*asb.Encoder); ok {
+	if _, ok := f.encoder.(*encoding.ASBEncoderFactory); ok {
 		open = func() (io.WriteCloser, error) {
 			return f.getNewBackupFileASB(namespace, int(f.fileID.Add(1)))
 		}
@@ -125,12 +124,7 @@ func (f *DirectoryWriterFactory) getNewBackupFileASB(namespace string, id int) (
 	fileName := getBackupFileNameASB(namespace, id)
 	filePath := filepath.Join(f.directory, fileName)
 
-	file, err := openBackupFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return file, writeASBHeader(file, namespace, id == 1)
+	return openBackupFile(filePath)
 }
 
 func openBackupFile(path string) (*os.File, error) {

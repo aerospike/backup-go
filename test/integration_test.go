@@ -36,21 +36,21 @@ func TestBackupRestore(t *testing.T) {
 	}
 
 	_ = os.RemoveAll("test_data")
-	encoder, _ := encoding.NewASBEncoderFactory().CreateEncoder()
 	test := []struct {
 		name          string
 		readers       backup.ReaderFactory
 		writerFactory backup.WriteFactory
 	}{
 		{
-			name:          "directory",
-			readers:       backup.NewFileReaderFactory("test_data", encoding.NewASBDecoderFactory()),
-			writerFactory: HandleError(backup.NewDirectoryWriterFactory("test_data", 1024*1024+1, encoder)),
+			name:    "directory",
+			readers: backup.NewFileReaderFactory("test_data", encoding.NewASBDecoderFactory()),
+			writerFactory: HandleError(backup.NewDirectoryWriterFactory(
+				"test_data", 1024*1024+1, encoding.NewASBEncoderFactory())),
 		},
 		{
 			name:          "s3",
 			readers:       backup.NewS3ReaderFactory(s3Cfg, encoding.NewASBDecoderFactory()),
-			writerFactory: backup.NewS3WriterFactory(s3Cfg, encoder),
+			writerFactory: backup.NewS3WriterFactory(s3Cfg, encoding.NewASBEncoderFactory()),
 		},
 	}
 

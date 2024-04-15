@@ -16,9 +16,12 @@ package backup
 
 import (
 	"context"
+	"io"
 	"log/slog"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
@@ -28,13 +31,14 @@ import (
 
 // BackupHandler handles a backup job to a directory
 type BackupHandler struct {
-	config          *BackupConfig
-	aerospikeClient *a.Client
-	errors          chan error
-	logger          *slog.Logger
-	id              string
-	stats           BackupStats
-	writeFactory    WriteFactory
+	config           *BackupConfig
+	aerospikeClient  *a.Client
+	errors           chan error
+	logger           *slog.Logger
+	id               string
+	stats            BackupStats
+	writeFactory     WriteFactory
+	firstFileWritten *atomic.Bool
 }
 
 // BackupStats stores the status of a backup job
@@ -50,11 +54,12 @@ func newBackupGenericHandler(config *BackupConfig,
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackupDirectory)
 
 	return &BackupHandler{
-		config:          config,
-		aerospikeClient: ac,
-		id:              id,
-		logger:          logger,
-		writeFactory:    writeFactory,
+		config:           config,
+		aerospikeClient:  ac,
+		id:               id,
+		logger:           logger,
+		writeFactory:     writeFactory,
+		firstFileWritten: &atomic.Bool{},
 	}
 }
 
@@ -72,6 +77,11 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			}
 
 			writer, err := bh.writeFactory.NewWriter(bh.config.Namespace)
+			if err != nil {
+				return err
+			}
+
+			err = bh.writeHeader(writer, bh.config.Namespace)
 			if err != nil {
 				return err
 			}
@@ -108,4 +118,12 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	case err := <-bh.errors:
 		return err
 	}
+}
+
+func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) error {
+	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
+		return writeASBHeader(writer, namespace, bh.firstFileWritten.Swap(true))
+	}
+
+	return nil
 }

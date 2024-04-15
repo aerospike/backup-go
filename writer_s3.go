@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
@@ -25,6 +26,8 @@ type S3WriteFactory struct {
 	fileID  *atomic.Int32
 	encoder EncoderFactory
 }
+
+var _ WriteFactory = (*S3WriteFactory)(nil)
 
 func NewS3WriterFactory(config *S3Config, encoder EncoderFactory) *S3WriteFactory {
 	return &S3WriteFactory{
@@ -47,6 +50,10 @@ func (s *S3WriteFactory) NewWriter(namespace string) (io.WriteCloser, error) {
 	fullPath := path.Join(s.config.Prefix, name)
 
 	return NewS3Writer(s.config, fullPath)
+}
+
+func (s *S3WriteFactory) GetType() logging.HandlerType {
+	return logging.HandlerTypeBackupS3
 }
 
 func NewS3Writer(config *S3Config, key string) (*S3Writer, error) {

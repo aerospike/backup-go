@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/writers"
 )
 
@@ -19,6 +20,8 @@ type DirectoryWriterFactory struct {
 
 	fileSizeLimit int64
 }
+
+var _ WriteFactory = (*DirectoryWriterFactory)(nil)
 
 // NewDirectoryWriterFactory creates new factory for directory backups
 // dir is target folder for backup
@@ -137,4 +140,8 @@ func getBackupFileNameGeneric(namespace string, id int) string {
 
 func getBackupFileNameASB(namespace string, id int) string {
 	return getBackupFileNameGeneric(namespace, id) + ".asb"
+}
+
+func (f *DirectoryWriterFactory) GetType() logging.HandlerType {
+	return logging.HandlerTypeBackupDirectory
 }

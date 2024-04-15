@@ -25,8 +25,8 @@ type HandlerType string
 
 const (
 	HandlerTypeUnknown          HandlerType = "unknown"
-	HandlerTypeBackup           HandlerType = "backup"
-	HandlerTypeRestore          HandlerType = "restore"
+	HandlerTypeBackupS3         HandlerType = "backupS3"
+	HandlerTypeRestoreS3        HandlerType = "restoreS3"
 	HandlerTypeBackupDirectory  HandlerType = "backup_directory"
 	HandlerTypeRestoreDirectory HandlerType = "restore_directory"
 )

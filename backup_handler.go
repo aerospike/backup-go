@@ -27,18 +27,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// **** Backup To Directory Handler ****
-
-// BackupHandler handles a backup job to a directory
+// BackupHandler handles a backup job
 type BackupHandler struct {
-	writeFactory     WriteFactory
-	config           *BackupConfig
-	aerospikeClient  *a.Client
-	logger           *slog.Logger
-	firstFileWritten *atomic.Bool
-	errors           chan error
-	id               string
-	stats            BackupStats
+	writeFactory           WriteFactory
+	config                 *BackupConfig
+	aerospikeClient        *a.Client
+	logger                 *slog.Logger
+	firstFileHeaderWritten *atomic.Bool
+	errors                 chan error
+	id                     string
+	stats                  BackupStats
 }
 
 // BackupStats stores the status of a backup job
@@ -47,19 +45,19 @@ type BackupStats struct {
 	tokenStats
 }
 
-// newBackupGenericHandler creates a new BackupHandler
-func newBackupGenericHandler(config *BackupConfig,
+// newBackupHandler creates a new BackupHandler
+func newBackupHandler(config *BackupConfig,
 	ac *a.Client, logger *slog.Logger, writeFactory WriteFactory) *BackupHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackupDirectory)
+	logger = logging.WithHandler(logger, id, writeFactory.GetType())
 
 	return &BackupHandler{
-		config:           config,
-		aerospikeClient:  ac,
-		id:               id,
-		logger:           logger,
-		writeFactory:     writeFactory,
-		firstFileWritten: &atomic.Bool{},
+		config:                 config,
+		aerospikeClient:        ac,
+		id:                     id,
+		logger:                 logger,
+		writeFactory:           writeFactory,
+		firstFileHeaderWritten: &atomic.Bool{},
 	}
 }
 
@@ -122,7 +120,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) error {
 	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
-		return writeASBHeader(writer, namespace, bh.firstFileWritten.Swap(true))
+		return writeASBHeader(writer, namespace, bh.firstFileHeaderWritten.Swap(true))
 	}
 
 	return nil

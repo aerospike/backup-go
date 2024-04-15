@@ -27,6 +27,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/internal/logging"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/testutils"
@@ -582,6 +583,10 @@ type ByteReaderWriterFactory struct {
 func (b *ByteReaderWriterFactory) Readers() ([]io.ReadCloser, error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	return []io.ReadCloser{reader}, nil
+}
+
+func (b *ByteReaderWriterFactory) GetType() logging.HandlerType {
+	return logging.HandlerTypeUnknown
 }
 
 type nopWriteCloser struct {

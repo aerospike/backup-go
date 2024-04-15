@@ -239,7 +239,7 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteF
 		return nil, err
 	}
 
-	handler := newBackupGenericHandler(config, c.aerospikeClient, c.logger, writer)
+	handler := newBackupHandler(config, c.aerospikeClient, c.logger, writer)
 	handler.run(ctx)
 
 	return handler, nil

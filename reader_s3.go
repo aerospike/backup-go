@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
@@ -12,6 +13,8 @@ import (
 type S3ReaderFactory struct {
 	config *S3Config
 }
+
+var _ ReaderFactory = (*S3ReaderFactory)(nil)
 
 func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 	sess, err := NewSession(f.config)
@@ -96,4 +99,8 @@ func (r *S3Reader) Read(p []byte) (int, error) {
 
 func (r *S3Reader) Close() error {
 	return nil
+}
+
+func (f *S3ReaderFactory) GetType() logging.HandlerType {
+	return logging.HandlerTypeRestoreS3
 }

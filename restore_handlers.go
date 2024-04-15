@@ -40,8 +40,7 @@ type worker interface {
 	DoJob(context.Context, *pipeline.Pipeline[*models.Token]) error
 }
 
-// restoreHandlerBase handles generic restore jobs on data readers
-// most other restore handlers can wrap this one to add additional functionality
+// restoreHandlerBase handles restore job for a single worker
 type restoreHandlerBase struct {
 	config   *RestoreConfig
 	dbClient DBRestoreClient
@@ -50,7 +49,7 @@ type restoreHandlerBase struct {
 	logger   *slog.Logger
 }
 
-// RestoreHandler handles a restore job from a directory
+// RestoreHandler handles a restore job from given readerFactory
 type RestoreHandler struct {
 	readerFactory   ReaderFactory
 	config          *RestoreConfig
@@ -65,7 +64,7 @@ type RestoreHandler struct {
 func newRestoreHandler(config *RestoreConfig,
 	ac *a.Client, logger *slog.Logger, readerFactory ReaderFactory) *RestoreHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestoreDirectory)
+	logger = logging.WithHandler(logger, id, readerFactory.GetType())
 
 	return &RestoreHandler{
 		config:          config,

@@ -50,8 +50,8 @@ type S3Reader struct {
 	config          *S3Config
 	downloader      *s3manager.Downloader
 	buffer          *aws.WriteAtBuffer
-	bytesDownloaded bool
 	key             string
+	bytesDownloaded bool
 }
 
 func NewS3Reader(config *S3Config, key string) (*S3Reader, error) {

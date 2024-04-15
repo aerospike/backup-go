@@ -31,14 +31,14 @@ import (
 
 // BackupHandler handles a backup job to a directory
 type BackupHandler struct {
+	writeFactory     WriteFactory
 	config           *BackupConfig
 	aerospikeClient  *a.Client
-	errors           chan error
 	logger           *slog.Logger
+	firstFileWritten *atomic.Bool
+	errors           chan error
 	id               string
 	stats            BackupStats
-	writeFactory     WriteFactory
-	firstFileWritten *atomic.Bool
 }
 
 // BackupStats stores the status of a backup job

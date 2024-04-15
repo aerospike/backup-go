@@ -52,13 +52,13 @@ type restoreHandlerBase struct {
 
 // RestoreHandler handles a restore job from a directory
 type RestoreHandler struct {
-	stats           RestoreStats
 	readerFactory   ReaderFactory
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
-	id              string
 	errors          chan error
+	id              string
+	stats           RestoreStats
 }
 
 // newRestoreHandler creates a new RestoreHandler

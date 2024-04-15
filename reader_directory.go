@@ -15,8 +15,8 @@ func NewFileReaderFactory(dir string, decoder DecoderFactory) *FileReader {
 }
 
 type FileReader struct {
-	dir     string
 	decoder DecoderFactory
+	dir     string
 }
 
 func (f *FileReader) Readers() ([]io.ReadCloser, error) {

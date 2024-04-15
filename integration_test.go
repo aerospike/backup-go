@@ -21,7 +21,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"sync"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -67,15 +66,15 @@ var testBins = a.BinMap{
 
 type backupRestoreTestSuite struct {
 	suite.Suite
+	Aeroclient        *a.Client
+	testClient        *testresources.TestClient
+	backupClient      *backup.Client
 	aerospikeIP       string
-	aerospikePort     int
 	aerospikePassword string
 	aerospikeUser     string
 	namespace         string
 	set               string
-	Aeroclient        *a.Client
-	testClient        *testresources.TestClient
-	backupClient      *backup.Client
+	aerospikePort     int
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -189,8 +188,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		bins          a.BinMap
 	}
 	var tests = []struct {
-		name string
 		args args
+		name string
 	}{
 		{
 			name: "default",
@@ -260,8 +259,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		bins          a.BinMap
 	}
 	var tests = []struct {
-		name string
 		args args
+		name string
 	}{
 		{
 			name: "default",
@@ -586,7 +585,6 @@ func (b *ByteReaderWriterFactory) Readers() ([]io.ReadCloser, error) {
 }
 
 type nopWriteCloser struct {
-	sync.Mutex
 	*bytes.Buffer
 }
 
@@ -595,11 +593,9 @@ func (n *nopWriteCloser) Close() error {
 }
 
 func (n *nopWriteCloser) Write(p []byte) (int, error) {
-	n.Lock()
-	defer n.Unlock()
 	return n.Buffer.Write(p)
 }
 
 func (b *ByteReaderWriterFactory) NewWriter(_ string) (io.WriteCloser, error) {
-	return &nopWriteCloser{sync.Mutex{}, b.buffer}, nil
+	return &nopWriteCloser{b.buffer}, nil
 }

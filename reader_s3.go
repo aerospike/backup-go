@@ -50,11 +50,11 @@ func NewS3ReaderFactory(config *S3Config, _ *encoding.ASBDecoderFactory) *S3Read
 }
 
 type S3Reader struct {
-	config          *S3Config
-	downloader      *s3manager.Downloader
-	buffer          *aws.WriteAtBuffer
-	key             string
-	bytesDownloaded bool
+	config         *S3Config
+	downloader     *s3manager.Downloader
+	buffer         *aws.WriteAtBuffer
+	key            string
+	dataDownloaded bool
 }
 
 func NewS3Reader(config *S3Config, key string) (*S3Reader, error) {
@@ -73,7 +73,7 @@ func NewS3Reader(config *S3Config, key string) (*S3Reader, error) {
 
 func (r *S3Reader) Read(p []byte) (int, error) {
 	// TODO: read with pagination
-	if !r.bytesDownloaded {
+	if !r.dataDownloaded {
 		_, err := r.downloader.Download(r.buffer, &s3.GetObjectInput{
 			Bucket: aws.String(r.config.Bucket),
 			Key:    aws.String(r.key),
@@ -82,7 +82,7 @@ func (r *S3Reader) Read(p []byte) (int, error) {
 			return 0, err
 		}
 
-		r.bytesDownloaded = true
+		r.dataDownloaded = true
 	}
 
 	b := r.buffer.Bytes()

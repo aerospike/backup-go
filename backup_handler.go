@@ -27,7 +27,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// WriteFactory provide access to back up storage
+// WriteFactory provides access to back up storage.
 type WriteFactory interface {
 	// NewWriter return new writer for backup logic to use.
 	// Each call creates new writer, they might be working in parallel.

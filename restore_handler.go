@@ -40,7 +40,7 @@ type worker interface {
 	DoJob(context.Context, *pipeline.Pipeline[*models.Token]) error
 }
 
-// restoreHandlerBase handles restore job for a single worker
+// restoreHandlerBase handles restore jobs for a single worker.
 type restoreHandlerBase struct {
 	config   *RestoreConfig
 	dbClient DBRestoreClient
@@ -49,9 +49,9 @@ type restoreHandlerBase struct {
 	logger   *slog.Logger
 }
 
-// ReaderFactory provide access to data that should be restored
+// ReaderFactory provides access to data that should be restored.
 type ReaderFactory interface {
-	// Readers return all available readers of backup.
+	// Readers returns all available readers of backup data.
 	// They will be used in parallel and closed after restore.
 	Readers() ([]io.ReadCloser, error) //TODO: use lazy creation
 	// GetType return type of storage. Used in logging.

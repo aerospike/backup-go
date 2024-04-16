@@ -217,7 +217,7 @@ func NewBackupConfig() *BackupConfig {
 }
 
 // Backup starts a backup operation
-// that writes data to provided writer
+// that writes data to a provided writer.
 // config.Parallel determines the number of files to write concurrently.
 // ctx can be used to cancel the backup operation.
 // config is the configuration for the backup operation.

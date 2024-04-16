@@ -51,8 +51,11 @@ type restoreHandlerBase struct {
 
 // ReaderFactory provide access to data that should be restored
 type ReaderFactory interface {
+	// Readers return all available readers of backup.
+	// They will be used in parallel and closed after restore.
 	Readers() ([]io.ReadCloser, error) //TODO: use lazy creation
-	GetType() logging.HandlerType
+	// GetType return type of storage. Used in logging.
+	GetType() string
 }
 
 // RestoreHandler handles a restore job using the given readerFactory.
@@ -70,7 +73,7 @@ type RestoreHandler struct {
 func newRestoreHandler(config *RestoreConfig,
 	ac *a.Client, logger *slog.Logger, readerFactory ReaderFactory) *RestoreHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, readerFactory.GetType())
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, readerFactory.GetType())
 
 	return &RestoreHandler{
 		config:          config,

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/internal/logging"
 )
 
 func NewFileReaderFactory(dir string, decoder DecoderFactory) *DirectoryReaderFactory {
@@ -118,6 +117,6 @@ func verifyBackupFileExtension(fileName string, decoder DecoderFactory) error {
 	return nil
 }
 
-func (f *DirectoryReaderFactory) GetType() logging.HandlerType {
-	return logging.HandlerTypeRestoreDirectory
+func (f *DirectoryReaderFactory) GetType() string {
+	return "directory"
 }

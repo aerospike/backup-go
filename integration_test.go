@@ -27,7 +27,6 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
-	"github.com/aerospike/backup-go/internal/logging"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/testutils"
@@ -212,7 +211,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
 	restoreConfig *backup.RestoreConfig, bins a.BinMap) {
-	numRec := 1
+	numRec := 1000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
@@ -585,8 +584,8 @@ func (b *ByteReaderWriterFactory) Readers() ([]io.ReadCloser, error) {
 	return []io.ReadCloser{reader}, nil
 }
 
-func (b *ByteReaderWriterFactory) GetType() logging.HandlerType {
-	return logging.HandlerTypeUnknown
+func (b *ByteReaderWriterFactory) GetType() string {
+	return "byte buffer"
 }
 
 type nopWriteCloser struct {

@@ -29,8 +29,12 @@ import (
 
 // WriteFactory provide access to back up storage
 type WriteFactory interface {
+	// NewWriter return new writer for backup logic to use.
+	// Each call creates new writer, they might be working in parallel.
+	// Backup logic will close the writer after backup is done.
 	NewWriter(namespace string) (io.WriteCloser, error)
-	GetType() logging.HandlerType
+	// GetType return type of storage. Used in logging.
+	GetType() string
 }
 
 // BackupHandler handles a backup job
@@ -55,7 +59,7 @@ type BackupStats struct {
 func newBackupHandler(config *BackupConfig,
 	ac *a.Client, logger *slog.Logger, writeFactory WriteFactory) *BackupHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, writeFactory.GetType())
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writeFactory.GetType())
 
 	return &BackupHandler{
 		config:                 config,

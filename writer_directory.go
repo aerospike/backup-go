@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/writers"
 )
 
@@ -142,6 +141,6 @@ func getBackupFileNameASB(namespace string, id int) string {
 	return getBackupFileNameGeneric(namespace, id) + ".asb"
 }
 
-func (f *DirectoryWriterFactory) GetType() logging.HandlerType {
-	return logging.HandlerTypeBackupDirectory
+func (f *DirectoryWriterFactory) GetType() string {
+	return "directory"
 }

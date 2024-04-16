@@ -45,8 +45,8 @@ type BackupHandler struct {
 	stats                  BackupStats
 }
 
-// BackupStats stores the status of a backup job
-// the stats are updated in realtime by backup jobs
+// BackupStats stores the status of a backup job.
+// Stats are updated in realtime by backup jobs.
 type BackupStats struct {
 	tokenStats
 }

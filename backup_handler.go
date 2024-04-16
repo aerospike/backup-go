@@ -32,7 +32,8 @@ type WriteFactory interface {
 	// NewWriter return new writer for backup logic to use.
 	// Each call creates new writer, they might be working in parallel.
 	// Backup logic will close the writer after backup is done.
-	NewWriter(namespace string) (io.WriteCloser, error)
+	// header func is executed on a writer after creation (on each one in case of multipart file)
+	NewWriter(namespace string, header func(io.WriteCloser) error) (io.WriteCloser, error)
 	// GetType return type of storage. Used in logging.
 	GetType() string
 }
@@ -84,12 +85,10 @@ func (bh *BackupHandler) run(ctx context.Context) {
 				return err
 			}
 
-			writer, err := bh.writeFactory.NewWriter(bh.config.Namespace)
-			if err != nil {
-				return err
-			}
-
-			err = bh.writeHeader(writer, bh.config.Namespace)
+			// TODO: add headers logic to endcoder, instead this lambda acrobatics
+			writer, err := bh.writeFactory.NewWriter(bh.config.Namespace, func(w io.WriteCloser) error {
+				return bh.writeHeader(w, bh.config.Namespace)
+			})
 			if err != nil {
 				return err
 			}

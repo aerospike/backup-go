@@ -619,6 +619,9 @@ func (n *nopWriteCloser) Write(p []byte) (int, error) {
 	return n.Buffer.Write(p)
 }
 
-func (b *byteReadWriterFactory) NewWriter(_ string) (io.WriteCloser, error) {
-	return &nopWriteCloser{b.buffer}, nil
+func (b *byteReadWriterFactory) NewWriter(_ string, writeHeader func(io.WriteCloser) error) (
+	io.WriteCloser, error) {
+	buffer := &nopWriteCloser{b.buffer}
+	_ = writeHeader(buffer)
+	return buffer, nil
 }

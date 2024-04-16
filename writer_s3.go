@@ -36,19 +36,27 @@ func NewS3WriterFactory(config *S3Config, encoder EncoderFactory) *S3WriteFactor
 	}
 }
 
-func (s *S3WriteFactory) NewWriter(namespace string) (io.WriteCloser, error) {
+func (s *S3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (io.WriteCloser, error) {
 	var name string
 	if _, ok := s.encoder.(*encoding.ASBEncoderFactory); ok {
 		name = getBackupFileNameASB(namespace, int(s.fileID.Add(1)))
-		fullPath := path.Join(s.config.Prefix, name)
-
-		return NewS3Writer(s.config, fullPath)
+	} else {
+		name = getBackupFileNameGeneric(namespace, int(s.fileID.Add(1)))
 	}
 
-	name = getBackupFileNameGeneric(namespace, int(s.fileID.Add(1)))
 	fullPath := path.Join(s.config.Prefix, name)
 
-	return NewS3Writer(s.config, fullPath)
+	writer, err := NewS3Writer(s.config, fullPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeHeader(writer)
+	if err != nil {
+		return nil, err
+	}
+
+	return writer, err
 }
 
 func (s *S3WriteFactory) GetType() string {

@@ -83,16 +83,37 @@ func prepareBackupDirectory(dir string) error {
 // The file name is based on the namespace and the id.
 // The file is returned in write mode.
 // If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
-func (f *DirectoryWriterFactory) NewWriter(namespace string) (io.WriteCloser, error) {
+func (f *DirectoryWriterFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (
+	io.WriteCloser, error) {
 	var open func() (io.WriteCloser, error)
 
 	if _, ok := f.encoder.(*encoding.ASBEncoderFactory); ok {
 		open = func() (io.WriteCloser, error) {
-			return f.getNewBackupFileASB(namespace, int(f.fileID.Add(1)))
+			file, err := f.getNewBackupFileASB(namespace, int(f.fileID.Add(1)))
+			if err != nil {
+				return nil, err
+			}
+
+			err = writeHeader(file)
+			if err != nil {
+				return nil, err
+			}
+
+			return file, err
 		}
 	} else {
 		open = func() (io.WriteCloser, error) {
-			return f.getNewBackupFileGeneric(namespace, int(f.fileID.Add(1)))
+			file, err := f.getNewBackupFileGeneric(namespace, int(f.fileID.Add(1)))
+			if err != nil {
+				return nil, err
+			}
+
+			err = writeHeader(file)
+			if err != nil {
+				return nil, err
+			}
+
+			return file, err
 		}
 	}
 

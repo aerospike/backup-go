@@ -300,6 +300,22 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				expectedFiles: 100,
 			},
 		},
+		{
+			name: "parallel with file size limit",
+			args: args{
+				backupConfig: &backup.BackupConfig{
+					Partitions:     backup.NewPartitionRange(0, 4096),
+					Set:            suite.set,
+					Namespace:      suite.namespace,
+					Parallel:       4,
+					EncoderFactory: encoding.NewASBEncoderFactory(),
+				},
+				restoreConfig: backup.NewRestoreConfig(),
+				bins:          testBins,
+				fileSizeLimit: 1024 * 1024,
+				expectedFiles: 12, // 8 files of full size + 4 small
+			},
+		},
 	}
 	for _, tt := range tests {
 		suite.SetupTest()

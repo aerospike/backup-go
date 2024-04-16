@@ -290,7 +290,7 @@ func NewRestoreConfig() *RestoreConfig {
 // ctx can be used to cancel the restore operation.
 // directory is the directory to read the backup data from.
 // config is the configuration for the restore operation.
-// readerFactory providers readers to access backed up data
+// readerFactory provides readers with access to backup data.
 func (c *Client) Restore(ctx context.Context, config *RestoreConfig, readerFactory ReaderFactory,
 ) (*RestoreHandler, error) {
 	if config == nil {

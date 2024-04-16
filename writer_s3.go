@@ -66,7 +66,8 @@ func NewS3Writer(config *S3Config, key string) (*S3Writer, error) {
 
 	return &S3Writer{
 		config:   config,
-		uploader: uploader, key: key,
+		uploader: uploader,
+		key: key,
 	}, nil
 }
 

@@ -220,7 +220,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	}
 
 	ctx := context.Background()
-	dst := ByteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
@@ -257,6 +257,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		backupConfig  *backup.BackupConfig
 		restoreConfig *backup.RestoreConfig
 		bins          a.BinMap
+		fileSizeLimit int64
+		expectedFiles int
 	}
 	var tests = []struct {
 		args args
@@ -268,6 +270,18 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				backupConfig:  backup.NewBackupConfig(),
 				restoreConfig: backup.NewRestoreConfig(),
 				bins:          testBins,
+				fileSizeLimit: 0,
+				expectedFiles: 1,
+			},
+		},
+		{
+			name: "with file size limit",
+			args: args{
+				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: backup.NewRestoreConfig(),
+				bins:          testBins,
+				fileSizeLimit: 1024 * 1024,
+				expectedFiles: 10,
 			},
 		},
 		{
@@ -282,13 +296,16 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				},
 				restoreConfig: backup.NewRestoreConfig(),
 				bins:          testBins,
+				fileSizeLimit: 0,
+				expectedFiles: 100,
 			},
 		},
 	}
 	for _, tt := range tests {
 		suite.SetupTest()
 		suite.Run(tt.name, func() {
-			runBackupRestoreDirectory(suite, tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins)
+			runBackupRestoreDirectory(suite,
+				tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins, tt.args.fileSizeLimit, tt.args.expectedFiles)
 		})
 		suite.TearDownTest()
 	}
@@ -297,8 +314,10 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	backupConfig *backup.BackupConfig,
 	restoreConfig *backup.RestoreConfig,
-	bins a.BinMap) {
-	numRec := 1000
+	bins a.BinMap,
+	fileSizeLimit int64,
+	expectedFiles int) {
+	numRec := 20000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
@@ -309,7 +328,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory)
+	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory)
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
@@ -330,7 +349,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Equal(uint32(0), statsBackup.GetUDFs())
 
 	backupFiles, _ := os.ReadDir(backupDir)
-	suite.Equal(backupConfig.Parallel, len(backupFiles))
+	suite.Equal(expectedFiles, len(backupFiles))
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {
@@ -396,7 +415,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	}
 
 	ctx := context.Background()
-	reader := &ByteReadWriterFactory{
+	reader := &byteReadWriterFactory{
 		bytes.NewBuffer(data.Bytes()),
 	}
 	rh, err := suite.backupClient.Restore(
@@ -503,7 +522,7 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	writer := ByteReadWriterFactory{}
+	writer := byteReadWriterFactory{}
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backup.NewBackupConfig(),
@@ -522,7 +541,7 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	cancel()
 
 	restoreConfig := backup.NewRestoreConfig()
-	reader := ByteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	reader := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -575,16 +594,16 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 	suite.Run(t, &testSuite)
 }
 
-type ByteReadWriterFactory struct {
+type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
-func (b *ByteReadWriterFactory) Readers() ([]io.ReadCloser, error) {
+func (b *byteReadWriterFactory) Readers() ([]io.ReadCloser, error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	return []io.ReadCloser{reader}, nil
 }
 
-func (b *ByteReadWriterFactory) GetType() string {
+func (b *byteReadWriterFactory) GetType() string {
 	return "byte buffer"
 }
 
@@ -600,6 +619,6 @@ func (n *nopWriteCloser) Write(p []byte) (int, error) {
 	return n.Buffer.Write(p)
 }
 
-func (b *ByteReadWriterFactory) NewWriter(_ string) (io.WriteCloser, error) {
+func (b *byteReadWriterFactory) NewWriter(_ string) (io.WriteCloser, error) {
 	return &nopWriteCloser{b.buffer}, nil
 }

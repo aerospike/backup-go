@@ -220,7 +220,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	}
 
 	ctx := context.Background()
-	dst := ByteReaderWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	dst := ByteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
@@ -396,7 +396,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	}
 
 	ctx := context.Background()
-	reader := &ByteReaderWriterFactory{
+	reader := &ByteReadWriterFactory{
 		bytes.NewBuffer(data.Bytes()),
 	}
 	rh, err := suite.backupClient.Restore(
@@ -503,7 +503,7 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	writer := ByteReaderWriterFactory{}
+	writer := ByteReadWriterFactory{}
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backup.NewBackupConfig(),
@@ -522,7 +522,7 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	cancel()
 
 	restoreConfig := backup.NewRestoreConfig()
-	reader := ByteReaderWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	reader := ByteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -575,16 +575,16 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 	suite.Run(t, &testSuite)
 }
 
-type ByteReaderWriterFactory struct {
+type ByteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
-func (b *ByteReaderWriterFactory) Readers() ([]io.ReadCloser, error) {
+func (b *ByteReadWriterFactory) Readers() ([]io.ReadCloser, error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	return []io.ReadCloser{reader}, nil
 }
 
-func (b *ByteReaderWriterFactory) GetType() string {
+func (b *ByteReadWriterFactory) GetType() string {
 	return "byte buffer"
 }
 
@@ -600,6 +600,6 @@ func (n *nopWriteCloser) Write(p []byte) (int, error) {
 	return n.Buffer.Write(p)
 }
 
-func (b *ByteReaderWriterFactory) NewWriter(_ string) (io.WriteCloser, error) {
+func (b *ByteReadWriterFactory) NewWriter(_ string) (io.WriteCloser, error) {
 	return &nopWriteCloser{b.buffer}, nil
 }

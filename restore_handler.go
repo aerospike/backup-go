@@ -55,7 +55,7 @@ type ReaderFactory interface {
 	GetType() logging.HandlerType
 }
 
-// RestoreHandler handles a restore job from given readerFactory
+// RestoreHandler handles a restore job using the given readerFactory.
 type RestoreHandler struct {
 	readerFactory   ReaderFactory
 	config          *RestoreConfig

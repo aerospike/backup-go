@@ -2,8 +2,11 @@ package backup_test
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/aerospike/backup-go"
@@ -30,9 +33,22 @@ func (s *writeReadTestSuite) SetupSuite() {
 	}
 
 	ctx := context.Background()
-	_, err = s.docker.ImagePull(ctx, "minio/minio", image.PullOptions{})
+	responseBody, err := s.docker.ImagePull(ctx, "minio/minio", image.PullOptions{})
 	if err != nil {
 		s.FailNow("could not pull minio image", err)
+	}
+	defer responseBody.Close()
+
+	dec := json.NewDecoder(responseBody)
+	for {
+		var jm jsonmessage.JSONMessage
+		if err := dec.Decode(&jm); err != nil {
+			if err == io.EOF {
+				break
+			}
+			s.FailNow("could not decode pull image response", err)
+		}
+		slog.Info("Image pull", "status", jm)
 	}
 
 	minioResponse, err := s.docker.ContainerCreate(ctx, &container.Config{

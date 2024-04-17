@@ -23,9 +23,14 @@ type writeReadTestSuite struct {
 }
 
 func (s *writeReadTestSuite) SetupSuite() {
-	s.docker, _ = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	var err error
+	s.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		s.FailNow("Failed to create Docker client", err)
+	}
+
 	ctx := context.Background()
-	_, err := s.docker.ImagePull(ctx, "minio/minio", image.PullOptions{})
+	_, err = s.docker.ImagePull(ctx, "minio/minio", image.PullOptions{})
 	if err != nil {
 		s.FailNow("could not pull minio image", err)
 	}
@@ -49,7 +54,7 @@ func (s *writeReadTestSuite) SetupSuite() {
 				{HostIP: "0.0.0.0", HostPort: "9001"},
 			},
 		},
-	}, nil, nil, "minio")
+	}, nil, nil, "minio_test")
 	if err != nil {
 		s.FailNow("could not create minio container", err)
 	}

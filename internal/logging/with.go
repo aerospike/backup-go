@@ -24,15 +24,12 @@ func WithClient(logger *slog.Logger, id string) *slog.Logger {
 type HandlerType string
 
 const (
-	HandlerTypeUnknown          HandlerType = "unknown"
-	HandlerTypeBackup           HandlerType = "backup"
-	HandlerTypeRestore          HandlerType = "restore"
-	HandlerTypeBackupDirectory  HandlerType = "backup_directory"
-	HandlerTypeRestoreDirectory HandlerType = "restore_directory"
+	HandlerTypeBackup  HandlerType = "backup"
+	HandlerTypeRestore HandlerType = "restore"
 )
 
-func WithHandler(logger *slog.Logger, id string, handlerType HandlerType) *slog.Logger {
-	group := slog.Group("handler", "id", id, "type", handlerType)
+func WithHandler(logger *slog.Logger, id string, handlerType HandlerType, storageTpe string) *slog.Logger {
+	group := slog.Group("handler", "id", id, "type", handlerType, "storage", storageTpe)
 	return logger.With(group)
 }
 

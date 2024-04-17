@@ -375,7 +375,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		backup.NewFileReaderFactory(backupDir, restoreConfig.DecoderFactory),
+		backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory),
 	)
 	suite.Nil(err)
 
@@ -518,7 +518,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewRestoreConfig()
-	readerFactory := backup.NewFileReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	readerFactory := backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,

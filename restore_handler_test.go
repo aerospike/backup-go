@@ -39,7 +39,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	f.Close()
 
-	err = NewFileReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.NoError(err)
 }
 
@@ -55,7 +55,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	f.Close()
 
-	err = NewFileReaderFactory(dir, nil).checkRestoreDirectory()
+	err = NewDirectoryReaderFactory(dir, nil).checkRestoreDirectory()
 	suite.NoError(err)
 }
 
@@ -81,7 +81,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	f.Close()
 
-	err = NewFileReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.NoError(err)
 }
 
@@ -97,7 +97,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	f.Close()
 
-	err = NewFileReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.Error(err)
 }
 
@@ -112,7 +112,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	path := filepath.Join(dir, file.Name())
 
-	err = NewFileReaderFactory(path, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = NewDirectoryReaderFactory(path, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.Error(err)
 }
 
@@ -126,13 +126,13 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 		suite.FailNow("Failed to create dir: %v", err)
 	}
 
-	err = NewFileReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.Error(err)
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := suite.T().TempDir()
-	err := NewFileReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err := NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.Error(err)
 }
 

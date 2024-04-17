@@ -10,7 +10,7 @@ import (
 	"github.com/aerospike/backup-go/encoding"
 )
 
-func NewFileReaderFactory(dir string, decoder DecoderFactory) *DirectoryReaderFactory {
+func NewDirectoryReaderFactory(dir string, decoder DecoderFactory) *DirectoryReaderFactory {
 	return &DirectoryReaderFactory{dir: dir, decoder: decoder}
 }
 

@@ -15,6 +15,7 @@
 package asinfo
 
 import (
+	"encoding/base64"
 	"reflect"
 	"testing"
 
@@ -784,7 +785,10 @@ func Test_parseSIndex(t *testing.T) {
 
 func Test_parseInfoResponse(t *testing.T) {
 	type args struct {
-		resp string
+		resp    string
+		objSep  string
+		pairSep string
+		kvSep   string
 	}
 	tests := []struct {
 		name    string
@@ -795,7 +799,10 @@ func Test_parseInfoResponse(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				resp: "foo=bar",
+				resp:    "foo=bar",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
 			},
 			want: []infoMap{
 				{
@@ -804,9 +811,32 @@ func Test_parseInfoResponse(t *testing.T) {
 			},
 		},
 		{
+			name: "positive empty",
+			args: args{
+				resp:    "",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
+			},
+			want: nil,
+		},
+		{
+			name: "positive delimiter only",
+			args: args{
+				resp:    ";",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
+			},
+			want: nil,
+		},
+		{
 			name: "positive value includes '='",
 			args: args{
-				resp: "foo=bar=as",
+				resp:    "foo=bar=as",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
 			},
 			want: []infoMap{
 				{
@@ -815,9 +845,12 @@ func Test_parseInfoResponse(t *testing.T) {
 			},
 		},
 		{
-			name: "positive multiple elements",
+			name: "positive multiple pairs",
 			args: args{
-				resp: "foo=bar:baz=qux",
+				resp:    "foo=bar:baz=qux",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
 			},
 			want: []infoMap{
 				{
@@ -829,7 +862,10 @@ func Test_parseInfoResponse(t *testing.T) {
 		{
 			name: "positive multiple objects",
 			args: args{
-				resp: "foo=bar:baz=qux;bar=foo:qux=bar",
+				resp:    "foo=bar:baz=qux;bar=foo:qux=bar",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
 			},
 			want: []infoMap{
 				{
@@ -845,7 +881,10 @@ func Test_parseInfoResponse(t *testing.T) {
 		{
 			name: "positive multiple objects",
 			args: args{
-				resp: "foo=bar:baz=qux;bar=foo:qux=bar",
+				resp:    "foo=bar:baz=qux;bar=foo:qux=bar",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
 			},
 			want: []infoMap{
 				{
@@ -859,30 +898,48 @@ func Test_parseInfoResponse(t *testing.T) {
 			},
 		},
 		{
-			name: "negative no data after terminator ;",
+			name: "positive other format objects",
 			args: args{
-				resp: "baz=qux;",
+				resp:    "foo.bar,baz.qux|bar.foo,qux.bar",
+				objSep:  "|",
+				pairSep: ",",
+				kvSep:   ".",
 			},
-			wantErr: true,
+			want: []infoMap{
+				{
+					"foo": "bar",
+					"baz": "qux",
+				},
+				{
+					"bar": "foo",
+					"qux": "bar",
+				},
+			},
 		},
 		{
 			name: "negative invalid key pair",
 			args: args{
-				resp: "foo=bar:bazqux;bar=foo:qux=bar",
+				resp:    "foo=bar:bazqux;bar=foo:qux=bar",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
 			},
 			wantErr: true,
 		},
 		{
 			name: "negative no syntax",
 			args: args{
-				resp: "asdfasdfasdf",
+				resp:    "asdfasdfasdf",
+				objSep:  ";",
+				pairSep: ":",
+				kvSep:   "=",
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseInfoResponse(tt.args.resp)
+			got, err := parseInfoResponse(tt.args.resp, tt.args.objSep, tt.args.pairSep, tt.args.kvSep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseInfoResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1158,7 +1215,7 @@ func Test_parseSIndexResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseSIndexResponse(tt.args.sindexInfoResp)
+			got, err := parseSIndexes(tt.args.sindexInfoResp)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndexResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1243,6 +1300,298 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 			}
 			if got := av.IsGreaterOrEqual(tt.args.other); got != tt.want {
 				t.Errorf("AerospikeVersion.IsGreaterOrEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_parseUDF(t *testing.T) {
+	type args struct {
+		udfMap infoMap
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *models.UDF
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				udfMap: infoMap{
+					"type":    "LUA",
+					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				},
+			},
+			want: &models.UDF{
+				UDFType: models.UDFTypeLUA,
+				Content: []byte("function test()\n return 1\n end\n"),
+			},
+		},
+		{
+			name: "negative missing type",
+			args: args{
+				udfMap: infoMap{
+					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative bad language type",
+			args: args{
+				udfMap: infoMap{
+					"type":    "BADTYPE",
+					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative missing content",
+			args: args{
+				udfMap: infoMap{
+					"type": "LUA",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative content is not base64 encoded",
+			args: args{
+				udfMap: infoMap{
+					"type":    "LUA",
+					"content": "function test()\n return 1\n end\n",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative wrong number of info elements",
+			args: args{
+				udfMap: infoMap{
+					"type":     "LUA",
+					"content":  "function test()\n return 1\n end\n",
+					"too many": "elements",
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseUDF(tt.args.udfMap)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseUDF() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseUDF() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_parseUDFResponse(t *testing.T) {
+	type args struct {
+		udfInfoResp string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *models.UDF
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				udfInfoResp: "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+			},
+			want: &models.UDF{
+				UDFType: models.UDFTypeLUA,
+				Content: []byte("function test()\n return 1\n end\n"),
+			},
+		},
+		{
+			name: "negative empty get udf response",
+			args: args{
+				udfInfoResp: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative bad info response",
+			args: args{
+				udfInfoResp: "badresponse;;;;;;-----;",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative bad udf info response",
+			args: args{
+				udfInfoResp: "type=BADTYPE;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseUDFResponse(tt.args.udfInfoResp)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseUDFResponse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseUDFResponse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getUDF(t *testing.T) {
+	type args struct {
+		node   infoGetter
+		name   string
+		policy *a.InfoPolicy
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *models.UDF
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				node: newMockInfoGetter(t, "udf-get:filename=test.lua", map[string]string{
+					"udf-get:filename=test.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				}, nil),
+				name: "test.lua",
+			},
+			want: &models.UDF{
+				UDFType: models.UDFTypeLUA,
+				Content: []byte("function test()\n return 1\n end\n"),
+				Name:    "test.lua",
+			},
+		},
+		{
+			name: "negative response has wrong command key",
+			args: args{
+				node: newMockInfoGetter(t, "udf-get:filename=test.lua", map[string]string{
+					"bad-key": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				}, nil),
+				name: "test.lua",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative infoGetter returned an error",
+			args: args{
+				node: newMockInfoGetter(t, "udf-get:filename=test.lua", nil, a.ErrConnectionPoolEmpty),
+				name: "test.lua",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getUDF(tt.args.node, tt.args.name, tt.args.policy)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getUDF() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getUDF() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getUDFs(t *testing.T) {
+	mockInfoGetter := mocks.NewInfoGetter(t)
+	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
+		"udf-list": "filename=test1.lua;filename=test2.lua;",
+	}, nil)
+	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-get:filename=test1.lua").Return(map[string]string{
+		"udf-get:filename=test1.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+	}, nil)
+	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-get:filename=test2.lua").Return(map[string]string{
+		"udf-get:filename=test2.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 2\n end\n")),
+	}, nil)
+
+	mockInfoGetterNoUDFs := mocks.NewInfoGetter(t)
+	mockInfoGetterNoUDFs.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
+		"udf-list": "",
+	}, nil)
+
+	mockInfoGetterListUDFsFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterListUDFsFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(nil, a.ErrNetTimeout)
+
+	mockInfoGetterGetUDFFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
+		"udf-list": "filename=test1.lua;",
+	}, nil)
+	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-get:filename=test1.lua").Return(nil, a.ErrNetwork)
+
+	type args struct {
+		node   infoGetter
+		policy *a.InfoPolicy
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*models.UDF
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				node: mockInfoGetter,
+			},
+			want: []*models.UDF{
+				{
+					UDFType: models.UDFTypeLUA,
+					Content: []byte("function test()\n return 1\n end\n"),
+					Name:    "test1.lua",
+				},
+				{
+					UDFType: models.UDFTypeLUA,
+					Content: []byte("function test()\n return 2\n end\n"),
+					Name:    "test2.lua",
+				},
+			},
+		},
+		{
+			name: "positive no UDFs",
+			args: args{
+				node: mockInfoGetterNoUDFs,
+			},
+			want: []*models.UDF(nil),
+		},
+		{
+			name: "negative listing UDFs failed",
+			args: args{
+				node: mockInfoGetterListUDFsFailed,
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative getting a UDF failed",
+			args: args{
+				node: mockInfoGetterGetUDFFailed,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getUDFs(tt.args.node, tt.args.policy)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getUDFs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getUDFs() = %v, want %v", got, tt.want)
 			}
 		})
 	}

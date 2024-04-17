@@ -200,6 +200,7 @@ type dbWriter interface {
 		ctx ...*a.CDTContext,
 	) (*a.IndexTask, a.Error)
 	DropIndex(policy *a.WritePolicy, namespace, set, indexName string) a.Error
+	RegisterUDF(policy *a.WritePolicy, udfBody []byte, serverPath string, language a.Language) (*a.RegisterTask, a.Error)
 }
 
 // restoreWriter satisfies the DataWriter interface
@@ -361,21 +362,44 @@ func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 // writeUDF writes a UDF to Aerospike
 // TODO check that this does not overwrite existing UDFs
 // TODO support write policy
-func (rw *restoreWriter) writeUDF(_ *models.UDF) error {
-	return fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
-	//nolint:gocritic // this code will be used to support UDF backup
-	// var UDFLang a.Language
-	// switch udf.UDFType {
-	// case models.LUAUDFType:
-	// 	UDFLang = a.LUA
-	// default:
-	// 	return fmt.Errorf("invalid UDF language: %c", udf.UDFType)
-	// }
+func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
+	var UDFLang a.Language
 
-	//nolint:gocritic // this code will be used to support UDF backup
-	// _, err := rw.asc.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)
-	// return err
-} //nolint:wsl // comments need to be kept and should not trigger whitespace warnings
+	switch udf.UDFType {
+	case models.UDFTypeLUA:
+		UDFLang = a.LUA
+	default:
+		msg := "error registering UDF: invalid UDF language"
+		rw.logger.Debug(msg, "udf", udf.Name, "language", udf.UDFType)
+
+		return errors.New(msg)
+	}
+
+	job, aerr := rw.asc.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)
+	if aerr != nil {
+		rw.logger.Error("error registering UDF", "udf", udf.Name, "error", aerr)
+		return aerr
+	}
+
+	if job == nil {
+		msg := "error registering UDF: job is nil"
+		rw.logger.Debug(msg, "udf", udf.Name)
+
+		return errors.New(msg)
+	}
+
+	errs := job.OnComplete()
+
+	err := <-errs
+	if err != nil {
+		rw.logger.Error("error registering UDF", "udf", udf.Name, "error", err)
+		return err
+	}
+
+	rw.logger.Debug("registered UDF", "udf", udf.Name)
+
+	return err
+}
 
 // Cancel satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter

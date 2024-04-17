@@ -75,6 +75,7 @@ type backupRestoreTestSuite struct {
 	set               string
 	aerospikePort     int
 	expectedSIndexes  []*models.SIndex
+	expectedUDFs      []*models.UDF
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -107,6 +108,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 		{Code: a.Truncate},
 		{Code: a.UserAdmin},
 		{Code: a.SIndexAdmin},
+		{Code: a.UDFAdmin},
 	}
 
 	aerr = asc.CreateRole(nil, "testBackup", privs, nil, 0, 0)
@@ -221,6 +223,11 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	}
 
 	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	err = suite.testClient.WriteUDFs(suite.expectedUDFs)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -353,6 +360,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		suite.FailNow(err.Error())
 	}
 
+	err = suite.testClient.WriteUDFs(suite.expectedUDFs)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
@@ -399,7 +411,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	suite.Equal(uint64(numRec), statsRestore.GetRecords())
 	suite.Equal(uint32(8), statsRestore.GetSIndexes())
-	suite.Equal(uint32(0), statsRestore.GetUDFs())
+	suite.Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Equal(uint64(0), statsRestore.GetRecordsExpired())
 
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
@@ -712,6 +724,26 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 	}
 
 	ts.expectedSIndexes = expectedSIndexes
+
+	expectedUDFs := []*models.UDF{
+		{
+			Name:    "simple_func.lua",
+			UDFType: models.UDFTypeLUA,
+			Content: []byte("function test(rec)\n  return 1\nend"),
+		},
+		{
+			Name:    "test.lua",
+			UDFType: models.UDFTypeLUA,
+			Content: []byte(testresources.UDF),
+		},
+		{
+			Name:    "add.lua",
+			UDFType: models.UDFTypeLUA,
+			Content: []byte("function add(rec)\n  return 1 + 1\nend\n"),
+		},
+	}
+
+	ts.expectedUDFs = expectedUDFs
 
 	suite.Run(t, &ts)
 }

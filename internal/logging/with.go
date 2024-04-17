@@ -40,6 +40,7 @@ const (
 	ReaderTypeToken   ReaderType = "token"
 	ReaderTypeRecord  ReaderType = "record"
 	ReaderTypeSIndex  ReaderType = "sindex"
+	ReaderTypeUDF     ReaderType = "udf"
 )
 
 func WithReader(logger *slog.Logger, id string, readerType ReaderType) *slog.Logger {

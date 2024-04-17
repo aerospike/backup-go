@@ -530,7 +530,7 @@ func TestASBReader_readUDF(t *testing.T) {
 				},
 			},
 			want: &models.UDF{
-				UDFType: models.LUAUDFType,
+				UDFType: models.UDFTypeLUA,
 				Name:    "lua-udf",
 				Content: []byte("lua-content"),
 			},
@@ -544,7 +544,7 @@ func TestASBReader_readUDF(t *testing.T) {
 				},
 			},
 			want: &models.UDF{
-				UDFType: models.LUAUDFType,
+				UDFType: models.UDFTypeLUA,
 				Name:    "lua-udf\n1",
 				Content: []byte("lua-content\\\n1"),
 			},
@@ -3576,7 +3576,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 				},
 			},
 			want: &models.UDF{
-				UDFType: models.LUAUDFType,
+				UDFType: models.UDFTypeLUA,
 				Name:    "lua-udf",
 				Content: []byte("lua-content"),
 			},

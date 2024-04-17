@@ -437,6 +437,59 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	mockSIndexGetter.AssertExpectations(suite.T())
 }
 
+func (suite *readersTestSuite) TestUDFReader() {
+	mockUDFGetter := mocks.NewUdfGetter(suite.T())
+	mockUDFs := []*models.UDF{
+		{
+			Name: "udf1",
+		},
+		{
+			Name: "udf2",
+		},
+	}
+	mockUDFGetter.EXPECT().GetUDFs().Return(
+		mockUDFs,
+		nil,
+	)
+
+	reader := newUDFReader(mockUDFGetter, slog.Default())
+	suite.NotNil(reader)
+
+	expectedUDFTokens := []*models.Token{}
+	for _, udf := range mockUDFs {
+		expectedUDFTokens = append(expectedUDFTokens, models.NewUDFToken(udf))
+	}
+
+	v, err := reader.Read()
+	suite.Nil(err)
+	suite.Equal(v, expectedUDFTokens[0])
+
+	v, err = reader.Read()
+	suite.Nil(err)
+	suite.Equal(v, expectedUDFTokens[1])
+
+	v, err = reader.Read()
+	suite.Equal(err, io.EOF)
+	suite.Nil(v)
+
+	reader.Close()
+}
+
+func (suite *readersTestSuite) TestUDFReaderReadFailed() {
+	mockUDFGetter := mocks.NewUdfGetter(suite.T())
+	mockUDFGetter.EXPECT().GetUDFs().Return(
+		nil,
+		fmt.Errorf("error"),
+	)
+
+	reader := newUDFReader(mockUDFGetter, slog.Default())
+	suite.NotNil(reader)
+
+	v, err := reader.Read()
+	suite.NotNil(err)
+	suite.Nil(v)
+}
+
 func TestReaders(t *testing.T) {
 	suite.Run(t, new(readersTestSuite))
 }

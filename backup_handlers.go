@@ -174,14 +174,19 @@ func (bwh *BackupHandler) run(ctx context.Context) {
 				}
 			}
 
-			// backup secondary indexes on the first writer
+			// backup secondary indexes and UDFs on the first writer
 			// this is done to match the behavior of the
 			// backup c tool and keep the backup files more consistent
-			// at some point we may want to treat the secondary indexes
+			// at some point we may want to treat the secondary indexes/UDFs
 			// like records and back them up as part of the same pipeline
 			// but doing so would cause them to be mixed in with records in the backup file(s)
 			if i == 0 {
 				err = backupSIndexes(ctx, bwh.aerospikeClient, bwh.config, writer, bwh.logger)
+				if err != nil {
+					return err
+				}
+
+				err = backupUDFs(ctx, bwh.aerospikeClient, bwh.config, writer, bwh.logger)
 				if err != nil {
 					return err
 				}
@@ -256,6 +261,42 @@ func backupSIndexes(
 	err = sindexPipeline.Run(ctx)
 	if err != nil {
 		logger.Error("failed to backup secondary indexes: %v", err)
+	}
+
+	return err
+}
+
+func backupUDFs(
+	ctx context.Context,
+	ac *a.Client,
+	config *BackupConfig,
+	writer io.Writer,
+	logger *slog.Logger,
+) error {
+	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
+	if err != nil {
+		return err
+	}
+
+	udfReader := newUDFReader(infoClient, logger)
+	udfReadWorker := newReadWorker(udfReader)
+
+	udfEncoder, err := config.EncoderFactory.CreateEncoder()
+	if err != nil {
+		return err
+	}
+
+	udfWriter := newTokenWriter(udfEncoder, writer, logger)
+	udfWriteWorker := newWriteWorker(udfWriter)
+
+	udfPipeline := pipeline.NewPipeline[*models.Token](
+		[]pipeline.Worker[*models.Token]{udfReadWorker},
+		[]pipeline.Worker[*models.Token]{udfWriteWorker},
+	)
+
+	err = udfPipeline.Run(ctx)
+	if err != nil {
+		logger.Error("failed to backup UDFs: %v", err)
 	}
 
 	return err

@@ -153,7 +153,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	writer.Close()
 }
 
-func (suite *writersTestSuite) TestRestoreWriter() {
+func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	namespace := "test"
 	set := ""
 

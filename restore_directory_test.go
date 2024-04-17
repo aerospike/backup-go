@@ -39,7 +39,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	f.Close()
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = checkRestoreDirectory(dir, encoding.NewASBDecoderFactory())
 	suite.NoError(err)
 }
 
@@ -55,7 +55,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	f.Close()
 
-	err = NewDirectoryReaderFactory(dir, nil).checkRestoreDirectory()
+	err = checkRestoreDirectory(dir, nil)
 	suite.NoError(err)
 }
 
@@ -81,7 +81,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	f.Close()
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = checkRestoreDirectory(dir, encoding.NewASBDecoderFactory())
 	suite.NoError(err)
 }
 
@@ -97,7 +97,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	f.Close()
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = checkRestoreDirectory(dir, encoding.NewASBDecoderFactory())
 	suite.Error(err)
 }
 
@@ -112,7 +112,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	path := filepath.Join(dir, file.Name())
 
-	err = NewDirectoryReaderFactory(path, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = checkRestoreDirectory(path, encoding.NewASBDecoderFactory())
 	suite.Error(err)
 }
 
@@ -126,13 +126,13 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 		suite.FailNow("Failed to create dir: %v", err)
 	}
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err = checkRestoreDirectory(dir, encoding.NewASBDecoderFactory())
 	suite.Error(err)
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := suite.T().TempDir()
-	err := NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	err := checkRestoreDirectory(dir, encoding.NewASBDecoderFactory())
 	suite.Error(err)
 }
 

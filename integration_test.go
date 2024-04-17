@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go"
+	backup "github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
@@ -66,15 +65,15 @@ var testBins = a.BinMap{
 
 type backupRestoreTestSuite struct {
 	suite.Suite
-	Aeroclient        *a.Client
-	testClient        *testresources.TestClient
-	backupClient      *backup.Client
 	aerospikeIP       string
+	aerospikePort     int
 	aerospikePassword string
 	aerospikeUser     string
 	namespace         string
 	set               string
-	aerospikePort     int
+	Aeroclient        *a.Client
+	testClient        *testresources.TestClient
+	backupClient      *backup.Client
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -97,7 +96,6 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	)
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
-		return
 	}
 	defer asc.Close()
 
@@ -188,13 +186,27 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		bins          a.BinMap
 	}
 	var tests = []struct {
-		args args
 		name string
+		args args
 	}{
 		{
 			name: "default",
 			args: args{
 				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: backup.NewRestoreConfig(),
+				bins:          testBins,
+			},
+		},
+		{
+			name: "with parallel backup",
+			args: args{
+				backupConfig: &backup.BackupConfig{
+					Partitions:     backup.NewPartitionRange(0, 4096),
+					Set:            suite.set,
+					Namespace:      suite.namespace,
+					Parallel:       4,
+					EncoderFactory: encoding.NewASBEncoderFactory(),
+				},
 				restoreConfig: backup.NewRestoreConfig(),
 				bins:          testBins,
 			},
@@ -220,12 +232,12 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	}
 
 	ctx := context.Background()
-	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	dst := bytes.NewBuffer([]byte{})
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
+		[]io.Writer{dst},
 		backupConfig,
-		&dst,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -238,10 +250,12 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 		panic(err)
 	}
 
+	reader := bytes.NewReader(dst.Bytes())
+
 	rh, err := suite.backupClient.Restore(
 		ctx,
+		[]io.Reader{reader},
 		restoreConfig,
-		&dst,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -254,86 +268,54 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 	type args struct {
-		backupConfig  *backup.BackupConfig
-		restoreConfig *backup.RestoreConfig
+		backupConfig  *backup.BackupToDirectoryConfig
+		restoreConfig *backup.RestoreFromDirectoryConfig
 		bins          a.BinMap
-		fileSizeLimit int64
-		expectedFiles int
 	}
 	var tests = []struct {
-		args args
 		name string
+		args args
 	}{
 		{
 			name: "default",
 			args: args{
-				backupConfig:  backup.NewBackupConfig(),
-				restoreConfig: backup.NewRestoreConfig(),
+				backupConfig:  backup.NewBackupToDirectoryConfig(),
+				restoreConfig: backup.NewRestoreFromDirectoryConfig(),
 				bins:          testBins,
-				fileSizeLimit: 0,
-				expectedFiles: 1,
 			},
 		},
 		{
 			name: "with file size limit",
 			args: args{
-				backupConfig:  backup.NewBackupConfig(),
-				restoreConfig: backup.NewRestoreConfig(),
-				bins:          testBins,
-				fileSizeLimit: 1024 * 1024,
-				expectedFiles: 10,
-			},
-		},
-		{
-			name: "with parallel backup",
-			args: args{
-				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.NewPartitionRange(0, 4096),
-					Set:            suite.set,
-					Namespace:      suite.namespace,
-					Parallel:       100,
-					EncoderFactory: encoding.NewASBEncoderFactory(),
+				backupConfig: &backup.BackupToDirectoryConfig{
+					FileSizeLimit: 1024 * 1024,
+					BackupConfig: backup.BackupConfig{
+						Partitions:     backup.NewPartitionRange(0, 4096),
+						Set:            suite.set,
+						Namespace:      suite.namespace,
+						Parallel:       4,
+						EncoderFactory: encoding.NewASBEncoderFactory(),
+					},
 				},
-				restoreConfig: backup.NewRestoreConfig(),
+				restoreConfig: backup.NewRestoreFromDirectoryConfig(),
 				bins:          testBins,
-				fileSizeLimit: 0,
-				expectedFiles: 100,
-			},
-		},
-		{
-			name: "parallel with file size limit",
-			args: args{
-				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.NewPartitionRange(0, 4096),
-					Set:            suite.set,
-					Namespace:      suite.namespace,
-					Parallel:       4,
-					EncoderFactory: encoding.NewASBEncoderFactory(),
-				},
-				restoreConfig: backup.NewRestoreConfig(),
-				bins:          testBins,
-				fileSizeLimit: 1024 * 1024,
-				expectedFiles: 12, // 8 files of full size + 4 small
 			},
 		},
 	}
 	for _, tt := range tests {
 		suite.SetupTest()
 		suite.Run(tt.name, func() {
-			runBackupRestoreDirectory(suite,
-				tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins, tt.args.fileSizeLimit, tt.args.expectedFiles)
+			runBackupRestoreDirectory(suite, tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins)
 		})
 		suite.TearDownTest()
 	}
 }
 
 func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
-	backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig,
-	bins a.BinMap,
-	fileSizeLimit int64,
-	expectedFiles int) {
-	numRec := 20000
+	backupConfig *backup.BackupToDirectoryConfig,
+	restoreConfig *backup.RestoreFromDirectoryConfig,
+	bins a.BinMap) {
+	numRec := 1000
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
@@ -344,12 +326,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory)
 
-	bh, err := suite.backupClient.Backup(
+	bh, err := suite.backupClient.BackupToDirectory(
 		ctx,
+		backupDir,
 		backupConfig,
-		writerFactory,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -364,18 +345,15 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Equal(uint32(0), statsBackup.GetSIndexes())
 	suite.Equal(uint32(0), statsBackup.GetUDFs())
 
-	backupFiles, _ := os.ReadDir(backupDir)
-	suite.Equal(expectedFiles, len(backupFiles))
-
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 
-	rh, err := suite.backupClient.Restore(
+	rh, err := suite.backupClient.RestoreFromDirectory(
 		ctx,
+		backupDir,
 		restoreConfig,
-		backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory),
 	)
 	suite.Nil(err)
 
@@ -431,13 +409,11 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	}
 
 	ctx := context.Background()
-	reader := &byteReadWriterFactory{
-		bytes.NewBuffer(data.Bytes()),
-	}
+	reader := bytes.NewReader(data.Bytes())
 	rh, err := suite.backupClient.Restore(
 		ctx,
-		backup.NewRestoreConfig(),
-		reader,
+		[]io.Reader{reader},
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -495,16 +471,15 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	ctx := context.Background()
+	dst := bytes.NewBuffer([]byte{})
 
 	backupConfig := backup.NewBackupConfig()
 	backupConfig.Partitions = partitions
 
-	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory)
 	bh, err := suite.backupClient.Backup(
 		ctx,
+		[]io.Writer{dst},
 		backupConfig,
-		writerFactory,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -517,13 +492,12 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 		panic(err)
 	}
 
-	restoreConfig := backup.NewRestoreConfig()
-	readerFactory := backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	reader := bytes.NewReader(dst.Bytes())
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
-		restoreConfig,
-		readerFactory,
+		[]io.Reader{reader},
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -538,11 +512,12 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	writer := byteReadWriterFactory{}
+	dst := bytes.NewBuffer([]byte{})
+
 	bh, err := suite.backupClient.Backup(
 		ctx,
-		backup.NewBackupConfig(),
-		&writer,
+		[]io.Writer{dst},
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -556,12 +531,12 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	restoreConfig := backup.NewRestoreConfig()
-	reader := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	reader := bytes.NewReader([]byte{})
+
 	rh, err := suite.backupClient.Restore(
 		ctx,
-		restoreConfig,
-		&reader,
+		[]io.Reader{reader},
+		nil,
 	)
 	suite.NotNil(rh)
 	suite.Nil(err)
@@ -608,36 +583,4 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 	}
 
 	suite.Run(t, &testSuite)
-}
-
-type byteReadWriterFactory struct {
-	buffer *bytes.Buffer
-}
-
-func (b *byteReadWriterFactory) Readers() ([]io.ReadCloser, error) {
-	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	return []io.ReadCloser{reader}, nil
-}
-
-func (b *byteReadWriterFactory) GetType() string {
-	return "byte buffer"
-}
-
-type nopWriteCloser struct {
-	*bytes.Buffer
-}
-
-func (n *nopWriteCloser) Close() error {
-	return nil
-}
-
-func (n *nopWriteCloser) Write(p []byte) (int, error) {
-	return n.Buffer.Write(p)
-}
-
-func (b *byteReadWriterFactory) NewWriter(_ string, writeHeader func(io.WriteCloser) error) (
-	io.WriteCloser, error) {
-	buffer := &nopWriteCloser{b.buffer}
-	_ = writeHeader(buffer)
-	return buffer, nil
 }

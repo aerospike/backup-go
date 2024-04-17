@@ -216,15 +216,13 @@ func NewBackupConfig() *BackupConfig {
 	}
 }
 
-// Backup starts a backup operation
-// that writes data to a provided writer.
-// config.Parallel determines the number of files to write concurrently.
+// Backup starts a backup operation to a set of io.writers.
 // ctx can be used to cancel the backup operation.
+// writers is a set of io.writers to write the backup data to.
 // config is the configuration for the backup operation.
-func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteFactory) (
-	*BackupHandler, error) {
+func (c *Client) Backup(ctx context.Context, writers []io.Writer, config *BackupConfig) (*BackupHandler, error) {
 	if config == nil {
-		return nil, fmt.Errorf("backup config required")
+		config = NewBackupConfig()
 	}
 
 	// copy the policies so we don't modify the original
@@ -238,7 +236,66 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteF
 		return nil, err
 	}
 
-	handler := newBackupHandler(config, c.aerospikeClient, c.logger, writer)
+	handler := newBackupHandler(config, c.aerospikeClient, writers, c.logger)
+	handler.run(ctx)
+
+	return handler, nil
+}
+
+// BackupToDirectoryConfig contains configuration for the backup to directory operation.
+type BackupToDirectoryConfig struct {
+	BackupConfig
+	// FileSizeLimit is the maximum size of each backup file in bytes.
+	// If FileSizeLimit is 0, backup file size is unbounded.
+	// If non-zero, backup files will be split into multiple files if their size exceeds this limit.
+	// If non-zero, FileSizeLimit must be greater than or equal to 1MB.
+	// FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
+	FileSizeLimit int64
+}
+
+// NewBackupToDirectoryConfig returns a new BackupToDirectoryConfig with default values.
+func NewBackupToDirectoryConfig() *BackupToDirectoryConfig {
+	return &BackupToDirectoryConfig{
+		BackupConfig: *NewBackupConfig(),
+	}
+}
+
+func (c *BackupToDirectoryConfig) validate() error {
+	if c.FileSizeLimit > 0 && c.FileSizeLimit < 1024*1024 {
+		return fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", c.FileSizeLimit)
+	}
+
+	if c.FileSizeLimit < 0 {
+		return fmt.Errorf("file size limit must not be negative, got %d", c.FileSizeLimit)
+	}
+
+	return c.BackupConfig.validate()
+}
+
+// BackupToDirectory starts a backup operation
+// that writes data to a local directory.
+// config.Parallel determines the number of files to write concurrently.
+// ctx can be used to cancel the backup operation.
+// directory is the directory to write the backup data to.
+// config is the configuration for the backup operation.
+func (c *Client) BackupToDirectory(ctx context.Context,
+	directory string, config *BackupToDirectoryConfig) (*BackupToDirectoryHandler, error) {
+	if config == nil {
+		config = NewBackupToDirectoryConfig()
+	}
+
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
+	config.ScanPolicy = &scanPolicy
+
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	handler := newBackupToDirectoryHandler(config, c.aerospikeClient, directory, c.logger)
 	handler.run(ctx)
 
 	return handler, nil
@@ -283,18 +340,13 @@ func NewRestoreConfig() *RestoreConfig {
 	}
 }
 
-// Restore starts a restore operation
-// that reads data from given readers.
-// The backup data may be in a single file or multiple files.
-// config.Parallel determines the number of files to read concurrently.
+// Restore starts a restore operation from a set of io.readers.
 // ctx can be used to cancel the restore operation.
-// directory is the directory to read the backup data from.
+// readers is a set of io.readers to read the backup data from.
 // config is the configuration for the restore operation.
-// readerFactory provides readers with access to backup data.
-func (c *Client) Restore(ctx context.Context, config *RestoreConfig, readerFactory ReaderFactory,
-) (*RestoreHandler, error) {
+func (c *Client) Restore(ctx context.Context, readers []io.Reader, config *RestoreConfig) (*RestoreHandler, error) {
 	if config == nil {
-		return nil, fmt.Errorf("restore config required")
+		config = NewRestoreConfig()
 	}
 
 	// copy the policies so we don't modify the original
@@ -308,7 +360,50 @@ func (c *Client) Restore(ctx context.Context, config *RestoreConfig, readerFacto
 		return nil, err
 	}
 
-	handler := newRestoreHandler(config, c.aerospikeClient, c.logger, readerFactory)
+	handler := newRestoreHandler(config, c.aerospikeClient, readers, c.logger)
+	handler.run(ctx)
+
+	return handler, nil
+}
+
+// RestoreFromDirectoryConfig contains configuration for the restore from directory operation.
+type RestoreFromDirectoryConfig struct {
+	RestoreConfig
+}
+
+// NewRestoreFromDirectoryConfig returns a new RestoreFromDirectoryConfig with default values.
+func NewRestoreFromDirectoryConfig() *RestoreFromDirectoryConfig {
+	return &RestoreFromDirectoryConfig{
+		RestoreConfig: *NewRestoreConfig(),
+	}
+}
+
+// RestoreFromDirectory starts a restore operation
+// that reads data from a local directory.
+// The backup data may be in a single file or multiple files.
+// config.Parallel determines the number of files to read concurrently.
+// All backup files in the directory must have been generated by the same backup operation.
+// ctx can be used to cancel the restore operation.
+// directory is the directory to read the backup data from.
+// config is the configuration for the restore operation.
+func (c *Client) RestoreFromDirectory(ctx context.Context,
+	directory string, config *RestoreFromDirectoryConfig) (*RestoreFromDirectoryHandler, error) {
+	if config == nil {
+		config = NewRestoreFromDirectoryConfig()
+	}
+
+	// copy the policies so we don't modify the original
+	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
+	config.InfoPolicy = &infoPolicy
+
+	writePolicy := c.getUsableWritePolicy(config.WritePolicy)
+	config.WritePolicy = &writePolicy
+
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	handler := newRestoreFromDirectoryHandler(config, c.aerospikeClient, directory, c.logger)
 	handler.run(ctx)
 
 	return handler, nil

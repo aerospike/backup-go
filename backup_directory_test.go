@@ -26,6 +26,54 @@ type backupDirectoryTestSuite struct {
 	suite.Suite
 }
 
+func (suite *backupDirectoryTestSuite) Test_getNewBackupFileGeneric() {
+	tmpDir := suite.T().TempDir()
+
+	w, err := getNewBackupFileGeneric(tmpDir, "test", 1)
+	suite.NoError(err)
+	suite.NotNil(w)
+
+	err = w.Close()
+	suite.NoError(err)
+
+	w, err = os.Open(filepath.Join(tmpDir, "test_1"))
+	suite.NoError(err)
+	suite.NotNil(w)
+
+	err = w.Close()
+	suite.NoError(err)
+}
+
+func (suite *backupDirectoryTestSuite) Test_getNewBackupFileGenericError() {
+	w, err := getNewBackupFileGeneric("./bad_dir", "test", 1)
+	suite.Error(err)
+	suite.Nil(w)
+}
+
+func (suite *backupDirectoryTestSuite) Test_getNewBackupFileASB() {
+	tmpDir := suite.T().TempDir()
+
+	w, err := getNewBackupFileASB(tmpDir, "test", 1)
+	suite.NoError(err)
+	suite.NotNil(w)
+
+	err = w.Close()
+	suite.NoError(err)
+
+	w, err = os.Open(filepath.Join(tmpDir, "test_1.asb"))
+	suite.NoError(err)
+	suite.NotNil(w)
+
+	err = w.Close()
+	suite.NoError(err)
+}
+
+func (suite *backupDirectoryTestSuite) Test_getNewBackupFileASBError() {
+	w, err := getNewBackupFileASB("./bad_dir", "test", 1)
+	suite.Error(err)
+	suite.Nil(w)
+}
+
 func (suite *backupDirectoryTestSuite) Test_openBackupFile() {
 	tmpDir := suite.T().TempDir()
 

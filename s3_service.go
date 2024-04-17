@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -25,7 +26,7 @@ func NewSession(config *S3Config) (*session.Session, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot create session: %v", err)
 	}
 
 	svc := s3.New(sess)

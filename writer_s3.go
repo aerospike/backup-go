@@ -56,7 +56,7 @@ func (s *S3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCl
 		return nil, err
 	}
 
-	return writer, err
+	return writer, nil
 }
 
 func (s *S3WriteFactory) GetType() string {

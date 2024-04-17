@@ -10,9 +10,9 @@ linters-settings:
       - performance
       - style
   govet:
-    check-shadowing: true
     enable:
       - fieldalignment
+      - shadow
   nolintlint:
     require-explanation: true
     require-specific: true

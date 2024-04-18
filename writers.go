@@ -298,7 +298,7 @@ func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 	}
 
 	job, err := rw.asc.CreateComplexIndex(
-		nil,
+		rw.writePolicy,
 		si.Namespace,
 		si.Set,
 		si.Name,
@@ -313,14 +313,14 @@ func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
 		if err.Matches(atypes.INDEX_FOUND) {
 			rw.logger.Debug("index already exists, replacing it", "sindex", si.Name)
 
-			err = rw.asc.DropIndex(nil, si.Namespace, si.Set, si.Name)
+			err = rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
 			if err != nil {
 				rw.logger.Error("error dropping sindex", "sindex", si.Name, "error", err)
 				return err
 			}
 
 			job, err = rw.asc.CreateComplexIndex(
-				nil,
+				rw.writePolicy,
 				si.Namespace,
 				si.Set,
 				si.Name,
@@ -375,7 +375,7 @@ func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
 		return errors.New(msg)
 	}
 
-	job, aerr := rw.asc.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)
+	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, UDFLang)
 	if aerr != nil {
 		rw.logger.Error("error registering UDF", "udf", udf.Name, "error", aerr)
 		return aerr

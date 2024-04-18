@@ -22,8 +22,10 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 )
 
@@ -101,6 +103,19 @@ func (bh *BackupHandler) run(ctx context.Context) {
 				}
 			}()
 
+			// backup secondary indexes on the first writer
+			// this is done to match the behavior of the
+			// backup c tool and keep the backup files more consistent
+			// at some point we may want to treat the secondary indexes
+			// like records and back them up as part of the same pipeline
+			// but doing so would cause them to be mixed in with records in the backup file(s)
+			if i == 0 {
+				err = backupSIndexes(ctx, bh.aerospikeClient, bh.config, writer, bh.logger)
+				if err != nil {
+					return err
+				}
+			}
+
 			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
 			writeWorkers[i] = newWriteWorker(dataWriter)
@@ -133,4 +148,40 @@ func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) er
 	}
 
 	return nil
+}
+
+func backupSIndexes(
+	ctx context.Context,
+	ac *a.Client,
+	config *BackupConfig,
+	writer io.Writer,
+	logger *slog.Logger,
+) error {
+	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
+	if err != nil {
+		return err
+	}
+
+	sindexReader := newSIndexReader(infoClient, config.Namespace, logger)
+	sindexReadWorker := newReadWorker(sindexReader)
+
+	sindexEncoder, err := config.EncoderFactory.CreateEncoder()
+	if err != nil {
+		return err
+	}
+
+	sindexWriter := newTokenWriter(sindexEncoder, writer, logger)
+	sindexWriteWorker := newWriteWorker(sindexWriter)
+
+	sindexPipeline := pipeline.NewPipeline[*models.Token](
+		[]pipeline.Worker[*models.Token]{sindexReadWorker},
+		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
+	)
+
+	err = sindexPipeline.Run(ctx)
+	if err != nil {
+		logger.Error("failed to backup secondary indexes: %v", err)
+	}
+
+	return err
 }

@@ -110,12 +110,12 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			// like records and back them up as part of the same pipeline
 			// but doing so would cause them to be mixed in with records in the backup file(s)
 			if i == 0 {
-				err = backupSIndexes(ctx, bh.aerospikeClient, bh.config, writer, bh.logger)
+				err = backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
 				if err != nil {
 					return err
 				}
 
-				err = backupUDFs(ctx, bh.aerospikeClient, bh.config, writer, bh.logger)
+				err = backupUDFs(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
 				if err != nil {
 					return err
 				}
@@ -159,6 +159,7 @@ func backupSIndexes(
 	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
+	stats *BackupStats,
 	writer io.Writer,
 	logger *slog.Logger,
 ) error {
@@ -175,7 +176,8 @@ func backupSIndexes(
 		return err
 	}
 
-	sindexWriter := newTokenWriter(sindexEncoder, writer, logger)
+	var sindexWriter dataWriter[*models.Token] = newTokenWriter(sindexEncoder, writer, logger)
+	sindexWriter = newWriterWithTokenStats(sindexWriter, stats, logger)
 	sindexWriteWorker := newWriteWorker(sindexWriter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
@@ -195,6 +197,7 @@ func backupUDFs(
 	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
+	stats *BackupStats,
 	writer io.Writer,
 	logger *slog.Logger,
 ) error {
@@ -211,7 +214,8 @@ func backupUDFs(
 		return err
 	}
 
-	udfWriter := newTokenWriter(udfEncoder, writer, logger)
+	var udfWriter dataWriter[*models.Token] = newTokenWriter(udfEncoder, writer, logger)
+	udfWriter = newWriterWithTokenStats(udfWriter, stats, logger)
 	udfWriteWorker := newWriteWorker(udfWriter)
 
 	udfPipeline := pipeline.NewPipeline[*models.Token](

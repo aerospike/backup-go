@@ -385,8 +385,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Nil(err)
 
 	suite.Equal(uint64(numRec), statsBackup.GetRecords())
-	suite.Equal(uint32(0), statsBackup.GetSIndexes())
-	suite.Equal(uint32(0), statsBackup.GetUDFs())
+	suite.Equal(uint32(8), statsBackup.GetSIndexes())
+	suite.Equal(uint32(3), statsBackup.GetUDFs())
 
 	backupFiles, _ := os.ReadDir(backupDir)
 	suite.Equal(expectedFiles, len(backupFiles))

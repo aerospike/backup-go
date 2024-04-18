@@ -187,7 +187,7 @@ func backupSIndexes(
 
 	err = sindexPipeline.Run(ctx)
 	if err != nil {
-		logger.Error("failed to backup secondary indexes: %v", err)
+		logger.Error("failed to backup secondary indexes", "error", err)
 	}
 
 	return err
@@ -225,7 +225,7 @@ func backupUDFs(
 
 	err = udfPipeline.Run(ctx)
 	if err != nil {
-		logger.Error("failed to backup UDFs: %v", err)
+		logger.Error("failed to backup UDFs", "error", err)
 	}
 
 	return err

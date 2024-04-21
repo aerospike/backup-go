@@ -100,7 +100,7 @@ func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan erro
 }
 
 type S3Reader struct {
-	body       io.Reader
+	reader     io.Reader
 	bucketName string
 	key        string
 	closed     bool
@@ -122,10 +122,8 @@ func (f *S3ReaderFactory) newS3Reader(key string) (*S3Reader, error) {
 		chunkSize = s3DefaultChunkSize
 	}
 
-	bufferedReader := bufio.NewReaderSize(getObjectOutput.Body, chunkSize)
-
 	return &S3Reader{
-		body:       bufferedReader,
+		reader:     bufio.NewReaderSize(getObjectOutput.Body, chunkSize),
 		bucketName: f.s3Config.Bucket,
 		key:        key,
 	}, nil
@@ -136,7 +134,7 @@ func (r *S3Reader) Read(p []byte) (int, error) {
 		return 0, os.ErrClosed
 	}
 
-	return r.body.Read(p)
+	return r.reader.Read(p)
 }
 
 func (r *S3Reader) Close() error {

@@ -15,7 +15,11 @@
 package testutils
 
 import (
+	"fmt"
+
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,6 +27,7 @@ import (
 // convenience methods for testing.
 type TestClient struct {
 	asc *a.Client
+	inf *asinfo.InfoClient
 }
 
 type digest = string
@@ -34,9 +39,112 @@ type RecordMap map[digest]*a.Record
 
 // NewTestClient creates a new TestClient.
 func NewTestClient(asc *a.Client) *TestClient {
+	infoPolicy := a.NewInfoPolicy()
+
+	infoClient, err := asinfo.NewInfoClientFromAerospike(asc, infoPolicy)
+	if err != nil {
+		panic(err)
+	}
+
 	return &TestClient{
 		asc: asc,
+		inf: infoClient,
 	}
+}
+
+// WriteSIndex writes a secondary index to the database.
+func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
+	for _, sindex := range sindexes {
+		var sindexType a.IndexType
+
+		switch sindex.Path.BinType {
+		case models.NumericSIDataType:
+			sindexType = a.NUMERIC
+		case models.StringSIDataType:
+			sindexType = a.STRING
+		case models.BlobSIDataType:
+			sindexType = a.BLOB
+		case models.GEO2DSphereSIDataType:
+			sindexType = a.GEO2DSPHERE
+		default:
+			return fmt.Errorf("invalid sindex bin type: %c", sindex.Path.BinType)
+		}
+
+		var sindexCollectionType a.IndexCollectionType
+
+		switch sindex.IndexType {
+		case models.BinSIndex:
+			sindexCollectionType = a.ICT_DEFAULT
+		case models.ListElementSIndex:
+			sindexCollectionType = a.ICT_LIST
+		case models.MapKeySIndex:
+			sindexCollectionType = a.ICT_MAPKEYS
+		case models.MapValueSIndex:
+			sindexCollectionType = a.ICT_MAPVALUES
+		default:
+			return fmt.Errorf("invalid sindex collection type: %c", sindex.IndexType)
+		}
+
+		var ctx []*a.CDTContext
+
+		if sindex.Path.B64Context != "" {
+			var err error
+
+			ctx, err = a.Base64ToCDTContext(sindex.Path.B64Context)
+			if err != nil {
+				return err
+			}
+		}
+
+		task, err := tc.asc.CreateComplexIndex( // TODO create complex indexes
+			nil,
+			sindex.Namespace,
+			sindex.Set,
+			sindex.Name,
+			sindex.Path.BinName,
+			sindexType,
+			sindexCollectionType,
+			ctx...,
+		)
+		if err != nil {
+			return err
+		}
+
+		errs := task.OnComplete()
+
+		err = <-errs
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DropSIndex deletes a secondary index from the database.
+func (tc *TestClient) DropSIndex(namespace, set, name string) error {
+	err := tc.asc.DropIndex(nil, namespace, set, name)
+	return err
+}
+
+// ReadAllSIndexes reads all secondary indexes in the given namespace.
+func (tc *TestClient) ReadAllSIndexes(namespace string) ([]*models.SIndex, error) {
+	sindexes, err := tc.inf.GetSIndexes(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return sindexes, nil
+}
+
+// ValidateSIndexes compares the expected secondary indexes to the actual secondary indexes in the database.
+func (tc *TestClient) ValidateSIndexes(t assert.TestingT, expected []*models.SIndex, namespace string) {
+	actual, err := tc.ReadAllSIndexes(namespace)
+	if err != nil {
+		t.Errorf("Error reading sindexes: %v", err)
+	}
+
+	assert.Equal(t, expected, actual)
 }
 
 // WriteRecords writes the given records to the database.

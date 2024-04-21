@@ -35,7 +35,6 @@ import (
 
 const (
 	// got this from writing and reading back a.HLLAddOp(hllpol, "hll", []a.Value{a.NewIntegerValue(1)}, 4, 12)
-	//nolint:lll // can't split this up without making it a raw quote which will cause the escaped bytes to be interpreted literally
 	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 )
 
@@ -75,6 +74,7 @@ type backupRestoreTestSuite struct {
 	namespace         string
 	set               string
 	aerospikePort     int
+	expectedSIndexes  []*models.SIndex
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -106,6 +106,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 		{Code: a.Write},
 		{Code: a.Truncate},
 		{Code: a.UserAdmin},
+		{Code: a.SIndexAdmin},
 	}
 
 	aerr = asc.CreateRole(nil, "testBackup", privs, nil, 0, 0)
@@ -216,7 +217,12 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 
 	err := suite.testClient.WriteRecords(expectedRecs)
 	if err != nil {
-		panic(err)
+		suite.FailNow(err.Error())
+	}
+
+	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
+	if err != nil {
+		suite.FailNow(err.Error())
 	}
 
 	ctx := context.Background()
@@ -250,6 +256,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	suite.Nil(err)
 
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
+	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
@@ -341,6 +348,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		panic(err)
 	}
 
+	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
@@ -386,9 +398,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Nil(err)
 
 	suite.Equal(uint64(numRec), statsRestore.GetRecords())
-	suite.Equal(uint32(0), statsRestore.GetSIndexes())
+	suite.Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Equal(uint32(0), statsRestore.GetUDFs())
 	suite.Equal(uint64(0), statsRestore.GetRecordsExpired())
+
+	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
@@ -598,7 +612,7 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 }
 
 func TestBackupRestoreTestSuite(t *testing.T) {
-	testSuite := backupRestoreTestSuite{
+	ts := backupRestoreTestSuite{
 		aerospikeIP:       testutils.IP,
 		aerospikePort:     testutils.PortStart,
 		aerospikePassword: testutils.Password,
@@ -607,7 +621,131 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 		set:               "",
 	}
 
-	suite.Run(t, &testSuite)
+	listCtx, _ := a.CDTContextToBase64([]*a.CDTContext{a.CtxListValue(a.NewValue([]byte("hi")))})
+	mapKeyCTX, _ := a.CDTContextToBase64([]*a.CDTContext{a.CtxMapKey(a.NewValue(1))})
+	mapValueCTX, _ := a.CDTContextToBase64([]*a.CDTContext{a.CtxMapValue(a.NewValue("hi"))})
+
+	expectedSIndexes := []*models.SIndex{
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "IntBinIndex",
+			IndexType: models.BinSIndex,
+			Path: models.SIndexPath{
+				BinName: "IntBin",
+				BinType: models.NumericSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "StringBinIndex",
+			IndexType: models.BinSIndex,
+			Path: models.SIndexPath{
+				BinName: "StringBin",
+				BinType: models.StringSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "ListBinIndex",
+			IndexType: models.ListElementSIndex,
+			Path: models.SIndexPath{
+				BinName: "ListBin",
+				BinType: models.NumericSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "MapBinIndex",
+			IndexType: models.MapKeySIndex,
+			Path: models.SIndexPath{
+				BinName: "MapBin",
+				BinType: models.StringSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "GeoJSONBinIndex",
+			IndexType: models.BinSIndex,
+			Path: models.SIndexPath{
+				BinName: "GeoJSONBin",
+				BinType: models.GEO2DSphereSIDataType,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "ListElemBinIndex",
+			IndexType: models.ListElementSIndex,
+			Path: models.SIndexPath{
+				BinName:    "ListBin",
+				BinType:    models.BlobSIDataType,
+				B64Context: listCtx,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "MapKeyBinIndex",
+			IndexType: models.MapKeySIndex,
+			Path: models.SIndexPath{
+				BinName:    "MapBin",
+				BinType:    models.NumericSIDataType,
+				B64Context: mapKeyCTX,
+			},
+		},
+		{
+			Namespace: ts.namespace,
+			Set:       ts.set,
+			Name:      "MapValBinIndex",
+			IndexType: models.MapValueSIndex,
+			Path: models.SIndexPath{
+				BinName:    "MapBin",
+				BinType:    models.StringSIDataType,
+				B64Context: mapValueCTX,
+			},
+		},
+	}
+
+	ts.expectedSIndexes = expectedSIndexes
+
+	suite.Run(t, &ts)
+}
+
+type byteReadWriterFactory struct {
+	buffer *bytes.Buffer
+}
+
+func (b *byteReadWriterFactory) Readers() ([]io.ReadCloser, error) {
+	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
+	return []io.ReadCloser{reader}, nil
+}
+
+func (b *byteReadWriterFactory) GetType() string {
+	return "byte buffer"
+}
+
+type nopWriteCloser struct {
+	*bytes.Buffer
+}
+
+func (n *nopWriteCloser) Close() error {
+	return nil
+}
+
+func (n *nopWriteCloser) Write(p []byte) (int, error) {
+	return n.Buffer.Write(p)
+}
+
+func (b *byteReadWriterFactory) NewWriter(_ string, writeHeader func(io.WriteCloser) error) (
+	io.WriteCloser, error) {
+	buffer := &nopWriteCloser{b.buffer}
+	_ = writeHeader(buffer)
+	return buffer, nil
 }
 
 type byteReadWriterFactory struct {

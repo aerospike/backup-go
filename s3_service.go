@@ -28,7 +28,7 @@ func newS3Client(s3Config *S3Config) (*s3.Client, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to load SDK s3Config, %v", err)
+		return nil, fmt.Errorf("unable to load SDK s3Config, %w", err)
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {

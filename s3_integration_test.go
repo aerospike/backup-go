@@ -3,8 +3,6 @@ package backup_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"io"
 	"log/slog"
 	"testing"
@@ -12,7 +10,9 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -116,7 +116,7 @@ func (s *writeReadTestSuite) TestWriteRead() {
 }
 
 func (s *writeReadTestSuite) write(namespace string, bytes []byte, config *backup.S3Config) {
-	factory := backup.NewS3WriterFactory(config, encoding.NewASBEncoderFactory())
+	factory, _ := backup.NewS3WriterFactory(config, encoding.NewASBEncoderFactory())
 
 	writer, err := factory.NewWriter(namespace, func(_ io.WriteCloser) error {
 		return nil
@@ -139,7 +139,7 @@ func (s *writeReadTestSuite) write(namespace string, bytes []byte, config *backu
 }
 
 func (s *writeReadTestSuite) read(config *backup.S3Config) (buffer []byte, n int) {
-	factory := backup.NewS3ReaderFactory(config, encoding.NewASBDecoderFactory())
+	factory, _ := backup.NewS3ReaderFactory(config, encoding.NewASBDecoderFactory())
 
 	readers, err := factory.Readers()
 	if err != nil {

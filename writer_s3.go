@@ -77,7 +77,7 @@ func (f *S3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCl
 			Key:    &fullPath,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to create multipart upload: %v", err)
+			return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 		}
 
 		writer := &S3Writer{

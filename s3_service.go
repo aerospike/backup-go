@@ -17,8 +17,8 @@ type S3Config struct {
 	ChunkSize int
 }
 
-const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part
-const maxS3File = int64(5) << 40           // 5 TiB
+const s3DefaultChunkSize = 5 * 1024 * 1024       // 5MB, minimum size of a part
+const maxS3File = s3DefaultChunkSize * 1_000_000 // 5 TB
 const s3type = "s3"
 
 func newS3Client(s3Config *S3Config) (*s3.Client, error) {

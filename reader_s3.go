@@ -3,7 +3,6 @@ package backup
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"io"
 	"os"
 
@@ -134,7 +133,7 @@ func (f *S3ReaderFactory) newS3Reader(key string) (*S3Reader, error) {
 
 func (r *S3Reader) Read(p []byte) (int, error) {
 	if r.closed {
-		return 0, fmt.Errorf("read on closed S3Download")
+		return 0, os.ErrClosed
 	}
 
 	return r.body.Read(p)

@@ -3,8 +3,11 @@ package backup_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/aerospike/backup-go"
@@ -91,6 +94,41 @@ func (s *writeReadTestSuite) SetupSuite() {
 	if err != nil {
 		s.FailNow("could not create bucket", err)
 	}
+
+	err = createMinioCredentialsFile()
+	if err != nil {
+		s.FailNow("could not create credentials file", err)
+	}
+}
+
+func createMinioCredentialsFile() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("error getting home directory: %v", err)
+	}
+
+	awsDir := filepath.Join(home, ".aws")
+	err = os.MkdirAll(awsDir, 0700)
+	if err != nil {
+		return fmt.Errorf("error creating .aws directory: %v", err)
+	}
+
+	filePath := filepath.Join(awsDir, "credentials")
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		credentialsFileBytes := []byte(`[minio]
+aws_access_key_id = minioadmin
+aws_secret_access_key = minioadmin`)
+
+		err = os.WriteFile(filePath, credentialsFileBytes, 0600)
+		if err != nil {
+			return fmt.Errorf("error writing ~/.aws/credentials file: %v", err)
+		}
+
+		fmt.Println("Credentials file created successfully!")
+	}
+
+	return nil
 }
 
 func (s *writeReadTestSuite) TearDownSuite() {

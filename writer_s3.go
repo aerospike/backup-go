@@ -172,7 +172,7 @@ func (w *S3Writer) Close() error {
 			},
 		})
 	if err != nil {
-		return fmt.Errorf("failed to complete multipart upload, %v", err)
+		return fmt.Errorf("failed to complete multipart upload, %w", err)
 	}
 
 	w.closed = true

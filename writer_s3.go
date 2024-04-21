@@ -118,12 +118,7 @@ func (w *S3Writer) Write(p []byte) (int, error) {
 		}
 	}
 
-	np, err := w.buffer.Write(p)
-	if err != nil {
-		return np, err
-	}
-
-	return np, nil
+	return w.buffer.Write(p)
 }
 
 func (w *S3Writer) uploadPart() error {

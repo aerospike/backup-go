@@ -209,6 +209,7 @@ func (s *writeReadTestSuite) read(config *backup.S3Config) []byte {
 		s.FailNow("failed to read", err)
 	}
 
+	_ = readers[0].Close()
 	return buffer
 }
 

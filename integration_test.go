@@ -747,35 +747,3 @@ func (b *byteReadWriterFactory) NewWriter(_ string, writeHeader func(io.WriteClo
 	_ = writeHeader(buffer)
 	return buffer, nil
 }
-
-type byteReadWriterFactory struct {
-	buffer *bytes.Buffer
-}
-
-func (b *byteReadWriterFactory) Readers() ([]io.ReadCloser, error) {
-	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	return []io.ReadCloser{reader}, nil
-}
-
-func (b *byteReadWriterFactory) GetType() string {
-	return "byte buffer"
-}
-
-type nopWriteCloser struct {
-	*bytes.Buffer
-}
-
-func (n *nopWriteCloser) Close() error {
-	return nil
-}
-
-func (n *nopWriteCloser) Write(p []byte) (int, error) {
-	return n.Buffer.Write(p)
-}
-
-func (b *byteReadWriterFactory) NewWriter(_ string, writeHeader func(io.WriteCloser) error) (
-	io.WriteCloser, error) {
-	buffer := &nopWriteCloser{b.buffer}
-	_ = writeHeader(buffer)
-	return buffer, nil
-}

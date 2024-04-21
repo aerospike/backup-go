@@ -41,9 +41,7 @@ func NewSized(limit int64, writer io.WriteCloser, open func() (io.WriteCloser, e
 }
 
 func (f *Sized) Write(p []byte) (n int, err error) {
-	// start new file if expected total length exceeds limit,
-	// but don't start new file if current buffer is empty
-	if f.size+int64(len(p)) >= f.limit && f.size > 0 {
+	if f.size >= f.limit {
 		err := f.WriteCloser.Close()
 		if err != nil {
 			return 0, err

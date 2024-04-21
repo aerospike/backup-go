@@ -2,6 +2,7 @@ package backup_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -108,7 +109,7 @@ func createMinioCredentialsFile() error {
 	}
 
 	awsDir := filepath.Join(home, ".aws")
-	err = os.MkdirAll(awsDir, 0700)
+	err = os.MkdirAll(awsDir, 0o700)
 	if err != nil {
 		return fmt.Errorf("error creating .aws directory: %v", err)
 	}
@@ -120,7 +121,7 @@ func createMinioCredentialsFile() error {
 aws_access_key_id = minioadmin
 aws_secret_access_key = minioadmin`)
 
-		err = os.WriteFile(filePath, credentialsFileBytes, 0600)
+		err = os.WriteFile(filePath, credentialsFileBytes, 0o600)
 		if err != nil {
 			return fmt.Errorf("error writing ~/.aws/credentials file: %v", err)
 		}
@@ -144,16 +145,27 @@ func (s *writeReadTestSuite) TestWriteRead() {
 		Profile:  "minio",
 	}
 
-	bytes := []byte{1, 2, 3, 4, 5}
-	namespace := "ns1"
-	s.write(namespace, bytes, config)
+	size := 500_000
+	times := 100
+	written := s.write("ns1", size, times, config)
+	read := s.read(config)
 
-	buffer, n := s.read(config)
-	s.Assertions.Equal(len(bytes), n)
-	s.Assertions.Equal(bytes, buffer[:n])
+	s.Assertions.Equal(size*times, len(read))
+	s.Assertions.Equal(written, read)
 }
 
-func (s *writeReadTestSuite) write(namespace string, bytes []byte, config *backup.S3Config) {
+func randomBytes(n int) []byte {
+	data := make([]byte, n)
+
+	_, _ = io.ReadFull(&io.LimitedReader{
+		R: rand.Reader,
+		N: int64(n),
+	}, data)
+
+	return data
+}
+
+func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *backup.S3Config) []byte {
 	factory, _ := backup.NewS3WriterFactory(config, encoding.NewASBEncoderFactory())
 
 	writer, err := factory.NewWriter(namespace, func(_ io.WriteCloser) error {
@@ -163,20 +175,26 @@ func (s *writeReadTestSuite) write(namespace string, bytes []byte, config *backu
 		s.FailNow("failed to create writer", err)
 	}
 
-	n, err := writer.Write(bytes)
-	if err != nil {
-		s.FailNow("failed to write", err)
-	}
+	var allBytesWritten []byte
+	for range times {
+		bytes := randomBytes(bytes)
+		n, err := writer.Write(bytes)
+		if err != nil {
+			s.FailNow("failed to write", err)
+		}
 
-	s.Assertions.Equal(len(bytes), n)
+		s.Assertions.Equal(len(bytes), n)
+		allBytesWritten = append(allBytesWritten, bytes...)
+	}
 
 	err = writer.Close()
 	if err != nil {
 		s.FailNow("failed to close writer", err)
 	}
+	return allBytesWritten
 }
 
-func (s *writeReadTestSuite) read(config *backup.S3Config) (buffer []byte, n int) {
+func (s *writeReadTestSuite) read(config *backup.S3Config) []byte {
 	factory, _ := backup.NewS3ReaderFactory(config, encoding.NewASBDecoderFactory())
 
 	readers, err := factory.Readers()
@@ -186,13 +204,12 @@ func (s *writeReadTestSuite) read(config *backup.S3Config) (buffer []byte, n int
 
 	s.Assertions.Equal(1, len(readers))
 
-	buffer = make([]byte, 10)
-	n, err = readers[0].Read(buffer)
+	buffer, err := io.ReadAll(readers[0])
 	if err != nil {
 		s.FailNow("failed to read", err)
 	}
 
-	return buffer, n
+	return buffer
 }
 
 func TestReadWrite(t *testing.T) {

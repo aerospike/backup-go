@@ -53,8 +53,8 @@ type S3Writer struct {
 var _ io.WriteCloser = (*S3Writer)(nil)
 
 func (f *S3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (io.WriteCloser, error) {
-	chunkSize := f.s3Config.chunkSize
-	if chunkSize == 0 {
+	chunkSize := f.s3Config.ChunkSize
+	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
 	}
 
@@ -111,7 +111,7 @@ func (w *S3Writer) Write(p []byte) (int, error) {
 		return 0, os.ErrClosed
 	}
 
-	if w.buffer.Len()+len(p) >= w.chunkSize {
+	if w.buffer.Len() >= w.chunkSize {
 		err := w.uploadPart()
 		if err != nil {
 			return 0, err

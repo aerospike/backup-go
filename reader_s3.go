@@ -118,7 +118,7 @@ func (f *S3ReaderFactory) newS3Reader(key string) (*S3Reader, error) {
 		return nil, err
 	}
 
-	chunkSize := f.s3Config.chunkSize
+	chunkSize := f.s3Config.ChunkSize
 	if chunkSize == 0 {
 		chunkSize = s3DefaultChunkSize
 	}

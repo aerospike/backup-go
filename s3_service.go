@@ -14,7 +14,7 @@ type S3Config struct {
 	Endpoint  string
 	Profile   string
 	Prefix    string
-	chunkSize int
+	ChunkSize int
 }
 
 const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part

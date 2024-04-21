@@ -135,7 +135,7 @@ func (w *S3Writer) uploadPart() error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to upload part, %v", err)
+		return fmt.Errorf("failed to upload part, %w", err)
 	}
 
 	p := w.partNumber

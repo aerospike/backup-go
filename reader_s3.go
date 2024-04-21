@@ -122,6 +122,7 @@ func (f *S3ReaderFactory) newS3Reader(key string) (io.ReadCloser, error) {
 	}
 
 	bufferedReader := bufio.NewReaderSize(getObjectOutput.Body, chunkSize)
+
 	return &S3Reader{
 		reader: bufferedReader,
 		closer: getObjectOutput.Body,
@@ -142,6 +143,7 @@ func (r *S3Reader) Close() error {
 	}
 
 	r.closed = true
+
 	return r.closer.Close()
 }
 

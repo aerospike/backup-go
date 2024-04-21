@@ -25,6 +25,10 @@ type S3WriteFactory struct {
 var _ WriteFactory = (*S3WriteFactory)(nil)
 
 func NewS3WriterFactory(s3Config *S3Config, encoder EncoderFactory) (*S3WriteFactory, error) {
+	if s3Config.ChunkSize > maxS3File {
+		return nil, fmt.Errorf("invalid chunk size %d, should not exceed %d", s3Config.ChunkSize, maxS3File)
+	}
+
 	client, err := newS3Client(s3Config)
 	if err != nil {
 		return nil, err

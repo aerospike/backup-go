@@ -95,12 +95,7 @@ func (tc *TestClient) DropUDF(name string) error {
 
 // ReadAllUDFs reads all UDFs in the database.
 func (tc *TestClient) ReadAllUDFs() ([]*models.UDF, error) {
-	udfs, err := tc.inf.GetUDFs()
-	if err != nil {
-		return nil, err
-	}
-
-	return udfs, nil
+	return tc.inf.GetUDFs()
 }
 
 // WriteSIndex writes a secondary index to the database.

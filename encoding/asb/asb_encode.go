@@ -490,9 +490,7 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 // **** UDFs ****
 
 func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
-	var bytesWritten int
-
-	n, err := fmt.Fprintf(
+	return fmt.Fprintf(
 		w,
 		"%c %c %c %s %d %s\n",
 		markerGlobalSection,
@@ -502,7 +500,4 @@ func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
 		len(udf.Content),
 		udf.Content,
 	)
-	bytesWritten += n
-
-	return bytesWritten, err
 }

@@ -398,7 +398,7 @@ func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
 
 	rw.logger.Debug("registered UDF", "udf", udf.Name)
 
-	return err
+	return nil
 }
 
 // Cancel satisfies the DataWriter interface

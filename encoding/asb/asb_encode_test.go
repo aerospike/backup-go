@@ -74,14 +74,20 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
-		UDF:  &models.UDF{},
+		UDF: &models.UDF{
+			Name:    "udf",
+			UDFType: models.UDFTypeLUA,
+			Content: []byte(base64.StdEncoding.EncodeToString([]byte("content"))),
+		},
 	}
 
-	// TODO change this when UDFs are supported
-	token.Type = models.TokenTypeUDF
+	_, err = encoder.encodeUDF(token.UDF)
+	suite.NoError(err)
+	expected := encoder.buff.Bytes()
+
 	actual, err := encoder.EncodeToken(token)
-	suite.Assert().Error(err)
-	suite.Assert().Nil(actual)
+	suite.Assert().NoError(err)
+	suite.Assert().Equal(expected, actual)
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
@@ -1925,6 +1931,60 @@ func Test_writeRawBlobBin(t *testing.T) {
 			}
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("writeRawBlobBin() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func Test_udfToASB(t *testing.T) {
+	type args struct {
+		udf *models.UDF
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "positive simple",
+			args: args{
+				udf: &models.UDF{
+					Name:    "hello.lua",
+					Content: []byte("print('hello')"),
+					UDFType: models.UDFTypeLUA,
+				},
+			},
+			want:  len(fmt.Sprintf("* u L hello.lua %d %s\n", len("print('hello')"), "print('hello')")),
+			wantW: fmt.Sprintf("* u L hello.lua %d %s\n", len("print('hello')"), "print('hello')"),
+		},
+		{
+			name: "positive UDF name with escaped characters",
+			args: args{
+				udf: &models.UDF{
+					Name:    "h\\e l\nlo.lua",
+					Content: []byte("print('hi there')"),
+					UDFType: models.UDFTypeLUA,
+				},
+			},
+			want:  len(fmt.Sprintf("* u L h\\\\e\\ l\\\nlo.lua %d %s\n", len("print('hi there')"), "print('hi there')")),
+			wantW: fmt.Sprintf("* u L h\\\\e\\ l\\\nlo.lua %d %s\n", len("print('hi there')"), "print('hi there')"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := udfToASB(tt.args.udf, w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("udfToASB() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("udfToASB() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("udfToASB() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

@@ -103,14 +103,19 @@ func (bh *BackupHandler) run(ctx context.Context) {
 				}
 			}()
 
-			// backup secondary indexes on the first writer
+			// backup secondary indexes and UDFs on the first writer
 			// this is done to match the behavior of the
 			// backup c tool and keep the backup files more consistent
-			// at some point we may want to treat the secondary indexes
+			// at some point we may want to treat the secondary indexes/UDFs
 			// like records and back them up as part of the same pipeline
 			// but doing so would cause them to be mixed in with records in the backup file(s)
 			if i == 0 {
-				err = backupSIndexes(ctx, bh.aerospikeClient, bh.config, writer, bh.logger)
+				err = backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
+				if err != nil {
+					return err
+				}
+
+				err = backupUDFs(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
 				if err != nil {
 					return err
 				}
@@ -154,6 +159,7 @@ func backupSIndexes(
 	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
+	stats *BackupStats,
 	writer io.Writer,
 	logger *slog.Logger,
 ) error {
@@ -170,7 +176,8 @@ func backupSIndexes(
 		return err
 	}
 
-	sindexWriter := newTokenWriter(sindexEncoder, writer, logger)
+	var sindexWriter dataWriter[*models.Token] = newTokenWriter(sindexEncoder, writer, logger)
+	sindexWriter = newWriterWithTokenStats(sindexWriter, stats, logger)
 	sindexWriteWorker := newWriteWorker(sindexWriter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
@@ -180,7 +187,45 @@ func backupSIndexes(
 
 	err = sindexPipeline.Run(ctx)
 	if err != nil {
-		logger.Error("failed to backup secondary indexes: %v", err)
+		logger.Error("failed to backup secondary indexes", "error", err)
+	}
+
+	return err
+}
+
+func backupUDFs(
+	ctx context.Context,
+	ac *a.Client,
+	config *BackupConfig,
+	stats *BackupStats,
+	writer io.Writer,
+	logger *slog.Logger,
+) error {
+	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
+	if err != nil {
+		return err
+	}
+
+	udfReader := newUDFReader(infoClient, logger)
+	udfReadWorker := newReadWorker(udfReader)
+
+	udfEncoder, err := config.EncoderFactory.CreateEncoder()
+	if err != nil {
+		return err
+	}
+
+	var udfWriter dataWriter[*models.Token] = newTokenWriter(udfEncoder, writer, logger)
+	udfWriter = newWriterWithTokenStats(udfWriter, stats, logger)
+	udfWriteWorker := newWriteWorker(udfWriter)
+
+	udfPipeline := pipeline.NewPipeline[*models.Token](
+		[]pipeline.Worker[*models.Token]{udfReadWorker},
+		[]pipeline.Worker[*models.Token]{udfWriteWorker},
+	)
+
+	err = udfPipeline.Run(ctx)
+	if err != nil {
+		logger.Error("failed to backup UDFs", "error", err)
 	}
 
 	return err

@@ -15,6 +15,7 @@
 package testutils
 
 import (
+	"errors"
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -50,6 +51,51 @@ func NewTestClient(asc *a.Client) *TestClient {
 		asc: asc,
 		inf: infoClient,
 	}
+}
+
+// WriteUDFs writes a UDF to the database.
+func (tc *TestClient) WriteUDFs(udfs []*models.UDF) error {
+	for _, udf := range udfs {
+		var UDFLang a.Language
+
+		switch udf.UDFType {
+		case models.UDFTypeLUA:
+			UDFLang = a.LUA
+		default:
+			return errors.New("error registering UDF: invalid UDF language")
+		}
+
+		job, err := tc.asc.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)
+		if err != nil {
+			return err
+		}
+
+		errs := job.OnComplete()
+
+		err = <-errs
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DropUDF deletes a UDF from the database.
+func (tc *TestClient) DropUDF(name string) error {
+	job, err := tc.asc.RemoveUDF(nil, name)
+	if err != nil {
+		return err
+	}
+
+	errs := job.OnComplete()
+
+	return <-errs
+}
+
+// ReadAllUDFs reads all UDFs in the database.
+func (tc *TestClient) ReadAllUDFs() ([]*models.UDF, error) {
+	return tc.inf.GetUDFs()
 }
 
 // WriteSIndex writes a secondary index to the database.

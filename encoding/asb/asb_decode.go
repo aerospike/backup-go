@@ -460,8 +460,8 @@ func (r *Decoder) readUDF() (*models.UDF, error) {
 	}
 
 	switch models.UDFType(b) {
-	case models.LUAUDFType:
-		res.UDFType = models.LUAUDFType
+	case models.UDFTypeLUA:
+		res.UDFType = models.UDFTypeLUA
 	default:
 		return nil, fmt.Errorf("invalid UDF type %c in global section UDF line", b)
 	}

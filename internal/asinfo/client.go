@@ -15,6 +15,7 @@
 package asinfo
 
 import (
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -103,6 +104,10 @@ func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 	return getSIndexes(ic.node, namespace, ic.policy)
 }
 
+func (ic *InfoClient) GetUDFs() ([]*models.UDF, error) {
+	return getUDFs(ic.node, ic.policy)
+}
+
 // ***** Utility functions *****
 
 var AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
@@ -123,7 +128,7 @@ func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*mo
 		return nil, fmt.Errorf("failed to get sindexes: %w", err)
 	}
 
-	return parseSIndexResponse(response[cmd])
+	return parseSIndexes(response[cmd])
 }
 
 func buildSindexCmd(namespace string, getCtx bool) string {
@@ -180,24 +185,15 @@ func parseAerospikeVersion(versionStr string) (AerospikeVersion, error) {
 	}, nil
 }
 
-func parseSIndexResponse(sindexInfoResp string) ([]*models.SIndex, error) {
-	if sindexInfoResp == "" {
-		return nil, nil
-	}
-
-	// Remove the trailing semicolon if it exists
-	if sindexInfoResp[len(sindexInfoResp)-1] == ';' {
-		sindexInfoResp = sindexInfoResp[:len(sindexInfoResp)-1]
-	}
-
-	// No secondary indexes
-	if sindexInfoResp == "" {
-		return nil, nil
-	}
-
-	sindexInfo, err := parseInfoResponse(sindexInfoResp)
+func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
+	sindexInfo, err := parseSindexListResponse(sindexListInfoResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
+	}
+
+	// No sindexes
+	if sindexInfo == nil {
+		return nil, nil
 	}
 
 	sindexes := make([]*models.SIndex, len(sindexInfo))
@@ -214,7 +210,7 @@ func parseSIndexResponse(sindexInfoResp string) ([]*models.SIndex, error) {
 	return sindexes, nil
 }
 
-// parseSindex parses a single infoMap containing a sindex into a SecondaryIndex model
+// parseSIndex parses a single infoMap containing a sindex into a SecondaryIndex model
 func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 	si := &models.SIndex{}
 
@@ -301,6 +297,113 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 	return si, nil
 }
 
+func getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF, error) {
+	cmd := "udf-list"
+
+	response, aerr := node.RequestInfo(policy, cmd)
+	if aerr != nil {
+		return nil, fmt.Errorf("failed to list UDFs: %w", aerr)
+	}
+
+	udfList, err := parseUDFListResponse(response[cmd])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse udf-list info response: %w", err)
+	}
+
+	// No UDFs
+	if udfList == nil {
+		return nil, nil
+	}
+
+	udfs := make([]*models.UDF, len(udfList))
+
+	for i, udfMap := range udfList {
+		name, ok := udfMap["filename"]
+		if !ok {
+			return nil, fmt.Errorf("udf-list response missing filename")
+		}
+
+		udf, err := getUDF(node, name, policy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get UDF: %w", err)
+		}
+
+		udfs[i] = udf
+	}
+
+	return udfs, nil
+}
+
+func getUDF(node infoGetter, name string, policy *a.InfoPolicy) (*models.UDF, error) {
+	cmd := fmt.Sprintf("udf-get:filename=%s", name)
+
+	response, aerr := node.RequestInfo(policy, cmd)
+	if aerr != nil {
+		return nil, fmt.Errorf("udf-get info command failed: %w", aerr)
+	}
+
+	udfInfo, ok := response[cmd]
+	if !ok {
+		return nil, fmt.Errorf("command %s info response missing", cmd)
+	}
+
+	udf, err := parseUDFResponse(udfInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	udf.Name = name
+
+	return udf, nil
+}
+
+func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
+	udfInfo, err := parseUDFGetResponse(udfGetInfoResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse udf response: %w", err)
+	}
+
+	udf, err := parseUDF(udfInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse udf: %w", err)
+	}
+
+	return udf, nil
+}
+
+func parseUDF(udfMap infoMap) (*models.UDF, error) {
+	var (
+		udf     models.UDF
+		udfLang string
+	)
+
+	if val, ok := udfMap["type"]; ok {
+		udfLang = val
+	} else {
+		return nil, fmt.Errorf("udf info response missing language type")
+	}
+
+	if strings.EqualFold(udfLang, "lua") {
+		udf.UDFType = models.UDFTypeLUA
+	} else {
+		return nil, fmt.Errorf("invalid udf language type: %s", udfLang)
+	}
+
+	if val, ok := udfMap["content"]; ok {
+		// the udf content field is base64 encoded in info responses
+		content, err := base64.StdEncoding.DecodeString(val)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode udf content: %w", err)
+		}
+
+		udf.Content = content
+	} else {
+		return nil, fmt.Errorf("udf info response missing content")
+	}
+
+	return &udf, nil
+}
+
 type infoMap map[string]string
 
 // parseInfoResponse parses a single info response format string.
@@ -308,27 +411,96 @@ type infoMap map[string]string
 // each key-value pair is separated by a colon and the key is separated from the value by an equals sign
 // e.g. "foo=bar:baz=qux;foo=bar:baz=qux"
 // the above example is returned as []infoMap{infoMap{"foo": "bar", "baz": "qux"}, infoMap{"foo": "bar", "baz": "qux"}}
-func parseInfoResponse(resp string) ([]infoMap, error) {
-	objects := strings.Split(resp, ";")
+// if the passed in infor response is empty nil, nil is returned
+func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]infoMap, error) {
+	if resp == "" {
+		return nil, nil
+	}
+
+	// remove the trailing object separator if it exists
+	if strings.HasSuffix(resp, objSep) {
+		resp = resp[:len(resp)-1]
+	}
+
+	if resp == "" {
+		return nil, nil
+	}
+
+	objects := strings.Split(resp, objSep)
 	info := make([]infoMap, len(objects))
 
 	for i, object := range objects {
-		data := map[string]string{}
-		kvpairs := strings.Split(object, ":")
-
-		for _, pair := range kvpairs {
-			// some info key value pairse can contain "=" in the value
-			// for example, the base64 encoded context for a secondary index
-			// so we need to split on the first "=" only
-			kv := strings.SplitN(pair, "=", 2)
-			if len(kv) != 2 {
-				return nil, fmt.Errorf("invalid key-value pair: %s", pair)
-			}
-
-			data[kv[0]] = kv[1]
-			info[i] = data
+		data, err := parseInfoObject(object, pairSep, kvSep)
+		if err != nil {
+			return nil, err
 		}
+
+		info[i] = data
 	}
 
 	return info, nil
+}
+
+func parseInfoObject(obj, pairSep, kvSep string) (infoMap, error) {
+	if obj == "" {
+		return nil, nil
+	}
+
+	// remove the trailing object separator if it exists
+	if strings.HasSuffix(obj, pairSep) {
+		obj = obj[:len(obj)-1]
+	}
+
+	if obj == "" {
+		return nil, nil
+	}
+
+	data := map[string]string{}
+	kvpairs := strings.Split(obj, pairSep)
+
+	for _, pair := range kvpairs {
+		key, val, err := parseInfoKVPair(pair, kvSep)
+		if err != nil {
+			return nil, err
+		}
+
+		data[key] = val
+	}
+
+	return data, nil
+}
+
+func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
+	// some info key value pairs can contain kvSep in the value
+	// for example, the base64 encoded context for a secondary index can contain "="
+	// so we need to split on the first separator only
+	kv := strings.SplitN(pair, kvSep, 2)
+	if len(kv) != 2 {
+		return "", "", fmt.Errorf("invalid key-value pair: %s", pair)
+	}
+
+	// make keys case insensitive
+	// to help with different version compatibility
+	key = strings.ToLower(kv[0])
+	val = kv[1]
+
+	return key, val, err
+}
+
+// parseSindexListResponse parses a sindex-list info response
+// TODO example response
+func parseSindexListResponse(resp string) ([]infoMap, error) {
+	return parseInfoResponse(resp, ";", ":", "=")
+}
+
+// parseUDFListResponse parses a udf-list info response
+// example resp: filename=basic_udf.lua,hash=706c57cb29e027221560a3cb4b693573ada98bf2,type=LUA;...
+func parseUDFListResponse(resp string) ([]infoMap, error) {
+	return parseInfoResponse(resp, ";", ",", "=")
+}
+
+// parseUDFGetResponse parses a udf-get info response
+// example resp: type=LUA;content=LS0gQSB2ZXJ5IHNpbXBsZSBhcml0
+func parseUDFGetResponse(resp string) (infoMap, error) {
+	return parseInfoObject(resp, ";", "=")
 }

@@ -77,7 +77,7 @@ type SIndex struct {
 type UDFType byte
 
 const (
-	LUAUDFType UDFType = 'L'
+	UDFTypeLUA UDFType = 'L'
 )
 
 type UDF struct {

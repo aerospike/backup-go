@@ -52,8 +52,7 @@ func (o *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 	case models.TokenTypeRecord:
 		n, err = o.encodeRecord(&token.Record)
 	case models.TokenTypeUDF:
-		data, UDFErr := o.encodeUDF(token.UDF)
-		n, err = len(data), UDFErr
+		n, err = o.encodeUDF(token.UDF)
 	case models.TokenTypeSIndex:
 		n, err = o.encodeSIndex(token.SIndex)
 	case models.TokenTypeInvalid:
@@ -73,9 +72,8 @@ func (o *Encoder) encodeRecord(rec *models.Record) (int, error) {
 	return recordToASB(rec, &o.buff)
 }
 
-//nolint:unparam // UDF is not implemented yet, return value is nil for now.
-func (o *Encoder) encodeUDF(_ *models.UDF) ([]byte, error) {
-	return nil, fmt.Errorf("%w: unimplemented", errors.ErrUnsupported)
+func (o *Encoder) encodeUDF(udf *models.UDF) (int, error) {
+	return udfToASB(udf, &o.buff)
 }
 
 func (o *Encoder) encodeSIndex(sindex *models.SIndex) (int, error) {
@@ -487,4 +485,19 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 	bytesWritten += n
 
 	return bytesWritten, err
+}
+
+// **** UDFs ****
+
+func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
+	return fmt.Fprintf(
+		w,
+		"%c %c %c %s %d %s\n",
+		markerGlobalSection,
+		globalTypeUDF,
+		byte(udf.UDFType),
+		escapeASB(udf.Name),
+		len(udf.Content),
+		udf.Content,
+	)
 }

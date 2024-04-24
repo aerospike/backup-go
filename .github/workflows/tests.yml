@@ -2,7 +2,7 @@ name: Tests
 on:
   push:
     branches:
-      - '*'
+      - '**'
   workflow_call:
   pull_request:
     branches:

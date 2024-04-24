@@ -42,7 +42,10 @@ func NewSized(limit int64, writer io.WriteCloser, open func() (io.WriteCloser, e
 
 func (f *Sized) Write(p []byte) (n int, err error) {
 	if f.size >= f.limit {
-		f.WriteCloser.Close()
+		err := f.WriteCloser.Close()
+		if err != nil {
+			return 0, err
+		}
 
 		f.size = 0
 

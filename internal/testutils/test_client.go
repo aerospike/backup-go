@@ -101,34 +101,14 @@ func (tc *TestClient) ReadAllUDFs() ([]*models.UDF, error) {
 // WriteSIndexes writes a secondary index to the database.
 func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 	for _, sindex := range sindexes {
-		var sindexType a.IndexType
-
-		switch sindex.Path.BinType {
-		case models.NumericSIDataType:
-			sindexType = a.NUMERIC
-		case models.StringSIDataType:
-			sindexType = a.STRING
-		case models.BlobSIDataType:
-			sindexType = a.BLOB
-		case models.GEO2DSphereSIDataType:
-			sindexType = a.GEO2DSPHERE
-		default:
-			return fmt.Errorf("invalid sindex bin type: %c", sindex.Path.BinType)
+		sindexType, err := getIndexType(sindex)
+		if err != nil {
+			return err
 		}
 
-		var sindexCollectionType a.IndexCollectionType
-
-		switch sindex.IndexType {
-		case models.BinSIndex:
-			sindexCollectionType = a.ICT_DEFAULT
-		case models.ListElementSIndex:
-			sindexCollectionType = a.ICT_LIST
-		case models.MapKeySIndex:
-			sindexCollectionType = a.ICT_MAPKEYS
-		case models.MapValueSIndex:
-			sindexCollectionType = a.ICT_MAPVALUES
-		default:
-			return fmt.Errorf("invalid sindex collection type: %c", sindex.IndexType)
+		sindexCollectionType, err := getSindexCollectionType(sindex)
+		if err != nil {
+			return err
 		}
 
 		var ctx []*a.CDTContext
@@ -165,6 +145,34 @@ func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 	}
 
 	return nil
+}
+
+func getSindexCollectionType(sindex *models.SIndex) (a.IndexCollectionType, error) {
+	switch sindex.IndexType {
+	case models.BinSIndex:
+		return a.ICT_DEFAULT, nil
+	case models.ListElementSIndex:
+		return a.ICT_LIST, nil
+	case models.MapKeySIndex:
+		return a.ICT_MAPKEYS, nil
+	case models.MapValueSIndex:
+		return a.ICT_MAPVALUES, nil
+	}
+	return 0, fmt.Errorf("invalid sindex collection type: %c", sindex.IndexType)
+}
+
+func getIndexType(sindex *models.SIndex) (a.IndexType, error) {
+	switch sindex.Path.BinType {
+	case models.NumericSIDataType:
+		return a.NUMERIC, nil
+	case models.StringSIDataType:
+		return a.STRING, nil
+	case models.BlobSIDataType:
+		return a.BLOB, nil
+	case models.GEO2DSphereSIDataType:
+		return a.GEO2DSPHERE, nil
+	}
+	return "", fmt.Errorf("invalid sindex bin type: %c", sindex.Path.BinType)
 }
 
 // DropSIndex deletes a secondary index from the database.

@@ -158,6 +158,7 @@ func getSindexCollectionType(sindex *models.SIndex) (a.IndexCollectionType, erro
 	case models.MapValueSIndex:
 		return a.ICT_MAPVALUES, nil
 	}
+
 	return 0, fmt.Errorf("invalid sindex collection type: %c", sindex.IndexType)
 }
 
@@ -172,6 +173,7 @@ func getIndexType(sindex *models.SIndex) (a.IndexType, error) {
 	case models.GEO2DSphereSIDataType:
 		return a.GEO2DSPHERE, nil
 	}
+
 	return "", fmt.Errorf("invalid sindex bin type: %c", sindex.Path.BinType)
 }
 

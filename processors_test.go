@@ -220,10 +220,10 @@ func TestProcessorTTL_Process(t *testing.T) {
 		token *models.Token
 	}
 	tests := []struct {
-		name    string
 		fields  fields
 		args    args
 		want    *models.Token
+		name    string
 		wantErr bool
 	}{
 		{
@@ -418,10 +418,10 @@ func Test_processorVoidTime_Process(t *testing.T) {
 		token *models.Token
 	}
 	tests := []struct {
-		name    string
 		fields  fields
 		args    args
 		want    *models.Token
+		name    string
 		wantErr bool
 	}{
 		{

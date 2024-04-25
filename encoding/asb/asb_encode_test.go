@@ -245,10 +245,10 @@ func Test__SIndexToASB(t *testing.T) {
 		sindex *models.SIndex
 	}
 	tests := []struct {
-		name    string
 		args    args
-		want    int
+		name    string
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -807,9 +807,9 @@ func Test_writeRecordHeaderGeneration(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		args    args
-		want    int
 		wantW   string
+		want    int
+		args    args
 		wantErr bool
 	}{
 		{
@@ -845,9 +845,9 @@ func Test_writeRecordHeaderExpiration(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -883,9 +883,9 @@ func Test_writeRecordHeaderBinCount(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -922,9 +922,9 @@ func Test_writeBinInt(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -971,9 +971,9 @@ func Test_writeBinFloat(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1019,10 +1019,10 @@ func Test_writeBinString(t *testing.T) {
 		v    string
 	}
 	tests := []struct {
-		name    string
 		args    args
-		want    int
+		name    string
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1069,9 +1069,9 @@ func Test_writeBinBytes(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1122,9 +1122,9 @@ func Test_writeBinHLL(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1174,10 +1174,10 @@ func Test_writeBinGeoJSON(t *testing.T) {
 		v    a.GeoJSONValue
 	}
 	tests := []struct {
-		name    string
 		args    args
-		want    int
+		name    string
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1232,8 +1232,8 @@ func Test_writeBinNil(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    int
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1278,8 +1278,8 @@ func Test_writeRecordNamespace(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    int
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1323,9 +1323,9 @@ func Test_writeRecordDigest(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1362,8 +1362,8 @@ func Test_writeRecordSet(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    int
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1407,9 +1407,9 @@ func Test_writeUserKeyInt(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1445,9 +1445,9 @@ func Test_writeUserKeyFloat(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1484,8 +1484,8 @@ func Test_writeUserKeyString(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    int
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1521,9 +1521,9 @@ func Test_writeUserKeyBytes(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		wantW   string
 		args    args
 		want    int
-		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1620,8 +1620,8 @@ func Test_writeVersionText(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    int
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1658,8 +1658,8 @@ func Test_writeNamespaceMetaText(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    int
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1700,8 +1700,8 @@ func Test_writeNamespaceMetaText(t *testing.T) {
 func Test_writeFirstMetaText(t *testing.T) {
 	tests := []struct {
 		name    string
-		want    int
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1730,9 +1730,9 @@ func Test_writeFirstMetaText(t *testing.T) {
 
 func Test_blobBinToASB(t *testing.T) {
 	type args struct {
+		name      string
 		val       []byte
 		bytesType byte
-		name      string
 	}
 	tests := []struct {
 		name string
@@ -1766,10 +1766,10 @@ func Test_writeRawListBin(t *testing.T) {
 		name string
 	}
 	tests := []struct {
-		name    string
 		args    args
-		want    int
+		name    string
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1821,10 +1821,10 @@ func Test_writeRawMapBin(t *testing.T) {
 		name string
 	}
 	tests := []struct {
-		name    string
 		args    args
-		want    int
+		name    string
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1876,10 +1876,10 @@ func Test_writeRawBlobBin(t *testing.T) {
 		name string
 	}
 	tests := []struct {
-		name    string
 		args    args
-		want    int
+		name    string
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{
@@ -1941,10 +1941,10 @@ func Test_udfToASB(t *testing.T) {
 		udf *models.UDF
 	}
 	tests := []struct {
-		name    string
 		args    args
-		want    int
+		name    string
 		wantW   string
+		want    int
 		wantErr bool
 	}{
 		{

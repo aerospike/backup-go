@@ -73,9 +73,9 @@ type backupRestoreTestSuite struct {
 	aerospikeUser     string
 	namespace         string
 	set               string
-	aerospikePort     int
 	expectedSIndexes  []*models.SIndex
 	expectedUDFs      []*models.UDF
+	aerospikePort     int
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -275,8 +275,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		expectedFiles int
 	}
 	var tests = []struct {
-		args args
 		name string
+		args args
 	}{
 		{
 			name: "default",

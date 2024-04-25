@@ -142,12 +142,12 @@ func TestCheckRestoreDirectory(t *testing.T) {
 
 func Test_verifyBackupFileExtension(t *testing.T) {
 	type args struct {
-		fileName string
 		decoder  DecoderFactory
+		fileName string
 	}
 	tests := []struct {
-		name    string
 		args    args
+		name    string
 		wantErr bool
 	}{
 		{

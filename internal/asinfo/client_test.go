@@ -266,8 +266,8 @@ func Test_buildSindexCmd(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		args args
 		want string
+		args args
 	}{
 		{
 			name: "positive no ctx",
@@ -305,9 +305,9 @@ func Test_parseSIndex(t *testing.T) {
 		sindexMap infoMap
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    *models.SIndex
+		name    string
 		wantErr bool
 	}{
 		{
@@ -964,8 +964,8 @@ func Test_getAerospikeVersion(t *testing.T) {
 		policy *a.InfoPolicy
 	}
 	tests := []struct {
-		name    string
 		args    args
+		name    string
 		want    AerospikeVersion
 		wantErr bool
 	}{
@@ -1038,8 +1038,8 @@ func Test_getSIndexes(t *testing.T) {
 
 	type args struct {
 		conn      infoGetter
-		namespace string
 		policy    *a.InfoPolicy
+		namespace string
 	}
 	tests := []struct {
 		name    string
@@ -1310,9 +1310,9 @@ func Test_parseUDF(t *testing.T) {
 		udfMap infoMap
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    *models.UDF
+		name    string
 		wantErr bool
 	}{
 		{
@@ -1397,9 +1397,9 @@ func Test_parseUDFResponse(t *testing.T) {
 		udfInfoResp string
 	}
 	tests := []struct {
+		want    *models.UDF
 		name    string
 		args    args
-		want    *models.UDF
 		wantErr bool
 	}{
 		{
@@ -1451,13 +1451,13 @@ func Test_parseUDFResponse(t *testing.T) {
 func Test_getUDF(t *testing.T) {
 	type args struct {
 		node   infoGetter
-		name   string
 		policy *a.InfoPolicy
+		name   string
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    *models.UDF
+		name    string
 		wantErr bool
 	}{
 		{

@@ -100,11 +100,11 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	errors := make(chan error, 1)
+	errorCh := make(chan error, 1)
 	go func() {
 		defer wg.Done()
 		err := worker.Run(ctx)
-		errors <- err
+		errorCh <- err
 	}()
 
 	// give the worker some time to start
@@ -113,7 +113,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
 	cancel()
 	wg.Wait()
 
-	err := <-errors
+	err := <-errorCh
 	suite.NotNil(err)
 
 	data := <-sender
@@ -138,11 +138,11 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	errors := make(chan error, 1)
+	errorCh := make(chan error, 1)
 	go func() {
 		defer wg.Done()
 		err := worker.Run(ctx)
-		errors <- err
+		errorCh <- err
 	}()
 
 	// give the worker some time to start
@@ -151,7 +151,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
 	cancel()
 	wg.Wait()
 
-	err := <-errors
+	err := <-errorCh
 	suite.NotNil(err)
 }
 

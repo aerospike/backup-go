@@ -16,12 +16,15 @@ linters-settings:
   nolintlint:
     require-explanation: true
     require-specific: true
+  cyclop:
+    max-complexity: 22
 
 linters:
   disable-all: true
   enable:
     - gci
     - bodyclose
+    - cyclop
     - unused
     - dogsled
     - dupl

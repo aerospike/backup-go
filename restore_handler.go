@@ -198,11 +198,14 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		writeWorkers[i] = newWriteWorker(writer)
 	}
 
-	processorWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
-
+	ttlSetters := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		TTLSetter := newProcessorTTL(rh.stats, rh.logger)
-		processorWorkers[i] = newProcessorWorker(TTLSetter)
+		ttlSetters[i] = newProcessorWorker(newProcessorTTL(rh.stats, rh.logger))
+	}
+
+	binFilters := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+	for i := 0; i < rh.config.Parallel; i++ {
+		binFilters[i] = newProcessorWorker(newProcessorBinFilter(rh.config.BinList))
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
@@ -212,7 +215,8 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 	job := pipeline.NewPipeline(
 		readWorkers,
-		processorWorkers,
+		ttlSetters,
+		binFilters,
 		writeWorkers,
 	)
 

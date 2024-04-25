@@ -718,25 +718,9 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		return fmt.Errorf("invalid bin type %c", binType)
 	}
 
-	b, err := r.ReadByte()
+	base64Encoded, err := r.checkEncoded()
 	if err != nil {
 		return err
-	}
-
-	var base64Encoded bool
-
-	switch b {
-	case '!':
-	case ' ':
-		base64Encoded = true
-	default:
-		return fmt.Errorf("invalid character in bytes bin %c, expected '!' or ' '", b)
-	}
-
-	if !base64Encoded {
-		if err := _expectChar(r, ' '); err != nil {
-			return err
-		}
 	}
 
 	nameBytes, err := _readUntilAny(r, []byte{' ', '\n'}, true)
@@ -745,11 +729,6 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 	}
 
 	name := string(nameBytes)
-
-	var (
-		binVal any
-		binErr error
-	)
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
@@ -766,6 +745,48 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		return err
 	}
 
+	binVal, binErr := fetchBinValue(r, binType, base64Encoded)
+
+	if binErr != nil {
+		return binErr
+	}
+
+	if err := _expectChar(r, '\n'); err != nil {
+		return err
+	}
+
+	bins[name] = binVal
+
+	return nil
+}
+
+func (r *Decoder) checkEncoded() (bool, error) {
+	b, err := r.ReadByte()
+	if err != nil {
+		return false, err
+	}
+
+	if b == ' ' {
+		return true, nil
+	}
+
+	if b == '!' {
+		if err := _expectChar(r, ' '); err != nil {
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	return false, fmt.Errorf("invalid character in bytes bin %c, expected '!' or ' '", b)
+}
+
+func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {
+	var (
+		binVal any
+		binErr error
+	)
+
 	switch binType {
 	case binTypeBool:
 		binVal, binErr = _readBool(r)
@@ -776,21 +797,20 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 	case binTypeString:
 		binVal, binErr = _readStringSized(r, ' ')
 	case binTypeLDT:
-		return errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
+		binErr = errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
 	case binTypeStringBase64:
 		val, err := _readBase64BytesSized(r, ' ')
 		if err != nil {
-			return err
+			binErr = err
+		} else {
+			binVal = string(val)
 		}
-
-		binVal = string(val)
 	case binTypeGeoJSON:
 		binVal, binErr = _readGeoJSON(r, ' ')
 	}
 
-	if _, ok := bytesBinTypes[binType]; ok {
+	if _, ok := bytesBinTypes[binType]; ok && binErr == nil {
 		var val []byte
-
 		if base64Encoded {
 			val, binErr = _readBase64BytesSized(r, ' ')
 		} else {
@@ -798,7 +818,7 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		}
 
 		// bytes special cases
-		if _, ok := isMsgPackBytes[binType]; ok {
+		if _, ok := isMsgPackBytes[binType]; ok && binErr == nil {
 			switch binType {
 			case binTypeBytesHLL:
 				// HLLs are treated as bytes by the client so no decode is needed
@@ -812,24 +832,14 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 				// with particle type LIST
 				binVal = a.NewRawBlobValue(particleType.LIST, val)
 			default:
-				return fmt.Errorf("invalid bytes to type bin type %d", binType)
+				binErr = fmt.Errorf("invalid bytes to type bin type %d", binType)
 			}
 		} else {
 			binVal = val
 		}
 	}
 
-	if binErr != nil {
-		return binErr
-	}
-
-	if err := _expectChar(r, '\n'); err != nil {
-		return err
-	}
-
-	bins[name] = binVal
-
-	return nil
+	return binVal, binErr
 }
 
 var asbKeyTypes = map[byte]struct{}{

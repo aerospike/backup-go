@@ -398,7 +398,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	reader := newSIndexReader(mockSIndexGetter, namespace, slog.Default())
 	suite.NotNil(reader)
 
-	expectedSIndexTokens := []*models.Token{}
+	var expectedSIndexTokens []*models.Token
 	for _, sindex := range mockSIndexes {
 		expectedSIndexTokens = append(expectedSIndexTokens, models.NewSIndexToken(sindex))
 	}
@@ -455,7 +455,7 @@ func (suite *readersTestSuite) TestUDFReader() {
 	reader := newUDFReader(mockUDFGetter, slog.Default())
 	suite.NotNil(reader)
 
-	expectedUDFTokens := []*models.Token{}
+	var expectedUDFTokens []*models.Token
 	for _, udf := range mockUDFs {
 		expectedUDFTokens = append(expectedUDFTokens, models.NewUDFToken(udf))
 	}

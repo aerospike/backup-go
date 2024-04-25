@@ -748,7 +748,7 @@ func TestASBReader_readBin(t *testing.T) {
 				},
 			},
 			want: map[string]any{
-				"float-bin": float64(1.1),
+				"float-bin": 1.1,
 			},
 			wantErr: false,
 		},
@@ -1274,7 +1274,7 @@ func TestASBReader_readKey(t *testing.T) {
 					ByteScanner: strings.NewReader("D 1.1\n"),
 				},
 			},
-			want:    float64(1.1),
+			want:    1.1,
 			wantErr: false,
 		},
 		{

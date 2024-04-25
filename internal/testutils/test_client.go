@@ -98,7 +98,7 @@ func (tc *TestClient) ReadAllUDFs() ([]*models.UDF, error) {
 	return tc.inf.GetUDFs()
 }
 
-// WriteSIndex writes a secondary index to the database.
+// WriteSIndexes writes a secondary index to the database.
 func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 	for _, sindex := range sindexes {
 		var sindexType a.IndexType

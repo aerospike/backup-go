@@ -26,7 +26,7 @@ import (
 	"unsafe"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
+	encmocks "github.com/aerospike/backup-go/encoding/mocks"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/suite"
@@ -108,7 +108,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	}
 	expectedRecToken := models.NewRecordToken(mockRec)
 
-	mockDecoder := enc_mocks.NewDecoder(suite.T())
+	mockDecoder := encmocks.NewDecoder(suite.T())
 	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
 
 	reader := newTokenReader(mockDecoder, slog.Default())

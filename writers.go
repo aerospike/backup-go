@@ -175,7 +175,7 @@ func (w *tokenWriter) Write(v *models.Token) error {
 	return err
 }
 
-// Cancel satisfies the DataWriter interface
+// Close satisfies the DataWriter interface
 // but is a no-op for the tokenWriter
 func (w *tokenWriter) Close() {
 	w.logger.Debug("closed token writer")
@@ -401,7 +401,7 @@ func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
 	return nil
 }
 
-// Cancel satisfies the DataWriter interface
+// Close satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter
 func (rw *restoreWriter) Close() {
 	rw.logger.Debug("closed restore writer")

@@ -155,6 +155,10 @@ func NewPartitionRange(begin, count int) PartitionRange {
 	return PartitionRange{begin, count}
 }
 
+func PartitionRangeAll() PartitionRange {
+	return NewPartitionRange(0, MaxPartitions)
+}
+
 func (p PartitionRange) validate() error {
 	if p.Begin < 0 || p.Begin >= MaxPartitions {
 		return fmt.Errorf("begin must be between 0 and %d, got %d", MaxPartitions-1, p.Begin)
@@ -186,6 +190,8 @@ type BackupConfig struct {
 	Namespace string
 	// Set is the Aerospike set to backup.
 	Set string
+	// The list of backup bin names (optional, an empty list implies backing up all bins).
+	BinList []string
 	// Partitions specifies the Aerospike partitions to backup.
 	Partitions PartitionRange
 	// parallel is the number of concurrent scans to run against the Aerospike cluster.
@@ -263,6 +269,8 @@ type RestoreConfig struct {
 	// WritePolicy applies to Aerospike write operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	WritePolicy *a.WritePolicy
+	// The bins to restore (optional, an empty list implies restoring up all bins).
+	BinList []string
 	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.
 	Parallel int
 }

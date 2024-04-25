@@ -782,64 +782,61 @@ func (r *Decoder) checkEncoded() (bool, error) {
 }
 
 func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {
-	var (
-		binVal any
-		binErr error
-	)
-
 	switch binType {
 	case binTypeBool:
-		binVal, binErr = _readBool(r)
+		return _readBool(r)
 	case binTypeInt:
-		binVal, binErr = _readInteger(r, '\n')
+		return _readInteger(r, '\n')
 	case binTypeFloat:
-		binVal, binErr = _readFloat(r, '\n')
+		return _readFloat(r, '\n')
 	case binTypeString:
-		binVal, binErr = _readStringSized(r, ' ')
+		return _readStringSized(r, ' ')
 	case binTypeLDT:
-		binErr = errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
+		return nil, errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
 	case binTypeStringBase64:
 		val, err := _readBase64BytesSized(r, ' ')
 		if err != nil {
-			binErr = err
-		} else {
-			binVal = string(val)
+			return nil, err
 		}
+
+		return string(val), nil
 	case binTypeGeoJSON:
-		binVal, binErr = _readGeoJSON(r, ' ')
+		return _readGeoJSON(r, ' ')
 	}
 
-	if _, ok := bytesBinTypes[binType]; ok && binErr == nil {
-		var val []byte
-		if base64Encoded {
-			val, binErr = _readBase64BytesSized(r, ' ')
-		} else {
-			val, binErr = _readBytesSized(r, ' ')
-		}
-
-		// bytes special cases
-		if _, ok := isMsgPackBytes[binType]; ok && binErr == nil {
-			switch binType {
-			case binTypeBytesHLL:
-				// HLLs are treated as bytes by the client so no decode is needed
-				binVal = a.NewHLLValue(val)
-			case binTypeBytesMap:
-				// map msgpack bytes can be sent as RawBlobValues
-				// with particle type MAP
-				binVal = a.NewRawBlobValue(particleType.MAP, val)
-			case binTypeBytesList:
-				// lists msgpack bytes can be sent as RawBlobValues
-				// with particle type LIST
-				binVal = a.NewRawBlobValue(particleType.LIST, val)
-			default:
-				binErr = fmt.Errorf("invalid bytes to type bin type %d", binType)
-			}
-		} else {
-			binVal = val
-		}
+	if _, ok := bytesBinTypes[binType]; !ok {
+		return nil, fmt.Errorf("unexpected binType %d", binType)
 	}
 
-	return binVal, binErr
+	var (
+		val []byte
+		err error
+	)
+
+	if base64Encoded {
+		val, err = _readBase64BytesSized(r, ' ')
+	} else {
+		val, err = _readBytesSized(r, ' ')
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := isMsgPackBytes[binType]; !ok {
+		return val, nil
+	}
+
+	switch binType {
+	case binTypeBytesHLL:
+		return a.NewHLLValue(val), nil
+	case binTypeBytesMap:
+		return a.NewRawBlobValue(particleType.MAP, val), nil
+	case binTypeBytesList:
+		return a.NewRawBlobValue(particleType.LIST, val), nil
+	}
+
+	return nil, fmt.Errorf("invalid bytes to type binType %d", binType)
 }
 
 var asbKeyTypes = map[byte]struct{}{

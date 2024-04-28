@@ -75,6 +75,10 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 			Set:            bh.config.Set,
 			FirstPartition: partitionRanges[i].Begin,
 			NumPartitions:  partitionRanges[i].Count,
+			timeBounds: models.TimeBounds{
+				FromTime: bh.config.ModAfter,
+				ToTime:   bh.config.ModBefore,
+			},
 		}
 
 		recordReader := newAerospikeRecordReader(

@@ -241,7 +241,7 @@ func (arr *aerospikeRecordReader) startScan() error {
 		arr.config.NumPartitions,
 	)
 
-	arr.scanPolicy.FilterExpression = expr(arr.config.timeBounds)
+	arr.scanPolicy.FilterExpression = timeBoundExpression(arr.config.timeBounds)
 
 	recSet, err := arr.client.ScanPartitions(
 		arr.scanPolicy,
@@ -259,7 +259,7 @@ func (arr *aerospikeRecordReader) startScan() error {
 	return nil
 }
 
-func expr(bounds models.TimeBounds) *a.Expression {
+func timeBoundExpression(bounds models.TimeBounds) *a.Expression {
 	if bounds.FromTime == nil && bounds.ToTime == nil {
 		return nil
 	}

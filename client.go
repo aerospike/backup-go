@@ -203,7 +203,7 @@ func (c *BackupConfig) validate() error {
 	}
 
 	if c.ModBefore != nil && c.ModAfter != nil && !c.ModBefore.After(*c.ModAfter) {
-		return errors.New("modified before should be strict greater than modified after")
+		return errors.New("modified before should be strictly greater than modified after")
 	}
 
 	err := c.Partitions.validate()

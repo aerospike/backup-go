@@ -347,12 +347,10 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	indexType, err := r.readIndexType()
+	res.IndexType, err = r.readIndexType()
 	if err != nil {
 		return nil, err
 	}
-
-	res.IndexType = indexType
 
 	if err := _expectChar(r, ' '); err != nil {
 		return nil, err
@@ -386,12 +384,10 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	binType, err := r.readBinType()
+	path.BinType, err = r.readBinType()
 	if err != nil {
 		return nil, err
 	}
-
-	path.BinType = binType
 
 	// check for optional context
 	b, err := _peek(r)

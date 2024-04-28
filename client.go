@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
@@ -183,6 +184,10 @@ type BackupConfig struct {
 	// If nil, the Aerospike client's default policy will be used.
 	ScanPolicy *a.ScanPolicy
 	// Namespace is the Aerospike namespace to backup.
+	// Only include records that last changed before the given time (optional).
+	ModBefore *time.Time
+	// Only include records that last changed after the given time (optional).
+	ModAfter  *time.Time
 	Namespace string
 	// Set is the Aerospike set to backup.
 	Set string
@@ -195,6 +200,10 @@ type BackupConfig struct {
 func (c *BackupConfig) validate() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
+	}
+
+	if c.ModBefore != nil && c.ModAfter != nil && !c.ModBefore.After(*c.ModAfter) {
+		return errors.New("modified before should be strict greater than modified after")
 	}
 
 	err := c.Partitions.validate()

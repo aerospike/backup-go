@@ -178,7 +178,7 @@ func (suite *backupRestoreTestSuite) SetupTest(records []*a.Record) {
 
 	err = suite.testClient.WriteRecords(records)
 	if err != nil {
-		panic(err)
+		suite.FailNow(err.Error())
 	}
 
 	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)

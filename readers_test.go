@@ -151,7 +151,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -168,7 +168,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -218,7 +218,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -235,7 +235,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -258,7 +258,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -275,7 +275,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -292,7 +292,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -309,7 +309,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 			FirstPartition: 0,
 			NumPartitions:  4096,
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)

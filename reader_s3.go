@@ -76,7 +76,7 @@ func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan erro
 		var continuationToken *string
 
 		for {
-			prefix := strings.TrimSuffix(f.s3Config.Prefix, "/") + "/"
+			prefix := strings.Trim(f.s3Config.Prefix, "/") + "/"
 			listResponse, err := f.client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
 				Bucket:            &f.s3Config.Bucket,
 				Prefix:            &prefix,

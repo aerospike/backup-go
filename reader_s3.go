@@ -5,19 +5,20 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type S3ReaderFactory struct {
 	client   *s3.Client
 	s3Config *S3Config
+	decoder  DecoderFactory
 }
 
 var _ ReaderFactory = (*S3ReaderFactory)(nil)
 
-func NewS3ReaderFactory(config *S3Config, _ *encoding.ASBDecoderFactory) (*S3ReaderFactory, error) {
+func NewS3ReaderFactory(config *S3Config, decoder DecoderFactory) (*S3ReaderFactory, error) {
 	client, err := newS3Client(config)
 	if err != nil {
 		return nil, err
@@ -26,6 +27,7 @@ func NewS3ReaderFactory(config *S3Config, _ *encoding.ASBDecoderFactory) (*S3Rea
 	return &S3ReaderFactory{
 		client:   client,
 		s3Config: config,
+		decoder:  decoder,
 	}, nil
 }
 
@@ -74,9 +76,10 @@ func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan erro
 		var continuationToken *string
 
 		for {
+			prefix := strings.TrimSuffix(f.s3Config.Prefix, "/") + "/"
 			listResponse, err := f.client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
 				Bucket:            &f.s3Config.Bucket,
-				Prefix:            &f.s3Config.Prefix,
+				Prefix:            &prefix,
 				ContinuationToken: continuationToken,
 			})
 			if err != nil {
@@ -85,7 +88,9 @@ func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan erro
 			}
 
 			for _, p := range listResponse.Contents {
-				// TODO: use decoder to filter files.
+				if err := verifyBackupFileExtension(*p.Key, f.decoder); err != nil {
+					continue
+				}
 				fileCh <- *p.Key
 			}
 

@@ -74,7 +74,7 @@ func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Negative_IsNot
 	if err != nil {
 		suite.FailNow("Failed to create file: %v", err)
 	}
-	f.Close()
+	_ = f.Close()
 
 	err = prepareBackupDirectory(file)
 	suite.Error(err)
@@ -88,7 +88,7 @@ func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Negative_DirNo
 	if err != nil {
 		suite.FailNow("Failed to create file: %v", err)
 	}
-	f.Close()
+	_ = f.Close()
 
 	err = prepareBackupDirectory(dir)
 	suite.Error(err)

@@ -347,22 +347,9 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	b, err := r.ReadByte()
+	res.IndexType, err = r.readSIndexType()
 	if err != nil {
 		return nil, err
-	}
-
-	switch b {
-	case sindexTypeBin:
-		res.IndexType = models.BinSIndex
-	case sindexTypeList:
-		res.IndexType = models.ListElementSIndex
-	case sindexTypeMapKey:
-		res.IndexType = models.MapKeySIndex
-	case sindexTypeMapVal:
-		res.IndexType = models.MapValueSIndex
-	default:
-		return nil, fmt.Errorf("invalid secondary index type %c", b)
 	}
 
 	if err := _expectChar(r, ' '); err != nil {
@@ -397,26 +384,13 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	b, err = r.ReadByte()
+	path.BinType, err = r.readSIndexBinType()
 	if err != nil {
 		return nil, err
 	}
 
-	switch b {
-	case sindexBinTypeString:
-		path.BinType = models.StringSIDataType
-	case sindexBinTypeNumeric:
-		path.BinType = models.NumericSIDataType
-	case sindexBinTypeGEO2D:
-		path.BinType = models.GEO2DSphereSIDataType
-	case sindexBinTypeBlob:
-		path.BinType = models.BlobSIDataType
-	default:
-		return nil, fmt.Errorf("invalid sindex path type %c", b)
-	}
-
 	// check for optional context
-	b, err = _peek(r)
+	b, err := _peek(r)
 	if err != nil {
 		return nil, err
 	}
@@ -443,6 +417,46 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 	}
 
 	return &res, nil
+}
+
+func (r *Decoder) readSIndexType() (models.SIndexType, error) {
+	b, err := r.ReadByte()
+	if err != nil {
+		return models.InvalidSIndex, err
+	}
+
+	switch b {
+	case sindexTypeBin:
+		return models.BinSIndex, nil
+	case sindexTypeList:
+		return models.ListElementSIndex, nil
+	case sindexTypeMapKey:
+		return models.MapKeySIndex, nil
+	case sindexTypeMapVal:
+		return models.MapValueSIndex, nil
+	}
+
+	return models.InvalidSIndex, fmt.Errorf("invalid secondary index type %c", b)
+}
+
+func (r *Decoder) readSIndexBinType() (models.SIPathBinType, error) {
+	b, err := r.ReadByte()
+	if err != nil {
+		return models.InvalidSIDataType, err
+	}
+
+	switch b {
+	case sindexBinTypeString:
+		return models.StringSIDataType, nil
+	case sindexBinTypeNumeric:
+		return models.NumericSIDataType, nil
+	case sindexBinTypeGEO2D:
+		return models.GEO2DSphereSIDataType, nil
+	case sindexBinTypeBlob:
+		return models.BlobSIDataType, nil
+	}
+
+	return models.InvalidSIDataType, fmt.Errorf("invalid sindex path type %c", b)
 }
 
 // readUDF is used to read UDF lines in the global section of the asb file.
@@ -555,77 +569,57 @@ func (r *Decoder) readRecord() (*models.Record, error) {
 			return nil, err
 		}
 
-		switch i {
-		case 0:
-			key, err := r.readUserKey()
-			if err != nil {
-				return nil, newLineError(lineTypeKey, err)
-			}
-
-			recData.userKey = key
-
-		case 1:
-			namespace, err := r.readNamespace()
-			if err != nil {
-				return nil, newLineError(lineTypeNamespace, err)
-			}
-
-			recData.namespace = namespace
-
-		case 2:
-			digest, err := r.readDigest()
-			if err != nil {
-				return nil, newLineError(lineTypeDigest, err)
-			}
-
-			recData.digest = digest
-
-		case 3:
-			set, err := r.readSet()
-			if err != nil {
-				return nil, newLineError(lineTypesSet, err)
-			}
-
-			recData.set = set
-
-		case 4:
-			gen, err := r.readGeneration()
-			if err != nil {
-				return nil, newLineError(lineTypeGen, err)
-			}
-
-			recData.generation = gen
-
-		case 5:
-			exp, err := r.readExpiration()
-			if err != nil {
-				return nil, newLineError(lineTypeExpiration, err)
-			}
-
-			recData.voidTime = exp
-
-		case 6:
-			binCount, err := r.readBinCount()
-			if err != nil {
-				return nil, newLineError(lineTypeBinCount, err)
-			}
-
-			recData.binCount = binCount
-
-		default:
-			// should never happen because this is set to the length of expectedRecordHeaderTypes
-			return nil, fmt.Errorf("read too many record header lines, count: %d", i)
+		if err := r.readRecordData(i, &recData); err != nil {
+			return nil, err
 		}
 	}
 
-	var arec a.Record
+	rec, err := r.prepareRecord(&recData)
+	if err != nil {
+		return nil, err
+	}
 
+	return &models.Record{
+		Record:   rec,
+		VoidTime: recData.voidTime,
+	}, nil
+}
+
+func (r *Decoder) readRecordData(i int, recData *recordData) error {
+	var err error
+
+	switch i {
+	case 0:
+		recData.userKey, err = r.readUserKey()
+	case 1:
+		recData.namespace, err = r.readNamespace()
+	case 2:
+		recData.digest, err = r.readDigest()
+	case 3:
+		recData.set, err = r.readSet()
+	case 4:
+		recData.generation, err = r.readGeneration()
+	case 5:
+		recData.voidTime, err = r.readExpiration()
+	case 6:
+		recData.binCount, err = r.readBinCount()
+	default:
+		// should never happen because this is set to the length of expectedRecordHeaderTypes
+		return fmt.Errorf("read too many record header lines, count: %d", i)
+	}
+
+	if err != nil {
+		return newLineError(lineTypeKey, err)
+	}
+
+	return nil
+}
+
+func (r *Decoder) prepareRecord(recData *recordData) (*a.Record, error) {
 	bins, err := r.readBins(recData.binCount)
 	if err != nil {
 		return nil, newLineError(lineTypeRecordBins, err)
 	}
-
-	arec.Bins = bins
 
 	key, err := a.NewKeyWithDigest(
 		recData.namespace,
@@ -637,15 +631,11 @@ func (r *Decoder) readRecord() (*models.Record, error) {
 		return nil, err
 	}
 
-	arec.Key = key
-	arec.Generation = recData.generation
-
-	rec := models.Record{
-		Record:   &arec,
-		VoidTime: recData.voidTime,
-	}
-
-	return &rec, nil
+	return &a.Record{
+		Key:        key,
+		Bins:       bins,
+		Generation: recData.generation,
+	}, nil
 }
 
 func (r *Decoder) readBins(count uint16) (a.BinMap, error) {
@@ -724,25 +714,9 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		return fmt.Errorf("invalid bin type %c", binType)
 	}
 
-	b, err := r.ReadByte()
+	base64Encoded, err := r.checkEncoded()
 	if err != nil {
 		return err
-	}
-
-	var base64Encoded bool
-
-	switch b {
-	case '!':
-	case ' ':
-		base64Encoded = true
-	default:
-		return fmt.Errorf("invalid character in bytes bin %c, expected '!' or ' '", b)
-	}
-
-	if !base64Encoded {
-		if err := _expectChar(r, ' '); err != nil {
-			return err
-		}
 	}
 
 	nameBytes, err := _readUntilAny(r, []byte{' ', '\n'}, true)
@@ -751,11 +725,6 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 	}
 
 	name := string(nameBytes)
-
-	var (
-		binVal any
-		binErr error
-	)
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
@@ -772,58 +741,7 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 		return err
 	}
 
-	switch binType {
-	case binTypeBool:
-		binVal, binErr = _readBool(r)
-	case binTypeInt:
-		binVal, binErr = _readInteger(r, '\n')
-	case binTypeFloat:
-		binVal, binErr = _readFloat(r, '\n')
-	case binTypeString:
-		binVal, binErr = _readStringSized(r, ' ')
-	case binTypeLDT:
-		return errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
-	case binTypeStringBase64:
-		val, err := _readBase64BytesSized(r, ' ')
-		if err != nil {
-			return err
-		}
-
-		binVal = string(val)
-	case binTypeGeoJSON:
-		binVal, binErr = _readGeoJSON(r, ' ')
-	}
-
-	if _, ok := bytesBinTypes[binType]; ok {
-		var val []byte
-
-		if base64Encoded {
-			val, binErr = _readBase64BytesSized(r, ' ')
-		} else {
-			val, binErr = _readBytesSized(r, ' ')
-		}
-
-		// bytes special cases
-		if _, ok := isMsgPackBytes[binType]; ok {
-			switch binType {
-			case binTypeBytesHLL:
-				// HLLs are treated as bytes by the client so no decode is needed
-				binVal = a.NewHLLValue(val)
-			case binTypeBytesMap:
-				// map msgpack bytes can be sent as RawBlobValues
-				// with particle type MAP
-				binVal = a.NewRawBlobValue(particleType.MAP, val)
-			case binTypeBytesList:
-				// lists msgpack bytes can be sent as RawBlobValues
-				// with particle type LIST
-				binVal = a.NewRawBlobValue(particleType.LIST, val)
-			default:
-				return fmt.Errorf("invalid bytes to type bin type %d", binType)
-			}
-		} else {
-			binVal = val
-		}
-	}
+	binVal, binErr := fetchBinValue(r, binType, base64Encoded)
 
 	if binErr != nil {
 		return binErr
@@ -836,6 +754,85 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 	bins[name] = binVal
 
 	return nil
+}
+
+func (r *Decoder) checkEncoded() (bool, error) {
+	b, err := r.ReadByte()
+	if err != nil {
+		return false, err
+	}
+
+	if b == ' ' {
+		return true, nil
+	}
+
+	if b == '!' {
+		if err := _expectChar(r, ' '); err != nil {
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	return false, fmt.Errorf("invalid character %c, expected '!' or ' '", b)
+}
+
+func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {
+	switch binType {
+	case binTypeBool:
+		return _readBool(r)
+	case binTypeInt:
+		return _readInteger(r, '\n')
+	case binTypeFloat:
+		return _readFloat(r, '\n')
+	case binTypeString:
+		return _readStringSized(r, ' ')
+	case binTypeLDT:
+		return nil, errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
+	case binTypeStringBase64:
+		val, err := _readBase64BytesSized(r, ' ')
+		if err != nil {
+			return nil, err
+		}
+
+		return string(val), nil
+	case binTypeGeoJSON:
+		return _readGeoJSON(r, ' ')
+	}
+
+	if _, ok := bytesBinTypes[binType]; !ok {
+		return nil, fmt.Errorf("unexpected binType %d", binType)
+	}
+
+	var (
+		val []byte
+		err error
+	)
+
+	if base64Encoded {
+		val, err = _readBase64BytesSized(r, ' ')
+	} else {
+		val, err = _readBytesSized(r, ' ')
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := isMsgPackBytes[binType]; !ok {
+		return val, nil
+	}
+
+	switch binType {
+	case binTypeBytesHLL:
+		return a.NewHLLValue(val), nil
+	case binTypeBytesMap:
+		return a.NewRawBlobValue(particleType.MAP, val), nil
+	case binTypeBytesList:
+		return a.NewRawBlobValue(particleType.LIST, val), nil
+	}
+
+	return nil, fmt.Errorf("invalid bytes to type binType %d", binType)
 }
 
 var asbKeyTypes = map[byte]struct{}{

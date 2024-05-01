@@ -26,7 +26,7 @@ import (
 	"unsafe"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
+	encmocks "github.com/aerospike/backup-go/encoding/mocks"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/suite"
@@ -108,7 +108,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 	}
 	expectedRecToken := models.NewRecordToken(mockRec)
 
-	mockDecoder := enc_mocks.NewDecoder(suite.T())
+	mockDecoder := encmocks.NewDecoder(suite.T())
 	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
 
 	reader := newTokenReader(mockDecoder, slog.Default())
@@ -393,7 +393,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	reader := newSIndexReader(mockSIndexGetter, namespace, slog.Default())
 	suite.NotNil(reader)
 
-	expectedSIndexTokens := []*models.Token{}
+	expectedSIndexTokens := make([]*models.Token, 0, len(mockSIndexes))
 	for _, sindex := range mockSIndexes {
 		expectedSIndexTokens = append(expectedSIndexTokens, models.NewSIndexToken(sindex))
 	}
@@ -450,7 +450,7 @@ func (suite *readersTestSuite) TestUDFReader() {
 	reader := newUDFReader(mockUDFGetter, slog.Default())
 	suite.NotNil(reader)
 
-	expectedUDFTokens := []*models.Token{}
+	expectedUDFTokens := make([]*models.Token, 0, len(mockUDFs))
 	for _, udf := range mockUDFs {
 		expectedUDFTokens = append(expectedUDFTokens, models.NewUDFToken(udf))
 	}

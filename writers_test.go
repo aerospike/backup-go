@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	enc_mocks "github.com/aerospike/backup-go/encoding/mocks"
+	encmocks "github.com/aerospike/backup-go/encoding/mocks"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/suite"
@@ -116,7 +116,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-	mockEncoder := enc_mocks.NewEncoder(suite.T())
+	mockEncoder := encmocks.NewEncoder(suite.T())
 	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
 	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)

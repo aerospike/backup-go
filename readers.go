@@ -126,7 +126,7 @@ func (dr *tokenReader) Read() (*models.Token, error) {
 	}
 }
 
-// Cancel satisfies the DataReader interface
+// Close satisfies the DataReader interface
 // but is a no-op for the tokenReader
 func (dr *tokenReader) Close() {
 	dr.logger.Debug("closed token reader")
@@ -353,7 +353,7 @@ func (r *sindexReader) Read() (*models.Token, error) {
 	return nil, io.EOF
 }
 
-// Cancel satisfies the DataReader interface
+// Close satisfies the DataReader interface
 // but is a no-op for the SIndexReader
 func (r *sindexReader) Close() {}
 
@@ -410,6 +410,6 @@ func (r *udfReader) Read() (*models.Token, error) {
 	return nil, io.EOF
 }
 
-// Cancel satisfies the DataReader interface
+// Close satisfies the DataReader interface
 // but is a no-op for the UDFReader
 func (r *udfReader) Close() {}

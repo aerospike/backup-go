@@ -145,6 +145,7 @@ func (s *writeReadTestSuite) TestWriteRead() {
 		Region:   "eu",
 		Endpoint: "http://localhost:9000",
 		Profile:  "minio",
+		Prefix:   "test",
 	}
 
 	size := 500_000

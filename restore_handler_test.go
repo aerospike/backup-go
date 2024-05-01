@@ -97,7 +97,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	_ = f.Close()
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
 	suite.Error(err)
 }
 
@@ -112,7 +112,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	path := filepath.Join(dir, file.Name())
 
-	err = NewDirectoryReaderFactory(path, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	_, err = NewDirectoryReaderFactory(path, encoding.NewASBDecoderFactory()).Readers()
 	suite.Error(err)
 }
 
@@ -126,7 +126,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 		suite.FailNow("Failed to create dir: %v", err)
 	}
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
 	suite.Error(err)
 }
 

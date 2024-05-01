@@ -41,7 +41,9 @@ func (s *writeReadTestSuite) SetupSuite() {
 	if err != nil {
 		s.FailNow("could not pull minio image", err)
 	}
-	defer responseBody.Close()
+	defer func(responseBody io.ReadCloser) {
+		_ = responseBody.Close()
+	}(responseBody)
 
 	dec := json.NewDecoder(responseBody)
 	for {

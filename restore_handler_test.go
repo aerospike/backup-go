@@ -37,7 +37,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 		suite.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.NoError(err)
@@ -53,7 +53,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 		suite.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	err = NewDirectoryReaderFactory(dir, nil).checkRestoreDirectory()
 	suite.NoError(err)
@@ -69,7 +69,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 		suite.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	file = "file2.asb"
 	filePath = filepath.Join(dir, file)
@@ -79,7 +79,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 		suite.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.NoError(err)
@@ -95,7 +95,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 		suite.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
 	suite.Error(err)
@@ -108,7 +108,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 		suite.FailNow("Failed to create file: %v", err)
 	}
 
-	file.Close()
+	_ = file.Close()
 
 	path := filepath.Join(dir, file.Name())
 
@@ -142,12 +142,12 @@ func TestCheckRestoreDirectory(t *testing.T) {
 
 func Test_verifyBackupFileExtension(t *testing.T) {
 	type args struct {
-		fileName string
 		decoder  DecoderFactory
+		fileName string
 	}
 	tests := []struct {
-		name    string
 		args    args
+		name    string
 		wantErr bool
 	}{
 		{

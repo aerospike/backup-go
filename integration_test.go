@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
@@ -73,9 +74,9 @@ type backupRestoreTestSuite struct {
 	aerospikeUser     string
 	namespace         string
 	set               string
-	aerospikePort     int
 	expectedSIndexes  []*models.SIndex
 	expectedUDFs      []*models.UDF
+	aerospikePort     int
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
@@ -170,8 +171,23 @@ func (suite *backupRestoreTestSuite) TearDownSuite() {
 	}
 }
 
-func (suite *backupRestoreTestSuite) SetupTest() {
+func (suite *backupRestoreTestSuite) SetupTest(records []*a.Record) {
 	err := suite.testClient.Truncate(suite.namespace, suite.set)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	err = suite.testClient.WriteRecords(records)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	err = suite.testClient.WriteUDFs(suite.expectedUDFs)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -204,34 +220,17 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		},
 	}
 	for _, tt := range tests {
-		suite.SetupTest()
+		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
+		suite.SetupTest(expectedRecs)
 		suite.Run(tt.name, func() {
-			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins)
+			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, expectedRecs)
 		})
 		suite.TearDownTest()
 	}
 }
 
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig, bins a.BinMap) {
-	numRec := 1000
-	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
-
-	err := suite.testClient.WriteRecords(expectedRecs)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
-	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
-	err = suite.testClient.WriteUDFs(suite.expectedUDFs)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
+	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) {
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
@@ -262,7 +261,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 }
 
@@ -275,8 +274,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		expectedFiles int
 	}
 	var tests = []struct {
-		args args
 		name string
+		args args
 	}{
 		{
 			name: "default",
@@ -302,7 +301,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "with parallel backup",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.NewPartitionRange(0, 4096),
+					Partitions:     backup.PartitionRangeAll(),
 					Set:            suite.set,
 					Namespace:      suite.namespace,
 					Parallel:       100,
@@ -318,7 +317,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "parallel with file size limit",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.NewPartitionRange(0, 4096),
+					Partitions:     backup.PartitionRangeAll(),
 					Set:            suite.set,
 					Namespace:      suite.namespace,
 					Parallel:       4,
@@ -332,10 +331,11 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		},
 	}
 	for _, tt := range tests {
-		suite.SetupTest()
+		var initialRecords = genRecords(suite.namespace, suite.set, 20_000, tt.args.bins)
+		suite.SetupTest(initialRecords)
 		suite.Run(tt.name, func() {
 			runBackupRestoreDirectory(suite,
-				tt.args.backupConfig, tt.args.restoreConfig, tt.args.bins, tt.args.fileSizeLimit, tt.args.expectedFiles)
+				tt.args.backupConfig, tt.args.restoreConfig, initialRecords, tt.args.fileSizeLimit, tt.args.expectedFiles)
 		})
 		suite.TearDownTest()
 	}
@@ -344,27 +344,9 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	backupConfig *backup.BackupConfig,
 	restoreConfig *backup.RestoreConfig,
-	bins a.BinMap,
+	expectedRecs []*a.Record,
 	fileSizeLimit int64,
 	expectedFiles int) {
-	numRec := 20000
-	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
-
-	err := suite.testClient.WriteRecords(expectedRecs)
-	if err != nil {
-		panic(err)
-	}
-
-	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
-	err = suite.testClient.WriteUDFs(suite.expectedUDFs)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
@@ -384,7 +366,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Equal(uint64(numRec), statsBackup.GetRecords())
+	suite.Equal(uint64(len(expectedRecs)), statsBackup.GetRecords())
 	suite.Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Equal(uint32(3), statsBackup.GetUDFs())
 
@@ -409,12 +391,13 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Equal(uint64(numRec), statsRestore.GetRecords())
+	suite.Equal(uint64(len(expectedRecs)), statsRestore.GetRecords())
 	suite.Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Equal(uint64(0), statsRestore.GetRecordsExpired())
 
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
@@ -557,7 +540,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.testClient.ValidateRecords(suite.T(), expectedRecs, numRec, suite.namespace, suite.set)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 }
 
 func (suite *backupRestoreTestSuite) TestBackupContext() {
@@ -746,6 +729,86 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 	ts.expectedUDFs = expectedUDFs
 
 	suite.Run(t, &ts)
+}
+
+func (suite *backupRestoreTestSuite) TestBinFilter() {
+	var initialRecords = genRecords(suite.namespace, suite.set, 1000, a.BinMap{
+		"BackupRestore": 1,
+		"OnlyBackup":    2,
+		"OnlyRestore":   3,
+	})
+
+	var expectedRecords = genRecords(suite.namespace, suite.set, 1000, a.BinMap{
+		"BackupRestore": 1,
+	})
+
+	var backupConfig = &backup.BackupConfig{
+		Partitions:     backup.PartitionRangeAll(),
+		Set:            suite.set,
+		Namespace:      suite.namespace,
+		Parallel:       1,
+		EncoderFactory: encoding.NewASBEncoderFactory(),
+		BinList:        []string{"BackupRestore", "OnlyBackup"},
+	}
+
+	var restoreConfig = &backup.RestoreConfig{
+		Parallel:       1,
+		DecoderFactory: encoding.NewASBDecoderFactory(),
+		BinList:        []string{"BackupRestore", "OnlyRestore"}, // only BackupAndRestore should be restored
+	}
+
+	suite.SetupTest(initialRecords)
+	suite.Run("Filter by bin", func() {
+		runBackupRestore(suite, backupConfig, restoreConfig, expectedRecords)
+	})
+	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
+	timeout := 2 * time.Second
+	batch1 := genRecords(suite.namespace, suite.set, 900, testBins)
+	suite.SetupTest(batch1)
+
+	time.Sleep(timeout)
+	lowerLimit := time.Now()
+	batch2 := genRecords(suite.namespace, suite.set, 600, testBins)
+	err := suite.testClient.WriteRecords(batch2)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	time.Sleep(timeout)
+	upperLimit := time.Now()
+	batch3 := genRecords(suite.namespace, suite.set, 300, testBins)
+	err = suite.testClient.WriteRecords(batch3)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	// every batch generated same records, but less of them each time.
+	// batch1 contains too old values (many of them were overwritten).
+	// batch3 contains too fresh values.
+	var expectedRecords = testresources.Subtract(batch2, batch3)
+
+	var backupConfig = &backup.BackupConfig{
+		Partitions:     backup.PartitionRangeAll(),
+		Set:            suite.set,
+		Namespace:      suite.namespace,
+		Parallel:       1,
+		EncoderFactory: encoding.NewASBEncoderFactory(),
+		ModAfter:       &lowerLimit,
+		ModBefore:      &upperLimit,
+	}
+
+	var restoreConfig = &backup.RestoreConfig{
+		Parallel:       1,
+		DecoderFactory: encoding.NewASBDecoderFactory(),
+	}
+
+	suite.Run("Filter by bin", func() {
+		runBackupRestore(suite, backupConfig, restoreConfig, expectedRecords)
+	})
+	suite.TearDownTest()
 }
 
 type byteReadWriterFactory struct {

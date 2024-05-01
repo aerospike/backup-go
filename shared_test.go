@@ -27,8 +27,8 @@ func Test_splitPartitions(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		args    args
 		want    []PartitionRange
+		args    args
 		wantErr bool
 	}{
 		{

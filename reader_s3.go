@@ -82,6 +82,7 @@ func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan erro
 				Prefix:            &prefix,
 				ContinuationToken: continuationToken,
 			})
+
 			if err != nil {
 				errCh <- err
 				return

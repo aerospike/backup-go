@@ -765,10 +765,11 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 }
 
 func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
+	timeout := 2 * time.Second
 	batch1 := genRecords(suite.namespace, suite.set, 900, testBins)
 	suite.SetupTest(batch1)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(timeout)
 	lowerLimit := time.Now()
 	batch2 := genRecords(suite.namespace, suite.set, 600, testBins)
 	err := suite.testClient.WriteRecords(batch2)
@@ -776,7 +777,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 		suite.FailNow(err.Error())
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(timeout)
 	upperLimit := time.Now()
 	batch3 := genRecords(suite.namespace, suite.set, 300, testBins)
 	err = suite.testClient.WriteRecords(batch3)

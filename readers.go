@@ -149,6 +149,10 @@ func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrCon
 		Set:            backupConfig.Set,
 		PartitionRange: partitions,
 		BinList:        backupConfig.BinList,
+		timeBounds: models.TimeBounds{
+			FromTime: backupConfig.ModAfter,
+			ToTime:   backupConfig.ModBefore,
+		},
 	}
 }
 

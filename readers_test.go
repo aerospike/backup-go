@@ -151,7 +151,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -167,7 +167,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 			Set:            set,
 			PartitionRange: PartitionRangeAll(),
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -217,7 +217,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -233,7 +233,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 			Set:            set,
 			PartitionRange: PartitionRangeAll(),
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -256,7 +256,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -272,7 +272,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 			Set:            set,
 			PartitionRange: PartitionRangeAll(),
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -289,7 +289,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 
 	mockScanner := mocks.NewScanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		(*a.ScanPolicy)(nil),
+		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -305,7 +305,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 			Set:            set,
 			PartitionRange: PartitionRangeAll(),
 		},
-		nil,
+		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)

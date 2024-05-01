@@ -136,6 +136,7 @@ func (dr *tokenReader) Close() {
 
 // arrConfig is the configuration for an AerospikeRecordReader
 type arrConfig struct {
+	timeBounds     models.TimeBounds
 	Namespace      string
 	Set            string
 	BinList        []string
@@ -148,6 +149,10 @@ func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrCon
 		Set:            backupConfig.Set,
 		PartitionRange: partitions,
 		BinList:        backupConfig.BinList,
+		timeBounds: models.TimeBounds{
+			FromTime: backupConfig.ModAfter,
+			ToTime:   backupConfig.ModBefore,
+		},
 	}
 }
 
@@ -254,6 +259,8 @@ func (arr *aerospikeRecordReader) startScan() error {
 		arr.config.PartitionRange.Count,
 	)
 
+	arr.scanPolicy.FilterExpression = timeBoundExpression(arr.config.timeBounds)
+
 	recSet, err := arr.client.ScanPartitions(
 		arr.scanPolicy,
 		arr.status.partitionFilter,
@@ -269,6 +276,25 @@ func (arr *aerospikeRecordReader) startScan() error {
 	arr.recResChan = recSet.Results()
 
 	return nil
+}
+
+func timeBoundExpression(bounds models.TimeBounds) *a.Expression {
+	if bounds.FromTime == nil && bounds.ToTime == nil {
+		return nil
+	}
+
+	if bounds.FromTime != nil && bounds.ToTime == nil {
+		return a.ExpGreaterEq(a.ExpLastUpdate(), a.ExpIntVal(bounds.FromTime.UnixNano()))
+	}
+
+	if bounds.FromTime == nil && bounds.ToTime != nil {
+		return a.ExpLess(a.ExpLastUpdate(), a.ExpIntVal(bounds.ToTime.UnixNano()))
+	}
+
+	return a.ExpAnd(
+		a.ExpGreaterEq(a.ExpLastUpdate(), a.ExpIntVal(bounds.FromTime.UnixNano())),
+		a.ExpLess(a.ExpLastUpdate(), a.ExpIntVal(bounds.ToTime.UnixNano())),
+	)
 }
 
 // **** Aerospike SIndex Reader ****

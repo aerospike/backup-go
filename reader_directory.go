@@ -35,6 +35,10 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 	readers := make([]io.ReadCloser, 0, len(fileInfo))
 
 	for _, file := range fileInfo {
+		if file.IsDir() {
+			continue
+		}
+
 		filePath := filepath.Join(f.dir, file.Name())
 		if err := verifyBackupFileExtension(filePath, f.decoder); err != nil {
 			continue

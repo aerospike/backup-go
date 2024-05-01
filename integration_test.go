@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
@@ -730,7 +731,7 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 	suite.Run(t, &ts)
 }
 
-func (suite *backupRestoreTestSuite) TestBinFilterContext() {
+func (suite *backupRestoreTestSuite) TestBinFilter() {
 	var initialRecords = genRecords(suite.namespace, suite.set, 1000, a.BinMap{
 		"BackupRestore": 1,
 		"OnlyBackup":    2,
@@ -757,6 +758,52 @@ func (suite *backupRestoreTestSuite) TestBinFilterContext() {
 	}
 
 	suite.SetupTest(initialRecords)
+	suite.Run("Filter by bin", func() {
+		runBackupRestore(suite, backupConfig, restoreConfig, expectedRecords)
+	})
+	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
+	batch1 := genRecords(suite.namespace, suite.set, 900, testBins)
+	suite.SetupTest(batch1)
+
+	time.Sleep(1 * time.Second)
+	lowerLimit := time.Now()
+	batch2 := genRecords(suite.namespace, suite.set, 600, testBins)
+	err := suite.testClient.WriteRecords(batch2)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	time.Sleep(1 * time.Second)
+	upperLimit := time.Now()
+	batch3 := genRecords(suite.namespace, suite.set, 300, testBins)
+	err = suite.testClient.WriteRecords(batch3)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	// every batch generated same records, but less of them each time.
+	// batch1 contains too old values (many of them were overwritten).
+	// batch3 contains too fresh values.
+	var expectedRecords = testresources.Subtract(batch2, batch3)
+
+	var backupConfig = &backup.BackupConfig{
+		Partitions:     backup.PartitionRangeAll(),
+		Set:            suite.set,
+		Namespace:      suite.namespace,
+		Parallel:       1,
+		EncoderFactory: encoding.NewASBEncoderFactory(),
+		ModAfter:       &lowerLimit,
+		ModBefore:      &upperLimit,
+	}
+
+	var restoreConfig = &backup.RestoreConfig{
+		Parallel:       1,
+		DecoderFactory: encoding.NewASBDecoderFactory(),
+	}
+
 	suite.Run("Filter by bin", func() {
 		runBackupRestore(suite, backupConfig, restoreConfig, expectedRecords)
 	})

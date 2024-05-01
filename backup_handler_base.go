@@ -70,16 +70,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 	}
 
 	for i := 0; i < bh.config.Parallel; i++ {
-		ARRCFG := arrConfig{
-			Namespace:      bh.config.Namespace,
-			Set:            bh.config.Set,
-			FirstPartition: partitionRanges[i].Begin,
-			NumPartitions:  partitionRanges[i].Count,
-			timeBounds: models.TimeBounds{
-				FromTime: bh.config.ModAfter,
-				ToTime:   bh.config.ModBefore,
-			},
-		}
+		ARRCFG := newArrConfig(bh.config, partitionRanges[i])
 
 		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,

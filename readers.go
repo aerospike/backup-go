@@ -139,8 +139,17 @@ type arrConfig struct {
 	timeBounds     models.TimeBounds
 	Namespace      string
 	Set            string
-	FirstPartition int
-	NumPartitions  int
+	BinList        []string
+	PartitionRange PartitionRange
+}
+
+func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrConfig {
+	return &arrConfig{
+		Namespace:      backupConfig.Namespace,
+		Set:            backupConfig.Set,
+		PartitionRange: partitions,
+		BinList:        backupConfig.BinList,
+	}
 }
 
 // arrStatus is the status of an AerospikeRecordReader
@@ -154,7 +163,12 @@ type arrStatus struct {
 //
 //go:generate mockery --name scanner
 type scanner interface {
-	ScanPartitions(*a.ScanPolicy, *a.PartitionFilter, string, string, ...string) (*a.Recordset, a.Error)
+	ScanPartitions(
+		scanPolicy *a.ScanPolicy,
+		partitionFilter *a.PartitionFilter,
+		namespace string,
+		setName string,
+		binNames ...string) (*a.Recordset, a.Error)
 }
 
 // aerospikeRecordReader satisfies the DataReader interface
@@ -165,12 +179,12 @@ type aerospikeRecordReader struct {
 	recResChan <-chan *a.Result
 	recSet     *a.Recordset
 	logger     *slog.Logger
+	config     *arrConfig
 	status     arrStatus
-	config     arrConfig
 }
 
 // newAerospikeRecordReader creates a new AerospikeRecordReader
-func newAerospikeRecordReader(client scanner, cfg arrConfig,
+func newAerospikeRecordReader(client scanner, cfg *arrConfig,
 	scanPolicy *a.ScanPolicy, logger *slog.Logger) *aerospikeRecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
@@ -237,8 +251,8 @@ func (arr *aerospikeRecordReader) startScan() error {
 	arr.recResChan = make(chan *a.Result)
 
 	arr.status.partitionFilter = a.NewPartitionFilterByRange(
-		arr.config.FirstPartition,
-		arr.config.NumPartitions,
+		arr.config.PartitionRange.Begin,
+		arr.config.PartitionRange.Count,
 	)
 
 	arr.scanPolicy.FilterExpression = timeBoundExpression(arr.config.timeBounds)
@@ -248,6 +262,7 @@ func (arr *aerospikeRecordReader) startScan() error {
 		arr.status.partitionFilter,
 		arr.config.Namespace,
 		arr.config.Set,
+		arr.config.BinList...,
 	)
 	if err != nil {
 		return err

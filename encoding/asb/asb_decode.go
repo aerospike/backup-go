@@ -347,7 +347,7 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	res.IndexType, err = r.readIndexType()
+	res.IndexType, err = r.readSIndexType()
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	path.BinType, err = r.readBinType()
+	path.BinType, err = r.readSIndexBinType()
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +419,7 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 	return &res, nil
 }
 
-func (r *Decoder) readIndexType() (models.SIndexType, error) {
+func (r *Decoder) readSIndexType() (models.SIndexType, error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return models.InvalidSIndex, err
@@ -439,7 +439,7 @@ func (r *Decoder) readIndexType() (models.SIndexType, error) {
 	return models.InvalidSIndex, fmt.Errorf("invalid secondary index type %c", b)
 }
 
-func (r *Decoder) readBinType() (models.SIPathBinType, error) {
+func (r *Decoder) readSIndexBinType() (models.SIPathBinType, error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return models.InvalidSIDataType, err
@@ -774,7 +774,7 @@ func (r *Decoder) checkEncoded() (bool, error) {
 		return false, nil
 	}
 
-	return false, fmt.Errorf("invalid character in bytes bin %c, expected '!' or ' '", b)
+	return false, fmt.Errorf("invalid character %c, expected '!' or ' '", b)
 }
 
 func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {

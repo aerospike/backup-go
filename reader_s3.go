@@ -3,6 +3,7 @@ package backup
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -60,6 +61,10 @@ func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 		if fileCh == nil && errCh == nil {
 			break
 		}
+	}
+
+	if len(readers) == 0 {
+		return nil, fmt.Errorf("%w: %s doesn't contains backup files", ErrRestoreDirectoryInvalid, f.s3Config.Prefix)
 	}
 
 	return readers, nil

@@ -48,6 +48,10 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 		readers = append(readers, reader)
 	}
 
+	if len(readers) == 0 {
+		return nil, fmt.Errorf("%w: %s doesn't contains backup files", ErrRestoreDirectoryInvalid, f.dir)
+	}
+
 	return readers, nil
 }
 

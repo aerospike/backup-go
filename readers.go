@@ -136,10 +136,24 @@ func (dr *tokenReader) Close() {
 
 // arrConfig is the configuration for an AerospikeRecordReader
 type arrConfig struct {
+	timeBounds     models.TimeBounds
 	Namespace      string
 	Set            string
-	FirstPartition int
-	NumPartitions  int
+	BinList        []string
+	PartitionRange PartitionRange
+}
+
+func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrConfig {
+	return &arrConfig{
+		Namespace:      backupConfig.Namespace,
+		Set:            backupConfig.Set,
+		PartitionRange: partitions,
+		BinList:        backupConfig.BinList,
+		timeBounds: models.TimeBounds{
+			FromTime: backupConfig.ModAfter,
+			ToTime:   backupConfig.ModBefore,
+		},
+	}
 }
 
 // arrStatus is the status of an AerospikeRecordReader
@@ -153,7 +167,12 @@ type arrStatus struct {
 //
 //go:generate mockery --name scanner
 type scanner interface {
-	ScanPartitions(*a.ScanPolicy, *a.PartitionFilter, string, string, ...string) (*a.Recordset, a.Error)
+	ScanPartitions(
+		scanPolicy *a.ScanPolicy,
+		partitionFilter *a.PartitionFilter,
+		namespace string,
+		setName string,
+		binNames ...string) (*a.Recordset, a.Error)
 }
 
 // aerospikeRecordReader satisfies the DataReader interface
@@ -164,12 +183,12 @@ type aerospikeRecordReader struct {
 	recResChan <-chan *a.Result
 	recSet     *a.Recordset
 	logger     *slog.Logger
+	config     *arrConfig
 	status     arrStatus
-	config     arrConfig
 }
 
 // newAerospikeRecordReader creates a new AerospikeRecordReader
-func newAerospikeRecordReader(client scanner, cfg arrConfig,
+func newAerospikeRecordReader(client scanner, cfg *arrConfig,
 	scanPolicy *a.ScanPolicy, logger *slog.Logger) *aerospikeRecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
@@ -236,15 +255,18 @@ func (arr *aerospikeRecordReader) startScan() error {
 	arr.recResChan = make(chan *a.Result)
 
 	arr.status.partitionFilter = a.NewPartitionFilterByRange(
-		arr.config.FirstPartition,
-		arr.config.NumPartitions,
+		arr.config.PartitionRange.Begin,
+		arr.config.PartitionRange.Count,
 	)
+
+	arr.scanPolicy.FilterExpression = timeBoundExpression(arr.config.timeBounds)
 
 	recSet, err := arr.client.ScanPartitions(
 		arr.scanPolicy,
 		arr.status.partitionFilter,
 		arr.config.Namespace,
 		arr.config.Set,
+		arr.config.BinList...,
 	)
 	if err != nil {
 		return err
@@ -254,6 +276,25 @@ func (arr *aerospikeRecordReader) startScan() error {
 	arr.recResChan = recSet.Results()
 
 	return nil
+}
+
+func timeBoundExpression(bounds models.TimeBounds) *a.Expression {
+	if bounds.FromTime == nil && bounds.ToTime == nil {
+		return nil
+	}
+
+	if bounds.FromTime != nil && bounds.ToTime == nil {
+		return a.ExpGreaterEq(a.ExpLastUpdate(), a.ExpIntVal(bounds.FromTime.UnixNano()))
+	}
+
+	if bounds.FromTime == nil && bounds.ToTime != nil {
+		return a.ExpLess(a.ExpLastUpdate(), a.ExpIntVal(bounds.ToTime.UnixNano()))
+	}
+
+	return a.ExpAnd(
+		a.ExpGreaterEq(a.ExpLastUpdate(), a.ExpIntVal(bounds.FromTime.UnixNano())),
+		a.ExpLess(a.ExpLastUpdate(), a.ExpIntVal(bounds.ToTime.UnixNano())),
+	)
 }
 
 // **** Aerospike SIndex Reader ****

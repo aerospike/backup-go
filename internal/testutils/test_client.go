@@ -245,14 +245,14 @@ func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 // Currently, it does not compare the records' metadata, only their digests and bins.
 // TODO compare metadata and user keys, maybe in another method
 func (tc *TestClient) ValidateRecords(
-	t assert.TestingT, expectedRecs []*a.Record, expCount int, namespace, set string) {
+	t assert.TestingT, expectedRecs []*a.Record, namespace, set string) {
 	actualRecs, err := tc.ReadAllRecords(namespace, set)
 	if err != nil {
 		t.Errorf("Error reading records: %v", err)
 	}
 
-	if len(actualRecs) != expCount {
-		t.Errorf("Expected %d records, got %d", expCount, len(actualRecs))
+	if len(actualRecs) != len(expectedRecs) {
+		t.Errorf("Expected %d records, got %d", len(expectedRecs), len(actualRecs))
 	}
 
 	for _, expRec := range expectedRecs {

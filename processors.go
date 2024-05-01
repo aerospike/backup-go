@@ -164,6 +164,41 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 	return token, nil
 }
 
+type binFilterProcessor struct {
+	keys map[string]bool
+}
+
+func newProcessorBinFilter(binList []string) *binFilterProcessor {
+	keys := make(map[string]bool, len(binList))
+	for _, key := range binList {
+		keys[key] = true
+	}
+
+	return &binFilterProcessor{
+		keys: keys,
+	}
+}
+
+func (b binFilterProcessor) Process(token *models.Token) (*models.Token, error) {
+	// if the token is not a record, we don't need to process it
+	if token.Type != models.TokenTypeRecord {
+		return token, nil
+	}
+
+	// if filter bin list is empty, don't filter anything.
+	if len(b.keys) == 0 {
+		return token, nil
+	}
+
+	for key := range token.Record.Bins {
+		if !b.keys[key] {
+			delete(token.Record.Bins, key)
+		}
+	}
+
+	return token, nil
+}
+
 // **** VoidTime Processor ****
 
 // processorVoidTime is a dataProcessor that sets the VoidTime of a record based on its TTL

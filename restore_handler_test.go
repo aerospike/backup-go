@@ -39,7 +39,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	_ = f.Close()
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
 	suite.NoError(err)
 }
 
@@ -55,7 +55,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	_ = f.Close()
 
-	err = NewDirectoryReaderFactory(dir, nil).checkRestoreDirectory()
+	_, err = NewDirectoryReaderFactory(dir, nil).Readers()
 	suite.NoError(err)
 }
 
@@ -81,7 +81,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	_ = f.Close()
 
-	err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
 	suite.NoError(err)
 }
 

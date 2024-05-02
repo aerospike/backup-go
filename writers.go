@@ -133,6 +133,7 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 	}
 
 	tw.stats.addBytes(uint64(n))
+
 	return n, nil
 }
 

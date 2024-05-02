@@ -100,6 +100,10 @@ func (bs *tokenStats) GetRecords() uint64 {
 	return bs.records.Load()
 }
 
+func (bs *tokenStats) GetBytes() uint64 {
+	return bs.bytes.Load()
+}
+
 func (bs *tokenStats) GetSIndexes() uint32 {
 	return bs.sIndexes.Load()
 }

@@ -35,7 +35,14 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 	readers := make([]io.ReadCloser, 0, len(fileInfo))
 
 	for _, file := range fileInfo {
+		if file.IsDir() {
+			continue
+		}
+
 		filePath := filepath.Join(f.dir, file.Name())
+		if err := verifyBackupFileExtension(filePath, f.decoder); err != nil {
+			continue
+		}
 
 		reader, err := os.Open(filePath)
 		if err != nil {
@@ -43,6 +50,10 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 		}
 
 		readers = append(readers, reader)
+	}
+
+	if len(readers) == 0 {
+		return nil, fmt.Errorf("%w: %s doesn't contain backup files", ErrRestoreDirectoryInvalid, f.dir)
 	}
 
 	return readers, nil
@@ -56,7 +67,6 @@ var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 // is a readable directory, and contains backup files of the correct format
 func (f *DirectoryReaderFactory) checkRestoreDirectory() error {
 	dir := f.dir
-	decoding := f.decoder
 
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
@@ -77,30 +87,6 @@ func (f *DirectoryReaderFactory) checkRestoreDirectory() error {
 	// Check if the directory is empty
 	if len(fileInfo) == 0 {
 		return fmt.Errorf("%w: %s is empty", ErrRestoreDirectoryInvalid, dir)
-	}
-
-	if err := filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("%w: failed reading restore file %s in %s: %v", ErrRestoreDirectoryInvalid, d.Name(), dir, err)
-		}
-
-		// this function gets called on the directory itself
-		// we only want to check nested files so skip the root
-		if d.Name() == filepath.Base(dir) {
-			return nil
-		}
-
-		if d.IsDir() {
-			return fmt.Errorf("%w: found directory %s in %s", ErrRestoreDirectoryInvalid, d.Name(), dir)
-		}
-
-		return verifyBackupFileExtension(d.Name(), decoding)
-	}); err != nil {
-		if errors.Is(err, ErrRestoreDirectoryInvalid) {
-			return err
-		}
-
-		return fmt.Errorf("%w: failed to read %s: %v", ErrRestoreDirectoryInvalid, dir, err)
 	}
 
 	return nil

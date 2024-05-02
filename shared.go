@@ -90,18 +90,18 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 }
 
 type tokenStats struct {
-	records  atomic.Uint64
-	sIndexes atomic.Uint32
-	uDFs     atomic.Uint32
-	bytes    atomic.Uint64
+	records   atomic.Uint64
+	sIndexes  atomic.Uint32
+	uDFs      atomic.Uint32
+	totalSize atomic.Uint64
 }
 
 func (bs *tokenStats) GetRecords() uint64 {
 	return bs.records.Load()
 }
 
-func (bs *tokenStats) GetBytes() uint64 {
-	return bs.bytes.Load()
+func (bs *tokenStats) GetTotalSize() uint64 {
+	return bs.totalSize.Load()
 }
 
 func (bs *tokenStats) GetSIndexes() uint32 {
@@ -116,8 +116,8 @@ func (bs *tokenStats) addRecords(num uint64) {
 	bs.records.Add(num)
 }
 
-func (bs *tokenStats) addBytes(num uint64) {
-	bs.bytes.Add(num)
+func (bs *tokenStats) addTotalSize(num uint64) {
+	bs.totalSize.Add(num)
 }
 
 func (bs *tokenStats) addSIndexes(num uint32) {

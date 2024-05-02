@@ -366,10 +366,10 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Equal(uint64(len(expectedRecs)), statsBackup.GetRecords())
-	suite.Equal(uint32(8), statsBackup.GetSIndexes())
-	suite.Equal(uint32(3), statsBackup.GetUDFs())
-	suite.Equal(uint64(9_442_237), statsBackup.GetBytes())
+	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetRecords())
+	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
+	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
+	suite.Require().Equal(uint64(9_442_237), statsBackup.GetTotalSize())
 
 	backupFiles, _ := os.ReadDir(backupDir)
 	suite.Equal(expectedFiles, len(backupFiles))
@@ -392,10 +392,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Equal(uint64(len(expectedRecs)), statsRestore.GetRecords())
-	suite.Equal(uint32(8), statsRestore.GetSIndexes())
-	suite.Equal(uint32(3), statsRestore.GetUDFs())
-	suite.Equal(uint64(0), statsRestore.GetRecordsExpired())
+	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecords())
+	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
+	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
+	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
+	suite.Require().Equal(uint64(20011), statsRestore.GetTotalSize())
 
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)

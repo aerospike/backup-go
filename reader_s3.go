@@ -64,7 +64,7 @@ func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 	}
 
 	if len(readers) == 0 {
-		return nil, fmt.Errorf("%w: %s doesn't contains backup files", ErrRestoreDirectoryInvalid, f.s3Config.Prefix)
+		return nil, fmt.Errorf("%w: %s doesn't contain backup files", ErrRestoreDirectoryInvalid, f.s3Config.Prefix)
 	}
 
 	return readers, nil

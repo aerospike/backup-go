@@ -93,6 +93,7 @@ type tokenStats struct {
 	records  atomic.Uint64
 	sIndexes atomic.Uint32
 	uDFs     atomic.Uint32
+	bytes    atomic.Uint64
 }
 
 func (bs *tokenStats) GetRecords() uint64 {
@@ -109,6 +110,10 @@ func (bs *tokenStats) GetUDFs() uint32 {
 
 func (bs *tokenStats) addRecords(num uint64) {
 	bs.records.Add(num)
+}
+
+func (bs *tokenStats) addBytes(num uint64) {
+	bs.bytes.Add(num)
 }
 
 func (bs *tokenStats) addSIndexes(num uint32) {

@@ -123,8 +123,6 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 
 	switch data.Type {
 	case models.TokenTypeRecord:
-		// TODO: distinguish different records types:
-		// expired_records, skipped_records, ignored_records, inserted_records, existed_records, fresher_records
 		tw.stats.addRecords(1)
 	case models.TokenTypeUDF:
 		tw.stats.addUDFs(1)

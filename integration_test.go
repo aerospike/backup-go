@@ -369,11 +369,12 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetRecords())
 	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
+
 	dirSize := uint64(testresources.DirSize(backupDir))
 	suite.Require().Equal(dirSize, statsBackup.GetTotalSize())
 
 	backupFiles, _ := os.ReadDir(backupDir)
-	suite.Equal(expectedFiles, len(backupFiles))
+	suite.Require().Equal(expectedFiles, len(backupFiles))
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	if err != nil {

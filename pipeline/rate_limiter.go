@@ -22,7 +22,7 @@ func (nl *NoOpLimiter) Wait(_ context.Context) error {
 
 func NewRateLimiter(requestsPerSecond int) RateLimiterInterface {
 	if requestsPerSecond != 0 {
-		rate.NewLimiter(rate.Every(time.Second/time.Duration(requestsPerSecond)), 1)
+		return rate.NewLimiter(rate.Every(time.Second/time.Duration(requestsPerSecond)), 1)
 	}
 	return &NoOpLimiter{}
 }

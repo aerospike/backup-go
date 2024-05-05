@@ -136,11 +136,12 @@ func (dr *tokenReader) Close() {
 
 // arrConfig is the configuration for an AerospikeRecordReader
 type arrConfig struct {
-	timeBounds     models.TimeBounds
-	Namespace      string
-	Set            string
-	BinList        []string
-	PartitionRange PartitionRange
+	timeBounds       models.TimeBounds
+	Namespace        string
+	Set              string
+	BinList          []string
+	PartitionRange   PartitionRange
+	RecordsPerSecond int
 }
 
 func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrConfig {
@@ -153,6 +154,7 @@ func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrCon
 			FromTime: backupConfig.ModAfter,
 			ToTime:   backupConfig.ModBefore,
 		},
+		RecordsPerSecond: backupConfig.RecordsPerSecond,
 	}
 }
 
@@ -260,6 +262,7 @@ func (arr *aerospikeRecordReader) startScan() error {
 	)
 
 	arr.scanPolicy.FilterExpression = timeBoundExpression(arr.config.timeBounds)
+	arr.scanPolicy.RecordsPerSecond = arr.config.RecordsPerSecond
 
 	recSet, err := arr.client.ScanPartitions(
 		arr.scanPolicy,

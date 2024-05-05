@@ -45,12 +45,13 @@ type Pipeline[T any] struct {
 }
 
 // NewPipeline creates a new DataPipeline.
-func NewPipeline[T any](workGroups ...[]Worker[T]) *Pipeline[T] {
+func NewPipeline[T any](rps int, workGroups ...[]Worker[T]) *Pipeline[T] {
 	stages := make([]*stage[T], len(workGroups))
 
 	for i, workers := range workGroups {
 		stages[i] = newStage(workers...)
 	}
+	stages[0].rateLimiter = NewRateLimiter(rps)
 
 	return &Pipeline[T]{
 		stages: stages,
@@ -129,9 +130,10 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 }
 
 type stage[T any] struct {
-	receive <-chan T
-	send    chan<- T
-	workers []Worker[T]
+	receive     <-chan T
+	send        chan<- T
+	workers     []Worker[T]
+	rateLimiter RateLimiterInterface
 }
 
 func (s *stage[T]) SetReceiveChan(c <-chan T) {
@@ -144,7 +146,8 @@ func (s *stage[T]) SetSendChan(c chan<- T) {
 
 func newStage[T any](workers ...Worker[T]) *stage[T] {
 	s := stage[T]{
-		workers: workers,
+		workers:     workers,
+		rateLimiter: &NoOpLimiter{},
 	}
 
 	return &s
@@ -172,7 +175,14 @@ func (s *stage[T]) Run(ctx context.Context) error {
 		go func(w Worker[T]) {
 			defer wg.Done()
 
-			err := w.Run(ctx)
+			err := s.rateLimiter.Wait(ctx)
+			if err != nil {
+				errors <- err
+				cancel()
+				return
+			}
+
+			err = w.Run(ctx)
 			if err != nil {
 				errors <- err
 

@@ -214,6 +214,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	}
 
 	job := pipeline.NewPipeline(
+		rh.config.RecordsPerSecond,
 		readWorkers,
 		ttlSetters,
 		binFilters,

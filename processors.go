@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"log/slog"
 	"math"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
 // **** Processor Worker ****
@@ -243,25 +243,32 @@ func (p *processorVoidTime) Process(token *models.Token) (*models.Token, error) 
 	return token, nil
 }
 
-type tpsLimiter struct {
-	rps     int
+// tpsLimiter is a type representing a Token Per Second limiter.
+// it does not allow processing more than tps amount of tokens per second.
+type tpsLimiter[T any] struct {
 	limiter *rate.Limiter
+	tps     int
 }
 
-// Create a new TPS limiter
-func newTPSLimiter(n int) *tpsLimiter {
-	return &tpsLimiter{
-		rps:     n,
-		limiter: rate.NewLimiter(rate.Limit(n), n),
+// newTPSLimiter Create a new TPS limiter.
+// n — allowed  number of tokens per second, n = 0 means no limit.
+func newTPSLimiter[T any](n int) *tpsLimiter[T] {
+	return &tpsLimiter[T]{
+		tps:     n,
+		limiter: rate.NewLimiter(rate.Limit(n), 1),
 	}
 }
 
-func (t *tpsLimiter) Process(token *models.Token) (*models.Token, error) {
-	if t.rps == 0 {
+// Process delays pipeline if it's needed to match desired rate.
+func (t *tpsLimiter[T]) Process(token T) (T, error) {
+	if t.tps == 0 {
 		return token, nil
 	}
+
 	if err := t.limiter.Wait(context.Background()); err != nil {
-		return nil, err
+		var zero T
+		return zero, err
 	}
+
 	return token, nil
 }

@@ -261,7 +261,7 @@ func (arr *aerospikeRecordReader) startScan() error {
 		arr.config.PartitionRange.Count,
 	)
 
-	arr.scanPolicy.FilterExpression = timeBoundExpression(arr.config.timeBounds)
+	arr.scanPolicy.FilterExpression = a.ExpGreaterEq(a.ExpLastUpdate(), a.ExpIntVal(100))
 	arr.scanPolicy.RecordsPerSecond = arr.config.RecordsPerSecond
 
 	recSet, err := arr.client.ScanPartitions(

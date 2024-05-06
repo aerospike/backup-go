@@ -181,7 +181,6 @@ func backupSIndexes(
 	sindexWriteWorker := newWriteWorker(sindexWriter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
-		config.RecordsPerSecond,
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
 		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
 	)
@@ -220,7 +219,6 @@ func backupUDFs(
 	udfWriteWorker := newWriteWorker(udfWriter)
 
 	udfPipeline := pipeline.NewPipeline[*models.Token](
-		config.RecordsPerSecond,
 		[]pipeline.Worker[*models.Token]{udfReadWorker},
 		[]pipeline.Worker[*models.Token]{udfWriteWorker},
 	)

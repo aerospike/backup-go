@@ -17,11 +17,10 @@ package pipeline
 import (
 	"context"
 	"errors"
-	"testing"
-
 	"github.com/aerospike/backup-go/pipeline/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"testing"
 )
 
 type pipelineTestSuite struct {

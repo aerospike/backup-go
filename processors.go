@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/time/rate"
 	"log/slog"
 	"math"
 
@@ -239,5 +240,25 @@ func (p *processorVoidTime) Process(token *models.Token) (*models.Token, error) 
 		record.VoidTime = now.Seconds + int64(record.Expiration)
 	}
 
+	return token, nil
+}
+
+type tpsLimiter struct {
+	rps     int
+	limiter *rate.Limiter
+}
+
+// Create a new TPS limiter
+func newTPSLimiter(n int) *tpsLimiter {
+	return &tpsLimiter{
+		rps:     n,
+		limiter: rate.NewLimiter(rate.Limit(n), n),
+	}
+}
+
+func (t *tpsLimiter) Process(token *models.Token) (*models.Token, error) {
+	if err := t.limiter.Wait(context.Background()); err != nil {
+		return nil, err
+	}
 	return token, nil
 }

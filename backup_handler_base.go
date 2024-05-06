@@ -101,7 +101,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
 		processorWorkers,
-		tpsLimiter,
+		//tpsLimiter,
 		writeWorkers,
 	)
 

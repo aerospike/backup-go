@@ -257,6 +257,9 @@ func newTPSLimiter(n int) *tpsLimiter {
 }
 
 func (t *tpsLimiter) Process(token *models.Token) (*models.Token, error) {
+	if t.rps == 0 {
+		return token, nil
+	}
 	if err := t.limiter.Wait(context.Background()); err != nil {
 		return nil, err
 	}

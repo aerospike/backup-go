@@ -91,11 +91,11 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		writeWorkers[i] = w
 	}
 
-	limiter := []pipeline.Worker[*models.Token]{newProcessorWorker(newTPSLimiter(bh.config.RecordsPerSecond))}
+	//limiter := []pipeline.Worker[*models.Token]{newProcessorWorker(newTPSLimiter(bh.config.RecordsPerSecond))}
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
 		processorWorkers,
-		limiter,
+		//limiter,
 		writeWorkers,
 	)
 

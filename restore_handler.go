@@ -213,11 +213,8 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		readWorkers[i] = r
 	}
 
-	var tpsLimiter []pipeline.Worker[*models.Token]
-
-	if rh.config.RecordsPerSecond > 0 {
-		limiter := newTPSLimiter[*models.Token](rh.config.RecordsPerSecond)
-		tpsLimiter = append(tpsLimiter, newProcessorWorker(limiter))
+	var tpsLimiter = []pipeline.Worker[*models.Token]{
+		newProcessorWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond)),
 	}
 
 	job := pipeline.NewPipeline(

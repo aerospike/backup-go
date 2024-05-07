@@ -377,9 +377,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(expectedFiles, len(backupFiles))
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
+	suite.Nil(err)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,

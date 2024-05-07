@@ -19,6 +19,7 @@ import (
 	"io"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
@@ -55,6 +56,8 @@ type BackupHandler struct {
 // BackupStats stores the status of a backup job.
 // Stats are updated in realtime by backup jobs.
 type BackupStats struct {
+	start    time.Time
+	Duration time.Duration
 	tokenStats
 }
 
@@ -78,6 +81,8 @@ func newBackupHandler(config *BackupConfig,
 // currently this should only be run once
 func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
+	bh.stats.start = time.Now()
+
 	go doWork(bh.errors, bh.logger, func() error {
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
 
@@ -146,6 +151,10 @@ func (bh *BackupHandler) GetStats() *BackupStats {
 
 // Wait waits for the backup job to complete and returns an error if the job failed
 func (bh *BackupHandler) Wait(ctx context.Context) error {
+	defer func() {
+		bh.stats.Duration = time.Since(bh.stats.start)
+	}()
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

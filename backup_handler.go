@@ -89,7 +89,14 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 			// TODO: add headers logic to endcoder, instead this lambda acrobatics
 			writer, err := bh.writeFactory.NewWriter(bh.config.Namespace, func(w io.WriteCloser) error {
-				return bh.writeHeader(w, bh.config.Namespace)
+				headerLen, err := bh.writeHeader(w, bh.config.Namespace)
+				if err != nil {
+					return err
+				}
+
+				bh.stats.addTotalSize(uint64(headerLen))
+
+				return nil
 			})
 			if err != nil {
 				return err
@@ -147,12 +154,12 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
-func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) error {
+func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) (int, error) {
 	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
 		return writeASBHeader(writer, namespace, bh.firstFileHeaderWritten.Swap(true))
 	}
 
-	return nil
+	return 0, nil
 }
 
 func backupSIndexes(

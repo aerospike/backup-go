@@ -821,13 +821,14 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	suite.SetupTest(records)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:       backup.PartitionRangeAll(),
-		Set:              suite.set,
-		Namespace:        suite.namespace,
-		Parallel:         1,
-		EncoderFactory:   encoding.NewASBEncoderFactory(),
-		RecordsPerSecond: rps,
+		Partitions:     backup.PartitionRangeAll(),
+		Set:            suite.set,
+		Namespace:      suite.namespace,
+		Parallel:       1,
+		EncoderFactory: encoding.NewASBEncoderFactory(),
 	}
+	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
+	backupConfig.ScanPolicy.RecordsPerSecond = rps
 
 	var restoreConfig = &backup.RestoreConfig{
 		Parallel:         1,

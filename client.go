@@ -130,6 +130,14 @@ func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
 	return *p
 }
 
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
+	if p == nil {
+		p = c.aerospikeClient.DefaultScanPolicy
+	}
+
+	return *p
+}
+
 // **** Backup ****
 
 // EncoderFactory is used to specify the encoder with which to encode the backup data
@@ -177,6 +185,9 @@ type BackupConfig struct {
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
+	// ScanPolicy applies to Aerospike scan operations made during backup and restore
+	// If nil, the Aerospike client's default policy will be used.
+	ScanPolicy *a.ScanPolicy
 	// Namespace is the Aerospike namespace to backup.
 	// Only include records that last changed before the given time (optional).
 	ModBefore *time.Time
@@ -191,9 +202,6 @@ type BackupConfig struct {
 	Partitions PartitionRange
 	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int
-	// RecordsPerSecond limits backup records per second (rps) rate.
-	// Will not apply rps limit if RecordsPerSecond is zero (default).
-	RecordsPerSecond int
 }
 
 func (c *BackupConfig) validate() error {
@@ -238,6 +246,9 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteF
 	// copy the policies so we don't modify the original
 	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
 	config.InfoPolicy = &infoPolicy
+
+	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
+	config.ScanPolicy = &scanPolicy
 
 	if err := config.validate(); err != nil {
 		return nil, err

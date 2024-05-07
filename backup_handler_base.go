@@ -61,7 +61,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		return err
 	}
 
-	scanPolicy := bh.aerospikeClient.DefaultScanPolicy
+	scanPolicy := *bh.config.ScanPolicy
 
 	// if we are using the asb encoder, we need to set the RawCDT flag
 	// in the scan policy so that maps and lists are returned as raw blob bins

@@ -2,6 +2,8 @@ package testutils
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -26,4 +28,18 @@ func contains(record *a.Record, list []*a.Record) bool {
 	}
 
 	return false
+}
+
+func DirSize(path string) int64 {
+	var size int64
+
+	_ = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			size += info.Size()
+		}
+
+		return err
+	})
+
+	return size
 }

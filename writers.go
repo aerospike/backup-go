@@ -35,7 +35,7 @@ import (
 //
 //go:generate mockery --name dataWriter
 type dataWriter[T any] interface {
-	Write(T) error
+	Write(T) (n int, err error)
 	Close()
 }
 
@@ -77,7 +77,7 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 				return nil
 			}
 
-			if err := w.Write(data); err != nil {
+			if _, err := w.Write(data); err != nil {
 				return err
 			}
 		}
@@ -93,6 +93,7 @@ type statsSetterToken interface {
 	addRecords(uint64)
 	addUDFs(uint32)
 	addSIndexes(uint32)
+	addTotalSize(uint64)
 }
 
 type tokenStatsWriter struct {
@@ -114,10 +115,10 @@ func newWriterWithTokenStats(writer dataWriter[*models.Token],
 	}
 }
 
-func (tw *tokenStatsWriter) Write(data *models.Token) error {
-	err := tw.writer.Write(data)
+func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
+	n, err := tw.writer.Write(data)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	switch data.Type {
@@ -128,10 +129,12 @@ func (tw *tokenStatsWriter) Write(data *models.Token) error {
 	case models.TokenTypeSIndex:
 		tw.stats.addSIndexes(1)
 	case models.TokenTypeInvalid:
-		return errors.New("invalid token")
+		return 0, errors.New("invalid token")
 	}
 
-	return nil
+	tw.stats.addTotalSize(uint64(n))
+
+	return n, nil
 }
 
 func (tw *tokenStatsWriter) Close() {
@@ -164,15 +167,13 @@ func newTokenWriter(encoder encoding.Encoder, output io.Writer, logger *slog.Log
 }
 
 // Write encodes v and writes it to the output
-func (w *tokenWriter) Write(v *models.Token) error {
+func (w *tokenWriter) Write(v *models.Token) (int, error) {
 	data, err := w.encoder.EncodeToken(v)
 	if err != nil {
-		return fmt.Errorf("error encoding token: %w", err)
+		return 0, fmt.Errorf("error encoding token: %w", err)
 	}
 
-	_, err = w.output.Write(data)
-
-	return err
+	return w.output.Write(data)
 }
 
 // Close satisfies the DataWriter interface
@@ -227,18 +228,18 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, logger *slog.Log
 
 // Write writes the types from the models package to an Aerospike DB.
 // TODO support batch writes
-func (rw *restoreWriter) Write(data *models.Token) error {
+func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	switch data.Type {
 	case models.TokenTypeRecord:
-		return rw.writeRecord(&data.Record)
+		return 1, rw.writeRecord(&data.Record)
 	case models.TokenTypeUDF:
-		return rw.writeUDF(data.UDF)
+		return 1, rw.writeUDF(data.UDF)
 	case models.TokenTypeSIndex:
-		return rw.writeSecondaryIndex(data.SIndex)
+		return 1, rw.writeSecondaryIndex(data.SIndex)
 	case models.TokenTypeInvalid:
-		return errors.New("invalid token")
+		return 0, errors.New("invalid token")
 	default:
-		return errors.New("unsupported token type")
+		return 0, errors.New("unsupported token type")
 	}
 }
 

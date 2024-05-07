@@ -90,13 +90,18 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 }
 
 type tokenStats struct {
-	records  atomic.Uint64
-	sIndexes atomic.Uint32
-	uDFs     atomic.Uint32
+	records   atomic.Uint64
+	sIndexes  atomic.Uint32
+	uDFs      atomic.Uint32
+	totalSize atomic.Uint64
 }
 
 func (bs *tokenStats) GetRecords() uint64 {
 	return bs.records.Load()
+}
+
+func (bs *tokenStats) GetTotalSize() uint64 {
+	return bs.totalSize.Load()
 }
 
 func (bs *tokenStats) GetSIndexes() uint32 {
@@ -111,6 +116,10 @@ func (bs *tokenStats) addRecords(num uint64) {
 	bs.records.Add(num)
 }
 
+func (bs *tokenStats) addTotalSize(num uint64) {
+	bs.totalSize.Add(num)
+}
+
 func (bs *tokenStats) addSIndexes(num uint32) {
 	bs.sIndexes.Add(num)
 }
@@ -119,13 +128,11 @@ func (bs *tokenStats) addUDFs(num uint32) {
 	bs.uDFs.Add(num)
 }
 
-func writeASBHeader(w io.Writer, namespace string, first bool) error {
+func writeASBHeader(w io.Writer, namespace string, first bool) (int, error) {
 	header, err := asb.GetHeader(namespace, first)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	_, err = w.Write(header)
-
-	return err
+	return w.Write(header)
 }

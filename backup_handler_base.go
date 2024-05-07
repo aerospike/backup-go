@@ -75,7 +75,7 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,
 			ARRCFG,
-			scanPolicy,
+			&scanPolicy,
 			bh.logger,
 		)
 

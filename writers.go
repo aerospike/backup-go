@@ -246,6 +246,11 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 func (rw *restoreWriter) writeRecord(record *models.Record) error {
 	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
 	if aerr != nil {
+		if aerr.Matches(atypes.GENERATION_ERROR) {
+			// TODO: increase fresher_records counter
+			slog.Debug("Skipped a record due to generation error")
+			return nil
+		}
 		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)
 	}
 

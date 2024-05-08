@@ -251,6 +251,11 @@ func (rw *restoreWriter) writeRecord(record *models.Record) error {
 			slog.Debug("Skipped a record due to generation error")
 			return nil
 		}
+		if aerr.Matches(atypes.KEY_EXISTS_ERROR) {
+			// TODO: increase existed_records counter
+			slog.Debug("Skipped a record due to key exists error")
+			return nil
+		}
 		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)
 	}
 

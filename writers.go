@@ -244,6 +244,10 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 }
 
 func (rw *restoreWriter) writeRecord(record *models.Record) error {
+	if len(record.Bins) == 0 {
+		// TODO: increase skipped_records counter
+		return nil
+	}
 	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
 	if aerr != nil {
 		if aerr.Matches(atypes.GENERATION_ERROR) {

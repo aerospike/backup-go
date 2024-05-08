@@ -19,6 +19,7 @@ import (
 	"io"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -88,6 +89,7 @@ func newRestoreHandler(config *RestoreConfig,
 // currently this should only be run once
 func (rh *RestoreHandler) run(ctx context.Context) {
 	rh.errors = make(chan error, 1)
+	rh.stats.start = time.Now()
 
 	go doWork(rh.errors, rh.logger, func() error {
 		// check that the restore directory is valid
@@ -159,6 +161,10 @@ func (rh *RestoreHandler) GetStats() *RestoreStats {
 
 // Wait waits for the restore job to complete and returns an error if the job failed
 func (rh *RestoreHandler) Wait(ctx context.Context) error {
+	defer func() {
+		rh.stats.Duration = time.Since(rh.stats.start)
+	}()
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -213,8 +219,13 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		readWorkers[i] = r
 	}
 
+	var tpsLimiter = []pipeline.Worker[*models.Token]{
+		newProcessorWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond)),
+	}
+
 	job := pipeline.NewPipeline(
 		readWorkers,
+		tpsLimiter,
 		ttlSetters,
 		binFilters,
 		writeWorkers,
@@ -227,6 +238,8 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 // RestoreStats stores the stats of a restore from reader job
 type RestoreStats struct {
+	start    time.Time
+	Duration time.Duration
 	tokenStats
 	recordsExpired atomic.Uint64
 }

@@ -230,7 +230,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 }
 
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) {
+	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*backup.BackupStats, *backup.RestoreStats) {
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
@@ -263,6 +263,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
+	return bh.GetStats(), rh.GetStats()
 }
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
@@ -377,9 +378,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(expectedFiles, len(backupFiles))
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
+	suite.Nil(err)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -777,9 +776,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 	lowerLimit := time.Now()
 	batch2 := genRecords(suite.namespace, suite.set, 600, testBins)
 	err := suite.testClient.WriteRecords(batch2)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
+	suite.Nil(err)
 
 	time.Sleep(timeout)
 	upperLimit := time.Now()
@@ -787,9 +784,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 
 	batch3 := genRecords(suite.namespace, suite.set, 300, testBins)
 	err = suite.testClient.WriteRecords(batch3)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
+	suite.Nil(err)
 
 	// every batch generated same records, but less of them each time.
 	// batch1 contains too old values (many of them were overwritten).
@@ -814,6 +809,42 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 	suite.Run("Filter by bin", func() {
 		runBackupRestore(suite, backupConfig, restoreConfig, expectedRecords)
 	})
+	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
+	const numRec = 1000
+	const rps = 200
+	epsilon := 2 * float64(time.Second)
+
+	records := genRecords(suite.namespace, suite.set, numRec, a.BinMap{"a": "b"})
+	suite.SetupTest(records)
+
+	var backupConfig = &backup.BackupConfig{
+		Partitions:     backup.PartitionRangeAll(),
+		Set:            suite.set,
+		Namespace:      suite.namespace,
+		Parallel:       1,
+		EncoderFactory: encoding.NewASBEncoderFactory(),
+	}
+	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
+	backupConfig.ScanPolicy.RecordsPerSecond = rps
+
+	var restoreConfig = &backup.RestoreConfig{
+		Parallel:         1,
+		DecoderFactory:   encoding.NewASBDecoderFactory(),
+		RecordsPerSecond: rps,
+	}
+
+	now := time.Now()
+	backupStats, restoreStats := runBackupRestore(suite, backupConfig, restoreConfig, records)
+	totalDuration := time.Since(now)
+
+	expectedDuration := time.Duration(1000.0*numRec/rps) * time.Millisecond
+	suite.Require().InDelta(expectedDuration, backupStats.Duration, epsilon)
+	suite.Require().InDelta(expectedDuration, restoreStats.Duration, epsilon)
+	suite.Require().InDelta(totalDuration, restoreStats.Duration+backupStats.Duration, epsilon)
+
 	suite.TearDownTest()
 }
 

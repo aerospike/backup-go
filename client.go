@@ -200,7 +200,7 @@ type BackupConfig struct {
 	BinList []string
 	// Partitions specifies the Aerospike partitions to backup.
 	Partitions PartitionRange
-	// parallel is the number of concurrent scans to run against the Aerospike cluster.
+	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int
 }
 
@@ -283,6 +283,9 @@ type RestoreConfig struct {
 	BinList []string
 	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.
 	Parallel int
+	// RecordsPerSecond limits restore records per second (rps) rate.
+	// Will not apply rps limit if RecordsPerSecond is zero (default).
+	RecordsPerSecond int
 }
 
 func (c *RestoreConfig) validate() error {

@@ -272,3 +272,23 @@ func (t *tpsLimiter[T]) Process(token T) (T, error) {
 
 	return token, nil
 }
+
+type recordFilterProcessor struct {
+	noRecords bool
+}
+
+func newProcessorRecordFilter(noRecords bool) *recordFilterProcessor {
+	return &recordFilterProcessor{
+		noRecords: noRecords,
+	}
+}
+
+var errFilteredRecord = fmt.Errorf("%w: record is filtered with no-records flag", errFilteredOut)
+
+func (b recordFilterProcessor) Process(token *models.Token) (*models.Token, error) {
+	if b.noRecords && token.Type == models.TokenTypeRecord {
+		return nil, errFilteredRecord
+	}
+
+	return token, nil
+}

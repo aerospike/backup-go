@@ -293,9 +293,11 @@ func (b recordFilterProcessor) Process(token *models.Token) (*models.Token, erro
 	if b.noRecords && token.Type == models.TokenTypeRecord {
 		return nil, errFilteredRecord
 	}
+
 	if b.noIndexes && token.Type == models.TokenTypeSIndex {
 		return nil, errFilteredRecord
 	}
+
 	if b.noUdf && token.Type == models.TokenTypeUDF {
 		return nil, errFilteredRecord
 	}

@@ -286,11 +286,11 @@ type RestoreConfig struct {
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
-	//Don't restore any records.
+	// Don't restore any records.
 	NoRecords bool
-	//Don't restore any secondary indexes.
+	// Don't restore any secondary indexes.
 	NoIndexes bool
-	//Don't restore any UDFs.
+	// Don't restore any UDFs.
 	NoUDFs bool
 }
 

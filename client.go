@@ -202,6 +202,12 @@ type BackupConfig struct {
 	Partitions PartitionRange
 	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int
+	// Don't backup any records.
+	NoRecords bool
+	// Don't backup any secondary indexes.
+	NoIndexes bool
+	// Don't backup any UDFs.
+	NoUDFs bool
 }
 
 func (c *BackupConfig) validate() error {

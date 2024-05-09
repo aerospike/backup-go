@@ -122,12 +122,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			// like records and back them up as part of the same pipeline
 			// but doing so would cause them to be mixed in with records in the backup file(s)
 			if i == 0 {
-				err = backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
-				if err != nil {
-					return err
-				}
-
-				err = backupUDFs(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
+				err := bh.backupSIndexesAndUdfs(ctx, writer)
 				if err != nil {
 					return err
 				}
@@ -138,10 +133,33 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			writeWorkers[i] = newWriteWorker(dataWriter)
 		}
 
+		if bh.config.NoRecords {
+			// no need to run backup handler
+			return nil
+		}
+
 		handler := newBackupHandlerBase(bh.config, bh.aerospikeClient, bh.logger)
 
 		return handler.run(ctx, writeWorkers)
 	})
+}
+
+func (bh *BackupHandler) backupSIndexesAndUdfs(ctx context.Context, writer io.WriteCloser) error {
+	if !bh.config.NoIndexes {
+		err := backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !bh.config.NoUDFs {
+		err := backupUDFs(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GetStats returns the stats of the backup job

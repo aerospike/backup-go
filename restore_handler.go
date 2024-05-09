@@ -197,6 +197,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		var writer dataWriter[*models.Token] = newRestoreWriter(
 			rh.dbClient,
 			rh.config.WritePolicy,
+			rh.stats,
 			rh.logger,
 		)
 
@@ -223,8 +224,13 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		newProcessorWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond)),
 	}
 
+	var recordFilter = []pipeline.Worker[*models.Token]{
+		newProcessorWorker(newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs)),
+	}
+
 	job := pipeline.NewPipeline(
 		readWorkers,
+		recordFilter,
 		tpsLimiter,
 		ttlSetters,
 		binFilters,
@@ -241,7 +247,17 @@ type RestoreStats struct {
 	start    time.Time
 	Duration time.Duration
 	tokenStats
+	// The number of records dropped because they were expired.
 	recordsExpired atomic.Uint64
+	// The number of records dropped because they didn't contain any of the
+	// selected bins or didn't belong to any of the the selected sets.
+	recordsSkipped atomic.Uint64
+	// The number of records dropped because the database already contained the
+	// records with a higher generation count.
+	recordsFresher atomic.Uint64
+	// The number of records dropped because they already existed in the
+	// database.
+	recordsExisted atomic.Uint64
 }
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
@@ -250,4 +266,27 @@ func (rs *RestoreStats) GetRecordsExpired() uint64 {
 
 func (rs *RestoreStats) addRecordsExpired(num uint64) {
 	rs.recordsExpired.Add(num)
+}
+
+func (rs *RestoreStats) GetRecordsSkipped() uint64 {
+	return rs.recordsSkipped.Load()
+}
+
+func (rs *RestoreStats) incrRecordsSkipped() {
+	rs.recordsSkipped.Add(1)
+}
+func (rs *RestoreStats) GetRecordsFresher() uint64 {
+	return rs.recordsFresher.Load()
+}
+
+func (rs *RestoreStats) incrRecordsFresher() {
+	rs.recordsFresher.Add(1)
+}
+
+func (rs *RestoreStats) GetRecordsExisted() uint64 {
+	return rs.recordsExisted.Load()
+}
+
+func (rs *RestoreStats) incrRecordsExisted() {
+	rs.recordsExisted.Add(1)
 }

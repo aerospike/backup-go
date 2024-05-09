@@ -210,11 +210,13 @@ type dbWriter interface {
 type restoreWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
+	stats       *RestoreStats
 	logger      *slog.Logger
 }
 
 // newRestoreWriter creates a new RestoreWriter
-func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, logger *slog.Logger) *restoreWriter {
+func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy,
+	stats *RestoreStats, logger *slog.Logger) *restoreWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
@@ -222,6 +224,7 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, logger *slog.Log
 	return &restoreWriter{
 		asc:         asc,
 		writePolicy: writePolicy,
+		stats:       stats,
 		logger:      logger,
 	}
 }
@@ -244,12 +247,29 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 }
 
 func (rw *restoreWriter) writeRecord(record *models.Record) error {
-	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
-	if aerr != nil {
-		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)
+	if len(record.Bins) == 0 {
+		rw.stats.incrRecordsSkipped()
+		return nil
 	}
 
-	return aerr
+	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
+	if aerr != nil {
+		if aerr.Matches(atypes.GENERATION_ERROR) {
+			rw.stats.incrRecordsFresher()
+			return nil
+		}
+
+		if aerr.Matches(atypes.KEY_EXISTS_ERROR) {
+			rw.stats.incrRecordsExisted()
+			return nil
+		}
+
+		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)
+
+		return aerr
+	}
+
+	return nil
 }
 
 // writeSecondaryIndex writes a secondary index to Aerospike

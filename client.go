@@ -202,6 +202,12 @@ type BackupConfig struct {
 	Partitions PartitionRange
 	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int
+	// Don't backup any records.
+	NoRecords bool
+	// Don't backup any secondary indexes.
+	NoIndexes bool
+	// Don't backup any UDFs.
+	NoUDFs bool
 }
 
 func (c *BackupConfig) validate() error {
@@ -286,6 +292,12 @@ type RestoreConfig struct {
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
+	// Don't restore any records.
+	NoRecords bool
+	// Don't restore any secondary indexes.
+	NoIndexes bool
+	// Don't restore any UDFs.
+	NoUDFs bool
 }
 
 func (c *RestoreConfig) validate() error {

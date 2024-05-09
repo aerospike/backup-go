@@ -165,18 +165,20 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 	return token, nil
 }
 
+// binFilterProcessor will remove bins with names in binsToRemove from every record it receives.
 type binFilterProcessor struct {
-	keys map[string]bool
+	binsToRemove map[string]bool
 }
 
+// newProcessorBinFilter creates new binFilterProcessor with given binList.
 func newProcessorBinFilter(binList []string) *binFilterProcessor {
-	keys := make(map[string]bool, len(binList))
+	binsMap := make(map[string]bool, len(binList))
 	for _, key := range binList {
-		keys[key] = true
+		binsMap[key] = true
 	}
 
 	return &binFilterProcessor{
-		keys: keys,
+		binsToRemove: binsMap,
 	}
 }
 
@@ -187,12 +189,12 @@ func (b binFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 	}
 
 	// if filter bin list is empty, don't filter anything.
-	if len(b.keys) == 0 {
+	if len(b.binsToRemove) == 0 {
 		return token, nil
 	}
 
 	for key := range token.Record.Bins {
-		if !b.keys[key] {
+		if !b.binsToRemove[key] {
 			delete(token.Record.Bins, key)
 		}
 	}
@@ -268,6 +270,39 @@ func (t *tpsLimiter[T]) Process(token T) (T, error) {
 	if err := t.limiter.Wait(context.Background()); err != nil {
 		var zero T
 		return zero, err
+	}
+
+	return token, nil
+}
+
+// tokenTypeFilterProcessor is used to support no-records, no-indexes and no-udf flags.
+type tokenTypeProcessor struct {
+	noRecords bool
+	noIndexes bool
+	noUdf     bool
+}
+
+// newTokenTypeFilterProcessor creates new tokenTypeFilterProcessor
+func newTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) *tokenTypeProcessor {
+	return &tokenTypeProcessor{
+		noRecords: noRecords,
+		noIndexes: noIndexes,
+		noUdf:     noUdf,
+	}
+}
+
+// Process filters tokens by type.
+func (b tokenTypeProcessor) Process(token *models.Token) (*models.Token, error) {
+	if b.noRecords && token.Type == models.TokenTypeRecord {
+		return nil, fmt.Errorf("%w: record is filtered with no-records flag", errFilteredOut)
+	}
+
+	if b.noIndexes && token.Type == models.TokenTypeSIndex {
+		return nil, fmt.Errorf("%w: index is filtered with no-indexes flag", errFilteredOut)
+	}
+
+	if b.noUdf && token.Type == models.TokenTypeUDF {
+		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", errFilteredOut)
 	}
 
 	return token, nil

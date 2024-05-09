@@ -351,7 +351,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory)
+	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
@@ -513,7 +513,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	backupConfig.Partitions = partitions
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory)
+	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory, false)
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,

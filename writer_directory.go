@@ -29,7 +29,7 @@ var _ WriteFactory = (*DirectoryWriterFactory)(nil)
 // If non-zero, backup files will be split into multiple files if their size exceeds this limit.
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
 // FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
-func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderFactory,
+func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderFactory, removeFiles bool,
 ) (*DirectoryWriterFactory, error) {
 	if fileSizeLimit > 0 && fileSizeLimit < 1024*1024 {
 		return nil, fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", fileSizeLimit)
@@ -39,7 +39,12 @@ func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderF
 		return nil, fmt.Errorf("file size limit must not be negative, got %d", fileSizeLimit)
 	}
 
-	err := prepareBackupDirectory(dir)
+	var err error
+	if removeFiles {
+		err = forcePrepareBackupDirectory(dir)
+	} else {
+		err = prepareBackupDirectory(dir)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +63,7 @@ func prepareBackupDirectory(dir string) error {
 	DirInfo, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(dir, 0o755)
-			if err != nil {
-				return fmt.Errorf("%w: failed to create backup directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
-			}
+			return makeDir(dir)
 		}
 	} else if !DirInfo.IsDir() {
 		return fmt.Errorf("%w: %s is not a directory", ErrBackupDirectoryInvalid, dir)
@@ -76,6 +78,25 @@ func prepareBackupDirectory(dir string) error {
 		return fmt.Errorf("%w: %s is not empty", ErrBackupDirectoryInvalid, dir)
 	}
 
+	return nil
+}
+
+// forcePrepareBackupDirectory removes any existing directory and its contents and creates a new directory.
+// Returns an error if it fails to remove or create a directory.
+func forcePrepareBackupDirectory(dir string) error {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		return fmt.Errorf("%w: failed to remove directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
+	}
+
+	return makeDir(dir)
+}
+
+func makeDir(dir string) error {
+	err := os.MkdirAll(dir, 0o755)
+	if err != nil {
+		return fmt.Errorf("%w: failed to create backup directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
+	}
 	return nil
 }
 

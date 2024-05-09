@@ -165,18 +165,20 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 	return token, nil
 }
 
+// binFilterProcessor will remove bins with names in binsToRemove from every record it receives.
 type binFilterProcessor struct {
-	keys map[string]bool
+	binsToRemove map[string]bool
 }
 
+// newProcessorBinFilter creates new binFilterProcessor with given binList.
 func newProcessorBinFilter(binList []string) *binFilterProcessor {
-	keys := make(map[string]bool, len(binList))
+	binsMap := make(map[string]bool, len(binList))
 	for _, key := range binList {
-		keys[key] = true
+		binsMap[key] = true
 	}
 
 	return &binFilterProcessor{
-		keys: keys,
+		binsToRemove: binsMap,
 	}
 }
 
@@ -187,12 +189,12 @@ func (b binFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 	}
 
 	// if filter bin list is empty, don't filter anything.
-	if len(b.keys) == 0 {
+	if len(b.binsToRemove) == 0 {
 		return token, nil
 	}
 
 	for key := range token.Record.Bins {
-		if !b.keys[key] {
+		if !b.binsToRemove[key] {
 			delete(token.Record.Bins, key)
 		}
 	}

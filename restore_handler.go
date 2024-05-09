@@ -294,9 +294,9 @@ func (rs *RestoreStats) incrRecordsExisted() {
 }
 
 func (rs *RestoreStats) GetRecordsInserted() uint64 {
-	return rs.recordsExisted.Load()
+	return rs.recordsInserted.Load()
 }
 
 func (rs *RestoreStats) incrRecordsInserted() {
-	rs.recordsExisted.Add(1)
+	rs.recordsInserted.Add(1)
 }

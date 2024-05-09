@@ -122,7 +122,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			// like records and back them up as part of the same pipeline
 			// but doing so would cause them to be mixed in with records in the backup file(s)
 			if i == 0 {
-				err := bh.backupIndexesAndUdf(ctx, writer)
+				err := bh.backupSIndexesAndUdfs(ctx, writer)
 				if err != nil {
 					return err
 				}
@@ -144,7 +144,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	})
 }
 
-func (bh *BackupHandler) backupIndexesAndUdf(ctx context.Context, writer io.WriteCloser) error {
+func (bh *BackupHandler) backupSIndexesAndUdfs(ctx context.Context, writer io.WriteCloser) error {
 	if !bh.config.NoIndexes {
 		err := backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
 		if err != nil {

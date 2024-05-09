@@ -258,6 +258,8 @@ type RestoreStats struct {
 	// The number of records dropped because they already existed in the
 	// database.
 	recordsExisted atomic.Uint64
+	// The number of successfully restored records.
+	recordsInserted atomic.Uint64
 }
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
@@ -288,5 +290,13 @@ func (rs *RestoreStats) GetRecordsExisted() uint64 {
 }
 
 func (rs *RestoreStats) incrRecordsExisted() {
+	rs.recordsExisted.Add(1)
+}
+
+func (rs *RestoreStats) GetRecordsInserted() uint64 {
+	return rs.recordsExisted.Load()
+}
+
+func (rs *RestoreStats) incrRecordsInserted() {
 	rs.recordsExisted.Add(1)
 }

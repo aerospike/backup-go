@@ -90,7 +90,7 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 //
 //go:generate mockery --name statsSetterToken --inpackage --exported=false
 type statsSetterToken interface {
-	addRecords(uint64)
+	addTotalRecords(uint64)
 	addUDFs(uint32)
 	addSIndexes(uint32)
 	addTotalSize(uint64)
@@ -123,7 +123,7 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 
 	switch data.Type {
 	case models.TokenTypeRecord:
-		tw.stats.addRecords(1)
+		tw.stats.addTotalRecords(1)
 	case models.TokenTypeUDF:
 		tw.stats.addUDFs(1)
 	case models.TokenTypeSIndex:
@@ -268,6 +268,8 @@ func (rw *restoreWriter) writeRecord(record *models.Record) error {
 
 		return aerr
 	}
+
+	rw.stats.incrRecordsInserted()
 
 	return nil
 }

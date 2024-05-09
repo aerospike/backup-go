@@ -176,7 +176,7 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := newRestoreWriter(mockDBWriter, nil, slog.Default())
+	writer := newRestoreWriter(mockDBWriter, nil, nil, slog.Default())
 	suite.NotNil(writer)
 
 	_, err := writer.Write(recToken)
@@ -226,7 +226,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := newRestoreWriter(mockDBWriter, policy, slog.Default())
+	writer := newRestoreWriter(mockDBWriter, policy, nil, slog.Default())
 	suite.NotNil(writer)
 
 	_, err := writer.Write(recToken)

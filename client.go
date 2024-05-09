@@ -287,6 +287,8 @@ type RestoreConfig struct {
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
 	NoRecords        bool
+	NoIndexes        bool
+	NoUDFs           bool
 }
 
 func (c *RestoreConfig) validate() error {

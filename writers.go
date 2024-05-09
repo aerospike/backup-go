@@ -210,11 +210,12 @@ type dbWriter interface {
 type restoreWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
+	stats       *RestoreStats
 	logger      *slog.Logger
 }
 
 // newRestoreWriter creates a new RestoreWriter
-func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, logger *slog.Logger) *restoreWriter {
+func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *RestoreStats, logger *slog.Logger) *restoreWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
@@ -222,6 +223,7 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, logger *slog.Log
 	return &restoreWriter{
 		asc:         asc,
 		writePolicy: writePolicy,
+		stats:       stats,
 		logger:      logger,
 	}
 }
@@ -245,19 +247,17 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 
 func (rw *restoreWriter) writeRecord(record *models.Record) error {
 	if len(record.Bins) == 0 {
-		// TODO: increase skipped_records counter
+		rw.stats.incrRecordsSkipped()
 		return nil
 	}
 	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
 	if aerr != nil {
 		if aerr.Matches(atypes.GENERATION_ERROR) {
-			// TODO: increase fresher_records counter
-			slog.Debug("Skipped a record due to generation error")
+			rw.stats.incrRecordsFresher()
 			return nil
 		}
 		if aerr.Matches(atypes.KEY_EXISTS_ERROR) {
-			// TODO: increase existed_records counter
-			slog.Debug("Skipped a record due to key exists error")
+			rw.stats.incrRecordsExisted()
 			return nil
 		}
 		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)

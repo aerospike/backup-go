@@ -197,6 +197,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		var writer dataWriter[*models.Token] = newRestoreWriter(
 			rh.dbClient,
 			rh.config.WritePolicy,
+			rh.stats,
 			rh.logger,
 		)
 
@@ -224,7 +225,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	}
 
 	var recordFilter = []pipeline.Worker[*models.Token]{
-		newProcessorWorker(newProcessorRecordFilter(rh.config.NoRecords)),
+		newProcessorWorker(newProcessorRecordFilter(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs)),
 	}
 
 	job := pipeline.NewPipeline(
@@ -247,6 +248,9 @@ type RestoreStats struct {
 	Duration time.Duration
 	tokenStats
 	recordsExpired atomic.Uint64
+	recordsSkipped atomic.Uint64
+	recordsFresher atomic.Uint64
+	recordsExisted atomic.Uint64
 }
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
@@ -255,4 +259,27 @@ func (rs *RestoreStats) GetRecordsExpired() uint64 {
 
 func (rs *RestoreStats) addRecordsExpired(num uint64) {
 	rs.recordsExpired.Add(num)
+}
+
+func (rs *RestoreStats) GetRecordsSkipped() uint64 {
+	return rs.recordsSkipped.Load()
+}
+
+func (rs *RestoreStats) incrRecordsSkipped() {
+	rs.recordsExpired.Add(1)
+}
+func (rs *RestoreStats) GetRecordsFresher() uint64 {
+	return rs.recordsFresher.Load()
+}
+
+func (rs *RestoreStats) incrRecordsFresher() {
+	rs.recordsFresher.Add(1)
+}
+
+func (rs *RestoreStats) GetRecordsExisted() uint64 {
+	return rs.recordsExisted.Load()
+}
+
+func (rs *RestoreStats) incrRecordsExisted() {
+	rs.recordsExisted.Add(1)
 }

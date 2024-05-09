@@ -275,11 +275,15 @@ func (t *tpsLimiter[T]) Process(token T) (T, error) {
 
 type recordFilterProcessor struct {
 	noRecords bool
+	noIndexes bool
+	noUdf     bool
 }
 
-func newProcessorRecordFilter(noRecords bool) *recordFilterProcessor {
+func newProcessorRecordFilter(noRecords, noIndexes, noUdf bool) *recordFilterProcessor {
 	return &recordFilterProcessor{
 		noRecords: noRecords,
+		noIndexes: noIndexes,
+		noUdf:     noUdf,
 	}
 }
 
@@ -287,6 +291,12 @@ var errFilteredRecord = fmt.Errorf("%w: record is filtered with no-records flag"
 
 func (b recordFilterProcessor) Process(token *models.Token) (*models.Token, error) {
 	if b.noRecords && token.Type == models.TokenTypeRecord {
+		return nil, errFilteredRecord
+	}
+	if b.noIndexes && token.Type == models.TokenTypeSIndex {
+		return nil, errFilteredRecord
+	}
+	if b.noUdf && token.Type == models.TokenTypeUDF {
 		return nil, errFilteredRecord
 	}
 

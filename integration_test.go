@@ -367,7 +367,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetRecords())
+	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetRecordsTotal())
 	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
 
@@ -393,7 +393,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecords())
+	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsTotal())
+	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsInserted())
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
@@ -462,7 +463,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 
 	statsRestore := rh.GetStats()
 	suite.NotNil(statsRestore)
-	suite.Equal(uint64(0), statsRestore.GetRecords())
+	suite.Equal(uint64(0), statsRestore.GetRecordsTotal())
 	suite.Equal(uint64(numRec), statsRestore.GetRecordsExpired())
 }
 

@@ -235,10 +235,13 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := newRestoreWriter(mockDBWriter, policy, nil, slog.Default())
+	stats := &RestoreStats{}
+	writer := newRestoreWriter(mockDBWriter, policy, stats, slog.Default())
 	suite.NotNil(writer)
+	n, err := writer.Write(recToken)
 
-	_, err := writer.Write(recToken)
+	suite.Equal(1, n)
+	suite.Equal(1, int(stats.GetRecordsInserted()))
 	suite.Nil(err)
 
 	writer.Close()
@@ -253,7 +256,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter.EXPECT().Close()
 
 	mockStats := newMockStatsSetterToken(suite.T())
-	mockStats.EXPECT().addRecords(uint64(1))
+	mockStats.EXPECT().addTotalRecords(uint64(1))
 	mockStats.EXPECT().addUDFs(uint32(1))
 	mockStats.EXPECT().addSIndexes(uint32(1))
 	mockStats.EXPECT().addTotalSize(uint64(1))

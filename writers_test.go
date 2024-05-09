@@ -241,7 +241,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	n, err := writer.Write(recToken)
 
 	suite.Equal(1, n)
-	suite.Equal(1, stats.GetRecordsInserted())
+	suite.Equal(1, int(stats.GetRecordsInserted()))
 	suite.Nil(err)
 
 	writer.Close()

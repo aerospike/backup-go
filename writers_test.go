@@ -176,7 +176,7 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := newRestoreWriter(mockDBWriter, nil, nil, slog.Default())
+	writer := newRestoreWriter(mockDBWriter, nil, &RestoreStats{}, slog.Default())
 	suite.NotNil(writer)
 
 	_, err := writer.Write(recToken)
@@ -185,17 +185,26 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	writer.Close()
 
 	mockDBWriter.AssertExpectations(suite.T())
+}
 
-	// DBWriter failed
-
-	failRec := models.Record{
+func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
+	namespace := "test"
+	set := ""
+	key, _ := a.NewKey(namespace, set, "key")
+	mockDBWriter := mocks.NewDbWriter(suite.T())
+	writer := newRestoreWriter(mockDBWriter, nil, &RestoreStats{}, slog.Default())
+	rec := models.Record{
 		Record: &a.Record{
 			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
 		},
 	}
-	failRecToken := models.NewRecordToken(failRec)
-	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), failRec.Key, failRec.Bins).Return(a.ErrInvalidParam)
-	_, err = writer.Write(failRecToken)
+	failRecToken := models.NewRecordToken(rec)
+	mockDBWriter.EXPECT().Put((*a.WritePolicy)(nil), rec.Key, rec.Bins).Return(a.ErrInvalidParam)
+	_, err := writer.Write(failRecToken)
 	suite.NotNil(err)
 
 	mockDBWriter.AssertExpectations(suite.T())

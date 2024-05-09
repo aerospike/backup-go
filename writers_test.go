@@ -239,9 +239,9 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	writer := newRestoreWriter(mockDBWriter, policy, stats, slog.Default())
 	suite.NotNil(writer)
 	n, err := writer.Write(recToken)
-	_ = n
+
+	suite.Equal(1, n)
 	suite.Equal(1, stats.GetRecordsInserted())
-	suite.Equal(1, stats.GetRecordsTotal())
 	suite.Nil(err)
 
 	writer.Close()

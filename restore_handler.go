@@ -266,7 +266,7 @@ func (rs *RestoreStats) GetRecordsSkipped() uint64 {
 }
 
 func (rs *RestoreStats) incrRecordsSkipped() {
-	rs.recordsExpired.Add(1)
+	rs.recordsSkipped.Add(1)
 }
 func (rs *RestoreStats) GetRecordsFresher() uint64 {
 	return rs.recordsFresher.Load()

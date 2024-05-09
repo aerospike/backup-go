@@ -247,9 +247,16 @@ type RestoreStats struct {
 	start    time.Time
 	Duration time.Duration
 	tokenStats
+	// The number of records dropped because they were expired.
 	recordsExpired atomic.Uint64
+	// The number of records dropped because they didn't contain any of the
+	// selected bins or didn't belong to any of the the selected sets.
 	recordsSkipped atomic.Uint64
+	// The number of records dropped because the database already contained the
+	// records with a higher generation count.
 	recordsFresher atomic.Uint64
+	// The number of records dropped because they already existed in the
+	// database.
 	recordsExisted atomic.Uint64
 }
 

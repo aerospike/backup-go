@@ -164,7 +164,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		mockScanner,
 		&arrConfig{
 			Namespace:      namespace,
-			Set:            set,
+			SetList:        []string{set},
 			PartitionRange: PartitionRangeAll(),
 		},
 		&a.ScanPolicy{},
@@ -230,7 +230,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 		mockScanner,
 		&arrConfig{
 			Namespace:      namespace,
-			Set:            set,
+			SetList:        []string{set},
 			PartitionRange: PartitionRangeAll(),
 		},
 		&a.ScanPolicy{},
@@ -269,7 +269,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 		mockScanner,
 		&arrConfig{
 			Namespace:      namespace,
-			Set:            set,
+			SetList:        []string{set},
 			PartitionRange: PartitionRangeAll(),
 		},
 		&a.ScanPolicy{},
@@ -302,7 +302,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 		mockScanner,
 		&arrConfig{
 			Namespace:      namespace,
-			Set:            set,
+			SetList:        []string{set},
 			PartitionRange: PartitionRangeAll(),
 		},
 		&a.ScanPolicy{},
@@ -360,7 +360,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 		mockScanner,
 		&arrConfig{
 			Namespace:      namespace,
-			Set:            set,
+			SetList:        []string{set},
 			PartitionRange: PartitionRangeAll(),
 		},
 		policy,

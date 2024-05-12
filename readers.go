@@ -17,14 +17,14 @@ package backup
 import (
 	"context"
 	"errors"
-	"io"
-	"log/slog"
-
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
+	"io"
+	"log/slog"
 )
 
 // **** Read Worker ****
@@ -138,7 +138,7 @@ func (dr *tokenReader) Close() {
 type arrConfig struct {
 	timeBounds     models.TimeBounds
 	Namespace      string
-	Set            string
+	SetList        []string
 	BinList        []string
 	PartitionRange PartitionRange
 }
@@ -146,7 +146,7 @@ type arrConfig struct {
 func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrConfig {
 	return &arrConfig{
 		Namespace:      backupConfig.Namespace,
-		Set:            backupConfig.Set,
+		SetList:        backupConfig.SetList,
 		PartitionRange: partitions,
 		BinList:        backupConfig.BinList,
 		timeBounds: models.TimeBounds{
@@ -158,8 +158,7 @@ func newArrConfig(backupConfig *BackupConfig, partitions PartitionRange) *arrCon
 
 // arrStatus is the status of an AerospikeRecordReader
 type arrStatus struct {
-	partitionFilter *a.PartitionFilter
-	started         bool
+	started bool
 }
 
 // scanner is an interface for scanning Aerospike records
@@ -181,7 +180,7 @@ type aerospikeRecordReader struct {
 	client     scanner
 	scanPolicy *a.ScanPolicy
 	recResChan <-chan *a.Result
-	recSet     *a.Recordset
+	recSet     []*a.Recordset
 	logger     *slog.Logger
 	config     *arrConfig
 	status     arrStatus
@@ -241,9 +240,11 @@ func (arr *aerospikeRecordReader) Close() {
 	if arr.recSet != nil {
 		// ignore this error, it only happens if the scan is already closed
 		// and this method can not return an error anyway
-		err := arr.recSet.Close()
-		if err != nil {
-			arr.logger.Error("error while closing record set", "error", err)
+		for _, rec := range arr.recSet {
+			err := rec.Close()
+			if err != nil {
+				arr.logger.Error("error while closing record set", "error", err)
+			}
 		}
 	}
 
@@ -254,26 +255,37 @@ func (arr *aerospikeRecordReader) Close() {
 func (arr *aerospikeRecordReader) startScan() error {
 	arr.recResChan = make(chan *a.Result)
 
-	arr.status.partitionFilter = a.NewPartitionFilterByRange(
+	partitionFilter := a.NewPartitionFilterByRange(
 		arr.config.PartitionRange.Begin,
 		arr.config.PartitionRange.Count,
 	)
 
 	arr.scanPolicy.FilterExpression = timeBoundExpression(arr.config.timeBounds)
 
-	recSet, err := arr.client.ScanPartitions(
-		arr.scanPolicy,
-		arr.status.partitionFilter,
-		arr.config.Namespace,
-		arr.config.Set,
-		arr.config.BinList...,
-	)
-	if err != nil {
-		return err
+	setsToScan := arr.config.SetList
+	if len(setsToScan) == 0 {
+		setsToScan = []string{""}
 	}
 
-	arr.recSet = recSet
-	arr.recResChan = recSet.Results()
+	resultChannels := make([]<-chan *a.Result, len(arr.recSet))
+
+	for _, set := range setsToScan {
+		recSet, err := arr.client.ScanPartitions(
+			arr.scanPolicy,
+			partitionFilter,
+			arr.config.Namespace,
+			set,
+			arr.config.BinList...,
+		)
+		if err != nil {
+			return err
+		}
+
+		arr.recSet = append(arr.recSet, recSet)
+		resultChannels = append(resultChannels, recSet.Results())
+	}
+
+	arr.recResChan = internal.MergeChannels(resultChannels)
 
 	return nil
 }

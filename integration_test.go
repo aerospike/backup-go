@@ -303,7 +303,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			args: args{
 				backupConfig: &backup.BackupConfig{
 					Partitions:     backup.PartitionRangeAll(),
-					Set:            suite.set,
+					SetList:        []string{suite.set},
 					Namespace:      suite.namespace,
 					Parallel:       100,
 					EncoderFactory: encoding.NewASBEncoderFactory(),
@@ -319,7 +319,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			args: args{
 				backupConfig: &backup.BackupConfig{
 					Partitions:     backup.PartitionRangeAll(),
-					Set:            suite.set,
+					SetList:        []string{suite.set},
 					Namespace:      suite.namespace,
 					Parallel:       4,
 					EncoderFactory: encoding.NewASBEncoderFactory(),
@@ -752,7 +752,7 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 
 	var backupConfig = &backup.BackupConfig{
 		Partitions:     backup.PartitionRangeAll(),
-		Set:            suite.set,
+		SetList:        []string{suite.set},
 		Namespace:      suite.namespace,
 		Parallel:       1,
 		EncoderFactory: encoding.NewASBEncoderFactory(),
@@ -798,7 +798,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 
 	var backupConfig = &backup.BackupConfig{
 		Partitions:     backup.PartitionRangeAll(),
-		Set:            suite.set,
+		SetList:        []string{suite.set},
 		Namespace:      suite.namespace,
 		Parallel:       1,
 		EncoderFactory: encoding.NewASBEncoderFactory(),
@@ -827,7 +827,7 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 
 	var backupConfig = &backup.BackupConfig{
 		Partitions:     backup.PartitionRangeAll(),
-		Set:            suite.set,
+		SetList:        []string{suite.set},
 		Namespace:      suite.namespace,
 		Parallel:       1,
 		EncoderFactory: encoding.NewASBEncoderFactory(),

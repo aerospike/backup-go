@@ -285,6 +285,8 @@ type RestoreConfig struct {
 	// WritePolicy applies to Aerospike write operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	WritePolicy *a.WritePolicy
+	// The sets to restore (optional, given an empty list, all sets will be restored).
+	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
 	BinList []string
 	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.

@@ -23,7 +23,7 @@ func TestMergeMultipleChannels(t *testing.T) {
 	resultChan := MergeChannels([]<-chan int{ch1, ch2, ch3})
 
 	counter := 0
-	for _ = range resultChan {
+	for range resultChan {
 		counter++
 	}
 	if counter != 15 {

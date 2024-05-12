@@ -22,6 +22,7 @@ import (
 	"math"
 
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
+	"github.com/aerospike/backup-go/internal"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
@@ -172,13 +173,8 @@ type binFilterProcessor struct {
 
 // newProcessorBinFilter creates new binFilterProcessor with given binList.
 func newProcessorBinFilter(binList []string) *binFilterProcessor {
-	binsMap := make(map[string]bool, len(binList))
-	for _, key := range binList {
-		binsMap[key] = true
-	}
-
 	return &binFilterProcessor{
-		binsToRemove: binsMap,
+		binsToRemove: internal.ListToMap(binList),
 	}
 }
 
@@ -200,6 +196,38 @@ func (b binFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 	}
 
 	return token, nil
+}
+
+// setFilterProcessor filter records by set.
+type setFilterProcessor struct {
+	setsToRestore map[string]bool
+}
+
+// newProcessorBinFilter creates new binFilterProcessor with given setList.
+func newProcessorSetFilter(setList []string) *setFilterProcessor {
+	return &setFilterProcessor{
+		setsToRestore: internal.ListToMap(setList),
+	}
+}
+
+// Process filters out records that does not belong to setsToRestore
+func (b setFilterProcessor) Process(token *models.Token) (*models.Token, error) {
+	// if the token is not a record, we don't need to process it
+	if token.Type != models.TokenTypeRecord {
+		return token, nil
+	}
+
+	// if filter set list is empty, don't filter anything.
+	if len(b.setsToRestore) == 0 {
+		return token, nil
+	}
+
+	set := token.Record.Key.SetName()
+	if b.setsToRestore[set] {
+		return token, nil
+	}
+
+	return nil, errFilteredOut
 }
 
 // **** VoidTime Processor ****

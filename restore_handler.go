@@ -228,9 +228,14 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		newProcessorWorker(newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs)),
 	}
 
+	var recordSetFilter = []pipeline.Worker[*models.Token]{
+		newProcessorWorker(newProcessorSetFilter(rh.config.SetList)),
+	}
+
 	job := pipeline.NewPipeline(
 		readWorkers,
 		recordFilter,
+		recordSetFilter,
 		tpsLimiter,
 		ttlSetters,
 		binFilters,

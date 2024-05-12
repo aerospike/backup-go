@@ -16,10 +16,12 @@ func MergeChannels[T any](channels []<-chan T) <-chan T {
 		for n := range c {
 			out <- n
 		}
+
 		wg.Done()
 	}
 
 	wg.Add(len(channels))
+
 	for _, c := range channels {
 		go output(c)
 	}

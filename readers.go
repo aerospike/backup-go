@@ -17,14 +17,15 @@ package backup
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
+
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
-	"io"
-	"log/slog"
 )
 
 // **** Read Worker ****
@@ -180,9 +181,9 @@ type aerospikeRecordReader struct {
 	client     scanner
 	scanPolicy *a.ScanPolicy
 	recResChan <-chan *a.Result
-	recSet     []*a.Recordset
 	logger     *slog.Logger
 	config     *arrConfig
+	recSet     []*a.Recordset
 	status     arrStatus
 }
 

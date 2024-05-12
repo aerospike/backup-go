@@ -60,6 +60,8 @@ func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderF
 
 var ErrBackupDirectoryInvalid = errors.New("backup directory is invalid")
 
+// prepareBackupDirectory creates backup directory if it not exists.
+// returns error is dir already exits and it is not empty.
 func prepareBackupDirectory(dir string) error {
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
@@ -87,7 +89,6 @@ func prepareBackupDirectory(dir string) error {
 }
 
 // forcePrepareBackupDirectory removes any existing directory and its contents and creates a new directory.
-// Returns an error if it fails to remove or create a directory.
 func forcePrepareBackupDirectory(dir string) error {
 	err := os.RemoveAll(dir)
 	if err != nil {

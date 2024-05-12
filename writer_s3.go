@@ -197,7 +197,6 @@ func (w *S3Writer) Close() error {
 	return nil
 }
 
-// Check if S3 directory is empty
 func isEmptyDirectory(client *s3.Client, s3config *S3Config) (bool, error) {
 	resp, err := client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
 		Bucket:  &s3config.Bucket,
@@ -226,7 +225,6 @@ func deleteAllFilesUnderPrefix(client *s3.Client, s3config *S3Config) error {
 			if !ok {
 				fileCh = nil // no more files
 			} else {
-				// Delete file from s3 bucket
 				_, err := client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 					Bucket: aws.String(s3config.Bucket),
 					Key:    aws.String(file),

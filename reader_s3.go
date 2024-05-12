@@ -33,7 +33,7 @@ func NewS3ReaderFactory(config *S3Config, decoder DecoderFactory) (*S3ReaderFact
 }
 
 func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
-	fileCh, errCh := f.streamFiles()
+	fileCh, errCh := f.streamBackupFiles()
 	readers := make([]io.ReadCloser, 0)
 
 	for {
@@ -70,7 +70,25 @@ func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 	return readers, nil
 }
 
-func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan error) {
+func (f *S3ReaderFactory) streamBackupFiles() (files <-chan string, errors <-chan error) {
+	fileCh, errCh := streamFilesFromS3(f.client, f.s3Config)
+	filterFileCh := make(chan string)
+
+	go func() {
+		defer close(filterFileCh)
+
+		for file := range fileCh {
+			if err := verifyBackupFileExtension(file, f.decoder); err != nil {
+				continue
+			}
+			filterFileCh <- file
+		}
+	}()
+
+	return filterFileCh, errCh
+}
+
+func streamFilesFromS3(client *s3.Client, s3Config *S3Config) (files <-chan string, errors <-chan error) {
 	fileCh := make(chan string)
 	errCh := make(chan error)
 
@@ -81,9 +99,9 @@ func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan erro
 		var continuationToken *string
 
 		for {
-			prefix := strings.Trim(f.s3Config.Prefix, "/") + "/"
-			listResponse, err := f.client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
-				Bucket:            &f.s3Config.Bucket,
+			prefix := strings.Trim(s3Config.Prefix, "/") + "/"
+			listResponse, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+				Bucket:            &s3Config.Bucket,
 				Prefix:            &prefix,
 				ContinuationToken: continuationToken,
 			})
@@ -94,9 +112,6 @@ func (f *S3ReaderFactory) streamFiles() (files <-chan string, errors <-chan erro
 			}
 
 			for _, p := range listResponse.Contents {
-				if err := verifyBackupFileExtension(*p.Key, f.decoder); err != nil {
-					continue
-				}
 				fileCh <- *p.Key
 			}
 

@@ -232,7 +232,6 @@ func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
 		Partitions:     PartitionRange{0, MaxPartitions},
 		Parallel:       1,
-		SetList:        nil,
 		Namespace:      "test",
 		EncoderFactory: defaultEncoderFactory,
 	}

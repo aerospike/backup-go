@@ -203,7 +203,7 @@ type setFilterProcessor struct {
 	setsToRestore map[string]bool
 }
 
-// newProcessorBinFilter creates new binFilterProcessor with given setList.
+// newProcessorSetFilter creates new setFilterProcessor with given setList.
 func newProcessorSetFilter(setList []string) *setFilterProcessor {
 	return &setFilterProcessor{
 		setsToRestore: internal.ListToMap(setList),

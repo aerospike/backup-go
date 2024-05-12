@@ -45,6 +45,7 @@ func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderF
 	} else {
 		err = prepareBackupDirectory(dir)
 	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +66,7 @@ func prepareBackupDirectory(dir string) error {
 		if os.IsNotExist(err) {
 			return makeDir(dir)
 		}
+
 		return err
 	}
 
@@ -100,6 +102,7 @@ func makeDir(dir string) error {
 	if err != nil {
 		return fmt.Errorf("%w: failed to create backup directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
 	}
+
 	return nil
 }
 

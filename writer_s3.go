@@ -11,6 +11,7 @@ import (
 
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/writers"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -24,7 +25,7 @@ type S3WriteFactory struct {
 
 var _ WriteFactory = (*S3WriteFactory)(nil)
 
-func NewS3WriterFactory(s3Config *S3Config, encoder EncoderFactory) (*S3WriteFactory, error) {
+func NewS3WriterFactory(s3Config *S3Config, encoder EncoderFactory, removeFiles bool) (*S3WriteFactory, error) {
 	if s3Config.ChunkSize > maxS3File {
 		return nil, fmt.Errorf("invalid chunk size %d, should not exceed %d", s3Config.ChunkSize, maxS3File)
 	}
@@ -32,6 +33,22 @@ func NewS3WriterFactory(s3Config *S3Config, encoder EncoderFactory) (*S3WriteFac
 	client, err := newS3Client(s3Config)
 	if err != nil {
 		return nil, err
+	}
+
+	isEmpty, err := isEmptyDirectory(client, s3Config)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isEmpty {
+		if !removeFiles {
+			return nil, fmt.Errorf("%w: %s is not empty", ErrBackupDirectoryInvalid, s3Config.Prefix)
+		}
+
+		err := deleteAllFilesUnderPrefix(client, s3Config)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &S3WriteFactory{
@@ -176,6 +193,60 @@ func (w *S3Writer) Close() error {
 	}
 
 	w.closed = true
+
+	return nil
+}
+
+// Check if S3 directory is empty
+func isEmptyDirectory(client *s3.Client, s3config *S3Config) (bool, error) {
+	resp, err := client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
+		Bucket:  &s3config.Bucket,
+		Prefix:  &s3config.Prefix,
+		MaxKeys: aws.Int32(1),
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	// Check if it's a single object
+	if len(resp.Contents) == 1 && *resp.Contents[0].Key == s3config.Prefix {
+		return false, nil
+	}
+
+	return len(resp.Contents) == 0, nil
+}
+
+func deleteAllFilesUnderPrefix(client *s3.Client, s3config *S3Config) error {
+	fileCh, errCh := streamFilesFromS3(client, s3config)
+
+	for {
+		select {
+		case file, ok := <-fileCh:
+			if !ok {
+				fileCh = nil // no more files
+			} else {
+				// Delete file from s3 bucket
+				_, err := client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+					Bucket: aws.String(s3config.Bucket),
+					Key:    aws.String(file),
+				})
+				if err != nil {
+					return err
+				}
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+			} else {
+				return err
+			}
+		}
+
+		if fileCh == nil && errCh == nil { // if no more files and no more errors
+			break
+		}
+	}
 
 	return nil
 }

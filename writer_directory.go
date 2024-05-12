@@ -60,12 +60,15 @@ func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderF
 var ErrBackupDirectoryInvalid = errors.New("backup directory is invalid")
 
 func prepareBackupDirectory(dir string) error {
-	DirInfo, err := os.Stat(dir)
+	dirInfo, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return makeDir(dir)
 		}
-	} else if !DirInfo.IsDir() {
+		return err
+	}
+
+	if !dirInfo.IsDir() {
 		return fmt.Errorf("%w: %s is not a directory", ErrBackupDirectoryInvalid, dir)
 	}
 

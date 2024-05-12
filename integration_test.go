@@ -351,7 +351,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	writerFactory, err := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	suite.Nil(err)
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
@@ -402,6 +403,9 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
+
+	_, err = backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	suite.ErrorContains(err, "backup directory is invalid")
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {

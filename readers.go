@@ -17,13 +17,13 @@ package backup
 import (
 	"context"
 	"errors"
-	"github.com/aerospike/backup-go/internal/util"
 	"io"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 )

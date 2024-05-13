@@ -18,12 +18,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aerospike/backup-go/internal/util"
 	"log/slog"
 	"math"
 
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"

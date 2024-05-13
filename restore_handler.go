@@ -224,7 +224,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		newProcessorWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond)),
 	}
 
-	var recordFilter = []pipeline.Worker[*models.Token]{
+	var tokenTypeFilter = []pipeline.Worker[*models.Token]{
 		newProcessorWorker(newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs)),
 	}
 
@@ -232,10 +232,15 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		newProcessorWorker(newchangeNamespaceFilterProcessor("source-ns15")),
 	}
 
+	var recordSetFilter = []pipeline.Worker[*models.Token]{
+		newProcessorWorker(newProcessorSetFilter(rh.config.SetList)),
+	}
+
 	job := pipeline.NewPipeline(
 		readWorkers,
 		namespaceSet,
-		recordFilter,
+		tokenTypeFilter,
+		recordSetFilter,
 		tpsLimiter,
 		ttlSetters,
 		binFilters,

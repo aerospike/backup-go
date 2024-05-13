@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/aerospike/aerospike-client-go/v7 v7.2.1
 	github.com/aerospike/tools-common-go v0.0.0-20240308225527-766ab8f3da4b
+	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.11
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1
 	github.com/docker/docker v26.1.0+incompatible
@@ -19,7 +20,6 @@ require (
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.4.14 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.26.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.11 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.1 // indirect

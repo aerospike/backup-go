@@ -339,11 +339,11 @@ func (b tokenTypeProcessor) Process(token *models.Token) (*models.Token, error) 
 
 // changeNamespaceFilterProcessor is used to support no-records, no-indexes and no-udf flags.
 type changeNamespaceProcessor struct {
-	namespace string
+	restoreNamespace *RestoreNamespace
 }
 
-// newchangeNamespaceFilterProcessor creates new changeNamespaceFilterProcessor
-func newchangeNamespaceFilterProcessor(namespace string) *changeNamespaceProcessor {
+// newChangeNamespaceProcessor creates new changeNamespaceProcessor
+func newChangeNamespaceProcessor(namespace *RestoreNamespace) *changeNamespaceProcessor {
 	return &changeNamespaceProcessor{
 		namespace,
 	}
@@ -356,8 +356,16 @@ func (b changeNamespaceProcessor) Process(token *models.Token) (*models.Token, e
 		return token, nil
 	}
 
+	if b.restoreNamespace == nil {
+		return token, nil
+	}
+
 	key := token.Record.Key
-	newKey, err := a.NewKeyWithDigest(b.namespace, key.SetName(), key.Value(), key.Digest())
+	if key.Namespace() != *b.restoreNamespace.Source {
+		return nil, fmt.Errorf("ivalid namespace %s (expected: %s)", key.Namespace(), b.restoreNamespace.Source)
+	}
+
+	newKey, err := a.NewKeyWithDigest(*b.restoreNamespace.Destination, key.SetName(), key.Value(), key.Digest())
 	if err != nil {
 		return nil, err
 	}

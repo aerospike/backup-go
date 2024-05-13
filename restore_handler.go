@@ -229,7 +229,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	}
 
 	var namespaceSet = []pipeline.Worker[*models.Token]{
-		newProcessorWorker(newchangeNamespaceFilterProcessor("source-ns15")),
+		newProcessorWorker(newChangeNamespaceProcessor(rh.config.Namespace)),
 	}
 
 	var recordSetFilter = []pipeline.Worker[*models.Token]{

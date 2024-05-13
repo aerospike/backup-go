@@ -18,11 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aerospike/backup-go/internal/util"
 	"log/slog"
 	"math"
 
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
-	"github.com/aerospike/backup-go/internal"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
@@ -174,7 +174,7 @@ type binFilterProcessor struct {
 // newProcessorBinFilter creates new binFilterProcessor with given binList.
 func newProcessorBinFilter(binList []string) *binFilterProcessor {
 	return &binFilterProcessor{
-		binsToRemove: internal.ListToMap(binList),
+		binsToRemove: util.ListToMap(binList),
 	}
 }
 
@@ -206,7 +206,7 @@ type setFilterProcessor struct {
 // newProcessorSetFilter creates new setFilterProcessor with given setList.
 func newProcessorSetFilter(setList []string) *setFilterProcessor {
 	return &setFilterProcessor{
-		setsToRestore: internal.ListToMap(setList),
+		setsToRestore: util.ListToMap(setList),
 	}
 }
 

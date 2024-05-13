@@ -329,7 +329,7 @@ func (b changeNamespaceProcessor) Process(token *models.Token) (*models.Token, e
 	}
 
 	key := token.Record.Key
-	newKey, err := a.NewKey(b.namespace, key.SetName(), key.Value())
+	newKey, err := a.NewKeyWithDigest(b.namespace, key.SetName(), key.Value(), key.Digest())
 	if err != nil {
 		return nil, err
 	}

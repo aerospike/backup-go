@@ -228,8 +228,13 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		newProcessorWorker(newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs)),
 	}
 
+	var namespaceSet = []pipeline.Worker[*models.Token]{
+		newProcessorWorker(newchangeNamespaceFilterProcessor("source-ns15")),
+	}
+
 	job := pipeline.NewPipeline(
 		readWorkers,
+		namespaceSet,
 		recordFilter,
 		tpsLimiter,
 		ttlSetters,

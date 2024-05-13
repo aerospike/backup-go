@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	a "github.com/aerospike/aerospike-client-go/v7"
 	"log/slog"
 	"math"
 
@@ -305,5 +306,33 @@ func (b tokenTypeProcessor) Process(token *models.Token) (*models.Token, error) 
 		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", errFilteredOut)
 	}
 
+	return token, nil
+}
+
+// changeNamespaceFilterProcessor is used to support no-records, no-indexes and no-udf flags.
+type changeNamespaceProcessor struct {
+	namespace string
+}
+
+// newchangeNamespaceFilterProcessor creates new changeNamespaceFilterProcessor
+func newchangeNamespaceFilterProcessor(namespace string) *changeNamespaceProcessor {
+	return &changeNamespaceProcessor{
+		namespace,
+	}
+}
+
+// Process filters tokens by type.
+func (b changeNamespaceProcessor) Process(token *models.Token) (*models.Token, error) {
+	// if the token is not a record, we don't need to process it
+	if token.Type != models.TokenTypeRecord {
+		return token, nil
+	}
+
+	key := token.Record.Key
+	newKey, err := a.NewKey(b.namespace, key.SetName(), key.Value())
+	if err != nil {
+		return nil, err
+	}
+	token.Record.Key = newKey
 	return token, nil
 }

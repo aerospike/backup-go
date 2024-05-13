@@ -242,9 +242,8 @@ func (arr *aerospikeRecordReader) Close() {
 		// ignore this error, it only happens if the scan is already closed
 		// and this method can not return an error anyway
 		for _, rec := range arr.recSet {
-			err := rec.Close()
-			if err != nil {
-				arr.logger.Error("error while closing record set", "error", err)
+			if err := rec.Close(); err != nil {
+				arr.logger.Error("error while closing record set", "error", rec.Close())
 			}
 		}
 	}

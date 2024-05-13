@@ -194,8 +194,8 @@ type BackupConfig struct {
 	// Only include records that last changed after the given time (optional).
 	ModAfter  *time.Time
 	Namespace string
-	// Set is the Aerospike set to backup.
-	Set string
+	// SetList is the Aerospike set to backup (optional, given an empty list, all sets will be backed up).
+	SetList []string
 	// The list of backup bin names (optional, given an empty list, all bins will be backed up)
 	BinList []string
 	// Partitions specifies the Aerospike partitions to backup.
@@ -232,7 +232,6 @@ func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
 		Partitions:     PartitionRange{0, MaxPartitions},
 		Parallel:       1,
-		Set:            "",
 		Namespace:      "test",
 		EncoderFactory: defaultEncoderFactory,
 	}
@@ -285,6 +284,8 @@ type RestoreConfig struct {
 	// WritePolicy applies to Aerospike write operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	WritePolicy *a.WritePolicy
+	// The sets to restore (optional, given an empty list, all sets will be restored).
+	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
 	BinList []string
 	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.

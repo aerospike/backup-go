@@ -18,10 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	a "github.com/aerospike/aerospike-client-go/v7"
 	"log/slog"
 	"math"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/util"
@@ -337,7 +337,7 @@ func (b tokenTypeProcessor) Process(token *models.Token) (*models.Token, error) 
 	return token, nil
 }
 
-// changeNamespaceFilterProcessor is used to support no-records, no-indexes and no-udf flags.
+// changeNamespaceProcessor is used to restore to another namespace.
 type changeNamespaceProcessor struct {
 	restoreNamespace *RestoreNamespace
 }
@@ -350,25 +350,27 @@ func newChangeNamespaceProcessor(namespace *RestoreNamespace) *changeNamespacePr
 }
 
 // Process filters tokens by type.
-func (b changeNamespaceProcessor) Process(token *models.Token) (*models.Token, error) {
+func (p changeNamespaceProcessor) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 
-	if b.restoreNamespace == nil {
+	if p.restoreNamespace == nil {
 		return token, nil
 	}
 
 	key := token.Record.Key
-	if key.Namespace() != *b.restoreNamespace.Source {
-		return nil, fmt.Errorf("ivalid namespace %s (expected: %s)", key.Namespace(), b.restoreNamespace.Source)
+	if key.Namespace() != *p.restoreNamespace.Source {
+		return nil, fmt.Errorf("invalid namespace %s (expected: %s)", key.Namespace(), *p.restoreNamespace.Source)
 	}
 
-	newKey, err := a.NewKeyWithDigest(*b.restoreNamespace.Destination, key.SetName(), key.Value(), key.Digest())
+	newKey, err := a.NewKeyWithDigest(*p.restoreNamespace.Destination, key.SetName(), key.Value(), key.Digest())
 	if err != nil {
 		return nil, err
 	}
+
 	token.Record.Key = newKey
+
 	return token, nil
 }

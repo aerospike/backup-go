@@ -284,6 +284,9 @@ type RestoreConfig struct {
 	// WritePolicy applies to Aerospike write operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	WritePolicy *a.WritePolicy
+	// Namespace details for the restore operation.
+	// By default, the data is restored to the namespace from which it was taken.
+	Namespace *RestoreNamespace `json:"namespace,omitempty"`
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
@@ -299,9 +302,6 @@ type RestoreConfig struct {
 	NoIndexes bool
 	// Don't restore any UDFs.
 	NoUDFs bool
-	// Namespace details for the restore operation.
-	// By default, the data is restored to the namespace from which it was taken.
-	Namespace *RestoreNamespace `json:"namespace,omitempty"`
 }
 
 // RestoreNamespace specifies an alternative namespace name for the restore
@@ -322,9 +322,11 @@ func (n *RestoreNamespace) Validate() error {
 	if n.Source == nil {
 		return fmt.Errorf("source namespace is not specified")
 	}
+
 	if n.Destination == nil {
 		return fmt.Errorf("destination namespace is not specified")
 	}
+
 	return nil
 }
 

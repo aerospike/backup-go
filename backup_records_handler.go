@@ -24,31 +24,23 @@ import (
 	"github.com/aerospike/backup-go/pipeline"
 )
 
-// **** Base Backup Handler ****
-
-type backupHandlerBase struct {
-	worker          workHandler
+type backupRecordsHandler struct {
 	config          *BackupConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
 }
 
-func newBackupHandlerBase(config *BackupConfig, ac *a.Client, logger *slog.Logger) *backupHandlerBase {
-	logger.Debug("created new backup base handler")
+func newBackupRecordsHandler(config *BackupConfig, ac *a.Client, logger *slog.Logger) *backupRecordsHandler {
+	logger.Debug("created new backup records handler")
 
-	wh := newWorkHandler()
-
-	handler := &backupHandlerBase{
+	return &backupRecordsHandler{
 		config:          config,
 		aerospikeClient: ac,
-		worker:          *wh,
 		logger:          logger,
 	}
-
-	return handler
 }
 
-func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
+func (bh *backupRecordsHandler) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
@@ -79,10 +71,8 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 			bh.logger,
 		)
 
-		readWorkers[i] = newReadWorker(recordReader)
-
-		voidTimeSetter := newProcessorVoidTime(bh.logger)
-		processorWorkers[i] = newProcessorWorker(voidTimeSetter)
+		readWorkers[i] = newReadWorker[*models.Token](recordReader)
+		processorWorkers[i] = newProcessorWorker[*models.Token](newProcessorVoidTime(bh.logger))
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
@@ -97,5 +87,5 @@ func (bh *backupHandlerBase) run(ctx context.Context, writers []*writeWorker[*mo
 		writeWorkers,
 	)
 
-	return bh.worker.DoJob(ctx, job)
+	return job.Run(ctx)
 }

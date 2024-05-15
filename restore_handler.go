@@ -36,16 +36,10 @@ type DBRestoreClient interface {
 	dbWriter
 }
 
-// worker is an interface for running a job
-type worker interface {
-	DoJob(context.Context, *pipeline.Pipeline[*models.Token]) error
-}
-
 // restoreHandlerBase handles restore jobs for a single worker.
 type restoreHandlerBase struct {
 	config   *RestoreConfig
 	dbClient DBRestoreClient
-	worker   worker
 	stats    *RestoreStats
 	logger   *slog.Logger
 }
@@ -138,9 +132,7 @@ func (rh *RestoreHandler) run(ctx context.Context) {
 				readWorkers[i] = readWorker
 			}
 
-			restoreWorker := newWorkHandler()
-			restoreHandler := newRestoreHandlerBase(rh.config,
-				rh.aerospikeClient, restoreWorker, &rh.stats, rh.logger)
+			restoreHandler := newRestoreHandlerBase(rh.config, rh.aerospikeClient, &rh.stats, rh.logger)
 
 			err = restoreHandler.run(ctx, readWorkers)
 			if err != nil {
@@ -175,13 +167,12 @@ func (rh *RestoreHandler) Wait(ctx context.Context) error {
 
 // newRestoreHandlerBase creates a new restoreHandler
 func newRestoreHandlerBase(config *RestoreConfig, ac DBRestoreClient,
-	w worker, stats *RestoreStats, logger *slog.Logger) *restoreHandlerBase {
+	stats *RestoreStats, logger *slog.Logger) *restoreHandlerBase {
 	logger.Debug("created new restore base handler")
 
 	return &restoreHandlerBase{
 		config:   config,
 		dbClient: ac,
-		worker:   w,
 		stats:    stats,
 		logger:   logger,
 	}
@@ -236,7 +227,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		writeWorkers,
 	)
 
-	return rh.worker.DoJob(ctx, job)
+	return job.Run(ctx)
 }
 
 func newTokenWorker(processor dataProcessor[*models.Token]) []pipeline.Worker[*models.Token] {

@@ -59,14 +59,14 @@ type BackupStats struct {
 	start    time.Time
 	Duration time.Duration
 	tokenStats
-	fileCount atomic.Int32
+	fileCount atomic.Uint64
 }
 
 func (b *BackupStats) incFiles() {
 	b.fileCount.Add(1)
 }
 
-func (b *BackupStats) GetFileCount() int32 {
+func (b *BackupStats) GetFileCount() uint64 {
 	return b.fileCount.Load()
 }
 

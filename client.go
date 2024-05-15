@@ -335,6 +335,12 @@ func (c *RestoreConfig) validate() error {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
 
+	if c.Namespace != nil {
+		if err := c.Namespace.Validate(); err != nil {
+			return fmt.Errorf("invalid restore namespace: %w", err)
+		}
+	}
+
 	return nil
 }
 

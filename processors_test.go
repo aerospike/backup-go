@@ -28,6 +28,7 @@ import (
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -40,7 +41,7 @@ func (suite *proccessorTestSuite) TestProcessorWorker() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker(mockProcessor)
+	worker := newProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -64,7 +65,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerFilteredOut() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", errFilteredOut)
 
-	worker := newProcessorWorker(mockProcessor)
+	worker := newProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -87,7 +88,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker(mockProcessor)
+	worker := newProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -125,7 +126,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker(mockProcessor)
+	worker := newProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -160,7 +161,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerReceiveClosed() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker(mockProcessor)
+	worker := newProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -181,7 +182,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("", errors.New("test"))
 
-	worker := newProcessorWorker(mockProcessor)
+	worker := newProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -633,6 +634,76 @@ func TestSetFilter(t *testing.T) {
 			} else {
 				assert.Equal(t, tc.token, resToken)
 				assert.Nil(t, resErr)
+			}
+		})
+	}
+}
+
+func TestChangeNamespaceProcessor(t *testing.T) {
+	restoreNamespace := RestoreNamespace{
+		Source:      ptr.String("sourceNS"),
+		Destination: ptr.String("destinationNS"),
+	}
+
+	key, _ := a.NewKey(*restoreNamespace.Source, "set", 1)
+	invalidKey, _ := a.NewKey("otherNs", "set", 1)
+
+	tests := []struct {
+		name         string
+		restoreNS    *RestoreNamespace
+		initialToken *models.Token
+		wantErr      bool
+	}{
+		{
+			name:      "nil restore Namespace",
+			restoreNS: nil,
+			initialToken: models.NewRecordToken(models.Record{
+				Record: &a.Record{
+					Key: key,
+				},
+			}),
+			wantErr: false,
+		},
+		{
+			name:         "non-record Token Type",
+			restoreNS:    &restoreNamespace,
+			initialToken: models.NewUDFToken(nil),
+			wantErr:      false,
+		},
+		{
+			name:      "invalid source namespace",
+			restoreNS: &restoreNamespace,
+			initialToken: models.NewRecordToken(models.Record{
+				Record: &a.Record{
+					Key: invalidKey,
+				},
+			}),
+			wantErr: true,
+		},
+		{
+			name:      "valid process",
+			restoreNS: &restoreNamespace,
+			initialToken: models.NewRecordToken(models.Record{
+				Record: &a.Record{
+					Key: key,
+				},
+			}),
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newChangeNamespaceProcessor(tt.restoreNS)
+			gotToken, err := p.Process(tt.initialToken)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if tt.initialToken.Type == models.TokenTypeRecord && tt.restoreNS != nil {
+					assert.Equal(t, *tt.restoreNS.Destination, gotToken.Record.Key.Namespace())
+				}
 			}
 		})
 	}

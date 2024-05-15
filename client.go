@@ -284,6 +284,9 @@ type RestoreConfig struct {
 	// WritePolicy applies to Aerospike write operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	WritePolicy *a.WritePolicy
+	// Namespace details for the restore operation.
+	// By default, the data is restored to the namespace from which it was taken.
+	Namespace *RestoreNamespace `json:"namespace,omitempty"`
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
@@ -301,9 +304,41 @@ type RestoreConfig struct {
 	NoUDFs bool
 }
 
+// RestoreNamespace specifies an alternative namespace name for the restore
+// operation, where Source is the original namespace name and Destination is
+// the namespace name to which the backup data is to be restored.
+//
+// @Description RestoreNamespace specifies an alternative namespace name for the restore
+// @Description operation.
+type RestoreNamespace struct {
+	// Original namespace name.
+	Source *string `json:"source,omitempty" example:"source-ns" validate:"required"`
+	// Destination namespace name.
+	Destination *string `json:"destination,omitempty" example:"destination-ns" validate:"required"`
+}
+
+// Validate validates the restore namespace.
+func (n *RestoreNamespace) Validate() error {
+	if n.Source == nil {
+		return fmt.Errorf("source namespace is not specified")
+	}
+
+	if n.Destination == nil {
+		return fmt.Errorf("destination namespace is not specified")
+	}
+
+	return nil
+}
+
 func (c *RestoreConfig) validate() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
+	}
+
+	if c.Namespace != nil {
+		if err := c.Namespace.Validate(); err != nil {
+			return fmt.Errorf("invalid restore namespace: %w", err)
+		}
 	}
 
 	return nil

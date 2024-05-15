@@ -134,7 +134,7 @@ func (rh *RestoreHandler) run(ctx context.Context) {
 				}
 
 				dr := newTokenReader(decoder, rh.logger)
-				readWorker := newReadWorker(dr)
+				readWorker := newReadWorker[*models.Token](dr)
 				readWorkers[i] = readWorker
 			}
 
@@ -205,44 +205,44 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		writeWorkers[i] = newWriteWorker(writer)
 	}
 
-	ttlSetters := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
-	for i := 0; i < rh.config.Parallel; i++ {
-		ttlSetters[i] = newProcessorWorker(newProcessorTTL(rh.stats, rh.logger))
-	}
-
-	binFilters := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
-	for i := 0; i < rh.config.Parallel; i++ {
-		binFilters[i] = newProcessorWorker(newProcessorBinFilter(rh.config.BinList))
-	}
-
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 	for i, r := range readers {
 		readWorkers[i] = r
 	}
 
-	var tpsLimiter = []pipeline.Worker[*models.Token]{
-		newProcessorWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond)),
-	}
-
-	var tokenTypeFilter = []pipeline.Worker[*models.Token]{
-		newProcessorWorker(newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs)),
-	}
-
-	var recordSetFilter = []pipeline.Worker[*models.Token]{
-		newProcessorWorker(newProcessorSetFilter(rh.config.SetList)),
-	}
+	namespaceSet := newTokenWorker(newChangeNamespaceProcessor(rh.config.Namespace))
+	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
+	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList))
+	tpsLimiter := newTokenWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
+	tokenTypeFilter := newTokenWorker(
+		newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
+	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList))
 
 	job := pipeline.NewPipeline(
 		readWorkers,
+
+		// in the pipeline, first all filters.
 		tokenTypeFilter,
 		recordSetFilter,
+
+		// speed limiters.
 		tpsLimiter,
+
+		// modifications.
+		namespaceSet,
 		ttlSetters,
 		binFilters,
+
 		writeWorkers,
 	)
 
 	return rh.worker.DoJob(ctx, job)
+}
+
+func newTokenWorker(processor dataProcessor[*models.Token]) []pipeline.Worker[*models.Token] {
+	return []pipeline.Worker[*models.Token]{
+		newProcessorWorker(processor),
+	}
 }
 
 // **** Restore From Reader Handler ****

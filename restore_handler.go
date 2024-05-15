@@ -134,7 +134,7 @@ func (rh *RestoreHandler) run(ctx context.Context) {
 				}
 
 				dr := newTokenReader(decoder, rh.logger)
-				readWorker := newReadWorker(dr)
+				readWorker := newReadWorker[*models.Token](dr)
 				readWorkers[i] = readWorker
 			}
 

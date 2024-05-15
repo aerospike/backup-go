@@ -59,6 +59,15 @@ type BackupStats struct {
 	start    time.Time
 	Duration time.Duration
 	tokenStats
+	fileCount atomic.Uint64
+}
+
+func (b *BackupStats) incFiles() {
+	b.fileCount.Add(1)
+}
+
+func (b *BackupStats) GetFileCount() uint64 {
+	return b.fileCount.Load()
 }
 
 // newBackupHandler creates a new BackupHandler
@@ -100,6 +109,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 				}
 
 				bh.stats.addTotalSize(uint64(headerLen))
+				bh.stats.incFiles()
 
 				return nil
 			})
@@ -138,7 +148,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			return nil
 		}
 
-		handler := newBackupHandlerBase(bh.config, bh.aerospikeClient, bh.logger)
+		handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
 
 		return handler.run(ctx, writeWorkers)
 	})
@@ -202,8 +212,8 @@ func backupSIndexes(
 		return err
 	}
 
-	sindexReader := newSIndexReader(infoClient, config.Namespace, logger)
-	sindexReadWorker := newReadWorker(sindexReader)
+	reader := newSIndexReader(infoClient, config.Namespace, logger)
+	sindexReadWorker := newReadWorker[*models.Token](reader)
 
 	sindexEncoder, err := config.EncoderFactory.CreateEncoder()
 	if err != nil {
@@ -240,8 +250,8 @@ func backupUDFs(
 		return err
 	}
 
-	udfReader := newUDFReader(infoClient, logger)
-	udfReadWorker := newReadWorker(udfReader)
+	reader := newUDFReader(infoClient, logger)
+	udfReadWorker := newReadWorker[*models.Token](reader)
 
 	udfEncoder, err := config.EncoderFactory.CreateEncoder()
 	if err != nil {

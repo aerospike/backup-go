@@ -206,10 +206,26 @@ func (tc *TestClient) ValidateSIndexes(t assert.TestingT, expected []*models.SIn
 // WriteRecords writes the given records to the database.
 func (tc *TestClient) WriteRecords(recs []*a.Record) error {
 	for _, rec := range recs {
-		err := tc.asc.Put(nil, rec.Key, rec.Bins)
+		var p = a.NewWritePolicy(0, 0)
+		p.GenerationPolicy = a.EXPECT_GEN_GT
+		p.RecordExistsAction = a.REPLACE
+		p.SendKey = true
+		err := tc.asc.Put(p, rec.Key, rec.Bins)
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (tc *TestClient) WriteRecord(rec *a.Record) error {
+	var p = a.NewWritePolicy(0, 0)
+	p.GenerationPolicy = a.EXPECT_GEN_GT
+	p.RecordExistsAction = a.UPDATE
+	err := tc.asc.Put(p, rec.Key, rec.Bins)
+	if err != nil {
+		return err
 	}
 
 	return nil

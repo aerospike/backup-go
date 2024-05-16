@@ -108,23 +108,7 @@ func newTokenReader(decoder encoding.Decoder, logger *slog.Logger) *tokenReader 
 
 // Read reads the next token from the decoder
 func (dr *tokenReader) Read() (*models.Token, error) {
-	data, err := dr.decoder.NextToken()
-	if err != nil {
-		return nil, err
-	}
-
-	switch data.Type {
-	case models.TokenTypeRecord:
-		return models.NewRecordToken(data.Record), nil
-	case models.TokenTypeUDF:
-		return models.NewUDFToken(data.UDF), nil
-	case models.TokenTypeSIndex:
-		return models.NewSIndexToken(data.SIndex), nil
-	case models.TokenTypeInvalid:
-		return nil, errors.New("invalid token")
-	default:
-		return nil, errors.New("unsupported token type")
-	}
+	return dr.decoder.NextToken()
 }
 
 // Close satisfies the DataReader interface
@@ -229,7 +213,7 @@ func (arr *aerospikeRecordReader) Read() (*models.Token, error) {
 	rec := models.Record{
 		Record: res.Record,
 	}
-	recToken := models.NewRecordToken(rec)
+	recToken := models.NewRecordToken(rec, 0)
 
 	return recToken, nil
 }
@@ -358,7 +342,7 @@ func (r *sindexReader) Read() (*models.Token, error) {
 	}
 
 	if len(r.sindexes) > 0 {
-		SIToken := models.NewSIndexToken(<-r.sindexes)
+		SIToken := models.NewSIndexToken(<-r.sindexes, 0)
 		return SIToken, nil
 	}
 
@@ -415,7 +399,7 @@ func (r *udfReader) Read() (*models.Token, error) {
 	}
 
 	if len(r.udfs) > 0 {
-		UDFToken := models.NewUDFToken(<-r.udfs)
+		UDFToken := models.NewUDFToken(<-r.udfs, 0)
 		return UDFToken, nil
 	}
 

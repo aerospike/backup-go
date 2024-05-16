@@ -661,13 +661,13 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 				Record: &a.Record{
 					Key: key,
 				},
-			}),
+			}, 0),
 			wantErr: false,
 		},
 		{
 			name:         "non-record Token Type",
 			restoreNS:    &restoreNamespace,
-			initialToken: models.NewUDFToken(nil),
+			initialToken: models.NewUDFToken(nil, 0),
 			wantErr:      false,
 		},
 		{
@@ -677,7 +677,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 				Record: &a.Record{
 					Key: invalidKey,
 				},
-			}),
+			}, 0),
 			wantErr: true,
 		},
 		{
@@ -687,7 +687,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 				Record: &a.Record{
 					Key: key,
 				},
-			}),
+			}, 0),
 			wantErr: false,
 		},
 	}

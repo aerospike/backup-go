@@ -125,6 +125,8 @@ func NewDecoder(src io.Reader) (*Decoder, error) {
 }
 
 func (r *Decoder) NextToken() (*models.Token, error) {
+	countBefore := r.count
+
 	v, err := func() (any, error) {
 		b, err := _peek(r)
 		if err != nil {
@@ -151,13 +153,14 @@ func (r *Decoder) NextToken() (*models.Token, error) {
 		return nil, newDecoderError(r.count, err)
 	}
 
+	size := r.count - countBefore
 	switch v := v.(type) {
 	case *models.SIndex:
-		return models.NewSIndexToken(v), nil
+		return models.NewSIndexToken(v, size), nil
 	case *models.UDF:
-		return models.NewUDFToken(v), nil
+		return models.NewUDFToken(v, size), nil
 	case *models.Record:
-		return models.NewRecordToken(*v), nil
+		return models.NewRecordToken(*v, size), nil
 	default:
 		return nil, fmt.Errorf("unsupported token type %T", v)
 	}

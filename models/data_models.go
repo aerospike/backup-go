@@ -116,14 +116,6 @@ func NewRecordToken(r Record, size uint64) *Token {
 	}
 }
 
-func NewRecordTokenWithSize(r Record, size uint64) *Token {
-	return &Token{
-		Record: r,
-		Type:   TokenTypeRecord,
-		Size:   size,
-	}
-}
-
 // NewSIndexToken creates a new token with the given secondary index
 func NewSIndexToken(s *SIndex, size uint64) *Token {
 	return &Token{

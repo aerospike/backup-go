@@ -188,11 +188,11 @@ type BackupConfig struct {
 	// ScanPolicy applies to Aerospike scan operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	ScanPolicy *a.ScanPolicy
-	// Namespace is the Aerospike namespace to backup.
 	// Only include records that last changed before the given time (optional).
 	ModBefore *time.Time
 	// Only include records that last changed after the given time (optional).
-	ModAfter  *time.Time
+	ModAfter *time.Time
+	// Namespace is the Aerospike namespace to backup.
 	Namespace string
 	// SetList is the Aerospike set to backup (optional, given an empty list, all sets will be backed up).
 	SetList []string
@@ -207,7 +207,8 @@ type BackupConfig struct {
 	// Don't backup any secondary indexes.
 	NoIndexes bool
 	// Don't backup any UDFs.
-	NoUDFs    bool
+	NoUDFs bool
+	// Limits backup bandwidth (bytes per second)
 	Bandwidth int
 }
 
@@ -297,7 +298,8 @@ type RestoreConfig struct {
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
-	Bandwidth        int
+	// Limits restore bandwidth (bytes per second)
+	Bandwidth int
 	// Don't restore any records.
 	NoRecords bool
 	// Don't restore any secondary indexes.

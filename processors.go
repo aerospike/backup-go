@@ -425,7 +425,11 @@ type changeNamespaceProcessor struct {
 }
 
 // newChangeNamespaceProcessor creates new changeNamespaceProcessor
-func newChangeNamespaceProcessor(namespace *RestoreNamespace) *changeNamespaceProcessor {
+func newChangeNamespaceProcessor(namespace *RestoreNamespace) dataProcessor[*models.Token] {
+	if namespace == nil {
+		return &noopProcessor[*models.Token]{}
+	}
+
 	return &changeNamespaceProcessor{
 		namespace,
 	}
@@ -435,10 +439,6 @@ func newChangeNamespaceProcessor(namespace *RestoreNamespace) *changeNamespacePr
 func (p changeNamespaceProcessor) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
-		return token, nil
-	}
-
-	if p.restoreNamespace == nil {
 		return token, nil
 	}
 

@@ -90,7 +90,6 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 //
 //go:generate mockery --name statsSetterToken --inpackage --exported=false
 type statsSetterToken interface {
-	addTotalRecords(uint64)
 	addUDFs(uint32)
 	addSIndexes(uint32)
 	addTotalSize(uint64)

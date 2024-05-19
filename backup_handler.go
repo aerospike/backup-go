@@ -150,7 +150,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 		handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
 
-		return handler.run(ctx, writeWorkers)
+		return handler.run(ctx, writeWorkers, &bh.stats.recordsTotal)
 	})
 }
 

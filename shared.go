@@ -112,10 +112,6 @@ func (bs *tokenStats) GetUDFs() uint32 {
 	return bs.uDFs.Load()
 }
 
-func (bs *tokenStats) addTotalRecords(num uint64) {
-	bs.recordsTotal.Add(num)
-}
-
 func (bs *tokenStats) addTotalSize(num uint64) {
 	bs.totalSize.Add(num)
 }

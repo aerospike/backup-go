@@ -274,9 +274,6 @@ func (rs *RestoreStats) GetRecordsSkipped() uint64 {
 	return rs.recordsSkipped.Load()
 }
 
-func (rs *RestoreStats) incrRecordsSkipped() {
-	rs.recordsSkipped.Add(1)
-}
 func (rs *RestoreStats) GetRecordsFresher() uint64 {
 	return rs.recordsFresher.Load()
 }

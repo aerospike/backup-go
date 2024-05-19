@@ -260,6 +260,7 @@ func (b setFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 	}
 
 	b.skipped.Add(1)
+
 	return nil, errFilteredOut
 }
 

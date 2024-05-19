@@ -41,7 +41,8 @@ func newBackupRecordsHandler(config *BackupConfig, ac *a.Client, logger *slog.Lo
 	}
 }
 
-func (bh *backupRecordsHandler) run(ctx context.Context, writers []*writeWorker[*models.Token], recordsTotal *atomic.Uint64) error {
+func (bh *backupRecordsHandler) run(ctx context.Context,
+	writers []*writeWorker[*models.Token], recordsTotal *atomic.Uint64) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 

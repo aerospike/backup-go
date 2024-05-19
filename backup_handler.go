@@ -160,7 +160,8 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	})
 }
 
-func (bh *BackupHandler) backupSIndexesAndUdfs(ctx context.Context, writer io.WriteCloser, limiter *rate.Limiter) error {
+func (bh *BackupHandler) backupSIndexesAndUdfs(
+	ctx context.Context, writer io.WriteCloser, limiter *rate.Limiter) error {
 	if !bh.config.NoIndexes {
 		err := backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger, limiter)
 		if err != nil {
@@ -205,7 +206,8 @@ func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) (i
 	return 0, nil
 }
 
-func backupSIndexes(ctx context.Context, ac *a.Client, config *BackupConfig, stats *BackupStats, writer io.Writer, logger *slog.Logger, limiter *rate.Limiter) error {
+func backupSIndexes(ctx context.Context, ac *a.Client, config *BackupConfig, stats *BackupStats,
+	writer io.Writer, logger *slog.Logger, limiter *rate.Limiter) error {
 	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
 	if err != nil {
 		return err
@@ -236,7 +238,8 @@ func backupSIndexes(ctx context.Context, ac *a.Client, config *BackupConfig, sta
 	return err
 }
 
-func backupUDFs(ctx context.Context, ac *a.Client, config *BackupConfig, stats *BackupStats, writer io.Writer, logger *slog.Logger, limiter *rate.Limiter) error {
+func backupUDFs(ctx context.Context, ac *a.Client, config *BackupConfig, stats *BackupStats,
+	writer io.Writer, logger *slog.Logger, limiter *rate.Limiter) error {
 	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
 	if err != nil {
 		return err

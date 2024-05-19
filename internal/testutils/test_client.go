@@ -215,18 +215,6 @@ func (tc *TestClient) WriteRecords(recs []*a.Record) error {
 	return nil
 }
 
-func (tc *TestClient) WriteRecord(rec *a.Record) error {
-	var p = a.NewWritePolicy(0, 0)
-	p.GenerationPolicy = a.EXPECT_GEN_GT
-	p.RecordExistsAction = a.UPDATE
-	err := tc.asc.Put(p, rec.Key, rec.Bins)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // ReadAllRecords reads all records from the given namespace and set.
 func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 	records := make(RecordMap)

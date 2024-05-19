@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
@@ -170,12 +171,14 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 // binFilterProcessor will remove bins with names in binsToRemove from every record it receives.
 type binFilterProcessor struct {
 	binsToRemove map[string]bool
+	skipped      *atomic.Uint64
 }
 
 // newProcessorBinFilter creates new binFilterProcessor with given binList.
-func newProcessorBinFilter(binList []string) *binFilterProcessor {
+func newProcessorBinFilter(binList []string, skipped *atomic.Uint64) *binFilterProcessor {
 	return &binFilterProcessor{
 		binsToRemove: util.ListToMap(binList),
+		skipped:      skipped,
 	}
 }
 
@@ -196,18 +199,25 @@ func (b binFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 		}
 	}
 
+	if len(token.Record.Bins) == 0 {
+		b.skipped.Add(1)
+		return nil, errFilteredOut
+	}
+
 	return token, nil
 }
 
 // setFilterProcessor filter records by set.
 type setFilterProcessor struct {
 	setsToRestore map[string]bool
+	skipped       *atomic.Uint64
 }
 
 // newProcessorSetFilter creates new setFilterProcessor with given setList.
-func newProcessorSetFilter(setList []string) *setFilterProcessor {
+func newProcessorSetFilter(setList []string, skipped *atomic.Uint64) *setFilterProcessor {
 	return &setFilterProcessor{
 		setsToRestore: util.ListToMap(setList),
+		skipped:       skipped,
 	}
 }
 
@@ -228,6 +238,7 @@ func (b setFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 		return token, nil
 	}
 
+	b.skipped.Add(1)
 	return nil, errFilteredOut
 }
 

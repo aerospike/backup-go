@@ -248,11 +248,6 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 }
 
 func (rw *restoreWriter) writeRecord(record *models.Record) error {
-	if len(record.Bins) == 0 {
-		rw.stats.incrRecordsSkipped()
-		return nil
-	}
-
 	writePolicy := rw.writePolicy
 	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {
 		setGenerationPolicy := *rw.writePolicy

@@ -203,12 +203,12 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 	namespaceSet := newTokenWorker(newChangeNamespaceProcessor(rh.config.Namespace))
 	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
-	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList))
+	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
 	tpsLimiter := newTokenWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
 	bandwidthLimiter := newTokenWorker(newBandwidthLimiter(rh.config.Bandwidth))
 	tokenTypeFilter := newTokenWorker(
 		newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
-	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList))
+	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList, &rh.stats.recordsSkipped))
 
 	job := pipeline.NewPipeline(
 		readWorkers,
@@ -216,6 +216,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		// in the pipeline, first all filters.
 		tokenTypeFilter,
 		recordSetFilter,
+		binFilters,
 
 		// speed limiters.
 		tpsLimiter,
@@ -224,7 +225,6 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		// modifications.
 		namespaceSet,
 		ttlSetters,
-		binFilters,
 
 		writeWorkers,
 	)
@@ -248,7 +248,7 @@ type RestoreStats struct {
 	// The number of records dropped because they were expired.
 	recordsExpired atomic.Uint64
 	// The number of records dropped because they didn't contain any of the
-	// selected bins or didn't belong to any of the the selected sets.
+	// selected bins or didn't belong to any of the selected sets.
 	recordsSkipped atomic.Uint64
 	// The number of records dropped because the database already contained the
 	// records with a higher generation count.

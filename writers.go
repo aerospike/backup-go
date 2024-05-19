@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/time/rate"
 	"io"
 	"log/slog"
 
@@ -44,6 +45,7 @@ type dataWriter[T any] interface {
 type writeWorker[T any] struct {
 	dataWriter[T]
 	receive <-chan T
+	limiter *rate.Limiter
 }
 
 // newWriteWorker creates a new WriteWorker
@@ -76,9 +78,12 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 			if !active {
 				return nil
 			}
-
-			if _, err := w.Write(data); err != nil {
+			n, err := w.Write(data)
+			if err != nil {
 				return err
+			}
+			if w.limiter != nil {
+				w.limiter.WaitN(context.TODO(), n)
 			}
 		}
 	}

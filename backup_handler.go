@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"golang.org/x/time/rate"
 	"io"
 	"log/slog"
 	"sync/atomic"
@@ -92,6 +93,11 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
 	bh.stats.start = time.Now()
 
+	var limiter *rate.Limiter
+	if bh.config.Bandwidth > 0 {
+		limiter = rate.NewLimiter(rate.Limit(bh.config.Bandwidth), bh.config.Bandwidth)
+	}
+
 	go doWork(bh.errors, bh.logger, func() error {
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
 
@@ -141,6 +147,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
 			writeWorkers[i] = newWriteWorker(dataWriter)
+			writeWorkers[i].limiter = limiter
 		}
 
 		if bh.config.NoRecords {

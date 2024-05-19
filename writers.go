@@ -253,7 +253,14 @@ func (rw *restoreWriter) writeRecord(record *models.Record) error {
 		return nil
 	}
 
-	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
+	writePolicy := rw.writePolicy
+	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {
+		setGenerationPolicy := *rw.writePolicy
+		setGenerationPolicy.Generation = record.Generation
+		writePolicy = &setGenerationPolicy
+	}
+
+	aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
 	if aerr != nil {
 		if aerr.Matches(atypes.GENERATION_ERROR) {
 			rw.stats.incrRecordsFresher()

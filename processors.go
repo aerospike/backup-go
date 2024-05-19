@@ -283,7 +283,11 @@ type tpsLimiter[T any] struct {
 
 // newTPSLimiter Create a new TPS limiter.
 // n — allowed  number of tokens per second, n = 0 means no limit.
-func newTPSLimiter[T any](n int) *tpsLimiter[T] {
+func newTPSLimiter[T any](n int) dataProcessor[T] {
+	if n == 0 {
+		return &noopProcessor[T]{}
+	}
+
 	return &tpsLimiter[T]{
 		tps:     n,
 		limiter: rate.NewLimiter(rate.Limit(n), 1),
@@ -313,7 +317,11 @@ type bandwidthLimiter struct {
 
 // newBandwidthLimiter creates a new bandwidth limiter.
 // n — allowed number of bytes per second, n = 0 means no limit.
-func newBandwidthLimiter(n int) *bandwidthLimiter {
+func newBandwidthLimiter(n int) dataProcessor[*models.Token] {
+	if n == 0 {
+		return &noopProcessor[*models.Token]{}
+	}
+
 	return &bandwidthLimiter{
 		bps:     n,
 		limiter: rate.NewLimiter(rate.Limit(n), n), // n tokens per second, with burst size of n
@@ -333,6 +341,14 @@ func (b *bandwidthLimiter) Process(token *models.Token) (*models.Token, error) {
 	return token, nil
 }
 
+// noopProcessor is a no-op implementation of a processor.
+type noopProcessor[T any] struct{}
+
+// Process just passes the token through for noopProcessor.
+func (n *noopProcessor[T]) Process(token T) (T, error) {
+	return token, nil
+}
+
 // tokenTypeFilterProcessor is used to support no-records, no-indexes and no-udf flags.
 type tokenTypeProcessor struct {
 	noRecords bool
@@ -341,7 +357,11 @@ type tokenTypeProcessor struct {
 }
 
 // newTokenTypeFilterProcessor creates new tokenTypeFilterProcessor
-func newTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) *tokenTypeProcessor {
+func newTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) dataProcessor[*models.Token] {
+	if !noRecords && !noIndexes && !noUdf {
+		return &noopProcessor[*models.Token]{}
+	}
+
 	return &tokenTypeProcessor{
 		noRecords: noRecords,
 		noIndexes: noIndexes,

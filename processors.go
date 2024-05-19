@@ -207,6 +207,27 @@ func (b binFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 	return token, nil
 }
 
+type recordCounter struct {
+	counter *atomic.Uint64
+}
+
+func newRecordCounter(counter *atomic.Uint64) *recordCounter {
+	return &recordCounter{
+		counter: counter,
+	}
+}
+
+func (b recordCounter) Process(token *models.Token) (*models.Token, error) {
+	// if the token is not a record, we don't need to process it
+	if token.Type != models.TokenTypeRecord {
+		return token, nil
+	}
+
+	b.counter.Add(1)
+
+	return token, nil
+}
+
 // setFilterProcessor filter records by set.
 type setFilterProcessor struct {
 	setsToRestore map[string]bool

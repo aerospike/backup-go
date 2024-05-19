@@ -123,7 +123,6 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 
 	switch data.Type {
 	case models.TokenTypeRecord:
-		tw.stats.addTotalRecords(1)
 	case models.TokenTypeUDF:
 		tw.stats.addUDFs(1)
 	case models.TokenTypeSIndex:

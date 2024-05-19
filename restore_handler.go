@@ -201,6 +201,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		readWorkers[i] = r
 	}
 
+	recordCounter := newTokenWorker(newRecordCounter(&rh.stats.recordsTotal))
 	namespaceSet := newTokenWorker(newChangeNamespaceProcessor(rh.config.Namespace))
 	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
 	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
@@ -214,6 +215,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		readWorkers,
 
 		// in the pipeline, first all filters.
+		recordCounter,
 		tokenTypeFilter,
 		recordSetFilter,
 		binFilters,

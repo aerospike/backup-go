@@ -207,7 +207,8 @@ type BackupConfig struct {
 	// Don't backup any secondary indexes.
 	NoIndexes bool
 	// Don't backup any UDFs.
-	NoUDFs bool
+	NoUDFs    bool
+	Bandwidth int
 }
 
 func (c *BackupConfig) validate() error {

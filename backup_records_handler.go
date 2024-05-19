@@ -81,10 +81,14 @@ func (bh *backupRecordsHandler) run(ctx context.Context, writers []*writeWorker[
 	for i, w := range writers {
 		writeWorkers[i] = w
 	}
+
 	recordCounter := newTokenWorker(newRecordCounter(recordsTotal))
+	bandwidthLimiter := newTokenWorker(newBandwidthLimiter(bh.config.Bandwidth))
+
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
 		recordCounter,
+		bandwidthLimiter,
 		processorWorkers,
 		writeWorkers,
 	)

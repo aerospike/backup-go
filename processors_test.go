@@ -21,6 +21,7 @@ import (
 	"math"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -607,6 +608,7 @@ func TestSetFilter(t *testing.T) {
 				setsToRestore: map[string]bool{
 					"anotherSet": true,
 				},
+				skipped: &atomic.Uint64{},
 			},
 			shouldBeFiltered: true,
 		},

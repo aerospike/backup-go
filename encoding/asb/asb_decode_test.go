@@ -3688,7 +3688,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					BinName: "bin1",
 					BinType: models.NumericSIDataType,
 				},
-			}, 0),
+			}, 42),
 			wantErr: false,
 		},
 		{
@@ -3718,7 +3718,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					Generation: 10,
 				},
 				VoidTime: 10,
-			}, 0),
+			}, 106),
 		},
 		{
 			name: "negative EOF",

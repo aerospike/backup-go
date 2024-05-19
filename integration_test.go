@@ -435,7 +435,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 			VoidTime: 1,
 		}
 
-		token := models.NewRecordToken(modelRec)
+		token := models.NewRecordToken(modelRec, 0)
 		v, err := encoder.EncodeToken(token)
 		if err != nil {
 			suite.FailNow(err.Error())

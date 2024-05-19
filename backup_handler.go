@@ -16,7 +16,6 @@ package backup
 
 import (
 	"context"
-	"golang.org/x/time/rate"
 	"io"
 	"log/slog"
 	"sync/atomic"
@@ -29,6 +28,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
 // WriteFactory provides access to back up storage.
@@ -138,7 +138,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 			// like records and back them up as part of the same pipeline
 			// but doing so would cause them to be mixed in with records in the backup file(s)
 			if i == 0 {
-				err := bh.backupSIndexesAndUdfs(ctx, writer)
+				err := bh.backupSIndexesAndUdfs(ctx, writer, limiter)
 				if err != nil {
 					return err
 				}
@@ -146,8 +146,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
-			writeWorkers[i] = newWriteWorker(dataWriter)
-			writeWorkers[i].limiter = limiter
+			writeWorkers[i] = newWriteWorkerWithLimit(dataWriter, limiter)
 		}
 
 		if bh.config.NoRecords {
@@ -161,16 +160,16 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	})
 }
 
-func (bh *BackupHandler) backupSIndexesAndUdfs(ctx context.Context, writer io.WriteCloser) error {
+func (bh *BackupHandler) backupSIndexesAndUdfs(ctx context.Context, writer io.WriteCloser, limiter *rate.Limiter) error {
 	if !bh.config.NoIndexes {
-		err := backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
+		err := backupSIndexes(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger, limiter)
 		if err != nil {
 			return err
 		}
 	}
 
 	if !bh.config.NoUDFs {
-		err := backupUDFs(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger)
+		err := backupUDFs(ctx, bh.aerospikeClient, bh.config, &bh.stats, writer, bh.logger, limiter)
 		if err != nil {
 			return err
 		}
@@ -206,14 +205,7 @@ func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) (i
 	return 0, nil
 }
 
-func backupSIndexes(
-	ctx context.Context,
-	ac *a.Client,
-	config *BackupConfig,
-	stats *BackupStats,
-	writer io.Writer,
-	logger *slog.Logger,
-) error {
+func backupSIndexes(ctx context.Context, ac *a.Client, config *BackupConfig, stats *BackupStats, writer io.Writer, logger *slog.Logger, limiter *rate.Limiter) error {
 	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
 	if err != nil {
 		return err
@@ -229,7 +221,7 @@ func backupSIndexes(
 
 	var sindexWriter dataWriter[*models.Token] = newTokenWriter(sindexEncoder, writer, logger)
 	sindexWriter = newWriterWithTokenStats(sindexWriter, stats, logger)
-	sindexWriteWorker := newWriteWorker(sindexWriter)
+	sindexWriteWorker := newWriteWorkerWithLimit(sindexWriter, limiter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
@@ -244,14 +236,7 @@ func backupSIndexes(
 	return err
 }
 
-func backupUDFs(
-	ctx context.Context,
-	ac *a.Client,
-	config *BackupConfig,
-	stats *BackupStats,
-	writer io.Writer,
-	logger *slog.Logger,
-) error {
+func backupUDFs(ctx context.Context, ac *a.Client, config *BackupConfig, stats *BackupStats, writer io.Writer, logger *slog.Logger, limiter *rate.Limiter) error {
 	infoClient, err := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy)
 	if err != nil {
 		return err
@@ -267,7 +252,7 @@ func backupUDFs(
 
 	var udfWriter dataWriter[*models.Token] = newTokenWriter(udfEncoder, writer, logger)
 	udfWriter = newWriterWithTokenStats(udfWriter, stats, logger)
-	udfWriteWorker := newWriteWorker(udfWriter)
+	udfWriteWorker := newWriteWorkerWithLimit(udfWriter, limiter)
 
 	udfPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{udfReadWorker},

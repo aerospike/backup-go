@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"io"
 	"log/slog"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
 // **** Write Worker ****
@@ -55,6 +55,13 @@ func newWriteWorker[T any](writer dataWriter[T]) *writeWorker[T] {
 	}
 }
 
+func newWriteWorkerWithLimit[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
+	return &writeWorker[T]{
+		dataWriter: writer,
+		limiter:    limiter,
+	}
+}
+
 // SetReceiveChan sets the receive channel for the WriteWorker
 func (w *writeWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
@@ -78,12 +85,14 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 			if !active {
 				return nil
 			}
+
 			n, err := w.Write(data)
 			if err != nil {
 				return err
 			}
+
 			if w.limiter != nil {
-				w.limiter.WaitN(context.TODO(), n)
+				_ = w.limiter.WaitN(ctx, n)
 			}
 		}
 	}
@@ -236,6 +245,7 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy,
 // TODO support batch writes
 func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	rw.stats.addTotalSize(data.Size)
+
 	switch data.Type {
 	case models.TokenTypeRecord:
 		return 1, rw.writeRecord(&data.Record)

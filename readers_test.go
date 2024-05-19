@@ -106,7 +106,7 @@ func (suite *readersTestSuite) TestGenericReader() {
 			Key: key,
 		},
 	}
-	expectedRecToken := models.NewRecordToken(mockRec)
+	expectedRecToken := models.NewRecordToken(mockRec, 0)
 
 	mockDecoder := encmocks.NewDecoder(suite.T())
 	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
@@ -174,7 +174,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	expectedRecToken := models.NewRecordToken(mockRec)
+	expectedRecToken := models.NewRecordToken(mockRec, 0)
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }
@@ -370,7 +370,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	expectedRecToken := models.NewRecordToken(mockRec)
+	expectedRecToken := models.NewRecordToken(mockRec, 0)
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }
@@ -395,7 +395,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 
 	expectedSIndexTokens := make([]*models.Token, 0, len(mockSIndexes))
 	for _, sindex := range mockSIndexes {
-		expectedSIndexTokens = append(expectedSIndexTokens, models.NewSIndexToken(sindex))
+		expectedSIndexTokens = append(expectedSIndexTokens, models.NewSIndexToken(sindex, 0))
 	}
 
 	v, err := reader.Read()
@@ -452,7 +452,7 @@ func (suite *readersTestSuite) TestUDFReader() {
 
 	expectedUDFTokens := make([]*models.Token, 0, len(mockUDFs))
 	for _, udf := range mockUDFs {
-		expectedUDFTokens = append(expectedUDFTokens, models.NewUDFToken(udf))
+		expectedUDFTokens = append(expectedUDFTokens, models.NewUDFToken(udf, 0))
 	}
 
 	v, err := reader.Read()

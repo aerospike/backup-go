@@ -205,6 +205,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
 	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList))
 	tpsLimiter := newTokenWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
+	bandwidthLimiter := newTokenWorker(newBandwidthLimiter(rh.config.Bandwidth))
 	tokenTypeFilter := newTokenWorker(
 		newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
 	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList))
@@ -218,6 +219,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 		// speed limiters.
 		tpsLimiter,
+		bandwidthLimiter,
 
 		// modifications.
 		namespaceSet,

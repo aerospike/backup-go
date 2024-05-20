@@ -188,11 +188,11 @@ type BackupConfig struct {
 	// ScanPolicy applies to Aerospike scan operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	ScanPolicy *a.ScanPolicy
-	// Namespace is the Aerospike namespace to backup.
 	// Only include records that last changed before the given time (optional).
 	ModBefore *time.Time
 	// Only include records that last changed after the given time (optional).
-	ModAfter  *time.Time
+	ModAfter *time.Time
+	// Namespace is the Aerospike namespace to backup.
 	Namespace string
 	// SetList is the Aerospike set to backup (optional, given an empty list, all sets will be backed up).
 	SetList []string
@@ -208,6 +208,9 @@ type BackupConfig struct {
 	NoIndexes bool
 	// Don't backup any UDFs.
 	NoUDFs bool
+	// Limits backup bandwidth (bytes per second).
+	// Will not apply rps limit if Bandwidth is zero (default).
+	Bandwidth int
 }
 
 func (c *BackupConfig) validate() error {
@@ -219,9 +222,12 @@ func (c *BackupConfig) validate() error {
 		return errors.New("modified before should be strictly greater than modified after")
 	}
 
-	err := c.Partitions.validate()
-	if err != nil {
+	if err := c.Partitions.validate(); err != nil {
 		return err
+	}
+
+	if c.Bandwidth < 0 {
+		return fmt.Errorf("bandwidth value should not be negative, got %d", c.Bandwidth)
 	}
 
 	return nil
@@ -296,6 +302,9 @@ type RestoreConfig struct {
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
+	// Limits restore bandwidth (bytes per second).
+	// Will not apply rps limit if Bandwidth is zero (default).
+	Bandwidth int
 	// Don't restore any records.
 	NoRecords bool
 	// Don't restore any secondary indexes.
@@ -339,6 +348,14 @@ func (c *RestoreConfig) validate() error {
 		if err := c.Namespace.Validate(); err != nil {
 			return fmt.Errorf("invalid restore namespace: %w", err)
 		}
+	}
+
+	if c.Bandwidth < 0 {
+		return fmt.Errorf("bandwidth value should not be negative, got %d", c.Bandwidth)
+	}
+
+	if c.RecordsPerSecond < 0 {
+		return fmt.Errorf("records per second value should not be negative, got %d", c.RecordsPerSecond)
 	}
 
 	return nil

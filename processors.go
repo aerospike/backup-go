@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
@@ -170,12 +171,14 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 // binFilterProcessor will remove bins with names in binsToRemove from every record it receives.
 type binFilterProcessor struct {
 	binsToRemove map[string]bool
+	skipped      *atomic.Uint64
 }
 
 // newProcessorBinFilter creates new binFilterProcessor with given binList.
-func newProcessorBinFilter(binList []string) *binFilterProcessor {
+func newProcessorBinFilter(binList []string, skipped *atomic.Uint64) *binFilterProcessor {
 	return &binFilterProcessor{
 		binsToRemove: util.ListToMap(binList),
+		skipped:      skipped,
 	}
 }
 
@@ -196,18 +199,62 @@ func (b binFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 		}
 	}
 
+	if len(token.Record.Bins) == 0 {
+		b.skipped.Add(1)
+		return nil, errFilteredOut
+	}
+
+	return token, nil
+}
+
+type recordCounter struct {
+	counter *atomic.Uint64
+}
+
+func newRecordCounter(counter *atomic.Uint64) *recordCounter {
+	return &recordCounter{
+		counter: counter,
+	}
+}
+
+func (c recordCounter) Process(token *models.Token) (*models.Token, error) {
+	// if the token is not a record, we don't need to process it
+	if token.Type != models.TokenTypeRecord {
+		return token, nil
+	}
+
+	c.counter.Add(1)
+
+	return token, nil
+}
+
+type sizeCounter struct {
+	counter *atomic.Uint64
+}
+
+func newSizeCounter(counter *atomic.Uint64) *sizeCounter {
+	return &sizeCounter{
+		counter: counter,
+	}
+}
+
+func (c sizeCounter) Process(token *models.Token) (*models.Token, error) {
+	c.counter.Add(token.Size)
+
 	return token, nil
 }
 
 // setFilterProcessor filter records by set.
 type setFilterProcessor struct {
 	setsToRestore map[string]bool
+	skipped       *atomic.Uint64
 }
 
 // newProcessorSetFilter creates new setFilterProcessor with given setList.
-func newProcessorSetFilter(setList []string) *setFilterProcessor {
+func newProcessorSetFilter(setList []string, skipped *atomic.Uint64) *setFilterProcessor {
 	return &setFilterProcessor{
 		setsToRestore: util.ListToMap(setList),
+		skipped:       skipped,
 	}
 }
 
@@ -227,6 +274,8 @@ func (b setFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 	if b.setsToRestore[set] {
 		return token, nil
 	}
+
+	b.skipped.Add(1)
 
 	return nil, errFilteredOut
 }
@@ -283,7 +332,11 @@ type tpsLimiter[T any] struct {
 
 // newTPSLimiter Create a new TPS limiter.
 // n — allowed  number of tokens per second, n = 0 means no limit.
-func newTPSLimiter[T any](n int) *tpsLimiter[T] {
+func newTPSLimiter[T any](n int) dataProcessor[T] {
+	if n == 0 {
+		return &noopProcessor[T]{}
+	}
+
 	return &tpsLimiter[T]{
 		tps:     n,
 		limiter: rate.NewLimiter(rate.Limit(n), 1),
@@ -304,6 +357,14 @@ func (t *tpsLimiter[T]) Process(token T) (T, error) {
 	return token, nil
 }
 
+// noopProcessor is a no-op implementation of a processor.
+type noopProcessor[T any] struct{}
+
+// Process just passes the token through for noopProcessor.
+func (n *noopProcessor[T]) Process(token T) (T, error) {
+	return token, nil
+}
+
 // tokenTypeFilterProcessor is used to support no-records, no-indexes and no-udf flags.
 type tokenTypeProcessor struct {
 	noRecords bool
@@ -312,7 +373,11 @@ type tokenTypeProcessor struct {
 }
 
 // newTokenTypeFilterProcessor creates new tokenTypeFilterProcessor
-func newTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) *tokenTypeProcessor {
+func newTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) dataProcessor[*models.Token] {
+	if !noRecords && !noIndexes && !noUdf {
+		return &noopProcessor[*models.Token]{}
+	}
+
 	return &tokenTypeProcessor{
 		noRecords: noRecords,
 		noIndexes: noIndexes,
@@ -343,7 +408,11 @@ type changeNamespaceProcessor struct {
 }
 
 // newChangeNamespaceProcessor creates new changeNamespaceProcessor
-func newChangeNamespaceProcessor(namespace *RestoreNamespace) *changeNamespaceProcessor {
+func newChangeNamespaceProcessor(namespace *RestoreNamespace) dataProcessor[*models.Token] {
+	if namespace == nil {
+		return &noopProcessor[*models.Token]{}
+	}
+
 	return &changeNamespaceProcessor{
 		namespace,
 	}
@@ -353,10 +422,6 @@ func newChangeNamespaceProcessor(namespace *RestoreNamespace) *changeNamespacePr
 func (p changeNamespaceProcessor) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
-		return token, nil
-	}
-
-	if p.restoreNamespace == nil {
 		return token, nil
 	}
 

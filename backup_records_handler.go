@@ -17,6 +17,7 @@ package backup
 import (
 	"context"
 	"log/slog"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
@@ -40,7 +41,11 @@ func newBackupRecordsHandler(config *BackupConfig, ac *a.Client, logger *slog.Lo
 	}
 }
 
-func (bh *backupRecordsHandler) run(ctx context.Context, writers []*writeWorker[*models.Token]) error {
+func (bh *backupRecordsHandler) run(
+	ctx context.Context,
+	writers []*writeWorker[*models.Token],
+	recordsTotal *atomic.Uint64,
+) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
@@ -81,8 +86,11 @@ func (bh *backupRecordsHandler) run(ctx context.Context, writers []*writeWorker[
 		writeWorkers[i] = w
 	}
 
+	recordCounter := newTokenWorker(newRecordCounter(recordsTotal))
+
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
+		recordCounter,
 		processorWorkers,
 		writeWorkers,
 	)

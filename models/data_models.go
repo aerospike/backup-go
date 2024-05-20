@@ -104,28 +104,32 @@ type Token struct {
 	UDF    *UDF
 	Record Record
 	Type   TokenType
+	Size   uint64
 }
 
 // NewRecordToken creates a new token with the given record
-func NewRecordToken(r Record) *Token {
+func NewRecordToken(r Record, size uint64) *Token {
 	return &Token{
 		Record: r,
 		Type:   TokenTypeRecord,
+		Size:   size,
 	}
 }
 
 // NewSIndexToken creates a new token with the given secondary index
-func NewSIndexToken(s *SIndex) *Token {
+func NewSIndexToken(s *SIndex, size uint64) *Token {
 	return &Token{
 		SIndex: s,
 		Type:   TokenTypeSIndex,
+		Size:   size,
 	}
 }
 
 // NewUDFToken creates a new token with the given UDF
-func NewUDFToken(u *UDF) *Token {
+func NewUDFToken(u *UDF, size uint64) *Token {
 	return &Token{
 		UDF:  u,
 		Type: TokenTypeUDF,
+		Size: size,
 	}
 }

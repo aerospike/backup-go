@@ -183,6 +183,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	rh.logger.Debug("running restore base handler")
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+	limiter := makeBandwidthLimiter(rh.config.Bandwidth)
 
 	for i := 0; i < rh.config.Parallel; i++ {
 		var writer dataWriter[*models.Token] = newRestoreWriter(
@@ -193,7 +194,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		)
 
 		writer = newWriterWithTokenStats(writer, rh.stats, rh.logger)
-		writeWorkers[i] = newWriteWorker(writer)
+		writeWorkers[i] = newWriteWorker(writer, limiter)
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
@@ -201,20 +202,27 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		readWorkers[i] = r
 	}
 
+	recordCounter := newTokenWorker(newRecordCounter(&rh.stats.recordsTotal))
+	sizeCounter := newTokenWorker(newSizeCounter(&rh.stats.totalSize))
 	namespaceSet := newTokenWorker(newChangeNamespaceProcessor(rh.config.Namespace))
 	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
-	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList))
+	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
 	tpsLimiter := newTokenWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
 	tokenTypeFilter := newTokenWorker(
 		newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
-	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList))
+	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList, &rh.stats.recordsSkipped))
 
 	job := pipeline.NewPipeline(
 		readWorkers,
 
-		// in the pipeline, first all filters.
+		// in the pipeline, first all counters.
+		recordCounter,
+		sizeCounter,
+
+		// filters
 		tokenTypeFilter,
 		recordSetFilter,
+		binFilters,
 
 		// speed limiters.
 		tpsLimiter,
@@ -222,7 +230,6 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		// modifications.
 		namespaceSet,
 		ttlSetters,
-		binFilters,
 
 		writeWorkers,
 	)
@@ -246,7 +253,7 @@ type RestoreStats struct {
 	// The number of records dropped because they were expired.
 	recordsExpired atomic.Uint64
 	// The number of records dropped because they didn't contain any of the
-	// selected bins or didn't belong to any of the the selected sets.
+	// selected bins or didn't belong to any of the selected sets.
 	recordsSkipped atomic.Uint64
 	// The number of records dropped because the database already contained the
 	// records with a higher generation count.
@@ -270,9 +277,6 @@ func (rs *RestoreStats) GetRecordsSkipped() uint64 {
 	return rs.recordsSkipped.Load()
 }
 
-func (rs *RestoreStats) incrRecordsSkipped() {
-	rs.recordsSkipped.Add(1)
-}
 func (rs *RestoreStats) GetRecordsFresher() uint64 {
 	return rs.recordsFresher.Load()
 }

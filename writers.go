@@ -27,6 +27,7 @@ import (
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
 // **** Write Worker ****
@@ -44,12 +45,13 @@ type dataWriter[T any] interface {
 type writeWorker[T any] struct {
 	dataWriter[T]
 	receive <-chan T
+	limiter *rate.Limiter
 }
 
-// newWriteWorker creates a new WriteWorker
-func newWriteWorker[T any](writer dataWriter[T]) *writeWorker[T] {
+func newWriteWorker[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
 	return &writeWorker[T]{
 		dataWriter: writer,
+		limiter:    limiter,
 	}
 }
 
@@ -77,8 +79,15 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 				return nil
 			}
 
-			if _, err := w.Write(data); err != nil {
+			n, err := w.Write(data)
+			if err != nil {
 				return err
+			}
+
+			if w.limiter != nil {
+				if err := w.limiter.WaitN(ctx, n); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -90,7 +99,6 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 //
 //go:generate mockery --name statsSetterToken --inpackage --exported=false
 type statsSetterToken interface {
-	addTotalRecords(uint64)
 	addUDFs(uint32)
 	addSIndexes(uint32)
 	addTotalSize(uint64)
@@ -123,7 +131,6 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 
 	switch data.Type {
 	case models.TokenTypeRecord:
-		tw.stats.addTotalRecords(1)
 	case models.TokenTypeUDF:
 		tw.stats.addUDFs(1)
 	case models.TokenTypeSIndex:
@@ -234,11 +241,11 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy,
 func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	switch data.Type {
 	case models.TokenTypeRecord:
-		return 1, rw.writeRecord(&data.Record)
+		return int(data.Size), rw.writeRecord(&data.Record)
 	case models.TokenTypeUDF:
-		return 1, rw.writeUDF(data.UDF)
+		return int(data.Size), rw.writeUDF(data.UDF)
 	case models.TokenTypeSIndex:
-		return 1, rw.writeSecondaryIndex(data.SIndex)
+		return int(data.Size), rw.writeSecondaryIndex(data.SIndex)
 	case models.TokenTypeInvalid:
 		return 0, errors.New("invalid token")
 	default:
@@ -247,12 +254,14 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 }
 
 func (rw *restoreWriter) writeRecord(record *models.Record) error {
-	if len(record.Bins) == 0 {
-		rw.stats.incrRecordsSkipped()
-		return nil
+	writePolicy := rw.writePolicy
+	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {
+		setGenerationPolicy := *rw.writePolicy
+		setGenerationPolicy.Generation = record.Generation
+		writePolicy = &setGenerationPolicy
 	}
 
-	aerr := rw.asc.Put(rw.writePolicy, record.Key, record.Bins)
+	aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
 	if aerr != nil {
 		if aerr.Matches(atypes.GENERATION_ERROR) {
 			rw.stats.incrRecordsFresher()

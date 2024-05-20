@@ -399,7 +399,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
-	suite.Require().Equal(uint64(20011), statsRestore.GetTotalSize())
+	suite.Require().Less(dirSize, statsRestore.GetTotalSize()) // restore size doesn't include asb control characters
 
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
@@ -435,7 +435,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 			VoidTime: 1,
 		}
 
-		token := models.NewRecordToken(modelRec)
+		token := models.NewRecordToken(modelRec, 0)
 		v, err := encoder.EncodeToken(token)
 		if err != nil {
 			suite.FailNow(err.Error())
@@ -467,7 +467,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 
 	statsRestore := rh.GetStats()
 	suite.NotNil(statsRestore)
-	suite.Equal(uint64(0), statsRestore.GetRecordsTotal())
+	suite.Equal(uint64(numRec), statsRestore.GetRecordsTotal())
 	suite.Equal(uint64(numRec), statsRestore.GetRecordsExpired())
 }
 

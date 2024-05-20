@@ -217,13 +217,29 @@ func newRecordCounter(counter *atomic.Uint64) *recordCounter {
 	}
 }
 
-func (b recordCounter) Process(token *models.Token) (*models.Token, error) {
+func (c recordCounter) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 
-	b.counter.Add(1)
+	c.counter.Add(1)
+
+	return token, nil
+}
+
+type sizeCounter struct {
+	counter *atomic.Uint64
+}
+
+func newSizeCounter(counter *atomic.Uint64) *sizeCounter {
+	return &sizeCounter{
+		counter: counter,
+	}
+}
+
+func (c sizeCounter) Process(token *models.Token) (*models.Token, error) {
+	c.counter.Add(token.Size)
 
 	return token, nil
 }

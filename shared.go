@@ -90,10 +90,14 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 }
 
 type tokenStats struct {
-	recordsTotal atomic.Uint64 // number of records read from source, before any filtering.
-	sIndexes     atomic.Uint32
-	uDFs         atomic.Uint32
-	totalSize    atomic.Uint64
+	// number of records read from source, before any filtering.
+	recordsTotal atomic.Uint64
+	// The number of successfully created secondary indexes.
+	sIndexes atomic.Uint32
+	// The number of successfully stored UDF files.
+	uDFs atomic.Uint32
+	// The total number of bytes read from the backup file(s) so far.
+	totalSize atomic.Uint64
 }
 
 func (bs *tokenStats) GetRecordsTotal() uint64 {

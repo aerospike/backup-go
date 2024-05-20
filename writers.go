@@ -85,7 +85,7 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 			}
 
 			if w.limiter != nil {
-				if err = w.limiter.WaitN(ctx, n); err != nil {
+				if err := w.limiter.WaitN(ctx, n); err != nil {
 					return err
 				}
 			}

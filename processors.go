@@ -341,39 +341,6 @@ func (t *tpsLimiter[T]) Process(token T) (T, error) {
 	return token, nil
 }
 
-// bandwidthLimiter is a type representing a Bandwidth Per Second limiter.
-// It does not allow processing more than bps bytes per second.
-type bandwidthLimiter struct {
-	limiter *rate.Limiter
-	bps     int
-}
-
-// newBandwidthLimiter creates a new bandwidth limiter.
-// n — allowed number of bytes per second, n = 0 means no limit.
-func newBandwidthLimiter(n int) dataProcessor[*models.Token] {
-	if n == 0 {
-		return &noopProcessor[*models.Token]{}
-	}
-
-	return &bandwidthLimiter{
-		bps:     n,
-		limiter: rate.NewLimiter(rate.Limit(n), n), // n tokens per second, with burst size of n
-	}
-}
-
-// Process delays pipeline if it's needed to match desired bandwidth.
-func (b *bandwidthLimiter) Process(token *models.Token) (*models.Token, error) {
-	if b.bps == 0 {
-		return token, nil
-	}
-
-	if err := b.limiter.WaitN(context.Background(), int(token.Size)); err != nil {
-		return nil, err
-	}
-
-	return token, nil
-}
-
 // noopProcessor is a no-op implementation of a processor.
 type noopProcessor[T any] struct{}
 

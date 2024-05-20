@@ -183,6 +183,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	rh.logger.Debug("running restore base handler")
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+	limiter := makeBandwidthLimiter(rh.config.Bandwidth)
 
 	for i := 0; i < rh.config.Parallel; i++ {
 		var writer dataWriter[*models.Token] = newRestoreWriter(
@@ -193,7 +194,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		)
 
 		writer = newWriterWithTokenStats(writer, rh.stats, rh.logger)
-		writeWorkers[i] = newWriteWorker(writer)
+		writeWorkers[i] = newWriteWorkerWithLimit(writer, limiter)
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
@@ -206,7 +207,6 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
 	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
 	tpsLimiter := newTokenWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
-	bandwidthLimiter := newTokenWorker(newBandwidthLimiter(rh.config.Bandwidth))
 	tokenTypeFilter := newTokenWorker(
 		newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
 	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList, &rh.stats.recordsSkipped))
@@ -222,7 +222,6 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 
 		// speed limiters.
 		tpsLimiter,
-		bandwidthLimiter,
 
 		// modifications.
 		namespaceSet,

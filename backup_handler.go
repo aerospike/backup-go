@@ -93,10 +93,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
 	bh.stats.start = time.Now()
 
-	var limiter *rate.Limiter
-	if bh.config.Bandwidth > 0 {
-		limiter = rate.NewLimiter(rate.Limit(bh.config.Bandwidth), bh.config.Bandwidth)
-	}
+	limiter := makeBandwidthLimiter(bh.config.Bandwidth)
 
 	go doWork(bh.errors, bh.logger, func() error {
 		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
@@ -158,6 +155,14 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 		return handler.run(ctx, writeWorkers, &bh.stats.recordsTotal)
 	})
+}
+
+func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
+	if bandwidth > 0 {
+		return rate.NewLimiter(rate.Limit(bandwidth), bandwidth)
+	}
+
+	return nil
 }
 
 func (bh *BackupHandler) backupSIndexesAndUdfs(

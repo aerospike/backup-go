@@ -209,6 +209,7 @@ type BackupConfig struct {
 	// Don't backup any UDFs.
 	NoUDFs bool
 	// Limits backup bandwidth (bytes per second).
+	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
 }
 
@@ -221,9 +222,12 @@ func (c *BackupConfig) validate() error {
 		return errors.New("modified before should be strictly greater than modified after")
 	}
 
-	err := c.Partitions.validate()
-	if err != nil {
+	if err := c.Partitions.validate(); err != nil {
 		return err
+	}
+
+	if c.Bandwidth < 0 {
+		return fmt.Errorf("bandwidth value should not be negative, got %d", c.Bandwidth)
 	}
 
 	return nil
@@ -299,6 +303,7 @@ type RestoreConfig struct {
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
 	// Limits restore bandwidth (bytes per second).
+	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
 	// Don't restore any records.
 	NoRecords bool
@@ -343,6 +348,14 @@ func (c *RestoreConfig) validate() error {
 		if err := c.Namespace.Validate(); err != nil {
 			return fmt.Errorf("invalid restore namespace: %w", err)
 		}
+	}
+
+	if c.Bandwidth < 0 {
+		return fmt.Errorf("bandwidth value should not be negative, got %d", c.Bandwidth)
+	}
+
+	if c.RecordsPerSecond < 0 {
+		return fmt.Errorf("records per second value should not be negative, got %d", c.RecordsPerSecond)
 	}
 
 	return nil

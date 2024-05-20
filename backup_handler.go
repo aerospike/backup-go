@@ -143,7 +143,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
-			writeWorkers[i] = newWriteWorkerWithLimit(dataWriter, limiter)
+			writeWorkers[i] = newWriteWorker(dataWriter, limiter)
 		}
 
 		if bh.config.NoRecords {
@@ -237,7 +237,7 @@ func backupSIndexes(ctx context.Context,
 
 	var sindexWriter dataWriter[*models.Token] = newTokenWriter(sindexEncoder, writer, logger)
 	sindexWriter = newWriterWithTokenStats(sindexWriter, stats, logger)
-	sindexWriteWorker := newWriteWorkerWithLimit(sindexWriter, limiter)
+	sindexWriteWorker := newWriteWorker(sindexWriter, limiter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
@@ -275,7 +275,7 @@ func backupUDFs(ctx context.Context,
 
 	var udfWriter dataWriter[*models.Token] = newTokenWriter(udfEncoder, writer, logger)
 	udfWriter = newWriterWithTokenStats(udfWriter, stats, logger)
-	udfWriteWorker := newWriteWorkerWithLimit(udfWriter, limiter)
+	udfWriteWorker := newWriteWorker(udfWriter, limiter)
 
 	udfPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{udfReadWorker},

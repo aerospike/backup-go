@@ -37,7 +37,7 @@ func (suite *writersTestSuite) TestWriteWorker() {
 	mockWriter.EXPECT().Write("test").Return(1, nil)
 	mockWriter.EXPECT().Close()
 
-	worker := newWriteWorker[string](mockWriter)
+	worker := newWriteWorker[string](mockWriter, nil)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -55,7 +55,7 @@ func (suite *writersTestSuite) TestWriteWorkerClose() {
 	mockWriter := mocks.NewDataWriter[string](suite.T())
 	mockWriter.EXPECT().Close()
 
-	worker := newWriteWorker[string](mockWriter)
+	worker := newWriteWorker[string](mockWriter, nil)
 	suite.NotNil(worker)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -70,7 +70,7 @@ func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
 	mockWriter.EXPECT().Write("test").Return(0, errors.New("error"))
 	mockWriter.EXPECT().Close()
 
-	worker := newWriteWorker[string](mockWriter)
+	worker := newWriteWorker[string](mockWriter, nil)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -230,7 +230,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 			},
 		},
 	}
-	recToken := models.NewRecordToken(expRecord, 0)
+	recToken := models.NewRecordToken(expRecord, 120)
 
 	policy := a.NewWritePolicy(1, 0)
 
@@ -242,7 +242,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	suite.NotNil(writer)
 	n, err := writer.Write(recToken)
 
-	suite.Equal(1, n)
+	suite.Equal(120, n)
 	suite.Equal(1, int(stats.GetRecordsInserted()))
 	suite.Nil(err)
 

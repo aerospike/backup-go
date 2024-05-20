@@ -48,14 +48,7 @@ type writeWorker[T any] struct {
 	limiter *rate.Limiter
 }
 
-// newWriteWorker creates a new WriteWorker
-func newWriteWorker[T any](writer dataWriter[T]) *writeWorker[T] {
-	return &writeWorker[T]{
-		dataWriter: writer,
-	}
-}
-
-func newWriteWorkerWithLimit[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
+func newWriteWorker[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
 	return &writeWorker[T]{
 		dataWriter: writer,
 		limiter:    limiter,
@@ -92,7 +85,9 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 			}
 
 			if w.limiter != nil {
-				_ = w.limiter.WaitN(ctx, n)
+				if err = w.limiter.WaitN(ctx, n); err != nil {
+					return err
+				}
 			}
 		}
 	}

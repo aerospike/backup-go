@@ -194,7 +194,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 		)
 
 		writer = newWriterWithTokenStats(writer, rh.stats, rh.logger)
-		writeWorkers[i] = newWriteWorkerWithLimit(writer, limiter)
+		writeWorkers[i] = newWriteWorker(writer, limiter)
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))

@@ -90,7 +90,7 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 }
 
 type tokenStats struct {
-	recordsTotal atomic.Uint64 // number of records read from source
+	recordsTotal atomic.Uint64 // number of records read from source, before any filtering.
 	sIndexes     atomic.Uint32
 	uDFs         atomic.Uint32
 	totalSize    atomic.Uint64

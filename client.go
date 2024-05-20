@@ -208,7 +208,7 @@ type BackupConfig struct {
 	NoIndexes bool
 	// Don't backup any UDFs.
 	NoUDFs bool
-	// Limits backup bandwidth (bytes per second)
+	// Limits backup bandwidth (bytes per second).
 	Bandwidth int
 }
 
@@ -298,7 +298,7 @@ type RestoreConfig struct {
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
-	// Limits restore bandwidth (bytes per second)
+	// Limits restore bandwidth (bytes per second).
 	Bandwidth int
 	// Don't restore any records.
 	NoRecords bool

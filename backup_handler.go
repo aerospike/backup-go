@@ -214,7 +214,8 @@ func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) (i
 	return 0, nil
 }
 
-func backupSIndexes(ctx context.Context,
+func backupSIndexes(
+	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
 	stats *BackupStats,
@@ -252,7 +253,8 @@ func backupSIndexes(ctx context.Context,
 	return err
 }
 
-func backupUDFs(ctx context.Context,
+func backupUDFs(
+	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
 	stats *BackupStats,

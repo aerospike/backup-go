@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
@@ -46,6 +47,7 @@ type writeWorker[T any] struct {
 	dataWriter[T]
 	receive <-chan T
 	limiter *rate.Limiter
+	lock    sync.Mutex
 }
 
 func newWriteWorker[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
@@ -84,13 +86,23 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 				return err
 			}
 
-			if w.limiter != nil {
-				if err := w.limiter.WaitN(ctx, n); err != nil {
-					return err
-				}
+			err = w.waitLimiter(ctx, n)
+			if err != nil {
+				return err
 			}
 		}
 	}
+}
+
+func (w *writeWorker[T]) waitLimiter(ctx context.Context, n int) error {
+	if w.limiter != nil {
+		w.lock.Lock()
+		defer w.lock.Unlock()
+		if err := w.limiter.WaitN(ctx, n); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // **** Token Stats Writer ****

@@ -120,7 +120,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 			name: "positive escaped namespace",
 			fields: fields{
 				countingByteScanner: countingByteScanner{
-					ByteScanner: strings.NewReader("# namespace ns\\\n1\n# first-file\na"),
+					ByteScanner: strings.NewReader("# namespace ns\\\n1\n# first-file\n"),
 				},
 			},
 			want: &metaData{

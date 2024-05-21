@@ -128,8 +128,8 @@ func (bs *tokenStats) addUDFs(num uint32) {
 	bs.uDFs.Add(num)
 }
 
-func writeASBHeader(w io.Writer, namespace string, first bool) (int, error) {
-	header, err := asb.GetHeader(namespace, first)
+func writeASBHeader(w io.Writer, namespace string, firstWritten bool) (int, error) {
+	header, err := asb.GetHeader(namespace, !firstWritten)
 	if err != nil {
 		return 0, err
 	}

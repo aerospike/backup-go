@@ -260,7 +260,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockStats := newMockStatsSetterToken(suite.T())
 	mockStats.EXPECT().addUDFs(uint32(1))
 	mockStats.EXPECT().addSIndexes(uint32(1))
-	mockStats.EXPECT().addTotalSize(uint64(1))
+	mockStats.EXPECT().addTotalBytesWritten(uint64(1))
 
 	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)

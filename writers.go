@@ -18,6 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/encoding"
@@ -25,8 +28,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
-	"io"
-	"log/slog"
 )
 
 // **** Write Worker ****

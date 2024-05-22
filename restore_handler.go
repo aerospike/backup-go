@@ -303,6 +303,6 @@ func (rs *RestoreStats) incrRecordsInserted() {
 	rs.recordsInserted.Add(1)
 }
 
-func (rs *RestoreStats) GetTotalBytes() uint64 {
+func (rs *RestoreStats) GetTotalBytesRead() uint64 {
 	return rs.totalBytesRead.Load()
 }

@@ -104,7 +104,7 @@ func (bs *tokenStats) GetRecordsTotal() uint64 {
 	return bs.recordsTotal.Load()
 }
 
-func (bs *tokenStats) GetTotalSize() uint64 {
+func (bs *tokenStats) GetTotalBytesWritten() uint64 {
 	return bs.totalBytesWritten.Load()
 }
 

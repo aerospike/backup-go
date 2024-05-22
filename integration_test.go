@@ -399,7 +399,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
-	suite.Require().Less(dirSize, statsRestore.GetTotalBytesWritten()) // restore size doesn't include asb control characters
+	suite.Require().Less(statsRestore.GetTotalBytesRead(), dirSize) // restore size doesn't include asb control characters
 
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)

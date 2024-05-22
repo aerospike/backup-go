@@ -251,7 +251,7 @@ type RestoreStats struct {
 	recordsExisted atomic.Uint64
 	// The number of successfully restored records.
 	recordsInserted atomic.Uint64
-	// Total number of bytes read from source
+	// Total number of bytes read from source.
 	totalBytesRead atomic.Uint64
 }
 

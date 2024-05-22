@@ -96,7 +96,7 @@ type tokenStats struct {
 	sIndexes atomic.Uint32
 	// The number of successfully stored UDF files.
 	uDFs atomic.Uint32
-	// The total number of bytes written to the destination
+	// The total number of bytes written to the destination.
 	totalBytesWritten atomic.Uint64
 }
 

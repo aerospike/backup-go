@@ -84,22 +84,13 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = w.waitLimiter(ctx, n)
-			if err != nil {
-				return err
+			if w.limiter != nil {
+				if err := w.limiter.WaitN(ctx, n); err != nil {
+					return err
+				}
 			}
 		}
 	}
-}
-
-func (w *writeWorker[T]) waitLimiter(ctx context.Context, n int) error {
-	if w.limiter != nil {
-		if err := w.limiter.WaitN(ctx, n); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // **** Token Stats Writer ****
@@ -256,7 +247,7 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	case models.TokenTypeSIndex:
 		return int(data.Size), rw.writeSecondaryIndex(data.SIndex)
 	case models.TokenTypeInvalid:
-		return int(data.Size), errors.New("invalid token")
+		return 0, errors.New("invalid token")
 	default:
 		return 0, errors.New("unsupported token type")
 	}

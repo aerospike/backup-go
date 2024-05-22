@@ -203,6 +203,10 @@ func (r *Decoder) readMetadata() (*metaData, error) {
 	for {
 		startC, err := _peek(r)
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
 			return nil, err
 		}
 

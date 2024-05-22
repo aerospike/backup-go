@@ -2,8 +2,8 @@ github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 h1:L/gRVlceqvL25
 github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/Microsoft/go-winio v0.4.14 h1:+hMXMk01us9KgxGb7ftKQt2Xpf5hH/yky+TDA+qxleU=
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
-github.com/aerospike/aerospike-client-go/v7 v7.2.1 h1:4A6CxgJMRlDnHx4ycyJ1a5lUzxMS7u4byG1XlhCrvSg=
-github.com/aerospike/aerospike-client-go/v7 v7.2.1/go.mod h1:sKfNsnAKgkGtAlYxdgWNOJm3ykm49s/p6xjEB/cX8/k=
+github.com/aerospike/aerospike-client-go/v7 v7.4.0 h1:g8/7v8RHhQhTArhW3C7Au7o+u8j8x5eySZL6MXfpHKU=
+github.com/aerospike/aerospike-client-go/v7 v7.4.0/go.mod h1:pPKnWiS8VDJcH4IeB1b8SA2TWnkjcVLHwAAJ+BHfGK8=
 github.com/aerospike/tools-common-go v0.0.0-20240308225527-766ab8f3da4b h1:uiHUq8tg4KJ8DydkO3LOccKWsHvcxQ+xbihveJo0CKY=
 github.com/aerospike/tools-common-go v0.0.0-20240308225527-766ab8f3da4b/go.mod h1:lZMam4vyhZgsIufTP7Z6DWBFXBs6v7SKpzP5c30yo5M=
 github.com/aws/aws-sdk-go-v2 v1.26.1 h1:5554eUqIYVWpU0YmeeYZ0wU64H2VLBs8TlhRB2L+EkA=

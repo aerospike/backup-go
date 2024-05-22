@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
 // **** Generic Restore Handler ****
@@ -34,14 +35,6 @@ import (
 // The Aerospike Go client satisfies this interface
 type DBRestoreClient interface {
 	dbWriter
-}
-
-// restoreHandlerBase handles restore jobs for a single worker.
-type restoreHandlerBase struct {
-	config   *RestoreConfig
-	dbClient DBRestoreClient
-	stats    *RestoreStats
-	logger   *slog.Logger
 }
 
 // ReaderFactory provides access to data that should be restored.
@@ -59,6 +52,7 @@ type RestoreHandler struct {
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
+	limiter         *rate.Limiter
 	errors          chan error
 	id              string
 	stats           RestoreStats
@@ -76,6 +70,7 @@ func newRestoreHandler(config *RestoreConfig,
 		id:              id,
 		logger:          logger,
 		readerFactory:   readerFactory,
+		limiter:         makeBandwidthLimiter(config.Bandwidth),
 	}
 }
 
@@ -119,22 +114,12 @@ func (rh *RestoreHandler) run(ctx context.Context) {
 				continue
 			}
 
-			readWorkers := make([]*readWorker[*models.Token], len(readersBuffer))
-
-			for i, reader := range readersBuffer {
-				decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
-				if err != nil {
-					return err
-				}
-
-				dr := newTokenReader(decoder, rh.logger)
-				readWorker := newReadWorker[*models.Token](dr)
-				readWorkers[i] = readWorker
+			readWorkers, err := rh.readersToReadWorkers(readersBuffer)
+			if err != nil {
+				return err
 			}
 
-			restoreHandler := newRestoreHandlerBase(rh.config, rh.aerospikeClient, &rh.stats, rh.logger)
-
-			err = restoreHandler.run(ctx, readWorkers)
+			err = rh.runRestoreBatch(ctx, readWorkers)
 			if err != nil {
 				return err
 			}
@@ -144,6 +129,23 @@ func (rh *RestoreHandler) run(ctx context.Context) {
 
 		return nil
 	})
+}
+
+func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.Reader) ([]*readWorker[*models.Token], error) {
+	readWorkers := make([]*readWorker[*models.Token], len(readersBuffer))
+
+	for i, reader := range readersBuffer {
+		decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
+		if err != nil {
+			return nil, err
+		}
+
+		dr := newTokenReader(decoder, rh.logger)
+		readWorker := newReadWorker[*models.Token](dr)
+		readWorkers[i] = readWorker
+	}
+
+	return readWorkers, nil
 }
 
 // GetStats returns the stats of the restore job
@@ -165,36 +167,22 @@ func (rh *RestoreHandler) Wait(ctx context.Context) error {
 	}
 }
 
-// newRestoreHandlerBase creates a new restoreHandler
-func newRestoreHandlerBase(config *RestoreConfig, ac DBRestoreClient,
-	stats *RestoreStats, logger *slog.Logger) *restoreHandlerBase {
-	logger.Debug("created new restore base handler")
-
-	return &restoreHandlerBase{
-		config:   config,
-		dbClient: ac,
-		stats:    stats,
-		logger:   logger,
-	}
-}
-
 // run runs the restore job
-func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*models.Token]) error {
+func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWorker[*models.Token]) error {
 	rh.logger.Debug("running restore base handler")
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
-	limiter := makeBandwidthLimiter(rh.config.Bandwidth)
 
 	for i := 0; i < rh.config.Parallel; i++ {
 		var writer dataWriter[*models.Token] = newRestoreWriter(
-			rh.dbClient,
+			rh.aerospikeClient,
 			rh.config.WritePolicy,
-			rh.stats,
+			&rh.stats,
 			rh.logger,
 		)
 
-		writer = newWriterWithTokenStats(writer, rh.stats, rh.logger)
-		writeWorkers[i] = newWriteWorker(writer, limiter)
+		writer = newWriterWithTokenStats(writer, &rh.stats, rh.logger)
+		writeWorkers[i] = newWriteWorker(writer, rh.limiter)
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
@@ -203,9 +191,9 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	}
 
 	recordCounter := newTokenWorker(newRecordCounter(&rh.stats.recordsTotal))
-	sizeCounter := newTokenWorker(newSizeCounter(&rh.stats.totalSize))
+	sizeCounter := newTokenWorker(newSizeCounter(&rh.stats.totalBytesRead))
 	namespaceSet := newTokenWorker(newChangeNamespaceProcessor(rh.config.Namespace))
-	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
+	ttlSetters := newTokenWorker(newProcessorTTL(&rh.stats, rh.logger))
 	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
 	tpsLimiter := newTokenWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
 	tokenTypeFilter := newTokenWorker(
@@ -263,6 +251,8 @@ type RestoreStats struct {
 	recordsExisted atomic.Uint64
 	// The number of successfully restored records.
 	recordsInserted atomic.Uint64
+	// Total number of bytes read from source.
+	totalBytesRead atomic.Uint64
 }
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
@@ -299,4 +289,8 @@ func (rs *RestoreStats) GetRecordsInserted() uint64 {
 
 func (rs *RestoreStats) incrRecordsInserted() {
 	rs.recordsInserted.Add(1)
+}
+
+func (rs *RestoreStats) GetTotalBytesRead() uint64 {
+	return rs.totalBytesRead.Load()
 }

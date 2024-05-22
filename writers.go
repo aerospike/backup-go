@@ -247,17 +247,16 @@ func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy,
 
 // Write writes the types from the models package to an Aerospike DB.
 // TODO support batch writes
-// Restore writer does not return size written.
 func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	switch data.Type {
 	case models.TokenTypeRecord:
-		return 0, rw.writeRecord(&data.Record)
+		return int(data.Size), rw.writeRecord(&data.Record)
 	case models.TokenTypeUDF:
-		return 0, rw.writeUDF(data.UDF)
+		return int(data.Size), rw.writeUDF(data.UDF)
 	case models.TokenTypeSIndex:
-		return 0, rw.writeSecondaryIndex(data.SIndex)
+		return int(data.Size), rw.writeSecondaryIndex(data.SIndex)
 	case models.TokenTypeInvalid:
-		return 0, errors.New("invalid token")
+		return int(data.Size), errors.New("invalid token")
 	default:
 		return 0, errors.New("unsupported token type")
 	}

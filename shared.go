@@ -96,8 +96,8 @@ type tokenStats struct {
 	sIndexes atomic.Uint32
 	// The number of successfully stored UDF files.
 	uDFs atomic.Uint32
-	// The total number of bytes read from the backup file(s) so far.
-	totalSize atomic.Uint64
+	// The total number of bytes written to the destination
+	totalBytesWritten atomic.Uint64
 }
 
 func (bs *tokenStats) GetRecordsTotal() uint64 {
@@ -105,7 +105,7 @@ func (bs *tokenStats) GetRecordsTotal() uint64 {
 }
 
 func (bs *tokenStats) GetTotalSize() uint64 {
-	return bs.totalSize.Load()
+	return bs.totalBytesWritten.Load()
 }
 
 func (bs *tokenStats) GetSIndexes() uint32 {
@@ -116,8 +116,8 @@ func (bs *tokenStats) GetUDFs() uint32 {
 	return bs.uDFs.Load()
 }
 
-func (bs *tokenStats) addTotalSize(num uint64) {
-	bs.totalSize.Add(num)
+func (bs *tokenStats) addTotalBytesWritten(num uint64) {
+	bs.totalBytesWritten.Add(num)
 }
 
 func (bs *tokenStats) addSIndexes(num uint32) {

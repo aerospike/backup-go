@@ -18,10 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
-	"sync"
-
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/encoding"
@@ -29,6 +25,8 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
+	"io"
+	"log/slog"
 )
 
 // **** Write Worker ****
@@ -47,7 +45,6 @@ type writeWorker[T any] struct {
 	dataWriter[T]
 	receive <-chan T
 	limiter *rate.Limiter
-	lock    sync.Mutex
 }
 
 func newWriteWorker[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
@@ -96,12 +93,11 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 
 func (w *writeWorker[T]) waitLimiter(ctx context.Context, n int) error {
 	if w.limiter != nil {
-		w.lock.Lock()
-		defer w.lock.Unlock()
 		if err := w.limiter.WaitN(ctx, n); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -113,7 +109,7 @@ func (w *writeWorker[T]) waitLimiter(ctx context.Context, n int) error {
 type statsSetterToken interface {
 	addUDFs(uint32)
 	addSIndexes(uint32)
-	addTotalSize(uint64)
+	addTotalBytesWritten(uint64)
 }
 
 type tokenStatsWriter struct {
@@ -151,7 +147,7 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 		return 0, errors.New("invalid token")
 	}
 
-	tw.stats.addTotalSize(uint64(n))
+	tw.stats.addTotalBytesWritten(uint64(n))
 
 	return n, nil
 }

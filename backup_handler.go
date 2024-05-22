@@ -111,7 +111,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 					return err
 				}
 
-				bh.stats.addTotalSize(uint64(headerLen))
+				bh.stats.addTotalBytesWritten(uint64(headerLen))
 				bh.stats.incFiles()
 
 				return nil

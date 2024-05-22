@@ -203,7 +203,7 @@ func (rh *restoreHandlerBase) run(ctx context.Context, readers []*readWorker[*mo
 	}
 
 	recordCounter := newTokenWorker(newRecordCounter(&rh.stats.recordsTotal))
-	sizeCounter := newTokenWorker(newSizeCounter(&rh.stats.totalSize))
+	sizeCounter := newTokenWorker(newSizeCounter(&rh.stats.totalBytesRead))
 	namespaceSet := newTokenWorker(newChangeNamespaceProcessor(rh.config.Namespace))
 	ttlSetters := newTokenWorker(newProcessorTTL(rh.stats, rh.logger))
 	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
@@ -263,6 +263,8 @@ type RestoreStats struct {
 	recordsExisted atomic.Uint64
 	// The number of successfully restored records.
 	recordsInserted atomic.Uint64
+	// Total number of bytes read from source
+	totalBytesRead atomic.Uint64
 }
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
@@ -299,4 +301,8 @@ func (rs *RestoreStats) GetRecordsInserted() uint64 {
 
 func (rs *RestoreStats) incrRecordsInserted() {
 	rs.recordsInserted.Add(1)
+}
+
+func (rs *RestoreStats) GetTotalBytes() uint64 {
+	return rs.totalBytesRead.Load()
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backup
+package processors
 
 import (
 	"context"
@@ -33,35 +33,37 @@ import (
 
 // **** Processor Worker ****
 
-// dataProcessor is an interface for processing data
+// DataProcessor is an interface for processing data
 //
-//go:generate mockery --name dataProcessor
-type dataProcessor[T any] interface {
+//go:generate mockery --name DataProcessor
+type DataProcessor[T any] interface {
 	Process(T) (T, error)
 }
 
-// processorWorker implements the pipeline.Worker interface
+type TokenProcessor = DataProcessor[*models.Token]
+
+// ProcessorWorker implements the pipeline.Worker interface
 // It wraps a DataProcessor and processes data with it
-type processorWorker[T any] struct {
-	processor dataProcessor[T]
+type ProcessorWorker[T any] struct {
+	processor DataProcessor[T]
 	receive   <-chan T
 	send      chan<- T
 }
 
-// newProcessorWorker creates a new ProcessorWorker
-func newProcessorWorker[T any](processor dataProcessor[T]) *processorWorker[T] {
-	return &processorWorker[T]{
+// NewProcessorWorker creates a new ProcessorWorker
+func NewProcessorWorker[T any](processor DataProcessor[T]) *ProcessorWorker[T] {
+	return &ProcessorWorker[T]{
 		processor: processor,
 	}
 }
 
 // SetReceiveChan sets the receive channel for the ProcessorWorker
-func (w *processorWorker[T]) SetReceiveChan(c <-chan T) {
+func (w *ProcessorWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
 }
 
 // SetSendChan sets the send channel for the ProcessorWorker
-func (w *processorWorker[T]) SetSendChan(c chan<- T) {
+func (w *ProcessorWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
@@ -70,7 +72,7 @@ func (w *processorWorker[T]) SetSendChan(c chan<- T) {
 var errFilteredOut = errors.New("filtered out")
 
 // Run starts the ProcessorWorker
-func (w *processorWorker[T]) Run(ctx context.Context) error {
+func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,38 +98,6 @@ func (w *processorWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// **** TTL Processor ****
-
-// statsSetterExpired is an interface for setting the number of expired records
-//
-//go:generate mockery --name statsSetterExpired --inpackage --exported=false
-type statsSetterExpired interface {
-	addRecordsExpired(uint64)
-}
-
-// processorTTL is a dataProcessor that sets the TTL of a record based on its VoidTime.
-// It is used during restore to set the TTL of records from their backed up VoidTime.
-type processorTTL struct {
-	// getNow returns the current time since the citrusleaf epoch
-	// It is a field so that it can be mocked in tests
-	getNow func() cltime.CLTime
-	stats  statsSetterExpired
-	logger *slog.Logger
-}
-
-// newProcessorTTL creates a new TTLProcessor
-func newProcessorTTL(stats statsSetterExpired, logger *slog.Logger) *processorTTL {
-	id := uuid.NewString()
-	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
-	logger.Debug("created new TTL processor")
-
-	return &processorTTL{
-		getNow: cltime.Now,
-		stats:  stats,
-		logger: logger,
-	}
-}
-
 // errExpiredRecord is returned when a record is expired
 // by embedding errFilteredOut, the processor worker will filter out the token
 // containing the expired record
@@ -149,7 +119,7 @@ func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
 		if ttl <= 0 {
 			// the record is expired
 			p.logger.Debug("record is expired", "digest", record.Key.Digest())
-			p.stats.addRecordsExpired(1)
+			p.expired.Add(1)
 
 			return nil, errExpiredRecord
 		}
@@ -174,8 +144,8 @@ type binFilterProcessor struct {
 	skipped      *atomic.Uint64
 }
 
-// newProcessorBinFilter creates new binFilterProcessor with given binList.
-func newProcessorBinFilter(binList []string, skipped *atomic.Uint64) *binFilterProcessor {
+// NewProcessorBinFilter creates new binFilterProcessor with given binList.
+func NewProcessorBinFilter(binList []string, skipped *atomic.Uint64) TokenProcessor {
 	return &binFilterProcessor{
 		binsToRemove: util.ListToMap(binList),
 		skipped:      skipped,
@@ -211,7 +181,7 @@ type recordCounter struct {
 	counter *atomic.Uint64
 }
 
-func newRecordCounter(counter *atomic.Uint64) *recordCounter {
+func NewRecordCounter(counter *atomic.Uint64) TokenProcessor {
 	return &recordCounter{
 		counter: counter,
 	}
@@ -232,7 +202,7 @@ type sizeCounter struct {
 	counter *atomic.Uint64
 }
 
-func newSizeCounter(counter *atomic.Uint64) *sizeCounter {
+func NewSizeCounter(counter *atomic.Uint64) TokenProcessor {
 	return &sizeCounter{
 		counter: counter,
 	}
@@ -250,8 +220,8 @@ type setFilterProcessor struct {
 	skipped       *atomic.Uint64
 }
 
-// newProcessorSetFilter creates new setFilterProcessor with given setList.
-func newProcessorSetFilter(setList []string, skipped *atomic.Uint64) *setFilterProcessor {
+// NewProcessorSetFilter creates new setFilterProcessor with given setList.
+func NewProcessorSetFilter(setList []string, skipped *atomic.Uint64) TokenProcessor {
 	return &setFilterProcessor{
 		setsToRestore: util.ListToMap(setList),
 		skipped:       skipped,
@@ -282,7 +252,7 @@ func (b setFilterProcessor) Process(token *models.Token) (*models.Token, error) 
 
 // **** VoidTime Processor ****
 
-// processorVoidTime is a dataProcessor that sets the VoidTime of a record based on its TTL
+// processorVoidTime is a DataProcessor that sets the VoidTime of a record based on its TTL
 // It is used during backup to set the VoidTime of records from their TTL
 // The VoidTime is the time at which the record will expire and is usually what is encoded in backups
 type processorVoidTime struct {
@@ -292,8 +262,8 @@ type processorVoidTime struct {
 	logger *slog.Logger
 }
 
-// newProcessorVoidTime creates a new VoidTimeProcessor
-func newProcessorVoidTime(logger *slog.Logger) *processorVoidTime {
+// NewProcessorVoidTime creates a new VoidTimeProcessor
+func NewProcessorVoidTime(logger *slog.Logger) TokenProcessor {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeVoidTime)
 	logger.Debug("created new VoidTime processor")
@@ -330,9 +300,9 @@ type tpsLimiter[T any] struct {
 	tps     int
 }
 
-// newTPSLimiter Create a new TPS limiter.
+// NewTPSLimiter Create a new TPS limiter.
 // n — allowed  number of tokens per second, n = 0 means no limit.
-func newTPSLimiter[T any](n int) dataProcessor[T] {
+func NewTPSLimiter[T any](n int) DataProcessor[T] {
 	if n == 0 {
 		return &noopProcessor[T]{}
 	}
@@ -372,8 +342,8 @@ type tokenTypeProcessor struct {
 	noUdf     bool
 }
 
-// newTokenTypeFilterProcessor creates new tokenTypeFilterProcessor
-func newTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) dataProcessor[*models.Token] {
+// NewTokenTypeFilterProcessor creates new tokenTypeFilterProcessor
+func NewTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) TokenProcessor {
 	if !noRecords && !noIndexes && !noUdf {
 		return &noopProcessor[*models.Token]{}
 	}
@@ -404,11 +374,11 @@ func (b tokenTypeProcessor) Process(token *models.Token) (*models.Token, error) 
 
 // changeNamespaceProcessor is used to restore to another namespace.
 type changeNamespaceProcessor struct {
-	restoreNamespace *RestoreNamespace
+	restoreNamespace *models.RestoreNamespace
 }
 
-// newChangeNamespaceProcessor creates new changeNamespaceProcessor
-func newChangeNamespaceProcessor(namespace *RestoreNamespace) dataProcessor[*models.Token] {
+// NewChangeNamespaceProcessor creates new changeNamespaceProcessor
+func NewChangeNamespaceProcessor(namespace *models.RestoreNamespace) TokenProcessor {
 	if namespace == nil {
 		return &noopProcessor[*models.Token]{}
 	}

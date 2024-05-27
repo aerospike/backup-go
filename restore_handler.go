@@ -23,6 +23,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/logic/logging"
+	"github.com/aerospike/backup-go/logic/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
@@ -190,15 +191,15 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWo
 		readWorkers[i] = r
 	}
 
-	recordCounter := newTokenWorker(newRecordCounter(&rh.stats.recordsTotal))
-	sizeCounter := newTokenWorker(newSizeCounter(&rh.stats.totalBytesRead))
-	namespaceSet := newTokenWorker(newChangeNamespaceProcessor(rh.config.Namespace))
-	ttlSetters := newTokenWorker(newProcessorTTL(&rh.stats, rh.logger))
-	binFilters := newTokenWorker(newProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
-	tpsLimiter := newTokenWorker(newTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
+	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.recordsTotal))
+	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.totalBytesRead))
+	namespaceSet := newTokenWorker(processors.NewChangeNamespaceProcessor(rh.config.Namespace))
+	ttlSetters := newTokenWorker(processors.NewProcessorTTL(&rh.stats.recordsExpired, rh.logger))
+	binFilters := newTokenWorker(processors.NewProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
+	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
 	tokenTypeFilter := newTokenWorker(
-		newTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
-	recordSetFilter := newTokenWorker(newProcessorSetFilter(rh.config.SetList, &rh.stats.recordsSkipped))
+		processors.NewTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
+	recordSetFilter := newTokenWorker(processors.NewProcessorSetFilter(rh.config.SetList, &rh.stats.recordsSkipped))
 
 	job := pipeline.NewPipeline(
 		readWorkers,
@@ -225,9 +226,9 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWo
 	return job.Run(ctx)
 }
 
-func newTokenWorker(processor dataProcessor[*models.Token]) []pipeline.Worker[*models.Token] {
+func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*models.Token] {
 	return []pipeline.Worker[*models.Token]{
-		newProcessorWorker(processor),
+		processors.NewProcessorWorker(processor),
 	}
 }
 
@@ -257,10 +258,6 @@ type RestoreStats struct {
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
 	return rs.recordsExpired.Load()
-}
-
-func (rs *RestoreStats) addRecordsExpired(num uint64) {
-	rs.recordsExpired.Add(num)
 }
 
 func (rs *RestoreStats) GetRecordsSkipped() uint64 {

@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/logic/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 )
@@ -77,7 +78,7 @@ func (bh *backupRecordsHandler) run(
 		)
 
 		readWorkers[i] = newReadWorker[*models.Token](recordReader)
-		processorWorkers[i] = newProcessorWorker[*models.Token](newProcessorVoidTime(bh.logger))
+		processorWorkers[i] = processors.NewProcessorWorker[*models.Token](processors.NewProcessorVoidTime(bh.logger))
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
@@ -86,7 +87,7 @@ func (bh *backupRecordsHandler) run(
 		writeWorkers[i] = w
 	}
 
-	recordCounter := newTokenWorker(newRecordCounter(recordsTotal))
+	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsTotal))
 
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,

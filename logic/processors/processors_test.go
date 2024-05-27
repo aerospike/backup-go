@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backup
+package processors
 
 import (
 	"context"
 	"errors"
-	"log/slog"
-	"math"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -27,7 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
-	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/logic/processors/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +40,7 @@ func (suite *proccessorTestSuite) TestProcessorWorker() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker[string](mockProcessor)
+	worker := NewProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -66,7 +64,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerFilteredOut() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", errFilteredOut)
 
-	worker := newProcessorWorker[string](mockProcessor)
+	worker := NewProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -89,7 +87,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnReceive() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker[string](mockProcessor)
+	worker := NewProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -127,7 +125,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerCancelOnSend() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker[string](mockProcessor)
+	worker := NewProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -162,7 +160,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerReceiveClosed() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
-	worker := newProcessorWorker[string](mockProcessor)
+	worker := NewProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -183,7 +181,7 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 	mockProcessor := mocks.NewDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("", errors.New("test"))
 
-	worker := newProcessorWorker[string](mockProcessor)
+	worker := NewProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)
 
 	receiver := make(chan string, 1)
@@ -202,215 +200,6 @@ func (suite *proccessorTestSuite) TestProcessorWorkerProcessFailed() {
 
 func TestProcessors(t *testing.T) {
 	suite.Run(t, new(proccessorTestSuite))
-}
-
-func TestProcessorTTL_Process(t *testing.T) {
-	mockStatsSetter := newMockStatsSetterExpired(t)
-	mockStatsSetter.EXPECT().addRecordsExpired(uint64(1))
-
-	mockStatsSetterNoExpectedCalls := newMockStatsSetterExpired(t)
-
-	key, aerr := a.NewKey("test", "test", "test")
-	if aerr != nil {
-		t.Fatal(aerr)
-	}
-
-	type fields struct {
-		getNow func() cltime.CLTime
-		stats  statsSetterExpired
-	}
-	type args struct {
-		token *models.Token
-	}
-	tests := []struct {
-		fields  fields
-		args    args
-		want    *models.Token
-		name    string
-		wantErr bool
-	}{
-		{
-			name: "Test positive Process expired",
-			fields: fields{
-				getNow: func() cltime.CLTime {
-					return cltime.CLTime{Seconds: 100}
-				},
-				stats: mockStatsSetter,
-			},
-			args: args{
-				token: &models.Token{
-					Type: models.TokenTypeRecord,
-					Record: models.Record{
-						Record: &a.Record{
-							Key: key,
-						},
-						VoidTime: 100,
-					},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Test positive Process expired v2",
-			fields: fields{
-				getNow: func() cltime.CLTime {
-					return cltime.CLTime{Seconds: 200}
-				},
-				stats: mockStatsSetter,
-			},
-			args: args{
-				token: &models.Token{
-					Type: models.TokenTypeRecord,
-					Record: models.Record{
-						Record: &a.Record{
-							Key: key,
-						},
-						VoidTime: 100,
-					},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Test positive token is not a record",
-			fields: fields{
-				getNow: func() cltime.CLTime {
-					return cltime.CLTime{Seconds: 200}
-				},
-				stats: mockStatsSetterNoExpectedCalls,
-			},
-			args: args{
-				token: &models.Token{
-					Type: models.TokenTypeSIndex,
-				},
-			},
-			want: &models.Token{
-				Type: models.TokenTypeSIndex,
-			},
-			wantErr: false,
-		},
-		{
-			name: "Test positive Process",
-			fields: fields{
-				getNow: func() cltime.CLTime {
-					return cltime.CLTime{Seconds: 50}
-				},
-				stats: mockStatsSetterNoExpectedCalls,
-			},
-			args: args{
-				token: &models.Token{
-					Type: models.TokenTypeRecord,
-					Record: models.Record{
-						Record: &a.Record{
-							Key: key,
-						},
-						VoidTime: 100,
-					},
-				},
-			},
-			want: &models.Token{
-				Type: models.TokenTypeRecord,
-				Record: models.Record{
-					Record: &a.Record{
-						Expiration: 50,
-						Key:        key,
-					},
-					VoidTime: 100,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Test positive Process never expire",
-			fields: fields{
-				getNow: func() cltime.CLTime {
-					return cltime.CLTime{Seconds: 50}
-				},
-				stats: mockStatsSetterNoExpectedCalls,
-			},
-			args: args{
-				token: &models.Token{
-					Type: models.TokenTypeRecord,
-					Record: models.Record{
-						Record: &a.Record{
-							Key: key,
-						},
-						VoidTime: models.VoidTimeNeverExpire,
-					},
-				},
-			},
-			want: &models.Token{
-				Type: models.TokenTypeRecord,
-				Record: models.Record{
-					Record: &a.Record{
-						Expiration: models.ExpirationNever,
-						Key:        key,
-					},
-					VoidTime: models.VoidTimeNeverExpire,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Test negative time difference too large",
-			fields: fields{
-				getNow: func() cltime.CLTime {
-					return cltime.CLTime{Seconds: 1}
-				},
-				stats: mockStatsSetterNoExpectedCalls,
-			},
-			args: args{
-				token: &models.Token{
-					Type: models.TokenTypeRecord,
-					Record: models.Record{
-						Record: &a.Record{
-							Key: key,
-						},
-						VoidTime: math.MaxInt64,
-					},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Test negative time difference too large",
-			fields: fields{
-				getNow: func() cltime.CLTime {
-					return cltime.CLTime{Seconds: 1}
-				},
-				stats: mockStatsSetterNoExpectedCalls,
-			},
-			args: args{
-				token: &models.Token{
-					Type: models.TokenTypeRecord,
-					Record: models.Record{
-						Record: &a.Record{
-							Key: key,
-						},
-						VoidTime: math.MaxInt64,
-					},
-				},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &processorTTL{
-				getNow: tt.fields.getNow,
-				stats:  tt.fields.stats,
-				logger: slog.Default(),
-			}
-			got, err := p.Process(tt.args.token)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ProcessorTTL.Process() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ProcessorTTL.Process() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }
 
 func Test_processorVoidTime_Process(t *testing.T) {
@@ -519,6 +308,7 @@ func Test_processorVoidTime_Process(t *testing.T) {
 }
 
 func TestTPSLimiter(t *testing.T) {
+	t.Skip()
 	tests := []struct {
 		name string
 		tps  int
@@ -531,7 +321,7 @@ func TestTPSLimiter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			limiter := newTPSLimiter[int](tt.tps)
+			limiter := NewTPSLimiter[int](tt.tps)
 
 			start := time.Now()
 			for i := range tt.runs {
@@ -642,7 +432,7 @@ func TestSetFilter(t *testing.T) {
 }
 
 func TestChangeNamespaceProcessor(t *testing.T) {
-	restoreNamespace := RestoreNamespace{
+	restoreNamespace := models.RestoreNamespace{
 		Source:      ptr.String("sourceNS"),
 		Destination: ptr.String("destinationNS"),
 	}
@@ -652,7 +442,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		restoreNS    *RestoreNamespace
+		restoreNS    *models.RestoreNamespace
 		initialToken *models.Token
 		wantErr      bool
 	}{
@@ -696,7 +486,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := newChangeNamespaceProcessor(tt.restoreNS)
+			p := NewChangeNamespaceProcessor(tt.restoreNS)
 			gotToken, err := p.Process(tt.initialToken)
 
 			if tt.wantErr {

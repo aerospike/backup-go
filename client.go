@@ -25,6 +25,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/logic/logging"
+	"github.com/aerospike/backup-go/models"
 )
 
 const (
@@ -292,7 +293,7 @@ type RestoreConfig struct {
 	WritePolicy *a.WritePolicy
 	// Namespace details for the restore operation.
 	// By default, the data is restored to the namespace from which it was taken.
-	Namespace *RestoreNamespace `json:"namespace,omitempty"`
+	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
@@ -311,32 +312,6 @@ type RestoreConfig struct {
 	NoIndexes bool
 	// Don't restore any UDFs.
 	NoUDFs bool
-}
-
-// RestoreNamespace specifies an alternative namespace name for the restore
-// operation, where Source is the original namespace name and Destination is
-// the namespace name to which the backup data is to be restored.
-//
-// @Description RestoreNamespace specifies an alternative namespace name for the restore
-// @Description operation.
-type RestoreNamespace struct {
-	// Original namespace name.
-	Source *string `json:"source,omitempty" example:"source-ns" validate:"required"`
-	// Destination namespace name.
-	Destination *string `json:"destination,omitempty" example:"destination-ns" validate:"required"`
-}
-
-// Validate validates the restore namespace.
-func (n *RestoreNamespace) Validate() error {
-	if n.Source == nil {
-		return fmt.Errorf("source namespace is not specified")
-	}
-
-	if n.Destination == nil {
-		return fmt.Errorf("destination namespace is not specified")
-	}
-
-	return nil
 }
 
 func (c *RestoreConfig) validate() error {

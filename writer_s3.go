@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/internal/writers"
+	"github.com/aerospike/backup-go/logic/writers"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"

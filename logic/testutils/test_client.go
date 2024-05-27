@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/logic/asinfo"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 )

@@ -132,8 +132,8 @@ func (rh *RestoreHandler) run(ctx context.Context) {
 	})
 }
 
-func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.Reader) ([]*readWorker[*models.Token], error) {
-	readWorkers := make([]*readWorker[*models.Token], len(readersBuffer))
+func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.Reader) ([]pipeline.Worker[*models.Token], error) {
+	readWorkers := make([]pipeline.Worker[*models.Token], len(readersBuffer))
 
 	for i, reader := range readersBuffer {
 		decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
@@ -142,7 +142,7 @@ func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.Reader) ([]*re
 		}
 
 		dr := newTokenReader(decoder, rh.logger)
-		readWorker := newReadWorker[*models.Token](dr)
+		readWorker := pipeline.NewReadWorker[*models.Token](dr)
 		readWorkers[i] = readWorker
 	}
 
@@ -169,26 +169,21 @@ func (rh *RestoreHandler) Wait(ctx context.Context) error {
 }
 
 // run runs the restore job
-func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWorker[*models.Token]) error {
+func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipeline.Worker[*models.Token]) error {
 	rh.logger.Debug("running restore base handler")
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
-		var writer dataWriter[*models.Token] = newRestoreWriter(
+		writer := newRestoreWriter(
 			rh.aerospikeClient,
 			rh.config.WritePolicy,
 			&rh.stats,
 			rh.logger,
 		)
 
-		writer = newWriterWithTokenStats(writer, &rh.stats, rh.logger)
-		writeWorkers[i] = newWriteWorker(writer, rh.limiter)
-	}
-
-	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
-	for i, r := range readers {
-		readWorkers[i] = r
+		statsWriter := newWriterWithTokenStats(writer, &rh.stats, rh.logger)
+		writeWorkers[i] = pipeline.NewWriteWorker[*models.Token](statsWriter, rh.limiter)
 	}
 
 	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.recordsTotal))
@@ -202,7 +197,7 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWo
 	recordSetFilter := newTokenWorker(processors.NewFilterBySet(rh.config.SetList, &rh.stats.recordsSkipped))
 
 	job := pipeline.NewPipeline(
-		readWorkers,
+		readers,
 
 		// in the pipeline, first all counters.
 		recordCounter,

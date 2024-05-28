@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,72 +25,9 @@ import (
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/logic/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
-	"golang.org/x/time/rate"
 )
-
-// **** Write Worker ****
-
-// dataWriter is an interface for writing data to a destination.
-//
-//go:generate mockery --name dataWriter
-type dataWriter[T any] interface {
-	Write(T) (n int, err error)
-	Close()
-}
-
-// writeWorker implements the pipeline.Worker interface
-// It wraps a DataWriter and writes data to it
-type writeWorker[T any] struct {
-	dataWriter[T]
-	receive <-chan T
-	limiter *rate.Limiter
-}
-
-func newWriteWorker[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
-	return &writeWorker[T]{
-		dataWriter: writer,
-		limiter:    limiter,
-	}
-}
-
-// SetReceiveChan sets the receive channel for the WriteWorker
-func (w *writeWorker[T]) SetReceiveChan(c <-chan T) {
-	w.receive = c
-}
-
-// SetSendChan satisfies the pipeline.Worker interface
-// but is a no-op for the WriteWorker
-func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
-	// no-op
-}
-
-// Run runs the WriteWorker
-func (w *writeWorker[T]) Run(ctx context.Context) error {
-	defer w.Close()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case data, active := <-w.receive:
-			if !active {
-				return nil
-			}
-
-			n, err := w.Write(data)
-			if err != nil {
-				return err
-			}
-
-			if w.limiter != nil {
-				if err := w.limiter.WaitN(ctx, n); err != nil {
-					return err
-				}
-			}
-		}
-	}
-}
 
 // **** Token Stats Writer ****
 
@@ -105,12 +41,12 @@ type statsSetterToken interface {
 }
 
 type tokenStatsWriter struct {
-	writer dataWriter[*models.Token]
+	writer pipeline.DataWriter[*models.Token]
 	stats  statsSetterToken
 	logger *slog.Logger
 }
 
-func newWriterWithTokenStats(writer dataWriter[*models.Token],
+func newWriterWithTokenStats(writer pipeline.DataWriter[*models.Token],
 	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)

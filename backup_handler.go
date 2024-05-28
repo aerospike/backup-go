@@ -96,7 +96,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	limiter := makeBandwidthLimiter(bh.config.Bandwidth)
 
 	go doWork(bh.errors, bh.logger, func() error {
-		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
+		writeWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
 		for i := range bh.config.Parallel {
 			encoder, err := bh.config.EncoderFactory.CreateEncoder()
@@ -141,9 +141,9 @@ func (bh *BackupHandler) run(ctx context.Context) {
 				}
 			}
 
-			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
+			var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
-			writeWorkers[i] = newWriteWorker(dataWriter, limiter)
+			writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, limiter)
 		}
 
 		if bh.config.NoRecords {
@@ -229,16 +229,16 @@ func backupSIndexes(
 	}
 
 	reader := newSIndexReader(infoClient, config.Namespace, logger)
-	sindexReadWorker := newReadWorker[*models.Token](reader)
+	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	sindexEncoder, err := config.EncoderFactory.CreateEncoder()
 	if err != nil {
 		return err
 	}
 
-	var sindexWriter dataWriter[*models.Token] = newTokenWriter(sindexEncoder, writer, logger)
+	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(sindexEncoder, writer, logger))
 	sindexWriter = newWriterWithTokenStats(sindexWriter, stats, logger)
-	sindexWriteWorker := newWriteWorker(sindexWriter, limiter)
+	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, limiter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
@@ -268,16 +268,16 @@ func backupUDFs(
 	}
 
 	reader := newUDFReader(infoClient, logger)
-	udfReadWorker := newReadWorker[*models.Token](reader)
+	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	udfEncoder, err := config.EncoderFactory.CreateEncoder()
 	if err != nil {
 		return err
 	}
 
-	var udfWriter dataWriter[*models.Token] = newTokenWriter(udfEncoder, writer, logger)
+	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(udfEncoder, writer, logger))
 	udfWriter = newWriterWithTokenStats(udfWriter, stats, logger)
-	udfWriteWorker := newWriteWorker(udfWriter, limiter)
+	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, limiter)
 
 	udfPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{udfReadWorker},

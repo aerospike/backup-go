@@ -24,6 +24,7 @@ import (
 	encmocks "github.com/aerospike/backup-go/encoding/mocks"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
+	pipemocks "github.com/aerospike/backup-go/pipeline/mocks"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -197,7 +198,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 }
 
 func (suite *writersTestSuite) TestTokenStatsWriter() {
-	mockWriter := mocks.NewDataWriter[*models.Token](suite.T())
+	mockWriter := pipemocks.NewDataWriter[*models.Token](suite.T())
 	mockWriter.EXPECT().Write(models.NewRecordToken(models.Record{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
@@ -228,7 +229,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 }
 
 func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
-	mockWriter := mocks.NewDataWriter[*models.Token](suite.T())
+	mockWriter := pipemocks.NewDataWriter[*models.Token](suite.T())
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
 	mockStats := newMockStatsSetterToken(suite.T())

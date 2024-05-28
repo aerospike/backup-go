@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/pipeline/mocks"
 	"github.com/stretchr/testify/suite"
 )
 

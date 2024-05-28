@@ -196,7 +196,7 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWo
 	namespaceSet := newTokenWorker(processors.NewChangeNamespaceProcessor(rh.config.Namespace))
 	ttlSetters := newTokenWorker(processors.NewProcessorTTL(&rh.stats.recordsExpired, rh.logger))
 	binFilters := newTokenWorker(processors.NewProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
-	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](rh.config.RecordsPerSecond))
+	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))
 	tokenTypeFilter := newTokenWorker(
 		processors.NewTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
 	recordSetFilter := newTokenWorker(processors.NewProcessorSetFilter(rh.config.SetList, &rh.stats.recordsSkipped))

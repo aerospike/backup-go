@@ -64,7 +64,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewChangeNamespaceProcessor(tt.restoreNS)
+			p := NewChangeNamespace(tt.restoreNS)
 			gotToken, err := p.Process(tt.initialToken)
 
 			if tt.wantErr {

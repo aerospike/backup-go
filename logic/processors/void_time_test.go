@@ -99,16 +99,16 @@ func Test_processorVoidTime_Process(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &processorVoidTime{
+			p := &voidTimeSetter{
 				getNow: tt.fields.getNow,
 			}
 			got, err := p.Process(tt.args.token)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("processorVoidTime.Process() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("voidTimeSetter.Process() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("processorVoidTime.Process() = %v, want %v", got, tt.want)
+				t.Errorf("voidTimeSetter.Process() = %v, want %v", got, tt.want)
 			}
 		})
 	}

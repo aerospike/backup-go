@@ -7,38 +7,38 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-// setFilterProcessor filter records by set.
-type setFilterProcessor struct {
+// filterBySet filter records by set.
+type filterBySet struct {
 	setsToRestore map[string]bool
 	skipped       *atomic.Uint64
 }
 
-// NewProcessorSetFilter creates new setFilterProcessor with given setList.
-func NewProcessorSetFilter(setList []string, skipped *atomic.Uint64) TokenProcessor {
-	return &setFilterProcessor{
+// NewFilterBySet creates new filterBySet processor with given setList.
+func NewFilterBySet(setList []string, skipped *atomic.Uint64) TokenProcessor {
+	return &filterBySet{
 		setsToRestore: util.ListToMap(setList),
 		skipped:       skipped,
 	}
 }
 
 // Process filters out records that does not belong to setsToRestore
-func (b setFilterProcessor) Process(token *models.Token) (*models.Token, error) {
+func (p filterBySet) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 
 	// if filter set list is empty, don't filter anything.
-	if len(b.setsToRestore) == 0 {
+	if len(p.setsToRestore) == 0 {
 		return token, nil
 	}
 
 	set := token.Record.Key.SetName()
-	if b.setsToRestore[set] {
+	if p.setsToRestore[set] {
 		return token, nil
 	}
 
-	b.skipped.Add(1)
+	p.skipped.Add(1)
 
 	return nil, errFilteredOut
 }

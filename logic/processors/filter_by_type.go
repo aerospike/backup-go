@@ -7,19 +7,19 @@ import (
 )
 
 // tokenTypeFilterProcessor is used to support no-records, no-indexes and no-udf flags.
-type tokenTypeProcessor struct {
+type filterByType struct {
 	noRecords bool
 	noIndexes bool
 	noUdf     bool
 }
 
-// NewTokenTypeFilterProcessor creates new tokenTypeFilterProcessor
-func NewTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) TokenProcessor {
+// NewFilterByType creates new filterByType processor
+func NewFilterByType(noRecords, noIndexes, noUdf bool) TokenProcessor {
 	if !noRecords && !noIndexes && !noUdf {
 		return &noopProcessor[*models.Token]{}
 	}
 
-	return &tokenTypeProcessor{
+	return &filterByType{
 		noRecords: noRecords,
 		noIndexes: noIndexes,
 		noUdf:     noUdf,
@@ -27,16 +27,16 @@ func NewTokenTypeFilterProcessor(noRecords, noIndexes, noUdf bool) TokenProcesso
 }
 
 // Process filters tokens by type.
-func (b tokenTypeProcessor) Process(token *models.Token) (*models.Token, error) {
-	if b.noRecords && token.Type == models.TokenTypeRecord {
+func (p filterByType) Process(token *models.Token) (*models.Token, error) {
+	if p.noRecords && token.Type == models.TokenTypeRecord {
 		return nil, fmt.Errorf("%w: record is filtered with no-records flag", errFilteredOut)
 	}
 
-	if b.noIndexes && token.Type == models.TokenTypeSIndex {
+	if p.noIndexes && token.Type == models.TokenTypeSIndex {
 		return nil, fmt.Errorf("%w: index is filtered with no-indexes flag", errFilteredOut)
 	}
 
-	if b.noUdf && token.Type == models.TokenTypeUDF {
+	if p.noUdf && token.Type == models.TokenTypeUDF {
 		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", errFilteredOut)
 	}
 

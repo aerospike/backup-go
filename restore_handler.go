@@ -193,13 +193,13 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWo
 
 	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.recordsTotal))
 	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.totalBytesRead))
-	namespaceSet := newTokenWorker(processors.NewChangeNamespaceProcessor(rh.config.Namespace))
-	ttlSetters := newTokenWorker(processors.NewProcessorTTL(&rh.stats.recordsExpired, rh.logger))
-	binFilters := newTokenWorker(processors.NewProcessorBinFilter(rh.config.BinList, &rh.stats.recordsSkipped))
+	changeNamespace := newTokenWorker(processors.NewChangeNamespace(rh.config.Namespace))
+	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.recordsExpired, rh.logger))
+	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.recordsSkipped))
 	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))
 	tokenTypeFilter := newTokenWorker(
-		processors.NewTokenTypeFilterProcessor(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
-	recordSetFilter := newTokenWorker(processors.NewProcessorSetFilter(rh.config.SetList, &rh.stats.recordsSkipped))
+		processors.NewFilterByType(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
+	recordSetFilter := newTokenWorker(processors.NewFilterBySet(rh.config.SetList, &rh.stats.recordsSkipped))
 
 	job := pipeline.NewPipeline(
 		readWorkers,
@@ -211,14 +211,14 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []*readWo
 		// filters
 		tokenTypeFilter,
 		recordSetFilter,
-		binFilters,
+		binFilter,
 
 		// speed limiters.
 		tpsLimiter,
 
 		// modifications.
-		namespaceSet,
-		ttlSetters,
+		changeNamespace,
+		ttlSetter,
 
 		writeWorkers,
 	)

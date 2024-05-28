@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// processorTTL is a DataProcessor that sets the TTL of a record based on its VoidTime.
+// expirationSetter is a DataProcessor that sets the Expiration (TTL) of a record based on its VoidTime.
 // It is used during restore to set the TTL of records from their backed up VoidTime.
-type processorTTL struct {
+type expirationSetter struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
 	getNow  func() cltime.CLTime
@@ -22,13 +22,13 @@ type processorTTL struct {
 	logger  *slog.Logger
 }
 
-// NewProcessorTTL creates a new TTLProcessor
-func NewProcessorTTL(expired *atomic.Uint64, logger *slog.Logger) TokenProcessor {
+// NewExpirationSetter creates a new expirationSetter processor
+func NewExpirationSetter(expired *atomic.Uint64, logger *slog.Logger) TokenProcessor {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
 	logger.Debug("created new TTL processor")
 
-	return &processorTTL{
+	return &expirationSetter{
 		getNow:  cltime.Now,
 		expired: expired,
 		logger:  logger,
@@ -41,7 +41,7 @@ func NewProcessorTTL(expired *atomic.Uint64, logger *slog.Logger) TokenProcessor
 var errExpiredRecord = fmt.Errorf("%w: record is expired", errFilteredOut)
 
 // Process sets the TTL of a record based on its VoidTime
-func (p *processorTTL) Process(token *models.Token) (*models.Token, error) {
+func (p *expirationSetter) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
 		return token, nil

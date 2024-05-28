@@ -78,7 +78,7 @@ func (bh *backupRecordsHandler) run(
 		)
 
 		readWorkers[i] = newReadWorker[*models.Token](recordReader)
-		processorWorkers[i] = processors.NewProcessorWorker[*models.Token](processors.NewProcessorVoidTime(bh.logger))
+		processorWorkers[i] = processors.NewProcessorWorker[*models.Token](processors.NewVoidTimeSetter(bh.logger))
 	}
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))

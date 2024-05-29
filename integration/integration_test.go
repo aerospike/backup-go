@@ -30,6 +30,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding/asb"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
+	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
@@ -352,7 +353,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, err := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	writerFactory, err := local.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
 	suite.Nil(err)
 
 	bh, err := suite.backupClient.Backup(
@@ -382,7 +383,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	factory, _ := backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	factory, _ := local.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -406,7 +407,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
-	_, err = backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	_, err = local.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
 	suite.ErrorContains(err, "backup directory is invalid")
 }
 
@@ -519,7 +520,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	backupConfig.Partitions = partitions
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory, false)
+	writerFactory, _ := local.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory, false)
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
@@ -537,7 +538,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewRestoreConfig()
-	readerFactory, _ := backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	readerFactory, _ := local.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,

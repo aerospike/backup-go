@@ -22,6 +22,8 @@ type s3ReaderFactory struct {
 
 var _ backup.ReaderFactory = (*s3ReaderFactory)(nil)
 
+var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
+
 func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) (backup.ReaderFactory, error) {
 	if decoder == nil {
 		return nil, errors.New("decoder is nil")
@@ -71,7 +73,7 @@ func (f *s3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 	}
 
 	if len(readers) == 0 {
-		return nil, fmt.Errorf("%w: %s doesn't contain backup files", backup.ErrRestoreDirectoryInvalid, f.s3Config.Prefix)
+		return nil, fmt.Errorf("%w: %s doesn't contain backup files", ErrRestoreDirectoryInvalid, f.s3Config.Prefix)
 	}
 
 	return readers, nil

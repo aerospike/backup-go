@@ -1,4 +1,4 @@
-package backup
+package local
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 )
 
@@ -18,7 +19,9 @@ func NewDirectoryReaderFactory(dir string, decoder encoding.DecoderFactory) (*Di
 	return &DirectoryReaderFactory{dir: dir, decoder: decoder}, nil
 }
 
-var _ ReaderFactory = (*DirectoryReaderFactory)(nil)
+var _ backup.ReaderFactory = (*DirectoryReaderFactory)(nil)
+
+var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 type DirectoryReaderFactory struct {
 	decoder encoding.DecoderFactory
@@ -62,10 +65,6 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 
 	return readers, nil
 }
-
-// **** Helper Functions ****
-
-var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format

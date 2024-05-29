@@ -13,6 +13,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/writers"
+	"github.com/aerospike/backup-go/io/local"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -52,7 +53,7 @@ func NewS3WriterFactory(
 
 	if !isEmpty {
 		if !removeFiles {
-			return nil, fmt.Errorf("%w: %s is not empty", backup.ErrBackupDirectoryInvalid, s3Config.Prefix)
+			return nil, fmt.Errorf("%w: %s is not empty", local.ErrBackupDirectoryInvalid, s3Config.Prefix)
 		}
 
 		err := deleteAllFilesUnderPrefix(client, s3Config)

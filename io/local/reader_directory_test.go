@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backup
+package local
 
 import (
 	"os"
@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/encoding/asb"
-	"github.com/aerospike/backup-go/io/local"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -40,14 +39,14 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	_ = f.Close()
 
-	factory, _ := local.NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
 	_, err = factory.Readers()
 	suite.NoError(err)
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilDecoder() {
 	dir := suite.T().TempDir()
-	_, err := local.NewDirectoryReaderFactory(dir, nil)
+	_, err := NewDirectoryReaderFactory(dir, nil)
 	suite.Error(err)
 }
 
@@ -73,7 +72,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	_ = f.Close()
 
-	factory, err := local.NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	factory, err := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
 	suite.NoError(err)
 	_, err = factory.Readers()
 	suite.NoError(err)
@@ -91,7 +90,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	_ = f.Close()
 
-	factory, _ := local.NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
 	_, err = factory.Readers()
 	suite.Error(err)
 }
@@ -107,7 +106,7 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	path := filepath.Join(dir, file.Name())
 
-	factory, _ := local.NewDirectoryReaderFactory(path, asb.NewASBDecoderFactory())
+	factory, _ := NewDirectoryReaderFactory(path, asb.NewASBDecoderFactory())
 	_, err = factory.Readers()
 	suite.Error(err)
 }
@@ -122,14 +121,14 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 		suite.FailNow("Failed to create dir: %v", err)
 	}
 
-	factory, _ := local.NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
 	_, err = factory.Readers()
 	suite.Error(err)
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := suite.T().TempDir()
-	factory, _ := local.NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
 	err := factory.checkRestoreDirectory()
 	suite.Error(err)
 }

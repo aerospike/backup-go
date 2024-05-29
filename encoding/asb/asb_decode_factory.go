@@ -25,6 +25,7 @@ func (f *asbDecoderFactory) CreateDecoder(src io.Reader) (encoding.Decoder, erro
 	return NewDecoder(src)
 }
 
+// Validate checks if given file name has .asb extension
 func (f *asbDecoderFactory) Validate(fileName string) error {
 	if filepath.Ext(fileName) != ".asb" {
 		return fmt.Errorf("restore file %s is in an invalid format, expected extension: .asb, got: %s",

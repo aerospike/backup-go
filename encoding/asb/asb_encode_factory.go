@@ -22,6 +22,8 @@ var _ encoding.EncoderFactory = (*asbEncoderFactory)(nil)
 func (f *asbEncoderFactory) CreateEncoder() (encoding.Encoder, error) {
 	return NewEncoder()
 }
+
+// GenerateFilename generates a filename for a given namespace and ID
 func (f *asbEncoderFactory) GenerateFilename(namespace string, id uint32) string {
 	return fmt.Sprintf("%s_%d.asb", namespace, id)
 }

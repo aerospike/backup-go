@@ -1,5 +1,3 @@
-//go:build integration
-
 // Copyright 2024-2024 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -232,7 +230,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 }
 
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*backup.BackupStats, *models.RestoreStats) {
+	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*models.BackupStats, *models.RestoreStats) {
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
@@ -849,9 +847,9 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	totalDuration := time.Since(now)
 
 	expectedDuration := time.Duration(1000.0*numRec/rps) * time.Millisecond
-	suite.Require().InDelta(expectedDuration, backupStats.Duration, epsilon)
-	suite.Require().InDelta(expectedDuration, restoreStats.Duration, epsilon)
-	suite.Require().InDelta(totalDuration, restoreStats.Duration+backupStats.Duration, epsilon)
+	suite.Require().InDelta(expectedDuration, backupStats.GetDuration(), epsilon)
+	suite.Require().InDelta(expectedDuration, restoreStats.GetDuration(), epsilon)
+	suite.Require().InDelta(totalDuration, restoreStats.GetDuration()+backupStats.GetDuration(), epsilon)
 
 	suite.TearDownTest()
 }

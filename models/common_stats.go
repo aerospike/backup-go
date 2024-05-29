@@ -51,7 +51,7 @@ func (s *commonStats) Start() {
 }
 
 func (s *commonStats) Stop() {
-	if s.duration != 0 {
+	if s.duration == 0 {
 		s.duration = time.Since(s.start)
 	}
 }

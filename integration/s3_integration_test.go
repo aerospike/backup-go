@@ -7,13 +7,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/aerospike/backup-go/encoding/asb"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/io/s3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -171,7 +171,7 @@ func randomBytes(n int) []byte {
 }
 
 func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *s3.StorageConfig) []byte {
-	factory, _ := s3.NewS3WriterFactory(config, encoding.NewASBEncoderFactory(), true)
+	factory, _ := s3.NewS3WriterFactory(config, asb.NewASBEncoderFactory(), true)
 
 	writer, err := factory.NewWriter(namespace, func(_ io.WriteCloser) error {
 		return nil
@@ -198,14 +198,14 @@ func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *s
 	}
 
 	// cannot create new factory because folder is not empty
-	_, err = s3.NewS3WriterFactory(config, encoding.NewASBEncoderFactory(), false)
+	_, err = s3.NewS3WriterFactory(config, asb.NewASBEncoderFactory(), false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
 	return allBytesWritten
 }
 
 func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
-	factory, _ := s3.NewS3ReaderFactory(config, encoding.NewASBDecoderFactory())
+	factory, _ := s3.NewS3ReaderFactory(config, asb.NewASBDecoderFactory())
 
 	readers, err := factory.Readers()
 	if err != nil {

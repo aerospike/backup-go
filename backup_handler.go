@@ -207,7 +207,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 }
 
 func (bh *BackupHandler) writeHeader(writer io.WriteCloser, encoder encoding.Encoder) (int, error) {
-	header, err := encoder.GetHeader(bh.config.Namespace, bh.firstFileHeaderWritten.Swap(true))
+	header, err := encoder.GetHeader(bh.config.Namespace, !bh.firstFileHeaderWritten.Swap(true))
 	if err != nil {
 		return 0, err
 	}

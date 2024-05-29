@@ -18,25 +18,16 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"sync/atomic"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
+	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 )
-
-// **** Generic Restore Handler ****
-
-// DBRestoreClient is an interface for writing data to a database
-// The Aerospike Go client satisfies this interface
-type DBRestoreClient interface {
-	dbWriter
-}
 
 // ReaderFactory provides access to data that should be restored.
 type ReaderFactory interface {
@@ -56,7 +47,7 @@ type RestoreHandler struct {
 	limiter         *rate.Limiter
 	errors          chan error
 	id              string
-	stats           RestoreStats
+	stats           models.RestoreStats
 }
 
 // newRestoreHandler creates a new RestoreHandler
@@ -79,7 +70,7 @@ func newRestoreHandler(config *RestoreConfig,
 // currently this should only be run once
 func (rh *RestoreHandler) run(ctx context.Context) {
 	rh.errors = make(chan error, 1)
-	rh.stats.start = time.Now()
+	rh.stats.Start()
 
 	go doWork(rh.errors, rh.logger, func() error {
 		// check that the restore directory is valid
@@ -150,14 +141,14 @@ func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.Reader) ([]pip
 }
 
 // GetStats returns the stats of the restore job
-func (rh *RestoreHandler) GetStats() *RestoreStats {
+func (rh *RestoreHandler) GetStats() *models.RestoreStats {
 	return &rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed
 func (rh *RestoreHandler) Wait(ctx context.Context) error {
 	defer func() {
-		rh.stats.Duration = time.Since(rh.stats.start)
+		rh.stats.Stop()
 	}()
 
 	select {
@@ -175,7 +166,7 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
-		writer := newRestoreWriter(
+		writer := aerospike.NewRestoreWriter(
 			rh.aerospikeClient,
 			rh.config.WritePolicy,
 			&rh.stats,
@@ -186,15 +177,15 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 		writeWorkers[i] = pipeline.NewWriteWorker[*models.Token](statsWriter, rh.limiter)
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.recordsTotal))
-	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.totalBytesRead))
+	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.RecordsTotal))
+	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
 	changeNamespace := newTokenWorker(processors.NewChangeNamespace(rh.config.Namespace))
-	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.recordsExpired, rh.logger))
-	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.recordsSkipped))
+	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.logger))
+	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped))
 	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))
 	tokenTypeFilter := newTokenWorker(
 		processors.NewFilterByType(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
-	recordSetFilter := newTokenWorker(processors.NewFilterBySet(rh.config.SetList, &rh.stats.recordsSkipped))
+	recordSetFilter := newTokenWorker(processors.NewFilterBySet(rh.config.SetList, &rh.stats.RecordsSkipped))
 
 	job := pipeline.NewPipeline(
 		readers,
@@ -228,61 +219,3 @@ func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*mode
 }
 
 // **** Restore From Reader Handler ****
-
-// RestoreStats stores the stats of a restore from reader job
-type RestoreStats struct {
-	start    time.Time
-	Duration time.Duration
-	tokenStats
-	// The number of records dropped because they were expired.
-	recordsExpired atomic.Uint64
-	// The number of records dropped because they didn't contain any of the
-	// selected bins or didn't belong to any of the selected sets.
-	recordsSkipped atomic.Uint64
-	// The number of records dropped because the database already contained the
-	// records with a higher generation count.
-	recordsFresher atomic.Uint64
-	// The number of records dropped because they already existed in the
-	// database.
-	recordsExisted atomic.Uint64
-	// The number of successfully restored records.
-	recordsInserted atomic.Uint64
-	// Total number of bytes read from source.
-	totalBytesRead atomic.Uint64
-}
-
-func (rs *RestoreStats) GetRecordsExpired() uint64 {
-	return rs.recordsExpired.Load()
-}
-
-func (rs *RestoreStats) GetRecordsSkipped() uint64 {
-	return rs.recordsSkipped.Load()
-}
-
-func (rs *RestoreStats) GetRecordsFresher() uint64 {
-	return rs.recordsFresher.Load()
-}
-
-func (rs *RestoreStats) incrRecordsFresher() {
-	rs.recordsFresher.Add(1)
-}
-
-func (rs *RestoreStats) GetRecordsExisted() uint64 {
-	return rs.recordsExisted.Load()
-}
-
-func (rs *RestoreStats) incrRecordsExisted() {
-	rs.recordsExisted.Add(1)
-}
-
-func (rs *RestoreStats) GetRecordsInserted() uint64 {
-	return rs.recordsInserted.Load()
-}
-
-func (rs *RestoreStats) incrRecordsInserted() {
-	rs.recordsInserted.Add(1)
-}
-
-func (rs *RestoreStats) GetTotalBytesRead() uint64 {
-	return rs.totalBytesRead.Load()
-}

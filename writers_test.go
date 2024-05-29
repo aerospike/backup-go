@@ -22,7 +22,6 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	encmocks "github.com/aerospike/backup-go/encoding/mocks"
-	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipeline/mocks"
 	"github.com/stretchr/testify/suite"
@@ -101,102 +100,6 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	writer.Close()
 }
 
-func (suite *writersTestSuite) TestRestoreWriterRecord() {
-	namespace := "test"
-	set := ""
-
-	key, aerr := a.NewKey(namespace, set, "key")
-	if aerr != nil {
-		panic(aerr)
-	}
-
-	expRecord := models.Record{
-		Record: &a.Record{
-			Key: key,
-			Bins: a.BinMap{
-				"key0": "hi",
-				"key1": 1,
-			},
-		},
-	}
-	recToken := models.NewRecordToken(expRecord, 0)
-
-	policy := &a.WritePolicy{}
-	mockDBWriter := mocks.NewDbWriter(suite.T())
-	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
-
-	writer := newRestoreWriter(mockDBWriter, policy, &RestoreStats{}, slog.Default())
-	suite.NotNil(writer)
-
-	_, err := writer.Write(recToken)
-	suite.Nil(err)
-
-	writer.Close()
-
-	mockDBWriter.AssertExpectations(suite.T())
-}
-
-func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
-	namespace := "test"
-	set := ""
-	key, _ := a.NewKey(namespace, set, "key")
-	mockDBWriter := mocks.NewDbWriter(suite.T())
-	policy := &a.WritePolicy{}
-	writer := newRestoreWriter(mockDBWriter, policy, &RestoreStats{}, slog.Default())
-	rec := models.Record{
-		Record: &a.Record{
-			Key: key,
-			Bins: a.BinMap{
-				"key0": "hi",
-				"key1": 1,
-			},
-		},
-	}
-	failRecToken := models.NewRecordToken(rec, 0)
-	mockDBWriter.EXPECT().Put(policy, rec.Key, rec.Bins).Return(a.ErrInvalidParam)
-	_, err := writer.Write(failRecToken)
-	suite.NotNil(err)
-
-	mockDBWriter.AssertExpectations(suite.T())
-}
-
-func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
-	namespace := "test"
-	set := ""
-
-	key, aerr := a.NewKey(namespace, set, "key")
-	if aerr != nil {
-		panic(aerr)
-	}
-
-	expRecord := models.Record{
-		Record: &a.Record{
-			Key: key,
-			Bins: a.BinMap{
-				"key0": "hi",
-				"key1": 1,
-			},
-		},
-	}
-	recToken := models.NewRecordToken(expRecord, 120)
-
-	policy := a.NewWritePolicy(1, 0)
-
-	mockDBWriter := mocks.NewDbWriter(suite.T())
-	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
-
-	stats := &RestoreStats{}
-	writer := newRestoreWriter(mockDBWriter, policy, stats, slog.Default())
-	suite.NotNil(writer)
-	n, err := writer.Write(recToken)
-
-	suite.Equal(120, n)
-	suite.Equal(1, int(stats.GetRecordsInserted()))
-	suite.Nil(err)
-
-	writer.Close()
-}
-
 func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter := pipemocks.NewDataWriter[*models.Token](suite.T())
 	mockWriter.EXPECT().Write(models.NewRecordToken(models.Record{}, 0)).Return(1, nil)
@@ -206,9 +109,9 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter.EXPECT().Close()
 
 	mockStats := newMockStatsSetterToken(suite.T())
-	mockStats.EXPECT().addUDFs(uint32(1))
-	mockStats.EXPECT().addSIndexes(uint32(1))
-	mockStats.EXPECT().addTotalBytesWritten(uint64(1))
+	mockStats.EXPECT().AddUDFs(uint32(1))
+	mockStats.EXPECT().AddSIndexes(uint32(1))
+	mockStats.EXPECT().AddTotalBytesWritten(uint64(1))
 
 	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)

@@ -232,7 +232,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 }
 
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*backup.BackupStats, *backup.RestoreStats) {
+	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*backup.BackupStats, *models.RestoreStats) {
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 

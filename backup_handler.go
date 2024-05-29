@@ -19,7 +19,6 @@ import (
 	"io"
 	"log/slog"
 	"sync/atomic"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
@@ -51,24 +50,7 @@ type BackupHandler struct {
 	firstFileHeaderWritten *atomic.Bool
 	errors                 chan error
 	id                     string
-	stats                  BackupStats
-}
-
-// BackupStats stores the status of a backup job.
-// Stats are updated in realtime by backup jobs.
-type BackupStats struct {
-	start    time.Time
-	Duration time.Duration
-	tokenStats
-	fileCount atomic.Uint64
-}
-
-func (b *BackupStats) incFiles() {
-	b.fileCount.Add(1)
-}
-
-func (b *BackupStats) GetFileCount() uint64 {
-	return b.fileCount.Load()
+	stats                  models.BackupStats
 }
 
 // newBackupHandler creates a new BackupHandler
@@ -91,7 +73,7 @@ func newBackupHandler(config *BackupConfig,
 // currently this should only be run once
 func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
-	bh.stats.start = time.Now()
+	bh.stats.Start()
 
 	limiter := makeBandwidthLimiter(bh.config.Bandwidth)
 
@@ -111,8 +93,8 @@ func (bh *BackupHandler) run(ctx context.Context) {
 					return err
 				}
 
-				bh.stats.addTotalBytesWritten(uint64(headerLen))
-				bh.stats.incFiles()
+				bh.stats.AddTotalBytesWritten(uint64(headerLen))
+				bh.stats.IncFiles()
 
 				return nil
 			})
@@ -153,7 +135,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 		handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
 
-		return handler.run(ctx, writeWorkers, &bh.stats.recordsTotal)
+		return handler.run(ctx, writeWorkers, &bh.stats.RecordsTotal)
 	})
 }
 
@@ -188,14 +170,14 @@ func (bh *BackupHandler) backupSIndexesAndUdfs(
 }
 
 // GetStats returns the stats of the backup job
-func (bh *BackupHandler) GetStats() *BackupStats {
+func (bh *BackupHandler) GetStats() *models.BackupStats {
 	return &bh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
 func (bh *BackupHandler) Wait(ctx context.Context) error {
 	defer func() {
-		bh.stats.Duration = time.Since(bh.stats.start)
+		bh.stats.Stop()
 	}()
 
 	select {
@@ -219,7 +201,7 @@ func backupSIndexes(
 	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
-	stats *BackupStats,
+	stats *models.BackupStats,
 	writer io.Writer,
 	logger *slog.Logger,
 	limiter *rate.Limiter,
@@ -258,7 +240,7 @@ func backupUDFs(
 	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
-	stats *BackupStats,
+	stats *models.BackupStats,
 	writer io.Writer,
 	logger *slog.Logger,
 	limiter *rate.Limiter,

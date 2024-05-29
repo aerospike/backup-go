@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/logic/asinfo/mocks"
+	"github.com/aerospike/backup-go/internal/asinfo/mocks"
 	"github.com/aerospike/backup-go/models"
 )
 

@@ -44,14 +44,6 @@ func (suite *backupDirectoryTestSuite) Test_openBackupFile() {
 	suite.NoError(err)
 }
 
-func (suite *backupDirectoryTestSuite) Test_getBackupFileNameGeneric() {
-	suite.Equal("test_1", getBackupFileNameGeneric("test", 1))
-}
-
-func (suite *backupDirectoryTestSuite) Test_getBackupFileNameASB() {
-	suite.Equal("test_1.asb", getBackupFileNameASB("test", 1))
-}
-
 func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Positive() {
 	dir := suite.T().TempDir()
 	err := prepareBackupDirectory(dir)

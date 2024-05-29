@@ -23,8 +23,8 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/logic/asinfo"
-	"github.com/aerospike/backup-go/logic/logging"
+	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
@@ -106,7 +106,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 			// TODO: add headers logic to endcoder, instead this lambda acrobatics
 			writer, err := bh.writeFactory.NewWriter(bh.config.Namespace, func(w io.WriteCloser) error {
-				headerLen, err := bh.writeHeader(w, bh.config.Namespace)
+				headerLen, err := bh.writeHeader(w, encoder)
 				if err != nil {
 					return err
 				}
@@ -206,12 +206,13 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
-func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) (int, error) {
-	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
-		return writeASBHeader(writer, namespace, bh.firstFileHeaderWritten.Swap(true))
+func (bh *BackupHandler) writeHeader(writer io.WriteCloser, encoder encoding.Encoder) (int, error) {
+	header, err := encoder.GetHeader(bh.config.Namespace, bh.firstFileHeaderWritten.Swap(true))
+	if err != nil {
+		return 0, err
 	}
 
-	return 0, nil
+	return writer.Write(header)
 }
 
 func backupSIndexes(

@@ -17,7 +17,6 @@ package encoding
 import (
 	"io"
 
-	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -32,17 +31,8 @@ type Decoder interface {
 	NextToken() (*models.Token, error)
 }
 
-// ASBDecoderFactory satisfies the DecoderBuilder interface
-// It creates a new ASB format decoder
-type ASBDecoderFactory struct{}
-
-// NewASBDecoderFactory returns a new ASBDecoderBuilder
-func NewASBDecoderFactory() *ASBDecoderFactory {
-	return &ASBDecoderFactory{}
-}
-
-// CreateDecoder creates a new ASBDecoder
-// This method is called by the backup client to create a new decoder
-func (f *ASBDecoderFactory) CreateDecoder(src io.Reader) (Decoder, error) {
-	return asb.NewDecoder(src)
+// DecoderFactory is used to specify the decoder with which to decode the backup data
+type DecoderFactory interface {
+	CreateDecoder(src io.Reader) (Decoder, error)
+	Validate(fileName string) error
 }

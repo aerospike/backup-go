@@ -190,7 +190,8 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	actual, err := GetHeader("test", true)
+	encoder, _ := NewEncoder()
+	actual, err := encoder.GetHeader("test", true)
 	suite.Assert().NoError(err)
 	suite.Assert().Equal(expected, string(actual))
 }
@@ -198,7 +199,8 @@ func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 func (suite *asbEncoderTestSuite) TestGetHeader() {
 	expected := "Version 3.1\n# namespace test\n"
 
-	actual, err := GetHeader("test", false)
+	encoder, _ := NewEncoder()
+	actual, err := encoder.GetHeader("test", false)
 	suite.Assert().NoError(err)
 	suite.Assert().Equal(expected, string(actual))
 }

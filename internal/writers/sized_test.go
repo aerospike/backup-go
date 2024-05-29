@@ -19,7 +19,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/aerospike/backup-go/logic/writers"
+	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/stretchr/testify/suite"
 )
 

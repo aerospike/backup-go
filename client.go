@@ -18,13 +18,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/logic/logging"
+	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -38,8 +38,8 @@ const (
 )
 
 var (
-	defaultEncoderFactory = encoding.NewASBEncoderFactory()
-	defaultDecoderFactory = encoding.NewASBDecoderFactory()
+	defaultEncoderFactory = asb.NewASBEncoderFactory()
+	defaultDecoderFactory = asb.NewASBDecoderFactory()
 )
 
 // **** Client ****
@@ -141,12 +141,6 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 
 // **** Backup ****
 
-// EncoderFactory is used to specify the encoder with which to encode the backup data
-// if nil, the default encoder factory will be used.
-type EncoderFactory interface {
-	CreateEncoder() (encoding.Encoder, error)
-}
-
 // PartitionRange specifies a range of Aerospike partitions.
 type PartitionRange struct {
 	Begin int
@@ -182,7 +176,7 @@ func (p PartitionRange) validate() error {
 type BackupConfig struct {
 	// EncoderFactory is used to specify the encoder with which to encode the backup data
 	// if nil, the default EncoderFactory will be used.
-	EncoderFactory EncoderFactory
+	EncoderFactory encoding.EncoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -274,17 +268,11 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteF
 
 // **** Restore ****
 
-// DecoderFactory is used to specify the decoder with which to decode the backup data
-// if nil, the default decoder factory will be used.
-type DecoderFactory interface {
-	CreateDecoder(src io.Reader) (encoding.Decoder, error)
-}
-
 // RestoreConfig contains configuration for the restore operation.
 type RestoreConfig struct {
 	// DecoderFactory is used to specify the decoder with which to decode the backup data
 	// if nil, the default DecoderFactory will be used.
-	DecoderFactory DecoderFactory
+	DecoderFactory encoding.DecoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy

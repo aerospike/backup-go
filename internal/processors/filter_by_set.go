@@ -3,7 +3,7 @@ package processors
 import (
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/logic/util"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 )
 

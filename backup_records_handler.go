@@ -20,8 +20,7 @@ import (
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/logic/processors"
+	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 )
@@ -61,11 +60,9 @@ func (bh *backupRecordsHandler) run(
 
 	scanPolicy := *bh.config.ScanPolicy
 
-	// if we are using the asb encoder, we need to set the RawCDT flag
+	// we need to set the RawCDT flag
 	// in the scan policy so that maps and lists are returned as raw blob bins
-	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
-		scanPolicy.RawCDT = true
-	}
+	scanPolicy.RawCDT = true
 
 	for i := 0; i < bh.config.Parallel; i++ {
 		ARRCFG := newArrConfig(bh.config, partitionRanges[i])

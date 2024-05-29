@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/logic/processors/mocks"
+	"github.com/aerospike/backup-go/internal/processors/mocks"
 	"github.com/stretchr/testify/suite"
 )
 

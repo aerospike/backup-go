@@ -23,12 +23,15 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/models"
 )
 
 type Encoder struct {
 	buff bytes.Buffer
 }
+
+var _ encoding.Encoder = (*Encoder)(nil)
 
 func NewEncoder() (*Encoder, error) {
 	return &Encoder{
@@ -80,7 +83,7 @@ func (o *Encoder) encodeSIndex(sindex *models.SIndex) (int, error) {
 	return sindexToASB(sindex, &o.buff)
 }
 
-func GetHeader(namespace string, firstFile bool) ([]byte, error) {
+func (o *Encoder) GetHeader(namespace string, firstFile bool) ([]byte, error) {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	data := make([]byte, 0, 256)
 	buff := bytes.NewBuffer(data)

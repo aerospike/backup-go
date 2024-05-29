@@ -16,12 +16,9 @@ package backup
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"runtime/debug"
 	"sync/atomic"
-
-	"github.com/aerospike/backup-go/encoding/asb"
 )
 
 func handlePanic(errors chan<- error, logger *slog.Logger) {
@@ -126,13 +123,4 @@ func (bs *tokenStats) addSIndexes(num uint32) {
 
 func (bs *tokenStats) addUDFs(num uint32) {
 	bs.uDFs.Add(num)
-}
-
-func writeASBHeader(w io.Writer, namespace string, firstWritten bool) (int, error) {
-	header, err := asb.GetHeader(namespace, !firstWritten)
-	if err != nil {
-		return 0, err
-	}
-
-	return w.Write(header)
 }

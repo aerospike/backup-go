@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/logic/writers"
+	"github.com/aerospike/backup-go/internal/writers"
 )
 
 type DirectoryWriterFactory struct {
-	fileID    *atomic.Int32
-	encoder   EncoderFactory
+	fileID    *atomic.Uint32
+	encoder   encoding.EncoderFactory
 	directory string
 
 	fileSizeLimit int64
@@ -29,7 +29,7 @@ var _ WriteFactory = (*DirectoryWriterFactory)(nil)
 // If non-zero, backup files will be split into multiple files if their size exceeds this limit.
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
 // FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
-func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderFactory, removeFiles bool,
+func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder encoding.EncoderFactory, removeFiles bool,
 ) (*DirectoryWriterFactory, error) {
 	if fileSizeLimit > 0 && fileSizeLimit < 1024*1024 {
 		return nil, fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", fileSizeLimit)
@@ -50,9 +50,13 @@ func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder EncoderF
 		return nil, err
 	}
 
+	if encoder == nil {
+		encoder = defaultEncoderFactory
+	}
+
 	return &DirectoryWriterFactory{
 		directory:     dir,
-		fileID:        &atomic.Int32{},
+		fileID:        &atomic.Uint32{},
 		fileSizeLimit: fileSizeLimit,
 		encoder:       encoder,
 	}, nil
@@ -113,36 +117,22 @@ func makeDir(dir string) error {
 // If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
 func (f *DirectoryWriterFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (
 	io.WriteCloser, error) {
-	var open func() (io.WriteCloser, error)
+	// open is a function that is executed for every file when split by size.
+	open := func() (io.WriteCloser, error) {
+		fileName := f.encoder.GenerateFilename(namespace, f.fileID.Add(1))
+		filePath := filepath.Join(f.directory, fileName)
 
-	if _, ok := f.encoder.(*encoding.ASBEncoderFactory); ok {
-		open = func() (io.WriteCloser, error) {
-			file, err := f.getNewBackupFileASB(namespace, int(f.fileID.Add(1)))
-			if err != nil {
-				return nil, err
-			}
-
-			err = writeHeader(file)
-			if err != nil {
-				return nil, err
-			}
-
-			return file, err
+		file, err := openBackupFile(filePath)
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		open = func() (io.WriteCloser, error) {
-			file, err := f.getNewBackupFileGeneric(namespace, int(f.fileID.Add(1)))
-			if err != nil {
-				return nil, err
-			}
 
-			err = writeHeader(file)
-			if err != nil {
-				return nil, err
-			}
-
-			return file, err
+		err = writeHeader(file)
+		if err != nil {
+			return nil, err
 		}
+
+		return file, err
 	}
 
 	writer, err := open()
@@ -157,37 +147,8 @@ func (f *DirectoryWriterFactory) NewWriter(namespace string, writeHeader func(io
 	return writer, nil
 }
 
-// getNewBackupFileGeneric creates a new backup file in the given directory.
-// The file name is based on the namespace and the id.
-// The files are returned in write mode.
-func (f *DirectoryWriterFactory) getNewBackupFileGeneric(namespace string, id int) (io.WriteCloser, error) {
-	fileName := getBackupFileNameGeneric(namespace, id)
-	filePath := filepath.Join(f.directory, fileName)
-
-	return openBackupFile(filePath)
-}
-
-// getNewBackupFileASB creates a new backup file in the given directory.
-// The file name is based on the namespace and the id.
-// The files is returned in write mode.
-// The file is created with an ASB header and .asb extension.
-func (f *DirectoryWriterFactory) getNewBackupFileASB(namespace string, id int) (io.WriteCloser, error) {
-	fileName := getBackupFileNameASB(namespace, id)
-	filePath := filepath.Join(f.directory, fileName)
-
-	return openBackupFile(filePath)
-}
-
 func openBackupFile(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o666)
-}
-
-func getBackupFileNameGeneric(namespace string, id int) string {
-	return fmt.Sprintf("%s_%d", namespace, id)
-}
-
-func getBackupFileNameASB(namespace string, id int) string {
-	return getBackupFileNameGeneric(namespace, id) + ".asb"
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

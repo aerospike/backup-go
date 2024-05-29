@@ -25,6 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -96,6 +97,8 @@ type Decoder struct {
 	metaData *metaData
 	countingByteScanner
 }
+
+var _ encoding.Decoder = (*Decoder)(nil)
 
 func NewDecoder(src io.Reader) (*Decoder, error) {
 	cbs := bufio.NewReader(src)

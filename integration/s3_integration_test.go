@@ -179,7 +179,7 @@ func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *s
 	}
 
 	var allBytesWritten []byte
-	for range times {
+	for i := 0; i < times; i++ {
 		bytes := randomBytes(bytes)
 		n, err := writer.Write(bytes)
 		if err != nil {

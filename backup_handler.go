@@ -80,7 +80,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 	go doWork(bh.errors, bh.logger, func() error {
 		writeWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
-		for i := range bh.config.Parallel {
+		for i := 0; i < bh.config.Parallel; i++ {
 			encoder, err := bh.config.EncoderFactory.CreateEncoder()
 			if err != nil {
 				return err

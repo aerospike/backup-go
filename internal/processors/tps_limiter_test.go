@@ -22,7 +22,7 @@ func TestTPSLimiter(t *testing.T) {
 			limiter := NewTPSLimiter[int](context.Background(), tt.tps)
 
 			start := time.Now()
-			for i := range tt.runs {
+			for i := 0; i < tt.runs; i++ {
 				got, err := limiter.Process(i)
 				if got != i {
 					t.Fatalf("Process() = %v, want %v", got, i)

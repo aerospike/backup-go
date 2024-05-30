@@ -417,10 +417,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	recs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	data := &bytes.Buffer{}
-	encoder, err := asb.NewEncoder()
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
+	encoder := asb.NewEncoder()
 
 	header, err := encoder.GetHeader(suite.namespace, true)
 	if err != nil {

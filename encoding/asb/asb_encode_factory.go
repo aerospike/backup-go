@@ -20,7 +20,7 @@ var _ encoding.EncoderFactory = (*asbEncoderFactory)(nil)
 // CreateEncoder creates a new ASBEncoder
 // This method is called by the backup client to create a new encoder
 func (f *asbEncoderFactory) CreateEncoder() (encoding.Encoder, error) {
-	return NewEncoder()
+	return NewEncoder(), nil
 }
 
 // GenerateFilename generates a filename for a given namespace and ID

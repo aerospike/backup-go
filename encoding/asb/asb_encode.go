@@ -27,23 +27,23 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-type Encoder struct {
+type asbEncoder struct {
 	buff bytes.Buffer
 }
 
-var _ encoding.Encoder = (*Encoder)(nil)
+var _ encoding.Encoder = (*asbEncoder)(nil)
 
-func NewEncoder() (*Encoder, error) {
-	return &Encoder{
+func NewEncoder() encoding.Encoder {
+	return &asbEncoder{
 		buff: bytes.Buffer{},
-	}, nil
+	}
 }
 
 // EncodeToken encodes a token to the ASB format.
 // It returns a byte slice of the encoded token
 // and an error if the encoding fails.
 // The returned byte slice is only valid until the next call to EncodeToken.
-func (o *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
+func (o *asbEncoder) EncodeToken(token *models.Token) ([]byte, error) {
 	var (
 		n   int
 		err error
@@ -71,19 +71,19 @@ func (o *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 	return o.buff.Bytes(), nil
 }
 
-func (o *Encoder) encodeRecord(rec *models.Record) (int, error) {
+func (o *asbEncoder) encodeRecord(rec *models.Record) (int, error) {
 	return recordToASB(rec, &o.buff)
 }
 
-func (o *Encoder) encodeUDF(udf *models.UDF) (int, error) {
+func (o *asbEncoder) encodeUDF(udf *models.UDF) (int, error) {
 	return udfToASB(udf, &o.buff)
 }
 
-func (o *Encoder) encodeSIndex(sindex *models.SIndex) (int, error) {
+func (o *asbEncoder) encodeSIndex(sindex *models.SIndex) (int, error) {
 	return sindexToASB(sindex, &o.buff)
 }
 
-func (o *Encoder) GetHeader(namespace string, firstFile bool) ([]byte, error) {
+func (o *asbEncoder) GetHeader(namespace string, firstFile bool) ([]byte, error) {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	data := make([]byte, 0, 256)
 	buff := bytes.NewBuffer(data)

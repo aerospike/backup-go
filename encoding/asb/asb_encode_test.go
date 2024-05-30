@@ -35,14 +35,11 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	encoder, err := NewEncoder()
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
+	encoder := NewEncoder().(*asbEncoder)
 
-	key, err := a.NewKey("test", "demo", "1234")
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
+	key, aerr := a.NewKey("test", "demo", "1234")
+	if aerr != nil {
+		suite.FailNow("unexpected error: %v", aerr)
 	}
 
 	token := &models.Token{
@@ -57,7 +54,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 		},
 	}
 
-	_, err = encoder.encodeRecord(&token.Record)
+	_, err := encoder.encodeRecord(&token.Record)
 	suite.Assert().NoError(err)
 	expected := bytes.Clone(encoder.buff.Bytes())
 
@@ -67,10 +64,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	encoder, err := NewEncoder()
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
+	encoder := NewEncoder().(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -81,7 +75,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 		},
 	}
 
-	_, err = encoder.encodeUDF(token.UDF)
+	_, err := encoder.encodeUDF(token.UDF)
 	suite.NoError(err)
 	expected := encoder.buff.Bytes()
 
@@ -91,10 +85,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	encoder, err := NewEncoder()
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
+	encoder := NewEncoder().(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -109,7 +100,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 		},
 	}
 
-	_, err = encoder.encodeSIndex(token.SIndex)
+	_, err := encoder.encodeSIndex(token.SIndex)
 	suite.Assert().NoError(err)
 	expected := encoder.buff.Bytes()
 
@@ -119,10 +110,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	encoder, err := NewEncoder()
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
+	encoder := NewEncoder().(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -135,10 +123,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder, err := NewEncoder()
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
+	encoder := NewEncoder().(*asbEncoder)
 
 	var recExpr int64 = 10
 
@@ -165,10 +150,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder, err := NewEncoder()
-	if err != nil {
-		suite.FailNow("unexpected error: %v", err)
-	}
+	encoder := NewEncoder().(*asbEncoder)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -190,7 +172,7 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder, _ := NewEncoder()
+	encoder := NewEncoder()
 	actual, err := encoder.GetHeader("test", true)
 	suite.Assert().NoError(err)
 	suite.Assert().Equal(expected, string(actual))
@@ -199,7 +181,7 @@ func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 func (suite *asbEncoderTestSuite) TestGetHeader() {
 	expected := "Version 3.1\n# namespace test\n"
 
-	encoder, _ := NewEncoder()
+	encoder := NewEncoder()
 	actual, err := encoder.GetHeader("test", false)
 	suite.Assert().NoError(err)
 	suite.Assert().Equal(expected, string(actual))
@@ -1559,10 +1541,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
-	encoder, err := NewEncoder()
-	if err != nil {
-		b.Fatalf("unexpected error: %v", err)
-	}
+	encoder := NewEncoder().(*asbEncoder)
 
 	key := genKey()
 	rec := &models.Record{

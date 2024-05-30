@@ -1,4 +1,4 @@
-package backup
+package s3
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type S3Config struct {
+type StorageConfig struct {
 	Bucket    string
 	Region    string
 	Endpoint  string
@@ -23,7 +23,7 @@ const (
 	s3type             = "s3"
 )
 
-func newS3Client(s3Config *S3Config) (*s3.Client, error) {
+func newS3Client(s3Config *StorageConfig) (*s3.Client, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithSharedConfigProfile(s3Config.Profile),
 		config.WithRegion(s3Config.Region),

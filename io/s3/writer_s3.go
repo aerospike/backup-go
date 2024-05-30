@@ -1,31 +1,42 @@
-package backup
+package s3
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/writers"
+	"github.com/aerospike/backup-go/io/local"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type S3WriteFactory struct {
+type s3WriteFactory struct {
 	client   *s3.Client
-	s3Config *S3Config
-	fileID   *atomic.Int32 // increments for each new file created
-	encoder  EncoderFactory
+	s3Config *StorageConfig
+	fileID   *atomic.Uint32 // increments for each new file created
+	encoder  encoding.EncoderFactory
 }
 
-var _ WriteFactory = (*S3WriteFactory)(nil)
+var _ backup.WriteFactory = (*s3WriteFactory)(nil)
 
-func NewS3WriterFactory(s3Config *S3Config, encoder EncoderFactory, removeFiles bool) (*S3WriteFactory, error) {
+func NewS3WriterFactory(
+	s3Config *StorageConfig,
+	encoder encoding.EncoderFactory,
+	removeFiles bool,
+) (backup.WriteFactory, error) {
+	if encoder == nil {
+		return nil, errors.New("encoder is nil")
+	}
+
 	if s3Config.ChunkSize > maxS3File {
 		return nil, fmt.Errorf("invalid chunk size %d, should not exceed %d", s3Config.ChunkSize, maxS3File)
 	}
@@ -42,7 +53,7 @@ func NewS3WriterFactory(s3Config *S3Config, encoder EncoderFactory, removeFiles 
 
 	if !isEmpty {
 		if !removeFiles {
-			return nil, fmt.Errorf("%w: %s is not empty", ErrBackupDirectoryInvalid, s3Config.Prefix)
+			return nil, fmt.Errorf("%w: %s is not empty", local.ErrBackupDirectoryInvalid, s3Config.Prefix)
 		}
 
 		err := deleteAllFilesUnderPrefix(client, s3Config)
@@ -51,15 +62,15 @@ func NewS3WriterFactory(s3Config *S3Config, encoder EncoderFactory, removeFiles 
 		}
 	}
 
-	return &S3WriteFactory{
+	return &s3WriteFactory{
 		client:   client,
 		s3Config: s3Config,
-		fileID:   &atomic.Int32{},
+		fileID:   &atomic.Uint32{},
 		encoder:  encoder,
 	}, nil
 }
 
-type S3Writer struct {
+type s3Writer struct {
 	uploadID       *string
 	client         *s3.Client
 	buffer         *bytes.Buffer
@@ -71,22 +82,16 @@ type S3Writer struct {
 	closed         bool
 }
 
-var _ io.WriteCloser = (*S3Writer)(nil)
+var _ io.WriteCloser = (*s3Writer)(nil)
 
-func (f *S3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (io.WriteCloser, error) {
+func (f *s3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (io.WriteCloser, error) {
 	chunkSize := f.s3Config.ChunkSize
 	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
 	}
 
 	var open = func() (io.WriteCloser, error) {
-		var name string
-		if _, ok := f.encoder.(*encoding.ASBEncoderFactory); ok {
-			name = getBackupFileNameASB(namespace, int(f.fileID.Add(1)))
-		} else {
-			name = getBackupFileNameGeneric(namespace, int(f.fileID.Add(1)))
-		}
-
+		name := f.encoder.GenerateFilename(namespace, f.fileID.Add(1))
 		fullPath := path.Join(f.s3Config.Prefix, name)
 
 		upload, err := f.client.CreateMultipartUpload(context.TODO(), &s3.CreateMultipartUploadInput{
@@ -97,7 +102,7 @@ func (f *S3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCl
 			return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 		}
 
-		writer := &S3Writer{
+		writer := &s3Writer{
 			uploadID:   upload.UploadId,
 			key:        fullPath,
 			client:     f.client,
@@ -123,11 +128,11 @@ func (f *S3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCl
 	return writers.NewSized(maxS3File, writer, open), nil
 }
 
-func (f *S3WriteFactory) GetType() string {
+func (f *s3WriteFactory) GetType() string {
 	return s3type
 }
 
-func (w *S3Writer) Write(p []byte) (int, error) {
+func (w *s3Writer) Write(p []byte) (int, error) {
 	if w.closed {
 		return 0, os.ErrClosed
 	}
@@ -142,7 +147,7 @@ func (w *S3Writer) Write(p []byte) (int, error) {
 	return w.buffer.Write(p)
 }
 
-func (w *S3Writer) uploadPart() error {
+func (w *s3Writer) uploadPart() error {
 	response, err := w.client.UploadPart(context.TODO(), &s3.UploadPartInput{
 		Body:       bytes.NewReader(w.buffer.Bytes()),
 		Bucket:     &w.bucket,
@@ -167,7 +172,7 @@ func (w *S3Writer) uploadPart() error {
 	return nil
 }
 
-func (w *S3Writer) Close() error {
+func (w *s3Writer) Close() error {
 	if w.closed {
 		return os.ErrClosed
 	}
@@ -197,7 +202,7 @@ func (w *S3Writer) Close() error {
 	return nil
 }
 
-func isEmptyDirectory(client *s3.Client, s3config *S3Config) (bool, error) {
+func isEmptyDirectory(client *s3.Client, s3config *StorageConfig) (bool, error) {
 	resp, err := client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
 		Bucket:  &s3config.Bucket,
 		Prefix:  &s3config.Prefix,
@@ -216,7 +221,7 @@ func isEmptyDirectory(client *s3.Client, s3config *S3Config) (bool, error) {
 	return len(resp.Contents) == 0, nil
 }
 
-func deleteAllFilesUnderPrefix(client *s3.Client, s3config *S3Config) error {
+func deleteAllFilesUnderPrefix(client *s3.Client, s3config *StorageConfig) error {
 	fileCh, errCh := streamFilesFromS3(client, s3config)
 
 	for {

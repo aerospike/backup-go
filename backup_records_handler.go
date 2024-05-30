@@ -20,7 +20,7 @@ import (
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 )
@@ -43,7 +43,7 @@ func newBackupRecordsHandler(config *BackupConfig, ac *a.Client, logger *slog.Lo
 
 func (bh *backupRecordsHandler) run(
 	ctx context.Context,
-	writers []*writeWorker[*models.Token],
+	writers []pipeline.Worker[*models.Token],
 	recordsTotal *atomic.Uint64,
 ) error {
 	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
@@ -60,11 +60,9 @@ func (bh *backupRecordsHandler) run(
 
 	scanPolicy := *bh.config.ScanPolicy
 
-	// if we are using the asb encoder, we need to set the RawCDT flag
+	// we need to set the RawCDT flag
 	// in the scan policy so that maps and lists are returned as raw blob bins
-	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
-		scanPolicy.RawCDT = true
-	}
+	scanPolicy.RawCDT = true
 
 	for i := 0; i < bh.config.Parallel; i++ {
 		ARRCFG := newArrConfig(bh.config, partitionRanges[i])
@@ -76,23 +74,17 @@ func (bh *backupRecordsHandler) run(
 			bh.logger,
 		)
 
-		readWorkers[i] = newReadWorker[*models.Token](recordReader)
-		processorWorkers[i] = newProcessorWorker[*models.Token](newProcessorVoidTime(bh.logger))
+		readWorkers[i] = pipeline.NewReadWorker[*models.Token](recordReader)
+		processorWorkers[i] = processors.NewProcessorWorker[*models.Token](processors.NewVoidTimeSetter(bh.logger))
 	}
 
-	writeWorkers := make([]pipeline.Worker[*models.Token], len(writers))
-
-	for i, w := range writers {
-		writeWorkers[i] = w
-	}
-
-	recordCounter := newTokenWorker(newRecordCounter(recordsTotal))
+	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsTotal))
 
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
 		recordCounter,
 		processorWorkers,
-		writeWorkers,
+		writers,
 	)
 
 	return job.Run(ctx)

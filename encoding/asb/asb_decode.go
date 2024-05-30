@@ -25,6 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -90,16 +91,18 @@ type metaData struct {
 	First     bool
 }
 
-// Decoder is used to decode an asb file
-type Decoder struct {
+// asbDecoder is used to decode an asb file
+type asbDecoder struct {
 	header   *header
 	metaData *metaData
 	countingByteScanner
 }
 
-func NewDecoder(src io.Reader) (*Decoder, error) {
+var _ encoding.Decoder = (*asbDecoder)(nil)
+
+func NewDecoder(src io.Reader) (encoding.Decoder, error) {
 	cbs := bufio.NewReader(src)
-	asb := Decoder{
+	asb := asbDecoder{
 		countingByteScanner: countingByteScanner{
 			cbs,
 			0,
@@ -124,7 +127,7 @@ func NewDecoder(src io.Reader) (*Decoder, error) {
 	return &asb, nil
 }
 
-func (r *Decoder) NextToken() (*models.Token, error) {
+func (r *asbDecoder) NextToken() (*models.Token, error) {
 	countBefore := r.count
 
 	v, err := func() (any, error) {
@@ -170,7 +173,7 @@ type header struct {
 	Version string
 }
 
-func (r *Decoder) readHeader() (*header, error) {
+func (r *asbDecoder) readHeader() (*header, error) {
 	var res header
 
 	if err := _expectToken(r, tokenASBVersion); err != nil {
@@ -197,7 +200,7 @@ func (r *Decoder) readHeader() (*header, error) {
 }
 
 // readMetadata consumes all metadata lines
-func (r *Decoder) readMetadata() (*metaData, error) {
+func (r *asbDecoder) readMetadata() (*metaData, error) {
 	var res metaData
 
 	for {
@@ -257,7 +260,7 @@ func (r *Decoder) readMetadata() (*metaData, error) {
 	return &res, nil
 }
 
-func (r *Decoder) readNamespace() (string, error) {
+func (r *asbDecoder) readNamespace() (string, error) {
 	data, err := _readUntil(r, '\n', true)
 	if err != nil {
 		return "", err
@@ -270,7 +273,7 @@ func (r *Decoder) readNamespace() (string, error) {
 	return string(data), nil
 }
 
-func (r *Decoder) readFirst() (bool, error) {
+func (r *asbDecoder) readFirst() (bool, error) {
 	if err := _expectChar(r, '\n'); err != nil {
 		return false, err
 	}
@@ -278,7 +281,7 @@ func (r *Decoder) readFirst() (bool, error) {
 	return true, nil
 }
 
-func (r *Decoder) readGlobals() (any, error) {
+func (r *asbDecoder) readGlobals() (any, error) {
 	var res any
 
 	if err := _expectChar(r, markerGlobalSection); err != nil {
@@ -314,7 +317,7 @@ func (r *Decoder) readGlobals() (any, error) {
 
 // readSindex is used to read secondary index lines in the global section of the asb file.
 // readSindex expects that r has been advanced past the secondary index global line markter '* i'
-func (r *Decoder) readSIndex() (*models.SIndex, error) {
+func (r *asbDecoder) readSIndex() (*models.SIndex, error) {
 	var res models.SIndex
 
 	if err := _expectChar(r, ' '); err != nil {
@@ -426,7 +429,7 @@ func (r *Decoder) readSIndex() (*models.SIndex, error) {
 	return &res, nil
 }
 
-func (r *Decoder) readSIndexType() (models.SIndexType, error) {
+func (r *asbDecoder) readSIndexType() (models.SIndexType, error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return models.InvalidSIndex, err
@@ -446,7 +449,7 @@ func (r *Decoder) readSIndexType() (models.SIndexType, error) {
 	return models.InvalidSIndex, fmt.Errorf("invalid secondary index type %c", b)
 }
 
-func (r *Decoder) readSIndexBinType() (models.SIPathBinType, error) {
+func (r *asbDecoder) readSIndexBinType() (models.SIPathBinType, error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return models.InvalidSIDataType, err
@@ -468,7 +471,7 @@ func (r *Decoder) readSIndexBinType() (models.SIPathBinType, error) {
 
 // readUDF is used to read UDF lines in the global section of the asb file.
 // readUDF expects that r has been advanced past the UDF global line marker '* u '
-func (r *Decoder) readUDF() (*models.UDF, error) {
+func (r *asbDecoder) readUDF() (*models.UDF, error) {
 	var res models.UDF
 
 	if err := _expectChar(r, ' '); err != nil {
@@ -545,7 +548,7 @@ var expectedRecordHeaderTypes = []byte{
 	recordHeaderTypeBinCount,
 }
 
-func (r *Decoder) readRecord() (*models.Record, error) {
+func (r *asbDecoder) readRecord() (*models.Record, error) {
 	var recData recordData
 
 	for i := 0; i < len(expectedRecordHeaderTypes); i++ {
@@ -592,7 +595,7 @@ func (r *Decoder) readRecord() (*models.Record, error) {
 	}, nil
 }
 
-func (r *Decoder) readRecordData(i int, recData *recordData) error {
+func (r *asbDecoder) readRecordData(i int, recData *recordData) error {
 	var err error
 
 	switch i {
@@ -622,7 +625,7 @@ func (r *Decoder) readRecordData(i int, recData *recordData) error {
 	return nil
 }
 
-func (r *Decoder) prepareRecord(recData *recordData) (*a.Record, error) {
+func (r *asbDecoder) prepareRecord(recData *recordData) (*a.Record, error) {
 	bins, err := r.readBins(recData.binCount)
 	if err != nil {
 		return nil, newLineError(lineTypeRecordBins, err)
@@ -645,7 +648,7 @@ func (r *Decoder) prepareRecord(recData *recordData) (*a.Record, error) {
 	}, nil
 }
 
-func (r *Decoder) readBins(count uint16) (a.BinMap, error) {
+func (r *asbDecoder) readBins(count uint16) (a.BinMap, error) {
 	bins := make(a.BinMap, count)
 
 	for i := uint16(0); i < count; i++ {
@@ -711,7 +714,7 @@ var binTypes = map[byte]struct{}{
 	binTypeGeoJSON:      {},
 }
 
-func (r *Decoder) readBin(bins a.BinMap) error {
+func (r *asbDecoder) readBin(bins a.BinMap) error {
 	binType, err := r.ReadByte()
 	if err != nil {
 		return err
@@ -763,7 +766,7 @@ func (r *Decoder) readBin(bins a.BinMap) error {
 	return nil
 }
 
-func (r *Decoder) checkEncoded() (bool, error) {
+func (r *asbDecoder) checkEncoded() (bool, error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return false, err
@@ -784,7 +787,7 @@ func (r *Decoder) checkEncoded() (bool, error) {
 	return false, fmt.Errorf("invalid character %c, expected '!' or ' '", b)
 }
 
-func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {
+func fetchBinValue(r *asbDecoder, binType byte, base64Encoded bool) (any, error) {
 	switch binType {
 	case binTypeBool:
 		return _readBool(r)
@@ -852,7 +855,7 @@ var asbKeyTypes = map[byte]struct{}{
 
 // readUserKey reads a record key line from the asb file
 // it expects that r has been advanced past the record key line marker '+ k'
-func (r *Decoder) readUserKey() (any, error) {
+func (r *asbDecoder) readUserKey() (any, error) {
 	var res any
 
 	keyTypeChar, err := r.ReadByte()
@@ -945,7 +948,7 @@ func (r *Decoder) readUserKey() (any, error) {
 	return res, nil
 }
 
-func (r *Decoder) readBinCount() (uint16, error) {
+func (r *asbDecoder) readBinCount() (uint16, error) {
 	binCount, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -967,7 +970,7 @@ func (r *Decoder) readBinCount() (uint16, error) {
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 // TODO expiration needs to be updated based on how much time has passed since the backup.
 // I think that should be done in a processor though, not here
-func (r *Decoder) readExpiration() (int64, error) {
+func (r *asbDecoder) readExpiration() (int64, error) {
 	exp, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -984,7 +987,7 @@ func (r *Decoder) readExpiration() (int64, error) {
 	return exp, nil
 }
 
-func (r *Decoder) readGeneration() (uint32, error) {
+func (r *asbDecoder) readGeneration() (uint32, error) {
 	gen, err := _readInteger(r, '\n')
 	if err != nil {
 		return 0, err
@@ -1001,7 +1004,7 @@ func (r *Decoder) readGeneration() (uint32, error) {
 	return uint32(gen), nil
 }
 
-func (r *Decoder) readSet() (string, error) {
+func (r *asbDecoder) readSet() (string, error) {
 	set, err := _readUntil(r, '\n', true)
 	if err != nil {
 		return "", err
@@ -1014,7 +1017,7 @@ func (r *Decoder) readSet() (string, error) {
 	return string(set), err
 }
 
-func (r *Decoder) readDigest() ([]byte, error) {
+func (r *asbDecoder) readDigest() ([]byte, error) {
 	digest, err := _readBase64BytesDelimited(r, '\n')
 	if err != nil {
 		return nil, err

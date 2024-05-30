@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backup_test
+package integration_test
 
 import (
 	"bytes"
@@ -26,9 +26,9 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/encoding/asb"
 	testresources "github.com/aerospike/backup-go/internal/testutils"
+	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
@@ -230,7 +230,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 }
 
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*backup.BackupStats, *backup.RestoreStats) {
+	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*models.BackupStats, *models.RestoreStats) {
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
@@ -306,7 +306,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					SetList:        []string{suite.set},
 					Namespace:      suite.namespace,
 					Parallel:       100,
-					EncoderFactory: encoding.NewASBEncoderFactory(),
+					EncoderFactory: asb.NewASBEncoderFactory(),
 				},
 				restoreConfig: backup.NewRestoreConfig(),
 				bins:          testBins,
@@ -322,7 +322,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					SetList:        []string{suite.set},
 					Namespace:      suite.namespace,
 					Parallel:       4,
-					EncoderFactory: encoding.NewASBEncoderFactory(),
+					EncoderFactory: asb.NewASBEncoderFactory(),
 				},
 				restoreConfig: backup.NewRestoreConfig(),
 				bins:          testBins,
@@ -351,7 +351,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, err := backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	writerFactory, err := local.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
 	suite.Nil(err)
 
 	bh, err := suite.backupClient.Backup(
@@ -381,10 +381,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
+	factory, _ := local.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory),
+		factory,
 	)
 	suite.Nil(err)
 
@@ -404,7 +405,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
-	_, err = backup.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	_, err = local.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
 	suite.ErrorContains(err, "backup directory is invalid")
 }
 
@@ -416,12 +417,9 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	recs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	data := &bytes.Buffer{}
-	encoder, err := asb.NewEncoder()
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
+	encoder := asb.NewEncoder()
 
-	header, err := asb.GetHeader(suite.namespace, true)
+	header, err := encoder.GetHeader(suite.namespace, true)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -517,7 +515,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	backupConfig.Partitions = partitions
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory, false)
+	writerFactory, _ := local.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory, false)
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
@@ -535,7 +533,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewRestoreConfig()
-	readerFactory := backup.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	readerFactory, _ := local.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -755,13 +753,13 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 		SetList:        []string{suite.set},
 		Namespace:      suite.namespace,
 		Parallel:       1,
-		EncoderFactory: encoding.NewASBEncoderFactory(),
+		EncoderFactory: asb.NewASBEncoderFactory(),
 		BinList:        []string{"BackupRestore", "OnlyBackup"},
 	}
 
 	var restoreConfig = &backup.RestoreConfig{
 		Parallel:       1,
-		DecoderFactory: encoding.NewASBDecoderFactory(),
+		DecoderFactory: asb.NewASBDecoderFactory(),
 		BinList:        []string{"BackupRestore", "OnlyRestore"}, // only BackupAndRestore should be restored
 	}
 
@@ -801,14 +799,14 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 		SetList:        []string{suite.set},
 		Namespace:      suite.namespace,
 		Parallel:       1,
-		EncoderFactory: encoding.NewASBEncoderFactory(),
+		EncoderFactory: asb.NewASBEncoderFactory(),
 		ModAfter:       &lowerLimit,
 		ModBefore:      &upperLimit,
 	}
 
 	var restoreConfig = &backup.RestoreConfig{
 		Parallel:       1,
-		DecoderFactory: encoding.NewASBDecoderFactory(),
+		DecoderFactory: asb.NewASBDecoderFactory(),
 	}
 
 	suite.Run("Filter by bin", func() {
@@ -830,14 +828,14 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 		SetList:        []string{suite.set},
 		Namespace:      suite.namespace,
 		Parallel:       1,
-		EncoderFactory: encoding.NewASBEncoderFactory(),
+		EncoderFactory: asb.NewASBEncoderFactory(),
 	}
 	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
 	backupConfig.ScanPolicy.RecordsPerSecond = rps
 
 	var restoreConfig = &backup.RestoreConfig{
 		Parallel:         1,
-		DecoderFactory:   encoding.NewASBDecoderFactory(),
+		DecoderFactory:   asb.NewASBDecoderFactory(),
 		RecordsPerSecond: rps,
 	}
 
@@ -846,9 +844,9 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	totalDuration := time.Since(now)
 
 	expectedDuration := time.Duration(1000.0*numRec/rps) * time.Millisecond
-	suite.Require().InDelta(expectedDuration, backupStats.Duration, epsilon)
-	suite.Require().InDelta(expectedDuration, restoreStats.Duration, epsilon)
-	suite.Require().InDelta(totalDuration, restoreStats.Duration+backupStats.Duration, epsilon)
+	suite.Require().InDelta(expectedDuration, backupStats.GetDuration(), epsilon)
+	suite.Require().InDelta(expectedDuration, restoreStats.GetDuration(), epsilon)
+	suite.Require().InDelta(totalDuration, restoreStats.GetDuration()+backupStats.GetDuration(), epsilon)
 
 	suite.TearDownTest()
 }

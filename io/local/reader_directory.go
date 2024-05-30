@@ -1,4 +1,4 @@
-package backup
+package local
 
 import (
 	"errors"
@@ -7,17 +7,24 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding"
 )
 
-func NewDirectoryReaderFactory(dir string, decoder DecoderFactory) *DirectoryReaderFactory {
-	return &DirectoryReaderFactory{dir: dir, decoder: decoder}
+func NewDirectoryReaderFactory(dir string, decoder encoding.DecoderFactory) (*DirectoryReaderFactory, error) {
+	if decoder == nil {
+		return nil, errors.New("decoder is nil")
+	}
+
+	return &DirectoryReaderFactory{dir: dir, decoder: decoder}, nil
 }
 
-var _ ReaderFactory = (*DirectoryReaderFactory)(nil)
+var _ backup.ReaderFactory = (*DirectoryReaderFactory)(nil)
+
+var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 type DirectoryReaderFactory struct {
-	decoder DecoderFactory
+	decoder encoding.DecoderFactory
 	dir     string
 }
 
@@ -40,7 +47,7 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 		}
 
 		filePath := filepath.Join(f.dir, file.Name())
-		if err := verifyBackupFileExtension(filePath, f.decoder); err != nil {
+		if err := f.decoder.Validate(filePath); err != nil {
 			continue
 		}
 
@@ -58,10 +65,6 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 
 	return readers, nil
 }
-
-// **** Helper Functions ****
-
-var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format
@@ -87,17 +90,6 @@ func (f *DirectoryReaderFactory) checkRestoreDirectory() error {
 	// Check if the directory is empty
 	if len(fileInfo) == 0 {
 		return fmt.Errorf("%w: %s is empty", ErrRestoreDirectoryInvalid, dir)
-	}
-
-	return nil
-}
-
-func verifyBackupFileExtension(fileName string, decoder DecoderFactory) error {
-	if _, ok := decoder.(*encoding.ASBDecoderFactory); ok {
-		if filepath.Ext(fileName) != ".asb" {
-			return fmt.Errorf("%w, restore file %s is in an invalid format, expected extension: .asb, got: %s",
-				ErrRestoreDirectoryInvalid, fileName, filepath.Ext(fileName))
-		}
 	}
 
 	return nil

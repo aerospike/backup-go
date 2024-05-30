@@ -15,83 +15,17 @@
 package backup
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
-	atypes "github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
-	"golang.org/x/time/rate"
 )
-
-// **** Write Worker ****
-
-// dataWriter is an interface for writing data to a destination.
-//
-//go:generate mockery --name dataWriter
-type dataWriter[T any] interface {
-	Write(T) (n int, err error)
-	Close()
-}
-
-// writeWorker implements the pipeline.Worker interface
-// It wraps a DataWriter and writes data to it
-type writeWorker[T any] struct {
-	dataWriter[T]
-	receive <-chan T
-	limiter *rate.Limiter
-}
-
-func newWriteWorker[T any](writer dataWriter[T], limiter *rate.Limiter) *writeWorker[T] {
-	return &writeWorker[T]{
-		dataWriter: writer,
-		limiter:    limiter,
-	}
-}
-
-// SetReceiveChan sets the receive channel for the WriteWorker
-func (w *writeWorker[T]) SetReceiveChan(c <-chan T) {
-	w.receive = c
-}
-
-// SetSendChan satisfies the pipeline.Worker interface
-// but is a no-op for the WriteWorker
-func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
-	// no-op
-}
-
-// Run runs the WriteWorker
-func (w *writeWorker[T]) Run(ctx context.Context) error {
-	defer w.Close()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case data, active := <-w.receive:
-			if !active {
-				return nil
-			}
-
-			n, err := w.Write(data)
-			if err != nil {
-				return err
-			}
-
-			if w.limiter != nil {
-				if err := w.limiter.WaitN(ctx, n); err != nil {
-					return err
-				}
-			}
-		}
-	}
-}
 
 // **** Token Stats Writer ****
 
@@ -99,18 +33,18 @@ func (w *writeWorker[T]) Run(ctx context.Context) error {
 //
 //go:generate mockery --name statsSetterToken --inpackage --exported=false
 type statsSetterToken interface {
-	addUDFs(uint32)
-	addSIndexes(uint32)
-	addTotalBytesWritten(uint64)
+	AddUDFs(uint32)
+	AddSIndexes(uint32)
+	AddTotalBytesWritten(uint64)
 }
 
 type tokenStatsWriter struct {
-	writer dataWriter[*models.Token]
+	writer pipeline.DataWriter[*models.Token]
 	stats  statsSetterToken
 	logger *slog.Logger
 }
 
-func newWriterWithTokenStats(writer dataWriter[*models.Token],
+func newWriterWithTokenStats(writer pipeline.DataWriter[*models.Token],
 	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
@@ -132,14 +66,14 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 	switch data.Type {
 	case models.TokenTypeRecord:
 	case models.TokenTypeUDF:
-		tw.stats.addUDFs(1)
+		tw.stats.AddUDFs(1)
 	case models.TokenTypeSIndex:
-		tw.stats.addSIndexes(1)
+		tw.stats.AddSIndexes(1)
 	case models.TokenTypeInvalid:
 		return 0, errors.New("invalid token")
 	}
 
-	tw.stats.addTotalBytesWritten(uint64(n))
+	tw.stats.AddTotalBytesWritten(uint64(n))
 
 	return n, nil
 }
@@ -187,254 +121,4 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 // but is a no-op for the tokenWriter
 func (w *tokenWriter) Close() {
 	w.logger.Debug("closed token writer")
-}
-
-// **** Aerospike Restore Writer ****
-
-// dbWriter is an interface for writing data to an Aerospike cluster.
-// The Aerospike Go client satisfies this interface.
-//
-//go:generate mockery --name dbWriter
-type dbWriter interface {
-	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
-	CreateComplexIndex(
-		policy *a.WritePolicy,
-		namespace,
-		set,
-		indexName,
-		binName string,
-		indexType a.IndexType,
-		indexCollectionType a.IndexCollectionType,
-		ctx ...*a.CDTContext,
-	) (*a.IndexTask, a.Error)
-	DropIndex(policy *a.WritePolicy, namespace, set, indexName string) a.Error
-	RegisterUDF(policy *a.WritePolicy, udfBody []byte, serverPath string, language a.Language) (*a.RegisterTask, a.Error)
-}
-
-// restoreWriter satisfies the DataWriter interface
-// It writes the types from the models package to an Aerospike client
-// It is used to restore data from a backup.
-type restoreWriter struct {
-	asc         dbWriter
-	writePolicy *a.WritePolicy
-	stats       *RestoreStats
-	logger      *slog.Logger
-}
-
-// newRestoreWriter creates a new RestoreWriter
-func newRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy,
-	stats *RestoreStats, logger *slog.Logger) *restoreWriter {
-	id := uuid.NewString()
-	logger = logging.WithWriter(logger, id, logging.WriterTypeRestore)
-	logger.Debug("created new restore writer")
-
-	return &restoreWriter{
-		asc:         asc,
-		writePolicy: writePolicy,
-		stats:       stats,
-		logger:      logger,
-	}
-}
-
-// Write writes the types from the models package to an Aerospike DB.
-// TODO support batch writes
-func (rw *restoreWriter) Write(data *models.Token) (int, error) {
-	switch data.Type {
-	case models.TokenTypeRecord:
-		return int(data.Size), rw.writeRecord(&data.Record)
-	case models.TokenTypeUDF:
-		return int(data.Size), rw.writeUDF(data.UDF)
-	case models.TokenTypeSIndex:
-		return int(data.Size), rw.writeSecondaryIndex(data.SIndex)
-	case models.TokenTypeInvalid:
-		return 0, errors.New("invalid token")
-	default:
-		return 0, errors.New("unsupported token type")
-	}
-}
-
-func (rw *restoreWriter) writeRecord(record *models.Record) error {
-	writePolicy := rw.writePolicy
-	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {
-		setGenerationPolicy := *rw.writePolicy
-		setGenerationPolicy.Generation = record.Generation
-		writePolicy = &setGenerationPolicy
-	}
-
-	aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
-	if aerr != nil {
-		if aerr.Matches(atypes.GENERATION_ERROR) {
-			rw.stats.incrRecordsFresher()
-			return nil
-		}
-
-		if aerr.Matches(atypes.KEY_EXISTS_ERROR) {
-			rw.stats.incrRecordsExisted()
-			return nil
-		}
-
-		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)
-
-		return aerr
-	}
-
-	rw.stats.incrRecordsInserted()
-
-	return nil
-}
-
-// writeSecondaryIndex writes a secondary index to Aerospike
-// TODO check that this does not overwrite existing sindexes
-// TODO support write policy
-func (rw *restoreWriter) writeSecondaryIndex(si *models.SIndex) error {
-	var sindexType a.IndexType
-
-	switch si.Path.BinType {
-	case models.NumericSIDataType:
-		sindexType = a.NUMERIC
-	case models.StringSIDataType:
-		sindexType = a.STRING
-	case models.BlobSIDataType:
-		sindexType = a.BLOB
-	case models.GEO2DSphereSIDataType:
-		sindexType = a.GEO2DSPHERE
-	default:
-		return fmt.Errorf("invalid sindex bin type: %c", si.Path.BinType)
-	}
-
-	var sindexCollectionType a.IndexCollectionType
-
-	switch si.IndexType {
-	case models.BinSIndex:
-		sindexCollectionType = a.ICT_DEFAULT
-	case models.ListElementSIndex:
-		sindexCollectionType = a.ICT_LIST
-	case models.MapKeySIndex:
-		sindexCollectionType = a.ICT_MAPKEYS
-	case models.MapValueSIndex:
-		sindexCollectionType = a.ICT_MAPVALUES
-	default:
-		return fmt.Errorf("invalid sindex collection type: %c", si.IndexType)
-	}
-
-	var ctx []*a.CDTContext
-
-	if si.Path.B64Context != "" {
-		var err error
-		ctx, err = a.Base64ToCDTContext(si.Path.B64Context)
-
-		if err != nil {
-			rw.logger.Error("error decoding sindex context", "context", si.Path.B64Context, "error", err)
-			return err
-		}
-	}
-
-	job, err := rw.asc.CreateComplexIndex(
-		rw.writePolicy,
-		si.Namespace,
-		si.Set,
-		si.Name,
-		si.Path.BinName,
-		sindexType,
-		sindexCollectionType,
-		ctx...,
-	)
-	if err != nil {
-		// if the sindex already exists, replace it because
-		// the seconday index may have changed since the backup was taken
-		if err.Matches(atypes.INDEX_FOUND) {
-			rw.logger.Debug("index already exists, replacing it", "sindex", si.Name)
-
-			err = rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
-			if err != nil {
-				rw.logger.Error("error dropping sindex", "sindex", si.Name, "error", err)
-				return err
-			}
-
-			job, err = rw.asc.CreateComplexIndex(
-				rw.writePolicy,
-				si.Namespace,
-				si.Set,
-				si.Name,
-				si.Path.BinName,
-				sindexType,
-				sindexCollectionType,
-				ctx...,
-			)
-			if err != nil {
-				rw.logger.Error("error creating replacement sindex", "sindex", si.Name, "error", err)
-				return err
-			}
-		} else {
-			rw.logger.Error("error creating sindex", "sindex", si.Name, "error", err)
-			return err
-		}
-	}
-
-	if job == nil {
-		msg := "error creating sindex: job is nil"
-		rw.logger.Debug(msg, "sindex", si.Name)
-
-		return errors.New(msg)
-	}
-
-	errs := job.OnComplete()
-
-	err = <-errs
-	if err != nil {
-		rw.logger.Error("error creating sindex", "sindex", si.Name, "error", err)
-		return err
-	}
-
-	rw.logger.Debug("created sindex", "sindex", si.Name)
-
-	return nil
-}
-
-// writeUDF writes a UDF to Aerospike
-// TODO check that this does not overwrite existing UDFs
-// TODO support write policy
-func (rw *restoreWriter) writeUDF(udf *models.UDF) error {
-	var UDFLang a.Language
-
-	switch udf.UDFType {
-	case models.UDFTypeLUA:
-		UDFLang = a.LUA
-	default:
-		msg := "error registering UDF: invalid UDF language"
-		rw.logger.Debug(msg, "udf", udf.Name, "language", udf.UDFType)
-
-		return errors.New(msg)
-	}
-
-	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, UDFLang)
-	if aerr != nil {
-		rw.logger.Error("error registering UDF", "udf", udf.Name, "error", aerr)
-		return aerr
-	}
-
-	if job == nil {
-		msg := "error registering UDF: job is nil"
-		rw.logger.Debug(msg, "udf", udf.Name)
-
-		return errors.New(msg)
-	}
-
-	errs := job.OnComplete()
-
-	err := <-errs
-	if err != nil {
-		rw.logger.Error("error registering UDF", "udf", udf.Name, "error", err)
-		return err
-	}
-
-	rw.logger.Debug("registered UDF", "udf", udf.Name)
-
-	return nil
-}
-
-// Close satisfies the DataWriter interface
-// but is a no-op for the RestoreWriter
-func (rw *restoreWriter) Close() {
-	rw.logger.Debug("closed restore writer")
 }

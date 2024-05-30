@@ -1,38 +1,47 @@
-package backup
+package s3
 
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type S3ReaderFactory struct {
+type s3ReaderFactory struct {
 	client   *s3.Client
-	s3Config *S3Config
-	decoder  DecoderFactory
+	s3Config *StorageConfig
+	decoder  encoding.DecoderFactory
 }
 
-var _ ReaderFactory = (*S3ReaderFactory)(nil)
+var _ backup.ReaderFactory = (*s3ReaderFactory)(nil)
 
-func NewS3ReaderFactory(config *S3Config, decoder DecoderFactory) (*S3ReaderFactory, error) {
+var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
+
+func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) (backup.ReaderFactory, error) {
+	if decoder == nil {
+		return nil, errors.New("decoder is nil")
+	}
+
 	client, err := newS3Client(config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &S3ReaderFactory{
+	return &s3ReaderFactory{
 		client:   client,
 		s3Config: config,
 		decoder:  decoder,
 	}, nil
 }
 
-func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
+func (f *s3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 	fileCh, errCh := f.streamBackupFiles()
 	readers := make([]io.ReadCloser, 0)
 
@@ -70,7 +79,7 @@ func (f *S3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 	return readers, nil
 }
 
-func (f *S3ReaderFactory) streamBackupFiles() (files <-chan string, errors <-chan error) {
+func (f *s3ReaderFactory) streamBackupFiles() (_ <-chan string, _ <-chan error) {
 	fileCh, errCh := streamFilesFromS3(f.client, f.s3Config)
 	filterFileCh := make(chan string)
 
@@ -78,7 +87,7 @@ func (f *S3ReaderFactory) streamBackupFiles() (files <-chan string, errors <-cha
 		defer close(filterFileCh)
 
 		for file := range fileCh {
-			if err := verifyBackupFileExtension(file, f.decoder); err != nil {
+			if err := f.decoder.Validate(file); err != nil {
 				continue
 			}
 			filterFileCh <- file
@@ -88,7 +97,7 @@ func (f *S3ReaderFactory) streamBackupFiles() (files <-chan string, errors <-cha
 	return filterFileCh, errCh
 }
 
-func streamFilesFromS3(client *s3.Client, s3Config *S3Config) (files <-chan string, errors <-chan error) {
+func streamFilesFromS3(client *s3.Client, s3Config *StorageConfig) (_ <-chan string, _ <-chan error) {
 	fileCh := make(chan string)
 	errCh := make(chan error)
 
@@ -125,15 +134,15 @@ func streamFilesFromS3(client *s3.Client, s3Config *S3Config) (files <-chan stri
 	return fileCh, errCh
 }
 
-type S3Reader struct {
+type s3Reader struct {
 	reader io.Reader
 	closer io.Closer
 	closed bool
 }
 
-var _ io.ReadCloser = (*S3Reader)(nil)
+var _ io.ReadCloser = (*s3Reader)(nil)
 
-func (f *S3ReaderFactory) newS3Reader(key string) (io.ReadCloser, error) {
+func (f *s3ReaderFactory) newS3Reader(key string) (io.ReadCloser, error) {
 	getObjectOutput, err := f.client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: &f.s3Config.Bucket,
 		Key:    &key,
@@ -147,13 +156,13 @@ func (f *S3ReaderFactory) newS3Reader(key string) (io.ReadCloser, error) {
 		chunkSize = s3DefaultChunkSize
 	}
 
-	return &S3Reader{
+	return &s3Reader{
 		reader: bufio.NewReaderSize(getObjectOutput.Body, chunkSize),
 		closer: getObjectOutput.Body,
 	}, nil
 }
 
-func (r *S3Reader) Read(p []byte) (int, error) {
+func (r *s3Reader) Read(p []byte) (int, error) {
 	if r.closed {
 		return 0, os.ErrClosed
 	}
@@ -161,7 +170,7 @@ func (r *S3Reader) Read(p []byte) (int, error) {
 	return r.reader.Read(p)
 }
 
-func (r *S3Reader) Close() error {
+func (r *s3Reader) Close() error {
 	if r.closed {
 		return os.ErrClosed
 	}
@@ -171,6 +180,6 @@ func (r *S3Reader) Close() error {
 	return r.closer.Close()
 }
 
-func (f *S3ReaderFactory) GetType() string {
+func (f *s3ReaderFactory) GetType() string {
 	return s3type
 }

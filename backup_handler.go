@@ -19,7 +19,6 @@ import (
 	"io"
 	"log/slog"
 	"sync/atomic"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
@@ -51,24 +50,7 @@ type BackupHandler struct {
 	firstFileHeaderWritten *atomic.Bool
 	errors                 chan error
 	id                     string
-	stats                  BackupStats
-}
-
-// BackupStats stores the status of a backup job.
-// Stats are updated in realtime by backup jobs.
-type BackupStats struct {
-	start    time.Time
-	Duration time.Duration
-	tokenStats
-	fileCount atomic.Uint64
-}
-
-func (b *BackupStats) incFiles() {
-	b.fileCount.Add(1)
-}
-
-func (b *BackupStats) GetFileCount() uint64 {
-	return b.fileCount.Load()
+	stats                  models.BackupStats
 }
 
 // newBackupHandler creates a new BackupHandler
@@ -91,14 +73,14 @@ func newBackupHandler(config *BackupConfig,
 // currently this should only be run once
 func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
-	bh.stats.start = time.Now()
+	bh.stats.Start()
 
 	limiter := makeBandwidthLimiter(bh.config.Bandwidth)
 
 	go doWork(bh.errors, bh.logger, func() error {
-		writeWorkers := make([]*writeWorker[*models.Token], bh.config.Parallel)
+		writeWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
-		for i := range bh.config.Parallel {
+		for i := 0; i < bh.config.Parallel; i++ {
 			encoder, err := bh.config.EncoderFactory.CreateEncoder()
 			if err != nil {
 				return err
@@ -106,13 +88,13 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 			// TODO: add headers logic to endcoder, instead this lambda acrobatics
 			writer, err := bh.writeFactory.NewWriter(bh.config.Namespace, func(w io.WriteCloser) error {
-				headerLen, err := bh.writeHeader(w, bh.config.Namespace)
+				headerLen, err := bh.writeHeader(w, encoder)
 				if err != nil {
 					return err
 				}
 
-				bh.stats.addTotalBytesWritten(uint64(headerLen))
-				bh.stats.incFiles()
+				bh.stats.AddTotalBytesWritten(uint64(headerLen))
+				bh.stats.IncFiles()
 
 				return nil
 			})
@@ -141,9 +123,9 @@ func (bh *BackupHandler) run(ctx context.Context) {
 				}
 			}
 
-			var dataWriter dataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
+			var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(encoder, writer, bh.logger)
 			dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
-			writeWorkers[i] = newWriteWorker(dataWriter, limiter)
+			writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, limiter)
 		}
 
 		if bh.config.NoRecords {
@@ -153,7 +135,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 		handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
 
-		return handler.run(ctx, writeWorkers, &bh.stats.recordsTotal)
+		return handler.run(ctx, writeWorkers, &bh.stats.RecordsTotal)
 	})
 }
 
@@ -188,14 +170,14 @@ func (bh *BackupHandler) backupSIndexesAndUdfs(
 }
 
 // GetStats returns the stats of the backup job
-func (bh *BackupHandler) GetStats() *BackupStats {
+func (bh *BackupHandler) GetStats() *models.BackupStats {
 	return &bh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed
 func (bh *BackupHandler) Wait(ctx context.Context) error {
 	defer func() {
-		bh.stats.Duration = time.Since(bh.stats.start)
+		bh.stats.Stop()
 	}()
 
 	select {
@@ -206,19 +188,20 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	}
 }
 
-func (bh *BackupHandler) writeHeader(writer io.WriteCloser, namespace string) (int, error) {
-	if _, ok := bh.config.EncoderFactory.(*encoding.ASBEncoderFactory); ok {
-		return writeASBHeader(writer, namespace, bh.firstFileHeaderWritten.Swap(true))
+func (bh *BackupHandler) writeHeader(writer io.WriteCloser, encoder encoding.Encoder) (int, error) {
+	header, err := encoder.GetHeader(bh.config.Namespace, !bh.firstFileHeaderWritten.Swap(true))
+	if err != nil {
+		return 0, err
 	}
 
-	return 0, nil
+	return writer.Write(header)
 }
 
 func backupSIndexes(
 	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
-	stats *BackupStats,
+	stats *models.BackupStats,
 	writer io.Writer,
 	logger *slog.Logger,
 	limiter *rate.Limiter,
@@ -229,16 +212,16 @@ func backupSIndexes(
 	}
 
 	reader := newSIndexReader(infoClient, config.Namespace, logger)
-	sindexReadWorker := newReadWorker[*models.Token](reader)
+	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	sindexEncoder, err := config.EncoderFactory.CreateEncoder()
 	if err != nil {
 		return err
 	}
 
-	var sindexWriter dataWriter[*models.Token] = newTokenWriter(sindexEncoder, writer, logger)
+	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(sindexEncoder, writer, logger))
 	sindexWriter = newWriterWithTokenStats(sindexWriter, stats, logger)
-	sindexWriteWorker := newWriteWorker(sindexWriter, limiter)
+	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, limiter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
@@ -257,7 +240,7 @@ func backupUDFs(
 	ctx context.Context,
 	ac *a.Client,
 	config *BackupConfig,
-	stats *BackupStats,
+	stats *models.BackupStats,
 	writer io.Writer,
 	logger *slog.Logger,
 	limiter *rate.Limiter,
@@ -268,16 +251,16 @@ func backupUDFs(
 	}
 
 	reader := newUDFReader(infoClient, logger)
-	udfReadWorker := newReadWorker[*models.Token](reader)
+	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	udfEncoder, err := config.EncoderFactory.CreateEncoder()
 	if err != nil {
 		return err
 	}
 
-	var udfWriter dataWriter[*models.Token] = newTokenWriter(udfEncoder, writer, logger)
+	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(udfEncoder, writer, logger))
 	udfWriter = newWriterWithTokenStats(udfWriter, stats, logger)
-	udfWriteWorker := newWriteWorker(udfWriter, limiter)
+	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, limiter)
 
 	udfPipeline := pipeline.NewPipeline[*models.Token](
 		[]pipeline.Worker[*models.Token]{udfReadWorker},

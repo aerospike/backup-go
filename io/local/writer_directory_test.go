@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backup
+package local
 
 import (
 	"os"
@@ -22,11 +22,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type backupDirectoryTestSuite struct {
+type writerTestSuite struct {
 	suite.Suite
 }
 
-func (suite *backupDirectoryTestSuite) Test_openBackupFile() {
+func (suite *writerTestSuite) Test_openBackupFile() {
 	tmpDir := suite.T().TempDir()
 
 	w, err := openBackupFile(filepath.Join(tmpDir, "test"))
@@ -44,21 +44,13 @@ func (suite *backupDirectoryTestSuite) Test_openBackupFile() {
 	suite.NoError(err)
 }
 
-func (suite *backupDirectoryTestSuite) Test_getBackupFileNameGeneric() {
-	suite.Equal("test_1", getBackupFileNameGeneric("test", 1))
-}
-
-func (suite *backupDirectoryTestSuite) Test_getBackupFileNameASB() {
-	suite.Equal("test_1.asb", getBackupFileNameASB("test", 1))
-}
-
-func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Positive() {
+func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive() {
 	dir := suite.T().TempDir()
 	err := prepareBackupDirectory(dir)
 	suite.NoError(err)
 }
 
-func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
+func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 	dir := suite.T().TempDir()
 	dir += "/test"
 	err := prepareBackupDirectory(dir)
@@ -66,7 +58,7 @@ func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Positive_Creat
 	suite.DirExists(dir)
 }
 
-func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Negative_IsNotDir() {
+func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_IsNotDir() {
 	dir := suite.T().TempDir()
 
 	file := dir + "/test"
@@ -80,7 +72,7 @@ func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Negative_IsNot
 	suite.Error(err)
 }
 
-func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Negative_DirNotEmpty() {
+func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_DirNotEmpty() {
 	dir := suite.T().TempDir()
 
 	file := dir + "/test"
@@ -95,5 +87,5 @@ func (suite *backupDirectoryTestSuite) TestPrepareBackupDirectory_Negative_DirNo
 }
 
 func Test_backupDirectoryTestSuite(t *testing.T) {
-	suite.Run(t, new(backupDirectoryTestSuite))
+	suite.Run(t, new(writerTestSuite))
 }

@@ -18,13 +18,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/models"
 )
 
 const (
@@ -37,8 +38,8 @@ const (
 )
 
 var (
-	defaultEncoderFactory = encoding.NewASBEncoderFactory()
-	defaultDecoderFactory = encoding.NewASBDecoderFactory()
+	defaultEncoderFactory = asb.NewASBEncoderFactory()
+	defaultDecoderFactory = asb.NewASBDecoderFactory()
 )
 
 // **** Client ****
@@ -140,12 +141,6 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 
 // **** Backup ****
 
-// EncoderFactory is used to specify the encoder with which to encode the backup data
-// if nil, the default encoder factory will be used.
-type EncoderFactory interface {
-	CreateEncoder() (encoding.Encoder, error)
-}
-
 // PartitionRange specifies a range of Aerospike partitions.
 type PartitionRange struct {
 	Begin int
@@ -181,7 +176,7 @@ func (p PartitionRange) validate() error {
 type BackupConfig struct {
 	// EncoderFactory is used to specify the encoder with which to encode the backup data
 	// if nil, the default EncoderFactory will be used.
-	EncoderFactory EncoderFactory
+	EncoderFactory encoding.EncoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -273,17 +268,11 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteF
 
 // **** Restore ****
 
-// DecoderFactory is used to specify the decoder with which to decode the backup data
-// if nil, the default decoder factory will be used.
-type DecoderFactory interface {
-	CreateDecoder(src io.Reader) (encoding.Decoder, error)
-}
-
 // RestoreConfig contains configuration for the restore operation.
 type RestoreConfig struct {
 	// DecoderFactory is used to specify the decoder with which to decode the backup data
 	// if nil, the default DecoderFactory will be used.
-	DecoderFactory DecoderFactory
+	DecoderFactory encoding.DecoderFactory
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -292,7 +281,7 @@ type RestoreConfig struct {
 	WritePolicy *a.WritePolicy
 	// Namespace details for the restore operation.
 	// By default, the data is restored to the namespace from which it was taken.
-	Namespace *RestoreNamespace `json:"namespace,omitempty"`
+	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
@@ -311,32 +300,6 @@ type RestoreConfig struct {
 	NoIndexes bool
 	// Don't restore any UDFs.
 	NoUDFs bool
-}
-
-// RestoreNamespace specifies an alternative namespace name for the restore
-// operation, where Source is the original namespace name and Destination is
-// the namespace name to which the backup data is to be restored.
-//
-// @Description RestoreNamespace specifies an alternative namespace name for the restore
-// @Description operation.
-type RestoreNamespace struct {
-	// Original namespace name.
-	Source *string `json:"source,omitempty" example:"source-ns" validate:"required"`
-	// Destination namespace name.
-	Destination *string `json:"destination,omitempty" example:"destination-ns" validate:"required"`
-}
-
-// Validate validates the restore namespace.
-func (n *RestoreNamespace) Validate() error {
-	if n.Source == nil {
-		return fmt.Errorf("source namespace is not specified")
-	}
-
-	if n.Destination == nil {
-		return fmt.Errorf("destination namespace is not specified")
-	}
-
-	return nil
 }
 
 func (c *RestoreConfig) validate() error {

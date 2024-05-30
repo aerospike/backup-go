@@ -16,12 +16,8 @@ package backup
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"runtime/debug"
-	"sync/atomic"
-
-	"github.com/aerospike/backup-go/encoding/asb"
 )
 
 func handlePanic(errors chan<- error, logger *slog.Logger) {
@@ -87,52 +83,4 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 	}
 
 	return pSpecs, nil
-}
-
-type tokenStats struct {
-	// number of records read from source, before any filtering.
-	recordsTotal atomic.Uint64
-	// The number of successfully created secondary indexes.
-	sIndexes atomic.Uint32
-	// The number of successfully stored UDF files.
-	uDFs atomic.Uint32
-	// The total number of bytes written to the destination.
-	totalBytesWritten atomic.Uint64
-}
-
-func (bs *tokenStats) GetRecordsTotal() uint64 {
-	return bs.recordsTotal.Load()
-}
-
-func (bs *tokenStats) GetTotalBytesWritten() uint64 {
-	return bs.totalBytesWritten.Load()
-}
-
-func (bs *tokenStats) GetSIndexes() uint32 {
-	return bs.sIndexes.Load()
-}
-
-func (bs *tokenStats) GetUDFs() uint32 {
-	return bs.uDFs.Load()
-}
-
-func (bs *tokenStats) addTotalBytesWritten(num uint64) {
-	bs.totalBytesWritten.Add(num)
-}
-
-func (bs *tokenStats) addSIndexes(num uint32) {
-	bs.sIndexes.Add(num)
-}
-
-func (bs *tokenStats) addUDFs(num uint32) {
-	bs.uDFs.Add(num)
-}
-
-func writeASBHeader(w io.Writer, namespace string, firstWritten bool) (int, error) {
-	header, err := asb.GetHeader(namespace, !firstWritten)
-	if err != nil {
-		return 0, err
-	}
-
-	return w.Write(header)
 }

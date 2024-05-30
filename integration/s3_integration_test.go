@@ -1,4 +1,4 @@
-package backup_test
+package integration_test
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/io/s3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -140,7 +140,7 @@ func (s *writeReadTestSuite) TearDownSuite() {
 }
 
 func (s *writeReadTestSuite) TestWriteRead() {
-	config := &backup.S3Config{
+	config := &s3.StorageConfig{
 		Bucket:   "backup",
 		Region:   "eu",
 		Endpoint: "http://localhost:9000",
@@ -168,8 +168,8 @@ func randomBytes(n int) []byte {
 	return data
 }
 
-func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *backup.S3Config) []byte {
-	factory, _ := backup.NewS3WriterFactory(config, encoding.NewASBEncoderFactory(), true)
+func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *s3.StorageConfig) []byte {
+	factory, _ := s3.NewS3WriterFactory(config, asb.NewASBEncoderFactory(), true)
 
 	writer, err := factory.NewWriter(namespace, func(_ io.WriteCloser) error {
 		return nil
@@ -179,7 +179,7 @@ func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *b
 	}
 
 	var allBytesWritten []byte
-	for range times {
+	for i := 0; i < times; i++ {
 		bytes := randomBytes(bytes)
 		n, err := writer.Write(bytes)
 		if err != nil {
@@ -196,14 +196,14 @@ func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *b
 	}
 
 	// cannot create new factory because folder is not empty
-	_, err = backup.NewS3WriterFactory(config, encoding.NewASBEncoderFactory(), false)
+	_, err = s3.NewS3WriterFactory(config, asb.NewASBEncoderFactory(), false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
 	return allBytesWritten
 }
 
-func (s *writeReadTestSuite) read(config *backup.S3Config) []byte {
-	factory, _ := backup.NewS3ReaderFactory(config, encoding.NewASBDecoderFactory())
+func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
+	factory, _ := s3.NewS3ReaderFactory(config, asb.NewASBDecoderFactory())
 
 	readers, err := factory.Readers()
 	if err != nil {

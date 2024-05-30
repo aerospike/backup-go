@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backup
+package local
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/encoding"
+	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -39,24 +39,15 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	_ = f.Close()
 
-	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	_, err = factory.Readers()
 	suite.NoError(err)
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilDecoder() {
 	dir := suite.T().TempDir()
-	file := "file1"
-	filePath := filepath.Join(dir, file)
-
-	f, err := os.Create(filePath)
-	if err != nil {
-		suite.FailNow("Failed to create file: %v", err)
-	}
-
-	_ = f.Close()
-
-	_, err = NewDirectoryReaderFactory(dir, nil).Readers()
-	suite.NoError(err)
+	_, err := NewDirectoryReaderFactory(dir, nil)
+	suite.Error(err)
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_MultipleFiles() {
@@ -81,7 +72,9 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_
 
 	_ = f.Close()
 
-	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
+	factory, err := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	suite.NoError(err)
+	_, err = factory.Readers()
 	suite.NoError(err)
 }
 
@@ -97,7 +90,8 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	_ = f.Close()
 
-	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	_, err = factory.Readers()
 	suite.Error(err)
 }
 
@@ -112,7 +106,8 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 
 	path := filepath.Join(dir, file.Name())
 
-	_, err = NewDirectoryReaderFactory(path, encoding.NewASBDecoderFactory()).Readers()
+	factory, _ := NewDirectoryReaderFactory(path, asb.NewASBDecoderFactory())
+	_, err = factory.Readers()
 	suite.Error(err)
 }
 
@@ -126,57 +121,18 @@ func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_
 		suite.FailNow("Failed to create dir: %v", err)
 	}
 
-	_, err = NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).Readers()
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	_, err = factory.Readers()
 	suite.Error(err)
 }
 
 func (suite *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := suite.T().TempDir()
-	err := NewDirectoryReaderFactory(dir, encoding.NewASBDecoderFactory()).checkRestoreDirectory()
+	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	err := factory.checkRestoreDirectory()
 	suite.Error(err)
 }
 
 func TestCheckRestoreDirectory(t *testing.T) {
 	suite.Run(t, new(checkRestoreDirectoryTestSuite))
-}
-
-func Test_verifyBackupFileExtension(t *testing.T) {
-	type args struct {
-		decoder  DecoderFactory
-		fileName string
-	}
-	tests := []struct {
-		args    args
-		name    string
-		wantErr bool
-	}{
-		{
-			name: "Positive ASB",
-			args: args{
-				fileName: "file1.asb",
-				decoder:  encoding.NewASBDecoderFactory(),
-			},
-		},
-		{
-			name: "Negative ASB",
-			args: args{
-				fileName: "file1.asb",
-				decoder:  encoding.NewASBDecoderFactory(),
-			},
-		},
-		{
-			name: "Positive no decoder",
-			args: args{
-				fileName: "file1",
-				decoder:  nil,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := verifyBackupFileExtension(tt.args.fileName, tt.args.decoder); (err != nil) != tt.wantErr {
-				t.Errorf("verifyBackupFileExtension() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
 }

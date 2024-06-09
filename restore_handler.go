@@ -113,24 +113,23 @@ func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) 
 func (rh *RestoreHandler) closeReaders(rs []io.ReadCloser) {
 	for _, r := range rs {
 		if err := r.Close(); err != nil {
-			rh.logger.Error("failed to close backup reader", "error", err)
+			rh.logger.Error("failed to close aerospike backup reader", "error", err)
 		}
 	}
 }
 
-func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.ReadCloser) (
+func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	[]pipeline.Worker[*models.Token], error) {
-	readWorkers := make([]pipeline.Worker[*models.Token], len(readersBuffer))
+	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 
-	for i, reader := range readersBuffer {
+	for i, reader := range readers {
 		decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create decoder: %w", err)
 		}
 
 		dr := newTokenReader(decoder, rh.logger)
-		readWorker := pipeline.NewReadWorker[*models.Token](dr)
-		readWorkers[i] = readWorker
+		readWorkers[i] = pipeline.NewReadWorker[*models.Token](dr)
 	}
 
 	return readWorkers, nil

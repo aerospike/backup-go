@@ -67,16 +67,16 @@ func newRestoreHandler(config *RestoreConfig,
 	}
 }
 
-func (rh *RestoreHandler) run(ctx context.Context) {
+func (rh *RestoreHandler) startAsync(ctx context.Context) {
 	rh.errors = make(chan error, 1)
 	rh.stats.Start()
 
 	go doWork(rh.errors, rh.logger, func() error {
-		return rh.processReaders(ctx)
+		return rh.restore(ctx)
 	})
 }
 
-func (rh *RestoreHandler) processReaders(ctx context.Context) error {
+func (rh *RestoreHandler) restore(ctx context.Context) error {
 	readers, err := rh.readerFactory.Readers()
 	if err != nil {
 		return fmt.Errorf("failed to get readers: %w", err)

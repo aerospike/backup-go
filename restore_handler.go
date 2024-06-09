@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -66,70 +67,65 @@ func newRestoreHandler(config *RestoreConfig,
 	}
 }
 
-// run runs the restore job
-// currently this should only be run once
 func (rh *RestoreHandler) run(ctx context.Context) {
 	rh.errors = make(chan error, 1)
 	rh.stats.Start()
 
 	go doWork(rh.errors, rh.logger, func() error {
-		// check that the restore directory is valid
-		// open the directory
-		// read the files rrh.config.Parallel at a time
-		// create a buffered reader for each reader
-		// hand the readers to a restore handler and run it
-		// wait for the restore handler to finish
-		// if there are more files, continue to the next batch
-		// if there are no more files, return
-		var readersBuffer []io.Reader
-
-		readers, err := rh.readerFactory.Readers()
-		if err != nil {
-			return err
-		}
-
-		for i, reader := range readers {
-			//nolint:gocritic // defer in loop is ok here
-			// we want to close the readers after the restore is done
-			defer func() {
-				if err := reader.Close(); err != nil {
-					rh.logger.Error("failed to close backup reader", "error", err)
-				}
-			}()
-
-			readersBuffer = append(readersBuffer, reader)
-
-			// if we have not reached the batch size and we have more readers
-			// continue to the next reader
-			// if we are at the end of readers then run no matter what
-			if i < len(readers)-1 && len(readersBuffer) < rh.config.Parallel {
-				continue
-			}
-
-			readWorkers, err := rh.readersToReadWorkers(readersBuffer)
-			if err != nil {
-				return err
-			}
-
-			err = rh.runRestoreBatch(ctx, readWorkers)
-			if err != nil {
-				return err
-			}
-
-			readersBuffer = []io.Reader{}
-		}
-
-		return nil
+		return rh.processReaders(ctx)
 	})
 }
 
-func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.Reader) ([]pipeline.Worker[*models.Token], error) {
+func (rh *RestoreHandler) processReaders(ctx context.Context) error {
+	readers, err := rh.readerFactory.Readers()
+	if err != nil {
+		return fmt.Errorf("failed to get readers: %w", err)
+	}
+
+	totalReaders := len(readers)
+	batchSize := rh.config.Parallel
+
+	for start := 0; start < totalReaders; start += batchSize {
+		end := min(start+batchSize, totalReaders)
+		if err := rh.processBatch(ctx, readers[start:end]); err != nil {
+			return fmt.Errorf("failed to process batch: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
+	defer rh.closeReaders(rs)
+
+	readWorkers, err := rh.readersToReadWorkers(rs)
+	if err != nil {
+		return fmt.Errorf("failed to convert readers to read workers: %w", err)
+	}
+
+	if err := rh.runRestoreBatch(ctx, readWorkers); err != nil {
+		return fmt.Errorf("failed to run restore batch: %w", err)
+	}
+
+	return nil
+}
+
+func (rh *RestoreHandler) closeReaders(rs []io.ReadCloser) {
+	for _, r := range rs {
+		if err := r.Close(); err != nil {
+			rh.logger.Error("failed to close backup reader", "error", err)
+		}
+	}
+}
+
+func (rh *RestoreHandler) readersToReadWorkers(readersBuffer []io.ReadCloser) (
+	[]pipeline.Worker[*models.Token], error) {
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readersBuffer))
 
 	for i, reader := range readersBuffer {
 		decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create decoder: %w", err)
 		}
 
 		dr := newTokenReader(decoder, rh.logger)

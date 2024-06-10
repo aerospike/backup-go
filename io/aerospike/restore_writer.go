@@ -237,6 +237,7 @@ func (rw restoreWriter) writeUDF(udf *models.UDF) error {
 
 // Close satisfies the DataWriter interface
 // but is a no-op for the RestoreWriter
-func (rw restoreWriter) Close() {
+func (rw restoreWriter) Close() error {
 	rw.logger.Debug("closed restore writer")
+	return nil
 }

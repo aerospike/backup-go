@@ -11,7 +11,7 @@ import (
 //go:generate mockery --name DataWriter
 type DataWriter[T any] interface {
 	Write(T) (n int, err error)
-	Close()
+	Close() (err error)
 }
 
 // writeWorker implements the pipeline.Worker interface

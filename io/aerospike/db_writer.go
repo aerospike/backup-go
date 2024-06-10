@@ -24,4 +24,5 @@ type dbWriter interface {
 		udfBody []byte, serverPath string,
 		language aerospike.Language,
 	) (*aerospike.RegisterTask, aerospike.Error)
+	BatchOperate(policy *aerospike.BatchPolicy, records []aerospike.BatchRecordIfc) aerospike.Error
 }

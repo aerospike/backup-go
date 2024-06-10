@@ -80,7 +80,8 @@ func (rw *restoreBatchWriter) batchWrite(r *models.Record) *a.BatchWrite {
 
 	ops := make([]*a.Operation, 0, len(r.Bins))
 	for k, v := range r.Bins {
-		ops = append(ops, a.PutOp(a.NewBin(k, v)))
+		op := a.PutOp(a.NewBin(k, v))
+		ops = append(ops, op)
 	}
 	return a.NewBatchWrite(policy, r.Key, ops...)
 }
@@ -245,7 +246,9 @@ func (rw *restoreBatchWriter) Close() error {
 func (rw *restoreBatchWriter) flushBuffer() error {
 	err := rw.asc.BatchOperate(nil, rw.operationBuffer)
 	if err != nil {
-		return err
+		if !err.Matches(atypes.GENERATION_ERROR) || err.Matches(atypes.KEY_EXISTS_ERROR) {
+			return err
+		}
 	}
 	for i := 0; i < len(rw.operationBuffer); i++ {
 		switch rw.operationBuffer[i].BatchRec().ResultCode {

@@ -72,6 +72,7 @@ func (rw *restoreBatchWriter) writeRecord(record *models.Record) error {
 // batchWrite creates and returns a batch write operation for the record.
 func (rw *restoreBatchWriter) batchWrite(r *models.Record) *a.BatchWrite {
 	policy := a.NewBatchWritePolicy()
+	policy.RecordExistsAction = rw.writePolicy.RecordExistsAction
 	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {
 		policy.GenerationPolicy = a.EXPECT_GEN_GT
 		policy.Generation = r.Generation

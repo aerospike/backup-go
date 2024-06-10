@@ -6,8 +6,8 @@ github.com/aerospike/aerospike-client-go/v7 v7.4.0 h1:g8/7v8RHhQhTArhW3C7Au7o+u8
 github.com/aerospike/aerospike-client-go/v7 v7.4.0/go.mod h1:pPKnWiS8VDJcH4IeB1b8SA2TWnkjcVLHwAAJ+BHfGK8=
 github.com/aerospike/tools-common-go v0.0.0-20240308225527-766ab8f3da4b h1:uiHUq8tg4KJ8DydkO3LOccKWsHvcxQ+xbihveJo0CKY=
 github.com/aerospike/tools-common-go v0.0.0-20240308225527-766ab8f3da4b/go.mod h1:lZMam4vyhZgsIufTP7Z6DWBFXBs6v7SKpzP5c30yo5M=
-github.com/aws/aws-sdk-go-v2 v1.26.1 h1:5554eUqIYVWpU0YmeeYZ0wU64H2VLBs8TlhRB2L+EkA=
-github.com/aws/aws-sdk-go-v2 v1.26.1/go.mod h1:ffIFB97e2yNsv4aTSGkqtHnppsIJzw7G7BReUZ3jCXM=
+github.com/aws/aws-sdk-go-v2 v1.27.2 h1:pLsTXqX93rimAOZG2FIYraDQstZaaGVVN4tNw65v0h8=
+github.com/aws/aws-sdk-go-v2 v1.27.2/go.mod h1:ffIFB97e2yNsv4aTSGkqtHnppsIJzw7G7BReUZ3jCXM=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 h1:x6xsQXGSmW6frevwDA+vi/wqhp1ct18mVXYN08/93to=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2/go.mod h1:lPprDr1e6cJdyYeGXnRaJoP4Md+cDBvi2eOj00BlGmg=
 github.com/aws/aws-sdk-go-v2/config v1.27.11 h1:f47rANd2LQEYHda2ddSCKYId18/8BhSRM4BULGmfgNA=

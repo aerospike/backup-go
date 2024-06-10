@@ -246,10 +246,11 @@ func (rw *restoreBatchWriter) Close() error {
 func (rw *restoreBatchWriter) flushBuffer() error {
 	err := rw.asc.BatchOperate(nil, rw.operationBuffer)
 	if err != nil {
-		if !err.Matches(atypes.GENERATION_ERROR) || err.Matches(atypes.KEY_EXISTS_ERROR) {
+		if !err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {
 			return err
 		}
 	}
+
 	for i := 0; i < len(rw.operationBuffer); i++ {
 		switch rw.operationBuffer[i].BatchRec().ResultCode {
 		case atypes.OK:
@@ -262,5 +263,6 @@ func (rw *restoreBatchWriter) flushBuffer() error {
 	}
 
 	rw.operationBuffer = nil
+
 	return nil
 }

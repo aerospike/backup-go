@@ -304,7 +304,7 @@ type RestoreConfig struct {
 	// By default, the cluster is checked for batch write support.
 	DisableBatchWrites bool
 	// The max allowed number of records per an async batch write call.
-	BatchSize int32 `json:"batch-size,omitempty" example:"128"`
+	BatchSize int32
 }
 
 func (c *RestoreConfig) validate() error {

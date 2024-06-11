@@ -304,7 +304,7 @@ type RestoreConfig struct {
 	// By default, the cluster is checked for batch write support.
 	DisableBatchWrites bool
 	// The max allowed number of records per an async batch write call.
-	BatchSize int32
+	BatchSize int
 }
 
 func (c *RestoreConfig) validate() error {
@@ -326,8 +326,8 @@ func (c *RestoreConfig) validate() error {
 		return fmt.Errorf("records per second value should not be negative, got %d", c.RecordsPerSecond)
 	}
 
-	if c.BatchSize < 0 {
-		return fmt.Errorf("batch size should not be negative, got %d", c.RecordsPerSecond)
+	if c.BatchSize <= 0 {
+		return fmt.Errorf("batch size should be positive, got %d", c.RecordsPerSecond)
 	}
 
 	return nil

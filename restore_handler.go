@@ -166,11 +166,13 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 
 	for i := 0; i < rh.config.Parallel; i++ {
-		writer := aerospike.NewRestoreBatchWriter(
+		writer := aerospike.NewRestoreWriter(
 			rh.aerospikeClient,
 			rh.config.WritePolicy,
 			&rh.stats,
 			rh.logger,
+			rh.config.DisableBatchWrites,
+			rh.config.BatchSize,
 		)
 
 		statsWriter := newWriterWithTokenStats(writer, &rh.stats, rh.logger)

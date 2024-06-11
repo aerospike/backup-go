@@ -300,6 +300,11 @@ type RestoreConfig struct {
 	NoIndexes bool
 	// Don't restore any UDFs.
 	NoUDFs bool
+	// Disables the use of batch writes when restoring records to the Aerospike cluster.
+	// By default, the cluster is checked for batch write support.
+	DisableBatchWrites bool
+	// The max allowed number of records per an async batch write call.
+	BatchSize int32 `json:"batch-size,omitempty" example:"128"`
 }
 
 func (c *RestoreConfig) validate() error {
@@ -319,6 +324,10 @@ func (c *RestoreConfig) validate() error {
 
 	if c.RecordsPerSecond < 0 {
 		return fmt.Errorf("records per second value should not be negative, got %d", c.RecordsPerSecond)
+	}
+
+	if c.BatchSize < 0 {
+		return fmt.Errorf("batch size should not be negative, got %d", c.RecordsPerSecond)
 	}
 
 	return nil

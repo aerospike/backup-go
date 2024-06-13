@@ -158,15 +158,15 @@ func (rh *RestoreHandler) Wait(ctx context.Context) error {
 func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipeline.Worker[*models.Token]) error {
 	rh.logger.Debug("running restore base handler")
 
-	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.MaxAsyncBatches)
 
-	for i := 0; i < rh.config.Parallel; i++ {
+	for i := 0; i < rh.config.MaxAsyncBatches; i++ {
 		writer := aerospike.NewRestoreWriter(
 			rh.aerospikeClient,
 			rh.config.WritePolicy,
 			&rh.stats,
 			rh.logger,
-			rh.config.DisableBatchWrites,
+			rh.config.BatchWrites,
 			rh.config.BatchSize,
 		)
 

@@ -36,19 +36,16 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 			},
 		},
 	}
-	recToken := models.NewRecordToken(expRecord, 0)
 
 	policy := &a.WritePolicy{}
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
-	writer := NewRestoreWriter(mockDBWriter, policy, &models.RestoreStats{}, slog.Default(), true, 1)
+	writer := newRecordWriter(mockDBWriter, policy, &models.RestoreStats{}, slog.Default(), false, 1)
 	suite.NotNil(writer)
 
-	_, err := writer.Write(recToken)
+	err := writer.writeRecord(&expRecord)
 	suite.Nil(err)
-
-	writer.Close()
 
 	mockDBWriter.AssertExpectations(suite.T())
 }
@@ -59,7 +56,7 @@ func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
 	key, _ := a.NewKey(namespace, set, "key")
 	mockDBWriter := mocks.NewDbWriter(suite.T())
 	policy := &a.WritePolicy{}
-	writer := NewRestoreWriter(mockDBWriter, policy, &models.RestoreStats{}, slog.Default(), true, 1)
+	writer := newRecordWriter(mockDBWriter, policy, &models.RestoreStats{}, slog.Default(), false, 1)
 	rec := models.Record{
 		Record: &a.Record{
 			Key: key,
@@ -69,9 +66,8 @@ func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
 			},
 		},
 	}
-	failRecToken := models.NewRecordToken(rec, 0)
 	mockDBWriter.EXPECT().Put(policy, rec.Key, rec.Bins).Return(a.ErrInvalidParam)
-	_, err := writer.Write(failRecToken)
+	err := writer.writeRecord(&rec)
 	suite.NotNil(err)
 
 	mockDBWriter.AssertExpectations(suite.T())
@@ -95,7 +91,6 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 			},
 		},
 	}
-	recToken := models.NewRecordToken(expRecord, 120)
 
 	policy := a.NewWritePolicy(1, 0)
 
@@ -103,13 +98,10 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	stats := &models.RestoreStats{}
-	writer := NewRestoreWriter(mockDBWriter, policy, stats, slog.Default(), true, 1)
+	writer := newRecordWriter(mockDBWriter, policy, &models.RestoreStats{}, slog.Default(), false, 1)
 	suite.NotNil(writer)
-	n, err := writer.Write(recToken)
+	err := writer.writeRecord(&expRecord)
 
-	suite.Equal(120, n)
 	suite.Equal(1, int(stats.GetRecordsInserted()))
 	suite.Nil(err)
-
-	writer.Close()
 }

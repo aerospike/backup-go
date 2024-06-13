@@ -106,7 +106,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(&models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
-	mockWriter.EXPECT().Close()
+	mockWriter.EXPECT().Close().Return(nil)
 
 	mockStats := newMockStatsSetterToken(suite.T())
 	mockStats.EXPECT().AddUDFs(uint32(1))

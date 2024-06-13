@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 
 	"golang.org/x/time/rate"
 )
@@ -41,8 +42,16 @@ func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
 }
 
 // Run runs the writeWorker
-func (w *writeWorker[T]) Run(ctx context.Context) error {
-	defer w.Close()
+func (w *writeWorker[T]) Run(ctx context.Context) (err error) {
+	defer func() {
+		closeErr := w.Close()
+
+		if err == nil {
+			err = closeErr
+		} else if closeErr != nil {
+			err = fmt.Errorf("write error: %v, close error: %w", err, closeErr)
+		}
+	}()
 
 	for {
 		select {

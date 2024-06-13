@@ -97,7 +97,8 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	_, err = writer.Write(failRecToken)
 	suite.NotNil(err)
 
-	writer.Close()
+	err = writer.Close()
+	suite.Nil(err)
 }
 
 func (suite *writersTestSuite) TestTokenStatsWriter() {
@@ -128,7 +129,8 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
 	suite.NotNil(err)
 
-	writer.Close()
+	err = writer.Close()
+	suite.Nil(err)
 }
 
 func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {

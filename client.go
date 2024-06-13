@@ -341,8 +341,10 @@ func (c *RestoreConfig) validate() error {
 // NewRestoreConfig returns a new RestoreConfig with default values.
 func NewRestoreConfig() *RestoreConfig {
 	return &RestoreConfig{
-		Parallel:       4,
-		DecoderFactory: defaultDecoderFactory,
+		Parallel:        4,
+		DecoderFactory:  defaultDecoderFactory,
+		BatchSize:       128,
+		MaxAsyncBatches: 16,
 	}
 }
 

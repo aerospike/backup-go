@@ -757,11 +757,8 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 		BinList:        []string{"BackupRestore", "OnlyBackup"},
 	}
 
-	var restoreConfig = &backup.RestoreConfig{
-		Parallel:       1,
-		DecoderFactory: asb.NewASBDecoderFactory(),
-		BinList:        []string{"BackupRestore", "OnlyRestore"}, // only BackupAndRestore should be restored
-	}
+	var restoreConfig = backup.NewRestoreConfig()
+	restoreConfig.BinList = []string{"BackupRestore", "OnlyRestore"} // only BackupAndRestore should be restored
 
 	suite.SetupTest(initialRecords)
 	suite.Run("Filter by bin", func() {
@@ -804,10 +801,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 		ModBefore:      &upperLimit,
 	}
 
-	var restoreConfig = &backup.RestoreConfig{
-		Parallel:       1,
-		DecoderFactory: asb.NewASBDecoderFactory(),
-	}
+	var restoreConfig = backup.NewRestoreConfig()
 
 	suite.Run("Filter by bin", func() {
 		runBackupRestore(suite, backupConfig, restoreConfig, expectedRecords)
@@ -833,11 +827,8 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
 	backupConfig.ScanPolicy.RecordsPerSecond = rps
 
-	var restoreConfig = &backup.RestoreConfig{
-		Parallel:         1,
-		DecoderFactory:   asb.NewASBDecoderFactory(),
-		RecordsPerSecond: rps,
-	}
+	var restoreConfig = backup.NewRestoreConfig()
+	restoreConfig.RecordsPerSecond = rps
 
 	now := time.Now()
 	backupStats, restoreStats := runBackupRestore(suite, backupConfig, restoreConfig, records)

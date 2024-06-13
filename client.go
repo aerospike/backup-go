@@ -302,7 +302,7 @@ type RestoreConfig struct {
 	NoUDFs bool
 	// Specifies if the batch writes should be used when restoring records to the Aerospike cluster.
 	BatchWrites bool
-	// The max allowed number of records per an async batch write call.
+	// The max allowed number of records per batch write call.
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
@@ -328,11 +328,11 @@ func (c *RestoreConfig) validate() error {
 	}
 
 	if c.BatchSize <= 0 {
-		return fmt.Errorf("batch size should be positive, got %d", c.RecordsPerSecond)
+		return fmt.Errorf("batch size should be positive, got %d", c.BatchSize)
 	}
 
 	if c.MaxAsyncBatches <= 0 {
-		return fmt.Errorf("max async batches should be positive, got %d", c.RecordsPerSecond)
+		return fmt.Errorf("max async batches should be positive, got %d", c.MaxAsyncBatches)
 	}
 
 	return nil

@@ -28,7 +28,6 @@ func (rw *recordBatchWriter) writeRecord(record *models.Record) error {
 	return nil
 }
 
-// batchWrite creates and returns a batch write operation for the record.
 func (rw *recordBatchWriter) batchWrite(record *models.Record) *a.BatchWrite {
 	policy := batchWritePolicy(rw.writePolicy, record)
 	operations := putBinsOperations(record.Bins)
@@ -62,6 +61,10 @@ func (rw *recordBatchWriter) close() error {
 }
 
 func (rw *recordBatchWriter) flushBuffer() error {
+	if len(rw.operationBuffer) == 0 {
+		return nil
+	}
+
 	err := rw.asc.BatchOperate(nil, rw.operationBuffer)
 	if err != nil {
 		if !err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {

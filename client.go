@@ -367,7 +367,7 @@ func (c *Client) Restore(ctx context.Context, config *RestoreConfig, readerFacto
 	}
 
 	handler := newRestoreHandler(config, c.aerospikeClient, c.logger, readerFactory)
-	handler.run(ctx)
+	handler.startAsync(ctx)
 
 	return handler, nil
 }

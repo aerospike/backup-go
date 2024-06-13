@@ -55,7 +55,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	batchSize int,
 ) recordWriter {
 	if useBatchWrites {
-		return &recordBatchWriter{
+		return &batchRecordWriter{
 			asc:         asc,
 			writePolicy: writePolicy,
 			stats:       stats,

@@ -8,7 +8,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-type recordBatchWriter struct {
+type batchRecordWriter struct {
 	asc             dbWriter
 	writePolicy     *a.WritePolicy
 	stats           *models.RestoreStats
@@ -17,7 +17,7 @@ type recordBatchWriter struct {
 	batchSize       int
 }
 
-func (rw *recordBatchWriter) writeRecord(record *models.Record) error {
+func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
 	writeOp := rw.batchWrite(record)
 	rw.operationBuffer = append(rw.operationBuffer, writeOp)
 
@@ -28,7 +28,7 @@ func (rw *recordBatchWriter) writeRecord(record *models.Record) error {
 	return nil
 }
 
-func (rw *recordBatchWriter) batchWrite(record *models.Record) *a.BatchWrite {
+func (rw *batchRecordWriter) batchWrite(record *models.Record) *a.BatchWrite {
 	policy := batchWritePolicy(rw.writePolicy, record)
 	operations := putBinsOperations(record.Bins)
 
@@ -56,11 +56,11 @@ func putBinsOperations(bins a.BinMap) []*a.Operation {
 	return ops
 }
 
-func (rw *recordBatchWriter) close() error {
+func (rw *batchRecordWriter) close() error {
 	return rw.flushBuffer()
 }
 
-func (rw *recordBatchWriter) flushBuffer() error {
+func (rw *batchRecordWriter) flushBuffer() error {
 	if len(rw.operationBuffer) == 0 {
 		return nil
 	}

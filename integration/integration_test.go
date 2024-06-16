@@ -274,6 +274,11 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		fileSizeLimit int64
 		expectedFiles int
 	}
+	nonBatchRestore := backup.NewRestoreConfig()
+	nonBatchRestore.BatchWrites = false
+	batchRestore := backup.NewRestoreConfig()
+	batchRestore.BatchWrites = true
+
 	var tests = []struct {
 		name string
 		args args
@@ -282,7 +287,17 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "default",
 			args: args{
 				backupConfig:  backup.NewBackupConfig(),
-				restoreConfig: backup.NewRestoreConfig(),
+				restoreConfig: nonBatchRestore,
+				bins:          testBins,
+				fileSizeLimit: 0,
+				expectedFiles: 1,
+			},
+		},
+		{
+			name: "default batch",
+			args: args{
+				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: batchRestore,
 				bins:          testBins,
 				fileSizeLimit: 0,
 				expectedFiles: 1,
@@ -292,7 +307,17 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "with file size limit",
 			args: args{
 				backupConfig:  backup.NewBackupConfig(),
-				restoreConfig: backup.NewRestoreConfig(),
+				restoreConfig: nonBatchRestore,
+				bins:          testBins,
+				fileSizeLimit: 1024 * 1024,
+				expectedFiles: 10,
+			},
+		},
+		{
+			name: "with file size limit batch",
+			args: args{
+				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: batchRestore,
 				bins:          testBins,
 				fileSizeLimit: 1024 * 1024,
 				expectedFiles: 10,
@@ -308,7 +333,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					Parallel:       100,
 					EncoderFactory: asb.NewASBEncoderFactory(),
 				},
-				restoreConfig: backup.NewRestoreConfig(),
+				restoreConfig: nonBatchRestore,
 				bins:          testBins,
 				fileSizeLimit: 0,
 				expectedFiles: 100,
@@ -324,7 +349,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					Parallel:       4,
 					EncoderFactory: asb.NewASBEncoderFactory(),
 				},
-				restoreConfig: backup.NewRestoreConfig(),
+				restoreConfig: nonBatchRestore,
 				bins:          testBins,
 				fileSizeLimit: 1024 * 1024,
 				expectedFiles: 12, // 8 files of full size + 4 small

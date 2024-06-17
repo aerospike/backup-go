@@ -275,7 +275,7 @@ func Test_buildSindexCmd(t *testing.T) {
 				namespace: "test",
 				getCtx:    false,
 			},
-			want: "sindex-list:namespace=test",
+			want: "sindex-list:ns=test",
 		},
 		{
 			name: "positive with ctx",
@@ -283,7 +283,7 @@ func Test_buildSindexCmd(t *testing.T) {
 				namespace: "test",
 				getCtx:    true,
 			},
-			want: "sindex-list:namespace=test;b64=true",
+			want: "sindex-list:ns=test;b64=true",
 		},
 	}
 	for _, tt := range tests {
@@ -1019,14 +1019,14 @@ func Test_getSIndexes(t *testing.T) {
 		map[string]string{"build": "5.6.0.0"},
 		nil,
 	)
-	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:namespace=test").Return(map[string]string{
-		"sindex-list:namespace=test": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW",
+	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:ns=test").Return(map[string]string{
+		"sindex-list:ns=test": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW",
 	}, nil)
 
 	mockInfoGetterCtx := mocks.NewInfoGetter(t)
 	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(map[string]string{"build": "7.1.0.0"}, nil)
-	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:namespace=test;b64=true").Return(map[string]string{
-		"sindex-list:namespace=test;b64=true": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=AAAAAA==:state=RW",
+	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:ns=test;b64=true").Return(map[string]string{
+		"sindex-list:ns=test;b64=true": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=AAAAAA==:state=RW",
 	}, nil)
 
 	mockInfoGetterGetBuildFailed := mocks.NewInfoGetter(t)
@@ -1034,7 +1034,7 @@ func Test_getSIndexes(t *testing.T) {
 
 	mockInfoGetterGetSIndexesFailed := mocks.NewInfoGetter(t)
 	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(map[string]string{"build": "7.1.0.0"}, nil)
-	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:namespace=test;b64=true").Return(nil, a.ErrNetwork)
+	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:ns=test;b64=true").Return(nil, a.ErrNetwork)
 
 	type args struct {
 		conn      infoGetter

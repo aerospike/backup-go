@@ -132,7 +132,7 @@ func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*mo
 }
 
 func buildSindexCmd(namespace string, getCtx bool) string {
-	cmd := fmt.Sprintf("sindex-list:namespace=%s", namespace)
+	cmd := fmt.Sprintf("sindex-list:ns=%s", namespace)
 
 	// NOTE: getting the sindex ctx was added in Aerospike 6.1
 	// so don't include this in the command at all if the server is older

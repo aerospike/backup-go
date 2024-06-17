@@ -49,7 +49,7 @@ func (w *writeWorker[T]) Run(ctx context.Context) (err error) {
 		if err == nil {
 			err = closeErr
 		} else if closeErr != nil {
-			err = fmt.Errorf("write error: %v, close error: %w", err, closeErr)
+			err = fmt.Errorf("write error: %w, close error: %w", err, closeErr)
 		}
 	}()
 

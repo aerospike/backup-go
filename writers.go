@@ -78,9 +78,9 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 	return n, nil
 }
 
-func (tw *tokenStatsWriter) Close() {
+func (tw *tokenStatsWriter) Close() error {
 	tw.logger.Debug("closed token stats writer")
-	tw.writer.Close()
+	return tw.writer.Close()
 }
 
 // **** Token Writer ****
@@ -119,6 +119,7 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 
 // Close satisfies the DataWriter interface
 // but is a no-op for the tokenWriter
-func (w *tokenWriter) Close() {
+func (w *tokenWriter) Close() error {
 	w.logger.Debug("closed token writer")
+	return nil
 }

@@ -286,7 +286,7 @@ type RestoreConfig struct {
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
 	BinList []string
-	// Parallel is the number of concurrent record writers to run against the Aerospike cluster.
+	// Parallel is the number of concurrent record readers from backup files.
 	Parallel int
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
@@ -300,6 +300,12 @@ type RestoreConfig struct {
 	NoIndexes bool
 	// Don't restore any UDFs.
 	NoUDFs bool
+	// Specifies if the batch writes should be used when restoring records to the Aerospike cluster.
+	BatchWrites bool
+	// The max allowed number of records per batch write call.
+	BatchSize int
+	// Max number of parallel writers to target AS cluster.
+	MaxAsyncBatches int
 }
 
 func (c *RestoreConfig) validate() error {
@@ -321,14 +327,24 @@ func (c *RestoreConfig) validate() error {
 		return fmt.Errorf("records per second value should not be negative, got %d", c.RecordsPerSecond)
 	}
 
+	if c.BatchSize <= 0 {
+		return fmt.Errorf("batch size should be positive, got %d", c.BatchSize)
+	}
+
+	if c.MaxAsyncBatches <= 0 {
+		return fmt.Errorf("max async batches should be positive, got %d", c.MaxAsyncBatches)
+	}
+
 	return nil
 }
 
 // NewRestoreConfig returns a new RestoreConfig with default values.
 func NewRestoreConfig() *RestoreConfig {
 	return &RestoreConfig{
-		Parallel:       4,
-		DecoderFactory: defaultDecoderFactory,
+		Parallel:        4,
+		DecoderFactory:  defaultDecoderFactory,
+		BatchSize:       128,
+		MaxAsyncBatches: 16,
 	}
 }
 

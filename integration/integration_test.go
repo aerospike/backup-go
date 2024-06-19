@@ -275,9 +275,9 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		expectedFiles int
 	}
 	nonBatchRestore := backup.NewRestoreConfig()
-	nonBatchRestore.BatchWrites = false
+	nonBatchRestore.DisableBatchWrites = true
 	batchRestore := backup.NewRestoreConfig()
-	batchRestore.BatchWrites = true
+	batchRestore.DisableBatchWrites = false
 
 	var tests = []struct {
 		name string

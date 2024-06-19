@@ -108,9 +108,19 @@ func (ic *InfoClient) GetUDFs() ([]*models.UDF, error) {
 	return getUDFs(ic.node, ic.policy)
 }
 
+func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
+	version, err := ic.GetVersion()
+	if err != nil {
+		return false, fmt.Errorf("failed to get aerospike version: %w", err)
+	}
+
+	return version.IsGreater(AerospikeVersionSupportsBatchWrites), nil
+}
+
 // ***** Utility functions *****
 
 var AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
+var AerospikeVersionSupportsBatchWrites = AerospikeVersion{6, 0, 0}
 
 func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext

@@ -114,7 +114,7 @@ func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
 		return false, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
 
-	return version.IsGreater(AerospikeVersionSupportsBatchWrites), nil
+	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
 }
 
 // ***** Utility functions *****

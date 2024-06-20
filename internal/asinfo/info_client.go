@@ -33,6 +33,11 @@ type AerospikeVersion struct {
 	Patch int
 }
 
+var (
+	AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
+	AerospikeVersionSupportsBatchWrites   = AerospikeVersion{6, 0, 0}
+)
+
 func (av AerospikeVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d", av.Major, av.Minor, av.Patch)
 }
@@ -108,9 +113,16 @@ func (ic *InfoClient) GetUDFs() ([]*models.UDF, error) {
 	return getUDFs(ic.node, ic.policy)
 }
 
-// ***** Utility functions *****
+func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
+	version, err := ic.GetVersion()
+	if err != nil {
+		return false, fmt.Errorf("failed to get aerospike version: %w", err)
+	}
 
-var AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
+	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
+}
+
+// ***** Utility functions *****
 
 func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext

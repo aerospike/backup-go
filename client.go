@@ -300,8 +300,8 @@ type RestoreConfig struct {
 	NoIndexes bool
 	// Don't restore any UDFs.
 	NoUDFs bool
-	// Specifies if the batch writes should be used when restoring records to the Aerospike cluster.
-	BatchWrites bool
+	// Disables the use of batch writes when restoring records to the Aerospike cluster.
+	DisableBatchWrites bool
 	// The max allowed number of records per batch write call.
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.

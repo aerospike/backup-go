@@ -21,6 +21,7 @@ import (
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/io/aerospike"
@@ -160,13 +161,18 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.MaxAsyncBatches)
 
+	useBatchWrites, err := rh.useBatchWrites()
+	if err != nil {
+		return err
+	}
+
 	for i := 0; i < rh.config.MaxAsyncBatches; i++ {
 		writer := aerospike.NewRestoreWriter(
 			rh.aerospikeClient,
 			rh.config.WritePolicy,
 			&rh.stats,
 			rh.logger,
-			rh.config.BatchWrites,
+			useBatchWrites,
 			rh.config.BatchSize,
 		)
 
@@ -207,6 +213,19 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 	)
 
 	return job.Run(ctx)
+}
+
+func (rh *RestoreHandler) useBatchWrites() (bool, error) {
+	if rh.config.DisableBatchWrites {
+		return false, nil
+	}
+
+	infoClient, err := asinfo.NewInfoClientFromAerospike(rh.aerospikeClient, rh.config.InfoPolicy)
+	if err != nil {
+		return false, err
+	}
+
+	return infoClient.SupportsBatchWrite()
 }
 
 func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*models.Token] {

@@ -84,7 +84,7 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 		return fmt.Errorf("failed to get readers: %w", err)
 	}
 
-	readers, err = setCompressionDecoder(rh, readers)
+	readers, err = setCompressionDecoder(rh.config.CompressionPolicy, readers)
 	if err != nil {
 		return err
 	}
@@ -102,8 +102,8 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	return nil
 }
 
-func setCompressionDecoder(rh *RestoreHandler, readers []io.ReadCloser) ([]io.ReadCloser, error) {
-	if rh.config.CompressionPolicy == nil {
+func setCompressionDecoder(compressionPolicy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+	if compressionPolicy == nil || compressionPolicy.Mode == models.CompressNone {
 		return readers, nil
 	}
 

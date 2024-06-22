@@ -28,6 +28,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
+	"github.com/klauspost/compress/zstd"
 	"golang.org/x/time/rate"
 )
 
@@ -83,6 +84,11 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 		return fmt.Errorf("failed to get readers: %w", err)
 	}
 
+	readers, err = setCompressionDecoder(rh, readers)
+	if err != nil {
+		return err
+	}
+
 	totalReaders := len(readers)
 	batchSize := rh.config.Parallel
 
@@ -94,6 +100,25 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func setCompressionDecoder(rh *RestoreHandler, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+	if rh.config.CompressionPolicy == nil {
+		return readers, nil
+	}
+
+	zstdReaders := make([]io.ReadCloser, len(readers))
+
+	for i, reader := range readers {
+		zstdDecoder, err := zstd.NewReader(reader)
+		if err != nil {
+			return nil, err
+		}
+
+		zstdReaders[i] = zstdDecoder.IOReadCloser()
+	}
+
+	return zstdReaders, nil
 }
 
 func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {

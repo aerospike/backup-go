@@ -16,7 +16,7 @@ type CompressionPolicy struct {
 	// The compression mode to be used (default is NONE).
 	Mode string `yaml:"mode,omitempty" json:"mode,omitempty" default:"NONE" enums:"NONE,ZSTD"`
 	// The compression level to use (or -1 if unspecified).
-	Level int32 `yaml:"level,omitempty" json:"level,omitempty"`
+	Level int `yaml:"level,omitempty" json:"level,omitempty"`
 }
 
 // Validate validates the compression policy.

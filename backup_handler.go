@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync/atomic"
@@ -27,6 +28,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
+	"github.com/klauspost/compress/zstd"
 	"golang.org/x/time/rate"
 )
 
@@ -102,6 +104,11 @@ func (bh *BackupHandler) run(ctx context.Context) {
 				return err
 			}
 
+			writer, err = setCompression(bh.config.CompressionPolicy, writer)
+			if err != nil {
+				return err
+			}
+
 			//nolint:gocritic // defer in loop is ok here,
 			// we want to close the file after the backup is done
 			defer func() {
@@ -137,6 +144,18 @@ func (bh *BackupHandler) run(ctx context.Context) {
 
 		return handler.run(ctx, writeWorkers, &bh.stats.RecordsTotal)
 	})
+}
+
+func setCompression(policy *models.CompressionPolicy, writer io.WriteCloser) (io.WriteCloser, error) {
+	if policy == nil || policy.Mode == models.CompressNone {
+		return writer, nil
+	}
+
+	if policy.Mode == models.CompressZSTD {
+		return zstd.NewWriter(writer)
+	}
+
+	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
 }
 
 func makeBandwidthLimiter(bandwidth int) *rate.Limiter {

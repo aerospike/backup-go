@@ -14,7 +14,10 @@
 
 package writers
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
 // Sized wraps an io.WriteCloser and adds a size limit.
 // when the size limit is reached, the io.WriteCloser is closed and a new one is created
@@ -28,15 +31,15 @@ type Sized struct {
 
 // NewSized creates a new Sized writer with a size limit.
 // limit must be greater than 0.
-func NewSized(limit int64, open func() (io.WriteCloser, error)) *Sized {
+func NewSized(limit int64, open func() (io.WriteCloser, error)) (*Sized, error) {
 	if limit <= 0 {
-		panic("limit must be greater than 0")
+		return nil, fmt.Errorf("limit must be greater than 0, got %d", limit)
 	}
 
 	return &Sized{
 		limit: limit,
 		open:  open,
-	}
+	}, nil
 }
 
 func (f *Sized) Write(p []byte) (n int, err error) {

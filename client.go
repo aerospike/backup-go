@@ -212,7 +212,7 @@ type BackupConfig struct {
 	Bandwidth int
 	// File size limit (in bytes) for the backup. If a backup file crosses this size threshold, a new file will be created.
 	// 0 for no file size limit.
-	FileLimit int
+	FileLimit int64
 }
 
 func (c *BackupConfig) validate() error {

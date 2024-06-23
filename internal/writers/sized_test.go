@@ -55,8 +55,9 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 		return writer2, nil
 	}
 
-	wcs := NewSized(10, open)
+	wcs, err := NewSized(10, open)
 	suite.NotNil(wcs)
+	suite.Nil(err)
 
 	n, err := wcs.Write([]byte("test"))
 	suite.NoError(err)

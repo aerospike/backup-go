@@ -153,6 +153,7 @@ func (bh *BackupHandler) combinedWriter(encoder encoding.Encoder) (io.WriteClose
 			return nil, err
 		}
 
+		bh.stats.IncFiles()
 		return writers.NewHeaderWriter(zippedWriter, func() []byte {
 			return encoder.GetHeader(namespace)
 		}), nil

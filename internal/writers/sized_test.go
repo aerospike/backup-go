@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package writers_test
+package writers
 
 import (
 	"bytes"
 	"io"
 	"testing"
 
-	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -38,26 +37,34 @@ func (m *mockWriteCloser) Close() error {
 }
 
 func (suite *sizedTestSuite) Test_writeCloserSized() {
-	writer := mockWriteCloser{
-		Writer: &bytes.Buffer{},
-	}
+	var writer1 *mockWriteCloser
+	var writer2 *mockWriteCloser
 
 	open := func() (io.WriteCloser, error) {
-		w := mockWriteCloser{
+		if writer1 == nil {
+			writer1 = &mockWriteCloser{
+				Writer: &bytes.Buffer{},
+			}
+
+			return writer1, nil
+		}
+		writer2 = &mockWriteCloser{
 			Writer: &bytes.Buffer{},
 		}
 
-		return &w, nil
+		return writer2, nil
 	}
 
-	wcs := writers.NewSized(10, &writer, open)
+	wcs := NewSized(10, open)
 	suite.NotNil(wcs)
 
 	n, err := wcs.Write([]byte("test"))
 	suite.NoError(err)
 	suite.Equal(4, n)
 
-	suite.False(writer.closed)
+	suite.NotNil(writer1)
+	suite.False(writer1.closed)
+	suite.Equal(writer1, wcs.writer)
 
 	// cross the limit here
 	n, err = wcs.Write([]byte("0123456789"))
@@ -68,10 +75,12 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	suite.NoError(err)
 	suite.Equal(5, n)
 
-	suite.True(writer.closed)
+	suite.True(writer1.closed)
+	suite.NotNil(writer2)
+	suite.Equal(writer2, wcs.writer)
 
-	suite.Equal("test0123456789", writer.Writer.(*bytes.Buffer).String())
-	suite.Equal("test1", wcs.WriteCloser.(*mockWriteCloser).Writer.(*bytes.Buffer).String())
+	suite.Equal("test0123456789", writer1.Writer.(*bytes.Buffer).String())
+	suite.Equal("test1", writer2.Writer.(*bytes.Buffer).String())
 }
 
 func Test_SizedTestSuite(t *testing.T) {

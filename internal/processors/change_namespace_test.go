@@ -19,9 +19,9 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 	invalidKey, _ := aerospike.NewKey("otherNs", "set", 1)
 
 	tests := []struct {
-		name         string
 		restoreNS    *models.RestoreNamespace
 		initialToken *models.Token
+		name         string
 		wantErr      bool
 	}{
 		{

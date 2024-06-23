@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
@@ -28,36 +29,40 @@ import (
 )
 
 type asbEncoder struct {
-	buff bytes.Buffer
+	firstFileWritten bool
+	id               atomic.Int64
 }
 
 var _ encoding.Encoder = (*asbEncoder)(nil)
 
 func NewEncoder() encoding.Encoder {
-	return &asbEncoder{
-		buff: bytes.Buffer{},
-	}
+	return &asbEncoder{}
+}
+
+// GenerateFilename generates a filename for a given namespace
+func (e *asbEncoder) GenerateFilename(namespace string) string {
+	return fmt.Sprintf("%s_%d.asb", namespace, e.id.Add(1))
 }
 
 // EncodeToken encodes a token to the ASB format.
 // It returns a byte slice of the encoded token
 // and an error if the encoding fails.
 // The returned byte slice is only valid until the next call to EncodeToken.
-func (o *asbEncoder) EncodeToken(token *models.Token) ([]byte, error) {
+func (e *asbEncoder) EncodeToken(token *models.Token) ([]byte, error) {
 	var (
 		n   int
 		err error
 	)
 
-	o.buff.Reset()
+	buff := &bytes.Buffer{}
 
 	switch token.Type {
 	case models.TokenTypeRecord:
-		n, err = o.encodeRecord(&token.Record)
+		n, err = e.encodeRecord(&token.Record, buff)
 	case models.TokenTypeUDF:
-		n, err = o.encodeUDF(token.UDF)
+		n, err = e.encodeUDF(token.UDF, buff)
 	case models.TokenTypeSIndex:
-		n, err = o.encodeSIndex(token.SIndex)
+		n, err = e.encodeSIndex(token.SIndex, buff)
 	case models.TokenTypeInvalid:
 		n, err = 0, errors.New("invalid token")
 	default:
@@ -68,58 +73,50 @@ func (o *asbEncoder) EncodeToken(token *models.Token) ([]byte, error) {
 		return nil, fmt.Errorf("error encoding token at byte %d: %w", n, err)
 	}
 
-	return o.buff.Bytes(), nil
+	return buff.Bytes(), nil
 }
 
-func (o *asbEncoder) encodeRecord(rec *models.Record) (int, error) {
-	return recordToASB(rec, &o.buff)
+func (e *asbEncoder) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
+	return recordToASB(rec, buff)
 }
 
-func (o *asbEncoder) encodeUDF(udf *models.UDF) (int, error) {
-	return udfToASB(udf, &o.buff)
+func (e *asbEncoder) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
+	return udfToASB(udf, buff)
 }
 
-func (o *asbEncoder) encodeSIndex(sindex *models.SIndex) (int, error) {
-	return sindexToASB(sindex, &o.buff)
+func (e *asbEncoder) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (int, error) {
+	return sindexToASB(sindex, buff)
 }
 
-func (o *asbEncoder) GetHeader(namespace string, firstFile bool) ([]byte, error) {
+func (e *asbEncoder) GetHeader(namespace string) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	data := make([]byte, 0, 256)
 	buff := bytes.NewBuffer(data)
 
-	_, err := writeVersionText(ASBFormatVersion, buff)
-	if err != nil {
-		return nil, err
+	writeVersionText(ASBFormatVersion, buff)
+
+	writeNamespaceMetaText(namespace, buff)
+
+	if !e.firstFileWritten {
+		writeFirstMetaText(buff)
+		e.firstFileWritten = true
 	}
 
-	_, err = writeNamespaceMetaText(namespace, buff)
-	if err != nil {
-		return nil, err
-	}
-
-	if firstFile {
-		_, err = writeFirstMetaText(buff)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return buff.Bytes(), nil
+	return buff.Bytes()
 }
 
 // **** META DATA ****
 
-func writeVersionText(asbVersion string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "Version %s\n", asbVersion)
+func writeVersionText(asbVersion string, w io.Writer) {
+	_, _ = fmt.Fprintf(w, "Version %s\n", asbVersion)
 }
 
-func writeNamespaceMetaText(namespace string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c namespace %s\n", markerMetadataSection, escapeASB(namespace))
+func writeNamespaceMetaText(namespace string, w io.Writer) {
+	_, _ = fmt.Fprintf(w, "%c namespace %s\n", markerMetadataSection, escapeASB(namespace))
 }
 
-func writeFirstMetaText(w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c first-file\n", markerMetadataSection)
+func writeFirstMetaText(w io.Writer) {
+	_, _ = fmt.Fprintf(w, "%c first-file\n", markerMetadataSection)
 }
 
 // **** RECORD ****

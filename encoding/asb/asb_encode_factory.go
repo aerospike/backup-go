@@ -1,14 +1,13 @@
 package asb
 
 import (
-	"fmt"
-
 	"github.com/aerospike/backup-go/encoding"
 )
 
-// asbEncoderFactory satisfies the asbEncoderFactory interface
+// asbEncoderFactory satisfies the encoding.EncoderFactory interface
 // It creates a new ASB format encoder
-type asbEncoderFactory struct{}
+type asbEncoderFactory struct {
+}
 
 // NewASBEncoderFactory returns a new asbEncoderFactory
 func NewASBEncoderFactory() encoding.EncoderFactory {
@@ -21,9 +20,4 @@ var _ encoding.EncoderFactory = (*asbEncoderFactory)(nil)
 // This method is called by the backup client to create a new encoder
 func (f *asbEncoderFactory) CreateEncoder() (encoding.Encoder, error) {
 	return NewEncoder(), nil
-}
-
-// GenerateFilename generates a filename for a given namespace and ID
-func (f *asbEncoderFactory) GenerateFilename(namespace string, id uint32) string {
-	return fmt.Sprintf("%s_%d.asb", namespace, id)
 }

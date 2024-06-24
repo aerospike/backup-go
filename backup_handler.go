@@ -196,7 +196,7 @@ func setCompression(policy *models.CompressionPolicy, writer io.WriteCloser) (io
 	}
 
 	if policy.Mode == models.CompressZSTD {
-		return zstd.NewWriter(writer)
+		return zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(policy.Level)))
 	}
 
 	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)

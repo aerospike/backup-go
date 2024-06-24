@@ -73,8 +73,6 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 		return 0, errors.New("invalid token")
 	}
 
-	tw.stats.AddTotalBytesWritten(n)
-
 	return n, nil
 }
 

@@ -15,7 +15,7 @@ type commonStats struct {
 	// The number of successfully stored UDF files.
 	uDFs atomic.Uint32
 	// The total number of bytes written to the destination.
-	totalBytesWritten atomic.Uint64
+	TotalBytesWritten atomic.Uint64
 }
 
 func (s *commonStats) GetRecordsTotal() uint64 {
@@ -23,7 +23,7 @@ func (s *commonStats) GetRecordsTotal() uint64 {
 }
 
 func (s *commonStats) GetTotalBytesWritten() uint64 {
-	return s.totalBytesWritten.Load()
+	return s.TotalBytesWritten.Load()
 }
 
 func (s *commonStats) GetSIndexes() uint32 {
@@ -35,7 +35,7 @@ func (s *commonStats) GetUDFs() uint32 {
 }
 
 func (s *commonStats) AddTotalBytesWritten(num int) {
-	s.totalBytesWritten.Add(uint64(num))
+	s.TotalBytesWritten.Add(uint64(num))
 }
 
 func (s *commonStats) AddSIndexes(num uint32) {

@@ -173,17 +173,18 @@ func (bh *BackupHandler) newConfiguredWriter() (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	zippedWriter, err := setCompression(bh.config.CompressionPolicy, storageWriter)
+	countingWriter := writers.NewCountingWriter(storageWriter, &bh.stats.TotalBytesWritten)
+
+	zippedWriter, err := setCompression(bh.config.CompressionPolicy, countingWriter)
 	if err != nil {
 		return nil, err
 	}
 
-	n, err := zippedWriter.Write(bh.encoder.GetHeader())
+	_, err = zippedWriter.Write(bh.encoder.GetHeader())
 	if err != nil {
 		return nil, err
 	}
 
-	bh.stats.AddTotalBytesWritten(n)
 	bh.stats.IncFiles()
 
 	return zippedWriter, nil

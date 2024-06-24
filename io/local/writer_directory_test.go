@@ -29,7 +29,10 @@ type writerTestSuite struct {
 func (suite *writerTestSuite) Test_openBackupFile() {
 	tmpDir := suite.T().TempDir()
 
-	w, err := openBackupFile(filepath.Join(tmpDir, "test"))
+	factory, err := NewDirectoryWriterFactory(tmpDir, true)
+	suite.NoError(err)
+
+	w, err := factory.NewWriter("test")
 	suite.NoError(err)
 	suite.NotNil(w)
 

@@ -99,10 +99,6 @@ func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, err
 	return os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 }
 
-func openBackupFile(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o666)
-}
-
 func (f *DirectoryWriterFactory) GetType() string {
 	return "directory"
 }

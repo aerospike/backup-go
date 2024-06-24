@@ -153,10 +153,16 @@ func (bh *BackupHandler) combinedWriter(encoder encoding.Encoder) (io.WriteClose
 			return nil, err
 		}
 
+		writer := zippedWriter
+		n, err := writer.Write(encoder.GetHeader(namespace))
+		if err != nil {
+			return nil, err
+		}
+
+		bh.stats.AddTotalBytesWritten(n)
 		bh.stats.IncFiles()
-		return writers.NewHeaderWriter(zippedWriter, func() []byte {
-			return encoder.GetHeader(namespace)
-		}), nil
+
+		return writer, nil
 	}
 
 	if bh.config.FileLimit > 0 {

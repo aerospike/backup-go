@@ -35,7 +35,6 @@ import (
 type statsSetterToken interface {
 	AddUDFs(uint32)
 	AddSIndexes(uint32)
-	AddTotalBytesWritten(num int)
 }
 
 type tokenStatsWriter struct {

@@ -34,10 +34,6 @@ func (s *commonStats) GetUDFs() uint32 {
 	return s.uDFs.Load()
 }
 
-func (s *commonStats) AddTotalBytesWritten(num int) {
-	s.TotalBytesWritten.Add(uint64(num))
-}
-
 func (s *commonStats) AddSIndexes(num uint32) {
 	s.sIndexes.Add(num)
 }

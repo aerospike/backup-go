@@ -28,26 +28,30 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+// asbEncoder contains logic for encoding backup into .asb format.
+// this is stateful object, should create new one for each backup operation.
 type asbEncoder struct {
-	firstFileWritten bool
+	namespace        string
+	firstFileWritten atomic.Bool
 	id               atomic.Int64
 }
 
 var _ encoding.Encoder = (*asbEncoder)(nil)
 
-func NewEncoder() encoding.Encoder {
-	return &asbEncoder{}
+func NewEncoder(namespace string) encoding.Encoder {
+	return &asbEncoder{
+		namespace: namespace,
+	}
 }
 
 // GenerateFilename generates a filename for a given namespace
-func (e *asbEncoder) GenerateFilename(namespace string) string {
-	return fmt.Sprintf("%s_%d.asb", namespace, e.id.Add(1))
+func (e *asbEncoder) GenerateFilename() string {
+	return fmt.Sprintf("%s_%d.asb", e.namespace, e.id.Add(1))
 }
 
 // EncodeToken encodes a token to the ASB format.
 // It returns a byte slice of the encoded token
 // and an error if the encoding fails.
-// The returned byte slice is only valid until the next call to EncodeToken.
 func (e *asbEncoder) EncodeToken(token *models.Token) ([]byte, error) {
 	var (
 		n   int
@@ -88,18 +92,17 @@ func (e *asbEncoder) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (in
 	return sindexToASB(sindex, buff)
 }
 
-func (e *asbEncoder) GetHeader(namespace string) []byte {
+func (e *asbEncoder) GetHeader() []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	data := make([]byte, 0, 256)
 	buff := bytes.NewBuffer(data)
 
 	writeVersionText(ASBFormatVersion, buff)
 
-	writeNamespaceMetaText(namespace, buff)
+	writeNamespaceMetaText(e.namespace, buff)
 
-	if !e.firstFileWritten {
+	if !e.firstFileWritten.Swap(true) {
 		writeFirstMetaText(buff)
-		e.firstFileWritten = true
 	}
 
 	return buff.Bytes()

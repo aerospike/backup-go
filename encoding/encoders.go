@@ -24,11 +24,11 @@ import (
 //go:generate mockery --name Encoder
 type Encoder interface {
 	EncodeToken(*models.Token) ([]byte, error)
-	GetHeader(namespace string) []byte
-	GenerateFilename(namespace string) string
+	GetHeader() []byte
+	GenerateFilename() string
 }
 
 // EncoderFactory is used to specify the encoder with which to encode the backup data
 type EncoderFactory interface {
-	CreateEncoder() (Encoder, error)
+	CreateEncoder(namespace string) Encoder
 }

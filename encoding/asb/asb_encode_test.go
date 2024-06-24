@@ -35,7 +35,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
 	if aerr != nil {
@@ -65,7 +65,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -86,7 +86,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -112,7 +112,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -125,7 +125,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	var recExpr int64 = 10
 
@@ -153,7 +153,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -176,12 +176,12 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder := NewEncoder()
-	firstHeader := encoder.GetHeader("test")
+	encoder := NewEncoder("test")
+	firstHeader := encoder.GetHeader()
 	suite.Assert().Equal(expected, string(firstHeader))
 
 	secondExpected := "Version 3.1\n# namespace test\n"
-	secondHeader := encoder.GetHeader("test")
+	secondHeader := encoder.GetHeader()
 	suite.Assert().Equal(secondExpected, string(secondHeader))
 }
 
@@ -1539,7 +1539,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	key := genKey()
 	rec := &models.Record{

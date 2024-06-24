@@ -271,13 +271,14 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		backupConfig  *backup.BackupConfig
 		restoreConfig *backup.RestoreConfig
 		bins          a.BinMap
-		fileSizeLimit int64
 		expectedFiles int
 	}
 	nonBatchRestore := backup.NewRestoreConfig()
 	nonBatchRestore.DisableBatchWrites = true
 	batchRestore := backup.NewRestoreConfig()
 	batchRestore.DisableBatchWrites = false
+	configWithFileLimit := backup.NewBackupConfig()
+	configWithFileLimit.FileLimit = 1024 * 1024
 
 	var tests = []struct {
 		name string
@@ -289,7 +290,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				backupConfig:  backup.NewBackupConfig(),
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
-				fileSizeLimit: 0,
 				expectedFiles: 1,
 			},
 		},
@@ -299,27 +299,24 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				backupConfig:  backup.NewBackupConfig(),
 				restoreConfig: batchRestore,
 				bins:          testBins,
-				fileSizeLimit: 0,
 				expectedFiles: 1,
 			},
 		},
 		{
 			name: "with file size limit",
 			args: args{
-				backupConfig:  backup.NewBackupConfig(),
+				backupConfig:  configWithFileLimit,
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
-				fileSizeLimit: 1024 * 1024,
 				expectedFiles: 10,
 			},
 		},
 		{
 			name: "with file size limit batch",
 			args: args{
-				backupConfig:  backup.NewBackupConfig(),
+				backupConfig:  configWithFileLimit,
 				restoreConfig: batchRestore,
 				bins:          testBins,
-				fileSizeLimit: 1024 * 1024,
 				expectedFiles: 10,
 			},
 		},
@@ -335,7 +332,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
-				fileSizeLimit: 0,
 				expectedFiles: 100,
 			},
 		},
@@ -348,10 +344,10 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					Namespace:      suite.namespace,
 					Parallel:       4,
 					EncoderFactory: asb.NewASBEncoderFactory(),
+					FileLimit:      1024 * 1024,
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
-				fileSizeLimit: 1024 * 1024,
 				expectedFiles: 12, // 8 files of full size + 4 small
 			},
 		},
@@ -361,7 +357,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		suite.SetupTest(initialRecords)
 		suite.Run(tt.name, func() {
 			runBackupRestoreDirectory(suite,
-				tt.args.backupConfig, tt.args.restoreConfig, initialRecords, tt.args.fileSizeLimit, tt.args.expectedFiles)
+				tt.args.backupConfig, tt.args.restoreConfig, initialRecords, tt.args.expectedFiles)
 		})
 		suite.TearDownTest()
 	}
@@ -371,12 +367,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	backupConfig *backup.BackupConfig,
 	restoreConfig *backup.RestoreConfig,
 	expectedRecs []*a.Record,
-	fileSizeLimit int64,
 	expectedFiles int) {
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, err := local.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	writerFactory, err := local.NewDirectoryWriterFactory(backupDir, false)
 	suite.Nil(err)
 
 	bh, err := suite.backupClient.Backup(
@@ -430,7 +425,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
-	_, err = local.NewDirectoryWriterFactory(backupDir, fileSizeLimit, backupConfig.EncoderFactory, false)
+	_, err = local.NewDirectoryWriterFactory(backupDir, false)
 	suite.ErrorContains(err, "backup directory is invalid")
 }
 
@@ -442,12 +437,9 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	recs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	data := &bytes.Buffer{}
-	encoder := asb.NewEncoder()
+	encoder := asb.NewEncoder("test")
 
-	header, err := encoder.GetHeader(suite.namespace, true)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
+	header := encoder.GetHeader()
 
 	data.Write(header)
 
@@ -540,7 +532,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	backupConfig.Partitions = partitions
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := local.NewDirectoryWriterFactory(backupDir, 0, backupConfig.EncoderFactory, false)
+	writerFactory, _ := local.NewDirectoryWriterFactory(backupDir, false)
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
@@ -892,9 +884,8 @@ func (n *nopWriteCloser) Write(p []byte) (int, error) {
 	return n.Buffer.Write(p)
 }
 
-func (b *byteReadWriterFactory) NewWriter(_ string, writeHeader func(io.WriteCloser) error) (
+func (b *byteReadWriterFactory) NewWriter(_ string) (
 	io.WriteCloser, error) {
 	buffer := &nopWriteCloser{b.buffer}
-	_ = writeHeader(buffer)
 	return buffer, nil
 }

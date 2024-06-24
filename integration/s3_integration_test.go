@@ -169,11 +169,9 @@ func randomBytes(n int) []byte {
 }
 
 func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *s3.StorageConfig) []byte {
-	factory, _ := s3.NewS3WriterFactory(config, asb.NewASBEncoderFactory(), true)
+	factory, _ := s3.NewS3WriterFactory(config, true)
 
-	writer, err := factory.NewWriter(namespace, func(_ io.WriteCloser) error {
-		return nil
-	})
+	writer, err := factory.NewWriter(namespace)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}
@@ -196,7 +194,7 @@ func (s *writeReadTestSuite) write(namespace string, bytes, times int, config *s
 	}
 
 	// cannot create new factory because folder is not empty
-	_, err = s3.NewS3WriterFactory(config, asb.NewASBEncoderFactory(), false)
+	_, err = s3.NewS3WriterFactory(config, false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
 	return allBytesWritten

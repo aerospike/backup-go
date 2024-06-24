@@ -102,8 +102,8 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	return nil
 }
 
-func setCompressionDecoder(compressionPolicy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
-	if compressionPolicy == nil || compressionPolicy.Mode == models.CompressNone {
+func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+	if policy == nil || policy.Mode == models.CompressNone {
 		return readers, nil
 	}
 

@@ -18,6 +18,6 @@ var _ encoding.EncoderFactory = (*asbEncoderFactory)(nil)
 
 // CreateEncoder creates a new ASBEncoder
 // This method is called by the backup client to create a new encoder
-func (f *asbEncoderFactory) CreateEncoder() (encoding.Encoder, error) {
-	return NewEncoder(), nil
+func (f *asbEncoderFactory) CreateEncoder(namespace string) encoding.Encoder {
+	return NewEncoder(namespace)
 }

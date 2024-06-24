@@ -132,7 +132,7 @@ func (bh *BackupHandler) makeWriteWorkers(backupWriters []io.WriteCloser) []pipe
 }
 
 func (bh *BackupHandler) makeWriters(n int) ([]io.WriteCloser, error) {
-	backupWriters := make([]io.WriteCloser, 0, n)
+	backupWriters := make([]io.WriteCloser, n)
 
 	for i := 0; i < n; i++ {
 		writer, err := bh.newWriter()

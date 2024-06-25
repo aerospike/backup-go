@@ -17,8 +17,10 @@ package backup
 import (
 	"context"
 	"fmt"
+	"github.com/aerospike/backup-go/internal/writers"
 	"io"
 	"log/slog"
+	"os"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
@@ -89,6 +91,11 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 		return err
 	}
 
+	readers, err = SetEncryptionDecoder(rh.config.EncryptionPolicy, readers)
+	if err != nil {
+		return err
+	}
+
 	totalReaders := len(readers)
 	batchSize := rh.config.Parallel
 
@@ -119,6 +126,43 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 	}
 
 	return zstdReaders, nil
+}
+
+func SetEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+
+	if policy == nil {
+		return readers, nil
+	}
+
+	key, err := os.ReadFile(*policy.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read key from file: %w", err)
+	}
+
+	keyLength := len(key)
+	switch policy.Mode {
+	case models.EncryptAES128:
+		if keyLength != 16 {
+			return nil, fmt.Errorf("AES128 requires a 16-byte key, got %d bytes", keyLength)
+		}
+	case models.EncryptAES256:
+		if keyLength != 32 {
+			return nil, fmt.Errorf("AES256 requires a 32-byte key, got %d bytes", keyLength)
+		}
+	default:
+		return nil, fmt.Errorf("unknown algorithm: %s", policy.Mode)
+	}
+
+	decryptedReaders := make([]io.ReadCloser, len(readers))
+	for i, reader := range readers {
+		encryptedReader, err := writers.NewEncryptedReader(reader, key)
+		if err != nil {
+			return nil, err
+		}
+		decryptedReaders[i] = encryptedReader
+	}
+
+	return decryptedReaders, nil
 }
 
 func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {

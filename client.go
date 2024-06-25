@@ -187,6 +187,8 @@ type BackupConfig struct {
 	ModBefore *time.Time
 	// Only include records that last changed after the given time (optional).
 	ModAfter *time.Time
+	// Encryption details.
+	EncryptionPolicy *models.EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
 	// Namespace is the Aerospike namespace to backup.
@@ -291,6 +293,8 @@ type RestoreConfig struct {
 	// Namespace details for the restore operation.
 	// By default, the data is restored to the namespace from which it was taken.
 	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
+	// Encryption details.
+	EncryptionPolicy *models.EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
 	// The sets to restore (optional, given an empty list, all sets will be restored).

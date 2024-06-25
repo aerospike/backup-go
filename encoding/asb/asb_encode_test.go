@@ -35,7 +35,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
 	if aerr != nil {
@@ -54,9 +54,10 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 		},
 	}
 
-	_, err := encoder.encodeRecord(&token.Record)
+	buff := &bytes.Buffer{}
+	_, err := encoder.encodeRecord(&token.Record, buff)
 	suite.Assert().NoError(err)
-	expected := bytes.Clone(encoder.buff.Bytes())
+	expected := bytes.Clone(buff.Bytes())
 
 	actual, err := encoder.EncodeToken(token)
 	suite.Assert().NoError(err)
@@ -64,7 +65,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -74,10 +75,10 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 			Content: []byte(base64.StdEncoding.EncodeToString([]byte("content"))),
 		},
 	}
-
-	_, err := encoder.encodeUDF(token.UDF)
+	buff := &bytes.Buffer{}
+	_, err := encoder.encodeUDF(token.UDF, buff)
 	suite.NoError(err)
-	expected := encoder.buff.Bytes()
+	expected := buff.Bytes()
 
 	actual, err := encoder.EncodeToken(token)
 	suite.Assert().NoError(err)
@@ -85,7 +86,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -100,9 +101,10 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 		},
 	}
 
-	_, err := encoder.encodeSIndex(token.SIndex)
+	buff := &bytes.Buffer{}
+	_, err := encoder.encodeSIndex(token.SIndex, buff)
 	suite.Assert().NoError(err)
-	expected := encoder.buff.Bytes()
+	expected := buff.Bytes()
 
 	actual, err := encoder.EncodeToken(token)
 	suite.Assert().NoError(err)
@@ -110,7 +112,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -123,7 +125,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	var recExpr int64 = 10
 
@@ -142,15 +144,16 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 	recTemplate := "+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ b 1\n- I bin1 0\n"
 	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
-	n, err := encoder.encodeRecord(rec)
+	buff := &bytes.Buffer{}
+	n, err := encoder.encodeRecord(rec, buff)
 	suite.Assert().NoError(err)
-	actual := encoder.buff.Bytes()
+	actual := buff.Bytes()
 	suite.Assert().Equal(len(actual), n)
 	suite.Assert().Equal(expected, string(actual))
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -163,28 +166,23 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 	}
 
 	expected := []byte("* i ns  name N 1 bin S\n")
-	n, err := encoder.encodeSIndex(sindex)
+	buff := &bytes.Buffer{}
+	n, err := encoder.encodeSIndex(sindex, buff)
 	suite.Assert().Equal(len(expected), n)
 	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, encoder.buff.Bytes())
+	suite.Assert().Equal(expected, buff.Bytes())
 }
 
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder := NewEncoder()
-	actual, err := encoder.GetHeader("test", true)
-	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, string(actual))
-}
+	encoder := NewEncoder("test")
+	firstHeader := encoder.GetHeader()
+	suite.Assert().Equal(expected, string(firstHeader))
 
-func (suite *asbEncoderTestSuite) TestGetHeader() {
-	expected := "Version 3.1\n# namespace test\n"
-
-	encoder := NewEncoder()
-	actual, err := encoder.GetHeader("test", false)
-	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, string(actual))
+	secondExpected := "Version 3.1\n# namespace test\n"
+	secondHeader := encoder.GetHeader()
+	suite.Assert().Equal(secondExpected, string(secondHeader))
 }
 
 func TestASBEncoderTestSuite(t *testing.T) {
@@ -1541,7 +1539,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
-	encoder := NewEncoder().(*asbEncoder)
+	encoder := NewEncoder("test").(*asbEncoder)
 
 	key := genKey()
 	rec := &models.Record{
@@ -1562,9 +1560,9 @@ func BenchmarkEncodeRecord(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = encoder.encodeRecord(rec)
-		output.Write(encoder.buff.Bytes())
-		encoder.buff.Reset()
+		buff := &bytes.Buffer{}
+		_, _ = encoder.encodeRecord(rec, buff)
+		output.Write(buff.Bytes())
 	}
 }
 
@@ -1617,14 +1615,7 @@ func Test_writeVersionText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeVersionText(tt.args.asbVersion, w)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("writeVersionText() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("writeVersionText() = %v, want %v", got, tt.want)
-			}
+			writeVersionText(tt.args.asbVersion, w)
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("writeVersionText() = %v, want %v", gotW, tt.wantW)
 			}
@@ -1663,14 +1654,7 @@ func Test_writeNamespaceMetaText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeNamespaceMetaText(tt.args.namespace, w)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("writeNamespaceMetaText() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("writeNamespaceMetaText() = %v, want %v", got, tt.want)
-			}
+			writeNamespaceMetaText(tt.args.namespace, w)
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("writeNamespaceMetaText() = %v, want %v", gotW, tt.wantW)
 			}
@@ -1694,14 +1678,7 @@ func Test_writeFirstMetaText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeFirstMetaText(w)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("writeFirstMetaText() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("writeFirstMetaText() = %v, want %v", got, tt.want)
-			}
+			writeFirstMetaText(w)
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("writeFirstMetaText() = %v, want %v", gotW, tt.wantW)
 			}
@@ -1717,8 +1694,8 @@ func Test_blobBinToASB(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		args args
 		want []byte
+		args args
 	}{
 		{
 			name: "positive simple",

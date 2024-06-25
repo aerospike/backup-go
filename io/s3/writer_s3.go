@@ -3,7 +3,6 @@ package s3
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,8 +10,6 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/aerospike/backup-go/io/local"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -23,20 +20,14 @@ type s3WriteFactory struct {
 	client   *s3.Client
 	s3Config *StorageConfig
 	fileID   *atomic.Uint32 // increments for each new file created
-	encoder  encoding.EncoderFactory
 }
 
 var _ backup.WriteFactory = (*s3WriteFactory)(nil)
 
 func NewS3WriterFactory(
 	s3Config *StorageConfig,
-	encoder encoding.EncoderFactory,
 	removeFiles bool,
 ) (backup.WriteFactory, error) {
-	if encoder == nil {
-		return nil, errors.New("encoder is nil")
-	}
-
 	if s3Config.ChunkSize > maxS3File {
 		return nil, fmt.Errorf("invalid chunk size %d, should not exceed %d", s3Config.ChunkSize, maxS3File)
 	}
@@ -66,7 +57,6 @@ func NewS3WriterFactory(
 		client:   client,
 		s3Config: s3Config,
 		fileID:   &atomic.Uint32{},
-		encoder:  encoder,
 	}, nil
 }
 
@@ -84,48 +74,31 @@ type s3Writer struct {
 
 var _ io.WriteCloser = (*s3Writer)(nil)
 
-func (f *s3WriteFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (io.WriteCloser, error) {
+func (f *s3WriteFactory) NewWriter(filename string) (io.WriteCloser, error) {
 	chunkSize := f.s3Config.ChunkSize
 	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
 	}
 
-	var open = func() (io.WriteCloser, error) {
-		name := f.encoder.GenerateFilename(namespace, f.fileID.Add(1))
-		fullPath := path.Join(f.s3Config.Prefix, name)
+	fullPath := path.Join(f.s3Config.Prefix, filename)
 
-		upload, err := f.client.CreateMultipartUpload(context.TODO(), &s3.CreateMultipartUploadInput{
-			Bucket: &f.s3Config.Bucket,
-			Key:    &fullPath,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create multipart upload: %w", err)
-		}
-
-		writer := &s3Writer{
-			uploadID:   upload.UploadId,
-			key:        fullPath,
-			client:     f.client,
-			bucket:     f.s3Config.Bucket,
-			buffer:     new(bytes.Buffer),
-			partNumber: 1,
-			chunkSize:  chunkSize,
-		}
-
-		err = writeHeader(writer)
-		if err != nil {
-			return nil, err
-		}
-
-		return writer, nil
-	}
-
-	writer, err := open()
+	upload, err := f.client.CreateMultipartUpload(context.TODO(), &s3.CreateMultipartUploadInput{
+		Bucket: &f.s3Config.Bucket,
+		Key:    &fullPath,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup file writer: %w", err)
+		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
-	return writers.NewSized(maxS3File, writer, open), nil
+	return &s3Writer{
+		uploadID:   upload.UploadId,
+		key:        fullPath,
+		client:     f.client,
+		bucket:     f.s3Config.Bucket,
+		buffer:     new(bytes.Buffer),
+		partNumber: 1,
+		chunkSize:  chunkSize,
+	}, nil
 }
 
 func (f *s3WriteFactory) GetType() string {

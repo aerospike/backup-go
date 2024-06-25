@@ -187,6 +187,8 @@ type BackupConfig struct {
 	ModBefore *time.Time
 	// Only include records that last changed after the given time (optional).
 	ModAfter *time.Time
+	// Compression details.
+	CompressionPolicy *models.CompressionPolicy
 	// Namespace is the Aerospike namespace to backup.
 	Namespace string
 	// SetList is the Aerospike set to backup (optional, given an empty list, all sets will be backed up).
@@ -197,15 +199,18 @@ type BackupConfig struct {
 	Partitions PartitionRange
 	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int
-	// Don't backup any records.
+	// Don't back up any records.
 	NoRecords bool
-	// Don't backup any secondary indexes.
+	// Don't back up any secondary indexes.
 	NoIndexes bool
-	// Don't backup any UDFs.
+	// Don't back up any UDFs.
 	NoUDFs bool
 	// Limits backup bandwidth (bytes per second).
 	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
+	// File size limit (in bytes) for the backup. If a backup file crosses this size threshold, a new file will be created.
+	// 0 for no file size limit.
+	FileLimit int64
 }
 
 func (c *BackupConfig) validate() error {
@@ -223,6 +228,10 @@ func (c *BackupConfig) validate() error {
 
 	if c.Bandwidth < 0 {
 		return fmt.Errorf("bandwidth value should not be negative, got %d", c.Bandwidth)
+	}
+
+	if c.FileLimit < 0 {
+		return fmt.Errorf("filelimit value should not be negative, got %d", c.FileLimit)
 	}
 
 	return nil
@@ -282,6 +291,8 @@ type RestoreConfig struct {
 	// Namespace details for the restore operation.
 	// By default, the data is restored to the namespace from which it was taken.
 	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
+	// Compression details.
+	CompressionPolicy *models.CompressionPolicy
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).

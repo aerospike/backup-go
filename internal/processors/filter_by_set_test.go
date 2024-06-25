@@ -11,9 +11,9 @@ import (
 
 func TestSetFilter(t *testing.T) {
 	type test struct {
-		name             string
 		token            *models.Token
 		setFilter        *filterBySet
+		name             string
 		shouldBeFiltered bool
 	}
 

@@ -6,19 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/internal/writers"
 )
 
 type DirectoryWriterFactory struct {
-	fileID    *atomic.Uint32
-	encoder   encoding.EncoderFactory
 	directory string
-
-	fileSizeLimit int64
 }
 
 var _ backup.WriteFactory = (*DirectoryWriterFactory)(nil)
@@ -30,20 +23,8 @@ var _ backup.WriteFactory = (*DirectoryWriterFactory)(nil)
 // If non-zero, backup files will be split into multiple files if their size exceeds this limit.
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
 // FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
-func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder encoding.EncoderFactory, removeFiles bool,
+func NewDirectoryWriterFactory(dir string, removeFiles bool,
 ) (*DirectoryWriterFactory, error) {
-	if encoder == nil {
-		return nil, errors.New("encoder is nil")
-	}
-
-	if fileSizeLimit > 0 && fileSizeLimit < 1024*1024 {
-		return nil, fmt.Errorf("file size limit must be 0 for no limit, or at least 1MB, got %d", fileSizeLimit)
-	}
-
-	if fileSizeLimit < 0 {
-		return nil, fmt.Errorf("file size limit must not be negative, got %d", fileSizeLimit)
-	}
-
 	var err error
 	if removeFiles {
 		err = forcePrepareBackupDirectory(dir)
@@ -56,10 +37,7 @@ func NewDirectoryWriterFactory(dir string, fileSizeLimit int64, encoder encoding
 	}
 
 	return &DirectoryWriterFactory{
-		directory:     dir,
-		fileID:        &atomic.Uint32{},
-		fileSizeLimit: fileSizeLimit,
-		encoder:       encoder,
+		directory: dir,
 	}, nil
 }
 
@@ -116,40 +94,9 @@ func makeDir(dir string) error {
 // The file name is based on the namespace and the id.
 // The file is returned in write mode.
 // If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
-func (f *DirectoryWriterFactory) NewWriter(namespace string, writeHeader func(io.WriteCloser) error) (
-	io.WriteCloser, error) {
-	// open is a function that is executed for every file when split by size.
-	open := func() (io.WriteCloser, error) {
-		fileName := f.encoder.GenerateFilename(namespace, f.fileID.Add(1))
-		filePath := filepath.Join(f.directory, fileName)
-
-		file, err := openBackupFile(filePath)
-		if err != nil {
-			return nil, err
-		}
-
-		err = writeHeader(file)
-		if err != nil {
-			return nil, err
-		}
-
-		return file, err
-	}
-
-	writer, err := open()
-	if err != nil {
-		return nil, fmt.Errorf("failed to open backup file: %w", err)
-	}
-
-	if f.fileSizeLimit > 0 {
-		writer = writers.NewSized(f.fileSizeLimit, writer, open)
-	}
-
-	return writer, nil
-}
-
-func openBackupFile(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o666)
+func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, error) {
+	filePath := filepath.Join(f.directory, fileName)
+	return os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

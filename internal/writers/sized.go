@@ -14,49 +14,58 @@
 
 package writers
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
-// Sized wraps a io.WriteCloser and adds a size limit.
+// Sized wraps an io.WriteCloser and adds a size limit.
 // when the size limit is reached, the io.WriteCloser is closed and a new one is created
 // using the open function.
 type Sized struct {
-	io.WriteCloser
-	open  func() (io.WriteCloser, error)
-	size  int64
-	limit int64
+	writer io.WriteCloser
+	open   func() (io.WriteCloser, error)
+	size   int64
+	limit  int64
 }
 
 // NewSized creates a new Sized writer with a size limit.
 // limit must be greater than 0.
-func NewSized(limit int64, writer io.WriteCloser, open func() (io.WriteCloser, error)) *Sized {
+func NewSized(limit int64, open func() (io.WriteCloser, error)) (*Sized, error) {
 	if limit <= 0 {
-		panic("limit must be greater than 0")
+		return nil, fmt.Errorf("limit must be greater than 0, got %d", limit)
 	}
 
 	return &Sized{
-		limit:       limit,
-		open:        open,
-		WriteCloser: writer,
-	}
+		limit: limit,
+		open:  open,
+	}, nil
 }
 
 func (f *Sized) Write(p []byte) (n int, err error) {
 	if f.size >= f.limit {
-		err := f.WriteCloser.Close()
+		err := f.writer.Close()
 		if err != nil {
 			return 0, err
 		}
 
 		f.size = 0
+		f.writer = nil
+	}
 
-		f.WriteCloser, err = f.open()
+	if f.writer == nil {
+		f.writer, err = f.open()
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	n, err = f.WriteCloser.Write(p)
+	n, err = f.writer.Write(p)
 	f.size += int64(n)
 
 	return n, err
+}
+
+func (f *Sized) Close() error {
+	return f.writer.Close()
 }

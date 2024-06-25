@@ -35,7 +35,6 @@ import (
 type statsSetterToken interface {
 	AddUDFs(uint32)
 	AddSIndexes(uint32)
-	AddTotalBytesWritten(uint64)
 }
 
 type tokenStatsWriter struct {
@@ -72,8 +71,6 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 	case models.TokenTypeInvalid:
 		return 0, errors.New("invalid token")
 	}
-
-	tw.stats.AddTotalBytesWritten(uint64(n))
 
 	return n, nil
 }

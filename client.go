@@ -231,7 +231,7 @@ func (c *BackupConfig) validate() error {
 	}
 
 	if c.FileLimit < 0 {
-		return fmt.Errorf("filelimit value should not be negative, got %d", c.Bandwidth)
+		return fmt.Errorf("filelimit value should not be negative, got %d", c.FileLimit)
 	}
 
 	return nil

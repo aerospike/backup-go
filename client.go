@@ -236,6 +236,14 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("filelimit value should not be negative, got %d", c.FileLimit)
 	}
 
+	if err := c.CompressionPolicy.Validate(); err != nil {
+		return fmt.Errorf("compression policy invalid: %w", err)
+	}
+
+	if err := c.EncryptionPolicy.Validate(); err != nil {
+		return fmt.Errorf("encryption policy invalid: %w", err)
+	}
+
 	return nil
 }
 

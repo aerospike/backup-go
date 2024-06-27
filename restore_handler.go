@@ -17,21 +17,19 @@ package backup
 import (
 	"context"
 	"fmt"
-	"github.com/aerospike/backup-go/internal/writers"
-	"io"
-	"log/slog"
-	"os"
-
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
+	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 	"golang.org/x/time/rate"
+	"io"
+	"log/slog"
 )
 
 // ReaderFactory provides access to data that should be restored.
@@ -86,12 +84,12 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 		return fmt.Errorf("failed to get readers: %w", err)
 	}
 
-	readers, err = setCompressionDecoder(rh.config.CompressionPolicy, readers)
+	readers, err = SetEncryptionDecoder(rh.config.EncryptionPolicy, readers)
 	if err != nil {
 		return err
 	}
 
-	readers, err = SetEncryptionDecoder(rh.config.EncryptionPolicy, readers)
+	readers, err = setCompressionDecoder(rh.config.CompressionPolicy, readers)
 	if err != nil {
 		return err
 	}
@@ -129,33 +127,18 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 }
 
 func SetEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
-
 	if policy == nil {
 		return readers, nil
 	}
 
-	key, err := os.ReadFile(*policy.KeyFile)
+	privateKey, err := policy.ReadPrivateKey()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read key from file: %w", err)
-	}
-
-	keyLength := len(key)
-	switch policy.Mode {
-	case models.EncryptAES128:
-		if keyLength != 16 {
-			return nil, fmt.Errorf("AES128 requires a 16-byte key, got %d bytes", keyLength)
-		}
-	case models.EncryptAES256:
-		if keyLength != 32 {
-			return nil, fmt.Errorf("AES256 requires a 32-byte key, got %d bytes", keyLength)
-		}
-	default:
-		return nil, fmt.Errorf("unknown algorithm: %s", policy.Mode)
+		return nil, err
 	}
 
 	decryptedReaders := make([]io.ReadCloser, len(readers))
 	for i, reader := range readers {
-		encryptedReader, err := writers.NewEncryptedReader(reader, key)
+		encryptedReader, err := writers.NewEncryptedReader(reader, privateKey)
 		if err != nil {
 			return nil, err
 		}

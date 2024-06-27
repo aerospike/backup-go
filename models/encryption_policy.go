@@ -1,8 +1,10 @@
 package models
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"os"
 )
 
 // Encryption modes
@@ -40,4 +42,21 @@ func (p *EncryptionPolicy) Validate() error {
 	}
 
 	return nil
+}
+
+func (p *EncryptionPolicy) ReadPrivateKey() ([]byte, error) {
+	key, err := os.ReadFile(*p.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read key from file: %w", err)
+	}
+
+	// TODO: support key in PEM format
+
+	sum256 := sha256.Sum256(key) // AES encrypt require 128 or 256 bits for key
+
+	if p.Mode == EncryptAES128 {
+		return sum256[:16], nil
+	}
+
+	return sum256[:], nil
 }

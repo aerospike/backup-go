@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -178,7 +177,7 @@ func (bh *BackupHandler) newConfiguredWriter() (io.WriteCloser, error) {
 
 	encryptedWriter, err := setEncryption(bh.config.EncryptionPolicy, countingWriter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot set encryption: %w", err)
 	}
 
 	zippedWriter, err := setCompression(bh.config.CompressionPolicy, encryptedWriter)
@@ -203,26 +202,12 @@ func setEncryption(policy *models.EncryptionPolicy, writer io.WriteCloser) (io.W
 		return writer, nil
 	}
 
-	key, err := os.ReadFile(*policy.KeyFile)
+	privateKey, err := policy.ReadPrivateKey()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read key from file: %w", err)
-	}
-	keyLength := len(key)
-
-	switch policy.Mode {
-	case models.EncryptAES128:
-		if keyLength != 16 {
-			return nil, fmt.Errorf("AES128 requires a 16-byte key, got %d bytes", keyLength)
-		}
-	case models.EncryptAES256:
-		if keyLength != 32 {
-			return nil, fmt.Errorf("AES256 requires a 32-byte key, got %d bytes", keyLength)
-		}
-	default:
-		return nil, fmt.Errorf("unknown algorithm: %s", policy.Mode)
+		return nil, err
 	}
 
-	return writers.NewEncryptedWriter(writer, key)
+	return writers.NewEncryptedWriter(writer, privateKey)
 }
 
 func setCompression(policy *models.CompressionPolicy, writer io.WriteCloser) (io.WriteCloser, error) {

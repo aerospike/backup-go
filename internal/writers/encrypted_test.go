@@ -3,17 +3,15 @@ package writers
 import (
 	"bytes"
 	"crypto/rand"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEncryptedWriterAndReader(t *testing.T) {
 	buf := new(bytes.Buffer)
-
-	key := make([]byte, 16)
-	_, err := io.ReadFull(rand.Reader, key)
-	assert.NoError(t, err)
+	key := generateKey(t)
 
 	encryptedWriter, err := NewEncryptedWriter(&writeCloserBuffer{buf}, key)
 	assert.NoError(t, err)
@@ -37,6 +35,32 @@ func TestEncryptedWriterAndReader(t *testing.T) {
 	}
 
 	assert.Equal(t, decrypted, testData)
+	assert.Equal(t, n, len(testData))
+}
+
+func TestNegative(t *testing.T) {
+	buf := new(bytes.Buffer)
+	encryptedWriter, _ := NewEncryptedWriter(&writeCloserBuffer{buf}, generateKey(t))
+
+	testData := []byte("Hello, encrypted world!")
+	_, _ = encryptedWriter.Write(testData)
+	_ = encryptedWriter.Close()
+
+	encryptedReader, _ := NewEncryptedReader(io.NopCloser(buf), generateKey(t))
+
+	decrypted := make([]byte, len(testData))
+	_, _ = io.ReadFull(encryptedReader, decrypted)
+
+	// data written and read with different keys should not be equal
+	assert.NotEqual(t, decrypted, testData)
+}
+
+func generateKey(t *testing.T) []byte {
+	t.Helper()
+	key := make([]byte, 32)
+	_, err := io.ReadFull(rand.Reader, key)
+	assert.NoError(t, err)
+	return key
 }
 
 type writeCloserBuffer struct {

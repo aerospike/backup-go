@@ -17,6 +17,9 @@ package backup
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
+
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -28,8 +31,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 	"golang.org/x/time/rate"
-	"io"
-	"log/slog"
 )
 
 // ReaderFactory provides access to data that should be restored.
@@ -137,11 +138,13 @@ func SetEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadClos
 	}
 
 	decryptedReaders := make([]io.ReadCloser, len(readers))
+
 	for i, reader := range readers {
 		encryptedReader, err := writers.NewEncryptedReader(reader, privateKey)
 		if err != nil {
 			return nil, err
 		}
+
 		decryptedReaders[i] = encryptedReader
 	}
 

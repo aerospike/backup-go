@@ -7,12 +7,14 @@ import (
 	"io"
 )
 
-type EncryptedWriter struct {
+type encryptedWriter struct {
 	writer io.WriteCloser
 	stream cipher.Stream
 }
 
-func NewEncryptedWriter(w io.WriteCloser, key []byte) (*EncryptedWriter, error) {
+// NewEncryptedWriter returns a new Writer
+// Writes to the returned writer are encrypted with a key and written to w.
+func NewEncryptedWriter(w io.WriteCloser, key []byte) (io.WriteCloser, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -31,30 +33,30 @@ func NewEncryptedWriter(w io.WriteCloser, key []byte) (*EncryptedWriter, error) 
 
 	stream := cipher.NewCTR(block, iv)
 
-	return &EncryptedWriter{
+	return &encryptedWriter{
 		writer: w,
 		stream: stream,
 	}, nil
 }
 
-func (ew *EncryptedWriter) Write(p []byte) (int, error) {
+func (ew *encryptedWriter) Write(p []byte) (int, error) {
 	encrypted := make([]byte, len(p))
 	ew.stream.XORKeyStream(encrypted, p)
+
 	return ew.writer.Write(encrypted)
 }
 
-func (ew *EncryptedWriter) Close() error {
+func (ew *encryptedWriter) Close() error {
 	return ew.writer.Close()
 }
 
-// EncryptedReader struct
-type EncryptedReader struct {
+type encryptedReader struct {
 	reader io.ReadCloser
 	stream cipher.Stream
 }
 
-// NewEncryptedReader function
-func NewEncryptedReader(r io.ReadCloser, key []byte) (*EncryptedReader, error) {
+// NewEncryptedReader create new reader, decrypting data from underlying reader with a key.
+func NewEncryptedReader(r io.ReadCloser, key []byte) (io.ReadCloser, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -67,20 +69,21 @@ func NewEncryptedReader(r io.ReadCloser, key []byte) (*EncryptedReader, error) {
 
 	stream := cipher.NewCTR(block, iv)
 
-	return &EncryptedReader{
+	return &encryptedReader{
 		reader: r,
 		stream: stream,
 	}, nil
 }
 
-func (er *EncryptedReader) Read(p []byte) (int, error) {
+func (er *encryptedReader) Read(p []byte) (int, error) {
 	n, err := er.reader.Read(p)
 	if n > 0 {
 		er.stream.XORKeyStream(p[:n], p[:n])
 	}
+
 	return n, err
 }
 
-func (er *EncryptedReader) Close() error {
+func (er *encryptedReader) Close() error {
 	return er.reader.Close()
 }

@@ -185,16 +185,14 @@ func (bh *BackupHandler) newConfiguredWriter() (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	writer := zippedWriter
-
-	_, err = writer.Write(bh.encoder.GetHeader())
+	_, err = zippedWriter.Write(bh.encoder.GetHeader())
 	if err != nil {
 		return nil, err
 	}
 
 	bh.stats.IncFiles()
 
-	return writer, nil
+	return zippedWriter, nil
 }
 
 func setEncryption(policy *models.EncryptionPolicy, writer io.WriteCloser) (io.WriteCloser, error) {

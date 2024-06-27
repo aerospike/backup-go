@@ -358,6 +358,14 @@ func (c *RestoreConfig) validate() error {
 		return fmt.Errorf("max async batches should be positive, got %d", c.MaxAsyncBatches)
 	}
 
+	if err := c.CompressionPolicy.Validate(); err != nil {
+		return fmt.Errorf("compression policy invalid: %w", err)
+	}
+
+	if err := c.EncryptionPolicy.Validate(); err != nil {
+		return fmt.Errorf("encryption policy invalid: %w", err)
+	}
+
 	return nil
 }
 

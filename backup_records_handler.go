@@ -46,16 +46,28 @@ func (bh *backupRecordsHandler) run(
 	writers []pipeline.Worker[*models.Token],
 	recordsTotal *atomic.Uint64,
 ) error {
-	readWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
-	processorWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
-
-	partitionRanges, err := splitPartitions(
-		bh.config.Partitions.Begin,
-		bh.config.Partitions.Count,
-		bh.config.Parallel,
-	)
+	readWorkers, err := bh.makeAerospikeReadWorkers(bh.config.Parallel)
 	if err != nil {
 		return err
+	}
+
+	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsTotal))
+	voidTimeSetter := newTokenWorker(processors.NewVoidTimeSetter(bh.logger))
+
+	job := pipeline.NewPipeline[*models.Token](
+		readWorkers,
+		recordCounter,
+		voidTimeSetter,
+		writers,
+	)
+
+	return job.Run(ctx)
+}
+
+func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Worker[*models.Token], error) {
+	partitionRanges, err := splitPartitions(bh.config.Partitions.Begin, bh.config.Partitions.Count, n)
+	if err != nil {
+		return nil, err
 	}
 
 	scanPolicy := *bh.config.ScanPolicy
@@ -64,28 +76,18 @@ func (bh *backupRecordsHandler) run(
 	// in the scan policy so that maps and lists are returned as raw blob bins
 	scanPolicy.RawCDT = true
 
-	for i := 0; i < bh.config.Parallel; i++ {
-		ARRCFG := newArrConfig(bh.config, partitionRanges[i])
+	readWorkers := make([]pipeline.Worker[*models.Token], n)
 
+	for i := 0; i < n; i++ {
 		recordReader := newAerospikeRecordReader(
 			bh.aerospikeClient,
-			ARRCFG,
+			newArrConfig(bh.config, partitionRanges[i]),
 			&scanPolicy,
 			bh.logger,
 		)
 
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](recordReader)
-		processorWorkers[i] = processors.NewProcessorWorker[*models.Token](processors.NewVoidTimeSetter(bh.logger))
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsTotal))
-
-	job := pipeline.NewPipeline[*models.Token](
-		readWorkers,
-		recordCounter,
-		processorWorkers,
-		writers,
-	)
-
-	return job.Run(ctx)
+	return readWorkers, nil
 }

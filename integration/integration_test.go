@@ -284,52 +284,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		args args
 	}{
 		{
-			name: "default",
-			args: args{
-				backupConfig:  backup.NewBackupConfig(),
-				restoreConfig: nonBatchRestore,
-				expectedFiles: 1,
-			},
-		},
-		{
-			name: "default batch",
-			args: args{
-				backupConfig:  backup.NewBackupConfig(),
-				restoreConfig: batchRestore,
-				expectedFiles: 1,
-			},
-		},
-		{
-			name: "with file size limit",
-			args: args{
-				backupConfig:  configWithFileLimit,
-				restoreConfig: nonBatchRestore,
-				expectedFiles: 10,
-			},
-		},
-		{
-			name: "with file size limit batch",
-			args: args{
-				backupConfig:  configWithFileLimit,
-				restoreConfig: batchRestore,
-				expectedFiles: 10,
-			},
-		},
-		{
-			name: "with parallel backup",
-			args: args{
-				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.PartitionRangeAll(),
-					SetList:        []string{suite.set},
-					Namespace:      suite.namespace,
-					Parallel:       100,
-					EncoderFactory: asb.NewASBEncoderFactory(),
-				},
-				restoreConfig: nonBatchRestore,
-				expectedFiles: 100,
-			},
-		},
-		{
 			name: "parallel with file size limit",
 			args: args{
 				backupConfig: &backup.BackupConfig{

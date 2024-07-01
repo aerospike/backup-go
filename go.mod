@@ -5,10 +5,10 @@ go 1.21
 require (
 	github.com/aerospike/aerospike-client-go/v7 v7.4.0
 	github.com/aerospike/tools-common-go v0.0.0-20240308225527-766ab8f3da4b
-	github.com/aws/aws-sdk-go-v2 v1.26.1
+	github.com/aws/aws-sdk-go-v2 v1.30.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.11
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1
-	github.com/aws/smithy-go v1.20.2
+	github.com/aws/smithy-go v1.20.3
 	github.com/docker/docker v26.1.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/google/go-cmp v0.6.0

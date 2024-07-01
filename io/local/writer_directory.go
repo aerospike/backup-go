@@ -118,7 +118,7 @@ func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, err
 		return nil, err
 	}
 
-	return &bufferedFile{bufio.NewWriter(file), file, fileName}, nil
+	return &bufferedFile{bufio.NewWriterSize(file, 4096), file, fileName}, nil
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

@@ -232,12 +232,12 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
 	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*models.BackupStats, *models.RestoreStats) {
 	ctx := context.Background()
-	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	dst := newByteReadWriteFactory()
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
-		&dst,
+		dst,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -253,7 +253,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		&dst,
+		dst,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -570,11 +570,11 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	writer := byteReadWriterFactory{}
+	writer := newByteReadWriteFactory()
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backup.NewBackupConfig(),
-		&writer,
+		writer,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -589,11 +589,11 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	cancel()
 
 	restoreConfig := backup.NewRestoreConfig()
-	reader := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	reader := newByteReadWriteFactory()
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		&reader,
+		reader,
 	)
 	suite.NotNil(rh)
 	suite.Nil(err)
@@ -857,6 +857,10 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	suite.Require().InDelta(totalDuration, restoreStats.GetDuration()+backupStats.GetDuration(), epsilon)
 
 	suite.TearDownTest()
+}
+
+func newByteReadWriteFactory() *byteReadWriterFactory {
+	return &byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 }
 
 type byteReadWriterFactory struct {

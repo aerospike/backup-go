@@ -175,7 +175,12 @@ func (bh *BackupHandler) newConfiguredWriter() (io.WriteCloser, error) {
 
 	countingWriter := writers.NewCountingWriter(storageWriter, &bh.stats.TotalBytesWritten)
 
-	zippedWriter, err := setCompression(bh.config.CompressionPolicy, countingWriter)
+	encryptedWriter, err := setEncryption(bh.config.EncryptionPolicy, countingWriter)
+	if err != nil {
+		return nil, fmt.Errorf("cannot set encryption: %w", err)
+	}
+
+	zippedWriter, err := setCompression(bh.config.CompressionPolicy, encryptedWriter)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +193,19 @@ func (bh *BackupHandler) newConfiguredWriter() (io.WriteCloser, error) {
 	bh.stats.IncFiles()
 
 	return zippedWriter, nil
+}
+
+func setEncryption(policy *models.EncryptionPolicy, writer io.WriteCloser) (io.WriteCloser, error) {
+	if policy == nil || policy.Mode == models.EncryptNone {
+		return writer, nil
+	}
+
+	privateKey, err := policy.ReadPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return writers.NewEncryptedWriter(writer, privateKey)
 }
 
 func setCompression(policy *models.CompressionPolicy, writer io.WriteCloser) (io.WriteCloser, error) {

@@ -24,6 +24,7 @@ import (
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
+	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -84,6 +85,11 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 		return fmt.Errorf("failed to get readers: %w", err)
 	}
 
+	readers, err = SetEncryptionDecoder(rh.config.EncryptionPolicy, readers)
+	if err != nil {
+		return err
+	}
+
 	readers, err = setCompressionDecoder(rh.config.CompressionPolicy, readers)
 	if err != nil {
 		return err
@@ -119,6 +125,30 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 	}
 
 	return zstdReaders, nil
+}
+
+func SetEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+	if policy == nil {
+		return readers, nil
+	}
+
+	privateKey, err := policy.ReadPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedReaders := make([]io.ReadCloser, len(readers))
+
+	for i, reader := range readers {
+		encryptedReader, err := writers.NewEncryptedReader(reader, privateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		decryptedReaders[i] = encryptedReader
+	}
+
+	return decryptedReaders, nil
 }
 
 func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {

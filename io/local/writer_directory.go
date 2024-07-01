@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -94,9 +95,11 @@ func makeDir(dir string) error {
 type bufferedFile struct {
 	*bufio.Writer
 	closer io.Closer
+	name   string
 }
 
 func (bf *bufferedFile) Close() error {
+	slog.Info("Close buffer", "buffered", bf.Buffered(), "name", bf.name)
 	err := bf.Writer.Flush()
 	if err != nil {
 		return err
@@ -115,7 +118,7 @@ func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, err
 		return nil, err
 	}
 
-	return &bufferedFile{bufio.NewWriter(file), file}, nil
+	return &bufferedFile{bufio.NewWriter(file), file, fileName}, nil
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

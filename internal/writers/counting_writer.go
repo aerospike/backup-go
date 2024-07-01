@@ -2,6 +2,7 @@ package writers
 
 import (
 	"io"
+	"log/slog"
 	"sync/atomic"
 )
 
@@ -27,5 +28,6 @@ func (cw *CountingWriter) Write(p []byte) (n int, err error) {
 }
 
 func (cw *CountingWriter) Close() error {
+	slog.Info("Close counting writer", "n", cw.count.Load())
 	return cw.writer.Close()
 }

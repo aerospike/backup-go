@@ -93,7 +93,7 @@ func makeDir(dir string) error {
 
 type bufferedFile struct {
 	*bufio.Writer
-	file *os.File
+	closer io.Closer
 }
 
 func (bf *bufferedFile) Close() error {
@@ -102,13 +102,11 @@ func (bf *bufferedFile) Close() error {
 		return err
 	}
 
-	return bf.file.Close()
+	return bf.closer.Close()
 }
 
 // NewWriter creates a new backup file in the given directory.
-// The file name is based on the namespace and the id.
-// The file is returned in write mode.
-// If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
+// The file name is based on the fileName parameter.
 func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, error) {
 	filePath := filepath.Join(f.directory, fileName)
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
@@ -117,7 +115,7 @@ func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, err
 		return nil, err
 	}
 
-	return file, nil
+	return &bufferedFile{bufio.NewWriter(file), file}, nil
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

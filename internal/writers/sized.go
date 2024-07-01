@@ -17,6 +17,7 @@ package writers
 import (
 	"fmt"
 	"io"
+	"log/slog"
 )
 
 // Sized wraps an io.WriteCloser and adds a size limit.
@@ -67,5 +68,7 @@ func (f *Sized) Write(p []byte) (n int, err error) {
 }
 
 func (f *Sized) Close() error {
+	_, _ = f.Write([]byte{})
+	slog.Info("Close sized")
 	return f.writer.Close()
 }

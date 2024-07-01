@@ -270,7 +270,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 	type args struct {
 		backupConfig  *backup.BackupConfig
 		restoreConfig *backup.RestoreConfig
-		bins          a.BinMap
 		expectedFiles int
 	}
 	nonBatchRestore := backup.NewRestoreConfig()
@@ -289,7 +288,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			args: args{
 				backupConfig:  backup.NewBackupConfig(),
 				restoreConfig: nonBatchRestore,
-				bins:          testBins,
 				expectedFiles: 1,
 			},
 		},
@@ -298,7 +296,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			args: args{
 				backupConfig:  backup.NewBackupConfig(),
 				restoreConfig: batchRestore,
-				bins:          testBins,
 				expectedFiles: 1,
 			},
 		},
@@ -307,7 +304,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			args: args{
 				backupConfig:  configWithFileLimit,
 				restoreConfig: nonBatchRestore,
-				bins:          testBins,
 				expectedFiles: 10,
 			},
 		},
@@ -316,7 +312,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			args: args{
 				backupConfig:  configWithFileLimit,
 				restoreConfig: batchRestore,
-				bins:          testBins,
 				expectedFiles: 10,
 			},
 		},
@@ -331,7 +326,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					EncoderFactory: asb.NewASBEncoderFactory(),
 				},
 				restoreConfig: nonBatchRestore,
-				bins:          testBins,
 				expectedFiles: 100,
 			},
 		},
@@ -347,20 +341,19 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					FileLimit:      1024 * 1024,
 				},
 				restoreConfig: nonBatchRestore,
-				bins:          testBins,
 				expectedFiles: 12, // 8 files of full size + 4 small
 			},
 		},
 	}
+	var initialRecords = genRecords(suite.namespace, suite.set, 20_000, testBins)
+	suite.SetupTest(initialRecords)
 	for _, tt := range tests {
-		var initialRecords = genRecords(suite.namespace, suite.set, 20_000, tt.args.bins)
-		suite.SetupTest(initialRecords)
 		suite.Run(tt.name, func() {
 			runBackupRestoreDirectory(suite,
 				tt.args.backupConfig, tt.args.restoreConfig, initialRecords, tt.args.expectedFiles)
 		})
-		suite.TearDownTest()
 	}
+	suite.TearDownTest()
 }
 
 func runBackupRestoreDirectory(suite *backupRestoreTestSuite,

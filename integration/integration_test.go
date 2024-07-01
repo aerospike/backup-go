@@ -379,6 +379,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.NotNil(statsBackup)
 
 	err = bh.Wait(ctx)
+	time.Sleep(1 * time.Second)
 	suite.Nil(err)
 
 	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetRecordsTotal())

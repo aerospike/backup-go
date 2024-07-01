@@ -12,6 +12,8 @@ type compressedWriter struct {
 }
 
 // NewCompressedWriter creates a new instance of compressedWriter with given compression level.
+// Every write to it is compressed and passed to inner writer.
+// On close both writers are closed.
 func NewCompressedWriter(w io.WriteCloser, level int) (io.WriteCloser, error) {
 	zstWriter, err := zstd.NewWriter(w, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
 	if err != nil {

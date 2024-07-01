@@ -187,6 +187,8 @@ type BackupConfig struct {
 	ModBefore *time.Time
 	// Only include records that last changed after the given time (optional).
 	ModAfter *time.Time
+	// Encryption details.
+	EncryptionPolicy *models.EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
 	// Namespace is the Aerospike namespace to backup.
@@ -232,6 +234,14 @@ func (c *BackupConfig) validate() error {
 
 	if c.FileLimit < 0 {
 		return fmt.Errorf("filelimit value should not be negative, got %d", c.FileLimit)
+	}
+
+	if err := c.CompressionPolicy.Validate(); err != nil {
+		return fmt.Errorf("compression policy invalid: %w", err)
+	}
+
+	if err := c.EncryptionPolicy.Validate(); err != nil {
+		return fmt.Errorf("encryption policy invalid: %w", err)
 	}
 
 	return nil
@@ -291,6 +301,8 @@ type RestoreConfig struct {
 	// Namespace details for the restore operation.
 	// By default, the data is restored to the namespace from which it was taken.
 	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
+	// Encryption details.
+	EncryptionPolicy *models.EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
 	// The sets to restore (optional, given an empty list, all sets will be restored).
@@ -344,6 +356,14 @@ func (c *RestoreConfig) validate() error {
 
 	if c.MaxAsyncBatches <= 0 {
 		return fmt.Errorf("max async batches should be positive, got %d", c.MaxAsyncBatches)
+	}
+
+	if err := c.CompressionPolicy.Validate(); err != nil {
+		return fmt.Errorf("compression policy invalid: %w", err)
+	}
+
+	if err := c.EncryptionPolicy.Validate(); err != nil {
+		return fmt.Errorf("encryption policy invalid: %w", err)
 	}
 
 	return nil

@@ -29,7 +29,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
-	"github.com/klauspost/compress/zstd"
 	"golang.org/x/time/rate"
 )
 
@@ -214,7 +213,7 @@ func setCompression(policy *models.CompressionPolicy, writer io.WriteCloser) (io
 	}
 
 	if policy.Mode == models.CompressZSTD {
-		return zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(policy.Level)))
+		return writers.NewCompressedWriter(writer, policy.Level)
 	}
 
 	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)

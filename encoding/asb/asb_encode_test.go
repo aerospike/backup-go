@@ -27,6 +27,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -196,21 +197,21 @@ func Test_escapeASBS(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string
+		want []byte
 	}{
 		{
 			name: "positive no escape",
 			args: args{
 				s: "hello",
 			},
-			want: "hello",
+			want: []byte("hello"),
 		},
 		{
 			name: "positive escape",
 			args: args{
 				s: "h el\\lo\n",
 			},
-			want: "h\\ el\\\\lo\\\n",
+			want: []byte("h\\ el\\\\lo\\\n"),
 		},
 	}
 	for _, tt := range tests {
@@ -494,28 +495,27 @@ func Test_boolToASB(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want byte
+		want []byte
 	}{
 		{
 			name: "positive true",
 			args: args{
 				b: true,
 			},
-			want: boolTrueByte,
+			want: trueBytes,
 		},
 		{
 			name: "positive false",
 			args: args{
 				b: false,
 			},
-			want: boolFalseByte,
+			want: falseBytes,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := boolToASB(tt.args.b); got != tt.want {
-				t.Errorf("boolToASB() = %v, want %v", got, tt.want)
-			}
+			got := boolToASB(tt.args.b)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

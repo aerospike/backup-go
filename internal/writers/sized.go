@@ -67,6 +67,9 @@ func (f *Sized) Write(p []byte) (n int, err error) {
 }
 
 func (f *Sized) Close() error {
-	_, _ = f.Write([]byte{})
+	if f.writer == nil { // in case there were no writes
+		return nil
+	}
+
 	return f.writer.Close()
 }

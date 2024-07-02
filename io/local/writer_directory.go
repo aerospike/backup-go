@@ -96,7 +96,6 @@ func makeDir(dir string) error {
 type bufferedFile struct {
 	*bufio.Writer
 	closer io.Closer
-	name   string
 }
 
 func (bf *bufferedFile) Close() error {
@@ -118,7 +117,7 @@ func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, err
 		return nil, err
 	}
 
-	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file, fileName}, nil
+	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

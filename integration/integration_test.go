@@ -355,7 +355,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		},
 	}
 	for _, tt := range tests {
-		var initialRecords = genRecords(suite.namespace, suite.set, 20_000, tt.args.bins)
+		var initialRecords = genRecords(suite.namespace, suite.set, 25_000, tt.args.bins)
 		suite.SetupTest(initialRecords)
 		suite.Run(tt.name, func() {
 			runBackupRestoreDirectory(suite,

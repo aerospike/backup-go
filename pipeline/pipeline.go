@@ -16,7 +16,6 @@ package pipeline
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 )
 
@@ -128,7 +127,6 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 		return <-errors
 	}
 
-	slog.Info("Pipeline finished OK")
 	return nil
 }
 

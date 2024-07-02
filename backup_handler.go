@@ -146,7 +146,6 @@ func (bh *BackupHandler) makeWriters(n int) ([]io.WriteCloser, error) {
 }
 
 func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
-	slog.Info("Start closing all writers", "n", len(backupWriters))
 	for _, w := range backupWriters {
 		if err := w.Close(); err != nil {
 			logger.Error("failed to close backup file", "error", err)

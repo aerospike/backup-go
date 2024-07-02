@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -101,7 +100,6 @@ type bufferedFile struct {
 }
 
 func (bf *bufferedFile) Close() error {
-	slog.Info("Close buffer", "buffered", bf.Buffered(), "name", bf.name)
 	err := bf.Writer.Flush()
 	if err != nil {
 		return err

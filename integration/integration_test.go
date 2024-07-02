@@ -287,22 +287,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		args args
 	}{
 		{
-			name: "parallel with file size limit",
-			args: args{
-				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.PartitionRangeAll(),
-					SetList:        []string{suite.set},
-					Namespace:      suite.namespace,
-					Parallel:       4,
-					EncoderFactory: asb.NewASBEncoderFactory(),
-					FileLimit:      1024 * 1024,
-				},
-				restoreConfig: nonBatchRestore,
-				bins:          testBins,
-				expectedFiles: 12, // 8 files of full size + 4 small
-			},
-		},
-		{
 			name: "default",
 			args: args{
 				backupConfig:  backup.NewBackupConfig(),
@@ -353,9 +337,25 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				expectedFiles: 100,
 			},
 		},
+		{
+			name: "parallel with file size limit",
+			args: args{
+				backupConfig: &backup.BackupConfig{
+					Partitions:     backup.PartitionRangeAll(),
+					SetList:        []string{suite.set},
+					Namespace:      suite.namespace,
+					Parallel:       2,
+					EncoderFactory: asb.NewASBEncoderFactory(),
+					FileLimit:      1024 * 1024,
+				},
+				restoreConfig: nonBatchRestore,
+				bins:          testBins,
+				expectedFiles: 10, // 8 files of full size + 2 small
+			},
+		},
 	}
 	for _, tt := range tests {
-		var initialRecords = genRecords(suite.namespace, suite.set, 21_000, tt.args.bins)
+		var initialRecords = genRecords(suite.namespace, suite.set, 20_000, tt.args.bins)
 		suite.SetupTest(initialRecords)
 		suite.Run(tt.name, func() {
 			runBackupRestoreDirectory(suite,

@@ -311,7 +311,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 				tt.args.backupConfig, tt.args.restoreConfig, initialRecords, tt.args.expectedFiles)
 		})
 	}
-	//suite.TearDownTest()
+	suite.TearDownTest()
 }
 
 func (suite *backupRestoreTestSuite) scanData() {

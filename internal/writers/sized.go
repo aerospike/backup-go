@@ -45,7 +45,7 @@ func NewSized(limit int64, open func() (io.WriteCloser, error)) (*Sized, error) 
 
 func (f *Sized) Write(p []byte) (n int, err error) {
 	if f.size >= f.limit {
-		slog.Info("Sized close file", "size", f.size)
+		slog.Info("Sized close file", "limit", f.limit, "size", f.size)
 		err := f.writer.Close()
 		if err != nil {
 			return 0, err

@@ -44,7 +44,7 @@ type Pipeline[T any] struct {
 	stages  []*stage[T]
 }
 
-const channelSize = 4096
+const channelSize = 256
 
 // NewPipeline creates a new DataPipeline.
 func NewPipeline[T any](workGroups ...[]Worker[T]) *Pipeline[T] {

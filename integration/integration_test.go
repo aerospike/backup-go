@@ -182,15 +182,15 @@ func (suite *backupRestoreTestSuite) SetupTest(records []*a.Record) {
 		suite.FailNow(err.Error())
 	}
 
-	//err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
-	//if err != nil {
-	//	suite.FailNow(err.Error())
-	//}
-	//
-	//err = suite.testClient.WriteUDFs(suite.expectedUDFs)
-	//if err != nil {
-	//	suite.FailNow(err.Error())
-	//}
+	err = suite.testClient.WriteSIndexes(suite.expectedSIndexes)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+
+	err = suite.testClient.WriteUDFs(suite.expectedUDFs)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
 }
 
 func (suite *backupRestoreTestSuite) TearDownTest() {
@@ -232,12 +232,12 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
 	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*models.BackupStats, *models.RestoreStats) {
 	ctx := context.Background()
-	dst := newByteReadWriteFactory()
+	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
-		dst,
+		&dst,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -253,7 +253,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		dst,
+		&dst,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -270,6 +270,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 	type args struct {
 		backupConfig  *backup.BackupConfig
 		restoreConfig *backup.RestoreConfig
+		bins          a.BinMap
 		expectedFiles int
 	}
 	nonBatchRestore := backup.NewRestoreConfig()
@@ -295,60 +296,71 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					FileLimit:      1024 * 1024,
 				},
 				restoreConfig: nonBatchRestore,
+				bins:          testBins,
 				expectedFiles: 12, // 8 files of full size + 4 small
 			},
 		},
+		{
+			name: "default",
+			args: args{
+				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: nonBatchRestore,
+				bins:          testBins,
+				expectedFiles: 1,
+			},
+		},
+		{
+			name: "default batch",
+			args: args{
+				backupConfig:  backup.NewBackupConfig(),
+				restoreConfig: batchRestore,
+				bins:          testBins,
+				expectedFiles: 1,
+			},
+		},
+		{
+			name: "with file size limit",
+			args: args{
+				backupConfig:  configWithFileLimit,
+				restoreConfig: nonBatchRestore,
+				bins:          testBins,
+				expectedFiles: 10,
+			},
+		},
+		{
+			name: "with file size limit batch",
+			args: args{
+				backupConfig:  configWithFileLimit,
+				restoreConfig: batchRestore,
+				bins:          testBins,
+				expectedFiles: 10,
+			},
+		},
+		{
+			name: "with parallel backup",
+			args: args{
+				backupConfig: &backup.BackupConfig{
+					Partitions:     backup.PartitionRangeAll(),
+					SetList:        []string{suite.set},
+					Namespace:      suite.namespace,
+					Parallel:       100,
+					EncoderFactory: asb.NewASBEncoderFactory(),
+				},
+				restoreConfig: nonBatchRestore,
+				bins:          testBins,
+				expectedFiles: 100,
+			},
+		},
 	}
-
-	var initialRecords = genRecords(suite.namespace, suite.set, 20_000, testBins)
-	suite.SetupTest(initialRecords)
-
-	suite.scanData()
-
 	for _, tt := range tests {
+		var initialRecords = genRecords(suite.namespace, suite.set, 20_000, tt.args.bins)
+		suite.SetupTest(initialRecords)
 		suite.Run(tt.name, func() {
 			runBackupRestoreDirectory(suite,
 				tt.args.backupConfig, tt.args.restoreConfig, initialRecords, tt.args.expectedFiles)
 		})
+		suite.TearDownTest()
 	}
-	suite.TearDownTest()
-}
-
-func (suite *backupRestoreTestSuite) scanData() {
-	suite.T().Helper()
-	apolicy := suite.Aeroclient.DefaultScanPolicy
-	apolicy.RawCDT = true
-	rec, _ := suite.Aeroclient.ScanAll(apolicy, suite.namespace, suite.set)
-	count := 0
-	start := time.Now() // Start time
-	// The loop will break when the channel is closed and empty
-	encoder := asb.NewASBEncoderFactory().CreateEncoder(suite.namespace)
-	var readRecords []*a.Record
-	for {
-		obj, ok := <-rec.Results()
-		if ok {
-			_ = obj
-			count++
-			readRecords = append(readRecords, obj.Record)
-		} else {
-			break
-		}
-	}
-
-	rduration := time.Since(start) // Measure time
-	fmt.Printf("Scanned %d objects in %v\n", count, rduration)
-
-	all := new(bytes.Buffer)
-
-	start = time.Now()
-	for _, r := range readRecords {
-		recToken := models.NewRecordToken(models.Record{Record: r}, 0)
-		bytes, err := encoder.EncodeToken(recToken)
-		_ = err
-		all.Write(bytes)
-	}
-
-	slog.Info("Encoding", "duration", time.Since(start), "size", all.Len())
 }
 
 func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
@@ -376,10 +388,45 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
-	backupFiles, _ := os.ReadDir(backupDir)
+	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetRecordsTotal())
+	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
+	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
+
 	dirSize := uint64(testresources.DirSize(backupDir))
-	slog.Info("Total bytes", "written", statsBackup.GetTotalBytesWritten(), "dir size", dirSize)
+	suite.Require().Equal(dirSize, statsBackup.GetTotalBytesWritten())
+
+	backupFiles, _ := os.ReadDir(backupDir)
 	suite.Require().Equal(expectedFiles, len(backupFiles))
+
+	err = suite.testClient.Truncate(suite.namespace, suite.set)
+	suite.Nil(err)
+
+	factory, _ := local.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	rh, err := suite.backupClient.Restore(
+		ctx,
+		restoreConfig,
+		factory,
+	)
+	suite.Nil(err)
+
+	statsRestore := rh.GetStats()
+	suite.NotNil(statsRestore)
+
+	err = rh.Wait(ctx)
+	suite.Nil(err)
+
+	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsTotal())
+	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsInserted())
+	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
+	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
+	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
+	suite.Require().Less(statsRestore.GetTotalBytesRead(), dirSize) // restore size doesn't include asb control characters
+
+	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
+	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
+
+	_, err = local.NewDirectoryWriterFactory(backupDir, false)
+	suite.ErrorContains(err, "backup directory is invalid")
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
@@ -523,11 +570,11 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	writer := newByteReadWriteFactory()
+	writer := byteReadWriterFactory{}
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backup.NewBackupConfig(),
-		writer,
+		&writer,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -542,11 +589,11 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	cancel()
 
 	restoreConfig := backup.NewRestoreConfig()
-	reader := newByteReadWriteFactory()
+	reader := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		reader,
+		&reader,
 	)
 	suite.NotNil(rh)
 	suite.Nil(err)
@@ -810,10 +857,6 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	suite.Require().InDelta(totalDuration, restoreStats.GetDuration()+backupStats.GetDuration(), epsilon)
 
 	suite.TearDownTest()
-}
-
-func newByteReadWriteFactory() *byteReadWriterFactory {
-	return &byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 }
 
 type byteReadWriterFactory struct {

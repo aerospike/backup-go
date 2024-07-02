@@ -18,6 +18,8 @@ type DirectoryWriterFactory struct {
 
 var _ backup.WriteFactory = (*DirectoryWriterFactory)(nil)
 
+const bufferSize = 4096 * 1024 // 4mb
+
 // NewDirectoryWriterFactory creates new factory for directory backups
 // dir is target folder for backup
 // fileSizeLimit is the maximum size of each backup file in bytes.
@@ -118,7 +120,7 @@ func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, err
 		return nil, err
 	}
 
-	return &bufferedFile{bufio.NewWriterSize(file, 4096*1024), file, fileName}, nil
+	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file, fileName}, nil
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

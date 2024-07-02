@@ -342,13 +342,13 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					Partitions:     backup.PartitionRangeAll(),
 					SetList:        []string{suite.set},
 					Namespace:      suite.namespace,
-					Parallel:       4,
+					Parallel:       2,
 					EncoderFactory: asb.NewASBEncoderFactory(),
 					FileLimit:      1024 * 1024,
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
-				expectedFiles: 12, // 8 files of full size + 4 small
+				expectedFiles: 10, // 8 files of full size + 2 small
 			},
 		},
 	}

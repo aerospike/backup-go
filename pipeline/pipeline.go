@@ -44,6 +44,8 @@ type Pipeline[T any] struct {
 	stages  []*stage[T]
 }
 
+const channelSize = 256
+
 // NewPipeline creates a new DataPipeline.
 func NewPipeline[T any](workGroups ...[]Worker[T]) *Pipeline[T] {
 	stages := make([]*stage[T], len(workGroups))
@@ -89,7 +91,7 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	var lastSend chan T
 
 	for _, s := range dp.stages {
-		send := make(chan T, len(s.workers))
+		send := make(chan T, channelSize)
 		s.SetSendChan(send)
 
 		s.SetReceiveChan(lastSend)

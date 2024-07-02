@@ -147,3 +147,26 @@ const (
 	// ASBFormatVersion is the current version of the ASB encoding format
 	ASBFormatVersion = "3.1"
 )
+
+var (
+	space                = []byte(" ")
+	newLine              = []byte("\n")
+	binBoolTypePrefix    = []byte("- Z ")
+	binIntTypePrefix     = []byte("- I ")
+	binFloatTypePrefix   = []byte("- D ")
+	binStringTypePrefix  = []byte("- S ")
+	binBytesTypePrefix   = []byte("- B ")
+	binHLLTypePrefix     = []byte("- Y ")
+	binGeoJSONTypePrefix = []byte("- G ")
+	binNilTypePrefix     = []byte("- N ")
+	binMapTypePrefix     = []byte("- M ")
+	binListTypePrefix    = []byte("- L ")
+	trueBytes            = []byte{boolTrueByte}
+	falseBytes           = []byte{boolFalseByte}
+	namespacePrefix      = []byte("+ n ")
+	setPrefix            = []byte("+ s ")
+	digestPrefix         = []byte("+ d ")
+	headerGeneration     = []byte("+ g ")
+	headerExpiration     = []byte("+ t ")
+	headerBinCount       = []byte("+ b ")
+)

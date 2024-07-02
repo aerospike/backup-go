@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,8 @@ type DirectoryWriterFactory struct {
 }
 
 var _ backup.WriteFactory = (*DirectoryWriterFactory)(nil)
+
+const bufferSize = 4096 * 1024 // 4mb
 
 // NewDirectoryWriterFactory creates new factory for directory backups
 // dir is target folder for backup
@@ -90,13 +93,31 @@ func makeDir(dir string) error {
 	return nil
 }
 
+type bufferedFile struct {
+	*bufio.Writer
+	closer io.Closer
+}
+
+func (bf *bufferedFile) Close() error {
+	err := bf.Writer.Flush()
+	if err != nil {
+		return err
+	}
+
+	return bf.closer.Close()
+}
+
 // NewWriter creates a new backup file in the given directory.
-// The file name is based on the namespace and the id.
-// The file is returned in write mode.
-// If the fileSizeLimit is greater than 0, the file is wrapped in a Sized writer.
+// The file name is based on the fileName parameter.
 func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, error) {
 	filePath := filepath.Join(f.directory, fileName)
-	return os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil
 }
 
 func (f *DirectoryWriterFactory) GetType() string {

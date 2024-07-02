@@ -21,8 +21,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -394,7 +392,6 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
 
-	slog.Info("\n" + GetFileSizes(backupDir))
 	dirSize := uint64(testresources.DirSize(backupDir))
 	suite.Require().Equal(dirSize, statsBackup.GetTotalBytesWritten())
 
@@ -430,30 +427,6 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	_, err = local.NewDirectoryWriterFactory(backupDir, false)
 	suite.ErrorContains(err, "backup directory is invalid")
-}
-
-func GetFileSizes(dirName string) string {
-	var sb strings.Builder
-
-	err := filepath.WalkDir(dirName, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			fileInfo, err := d.Info()
-			if err != nil {
-				return err
-			}
-			sb.WriteString(fmt.Sprintf("File: %v \t Size: %v bytes\n", filepath.Base(path), fileInfo.Size()))
-		}
-		return nil
-	})
-
-	if err != nil {
-		return ""
-	}
-
-	return sb.String()
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {

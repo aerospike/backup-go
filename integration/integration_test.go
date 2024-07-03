@@ -344,11 +344,11 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 					Namespace:      suite.namespace,
 					Parallel:       2,
 					EncoderFactory: asb.NewASBEncoderFactory(),
-					FileLimit:      1024 * 1024,
+					FileLimit:      4 * 1024 * 1024, // 4mb, full backup ~9mb
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
-				expectedFiles: 10, // 8 files of full size + 2 small
+				expectedFiles: 4, // every thread create one big and one small file
 			},
 		},
 	}

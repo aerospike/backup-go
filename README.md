@@ -34,14 +34,12 @@ func main() {
 		panic(aerr)
 	}
 
-	backupClientConfig := backup.NewConfig()
-
-	backupClient, err := backup.NewClient(aerospikeClient, "client_id", slog.Default(), backupClientConfig)
+	backupClient, err := backup.NewClient(aerospikeClient, "client_id", slog.Default())
 	if err != nil {
 		panic(err)
 	}
 
-	writers, err := local.NewDirectoryWriterFactory("backups_folder", 0, asb.NewASBEncoderFactory(), false)
+	writers, err := local.NewDirectoryWriterFactory("backups_folder", false)
 	if err != nil {
 		panic(err)
 	}

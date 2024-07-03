@@ -140,8 +140,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	testClient := testresources.NewTestClient(testAeroClient)
 	suite.testClient = testClient
 
-	backupCFG := backup.Config{}
-	backupClient, err := backup.NewClient(testAeroClient, "test_client", slog.Default(), &backupCFG)
+	backupClient, err := backup.NewClient(testAeroClient, "test_client", slog.Default())
 	if err != nil {
 		suite.FailNow(err.Error())
 	}

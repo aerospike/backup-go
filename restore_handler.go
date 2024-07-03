@@ -288,5 +288,3 @@ func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*mode
 		processors.NewProcessorWorker(processor),
 	}
 }
-
-// **** Restore From Reader Handler ****

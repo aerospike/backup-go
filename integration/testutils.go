@@ -1,4 +1,4 @@
-package testutils
+package integration
 
 import (
 	"bytes"
@@ -53,13 +53,16 @@ func GetFileSizes(dirName string) string {
 		if err != nil {
 			return err
 		}
+
 		if !d.IsDir() {
 			fileInfo, err := d.Info()
 			if err != nil {
 				return err
 			}
+
 			sb.WriteString(fmt.Sprintf("File: %v \t Size: %v bytes\n", path, fileInfo.Size()))
 		}
+
 		return nil
 	})
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integration_test
+package integration
 
 import (
 	"bytes"
@@ -27,7 +27,6 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/encoding/asb"
-	testresources "github.com/aerospike/backup-go/internal/testutils"
 	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/testutils"
@@ -67,7 +66,7 @@ var testBins = a.BinMap{
 type backupRestoreTestSuite struct {
 	suite.Suite
 	Aeroclient        *a.Client
-	testClient        *testresources.TestClient
+	testClient        *TestClient
 	backupClient      *backup.Client
 	aerospikeIP       string
 	aerospikePassword string
@@ -137,7 +136,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 
 	suite.Aeroclient = testAeroClient
 
-	testClient := testresources.NewTestClient(testAeroClient)
+	testClient := NewTestClient(testAeroClient)
 	suite.testClient = testClient
 
 	backupClient, err := backup.NewClient(testAeroClient, "test_client", slog.Default())
@@ -391,10 +390,10 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
 
-	dirSize := uint64(testresources.DirSize(backupDir))
+	dirSize := uint64(DirSize(backupDir))
 	suite.Require().Equal(dirSize, statsBackup.GetTotalBytesWritten())
 
-	slog.Info("backup", "size", statsBackup.GetTotalBytesWritten(), "files", testresources.GetFileSizes(backupDir))
+	slog.Info("backup", "size", statsBackup.GetTotalBytesWritten(), "files", GetFileSizes(backupDir))
 
 	backupFiles, _ := os.ReadDir(backupDir)
 	suite.Require().Equal(expectedFiles, len(backupFiles))
@@ -741,7 +740,7 @@ func TestBackupRestoreTestSuite(t *testing.T) {
 		{
 			Name:    "test.lua",
 			UDFType: models.UDFTypeLUA,
-			Content: []byte(testresources.UDF),
+			Content: []byte(UDF),
 		},
 		{
 			Name:    "add.lua",
@@ -807,7 +806,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 	// every batch generated same records, but less of them each time.
 	// batch1 contains too old values (many of them were overwritten).
 	// batch3 contains too fresh values.
-	var expectedRecords = testresources.Subtract(batch2, batch3)
+	var expectedRecords = Subtract(batch2, batch3)
 
 	var backupConfig = &backup.BackupConfig{
 		Partitions:     backup.PartitionRangeAll(),

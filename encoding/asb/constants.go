@@ -144,8 +144,8 @@ const (
 
 // misc constants
 const (
-	// ASBFormatVersion is the current version of the ASB encoding format
-	ASBFormatVersion = "3.1"
+	// FormatVersion is the current version of the ASB encoding format
+	FormatVersion = "3.1"
 )
 
 var (

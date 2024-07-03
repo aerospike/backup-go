@@ -1,9 +1,11 @@
-package testutils
+package integration
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -42,4 +44,31 @@ func DirSize(path string) int64 {
 	})
 
 	return size
+}
+
+func GetFileSizes(dirName string) string {
+	var sb strings.Builder
+
+	err := filepath.WalkDir(dirName, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() {
+			fileInfo, err := d.Info()
+			if err != nil {
+				return err
+			}
+
+			sb.WriteString(fmt.Sprintf("File: %v \t Size: %v bytes\n", path, fileInfo.Size()))
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err.Error()
+	}
+
+	return sb.String()
 }

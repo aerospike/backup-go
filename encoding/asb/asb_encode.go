@@ -97,7 +97,7 @@ func (e *asbEncoder) GetHeader() []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 256))
 
-	writeVersionText(ASBFormatVersion, buff)
+	writeVersionText(FormatVersion, buff)
 
 	writeNamespaceMetaText(e.namespace, buff)
 

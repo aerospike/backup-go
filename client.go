@@ -42,16 +42,6 @@ var (
 	defaultDecoderFactory = asb.NewASBDecoderFactory()
 )
 
-// **** Client ****
-
-// Config contains configuration for the backup client.
-type Config struct{}
-
-// NewConfig returns a new client Config.
-func NewConfig() *Config {
-	return &Config{}
-}
-
 // Client is the main entry point for the backup package.
 // It wraps an aerospike client and provides methods to start backup and restore operations.
 // Example usage:
@@ -60,8 +50,7 @@ func NewConfig() *Config {
 //		if aerr != nil {
 //			// handle error
 //		}
-//		backupCFG := backup.NewConfig()	// create a backup config
-//		backupClient, err := backup.NewClient(asc, "id", nil, backupCFG)	// create a backup client
+//		backupClient, err := backup.NewClient(asc, "id", nil)	// create a backup client
 //		if err != nil {
 //			// handle error
 //		}
@@ -78,7 +67,6 @@ func NewConfig() *Config {
 //		// err = backupHandler.Wait(ctx)
 type Client struct {
 	aerospikeClient *a.Client
-	config          *Config
 	logger          *slog.Logger
 	id              string
 }
@@ -88,17 +76,13 @@ type Client struct {
 // id is an identifier for the client.
 // logger is the logger that this client will log to.
 // config is the configuration for the backup client.
-func NewClient(ac *a.Client, id string, logger *slog.Logger, config *Config) (*Client, error) {
+func NewClient(ac *a.Client, id string, logger *slog.Logger) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}
 
 	if logger == nil {
 		logger = slog.Default()
-	}
-
-	if config == nil {
-		config = NewConfig()
 	}
 
 	// qualify the logger with a backup lib group
@@ -110,7 +94,6 @@ func NewClient(ac *a.Client, id string, logger *slog.Logger, config *Config) (*C
 	return &Client{
 		aerospikeClient: ac,
 		id:              id,
-		config:          config,
 		logger:          logger,
 	}, nil
 }
@@ -191,13 +174,13 @@ type BackupConfig struct {
 	EncryptionPolicy *models.EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
-	// Namespace is the Aerospike namespace to backup.
+	// Namespace is the Aerospike namespace to back up.
 	Namespace string
-	// SetList is the Aerospike set to backup (optional, given an empty list, all sets will be backed up).
+	// SetList is the Aerospike set to back up (optional, given an empty list, all sets will be backed up).
 	SetList []string
 	// The list of backup bin names (optional, given an empty list, all bins will be backed up)
 	BinList []string
-	// Partitions specifies the Aerospike partitions to backup.
+	// Partitions specifies the Aerospike partitions to back up.
 	Partitions PartitionRange
 	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int

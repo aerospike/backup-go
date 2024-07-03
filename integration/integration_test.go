@@ -394,6 +394,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	dirSize := uint64(testresources.DirSize(backupDir))
 	suite.Require().Equal(dirSize, statsBackup.GetTotalBytesWritten())
 
+	slog.Info("backup", "size", statsBackup.GetTotalBytesWritten(), "files", testresources.GetFileSizes(backupDir))
+
 	backupFiles, _ := os.ReadDir(backupDir)
 	suite.Require().Equal(expectedFiles, len(backupFiles))
 

@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/writers"
+	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
@@ -276,7 +277,7 @@ func (bh *BackupHandler) backupSIndexes(
 		return err
 	}
 
-	reader := newSIndexReader(infoClient, bh.config.Namespace, bh.logger)
+	reader := aerospike.NewSIndexReader(infoClient, bh.config.Namespace, bh.logger)
 	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger))
@@ -305,7 +306,7 @@ func (bh *BackupHandler) backupUDFs(
 		return err
 	}
 
-	reader := newUDFReader(infoClient, bh.logger)
+	reader := aerospike.NewUDFReader(infoClient, bh.logger)
 	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger))

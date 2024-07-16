@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/processors"
+	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 )
@@ -79,9 +80,9 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Work
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
 
 	for i := 0; i < n; i++ {
-		recordReader := newAerospikeRecordReader(
+		recordReader := aerospike.NewRecordReader(
 			bh.aerospikeClient,
-			newArrConfig(bh.config, partitionRanges[i]),
+			bh.recordReaderConfigForPartition(partitionRanges[i]),
 			&scanPolicy,
 			bh.logger,
 		)
@@ -90,4 +91,17 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Work
 	}
 
 	return readWorkers, nil
+}
+
+func (bh *backupRecordsHandler) recordReaderConfigForPartition(partitionRange PartitionRange) *aerospike.ArrConfig {
+	return aerospike.NewArrConfig(
+		bh.config.Namespace,
+		bh.config.SetList,
+		a.NewPartitionFilterByRange(partitionRange.Begin, partitionRange.Count),
+		bh.config.BinList,
+		models.TimeBounds{
+			FromTime: bh.config.ModAfter,
+			ToTime:   bh.config.ModBefore,
+		},
+	)
 }

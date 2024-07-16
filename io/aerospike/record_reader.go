@@ -26,11 +26,11 @@ import (
 )
 
 type ArrConfig struct {
+	timeBounds      models.TimeBounds
+	partitionFilter *a.PartitionFilter
 	namespace       string
 	setList         []string
-	partitionFilter *a.PartitionFilter
 	binList         []string
-	timeBounds      models.TimeBounds
 }
 
 func NewArrConfig(namespace string,
@@ -39,11 +39,11 @@ func NewArrConfig(namespace string,
 	binList []string,
 	timeBounds models.TimeBounds) *ArrConfig {
 	return &ArrConfig{
-		namespace,
-		setList,
-		partitionFilter,
-		binList,
-		timeBounds,
+		namespace:       namespace,
+		setList:         setList,
+		partitionFilter: partitionFilter,
+		binList:         binList,
+		timeBounds:      timeBounds,
 	}
 }
 

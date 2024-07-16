@@ -16,9 +16,9 @@ type sindexGetter interface {
 	GetSIndexes(namespace string) ([]*models.SIndex, error)
 }
 
-// sindexReader satisfies the DataReader interface
+// SindexReader satisfies the DataReader interface
 // It reads secondary indexes from a SIndexGetter and returns them as *models.SecondaryIndex
-type sindexReader struct {
+type SindexReader struct {
 	client    sindexGetter
 	sindexes  chan *models.SIndex
 	logger    *slog.Logger
@@ -26,12 +26,12 @@ type sindexReader struct {
 }
 
 // NewSIndexReader creates a new SIndexReader
-func NewSIndexReader(client sindexGetter, namespace string, logger *slog.Logger) *sindexReader {
+func NewSIndexReader(client sindexGetter, namespace string, logger *slog.Logger) *SindexReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeSIndex)
 	logger.Debug("created new sindex reader")
 
-	return &sindexReader{
+	return &SindexReader{
 		client:    client,
 		namespace: namespace,
 		logger:    logger,
@@ -39,7 +39,7 @@ func NewSIndexReader(client sindexGetter, namespace string, logger *slog.Logger)
 }
 
 // Read reads the next secondary index from the SIndexGetter
-func (r *sindexReader) Read() (*models.Token, error) {
+func (r *SindexReader) Read() (*models.Token, error) {
 	// grab all the sindexes on the first run
 	if r.sindexes == nil {
 		r.logger.Debug("fetching all secondary indexes")
@@ -65,4 +65,4 @@ func (r *sindexReader) Read() (*models.Token, error) {
 
 // Close satisfies the DataReader interface
 // but is a no-op for the SIndexReader
-func (r *sindexReader) Close() {}
+func (r *SindexReader) Close() {}

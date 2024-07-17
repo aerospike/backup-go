@@ -112,6 +112,7 @@ func ctr128AddTo(dst, src []byte, val uint64) {
 
 	v2 += val
 	overflow := v2 < val
+
 	if overflow {
 		v1++
 	}
@@ -130,6 +131,7 @@ func ctr128SubtractFrom(dst, src []byte, val uint64) {
 	if v2 == 0 {
 		v1--
 	}
+
 	v2 -= val
 
 	binary.BigEndian.PutUint64(dst[:8], v1)

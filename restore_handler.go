@@ -142,6 +142,7 @@ func (rh *RestoreHandler) processReaders(
 
 	doneCh <- struct{}{}
 	close(doneCh)
+	close(errorsCh)
 }
 
 func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadCloser, errorsCh chan<- error) {

@@ -104,8 +104,6 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-
-	return nil
 }
 
 // processReaders serving go routine for processing batches.
@@ -113,6 +111,7 @@ func (rh *RestoreHandler) processReaders(
 	ctx context.Context, readersCh <-chan io.ReadCloser, doneCh chan<- struct{}, errorsCh chan<- error,
 ) {
 	var wg sync.WaitGroup
+
 	batchSize := rh.config.Parallel
 
 	for {
@@ -123,6 +122,7 @@ func (rh *RestoreHandler) processReaders(
 			if !ok {
 				break
 			}
+
 			batch = append(batch, reader)
 		}
 
@@ -131,6 +131,7 @@ func (rh *RestoreHandler) processReaders(
 		}
 
 		wg.Add(1)
+
 		go func(ctx context.Context, batch []io.ReadCloser, errorsCh chan<- error) {
 			defer wg.Done()
 			rh.restoreBatch(ctx, batch, errorsCh)
@@ -166,8 +167,6 @@ func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadClose
 			return
 		}
 	}
-
-	return
 }
 
 func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
@@ -251,17 +250,6 @@ func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	}
 
 	return readWorkers, nil
-}
-
-func (rh *RestoreHandler) readerToReadWorker(reader io.ReadCloser) (
-	pipeline.Worker[*models.Token], error) {
-	decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create decoder: %w", err)
-	}
-
-	dr := newTokenReader(decoder, rh.logger)
-	return pipeline.NewReadWorker[*models.Token](dr), nil
 }
 
 // GetStats returns the stats of the restore job

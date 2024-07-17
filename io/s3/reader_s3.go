@@ -48,6 +48,8 @@ func (f *s3ReaderFactory) StreamFiles(ctx context.Context, readersCh chan<- io.R
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case file, ok := <-fileCh:
 			if !ok {
 				fileCh = nil

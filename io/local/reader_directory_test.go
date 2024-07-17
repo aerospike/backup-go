@@ -16,13 +16,13 @@ package local
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -30,108 +30,15 @@ type checkRestoreDirectoryTestSuite struct {
 	suite.Suite
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_SingleFile() {
-	dir := s.T().TempDir()
-	file := "file1.asb"
-	filePath := filepath.Join(dir, file)
-
-	f, err := os.Create(filePath)
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	f.Close()
-
-	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
-	_, err = factory.Readers()
-	s.NoError(err)
-}
-
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilDecoder() {
 	dir := s.T().TempDir()
-	_, err := NewDirectoryReaderFactory(dir, nil)
-	s.Error(err)
-}
-
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_MultipleFiles() {
-	dir := s.T().TempDir()
-	file := "file1.asb"
-	filePath := filepath.Join(dir, file)
-
-	f, err := os.Create(filePath)
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	f.Close()
-
-	file = "file2.asb"
-	filePath = filepath.Join(dir, file)
-
-	f, err = os.Create(filePath)
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	f.Close()
-
-	factory, err := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
-	s.NoError(err)
-	_, err = factory.Readers()
-	s.NoError(err)
-}
-
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_BadExtension() {
-	dir := s.T().TempDir()
-	file := "file1"
-	filePath := filepath.Join(dir, file)
-
-	f, err := os.Create(filePath)
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	f.Close()
-
-	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
-	_, err = factory.Readers()
-	s.Error(err)
-}
-
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_NotADir() {
-	dir := s.T().TempDir()
-	file, err := os.CreateTemp(dir, "")
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	file.Close()
-
-	path := filepath.Join(dir, file.Name())
-
-	factory, _ := NewDirectoryReaderFactory(path, asb.NewASBDecoderFactory())
-	_, err = factory.Readers()
-	s.Error(err)
-}
-
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_ContainsDir() {
-	dir := s.T().TempDir()
-	file := "file1"
-	filePath := filepath.Join(dir, file)
-
-	err := os.Mkdir(filePath, 0o755)
-	if err != nil {
-		s.FailNow("Failed to create dir: %v", err)
-	}
-
-	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
-	_, err = factory.Readers()
+	_, err := NewDirectoryReader(dir, nil)
 	s.Error(err)
 }
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
-	factory, _ := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	factory, _ := NewDirectoryReader(dir, asb.NewASBDecoderFactory())
 	err := factory.checkRestoreDirectory()
 	s.Error(err)
 }
@@ -140,7 +47,7 @@ func TestCheckRestoreDirectory(t *testing.T) {
 	suite.Run(t, new(checkRestoreDirectoryTestSuite))
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_ReadToChan() {
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 	dir := s.T().TempDir()
 	file := "file1.asb"
 	filePath := filepath.Join(dir, file)
@@ -162,18 +69,60 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_Read
 
 	f.Close()
 
-	fac, err := NewDirectoryReaderFactory(dir, asb.NewASBDecoderFactory())
+	fac, err := NewDirectoryReader(dir, asb.NewASBDecoderFactory())
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
 	errorChan := make(chan error)
-	go fac.ReadToChan(context.Background(), readerChan, errorChan)
+	go fac.StreamFiles(context.Background(), readerChan, errorChan)
 
 	var counter int
-	for msg := range readerChan {
-		fmt.Println(msg)
-		counter++
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(2, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
+	dir := s.T().TempDir()
+	file := "file1.asb"
+	filePath := filepath.Join(dir, file)
+
+	f, err := os.Create(filePath)
+	if err != nil {
+		s.FailNow("Failed to create file: %v", err)
 	}
 
-	s.Require().Equal(2, counter)
+	f.Close()
+
+	r, err := NewDirectoryReader(dir, asb.NewASBDecoderFactory())
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(1, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
 }

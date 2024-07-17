@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -20,11 +19,11 @@ type s3ReaderFactory struct {
 	decoder  encoding.DecoderFactory
 }
 
-var _ backup.ReaderFactory = (*s3ReaderFactory)(nil)
+var _ backup.Reader = (*s3ReaderFactory)(nil)
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) (backup.ReaderFactory, error) {
+func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) (backup.Reader, error) {
 	if decoder == nil {
 		return nil, errors.New("decoder is nil")
 	}
@@ -41,9 +40,11 @@ func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) 
 	}, nil
 }
 
-func (f *s3ReaderFactory) Readers() ([]io.ReadCloser, error) {
-	fileCh, errCh := f.streamBackupFiles()
-	readers := make([]io.ReadCloser, 0)
+// StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// In case of error we send error to `errorsCh` channel.
+func (f *s3ReaderFactory) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+) {
+	fileCh, s3errCh := f.streamBackupFiles()
 
 	for {
 		select {
@@ -53,30 +54,28 @@ func (f *s3ReaderFactory) Readers() ([]io.ReadCloser, error) {
 			} else {
 				reader, err := f.newS3Reader(file)
 				if err != nil {
-					return nil, err
+					errorsCh <- err
+					return
 				}
 
-				readers = append(readers, reader)
+				readersCh <- reader
 			}
 
-		case err, ok := <-errCh:
+		case err, ok := <-s3errCh:
 			if ok {
-				return nil, err
+				errorsCh <- err
+				return
 			}
 
-			errCh = nil
+			s3errCh = nil
 		}
 
-		if fileCh == nil && errCh == nil {
+		if fileCh == nil && s3errCh == nil {
 			break
 		}
 	}
 
-	if len(readers) == 0 {
-		return nil, fmt.Errorf("%w: %s doesn't contain backup files", ErrRestoreDirectoryInvalid, f.s3Config.Prefix)
-	}
-
-	return readers, nil
+	close(readersCh)
 }
 
 func (f *s3ReaderFactory) streamBackupFiles() (_ <-chan string, _ <-chan error) {

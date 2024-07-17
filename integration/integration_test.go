@@ -401,7 +401,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	factory, _ := local.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	factory, _ := local.NewDirectoryReader(backupDir, restoreConfig.DecoderFactory)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -550,7 +550,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewRestoreConfig()
-	readerFactory, _ := local.NewDirectoryReaderFactory(backupDir, restoreConfig.DecoderFactory)
+	readerFactory, _ := local.NewDirectoryReader(backupDir, restoreConfig.DecoderFactory)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -861,6 +861,12 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 
 type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
+}
+
+func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
+	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
+	readersCh <- reader
+	close(readersCh)
 }
 
 func (b *byteReadWriterFactory) Readers() ([]io.ReadCloser, error) {

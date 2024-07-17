@@ -20,6 +20,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -203,20 +204,22 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
 	factory, _ := s3.NewS3ReaderFactory(config, asb.NewASBDecoderFactory())
 
-	readers, err := factory.Readers()
-	if err != nil {
-		s.FailNow("failed to create readers", err)
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go factory.StreamFiles(context.Background(), readerChan, errorChan)
+
+	select {
+	case reader := <-readerChan:
+		buffer, err := io.ReadAll(reader)
+		if err != nil {
+			s.FailNow("failed to read", err)
+		}
+		reader.Close()
+		return buffer
+	case err := <-errorChan:
+		require.NoError(s.T(), err)
 	}
-
-	s.Assertions.Equal(1, len(readers))
-
-	buffer, err := io.ReadAll(readers[0])
-	if err != nil {
-		s.FailNow("failed to read", err)
-	}
-
-	_ = readers[0].Close()
-	return buffer
+	return nil
 }
 
 func TestReadWrite(t *testing.T) {

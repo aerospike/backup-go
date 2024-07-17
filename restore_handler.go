@@ -34,22 +34,19 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// ReaderFactory provides access to data that should be restored.
-type ReaderFactory interface {
-	// Readers returns all available readers of backup data.
-	// They will be used in parallel and closed after restore.
-	Readers() ([]io.ReadCloser, error)
-
-	// ReadToChan returns all available readers of backup data to readersChan.
-	ReadToChan(context.Context, chan<- io.ReadCloser, chan<- error)
+// Reader provides access to data that should be restored.
+type Reader interface {
+	// StreamFiles create readers from files and send them to chan.
+	// In case of error, send errors to error chan.
+	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
 
 	// GetType return type of storage. Used in logging.
 	GetType() string
 }
 
-// RestoreHandler handles a restore job using the given readerFactory.
+// RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
-	readerFactory   ReaderFactory
+	reader          Reader
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
@@ -61,16 +58,16 @@ type RestoreHandler struct {
 
 // newRestoreHandler creates a new RestoreHandler
 func newRestoreHandler(config *RestoreConfig,
-	ac *a.Client, logger *slog.Logger, readerFactory ReaderFactory) *RestoreHandler {
+	ac *a.Client, logger *slog.Logger, reader Reader) *RestoreHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, readerFactory.GetType())
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 
 	return &RestoreHandler{
 		config:          config,
 		aerospikeClient: ac,
 		id:              id,
 		logger:          logger,
-		readerFactory:   readerFactory,
+		reader:          reader,
 		limiter:         makeBandwidthLimiter(config.Bandwidth),
 	}
 }
@@ -85,35 +82,6 @@ func (rh *RestoreHandler) startAsync(ctx context.Context) {
 }
 
 func (rh *RestoreHandler) restore(ctx context.Context) error {
-	readers, err := rh.readerFactory.Readers()
-	if err != nil {
-		return fmt.Errorf("failed to get readers: %w", err)
-	}
-
-	readers, err = SetEncryptionDecoder(rh.config.EncryptionPolicy, readers)
-	if err != nil {
-		return err
-	}
-
-	readers, err = setCompressionDecoder(rh.config.CompressionPolicy, readers)
-	if err != nil {
-		return err
-	}
-
-	totalReaders := len(readers)
-	batchSize := rh.config.Parallel
-
-	for start := 0; start < totalReaders; start += batchSize {
-		end := min(start+batchSize, totalReaders)
-		if err := rh.processBatch(ctx, readers[start:end]); err != nil {
-			return fmt.Errorf("failed to process batch: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (rh *RestoreHandler) restoreFromChan(ctx context.Context) error {
 	// Channel for transferring readers.
 	readersCh := make(chan io.ReadCloser)
 	// Channel for processing errors from readers or writers.
@@ -122,10 +90,10 @@ func (rh *RestoreHandler) restoreFromChan(ctx context.Context) error {
 	doneCh := make(chan struct{})
 
 	// Start lazy file reading.
-	go rh.readerFactory.ReadToChan(ctx, readersCh, errorsCh)
+	go rh.reader.StreamFiles(ctx, readersCh, errorsCh)
 
 	// Start lazy file processing.
-	go rh.processFromChan(ctx, readersCh, doneCh, errorsCh)
+	go rh.processReaders(ctx, readersCh, doneCh, errorsCh)
 
 	// Process errors if we have them.
 	select {
@@ -140,8 +108,8 @@ func (rh *RestoreHandler) restoreFromChan(ctx context.Context) error {
 	return nil
 }
 
-// processFromChan serving go routine for processing batches.
-func (rh *RestoreHandler) processFromChan(
+// processReaders serving go routine for processing batches.
+func (rh *RestoreHandler) processReaders(
 	ctx context.Context, readersCh <-chan io.ReadCloser, doneCh chan<- struct{}, errorsCh chan<- error,
 ) {
 	var wg sync.WaitGroup
@@ -169,14 +137,14 @@ func (rh *RestoreHandler) processFromChan(
 		}(ctx, batch, errorsCh)
 
 		wg.Wait()
-
 	}
 
 	doneCh <- struct{}{}
+	close(doneCh)
 }
 
 func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadCloser, errorsCh chan<- error) {
-	batch, err := SetEncryptionDecoder(rh.config.EncryptionPolicy, batch)
+	batch, err := setEncryptionDecoder(rh.config.EncryptionPolicy, batch)
 	if err != nil {
 		errorsCh <- err
 		return
@@ -221,7 +189,7 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 	return zstdReaders, nil
 }
 
-func SetEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+func setEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
 	if policy == nil {
 		return readers, nil
 	}

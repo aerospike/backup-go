@@ -12,68 +12,30 @@ import (
 	"github.com/aerospike/backup-go/encoding"
 )
 
-var _ backup.ReaderFactory = (*DirectoryReaderFactory)(nil)
+var _ backup.Reader = (*DirectoryReader)(nil)
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-type DirectoryReaderFactory struct {
+type DirectoryReader struct {
 	decoder encoding.DecoderFactory
 	dir     string
 }
 
-func NewDirectoryReaderFactory(dir string, decoder encoding.DecoderFactory,
-) (*DirectoryReaderFactory, error) {
+func NewDirectoryReader(dir string, decoder encoding.DecoderFactory,
+) (*DirectoryReader, error) {
 	if decoder == nil {
 		return nil, errors.New("decoder is nil")
 	}
 
-	return &DirectoryReaderFactory{
+	return &DirectoryReader{
 		dir:     dir,
 		decoder: decoder,
 	}, nil
 }
 
-func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
-	err := f.checkRestoreDirectory()
-	if err != nil {
-		return nil, err
-	}
-
-	fileInfo, err := os.ReadDir(f.dir)
-	if err != nil {
-		return nil, fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, f.dir, err)
-	}
-
-	readers := make([]io.ReadCloser, 0, len(fileInfo))
-
-	for _, file := range fileInfo {
-		if file.IsDir() {
-			continue
-		}
-
-		filePath := filepath.Join(f.dir, file.Name())
-		if err := f.decoder.Validate(filePath); err != nil {
-			continue
-		}
-
-		reader, err := os.Open(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
-		}
-
-		readers = append(readers, reader)
-	}
-
-	if len(readers) == 0 {
-		return nil, fmt.Errorf("%w: %s doesn't contain backup files", ErrRestoreDirectoryInvalid, f.dir)
-	}
-
-	return readers, nil
-}
-
-// ReadToChan Read files and send io.Readers to `readersCh` communication chan for lazy loading.
+// StreamFiles read files from disk and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *DirectoryReaderFactory) ReadToChan(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+func (f *DirectoryReader) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	err := f.checkRestoreDirectory()
 	if err != nil {
@@ -99,6 +61,8 @@ func (f *DirectoryReaderFactory) ReadToChan(ctx context.Context, readersCh chan<
 
 		filePath := filepath.Join(f.dir, file.Name())
 		if err = f.decoder.Validate(filePath); err != nil {
+			// As we pass invalid files, we don't need process this error and write test for it.
+			// Maybe we need to log this info, for user. So he will understand what happens.
 			continue
 		}
 
@@ -114,13 +78,11 @@ func (f *DirectoryReaderFactory) ReadToChan(ctx context.Context, readersCh chan<
 	}
 
 	close(readersCh)
-
-	return
 }
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format
-func (f *DirectoryReaderFactory) checkRestoreDirectory() error {
+func (f *DirectoryReader) checkRestoreDirectory() error {
 	dir := f.dir
 
 	dirInfo, err := os.Stat(dir)
@@ -147,6 +109,6 @@ func (f *DirectoryReaderFactory) checkRestoreDirectory() error {
 	return nil
 }
 
-func (f *DirectoryReaderFactory) GetType() string {
+func (f *DirectoryReader) GetType() string {
 	return "directory"
 }

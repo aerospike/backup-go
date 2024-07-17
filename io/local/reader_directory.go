@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,14 +12,6 @@ import (
 	"github.com/aerospike/backup-go/encoding"
 )
 
-func NewDirectoryReaderFactory(dir string, decoder encoding.DecoderFactory) (*DirectoryReaderFactory, error) {
-	if decoder == nil {
-		return nil, errors.New("decoder is nil")
-	}
-
-	return &DirectoryReaderFactory{dir: dir, decoder: decoder}, nil
-}
-
 var _ backup.ReaderFactory = (*DirectoryReaderFactory)(nil)
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
@@ -26,6 +19,18 @@ var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 type DirectoryReaderFactory struct {
 	decoder encoding.DecoderFactory
 	dir     string
+}
+
+func NewDirectoryReaderFactory(dir string, decoder encoding.DecoderFactory,
+) (*DirectoryReaderFactory, error) {
+	if decoder == nil {
+		return nil, errors.New("decoder is nil")
+	}
+
+	return &DirectoryReaderFactory{
+		dir:     dir,
+		decoder: decoder,
+	}, nil
 }
 
 func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
@@ -64,6 +69,53 @@ func (f *DirectoryReaderFactory) Readers() ([]io.ReadCloser, error) {
 	}
 
 	return readers, nil
+}
+
+// ReadToChan Read files and send io.Readers to `readersCh` communication chan for lazy loading.
+// In case of error we send error to `errorsCh` channel.
+func (f *DirectoryReaderFactory) ReadToChan(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+) {
+	err := f.checkRestoreDirectory()
+	if err != nil {
+		errorsCh <- err
+		return
+	}
+
+	fileInfo, err := os.ReadDir(f.dir)
+	if err != nil {
+		errorsCh <- fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, f.dir, err)
+		return
+	}
+
+	for _, file := range fileInfo {
+		if err = ctx.Err(); err != nil {
+			errorsCh <- err
+			return
+		}
+
+		if file.IsDir() {
+			continue
+		}
+
+		filePath := filepath.Join(f.dir, file.Name())
+		if err = f.decoder.Validate(filePath); err != nil {
+			continue
+		}
+
+		var reader io.ReadCloser
+
+		reader, err = os.Open(filePath)
+		if err != nil {
+			errorsCh <- fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
+			return
+		}
+
+		readersCh <- reader
+	}
+
+	close(readersCh)
+
+	return
 }
 
 // checkRestoreDirectory checks that the restore directory exists,

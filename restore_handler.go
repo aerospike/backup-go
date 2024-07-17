@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
@@ -37,7 +38,11 @@ import (
 type ReaderFactory interface {
 	// Readers returns all available readers of backup data.
 	// They will be used in parallel and closed after restore.
-	Readers() ([]io.ReadCloser, error) //TODO: use lazy creation
+	Readers() ([]io.ReadCloser, error)
+
+	// ReadToChan returns all available readers of backup data to readersChan.
+	ReadToChan(context.Context, chan<- io.ReadCloser, chan<- error)
+
 	// GetType return type of storage. Used in logging.
 	GetType() string
 }
@@ -106,6 +111,95 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (rh *RestoreHandler) restoreFromChan(ctx context.Context) error {
+	// Channel for transferring readers.
+	readersCh := make(chan io.ReadCloser)
+	// Channel for processing errors from readers or writers.
+	errorsCh := make(chan error)
+	// Channel for signals about successful processing files.
+	doneCh := make(chan struct{})
+
+	// Start lazy file reading.
+	go rh.readerFactory.ReadToChan(ctx, readersCh, errorsCh)
+
+	// Start lazy file processing.
+	go rh.processFromChan(ctx, readersCh, doneCh, errorsCh)
+
+	// Process errors if we have them.
+	select {
+	case err := <-errorsCh:
+		return fmt.Errorf("failed to restore: %w", err)
+	case <-doneCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	return nil
+}
+
+// processFromChan serving go routine for processing batches.
+func (rh *RestoreHandler) processFromChan(
+	ctx context.Context, readersCh <-chan io.ReadCloser, doneCh chan<- struct{}, errorsCh chan<- error,
+) {
+	var wg sync.WaitGroup
+	batchSize := rh.config.Parallel
+
+	for {
+		batch := make([]io.ReadCloser, 0, batchSize)
+
+		for i := 0; i < batchSize; i++ {
+			reader, ok := <-readersCh
+			if !ok {
+				break
+			}
+			batch = append(batch, reader)
+		}
+
+		if len(batch) == 0 {
+			break
+		}
+
+		wg.Add(1)
+		go func(ctx context.Context, batch []io.ReadCloser, errorsCh chan<- error) {
+			defer wg.Done()
+			rh.restoreBatch(ctx, batch, errorsCh)
+		}(ctx, batch, errorsCh)
+
+		wg.Wait()
+
+	}
+
+	doneCh <- struct{}{}
+}
+
+func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadCloser, errorsCh chan<- error) {
+	batch, err := SetEncryptionDecoder(rh.config.EncryptionPolicy, batch)
+	if err != nil {
+		errorsCh <- err
+		return
+	}
+
+	batch, err = setCompressionDecoder(rh.config.CompressionPolicy, batch)
+	if err != nil {
+		errorsCh <- err
+		return
+	}
+
+	totalReaders := len(batch)
+	batchSize := rh.config.Parallel
+
+	for start := 0; start < totalReaders; start += batchSize {
+		end := min(start+batchSize, totalReaders)
+		if err = rh.processBatch(ctx, batch[start:end]); err != nil {
+			errorsCh <- fmt.Errorf("failed to process batch: %w", err)
+			return
+		}
+	}
+
+	return
 }
 
 func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
@@ -189,6 +283,17 @@ func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	}
 
 	return readWorkers, nil
+}
+
+func (rh *RestoreHandler) readerToReadWorker(reader io.ReadCloser) (
+	pipeline.Worker[*models.Token], error) {
+	decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create decoder: %w", err)
+	}
+
+	dr := newTokenReader(decoder, rh.logger)
+	return pipeline.NewReadWorker[*models.Token](dr), nil
 }
 
 // GetStats returns the stats of the restore job

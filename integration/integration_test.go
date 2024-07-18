@@ -401,7 +401,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	factory, _ := local.NewDirectoryReader(backupDir, restoreConfig.DecoderFactory)
+	factory, _ := local.NewDirectoryStreamingReader(backupDir, restoreConfig.DecoderFactory)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -550,7 +550,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewRestoreConfig()
-	readerFactory, _ := local.NewDirectoryReader(backupDir, restoreConfig.DecoderFactory)
+	readerFactory, _ := local.NewDirectoryStreamingReader(backupDir, restoreConfig.DecoderFactory)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,

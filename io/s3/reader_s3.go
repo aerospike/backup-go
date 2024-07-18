@@ -13,17 +13,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type s3ReaderFactory struct {
+type s3StreamingReader struct {
 	client   *s3.Client
 	s3Config *StorageConfig
 	decoder  encoding.DecoderFactory
 }
 
-var _ backup.Reader = (*s3ReaderFactory)(nil)
+var _ backup.StreamingReader = (*s3StreamingReader)(nil)
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) (backup.Reader, error) {
+func NewS3StreamingReader(config *StorageConfig, decoder encoding.DecoderFactory) (backup.StreamingReader, error) {
 	if decoder == nil {
 		return nil, errors.New("decoder is nil")
 	}
@@ -33,7 +33,7 @@ func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) 
 		return nil, err
 	}
 
-	return &s3ReaderFactory{
+	return &s3StreamingReader{
 		client:   client,
 		s3Config: config,
 		decoder:  decoder,
@@ -42,7 +42,7 @@ func NewS3ReaderFactory(config *StorageConfig, decoder encoding.DecoderFactory) 
 
 // StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *s3ReaderFactory) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+func (f *s3StreamingReader) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	fileCh, s3errCh := f.streamBackupFiles()
 
@@ -80,7 +80,7 @@ func (f *s3ReaderFactory) StreamFiles(ctx context.Context, readersCh chan<- io.R
 	close(readersCh)
 }
 
-func (f *s3ReaderFactory) streamBackupFiles() (_ <-chan string, _ <-chan error) {
+func (f *s3StreamingReader) streamBackupFiles() (_ <-chan string, _ <-chan error) {
 	fileCh, errCh := streamFilesFromS3(f.client, f.s3Config)
 	filterFileCh := make(chan string)
 
@@ -143,7 +143,7 @@ type s3Reader struct {
 
 var _ io.ReadCloser = (*s3Reader)(nil)
 
-func (f *s3ReaderFactory) newS3Reader(key string) (io.ReadCloser, error) {
+func (f *s3StreamingReader) newS3Reader(key string) (io.ReadCloser, error) {
 	getObjectOutput, err := f.client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: &f.s3Config.Bucket,
 		Key:    &key,
@@ -181,6 +181,6 @@ func (r *s3Reader) Close() error {
 	return r.closer.Close()
 }
 
-func (f *s3ReaderFactory) GetType() string {
+func (f *s3StreamingReader) GetType() string {
 	return s3type
 }

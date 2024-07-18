@@ -12,22 +12,22 @@ import (
 	"github.com/aerospike/backup-go/encoding"
 )
 
-var _ backup.Reader = (*DirectoryReader)(nil)
+var _ backup.StreamingReader = (*DirectoryStreamingReader)(nil)
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-type DirectoryReader struct {
+type DirectoryStreamingReader struct {
 	decoder encoding.DecoderFactory
 	dir     string
 }
 
-func NewDirectoryReader(dir string, decoder encoding.DecoderFactory,
-) (*DirectoryReader, error) {
+func NewDirectoryStreamingReader(dir string, decoder encoding.DecoderFactory,
+) (*DirectoryStreamingReader, error) {
 	if decoder == nil {
 		return nil, errors.New("decoder is nil")
 	}
 
-	return &DirectoryReader{
+	return &DirectoryStreamingReader{
 		dir:     dir,
 		decoder: decoder,
 	}, nil
@@ -35,7 +35,7 @@ func NewDirectoryReader(dir string, decoder encoding.DecoderFactory,
 
 // StreamFiles read files from disk and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *DirectoryReader) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+func (f *DirectoryStreamingReader) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	err := f.checkRestoreDirectory()
 	if err != nil {
@@ -82,7 +82,7 @@ func (f *DirectoryReader) StreamFiles(ctx context.Context, readersCh chan<- io.R
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format
-func (f *DirectoryReader) checkRestoreDirectory() error {
+func (f *DirectoryStreamingReader) checkRestoreDirectory() error {
 	dir := f.dir
 
 	dirInfo, err := os.Stat(dir)
@@ -109,6 +109,6 @@ func (f *DirectoryReader) checkRestoreDirectory() error {
 	return nil
 }
 
-func (f *DirectoryReader) GetType() string {
+func (f *DirectoryStreamingReader) GetType() string {
 	return "directory"
 }

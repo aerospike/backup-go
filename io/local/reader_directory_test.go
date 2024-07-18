@@ -32,13 +32,13 @@ type checkRestoreDirectoryTestSuite struct {
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilDecoder() {
 	dir := s.T().TempDir()
-	_, err := NewDirectoryReader(dir, nil)
+	_, err := NewDirectoryStreamingReader(dir, nil)
 	s.Error(err)
 }
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
-	factory, _ := NewDirectoryReader(dir, asb.NewASBDecoderFactory())
+	factory, _ := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
 	err := factory.checkRestoreDirectory()
 	s.Error(err)
 }
@@ -69,7 +69,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 
 	f.Close()
 
-	fac, err := NewDirectoryReader(dir, asb.NewASBDecoderFactory())
+	fac, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -104,7 +104,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 
 	f.Close()
 
-	r, err := NewDirectoryReader(dir, asb.NewASBDecoderFactory())
+	r, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)

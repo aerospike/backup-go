@@ -34,8 +34,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Reader provides access to data that should be restored.
-type Reader interface {
+// StreamingReader provides access to data that should be restored.
+type StreamingReader interface {
 	// StreamFiles create readers from files and send them to chan.
 	// In case of error, send errors to error chan.
 	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
@@ -46,7 +46,7 @@ type Reader interface {
 
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
-	reader          Reader
+	reader          StreamingReader
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
@@ -58,7 +58,7 @@ type RestoreHandler struct {
 
 // newRestoreHandler creates a new RestoreHandler
 func newRestoreHandler(config *RestoreConfig,
-	ac *a.Client, logger *slog.Logger, reader Reader) *RestoreHandler {
+	ac *a.Client, logger *slog.Logger, reader StreamingReader) *RestoreHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 
@@ -89,6 +89,8 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	// Channel for signals about successful processing files.
 	doneCh := make(chan struct{})
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	// Start lazy file reading.
 	go rh.reader.StreamFiles(ctx, readersCh, errorsCh)
 
@@ -98,11 +100,11 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	// Process errors if we have them.
 	select {
 	case err := <-errorsCh:
+		cancel()
 		return fmt.Errorf("failed to restore: %w", err)
 	case <-doneCh:
+		cancel()
 		return nil
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 }
 
@@ -140,7 +142,6 @@ func (rh *RestoreHandler) processReaders(
 		wg.Wait()
 	}
 
-	doneCh <- struct{}{}
 	close(doneCh)
 	close(errorsCh)
 }

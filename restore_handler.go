@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
@@ -112,8 +111,6 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 func (rh *RestoreHandler) processReaders(
 	ctx context.Context, readersCh <-chan io.ReadCloser, doneCh chan<- struct{}, errorsCh chan<- error,
 ) {
-	var wg sync.WaitGroup
-
 	batchSize := rh.config.Parallel
 
 	for {
@@ -132,31 +129,24 @@ func (rh *RestoreHandler) processReaders(
 			break
 		}
 
-		wg.Add(1)
-
-		go func(ctx context.Context, batch []io.ReadCloser, errorsCh chan<- error) {
-			defer wg.Done()
-			rh.restoreBatch(ctx, batch, errorsCh)
-		}(ctx, batch, errorsCh)
-
-		wg.Wait()
+		if err := rh.restoreBatch(ctx, batch); err != nil {
+			errorsCh <- err
+			return
+		}
 	}
 
 	close(doneCh)
-	close(errorsCh)
 }
 
-func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadCloser, errorsCh chan<- error) {
+func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadCloser) error {
 	batch, err := setEncryptionDecoder(rh.config.EncryptionPolicy, batch)
 	if err != nil {
-		errorsCh <- err
-		return
+		return err
 	}
 
 	batch, err = setCompressionDecoder(rh.config.CompressionPolicy, batch)
 	if err != nil {
-		errorsCh <- err
-		return
+		return err
 	}
 
 	totalReaders := len(batch)
@@ -165,10 +155,10 @@ func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadClose
 	for start := 0; start < totalReaders; start += batchSize {
 		end := min(start+batchSize, totalReaders)
 		if err = rh.processBatch(ctx, batch[start:end]); err != nil {
-			errorsCh <- fmt.Errorf("failed to process batch: %w", err)
-			return
+			return fmt.Errorf("failed to process batch: %w", err)
 		}
 	}
+	return nil
 }
 
 func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {

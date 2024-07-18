@@ -35,7 +35,8 @@ func NewDirectoryStreamingReader(dir string, decoder encoding.DecoderFactory,
 
 // StreamFiles read files from disk and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *DirectoryStreamingReader) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+func (f *DirectoryStreamingReader) StreamFiles(
+	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	err := f.checkRestoreDirectory()
 	if err != nil {

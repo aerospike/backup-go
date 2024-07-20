@@ -45,14 +45,14 @@ func newBackupRecordsHandler(config *BackupConfig, ac *a.Client, logger *slog.Lo
 func (bh *backupRecordsHandler) run(
 	ctx context.Context,
 	writers []pipeline.Worker[*models.Token],
-	recordsTotal *atomic.Uint64,
+	recordsReadTotal *atomic.Uint64,
 ) error {
 	readWorkers, err := bh.makeAerospikeReadWorkers(bh.config.Parallel)
 	if err != nil {
 		return err
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsTotal))
+	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsReadTotal))
 	voidTimeSetter := newTokenWorker(processors.NewVoidTimeSetter(bh.logger))
 
 	job := pipeline.NewPipeline[*models.Token](

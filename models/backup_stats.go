@@ -10,7 +10,7 @@ type BackupStats struct {
 	commonStats
 	fileCount atomic.Uint64
 	// total number of records in DB
-	recordsToBackup uint64
+	RecordsToBackup uint64
 }
 
 func (b *BackupStats) IncFiles() {
@@ -19,8 +19,4 @@ func (b *BackupStats) IncFiles() {
 
 func (b *BackupStats) GetFileCount() uint64 {
 	return b.fileCount.Load()
-}
-
-func (b *BackupStats) GetRecordsToBackup() uint64 {
-	return b.recordsToBackup
 }

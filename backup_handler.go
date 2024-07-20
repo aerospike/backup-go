@@ -116,7 +116,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
 
-	return handler.run(ctx, writeWorkers, &bh.stats.RecordsTotal)
+	return handler.run(ctx, writeWorkers, &bh.stats.RecordsReadTotal)
 }
 
 func (bh *BackupHandler) makeWriteWorkers(backupWriters []io.WriteCloser) []pipeline.Worker[*models.Token] {

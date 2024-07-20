@@ -9,7 +9,7 @@ type commonStats struct {
 	start    time.Time
 	duration time.Duration
 	// number of records read from source, before any filtering.
-	RecordsTotal atomic.Uint64
+	RecordsReadTotal atomic.Uint64
 	// The number of successfully created secondary indexes.
 	sIndexes atomic.Uint32
 	// The number of successfully stored UDF files.
@@ -18,8 +18,8 @@ type commonStats struct {
 	TotalBytesWritten atomic.Uint64
 }
 
-func (s *commonStats) GetRecordsTotal() uint64 {
-	return s.RecordsTotal.Load()
+func (s *commonStats) GetRecordsReadTotal() uint64 {
+	return s.RecordsReadTotal.Load()
 }
 
 func (s *commonStats) GetTotalBytesWritten() uint64 {

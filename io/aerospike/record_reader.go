@@ -15,12 +15,12 @@
 package aerospike
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
-	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 )
@@ -65,10 +65,9 @@ type scanner interface {
 type RecordReader struct {
 	client     scanner
 	scanPolicy *a.ScanPolicy
-	recResChan <-chan *a.Result
 	logger     *slog.Logger
 	config     *ArrConfig
-	recSet     []*a.Recordset
+	scanResult *recordSets
 }
 
 // NewRecordReader creates a new RecordReader
@@ -90,16 +89,16 @@ func NewRecordReader(client scanner, cfg *ArrConfig,
 
 // Read reads the next record from the Aerospike database
 func (r *RecordReader) Read() (*models.Token, error) {
-	if r.recResChan == nil {
-		scan, err := r.startScan()
+	if r.scanResult == nil {
+		scan, err := r.startScan(true)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to start scan: %w", err)
 		}
 
-		r.recResChan = scan
+		r.scanResult = scan
 	}
 
-	res, active := <-r.recResChan
+	res, active := <-r.scanResult.Results()
 	if !active {
 		r.logger.Debug("scan finished")
 		return nil, io.EOF
@@ -121,33 +120,30 @@ func (r *RecordReader) Read() (*models.Token, error) {
 // Close cancels the Aerospike scan used to read records
 // if it was started
 func (r *RecordReader) Close() {
-	if r.recSet != nil {
-		// ignore this error, it only happens if the scan is already closed
-		// and this method can not return an error anyway
-		for _, rec := range r.recSet {
-			if err := rec.Close(); err != nil {
-				r.logger.Error("error while closing record set", "error", rec.Close())
-			}
-		}
+	if r.scanResult != nil {
+		r.scanResult.Close()
 	}
 
 	r.logger.Debug("closed aerospike record reader")
 }
 
 // startScan starts the scan for RecordReader
-func (r *RecordReader) startScan() (<-chan *a.Result, error) {
-	r.scanPolicy.FilterExpression = timeBoundExpression(r.config.timeBounds)
+func (r *RecordReader) startScan(includeBinData bool) (*recordSets, error) {
+	effectivePolicy := *r.scanPolicy
+
+	effectivePolicy.FilterExpression = timeBoundExpression(r.config.timeBounds)
+	effectivePolicy.IncludeBinData = includeBinData
 
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {
 		setsToScan = []string{""}
 	}
 
-	resultChannels := make([]<-chan *a.Result, len(r.recSet))
+	scans := make([]*a.Recordset, 0, len(setsToScan))
 
 	for _, set := range setsToScan {
 		recSet, err := r.client.ScanPartitions(
-			r.scanPolicy,
+			&effectivePolicy,
 			r.config.partitionFilter,
 			r.config.namespace,
 			set,
@@ -157,11 +153,10 @@ func (r *RecordReader) startScan() (<-chan *a.Result, error) {
 			return nil, err
 		}
 
-		r.recSet = append(r.recSet, recSet)
-		resultChannels = append(resultChannels, recSet.Results())
+		scans = append(scans, recSet)
 	}
 
-	return util.MergeChannels(resultChannels), nil
+	return newRecordSets(scans, r.logger), nil
 }
 
 func timeBoundExpression(bounds models.TimeBounds) *a.Expression {

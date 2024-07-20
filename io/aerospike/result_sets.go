@@ -8,12 +8,22 @@ import (
 )
 
 type recordSets struct {
-	logger *slog.Logger
-	data   []*a.Recordset
+	logger  *slog.Logger
+	data    []*a.Recordset
+	results <-chan *a.Result
 }
 
 func newRecordSets(data []*a.Recordset, logger *slog.Logger) *recordSets {
-	return &recordSets{logger: logger, data: data}
+	resultChannels := make([]<-chan *a.Result, 0, len(data))
+	for _, recSet := range data {
+		resultChannels = append(resultChannels, recSet.Results())
+	}
+
+	return &recordSets{
+		results: util.MergeChannels(resultChannels),
+		data:    data,
+		logger:  logger,
+	}
 }
 
 func (r *recordSets) Close() {
@@ -27,10 +37,5 @@ func (r *recordSets) Close() {
 }
 
 func (r *recordSets) Results() <-chan *a.Result {
-	resultChannels := make([]<-chan *a.Result, 0, len(r.data))
-	for _, recSet := range r.data {
-		resultChannels = append(resultChannels, recSet.Results())
-	}
-
-	return util.MergeChannels(resultChannels)
+	return r.results
 }

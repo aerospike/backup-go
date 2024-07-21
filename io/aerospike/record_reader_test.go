@@ -75,8 +75,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -129,8 +129,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -168,8 +168,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -201,8 +201,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -259,8 +259,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      policy,
 		},
-		policy,
 		slog.Default(),
 	)
 	suite.NotNil(reader)

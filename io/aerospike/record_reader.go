@@ -25,9 +25,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// ArrConfig represents the configuration for scanning Aerospike records.
 type ArrConfig struct {
 	timeBounds      models.TimeBounds
 	partitionFilter *a.PartitionFilter
+	scanPolicy      *a.ScanPolicy
 	namespace       string
 	setList         []string
 	binList         []string
@@ -36,12 +38,14 @@ type ArrConfig struct {
 func NewArrConfig(namespace string,
 	setList []string,
 	partitionFilter *a.PartitionFilter,
+	scanPolicy *a.ScanPolicy,
 	binList []string,
 	timeBounds models.TimeBounds) *ArrConfig {
 	return &ArrConfig{
 		namespace:       namespace,
 		setList:         setList,
 		partitionFilter: partitionFilter,
+		scanPolicy:      scanPolicy,
 		binList:         binList,
 		timeBounds:      timeBounds,
 	}
@@ -64,7 +68,6 @@ type scanner interface {
 // It reads records from an Aerospike database and returns them as *models.Record
 type RecordReader struct {
 	client     scanner
-	scanPolicy *a.ScanPolicy
 	logger     *slog.Logger
 	config     *ArrConfig
 	scanResult *recordSets
@@ -72,16 +75,15 @@ type RecordReader struct {
 
 // NewRecordReader creates a new RecordReader
 func NewRecordReader(client scanner, cfg *ArrConfig,
-	scanPolicy *a.ScanPolicy, logger *slog.Logger) *RecordReader {
+	logger *slog.Logger) *RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	logger.Debug("created new aerospike record reader")
 
 	job := &RecordReader{
-		config:     cfg,
-		client:     client,
-		scanPolicy: scanPolicy,
-		logger:     logger,
+		config: cfg,
+		client: client,
+		logger: logger,
 	}
 
 	return job
@@ -129,7 +131,7 @@ func (r *RecordReader) Close() {
 
 // startScan starts the scan for RecordReader
 func (r *RecordReader) startScan() (*recordSets, error) {
-	scanPolicy := *r.scanPolicy
+	scanPolicy := *r.config.scanPolicy
 
 	scanPolicy.FilterExpression = timeBoundExpression(r.config.timeBounds)
 

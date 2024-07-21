@@ -69,13 +69,11 @@ func (bh *backupRecordsHandler) countRecords() uint64 {
 	scanPolicy := *bh.config.ScanPolicy
 
 	scanPolicy.IncludeBinData = false
-	scanPolicy.RecordsPerSecond = 0
 	scanPolicy.MaxRecords = 0
 
 	recordReader := aerospike.NewRecordReader(
 		bh.aerospikeClient,
-		bh.recordReaderConfigForPartition(PartitionRangeAll()),
-		&scanPolicy,
+		bh.recordReaderConfigForPartition(PartitionRangeAll(), &scanPolicy),
 		bh.logger,
 	)
 
@@ -109,8 +107,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Work
 	for i := 0; i < n; i++ {
 		recordReader := aerospike.NewRecordReader(
 			bh.aerospikeClient,
-			bh.recordReaderConfigForPartition(partitionRanges[i]),
-			&scanPolicy,
+			bh.recordReaderConfigForPartition(partitionRanges[i], &scanPolicy),
 			bh.logger,
 		)
 
@@ -120,11 +117,15 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Work
 	return readWorkers, nil
 }
 
-func (bh *backupRecordsHandler) recordReaderConfigForPartition(partitionRange PartitionRange) *aerospike.ArrConfig {
+func (bh *backupRecordsHandler) recordReaderConfigForPartition(
+	partitionRange PartitionRange,
+	scanPolicy *a.ScanPolicy,
+) *aerospike.ArrConfig {
 	return aerospike.NewArrConfig(
 		bh.config.Namespace,
 		bh.config.SetList,
 		a.NewPartitionFilterByRange(partitionRange.Begin, partitionRange.Count),
+		scanPolicy,
 		bh.config.BinList,
 		models.TimeBounds{
 			FromTime: bh.config.ModAfter,

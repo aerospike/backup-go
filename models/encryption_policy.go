@@ -77,3 +77,36 @@ func (p *EncryptionPolicy) ReadPrivateKey() ([]byte, error) {
 
 	return sum256[:], nil
 }
+
+func (p *EncryptionPolicy) readPemFromFile() ([]byte, error) {
+	if p.KeyFile == nil {
+		return nil, fmt.Errorf("pem file not specified")
+	}
+
+	pemData, err := os.ReadFile(*p.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read PEM file: %w", err)
+	}
+
+	return pemData, nil
+}
+
+func (p *EncryptionPolicy) readPemFromEnv() ([]byte, error) {
+	if p.KeyEnv == nil {
+		return nil, fmt.Errorf("pem env not specified")
+	}
+
+	pem := os.Getenv(*p.KeyEnv)
+
+	return []byte(pem), nil
+}
+
+func (p *EncryptionPolicy) readPemFromSecret() ([]byte, error) {
+	if p.KeySecret == nil {
+		return nil, fmt.Errorf("pem secret not specified")
+	}
+
+	pem := os.Getenv(*p.KeyEnv)
+
+	return []byte(pem), nil
+}

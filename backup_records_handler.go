@@ -70,21 +70,26 @@ func (bh *backupRecordsHandler) run(
 
 func (bh *backupRecordsHandler) countRecords() int {
 	scanPolicy := *bh.config.ScanPolicy
+
 	scanPolicy.IncludeBinData = false
+
 	recordReader := aerospike.NewRecordReader(
 		bh.aerospikeClient,
 		bh.recordReaderConfigForPartition(PartitionRangeAll()),
 		&scanPolicy,
 		bh.logger,
 	)
+
 	count := 0
+
 	for {
-		_, err := recordReader.Read()
-		if err != nil {
+		if _, err := recordReader.Read(); err != nil {
 			break
 		}
+
 		count++
 	}
+
 	return count
 }
 

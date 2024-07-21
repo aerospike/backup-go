@@ -9,9 +9,9 @@ import (
 
 // recordSets contains multiple Aerospike Recordset objects
 type recordSets struct {
+	resultsChannel <-chan *a.Result
 	logger         *slog.Logger
 	data           []*a.Recordset
-	resultsChannel <-chan *a.Result
 }
 
 func newRecordSets(data []*a.Recordset, logger *slog.Logger) *recordSets {

@@ -113,8 +113,9 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	}
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
-
 	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
+
+	bh.stats.RecordsToBackup = handler.countRecords()
 
 	return handler.run(ctx, writeWorkers, &bh.stats.RecordsReadTotal)
 }

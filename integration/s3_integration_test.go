@@ -20,6 +20,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -169,9 +170,9 @@ func randomBytes(n int) []byte {
 }
 
 func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3.StorageConfig) []byte {
-	factory, _ := s3.NewS3WriterFactory(config, true)
+	streamingReader, _ := s3.NewS3WriterFactory(config, true)
 
-	writer, err := factory.NewWriter(filename)
+	writer, err := streamingReader.NewWriter(filename)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}
@@ -193,7 +194,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 		s.FailNow("failed to close writer", err)
 	}
 
-	// cannot create new factory because folder is not empty
+	// cannot create new streamingReader because folder is not empty
 	_, err = s3.NewS3WriterFactory(config, false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
@@ -201,22 +202,24 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 }
 
 func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
-	factory, _ := s3.NewS3ReaderFactory(config, asb.NewASBDecoderFactory())
+	streamingReader, _ := s3.NewS3StreamingReader(config, asb.NewASBDecoderFactory())
 
-	readers, err := factory.Readers()
-	if err != nil {
-		s.FailNow("failed to create readers", err)
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
+
+	select {
+	case reader := <-readerChan:
+		buffer, err := io.ReadAll(reader)
+		if err != nil {
+			s.FailNow("failed to read", err)
+		}
+		reader.Close()
+		return buffer
+	case err := <-errorChan:
+		require.NoError(s.T(), err)
 	}
-
-	s.Assertions.Equal(1, len(readers))
-
-	buffer, err := io.ReadAll(readers[0])
-	if err != nil {
-		s.FailNow("failed to read", err)
-	}
-
-	_ = readers[0].Close()
-	return buffer
+	return nil
 }
 
 func TestReadWrite(t *testing.T) {

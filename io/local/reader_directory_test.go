@@ -57,7 +57,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 		s.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	file = "file2.asb"
 	filePath = filepath.Join(dir, file)
@@ -67,7 +67,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 		s.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	fac, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
 	s.Require().NoError(err)
@@ -102,7 +102,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 		s.FailNow("Failed to create file: %v", err)
 	}
 
-	f.Close()
+	_ = f.Close()
 
 	r, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
 	s.Require().NoError(err)

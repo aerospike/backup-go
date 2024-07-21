@@ -9,8 +9,6 @@ import (
 type BackupStats struct {
 	commonStats
 	fileCount atomic.Uint64
-	// total number of records in DB
-	RecordsToBackup uint64
 }
 
 func (b *BackupStats) IncFiles() {

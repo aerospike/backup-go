@@ -22,6 +22,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	encmocks "github.com/aerospike/backup-go/encoding/mocks"
+	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipeline/mocks"
 	"github.com/stretchr/testify/suite"
@@ -109,7 +110,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter.EXPECT().Write(&models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
 	mockWriter.EXPECT().Close().Return(nil)
 
-	mockStats := newMockStatsSetterToken(suite.T())
+	mockStats := mocks.NewStatsSetterToken(suite.T())
 	mockStats.EXPECT().AddUDFs(uint32(1))
 	mockStats.EXPECT().AddSIndexes(uint32(1))
 
@@ -136,7 +137,7 @@ func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
 	mockWriter := pipemocks.NewDataWriter[*models.Token](suite.T())
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
-	mockStats := newMockStatsSetterToken(suite.T())
+	mockStats := mocks.NewStatsSetterToken(suite.T())
 
 	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)

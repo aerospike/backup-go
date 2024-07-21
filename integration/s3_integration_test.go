@@ -170,9 +170,9 @@ func randomBytes(n int) []byte {
 }
 
 func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3.StorageConfig) []byte {
-	factory, _ := s3.NewS3WriterFactory(config, true)
+	streamingReader, _ := s3.NewS3WriterFactory(config, true)
 
-	writer, err := factory.NewWriter(filename)
+	writer, err := streamingReader.NewWriter(filename)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}
@@ -194,7 +194,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 		s.FailNow("failed to close writer", err)
 	}
 
-	// cannot create new factory because folder is not empty
+	// cannot create new streamingReader because folder is not empty
 	_, err = s3.NewS3WriterFactory(config, false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
@@ -202,11 +202,11 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 }
 
 func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
-	factory, _ := s3.NewS3StreamingReader(config, asb.NewASBDecoderFactory())
+	streamingReader, _ := s3.NewS3StreamingReader(config, asb.NewASBDecoderFactory())
 
 	readerChan := make(chan io.ReadCloser)
 	errorChan := make(chan error)
-	go factory.StreamFiles(context.Background(), readerChan, errorChan)
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
 
 	select {
 	case reader := <-readerChan:

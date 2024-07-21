@@ -10,14 +10,8 @@ coverage: test_deps
 	go tool cover -func coverage.cov
 
 .PHONY: clean
-clean:
+clean: mocks-clean
 	rm -f coverage.cov
-	rm -rf mocks
-	rm -rf pipeline/mocks
-	rm -f mock_statsSetterToken.go
-	rm -f mock_statsSetterExpired.go
-	rm -rf encoding/mocks
-	rm -rf internal/asinfo/mocks
 
 .PHONY: test_deps
 test_deps: mocks-generate

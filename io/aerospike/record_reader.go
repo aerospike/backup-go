@@ -90,7 +90,7 @@ func NewRecordReader(client scanner, cfg *ArrConfig,
 // Read reads the next record from the Aerospike database
 func (r *RecordReader) Read() (*models.Token, error) {
 	if r.scanResult == nil {
-		scan, err := r.startScan(true)
+		scan, err := r.startScan()
 		if err != nil {
 			return nil, fmt.Errorf("failed to start scan: %w", err)
 		}
@@ -128,11 +128,10 @@ func (r *RecordReader) Close() {
 }
 
 // startScan starts the scan for RecordReader
-func (r *RecordReader) startScan(includeBinData bool) (*recordSets, error) {
-	effectivePolicy := *r.scanPolicy
+func (r *RecordReader) startScan() (*recordSets, error) {
+	scanPolicy := *r.scanPolicy
 
-	effectivePolicy.FilterExpression = timeBoundExpression(r.config.timeBounds)
-	effectivePolicy.IncludeBinData = includeBinData
+	scanPolicy.FilterExpression = timeBoundExpression(r.config.timeBounds)
 
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {
@@ -143,7 +142,7 @@ func (r *RecordReader) startScan(includeBinData bool) (*recordSets, error) {
 
 	for _, set := range setsToScan {
 		recSet, err := r.client.ScanPartitions(
-			&effectivePolicy,
+			&scanPolicy,
 			r.config.partitionFilter,
 			r.config.namespace,
 			set,

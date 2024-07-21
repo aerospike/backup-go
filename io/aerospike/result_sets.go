@@ -7,10 +7,11 @@ import (
 	"github.com/aerospike/backup-go/internal/util"
 )
 
+// recordSets contains multiple Aerospike Recordset objects
 type recordSets struct {
-	logger  *slog.Logger
-	data    []*a.Recordset
-	results <-chan *a.Result
+	logger         *slog.Logger
+	data           []*a.Recordset
+	resultsChannel <-chan *a.Result
 }
 
 func newRecordSets(data []*a.Recordset, logger *slog.Logger) *recordSets {
@@ -20,9 +21,9 @@ func newRecordSets(data []*a.Recordset, logger *slog.Logger) *recordSets {
 	}
 
 	return &recordSets{
-		results: util.MergeChannels(resultChannels),
-		data:    data,
-		logger:  logger,
+		resultsChannel: util.MergeChannels(resultChannels),
+		data:           data,
+		logger:         logger,
 	}
 }
 
@@ -37,5 +38,5 @@ func (r *recordSets) Close() {
 }
 
 func (r *recordSets) Results() <-chan *a.Result {
-	return r.results
+	return r.resultsChannel
 }

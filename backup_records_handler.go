@@ -47,6 +47,9 @@ func (bh *backupRecordsHandler) run(
 	writers []pipeline.Worker[*models.Token],
 	recordsReadTotal *atomic.Uint64,
 ) error {
+	records := bh.countRecords()
+	_ = records
+
 	readWorkers, err := bh.makeAerospikeReadWorkers(bh.config.Parallel)
 	if err != nil {
 		return err
@@ -63,6 +66,26 @@ func (bh *backupRecordsHandler) run(
 	)
 
 	return job.Run(ctx)
+}
+
+func (bh *backupRecordsHandler) countRecords() int {
+	scanPolicy := *bh.config.ScanPolicy
+	scanPolicy.IncludeBinData = false
+	recordReader := aerospike.NewRecordReader(
+		bh.aerospikeClient,
+		bh.recordReaderConfigForPartition(PartitionRangeAll()),
+		&scanPolicy,
+		bh.logger,
+	)
+	count := 0
+	for {
+		_, err := recordReader.Read()
+		if err != nil {
+			break
+		}
+		count++
+	}
+	return count
 }
 
 func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Worker[*models.Token], error) {

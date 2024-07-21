@@ -16,8 +16,6 @@ type commonStats struct {
 	uDFs atomic.Uint32
 	// The total number of bytes written to the destination.
 	TotalBytesWritten atomic.Uint64
-	// total number of records
-	TotalRecords uint64
 }
 
 func (s *commonStats) GetRecordsReadTotal() uint64 {

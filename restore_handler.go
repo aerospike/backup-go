@@ -37,6 +37,7 @@ import (
 type StreamingReader interface {
 	// StreamFiles create readers from files and send them to chan.
 	// In case of error, send errors to error chan.
+	// Must be run in goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
 	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
 
 	// GetType return type of storage. Used in logging.

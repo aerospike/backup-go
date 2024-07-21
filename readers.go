@@ -26,7 +26,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// **** Token StreamingReader ****
+// **** Token Reader ****
 
 // tokenReader satisfies the DataReader interface
 // It reads data as tokens using a Decoder
@@ -58,7 +58,7 @@ func (dr *tokenReader) Close() {
 	dr.logger.Debug("closed token reader")
 }
 
-// **** Aerospike DB StreamingReader ****
+// **** Aerospike DB Reader ****
 
 // arrConfig is the configuration for an AerospikeRecordReader
 type arrConfig struct {
@@ -234,7 +234,7 @@ func timeBoundExpression(bounds models.TimeBounds) *a.Expression {
 	)
 }
 
-// **** Aerospike SIndex StreamingReader ****
+// **** Aerospike SIndex Reader ****
 
 // sindexGetter is an interface for getting secondary indexes
 //
@@ -294,7 +294,7 @@ func (r *sindexReader) Read() (*models.Token, error) {
 // but is a no-op for the SIndexReader
 func (r *sindexReader) Close() {}
 
-// **** Aerospike UDF StreamingReader ****
+// **** Aerospike UDF Reader ****
 
 // udfGetter is an interface for getting UDFs
 //

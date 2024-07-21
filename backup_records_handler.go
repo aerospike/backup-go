@@ -69,6 +69,8 @@ func (bh *backupRecordsHandler) countRecords() uint64 {
 	scanPolicy := *bh.config.ScanPolicy
 
 	scanPolicy.IncludeBinData = false
+	scanPolicy.RecordsPerSecond = 0
+	scanPolicy.MaxRecords = 0
 
 	recordReader := aerospike.NewRecordReader(
 		bh.aerospikeClient,

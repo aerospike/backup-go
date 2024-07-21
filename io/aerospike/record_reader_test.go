@@ -23,7 +23,7 @@ import (
 	"unsafe"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/suite"
 )

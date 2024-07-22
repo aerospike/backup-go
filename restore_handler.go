@@ -139,6 +139,31 @@ func (rh *RestoreHandler) processReaders(
 	close(doneCh)
 }
 
+func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
+	defer rh.closeReaders(rs)
+
+	rs, err := setEncryptionDecoder(rh.config.EncryptionPolicy, rs)
+	if err != nil {
+		return err
+	}
+
+	rs, err = setCompressionDecoder(rh.config.CompressionPolicy, rs)
+	if err != nil {
+		return err
+	}
+
+	readWorkers, err := rh.readersToReadWorkers(rs)
+	if err != nil {
+		return fmt.Errorf("failed to convert readers to read workers: %w", err)
+	}
+
+	if err = rh.runRestoreBatch(ctx, readWorkers); err != nil {
+		return fmt.Errorf("failed to run restore batch: %w", err)
+	}
+
+	return nil
+}
+
 func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
 	if policy == nil || policy.Mode == models.CompressNone {
 		return readers, nil
@@ -180,31 +205,6 @@ func setEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadClos
 	}
 
 	return decryptedReaders, nil
-}
-
-func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
-	defer rh.closeReaders(rs)
-
-	rs, err := setEncryptionDecoder(rh.config.EncryptionPolicy, rs)
-	if err != nil {
-		return err
-	}
-
-	rs, err = setCompressionDecoder(rh.config.CompressionPolicy, rs)
-	if err != nil {
-		return err
-	}
-
-	readWorkers, err := rh.readersToReadWorkers(rs)
-	if err != nil {
-		return fmt.Errorf("failed to convert readers to read workers: %w", err)
-	}
-
-	if err = rh.runRestoreBatch(ctx, readWorkers); err != nil {
-		return fmt.Errorf("failed to run restore batch: %w", err)
-	}
-
-	return nil
 }
 
 func (rh *RestoreHandler) closeReaders(rs []io.ReadCloser) {

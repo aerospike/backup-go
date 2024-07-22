@@ -16,6 +16,8 @@ package backup
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
 	"sync/atomic"
 
@@ -65,7 +67,7 @@ func (bh *backupRecordsHandler) run(
 	return job.Run(ctx)
 }
 
-func (bh *backupRecordsHandler) countRecords() uint64 {
+func (bh *backupRecordsHandler) countRecords() (uint64, error) {
 	scanPolicy := *bh.config.ScanPolicy
 
 	scanPolicy.IncludeBinData = false
@@ -81,13 +83,17 @@ func (bh *backupRecordsHandler) countRecords() uint64 {
 
 	for {
 		if _, err := recordReader.Read(); err != nil {
-			break
+			if err == io.EOF {
+				break
+			}
+
+			return 0, fmt.Errorf("error during records counting: %w", err)
 		}
 
 		count++
 	}
 
-	return count
+	return count, nil
 }
 
 func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Worker[*models.Token], error) {

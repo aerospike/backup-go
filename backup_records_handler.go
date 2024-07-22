@@ -127,7 +127,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 	partitionRange PartitionRange,
 	scanPolicy *a.ScanPolicy,
 ) *aerospike.RecordReaderConfig {
-	return aerospike.NewArrConfig(
+	return aerospike.NewRecordReaderConfig(
 		bh.config.Namespace,
 		bh.config.SetList,
 		a.NewPartitionFilterByRange(partitionRange.Begin, partitionRange.Count),

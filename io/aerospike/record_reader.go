@@ -35,7 +35,7 @@ type RecordReaderConfig struct {
 	binList         []string
 }
 
-func NewArrConfig(namespace string,
+func NewRecordReaderConfig(namespace string,
 	setList []string,
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,

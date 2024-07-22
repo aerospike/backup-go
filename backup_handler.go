@@ -120,7 +120,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		return err
 	}
 
-	return handler.run(ctx, writeWorkers, &bh.stats.RecordsReadTotal)
+	return handler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
 }
 
 func (bh *BackupHandler) makeWriteWorkers(backupWriters []io.WriteCloser) []pipeline.Worker[*models.Token] {
@@ -177,7 +177,7 @@ func (bh *BackupHandler) newConfiguredWriter() (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	countingWriter := writers.NewCountingWriter(storageWriter, &bh.stats.TotalBytesWritten)
+	countingWriter := writers.NewCountingWriter(storageWriter, &bh.stats.BytesWritten)
 
 	encryptedWriter, err := setEncryption(bh.config.EncryptionPolicy, countingWriter)
 	if err != nil {

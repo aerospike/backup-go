@@ -130,19 +130,7 @@ func (rh *RestoreHandler) processReaders(
 			break
 		}
 
-		batch, err := setEncryptionDecoder(rh.config.EncryptionPolicy, batch)
-		if err != nil {
-			errorsCh <- err
-			return
-		}
-
-		batch, err = setCompressionDecoder(rh.config.CompressionPolicy, batch)
-		if err != nil {
-			errorsCh <- err
-			return
-		}
-
-		if err = rh.processBatch(ctx, batch); err != nil {
+		if err := rh.processBatch(ctx, batch); err != nil {
 			errorsCh <- fmt.Errorf("failed to process batch: %w", err)
 			return
 		}
@@ -197,12 +185,22 @@ func setEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadClos
 func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
 	defer rh.closeReaders(rs)
 
+	rs, err := setEncryptionDecoder(rh.config.EncryptionPolicy, rs)
+	if err != nil {
+		return err
+	}
+
+	rs, err = setCompressionDecoder(rh.config.CompressionPolicy, rs)
+	if err != nil {
+		return err
+	}
+
 	readWorkers, err := rh.readersToReadWorkers(rs)
 	if err != nil {
 		return fmt.Errorf("failed to convert readers to read workers: %w", err)
 	}
 
-	if err := rh.runRestoreBatch(ctx, readWorkers); err != nil {
+	if err = rh.runRestoreBatch(ctx, readWorkers); err != nil {
 		return fmt.Errorf("failed to run restore batch: %w", err)
 	}
 

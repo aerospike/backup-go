@@ -58,7 +58,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -112,7 +112,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -151,7 +151,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	close(mockResults)
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -184,7 +184,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 	namespace := "test"
 	set := ""
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -242,7 +242,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	policy := a.NewScanPolicy()
 	policy.MaxRecords = 10
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		policy,
 		a.NewPartitionFilterByRange(0, 4096),
@@ -274,7 +274,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 
 func (suite *readersTestSuite) TestSIndexReader() {
 	namespace := "test"
-	mockSIndexGetter := mocks.NewSindexGetter(suite.T())
+	mockSIndexGetter := mocks.NewMocksindexGetter(suite.T())
 	mockSIndexes := []*models.SIndex{
 		{
 			Namespace: namespace,
@@ -313,7 +313,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 
 	// negative GetSindexes fails
 
-	mockSIndexGetter = mocks.NewSindexGetter(suite.T())
+	mockSIndexGetter = mocks.NewMocksindexGetter(suite.T())
 	mockSIndexGetter.EXPECT().GetSIndexes(namespace).Return(
 		nil,
 		fmt.Errorf("error"),
@@ -330,7 +330,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 }
 
 func (suite *readersTestSuite) TestUDFReader() {
-	mockUDFGetter := mocks.NewUdfGetter(suite.T())
+	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
 	mockUDFs := []*models.UDF{
 		{
 			Name: "udf1",
@@ -368,7 +368,7 @@ func (suite *readersTestSuite) TestUDFReader() {
 }
 
 func (suite *readersTestSuite) TestUDFReaderReadFailed() {
-	mockUDFGetter := mocks.NewUdfGetter(suite.T())
+	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
 	mockUDFGetter.EXPECT().GetUDFs().Return(
 		nil,
 		fmt.Errorf("error"),

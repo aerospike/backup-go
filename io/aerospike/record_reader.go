@@ -25,8 +25,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// ArrConfig represents the configuration for scanning Aerospike records.
-type ArrConfig struct {
+// RecordReaderConfig represents the configuration for scanning Aerospike records.
+type RecordReaderConfig struct {
 	timeBounds      models.TimeBounds
 	partitionFilter *a.PartitionFilter
 	scanPolicy      *a.ScanPolicy
@@ -40,8 +40,8 @@ func NewArrConfig(namespace string,
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	binList []string,
-	timeBounds models.TimeBounds) *ArrConfig {
-	return &ArrConfig{
+	timeBounds models.TimeBounds) *RecordReaderConfig {
+	return &RecordReaderConfig{
 		namespace:       namespace,
 		setList:         setList,
 		partitionFilter: partitionFilter,
@@ -69,24 +69,24 @@ type scanner interface {
 type RecordReader struct {
 	client     scanner
 	logger     *slog.Logger
-	config     *ArrConfig
+	config     *RecordReaderConfig
 	scanResult *recordSets
 }
 
 // NewRecordReader creates a new RecordReader
-func NewRecordReader(client scanner, cfg *ArrConfig,
-	logger *slog.Logger) *RecordReader {
+func NewRecordReader(client scanner,
+	cfg *RecordReaderConfig,
+	logger *slog.Logger,
+) *RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	logger.Debug("created new aerospike record reader")
 
-	job := &RecordReader{
+	return &RecordReader{
 		config: cfg,
 		client: client,
 		logger: logger,
 	}
-
-	return job
 }
 
 // Read reads the next record from the Aerospike database

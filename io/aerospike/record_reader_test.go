@@ -71,7 +71,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	reader := NewRecordReader(
 		mockScanner,
-		&ArrConfig{
+		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
@@ -125,7 +125,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 
 	reader := NewRecordReader(
 		mockScanner,
-		&ArrConfig{
+		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
@@ -164,7 +164,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	reader := NewRecordReader(
 		mockScanner,
-		&ArrConfig{
+		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
@@ -197,7 +197,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 
 	reader := NewRecordReader(
 		mockScanner,
-		&ArrConfig{
+		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
@@ -255,7 +255,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 
 	reader := NewRecordReader(
 		mockScanner,
-		&ArrConfig{
+		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),

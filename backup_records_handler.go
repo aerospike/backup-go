@@ -120,7 +120,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Work
 func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 	partitionRange PartitionRange,
 	scanPolicy *a.ScanPolicy,
-) *aerospike.ArrConfig {
+) *aerospike.RecordReaderConfig {
 	return aerospike.NewArrConfig(
 		bh.config.Namespace,
 		bh.config.SetList,

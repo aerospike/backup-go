@@ -19,7 +19,7 @@ test_deps: mocks-generate
 # Install mockery for generating test mocks
 .PHONY: mockery-install
 mockery-install:
-	go install github.com/vektra/mockery/v2@v2.42.0
+	go install github.com/vektra/mockery/v2@v2.43.2
 
 # Iterate over project directory and generate mocks in packages where they must be.
 # FYI: --recursively not working, because then mockery creates mock in root dirs, not putting them to /mocks folder.

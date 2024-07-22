@@ -63,12 +63,12 @@ func main() {
 	restoreCfg := backup.NewRestoreConfig()
 	restoreCfg.Parallel = 5
 
-	readers, err := local.NewDirectoryReaderFactory("backup_folder", asb.NewASBDecoderFactory())
+	streamingReader, err := local.NewDirectoryStreamingReader("backup_folder", asb.NewASBDecoderFactory())
 	if err != nil {
 		panic(err)
 	}
 
-	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, readers)
+	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, streamingReader)
 	if err != nil {
 		panic(err)
 	}
@@ -82,7 +82,6 @@ func main() {
 	// optionally check the stats of the restore job
 	_ = restoreHandler.GetStats()
 }
-
 ```
 
 ### Prerequisites

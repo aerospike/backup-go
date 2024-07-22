@@ -71,6 +71,8 @@ type mockWorker struct {
 	mocks.MockWorker[string]
 }
 
+var _ Worker[string] = (*mockWorker)(nil)
+
 func newMockWorker(t *testing.T) *mockWorker {
 	t.Helper()
 	return &mockWorker{

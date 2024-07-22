@@ -33,13 +33,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// WriteFactory provides access to back up storage.
+// WriteFactory provides access to backup storage.
 type WriteFactory interface {
 	// NewWriter return new writer for backup logic to use.
 	// Each call creates new writer, they might be working in parallel.
 	// Backup logic will close the writer after backup is done.
 	// header func is executed on a writer after creation (on each one in case of multipart file)
-	NewWriter(filename string) (io.WriteCloser, error)
+	NewWriter(ctx context.Context, filename string) (io.WriteCloser, error)
 	// GetType return type of storage. Used in logging.
 	GetType() string
 }
@@ -89,7 +89,7 @@ func (bh *BackupHandler) run(ctx context.Context) {
 }
 
 func (bh *BackupHandler) backupSync(ctx context.Context) error {
-	backupWriters, err := bh.makeWriters(bh.config.Parallel)
+	backupWriters, err := bh.makeWriters(ctx, bh.config.Parallel)
 	if err != nil {
 		return err
 	}
@@ -135,11 +135,11 @@ func (bh *BackupHandler) makeWriteWorkers(backupWriters []io.WriteCloser) []pipe
 	return writeWorkers
 }
 
-func (bh *BackupHandler) makeWriters(n int) ([]io.WriteCloser, error) {
+func (bh *BackupHandler) makeWriters(ctx context.Context, n int) ([]io.WriteCloser, error) {
 	backupWriters := make([]io.WriteCloser, n)
 
 	for i := 0; i < n; i++ {
-		writer, err := bh.newWriter()
+		writer, err := bh.newWriter(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -161,18 +161,18 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 // newWriter creates a new writer based on the current configuration.
 // If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
 // The returned writer may be compressed or encrypted depending on the BackupHandler's configuration.
-func (bh *BackupHandler) newWriter() (io.WriteCloser, error) {
+func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) {
 	if bh.config.FileLimit > 0 {
-		return writers.NewSized(bh.config.FileLimit, bh.newConfiguredWriter)
+		return writers.NewSized(ctx, bh.config.FileLimit, bh.newConfiguredWriter)
 	}
 
-	return bh.newConfiguredWriter()
+	return bh.newConfiguredWriter(ctx)
 }
 
-func (bh *BackupHandler) newConfiguredWriter() (io.WriteCloser, error) {
+func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
 	filename := bh.encoder.GenerateFilename()
 
-	storageWriter, err := bh.writeFactory.NewWriter(filename)
+	storageWriter, err := bh.writeFactory.NewWriter(ctx, filename)
 	if err != nil {
 		return nil, err
 	}

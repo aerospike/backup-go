@@ -44,6 +44,8 @@ type Pipeline[T any] struct {
 	stages  []*stage[T]
 }
 
+var _ Worker[any] = (*Pipeline[any])(nil)
+
 const channelSize = 256
 
 // NewPipeline creates a new DataPipeline.

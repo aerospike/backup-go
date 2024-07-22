@@ -23,8 +23,8 @@ const (
 	s3type             = "s3"
 )
 
-func newS3Client(s3Config *StorageConfig) (*s3.Client, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+func newS3Client(ctx context.Context, s3Config *StorageConfig) (*s3.Client, error) {
+	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithSharedConfigProfile(s3Config.Profile),
 		config.WithRegion(s3Config.Region),
 	)

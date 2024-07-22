@@ -56,11 +56,20 @@ func (bh *backupRecordsHandler) run(
 
 	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsReadTotal))
 	voidTimeSetter := newTokenWorker(processors.NewVoidTimeSetter(bh.logger))
+	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, bh.config.RecordsPerSecond))
 
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
+
+		// in the pipeline, first all counters.
 		recordCounter,
+
+		// speed limiters.
+		tpsLimiter,
+
+		// modifications.
 		voidTimeSetter,
+
 		writers,
 	)
 

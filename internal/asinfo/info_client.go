@@ -69,7 +69,7 @@ func (av AerospikeVersion) IsGreaterOrEqual(other AerospikeVersion) bool {
 // infoGetter defines the methods for doing info requests
 // with the Aerospike database.
 //
-//go:generate mockery --name infoGetter
+//go:generate mockery --name InfoGetter
 type infoGetter interface {
 	RequestInfo(infoPolicy *a.InfoPolicy, commands ...string) (map[string]string, a.Error)
 }

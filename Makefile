@@ -10,23 +10,26 @@ coverage: test_deps
 	go tool cover -func coverage.cov
 
 .PHONY: clean
-clean:
+clean: mocks-clean
 	rm -f coverage.cov
-	rm -rf mocks
-	rm -rf pipeline/mocks
-	rm -f mock_statsSetterToken.go
-	rm -f mock_statsSetterExpired.go
-	rm -rf encoding/mocks
-	rm -rf internal/asinfo/mocks
 
 .PHONY: test_deps
-test_deps: mocks
-
-.PHONY: mocks
-mocks: mockery
-	go generate ./...
+test_deps: mocks-generate
 
 # Install mockery for generating test mocks
-.PHONY: mockery
-mockery:
-	go install github.com/vektra/mockery/v2@v2.42.0
+.PHONY: mockery-install
+mockery-install:
+	go install github.com/vektra/mockery/v2@v2.43.2
+
+# Iterate over project directory and generate mocks in packages where they must be.
+# FYI: --recursively not working, because then mockery creates mock in root dirs, not putting them to /mocks folder.
+.PHONY: mocks-generate
+mocks-generate: mockery-install
+	@echo "Generating mocks with config..."
+	mockery --config=.mockery.yaml
+
+# Removing all mocks in the project.
+.PHONY: mocks-clean
+mocks-clean:
+	@echo "Cleaning up all 'mocks' directories..."
+	@find . -type d -name 'mocks' -exec rm -rf {} +

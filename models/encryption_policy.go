@@ -1,7 +1,10 @@
 package models
 
 import (
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -44,15 +47,29 @@ func (p *EncryptionPolicy) Validate() error {
 	return nil
 }
 
+// TODO: support reading the key from KeyEnv and KeySecret
 func (p *EncryptionPolicy) ReadPrivateKey() ([]byte, error) {
-	key, err := os.ReadFile(*p.KeyFile)
+	pemData, err := os.ReadFile(*p.KeyFile)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read key from file: %w", err)
+		return nil, fmt.Errorf("unable to read PEM file: %w", err)
 	}
 
-	// TODO: support key in PEM format
+	// Decode the PEM file
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block containing private key")
+	}
 
-	sum256 := sha256.Sum256(key) // AES encrypt require 128 or 256 bits for key
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	key := privateKey.(*rsa.PrivateKey)
+	// Originally asbackup converts the key to the PKCS1 format
+	decodedKey := x509.MarshalPKCS1PrivateKey(key)
+
+	sum256 := sha256.Sum256(decodedKey) // AES encrypt require 128 or 256 bits for key
 
 	if p.Mode == EncryptAES128 {
 		return sum256[:16], nil

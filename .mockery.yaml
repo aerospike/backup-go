@@ -1,3 +1,33 @@
-inpackage: False
 with-expecter: True
+filename: "{{.InterfaceName}}_mock.go"
+all: True
 exported: True
+packages:
+  github.com/aerospike/backup-go/encoding/asb:
+    config:
+      dir: ./encoding/asb/mocks
+      outpkg: mocks
+  github.com/aerospike/backup-go/encoding:
+    config:
+      dir: ./encoding/mocks
+      outpkg: mocks
+  github.com/aerospike/backup-go/internal/asinfo:
+    config:
+      dir: ./internal/asinfo/mocks
+      outpkg: mocks
+  github.com/aerospike/backup-go/internal/processors:
+    config:
+      dir: ./internal/processors/mocks
+      outpkg: mocks
+  github.com/aerospike/backup-go/io/aerospike:
+    config:
+      dir: ./io/aerospike/mocks
+      outpkg: mocks
+  github.com/aerospike/backup-go/pipeline:
+    config:
+      dir: ./pipeline/mocks
+      outpkg: mocks
+  github.com/aerospike/backup-go:
+    config:
+      dir: mocks
+      outpkg: mocks

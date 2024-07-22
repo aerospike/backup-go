@@ -20,7 +20,7 @@ func TestReaders(t *testing.T) {
 }
 
 func (suite *readersTestSuite) TestReadWorker() {
-	mockReader := mocks.NewDataReader[string](suite.T())
+	mockReader := mocks.NewMockdataReader[string](suite.T())
 
 	readCalls := 0
 	mockReader.EXPECT().Read().RunAndReturn(func() (string, error) {
@@ -51,7 +51,7 @@ func (suite *readersTestSuite) TestReadWorker() {
 }
 
 func (suite *readersTestSuite) TestReadWorkerClose() {
-	mockReader := mocks.NewDataReader[string](suite.T())
+	mockReader := mocks.NewMockdataReader[string](suite.T())
 	mockReader.EXPECT().Read().Return("hi", nil)
 	mockReader.EXPECT().Close()
 

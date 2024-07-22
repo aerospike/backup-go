@@ -24,18 +24,9 @@ mockery-install:
 # Iterate over project directory and generate mocks in packages where they must be.
 # FYI: --recursively not working, because then mockery creates mock in root dirs, not putting them to /mocks folder.
 .PHONY: mocks-generate
-GO_SRC_DIRS := $(shell find . -type f -name '*.go' -exec dirname {} \; | sort -u)
 mocks-generate: mockery-install
-	@for dir in $(GO_SRC_DIRS); do \
-		echo "Checking directory $$dir"; \
-		goFiles=$$(find $$dir -maxdepth 1 -name '*.go'); \
-		if [ -n "$$goFiles" ]; then \
-			echo "Generating mocks in $$dir"; \
-			mockery --dir=$$dir --output=$$dir/mocks --outpkg=mocks --exported --with-expecter --all; \
-		else \
-			echo "No .go files in $$dir, skipping"; \
-		fi; \
-	done
+	@echo "Generating mocks with config..."
+	mockery --config=.mockery.yaml
 
 # Removing all mocks in the project.
 .PHONY: mocks-clean

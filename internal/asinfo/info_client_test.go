@@ -953,7 +953,7 @@ func Test_parseInfoResponse(t *testing.T) {
 
 func newMockInfoGetter(t *testing.T, arg string, resp map[string]string, err a.Error) infoGetter {
 	t.Helper()
-	mockInfoGetter := mocks.NewInfoGetter(t)
+	mockInfoGetter := mocks.NewMockinfoGetter(t)
 	mockInfoGetter.On("RequestInfo", (*a.InfoPolicy)(nil), arg).Return(resp, err)
 	return mockInfoGetter
 }
@@ -1014,7 +1014,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 }
 
 func Test_getSIndexes(t *testing.T) {
-	mockInfoGetterNoCtx := mocks.NewInfoGetter(t)
+	mockInfoGetterNoCtx := mocks.NewMockinfoGetter(t)
 	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(
 		map[string]string{"build": "5.6.0.0"},
 		nil,
@@ -1023,16 +1023,16 @@ func Test_getSIndexes(t *testing.T) {
 		"sindex-list:ns=test": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW",
 	}, nil)
 
-	mockInfoGetterCtx := mocks.NewInfoGetter(t)
+	mockInfoGetterCtx := mocks.NewMockinfoGetter(t)
 	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(map[string]string{"build": "7.1.0.0"}, nil)
 	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:ns=test;b64=true").Return(map[string]string{
 		"sindex-list:ns=test;b64=true": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=AAAAAA==:state=RW",
 	}, nil)
 
-	mockInfoGetterGetBuildFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterGetBuildFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterGetBuildFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(nil, a.ErrNetTimeout)
 
-	mockInfoGetterGetSIndexesFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterGetSIndexesFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(map[string]string{"build": "7.1.0.0"}, nil)
 	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:ns=test;b64=true").Return(nil, a.ErrNetwork)
 
@@ -1508,7 +1508,7 @@ func Test_getUDF(t *testing.T) {
 }
 
 func Test_getUDFs(t *testing.T) {
-	mockInfoGetter := mocks.NewInfoGetter(t)
+	mockInfoGetter := mocks.NewMockinfoGetter(t)
 	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
 		"udf-list": "filename=test1.lua;filename=test2.lua;",
 	}, nil)
@@ -1519,15 +1519,15 @@ func Test_getUDFs(t *testing.T) {
 		"udf-get:filename=test2.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 2\n end\n")),
 	}, nil)
 
-	mockInfoGetterNoUDFs := mocks.NewInfoGetter(t)
+	mockInfoGetterNoUDFs := mocks.NewMockinfoGetter(t)
 	mockInfoGetterNoUDFs.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
 		"udf-list": "",
 	}, nil)
 
-	mockInfoGetterListUDFsFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterListUDFsFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterListUDFsFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(nil, a.ErrNetTimeout)
 
-	mockInfoGetterGetUDFFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterGetUDFFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
 		"udf-list": "filename=test1.lua;",
 	}, nil)

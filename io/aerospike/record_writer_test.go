@@ -38,7 +38,7 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	}
 
 	policy := &a.WritePolicy{}
-	mockDBWriter := mocks.NewDbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	stats := &models.RestoreStats{}
@@ -56,7 +56,7 @@ func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
 	namespace := "test"
 	set := ""
 	key, _ := a.NewKey(namespace, set, "key")
-	mockDBWriter := mocks.NewDbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	policy := &a.WritePolicy{}
 	stats := &models.RestoreStats{}
 	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1)
@@ -98,7 +98,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 
 	policy := a.NewWritePolicy(1, 0)
 
-	mockDBWriter := mocks.NewDbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	stats := &models.RestoreStats{}

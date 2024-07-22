@@ -32,7 +32,7 @@ func (r *recordSets) Close() {
 		if err := rec.Close(); err != nil {
 			// ignore this error, it only happens if the scan is already closed
 			// and this method can not return an error anyway
-			r.logger.Error("error while closing record set", "error", rec.Close())
+			r.logger.Error("error while closing record set", "error", err)
 		}
 	}
 }

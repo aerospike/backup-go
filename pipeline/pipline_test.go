@@ -29,9 +29,9 @@ type pipelineTestSuite struct {
 }
 
 func (suite *pipelineTestSuite) TestNewDataPipeline() {
-	w1 := mocks.NewWorker[string](suite.T())
-	w2 := mocks.NewWorker[string](suite.T())
-	w3 := mocks.NewWorker[string](suite.T())
+	w1 := mocks.NewMockWorker[string](suite.T())
+	w2 := mocks.NewMockWorker[string](suite.T())
+	w3 := mocks.NewMockWorker[string](suite.T())
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}}
 
@@ -40,17 +40,17 @@ func (suite *pipelineTestSuite) TestNewDataPipeline() {
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineRun() {
-	w1 := mocks.NewWorker[string](suite.T())
+	w1 := mocks.NewMockWorker[string](suite.T())
 	w1.EXPECT().SetReceiveChan(mock.Anything)
 	w1.EXPECT().SetSendChan(mock.Anything)
 	w1.EXPECT().Run(mock.Anything).Return(nil)
 
-	w2 := mocks.NewWorker[string](suite.T())
+	w2 := mocks.NewMockWorker[string](suite.T())
 	w2.EXPECT().SetReceiveChan(mock.Anything)
 	w2.EXPECT().SetSendChan(mock.Anything)
 	w2.EXPECT().Run(mock.Anything).Return(nil)
 
-	w3 := mocks.NewWorker[string](suite.T())
+	w3 := mocks.NewMockWorker[string](suite.T())
 	w3.EXPECT().SetReceiveChan(mock.Anything)
 	w3.EXPECT().SetSendChan(mock.Anything)
 	w3.EXPECT().Run(mock.Anything).Return(nil)
@@ -68,13 +68,13 @@ func (suite *pipelineTestSuite) TestDataPipelineRun() {
 type mockWorker struct {
 	receive <-chan string
 	send    chan<- string
-	mocks.Worker[string]
+	mocks.MockWorker[string]
 }
 
 func newMockWorker(t *testing.T) *mockWorker {
 	t.Helper()
 	return &mockWorker{
-		Worker: *mocks.NewWorker[string](t),
+		MockWorker: *mocks.NewMockWorker[string](t),
 	}
 }
 
@@ -150,22 +150,22 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineRunWorkerFails() {
-	w1 := mocks.NewWorker[string](suite.T())
+	w1 := mocks.NewMockWorker[string](suite.T())
 	w1.EXPECT().SetReceiveChan(mock.Anything)
 	w1.EXPECT().SetSendChan(mock.Anything)
 	w1.EXPECT().Run(mock.Anything).Return(nil)
 
-	w2 := mocks.NewWorker[string](suite.T())
+	w2 := mocks.NewMockWorker[string](suite.T())
 	w2.EXPECT().SetReceiveChan(mock.Anything)
 	w2.EXPECT().SetSendChan(mock.Anything)
 	w2.EXPECT().Run(mock.Anything).Return(nil)
 
-	w3 := mocks.NewWorker[string](suite.T())
+	w3 := mocks.NewMockWorker[string](suite.T())
 	w3.EXPECT().SetReceiveChan(mock.Anything)
 	w3.EXPECT().SetSendChan(mock.Anything)
 	w3.EXPECT().Run(mock.Anything).Return(errors.New("error"))
 
-	w4 := mocks.NewWorker[string](suite.T())
+	w4 := mocks.NewMockWorker[string](suite.T())
 	w4.EXPECT().SetReceiveChan(mock.Anything)
 	w4.EXPECT().SetSendChan(mock.Anything)
 	w4.EXPECT().Run(mock.Anything).Return(nil)

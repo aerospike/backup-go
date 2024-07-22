@@ -150,16 +150,9 @@ func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadClose
 		return err
 	}
 
-	totalReaders := len(batch)
-	batchSize := rh.config.Parallel
-
-	for start := 0; start < totalReaders; start += batchSize {
-		end := min(start+batchSize, totalReaders)
-		if err = rh.processBatch(ctx, batch[start:end]); err != nil {
-			return fmt.Errorf("failed to process batch: %w", err)
-		}
+	if err = rh.processBatch(ctx, batch); err != nil {
+		return fmt.Errorf("failed to process batch: %w", err)
 	}
-
 	return nil
 }
 

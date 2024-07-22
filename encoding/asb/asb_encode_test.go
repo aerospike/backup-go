@@ -494,8 +494,8 @@ func Test_boolToASB(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		args args
 		want []byte
+		args args
 	}{
 		{
 			name: "positive true",

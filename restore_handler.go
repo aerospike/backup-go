@@ -290,7 +290,7 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 		writeWorkers[i] = pipeline.NewWriteWorker[*models.Token](statsWriter, rh.limiter)
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.RecordsTotal))
+	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.ReadRecords))
 	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
 	changeNamespace := newTokenWorker(processors.NewChangeNamespace(rh.config.Namespace))
 	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.logger))

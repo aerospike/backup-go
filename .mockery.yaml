@@ -2,7 +2,6 @@ with-expecter: True
 filename: "{{.InterfaceName}}_mock.go"
 all: True
 exported: True
-outpkg: "mocks"
 packages:
   github.com/aerospike/backup-go/encoding/asb:
     config:
@@ -15,7 +14,7 @@ packages:
   github.com/aerospike/backup-go/internal/asinfo:
     config:
       dir: ./internal/asinfo/mocks
-      outpkg: "mocks"
+      outpkg: mocks
   github.com/aerospike/backup-go/internal/processors:
     config:
       dir: ./internal/processors/mocks

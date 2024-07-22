@@ -153,6 +153,7 @@ func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadClose
 	if err = rh.processBatch(ctx, batch); err != nil {
 		return fmt.Errorf("failed to process batch: %w", err)
 	}
+
 	return nil
 }
 

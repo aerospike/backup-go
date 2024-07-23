@@ -56,6 +56,7 @@ type BackupHandler struct {
 	errors                 chan error
 	id                     string
 	stats                  models.BackupStats
+	infoClient             *asinfo.InfoClient
 }
 
 // newBackupHandler creates a new BackupHandler
@@ -74,6 +75,7 @@ func newBackupHandler(config *BackupConfig,
 		firstFileHeaderWritten: &atomic.Bool{},
 		encoder:                config.EncoderFactory.CreateEncoder(config.Namespace),
 		limiter:                limiter,
+		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
 	}
 }
 
@@ -96,17 +98,13 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	defer closeWriters(backupWriters, bh.logger)
 
-	infoClient, err := asinfo.NewInfoClientFromAerospike(bh.aerospikeClient, bh.config.InfoPolicy)
-	if err != nil {
-		return err
-	}
 	// backup secondary indexes and UDFs on the first writer
 	// this is done to match the behavior of the
 	// backup c tool and keep the backup files more consistent
 	// at some point we may want to treat the secondary indexes/UDFs
 	// like records and back them up as part of the same pipeline
 	// but doing so would cause them to be mixed in with records in the backup file(s)
-	err = bh.backupSIndexesAndUdfs(ctx, infoClient, backupWriters[0])
+	err = bh.backupSIndexesAndUdfs(ctx, backupWriters[0])
 	if err != nil {
 		return err
 	}
@@ -119,7 +117,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
 	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
 
-	bh.stats.TotalRecords, err = handler.countRecords(infoClient)
+	bh.stats.TotalRecords, err = handler.countRecords(bh.infoClient)
 	if err != nil {
 		return err
 	}
@@ -238,18 +236,17 @@ func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
 
 func (bh *BackupHandler) backupSIndexesAndUdfs(
 	ctx context.Context,
-	infoClient *asinfo.InfoClient,
 	writer io.WriteCloser,
 ) error {
 	if !bh.config.NoIndexes {
-		err := bh.backupSIndexes(ctx, infoClient, writer)
+		err := bh.backupSIndexes(ctx, writer)
 		if err != nil {
 			return fmt.Errorf("failed to backup secondary indexes: %w", err)
 		}
 	}
 
 	if !bh.config.NoUDFs {
-		err := bh.backupUDFs(ctx, infoClient, writer)
+		err := bh.backupUDFs(ctx, writer)
 		if err != nil {
 			return fmt.Errorf("failed to backup UDFs: %w", err)
 		}
@@ -279,10 +276,9 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 func (bh *BackupHandler) backupSIndexes(
 	ctx context.Context,
-	infoClient *asinfo.InfoClient,
 	writer io.Writer,
 ) error {
-	reader := aerospike.NewSIndexReader(infoClient, bh.config.Namespace, bh.logger)
+	reader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
 	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger))
@@ -299,10 +295,9 @@ func (bh *BackupHandler) backupSIndexes(
 
 func (bh *BackupHandler) backupUDFs(
 	ctx context.Context,
-	infoClient *asinfo.InfoClient,
 	writer io.Writer,
 ) error {
-	reader := aerospike.NewUDFReader(infoClient, bh.logger)
+	reader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
 	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
 	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger))

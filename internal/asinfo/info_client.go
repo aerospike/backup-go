@@ -76,50 +76,50 @@ type infoGetter interface {
 }
 
 type InfoClient struct {
-	node   infoGetter
-	policy *a.InfoPolicy
-	nodes  []infoGetter
+	policy  *a.InfoPolicy
+	cluster *a.Cluster
 }
 
-func NewInfoClientFromAerospike(aeroClient *a.Client, policy *a.InfoPolicy) (*InfoClient, error) {
-	node, err := aeroClient.Cluster().GetRandomNode()
+func NewInfoClientFromAerospike(aeroClient *a.Client, policy *a.InfoPolicy) *InfoClient {
+	return &InfoClient{
+		cluster: aeroClient.Cluster(),
+		policy:  policy,
+	}
+}
+
+func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
+	node, err := ic.cluster.GetRandomNode()
+	if err != nil {
+		return nil, err
+	}
+	return node.RequestInfo(ic.policy, names...)
+}
+
+func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
+	node, err := ic.cluster.GetRandomNode()
+	if err != nil {
+		return AerospikeVersion{}, err
+	}
+
+	return getAerospikeVersion(node, ic.policy)
+}
+
+func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
+	node, err := ic.cluster.GetRandomNode()
 	if err != nil {
 		return nil, err
 	}
 
-	return &InfoClient{
-		node:   node,
-		nodes:  nodeToInfoGetter(aeroClient.Cluster().GetNodes()),
-		policy: policy,
-	}, nil
-}
-
-func nodeToInfoGetter(nodes []*a.Node) []infoGetter {
-	infoClients := make([]infoGetter, 0, len(nodes))
-
-	for _, node := range nodes {
-		if node.IsActive() {
-			infoClients = append(infoClients, node)
-		}
-	}
-
-	return infoClients
-}
-
-func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
-	return ic.node.RequestInfo(ic.policy, names...)
-}
-
-func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
-	return getAerospikeVersion(ic.node, ic.policy)
-}
-
-func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
-	return getSIndexes(ic.node, namespace, ic.policy)
+	return getSIndexes(node, namespace, ic.policy)
 }
 
 func (ic *InfoClient) GetUDFs() ([]*models.UDF, error) {
-	return getUDFs(ic.node, ic.policy)
+	node, err := ic.cluster.GetRandomNode()
+	if err != nil {
+		return nil, err
+	}
+
+	return getUDFs(node, ic.policy)
 }
 
 func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
@@ -131,16 +131,25 @@ func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
 	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
 }
 
-// GetRecordsCount counts number of record in given namespace and sets.
-func (ic *InfoClient) GetRecordsCount(namespace string, sets []string) (uint64, error) {
-	effectiveReplicationFactor, err := getEffectiveReplicationFactor(ic.node, ic.policy, namespace)
+// GetRecordCount counts number of records in given namespace and sets.
+func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, error) {
+	node, aerr := ic.cluster.GetRandomNode()
+	if aerr != nil {
+		return 0, aerr
+	}
+
+	effectiveReplicationFactor, err := getEffectiveReplicationFactor(node, ic.policy, namespace)
 	if err != nil {
 		return 0, err
 	}
 
 	var recordsNumber uint64
 
-	for _, node := range ic.nodes {
+	for _, node := range ic.cluster.GetNodes() {
+		if !node.IsActive() {
+			continue
+		}
+
 		recordCountForNode, err := getRecordCountForNode(node, ic.policy, namespace, sets)
 		if err != nil {
 			return 0, err

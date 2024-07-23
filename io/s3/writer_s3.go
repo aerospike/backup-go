@@ -25,6 +25,7 @@ type s3WriteFactory struct {
 var _ backup.WriteFactory = (*s3WriteFactory)(nil)
 
 func NewS3WriterFactory(
+	ctx context.Context,
 	s3Config *StorageConfig,
 	removeFiles bool,
 ) (backup.WriteFactory, error) {
@@ -32,12 +33,12 @@ func NewS3WriterFactory(
 		return nil, fmt.Errorf("invalid chunk size %d, should not exceed %d", s3Config.ChunkSize, maxS3File)
 	}
 
-	client, err := newS3Client(s3Config)
+	client, err := newS3Client(ctx, s3Config)
 	if err != nil {
 		return nil, err
 	}
 
-	isEmpty, err := isEmptyDirectory(client, s3Config)
+	isEmpty, err := isEmptyDirectory(ctx, client, s3Config)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func NewS3WriterFactory(
 			return nil, fmt.Errorf("%w: %s is not empty", local.ErrBackupDirectoryInvalid, s3Config.Prefix)
 		}
 
-		err := deleteAllFilesUnderPrefix(client, s3Config)
+		err := deleteAllFilesUnderPrefix(ctx, client, s3Config)
 		if err != nil {
 			return nil, err
 		}
@@ -61,6 +62,8 @@ func NewS3WriterFactory(
 }
 
 type s3Writer struct {
+	// ctx is stored internally so that it can be used in io.WriteCloser methods
+	ctx            context.Context
 	uploadID       *string
 	client         *s3.Client
 	buffer         *bytes.Buffer
@@ -74,7 +77,7 @@ type s3Writer struct {
 
 var _ io.WriteCloser = (*s3Writer)(nil)
 
-func (f *s3WriteFactory) NewWriter(filename string) (io.WriteCloser, error) {
+func (f *s3WriteFactory) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	chunkSize := f.s3Config.ChunkSize
 	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
@@ -82,7 +85,7 @@ func (f *s3WriteFactory) NewWriter(filename string) (io.WriteCloser, error) {
 
 	fullPath := path.Join(f.s3Config.Prefix, filename)
 
-	upload, err := f.client.CreateMultipartUpload(context.TODO(), &s3.CreateMultipartUploadInput{
+	upload, err := f.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket: &f.s3Config.Bucket,
 		Key:    &fullPath,
 	})
@@ -91,6 +94,7 @@ func (f *s3WriteFactory) NewWriter(filename string) (io.WriteCloser, error) {
 	}
 
 	return &s3Writer{
+		ctx:        ctx,
 		uploadID:   upload.UploadId,
 		key:        fullPath,
 		client:     f.client,
@@ -121,7 +125,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 }
 
 func (w *s3Writer) uploadPart() error {
-	response, err := w.client.UploadPart(context.TODO(), &s3.UploadPartInput{
+	response, err := w.client.UploadPart(w.ctx, &s3.UploadPartInput{
 		Body:       bytes.NewReader(w.buffer.Bytes()),
 		Bucket:     &w.bucket,
 		Key:        &w.key,
@@ -157,7 +161,7 @@ func (w *s3Writer) Close() error {
 		}
 	}
 
-	_, err := w.client.CompleteMultipartUpload(context.TODO(),
+	_, err := w.client.CompleteMultipartUpload(w.ctx,
 		&s3.CompleteMultipartUploadInput{
 			Bucket:   &w.bucket,
 			UploadId: w.uploadID,
@@ -175,8 +179,8 @@ func (w *s3Writer) Close() error {
 	return nil
 }
 
-func isEmptyDirectory(client *s3.Client, s3config *StorageConfig) (bool, error) {
-	resp, err := client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
+func isEmptyDirectory(ctx context.Context, client *s3.Client, s3config *StorageConfig) (bool, error) {
+	resp, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:  &s3config.Bucket,
 		Prefix:  &s3config.Prefix,
 		MaxKeys: aws.Int32(1),
@@ -194,8 +198,8 @@ func isEmptyDirectory(client *s3.Client, s3config *StorageConfig) (bool, error) 
 	return len(resp.Contents) == 0, nil
 }
 
-func deleteAllFilesUnderPrefix(client *s3.Client, s3config *StorageConfig) error {
-	fileCh, errCh := streamFilesFromS3(client, s3config)
+func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, s3config *StorageConfig) error {
+	fileCh, errCh := streamFilesFromS3(ctx, client, s3config)
 
 	for {
 		select {
@@ -203,7 +207,7 @@ func deleteAllFilesUnderPrefix(client *s3.Client, s3config *StorageConfig) error
 			if !ok {
 				fileCh = nil // no more files
 			} else {
-				_, err := client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+				_, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{
 					Bucket: aws.String(s3config.Bucket),
 					Key:    aws.String(file),
 				})

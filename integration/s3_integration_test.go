@@ -170,9 +170,10 @@ func randomBytes(n int) []byte {
 }
 
 func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3.StorageConfig) []byte {
-	streamingReader, _ := s3.NewS3WriterFactory(config, true)
+	ctx := context.Background()
+	streamingReader, _ := s3.NewS3WriterFactory(ctx, config, true)
 
-	writer, err := streamingReader.NewWriter(filename)
+	writer, err := streamingReader.NewWriter(ctx, filename)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}
@@ -195,14 +196,15 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 	}
 
 	// cannot create new streamingReader because folder is not empty
-	_, err = s3.NewS3WriterFactory(config, false)
+	_, err = s3.NewS3WriterFactory(ctx, config, false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
 	return allBytesWritten
 }
 
 func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
-	streamingReader, _ := s3.NewS3StreamingReader(config, asb.NewASBDecoderFactory())
+	ctx := context.Background()
+	streamingReader, _ := s3.NewS3StreamingReader(ctx, config, asb.NewASBDecoderFactory())
 
 	readerChan := make(chan io.ReadCloser)
 	errorChan := make(chan error)

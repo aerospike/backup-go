@@ -23,12 +23,14 @@ var _ backup.StreamingReader = (*s3StreamingReader)(nil)
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-func NewS3StreamingReader(config *StorageConfig, decoder encoding.DecoderFactory) (backup.StreamingReader, error) {
+func NewS3StreamingReader(
+	ctx context.Context, config *StorageConfig, decoder encoding.DecoderFactory,
+) (backup.StreamingReader, error) {
 	if decoder == nil {
 		return nil, errors.New("decoder is nil")
 	}
 
-	client, err := newS3Client(config)
+	client, err := newS3Client(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +42,13 @@ func NewS3StreamingReader(config *StorageConfig, decoder encoding.DecoderFactory
 	}, nil
 }
 
-// StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// StreamFiles read files form s3 and send io.Readers to `readersCh` communication
+// chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *s3StreamingReader) StreamFiles(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+func (f *s3StreamingReader) StreamFiles(
+	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	fileCh, s3errCh := f.streamBackupFiles()
+	fileCh, s3errCh := f.streamBackupFiles(ctx)
 
 	for {
 		select {
@@ -54,7 +58,7 @@ func (f *s3StreamingReader) StreamFiles(ctx context.Context, readersCh chan<- io
 			if !ok {
 				fileCh = nil
 			} else {
-				reader, err := f.newS3Reader(file)
+				reader, err := f.newS3Reader(ctx, file)
 				if err != nil {
 					errorsCh <- err
 					return
@@ -80,8 +84,10 @@ func (f *s3StreamingReader) StreamFiles(ctx context.Context, readersCh chan<- io
 	close(readersCh)
 }
 
-func (f *s3StreamingReader) streamBackupFiles() (_ <-chan string, _ <-chan error) {
-	fileCh, errCh := streamFilesFromS3(f.client, f.s3Config)
+func (f *s3StreamingReader) streamBackupFiles(
+	ctx context.Context,
+) (_ <-chan string, _ <-chan error) {
+	fileCh, errCh := streamFilesFromS3(ctx, f.client, f.s3Config)
 	filterFileCh := make(chan string)
 
 	go func() {
@@ -98,7 +104,9 @@ func (f *s3StreamingReader) streamBackupFiles() (_ <-chan string, _ <-chan error
 	return filterFileCh, errCh
 }
 
-func streamFilesFromS3(client *s3.Client, s3Config *StorageConfig) (_ <-chan string, _ <-chan error) {
+func streamFilesFromS3(
+	ctx context.Context, client *s3.Client, s3Config *StorageConfig,
+) (_ <-chan string, _ <-chan error) {
 	fileCh := make(chan string)
 	errCh := make(chan error)
 
@@ -110,7 +118,7 @@ func streamFilesFromS3(client *s3.Client, s3Config *StorageConfig) (_ <-chan str
 
 		for {
 			prefix := strings.Trim(s3Config.Prefix, "/") + "/"
-			listResponse, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+			listResponse, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 				Bucket:            &s3Config.Bucket,
 				Prefix:            &prefix,
 				ContinuationToken: continuationToken,
@@ -143,8 +151,8 @@ type s3Reader struct {
 
 var _ io.ReadCloser = (*s3Reader)(nil)
 
-func (f *s3StreamingReader) newS3Reader(key string) (io.ReadCloser, error) {
-	getObjectOutput, err := f.client.GetObject(context.TODO(), &s3.GetObjectInput{
+func (f *s3StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadCloser, error) {
+	getObjectOutput, err := f.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &f.s3Config.Bucket,
 		Key:    &key,
 	})

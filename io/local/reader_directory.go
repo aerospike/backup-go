@@ -12,14 +12,14 @@ import (
 	"github.com/aerospike/backup-go/encoding"
 )
 
-var _ backup.StreamingReader = (*DirectoryStreamingReader)(nil)
-
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 type DirectoryStreamingReader struct {
 	decoder encoding.DecoderFactory
 	dir     string
 }
+
+var _ backup.StreamingReader = (*DirectoryStreamingReader)(nil)
 
 func NewDirectoryStreamingReader(dir string, decoder encoding.DecoderFactory,
 ) (*DirectoryStreamingReader, error) {

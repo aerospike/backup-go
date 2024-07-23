@@ -75,7 +75,6 @@ type Client struct {
 // ac is the aerospike client to use for backup and restore operations.
 // id is an identifier for the client.
 // logger is the logger that this client will log to.
-// config is the configuration for the backup client.
 func NewClient(ac *a.Client, id string, logger *slog.Logger) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
@@ -130,11 +129,13 @@ type PartitionRange struct {
 	Count int
 }
 
+// NewPartitionRange returns a partition range with boundaries specified by the
+// provided values.
 func NewPartitionRange(begin, count int) PartitionRange {
 	return PartitionRange{begin, count}
 }
 
-// PartitionRangeAll return partition range containing all partitions.
+// PartitionRangeAll returns a partition range containing all partitions.
 func PartitionRangeAll() PartitionRange {
 	return NewPartitionRange(0, MaxPartitions)
 }
@@ -249,11 +250,10 @@ func NewBackupConfig() *BackupConfig {
 	}
 }
 
-// Backup starts a backup operation
-// that writes data to a provided writer.
-// config.Parallel determines the number of files to write concurrently.
+// Backup starts a backup operation that writes data to a provided writer.
 // ctx can be used to cancel the backup operation.
 // config is the configuration for the backup operation.
+// writer creates new writers for the backup operation.
 func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteFactory) (
 	*BackupHandler, error) {
 	if config == nil {
@@ -373,11 +373,9 @@ func NewRestoreConfig() *RestoreConfig {
 
 // Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
-// config.Parallel determines the number of files to read concurrently.
 // ctx can be used to cancel the restore operation.
-// directory is the directory to read the backup data from.
 // config is the configuration for the restore operation.
-// reader provides readers with access to backup data.
+// streamingReader provides readers with access to backup data.
 func (c *Client) Restore(ctx context.Context, config *RestoreConfig, streamingReader StreamingReader,
 ) (*RestoreHandler, error) {
 	if config == nil {

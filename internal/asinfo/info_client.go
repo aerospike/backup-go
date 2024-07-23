@@ -92,6 +92,7 @@ func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return node.RequestInfo(ic.policy, names...)
 }
 

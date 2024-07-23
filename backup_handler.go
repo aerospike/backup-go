@@ -54,9 +54,9 @@ type BackupHandler struct {
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *rate.Limiter
 	errors                 chan error
+	infoClient             *asinfo.InfoClient
 	id                     string
 	stats                  models.BackupStats
-	infoClient             *asinfo.InfoClient
 }
 
 // newBackupHandler creates a new BackupHandler

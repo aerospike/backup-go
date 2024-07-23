@@ -1613,13 +1613,13 @@ func TestGetRecordCount(t *testing.T) {
 	mockInfoGetterReqFail.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(nil, a.ErrNetTimeout)
 
 	tests := []struct {
+		err  error
 		name string
 		args struct {
 			node infoGetter
 			sets []string
 		}
 		want uint64
-		err  error
 	}{
 		{
 			name: "positive with specified sets",

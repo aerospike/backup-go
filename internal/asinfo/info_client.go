@@ -400,7 +400,7 @@ func getRecordCount(node infoGetter, policy *a.InfoPolicy, namespace string, set
 		return 0, fmt.Errorf("failed to parse record info request: %w", err)
 	}
 
-	recordsNumber := uint64(0)
+	var recordsNumber uint64
 
 	for _, setInfo := range infoResponse {
 		setName, ok := setInfo["set"]
@@ -408,12 +408,12 @@ func getRecordCount(node infoGetter, policy *a.InfoPolicy, namespace string, set
 			return 0, fmt.Errorf("set name missing in response %s", response[cmd])
 		}
 
-		objectCount, ok := setInfo["objects"]
-		if !ok {
-			return 0, fmt.Errorf("objects number missing in response %s", response[cmd])
-		}
-
 		if len(sets) == 0 || contains(sets, setName) {
+			objectCount, ok := setInfo["objects"]
+			if !ok {
+				return 0, fmt.Errorf("objects number missing in response %s", response[cmd])
+			}
+
 			objects, err := strconv.ParseUint(objectCount, 10, 64)
 			if err != nil {
 				return 0, err

@@ -237,7 +237,10 @@ func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
 }
 
 func (bh *BackupHandler) backupSIndexesAndUdfs(
-	ctx context.Context, infoClient *asinfo.InfoClient, writer io.WriteCloser) error {
+	ctx context.Context,
+	infoClient *asinfo.InfoClient,
+	writer io.WriteCloser,
+) error {
 	if !bh.config.NoIndexes {
 		err := bh.backupSIndexes(ctx, infoClient, writer)
 		if err != nil {
@@ -275,7 +278,10 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 }
 
 func (bh *BackupHandler) backupSIndexes(
-	ctx context.Context, infoClient *asinfo.InfoClient, writer io.Writer) error {
+	ctx context.Context,
+	infoClient *asinfo.InfoClient,
+	writer io.Writer,
+) error {
 	reader := aerospike.NewSIndexReader(infoClient, bh.config.Namespace, bh.logger)
 	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 

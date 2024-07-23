@@ -78,7 +78,7 @@ func (bh *backupRecordsHandler) run(
 }
 
 func (bh *backupRecordsHandler) countRecords(infoClient *asinfo.InfoClient) (uint64, error) {
-	if bh.config.ModAfter == nil { // that's full backup
+	if bh.config.isFullBackup() {
 		return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
 	}
 

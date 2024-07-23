@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
@@ -76,7 +77,11 @@ func (bh *backupRecordsHandler) run(
 	return job.Run(ctx)
 }
 
-func (bh *backupRecordsHandler) countRecords() (uint64, error) {
+func (bh *backupRecordsHandler) countRecords(infoClient *asinfo.InfoClient) (uint64, error) {
+	if bh.config.ModAfter == nil { // that's full backup
+		return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
+	}
+
 	scanPolicy := *bh.config.ScanPolicy
 
 	scanPolicy.IncludeBinData = false

@@ -1618,7 +1618,7 @@ func TestGetRecordCount(t *testing.T) {
 			node infoGetter
 			sets []string
 		}
-		want int
+		want uint64
 		err  error
 	}{
 		{

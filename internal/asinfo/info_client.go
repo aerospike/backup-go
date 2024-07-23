@@ -122,7 +122,7 @@ func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
 	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
 }
 
-func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (int, error) {
+func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, error) {
 	return getRecordCount(ic.node, ic.policy, namespace, sets)
 }
 
@@ -387,7 +387,7 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 	return udf, nil
 }
 
-func getRecordCount(node infoGetter, policy *a.InfoPolicy, namespace string, sets []string) (int, error) {
+func getRecordCount(node infoGetter, policy *a.InfoPolicy, namespace string, sets []string) (uint64, error) {
 	cmd := fmt.Sprintf("sets/%s", namespace)
 
 	response, aerr := node.RequestInfo(policy, cmd)
@@ -400,7 +400,7 @@ func getRecordCount(node infoGetter, policy *a.InfoPolicy, namespace string, set
 		return 0, fmt.Errorf("failed to parse record info request: %w", err)
 	}
 
-	recordsNumber := 0
+	recordsNumber := uint64(0)
 
 	for _, setInfo := range infoResponse {
 		setName, ok := setInfo["set"]
@@ -414,7 +414,7 @@ func getRecordCount(node infoGetter, policy *a.InfoPolicy, namespace string, set
 		}
 
 		if len(sets) == 0 || contains(sets, setName) {
-			objects, err := strconv.Atoi(objectCount)
+			objects, err := strconv.ParseUint(objectCount, 10, 64)
 			if err != nil {
 				return 0, err
 			}

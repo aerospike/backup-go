@@ -62,6 +62,7 @@ func NewS3WriterFactory(
 }
 
 type s3Writer struct {
+	// ctx is stored internally so that it can be used in io.WriteCloser methods
 	ctx            context.Context
 	uploadID       *string
 	client         *s3.Client

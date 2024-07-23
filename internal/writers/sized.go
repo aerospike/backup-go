@@ -24,12 +24,14 @@ import (
 // when the size limit is reached, the io.WriteCloser is closed and a new one is created
 // using the open function.
 type Sized struct {
-	ctx    context.Context
+	ctx    context.Context // stored internally to be used by the Write method
 	writer io.WriteCloser
 	open   func(context.Context) (io.WriteCloser, error)
 	size   int64
 	limit  int64
 }
+
+var _ io.WriteCloser = (*Sized)(nil)
 
 // NewSized creates a new Sized writer with a size limit.
 // limit must be greater than 0.

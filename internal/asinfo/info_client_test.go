@@ -1657,7 +1657,7 @@ func TestGetRecordCount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getRecordCount(tt.args.node, nil, "myNamespace", tt.args.sets)
+			got, err := getRecordCountForNode(tt.args.node, nil, "myNamespace", tt.args.sets)
 			if err != nil && !errors.Is(err, tt.err) {
 				t.Errorf("GetRecordCount() error = %v, wantErr %v", err, tt.err)
 				return

@@ -16,6 +16,7 @@ package asinfo
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -77,15 +78,7 @@ type infoGetter interface {
 type InfoClient struct {
 	node   infoGetter
 	policy *a.InfoPolicy
-}
-
-func NewInfoClient(cg infoGetter, policy *a.InfoPolicy) *InfoClient {
-	ic := &InfoClient{
-		node:   cg,
-		policy: policy,
-	}
-
-	return ic
+	nodes  []infoGetter
 }
 
 func NewInfoClientFromAerospike(aeroClient *a.Client, policy *a.InfoPolicy) (*InfoClient, error) {
@@ -94,7 +87,21 @@ func NewInfoClientFromAerospike(aeroClient *a.Client, policy *a.InfoPolicy) (*In
 		return nil, err
 	}
 
-	return NewInfoClient(node, policy), nil
+	return &InfoClient{
+		node:   node,
+		nodes:  nodeToInfoGetter(aeroClient.Cluster().GetNodes()),
+		policy: policy,
+	}, nil
+}
+
+func nodeToInfoGetter(nodes []*a.Node) []infoGetter {
+	infoClients := make([]infoGetter, len(nodes))
+
+	for i, node := range nodes {
+		infoClients[i] = node
+	}
+
+	return infoClients
 }
 
 func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
@@ -122,8 +129,25 @@ func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
 	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
 }
 
+// GetRecordCount counts number of record in given namespace and sets.
 func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, error) {
-	return getRecordCount(ic.node, ic.policy, namespace, sets)
+	effectiveReplicationFactor, err := getEffectiveReplicationFactor(ic.node, ic.policy, namespace)
+	if err != nil {
+		return 0, err
+	}
+
+	var recordsNumber uint64
+
+	for _, node := range ic.nodes {
+		recordCountForNode, err := getRecordCountForNode(node, ic.policy, namespace, sets)
+		if err != nil {
+			return 0, err
+		}
+
+		recordsNumber += recordCountForNode
+	}
+
+	return recordsNumber / uint64(effectiveReplicationFactor), nil
 }
 
 // ***** Utility functions *****
@@ -387,7 +411,7 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 	return udf, nil
 }
 
-func getRecordCount(node infoGetter, policy *a.InfoPolicy, namespace string, sets []string) (uint64, error) {
+func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace string, sets []string) (uint64, error) {
 	cmd := fmt.Sprintf("sets/%s", namespace)
 
 	response, aerr := node.RequestInfo(policy, cmd)
@@ -434,6 +458,29 @@ func contains(s []string, str string) bool {
 	}
 
 	return false
+}
+
+func getEffectiveReplicationFactor(node infoGetter, policy *a.InfoPolicy, namespace string) (int, error) {
+	cmd := fmt.Sprintf("namespace/%s", namespace)
+
+	response, aerr := node.RequestInfo(policy, cmd)
+	if aerr != nil {
+		return 0, fmt.Errorf("failed to get namespace info: %w", aerr)
+	}
+
+	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse record info request: %w", err)
+	}
+
+	for _, r := range infoResponse {
+		factor, ok := r["effective_replication_factor"]
+		if ok {
+			return strconv.Atoi(factor)
+		}
+	}
+
+	return 0, errors.New("replication factor not found")
 }
 
 func parseUDF(udfMap infoMap) (*models.UDF, error) {

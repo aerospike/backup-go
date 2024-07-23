@@ -16,6 +16,7 @@ package asinfo
 
 import (
 	"encoding/base64"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -1592,6 +1593,77 @@ func Test_getUDFs(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getUDFs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetRecordCount(t *testing.T) {
+	mockInfoGetter := mocks.NewMockinfoGetter(t)
+	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(map[string]string{
+		"sets/myNamespace": "set=mySet:objects=2",
+	}, nil)
+
+	mockInfoGetterNoSets := mocks.NewMockinfoGetter(t)
+	mockInfoGetterNoSets.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(map[string]string{
+		"sets/myNamespace": "",
+	}, nil)
+
+	mockInfoGetterReqFail := mocks.NewMockinfoGetter(t)
+	mockInfoGetterReqFail.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(nil, a.ErrNetTimeout)
+
+	tests := []struct {
+		name string
+		args struct {
+			node infoGetter
+			sets []string
+		}
+		want int
+		err  error
+	}{
+		{
+			name: "positive with specified sets",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetter, sets: []string{"mySet"}},
+			want: 2,
+		},
+		{
+			name: "positive with no sets specified",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetter, sets: nil},
+			want: 2,
+		},
+		{
+			name: "positive with no sets found",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetterNoSets, sets: nil},
+			want: 0,
+		},
+		{
+			name: "negative request failed",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetterReqFail, sets: nil},
+			err: a.ErrNetTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getRecordCount(tt.args.node, nil, "myNamespace", tt.args.sets)
+			if err != nil && !errors.Is(err, tt.err) {
+				t.Errorf("GetRecordCount() error = %v, wantErr %v", err, tt.err)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetRecordCount() = %v, want %v", got, tt.want)
 			}
 		})
 	}

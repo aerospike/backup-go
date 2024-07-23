@@ -95,10 +95,12 @@ func NewInfoClientFromAerospike(aeroClient *a.Client, policy *a.InfoPolicy) (*In
 }
 
 func nodeToInfoGetter(nodes []*a.Node) []infoGetter {
-	infoClients := make([]infoGetter, len(nodes))
+	infoClients := make([]infoGetter, 0, len(nodes))
 
-	for i, node := range nodes {
-		infoClients[i] = node
+	for _, node := range nodes {
+		if node.IsActive() {
+			infoClients = append(infoClients, node)
+		}
 	}
 
 	return infoClients
@@ -129,8 +131,8 @@ func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
 	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
 }
 
-// GetRecordCount counts number of record in given namespace and sets.
-func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, error) {
+// GetRecordsCount counts number of record in given namespace and sets.
+func (ic *InfoClient) GetRecordsCount(namespace string, sets []string) (uint64, error) {
 	effectiveReplicationFactor, err := getEffectiveReplicationFactor(ic.node, ic.policy, namespace)
 	if err != nil {
 		return 0, err

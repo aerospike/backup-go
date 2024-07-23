@@ -250,6 +250,11 @@ func NewBackupConfig() *BackupConfig {
 	}
 }
 
+func (c *BackupConfig) isFullBackup() bool {
+	// full backup doesn't have lower bound
+	return c.ModAfter == nil
+}
+
 // Backup starts a backup operation that writes data to a provided writer.
 // ctx can be used to cancel the backup operation.
 // config is the configuration for the backup operation.

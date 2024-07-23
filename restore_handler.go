@@ -316,10 +316,7 @@ func (rh *RestoreHandler) useBatchWrites() (bool, error) {
 		return false, nil
 	}
 
-	infoClient, err := asinfo.NewInfoClientFromAerospike(rh.aerospikeClient, rh.config.InfoPolicy)
-	if err != nil {
-		return false, err
-	}
+	infoClient := asinfo.NewInfoClientFromAerospike(rh.aerospikeClient, rh.config.InfoPolicy)
 
 	return infoClient.SupportsBatchWrite()
 }

@@ -42,10 +42,7 @@ type RecordMap map[digest]*a.Record
 func NewTestClient(asc *a.Client) *TestClient {
 	infoPolicy := a.NewInfoPolicy()
 
-	infoClient, err := asinfo.NewInfoClientFromAerospike(asc, infoPolicy)
-	if err != nil {
-		panic(err)
-	}
+	infoClient := asinfo.NewInfoClientFromAerospike(asc, infoPolicy)
 
 	return &TestClient{
 		asc: asc,

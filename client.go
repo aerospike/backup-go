@@ -75,7 +75,6 @@ type Client struct {
 // ac is the aerospike client to use for backup and restore operations.
 // id is an identifier for the client.
 // logger is the logger that this client will log to.
-// config is the configuration for the backup client.
 func NewClient(ac *a.Client, id string, logger *slog.Logger) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
@@ -130,11 +129,13 @@ type PartitionRange struct {
 	Count int
 }
 
+// NewPartitionRange returns a partition range with boundaries specified by the
+// provided values.
 func NewPartitionRange(begin, count int) PartitionRange {
 	return PartitionRange{begin, count}
 }
 
-// PartitionRangeAll return partition range containing all partitions.
+// PartitionRangeAll returns a partition range containing all partitions.
 func PartitionRangeAll() PartitionRange {
 	return NewPartitionRange(0, MaxPartitions)
 }
@@ -149,7 +150,8 @@ func (p PartitionRange) validate() error {
 	}
 
 	if p.Begin+p.Count > MaxPartitions {
-		return fmt.Errorf("begin + count is greater than the max partitions count of %d", MaxPartitions)
+		return fmt.Errorf("begin + count is greater than the max partitions count of %d",
+			MaxPartitions)
 	}
 
 	return nil
@@ -176,7 +178,8 @@ type BackupConfig struct {
 	CompressionPolicy *models.CompressionPolicy
 	// Namespace is the Aerospike namespace to back up.
 	Namespace string
-	// SetList is the Aerospike set to back up (optional, given an empty list, all sets will be backed up).
+	// SetList is the Aerospike set to back up (optional, given an empty list,
+	// all sets will be backed up).
 	SetList []string
 	// The list of backup bin names (optional, given an empty list, all bins will be backed up)
 	BinList []string
@@ -190,11 +193,14 @@ type BackupConfig struct {
 	NoIndexes bool
 	// Don't back up any UDFs.
 	NoUDFs bool
+	// RecordsPerSecond limits backup records per second (rps) rate.
+	// Will not apply rps limit if RecordsPerSecond is zero (default).
+	RecordsPerSecond int
 	// Limits backup bandwidth (bytes per second).
 	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
-	// File size limit (in bytes) for the backup. If a backup file crosses this size threshold, a new file will be created.
-	// 0 for no file size limit.
+	// File size limit (in bytes) for the backup. If a backup file crosses this size threshold,
+	// a new file will be created. 0 for no file size limit.
 	FileLimit int64
 }
 
@@ -204,19 +210,23 @@ func (c *BackupConfig) validate() error {
 	}
 
 	if c.ModBefore != nil && c.ModAfter != nil && !c.ModBefore.After(*c.ModAfter) {
-		return errors.New("modified before should be strictly greater than modified after")
+		return errors.New("modified before must be strictly greater than modified after")
 	}
 
 	if err := c.Partitions.validate(); err != nil {
 		return err
 	}
 
+	if c.RecordsPerSecond < 0 {
+		return fmt.Errorf("rps value must not be negative, got %d", c.RecordsPerSecond)
+	}
+
 	if c.Bandwidth < 0 {
-		return fmt.Errorf("bandwidth value should not be negative, got %d", c.Bandwidth)
+		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
 	}
 
 	if c.FileLimit < 0 {
-		return fmt.Errorf("filelimit value should not be negative, got %d", c.FileLimit)
+		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
 	}
 
 	if err := c.CompressionPolicy.Validate(); err != nil {
@@ -240,11 +250,15 @@ func NewBackupConfig() *BackupConfig {
 	}
 }
 
-// Backup starts a backup operation
-// that writes data to a provided writer.
-// config.Parallel determines the number of files to write concurrently.
+func (c *BackupConfig) isFullBackup() bool {
+	// full backup doesn't have lower bound
+	return c.ModAfter == nil
+}
+
+// Backup starts a backup operation that writes data to a provided writer.
 // ctx can be used to cancel the backup operation.
 // config is the configuration for the backup operation.
+// writer creates new writers for the backup operation.
 func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteFactory) (
 	*BackupHandler, error) {
 	if config == nil {
@@ -326,19 +340,19 @@ func (c *RestoreConfig) validate() error {
 	}
 
 	if c.Bandwidth < 0 {
-		return fmt.Errorf("bandwidth value should not be negative, got %d", c.Bandwidth)
+		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
 	}
 
 	if c.RecordsPerSecond < 0 {
-		return fmt.Errorf("records per second value should not be negative, got %d", c.RecordsPerSecond)
+		return fmt.Errorf("rps value must not be negative, got %d", c.RecordsPerSecond)
 	}
 
 	if c.BatchSize <= 0 {
-		return fmt.Errorf("batch size should be positive, got %d", c.BatchSize)
+		return fmt.Errorf("batch size must be positive, got %d", c.BatchSize)
 	}
 
 	if c.MaxAsyncBatches <= 0 {
-		return fmt.Errorf("max async batches should be positive, got %d", c.MaxAsyncBatches)
+		return fmt.Errorf("max async batches must be positive, got %d", c.MaxAsyncBatches)
 	}
 
 	if err := c.CompressionPolicy.Validate(); err != nil {
@@ -362,14 +376,11 @@ func NewRestoreConfig() *RestoreConfig {
 	}
 }
 
-// Restore starts a restore operation
-// that reads data from given readers.
+// Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
-// config.Parallel determines the number of files to read concurrently.
 // ctx can be used to cancel the restore operation.
-// directory is the directory to read the backup data from.
 // config is the configuration for the restore operation.
-// reader provides readers with access to backup data.
+// streamingReader provides readers with access to backup data.
 func (c *Client) Restore(ctx context.Context, config *RestoreConfig, streamingReader StreamingReader,
 ) (*RestoreHandler, error) {
 	if config == nil {

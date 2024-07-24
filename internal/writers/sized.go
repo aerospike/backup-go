@@ -15,6 +15,7 @@
 package writers
 
 import (
+	"context"
 	"fmt"
 	"io"
 )
@@ -23,20 +24,25 @@ import (
 // when the size limit is reached, the io.WriteCloser is closed and a new one is created
 // using the open function.
 type Sized struct {
+	ctx    context.Context // stored internally to be used by the Write method
 	writer io.WriteCloser
-	open   func() (io.WriteCloser, error)
+	open   func(context.Context) (io.WriteCloser, error)
 	size   int64
 	limit  int64
 }
 
+var _ io.WriteCloser = (*Sized)(nil)
+
 // NewSized creates a new Sized writer with a size limit.
 // limit must be greater than 0.
-func NewSized(limit int64, open func() (io.WriteCloser, error)) (*Sized, error) {
+func NewSized(ctx context.Context, limit int64,
+	open func(context.Context) (io.WriteCloser, error)) (*Sized, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be greater than 0, got %d", limit)
 	}
 
 	return &Sized{
+		ctx:   ctx,
 		limit: limit,
 		open:  open,
 	}, nil
@@ -54,7 +60,7 @@ func (f *Sized) Write(p []byte) (n int, err error) {
 	}
 
 	if f.writer == nil {
-		f.writer, err = f.open()
+		f.writer, err = f.open(f.ctx)
 		if err != nil {
 			return 0, err
 		}

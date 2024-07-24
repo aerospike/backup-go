@@ -16,6 +16,7 @@ package asinfo
 
 import (
 	"encoding/base64"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -953,7 +954,7 @@ func Test_parseInfoResponse(t *testing.T) {
 
 func newMockInfoGetter(t *testing.T, arg string, resp map[string]string, err a.Error) infoGetter {
 	t.Helper()
-	mockInfoGetter := mocks.NewInfoGetter(t)
+	mockInfoGetter := mocks.NewMockinfoGetter(t)
 	mockInfoGetter.On("RequestInfo", (*a.InfoPolicy)(nil), arg).Return(resp, err)
 	return mockInfoGetter
 }
@@ -1014,7 +1015,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 }
 
 func Test_getSIndexes(t *testing.T) {
-	mockInfoGetterNoCtx := mocks.NewInfoGetter(t)
+	mockInfoGetterNoCtx := mocks.NewMockinfoGetter(t)
 	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(
 		map[string]string{"build": "5.6.0.0"},
 		nil,
@@ -1023,16 +1024,16 @@ func Test_getSIndexes(t *testing.T) {
 		"sindex-list:ns=test": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW",
 	}, nil)
 
-	mockInfoGetterCtx := mocks.NewInfoGetter(t)
+	mockInfoGetterCtx := mocks.NewMockinfoGetter(t)
 	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(map[string]string{"build": "7.1.0.0"}, nil)
 	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:ns=test;b64=true").Return(map[string]string{
 		"sindex-list:ns=test;b64=true": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=AAAAAA==:state=RW",
 	}, nil)
 
-	mockInfoGetterGetBuildFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterGetBuildFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterGetBuildFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(nil, a.ErrNetTimeout)
 
-	mockInfoGetterGetSIndexesFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterGetSIndexesFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(map[string]string{"build": "7.1.0.0"}, nil)
 	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sindex-list:ns=test;b64=true").Return(nil, a.ErrNetwork)
 
@@ -1508,7 +1509,7 @@ func Test_getUDF(t *testing.T) {
 }
 
 func Test_getUDFs(t *testing.T) {
-	mockInfoGetter := mocks.NewInfoGetter(t)
+	mockInfoGetter := mocks.NewMockinfoGetter(t)
 	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
 		"udf-list": "filename=test1.lua;filename=test2.lua;",
 	}, nil)
@@ -1519,15 +1520,15 @@ func Test_getUDFs(t *testing.T) {
 		"udf-get:filename=test2.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 2\n end\n")),
 	}, nil)
 
-	mockInfoGetterNoUDFs := mocks.NewInfoGetter(t)
+	mockInfoGetterNoUDFs := mocks.NewMockinfoGetter(t)
 	mockInfoGetterNoUDFs.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
 		"udf-list": "",
 	}, nil)
 
-	mockInfoGetterListUDFsFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterListUDFsFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterListUDFsFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(nil, a.ErrNetTimeout)
 
-	mockInfoGetterGetUDFFailed := mocks.NewInfoGetter(t)
+	mockInfoGetterGetUDFFailed := mocks.NewMockinfoGetter(t)
 	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
 		"udf-list": "filename=test1.lua;",
 	}, nil)
@@ -1592,6 +1593,77 @@ func Test_getUDFs(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getUDFs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetRecordCount(t *testing.T) {
+	mockInfoGetter := mocks.NewMockinfoGetter(t)
+	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(map[string]string{
+		"sets/myNamespace": "set=mySet:objects=2",
+	}, nil)
+
+	mockInfoGetterNoSets := mocks.NewMockinfoGetter(t)
+	mockInfoGetterNoSets.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(map[string]string{
+		"sets/myNamespace": "",
+	}, nil)
+
+	mockInfoGetterReqFail := mocks.NewMockinfoGetter(t)
+	mockInfoGetterReqFail.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(nil, a.ErrNetTimeout)
+
+	tests := []struct {
+		err  error
+		name string
+		args struct {
+			node infoGetter
+			sets []string
+		}
+		want uint64
+	}{
+		{
+			name: "positive with specified sets",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetter, sets: []string{"mySet"}},
+			want: 2,
+		},
+		{
+			name: "positive with no sets specified",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetter, sets: nil},
+			want: 2,
+		},
+		{
+			name: "positive with no sets found",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetterNoSets, sets: nil},
+			want: 0,
+		},
+		{
+			name: "negative request failed",
+			args: struct {
+				node infoGetter
+				sets []string
+			}{node: mockInfoGetterReqFail, sets: nil},
+			err: a.ErrNetTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getRecordCountForNode(tt.args.node, nil, "myNamespace", tt.args.sets)
+			if err != nil && !errors.Is(err, tt.err) {
+				t.Errorf("GetRecordCount() error = %v, wantErr %v", err, tt.err)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetRecordCount() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -34,7 +34,7 @@ func TestProcessors(t *testing.T) {
 }
 
 func (suite *processorTestSuite) TestProcessorWorker() {
-	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor := mocks.NewMockDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker[string](mockProcessor)
@@ -58,7 +58,7 @@ func (suite *processorTestSuite) TestProcessorWorker() {
 }
 
 func (suite *processorTestSuite) TestProcessorWorkerFilteredOut() {
-	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor := mocks.NewMockDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", errFilteredOut)
 
 	worker := NewProcessorWorker[string](mockProcessor)
@@ -81,7 +81,7 @@ func (suite *processorTestSuite) TestProcessorWorkerFilteredOut() {
 }
 
 func (suite *processorTestSuite) TestProcessorWorkerCancelOnReceive() {
-	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor := mocks.NewMockDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker[string](mockProcessor)
@@ -119,7 +119,7 @@ func (suite *processorTestSuite) TestProcessorWorkerCancelOnReceive() {
 }
 
 func (suite *processorTestSuite) TestProcessorWorkerCancelOnSend() {
-	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor := mocks.NewMockDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker[string](mockProcessor)
@@ -154,7 +154,7 @@ func (suite *processorTestSuite) TestProcessorWorkerCancelOnSend() {
 }
 
 func (suite *processorTestSuite) TestProcessorWorkerReceiveClosed() {
-	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor := mocks.NewMockDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("test", nil)
 
 	worker := NewProcessorWorker[string](mockProcessor)
@@ -175,7 +175,7 @@ func (suite *processorTestSuite) TestProcessorWorkerReceiveClosed() {
 }
 
 func (suite *processorTestSuite) TestProcessorWorkerProcessFailed() {
-	mockProcessor := mocks.NewDataProcessor[string](suite.T())
+	mockProcessor := mocks.NewMockDataProcessor[string](suite.T())
 	mockProcessor.EXPECT().Process("test").Return("", errors.New("test"))
 
 	worker := NewProcessorWorker[string](mockProcessor)

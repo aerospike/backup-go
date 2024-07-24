@@ -18,7 +18,7 @@ func TestWriters(t *testing.T) {
 }
 
 func (suite *writersTestSuite) TestWriteWorker() {
-	mockWriter := mocks.NewDataWriter[string](suite.T())
+	mockWriter := mocks.NewMockDataWriter[string](suite.T())
 	mockWriter.EXPECT().Write("test").Return(1, nil)
 	mockWriter.EXPECT().Close().Return(nil)
 
@@ -37,7 +37,7 @@ func (suite *writersTestSuite) TestWriteWorker() {
 }
 
 func (suite *writersTestSuite) TestWriteWorkerClose() {
-	mockWriter := mocks.NewDataWriter[string](suite.T())
+	mockWriter := mocks.NewMockDataWriter[string](suite.T())
 	mockWriter.EXPECT().Close().Return(nil)
 
 	worker := NewWriteWorker[string](mockWriter, nil)
@@ -51,7 +51,7 @@ func (suite *writersTestSuite) TestWriteWorkerClose() {
 }
 
 func (suite *writersTestSuite) TestWriteWorkerWriteFailed() {
-	mockWriter := mocks.NewDataWriter[string](suite.T())
+	mockWriter := mocks.NewMockDataWriter[string](suite.T())
 	mockWriter.EXPECT().Write("test").Return(0, errors.New("error"))
 	mockWriter.EXPECT().Close().Return(nil)
 

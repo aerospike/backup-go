@@ -130,8 +130,8 @@ func (rh *RestoreHandler) processReaders(
 			break
 		}
 
-		if err := rh.restoreBatch(ctx, batch); err != nil {
-			errorsCh <- err
+		if err := rh.processBatch(ctx, batch); err != nil {
+			errorsCh <- fmt.Errorf("failed to process batch: %w", err)
 			return
 		}
 	}
@@ -139,25 +139,26 @@ func (rh *RestoreHandler) processReaders(
 	close(doneCh)
 }
 
-func (rh *RestoreHandler) restoreBatch(ctx context.Context, batch []io.ReadCloser) error {
-	batch, err := setEncryptionDecoder(rh.config.EncryptionPolicy, batch)
+func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
+	defer rh.closeReaders(rs)
+
+	rs, err := setEncryptionDecoder(rh.config.EncryptionPolicy, rs)
 	if err != nil {
 		return err
 	}
 
-	batch, err = setCompressionDecoder(rh.config.CompressionPolicy, batch)
+	rs, err = setCompressionDecoder(rh.config.CompressionPolicy, rs)
 	if err != nil {
 		return err
 	}
 
-	totalReaders := len(batch)
-	batchSize := rh.config.Parallel
+	readWorkers, err := rh.readersToReadWorkers(rs)
+	if err != nil {
+		return fmt.Errorf("failed to convert readers to read workers: %w", err)
+	}
 
-	for start := 0; start < totalReaders; start += batchSize {
-		end := min(start+batchSize, totalReaders)
-		if err = rh.processBatch(ctx, batch[start:end]); err != nil {
-			return fmt.Errorf("failed to process batch: %w", err)
-		}
+	if err = rh.runRestoreBatch(ctx, readWorkers); err != nil {
+		return fmt.Errorf("failed to run restore batch: %w", err)
 	}
 
 	return nil
@@ -204,21 +205,6 @@ func setEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadClos
 	}
 
 	return decryptedReaders, nil
-}
-
-func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
-	defer rh.closeReaders(rs)
-
-	readWorkers, err := rh.readersToReadWorkers(rs)
-	if err != nil {
-		return fmt.Errorf("failed to convert readers to read workers: %w", err)
-	}
-
-	if err := rh.runRestoreBatch(ctx, readWorkers); err != nil {
-		return fmt.Errorf("failed to run restore batch: %w", err)
-	}
-
-	return nil
 }
 
 func (rh *RestoreHandler) closeReaders(rs []io.ReadCloser) {
@@ -290,7 +276,7 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 		writeWorkers[i] = pipeline.NewWriteWorker[*models.Token](statsWriter, rh.limiter)
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.RecordsTotal))
+	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.ReadRecords))
 	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
 	changeNamespace := newTokenWorker(processors.NewChangeNamespace(rh.config.Namespace))
 	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.logger))
@@ -330,10 +316,7 @@ func (rh *RestoreHandler) useBatchWrites() (bool, error) {
 		return false, nil
 	}
 
-	infoClient, err := asinfo.NewInfoClientFromAerospike(rh.aerospikeClient, rh.config.InfoPolicy)
-	if err != nil {
-		return false, err
-	}
+	infoClient := asinfo.NewInfoClientFromAerospike(rh.aerospikeClient, rh.config.InfoPolicy)
 
 	return infoClient.SupportsBatchWrite()
 }

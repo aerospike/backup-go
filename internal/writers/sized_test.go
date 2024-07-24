@@ -16,6 +16,7 @@ package writers
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -40,7 +41,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
-	open := func() (io.WriteCloser, error) {
+	open := func(_ context.Context) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer: &bytes.Buffer{},
@@ -55,7 +56,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 		return writer2, nil
 	}
 
-	wcs, err := NewSized(10, open)
+	wcs, err := NewSized(context.Background(), 10, open)
 	suite.NotNil(wcs)
 	suite.Nil(err)
 

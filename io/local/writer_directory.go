@@ -2,6 +2,7 @@ package local
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -109,7 +110,7 @@ func (bf *bufferedFile) Close() error {
 
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the fileName parameter.
-func (f *DirectoryWriterFactory) NewWriter(fileName string) (io.WriteCloser, error) {
+func (f *DirectoryWriterFactory) NewWriter(_ context.Context, fileName string) (io.WriteCloser, error) {
 	filePath := filepath.Join(f.directory, fileName)
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 

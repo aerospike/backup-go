@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package backup
+package aerospike
 
 import (
 	"fmt"
@@ -23,45 +23,13 @@ import (
 	"unsafe"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	encmocks "github.com/aerospike/backup-go/encoding/mocks"
-	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/suite"
 )
 
 type readersTestSuite struct {
 	suite.Suite
-}
-
-func (suite *readersTestSuite) TestGenericReader() {
-	key, aerr := a.NewKey("test", "", "key")
-	if aerr != nil {
-		panic(aerr)
-	}
-
-	mockRec := models.Record{
-		Record: &a.Record{
-			Bins: a.BinMap{
-				"key": "hi",
-			},
-			Key: key,
-		},
-	}
-	expectedRecToken := models.NewRecordToken(mockRec, 0)
-
-	mockDecoder := encmocks.NewDecoder(suite.T())
-	mockDecoder.EXPECT().NextToken().Return(expectedRecToken, nil)
-
-	reader := newTokenReader(mockDecoder, slog.Default())
-	suite.NotNil(reader)
-
-	v, err := reader.Read()
-	suite.Nil(err)
-	suite.Equal(expectedRecToken, v)
-
-	reader.Close()
-
-	mockDecoder.AssertExpectations(suite.T())
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReader() {
@@ -90,7 +58,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -101,14 +69,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		nil,
 	)
 
-	reader := newAerospikeRecordReader(
+	reader := NewRecordReader(
 		mockScanner,
-		&arrConfig{
-			Namespace:      namespace,
-			SetList:        []string{set},
-			PartitionRange: PartitionRangeAll(),
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -118,18 +86,6 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	expectedRecToken := models.NewRecordToken(mockRec, 0)
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
-}
-
-func (suite *readersTestSuite) TestAerospikeRecordReaderNotStarted() {
-	reader := &aerospikeRecordReader{
-		status: arrStatus{
-			started: false,
-		},
-		logger: slog.Default(),
-	}
-
-	reader.Close()
-	suite.False(reader.status.started)
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
@@ -156,7 +112,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -167,14 +123,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 		nil,
 	)
 
-	reader := newAerospikeRecordReader(
+	reader := NewRecordReader(
 		mockScanner,
-		&arrConfig{
-			Namespace:      namespace,
-			SetList:        []string{set},
-			PartitionRange: PartitionRangeAll(),
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -195,7 +151,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	close(mockResults)
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -206,14 +162,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 		nil,
 	)
 
-	reader := newAerospikeRecordReader(
+	reader := NewRecordReader(
 		mockScanner,
-		&arrConfig{
-			Namespace:      namespace,
-			SetList:        []string{set},
-			PartitionRange: PartitionRangeAll(),
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -228,7 +184,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 	namespace := "test"
 	set := ""
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		&a.ScanPolicy{},
 		a.NewPartitionFilterByRange(0, 4096),
@@ -239,14 +195,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 		a.ErrInvalidParam,
 	)
 
-	reader := newAerospikeRecordReader(
+	reader := NewRecordReader(
 		mockScanner,
-		&arrConfig{
-			Namespace:      namespace,
-			SetList:        []string{set},
-			PartitionRange: PartitionRangeAll(),
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
 		},
-		&a.ScanPolicy{},
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -286,7 +242,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	policy := a.NewScanPolicy()
 	policy.MaxRecords = 10
 
-	mockScanner := mocks.NewScanner(suite.T())
+	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
 		policy,
 		a.NewPartitionFilterByRange(0, 4096),
@@ -297,14 +253,14 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 		nil,
 	)
 
-	reader := newAerospikeRecordReader(
+	reader := NewRecordReader(
 		mockScanner,
-		&arrConfig{
-			Namespace:      namespace,
-			SetList:        []string{set},
-			PartitionRange: PartitionRangeAll(),
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      policy,
 		},
-		policy,
 		slog.Default(),
 	)
 	suite.NotNil(reader)
@@ -318,7 +274,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 
 func (suite *readersTestSuite) TestSIndexReader() {
 	namespace := "test"
-	mockSIndexGetter := mocks.NewSindexGetter(suite.T())
+	mockSIndexGetter := mocks.NewMocksindexGetter(suite.T())
 	mockSIndexes := []*models.SIndex{
 		{
 			Namespace: namespace,
@@ -331,7 +287,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 		nil,
 	)
 
-	reader := newSIndexReader(mockSIndexGetter, namespace, slog.Default())
+	reader := NewSIndexReader(mockSIndexGetter, namespace, slog.Default())
 	suite.NotNil(reader)
 
 	expectedSIndexTokens := make([]*models.Token, 0, len(mockSIndexes))
@@ -357,13 +313,13 @@ func (suite *readersTestSuite) TestSIndexReader() {
 
 	// negative GetSindexes fails
 
-	mockSIndexGetter = mocks.NewSindexGetter(suite.T())
+	mockSIndexGetter = mocks.NewMocksindexGetter(suite.T())
 	mockSIndexGetter.EXPECT().GetSIndexes(namespace).Return(
 		nil,
 		fmt.Errorf("error"),
 	)
 
-	reader = newSIndexReader(mockSIndexGetter, namespace, slog.Default())
+	reader = NewSIndexReader(mockSIndexGetter, namespace, slog.Default())
 	suite.NotNil(reader)
 
 	v, err = reader.Read()
@@ -374,7 +330,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 }
 
 func (suite *readersTestSuite) TestUDFReader() {
-	mockUDFGetter := mocks.NewUdfGetter(suite.T())
+	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
 	mockUDFs := []*models.UDF{
 		{
 			Name: "udf1",
@@ -388,7 +344,7 @@ func (suite *readersTestSuite) TestUDFReader() {
 		nil,
 	)
 
-	reader := newUDFReader(mockUDFGetter, slog.Default())
+	reader := NewUDFReader(mockUDFGetter, slog.Default())
 	suite.NotNil(reader)
 
 	expectedUDFTokens := make([]*models.Token, 0, len(mockUDFs))
@@ -412,13 +368,13 @@ func (suite *readersTestSuite) TestUDFReader() {
 }
 
 func (suite *readersTestSuite) TestUDFReaderReadFailed() {
-	mockUDFGetter := mocks.NewUdfGetter(suite.T())
+	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
 	mockUDFGetter.EXPECT().GetUDFs().Return(
 		nil,
 		fmt.Errorf("error"),
 	)
 
-	reader := newUDFReader(mockUDFGetter, slog.Default())
+	reader := NewUDFReader(mockUDFGetter, slog.Default())
 	suite.NotNil(reader)
 
 	v, err := reader.Read()

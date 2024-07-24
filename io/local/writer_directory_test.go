@@ -15,6 +15,7 @@
 package local
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,7 +33,7 @@ func (suite *writerTestSuite) Test_openBackupFile() {
 	factory, err := NewDirectoryWriterFactory(tmpDir, true)
 	suite.NoError(err)
 
-	w, err := factory.NewWriter("test")
+	w, err := factory.NewWriter(context.Background(), "test")
 	suite.NoError(err)
 	suite.NotNil(w)
 

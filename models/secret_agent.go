@@ -33,6 +33,10 @@ type SecretAgent struct {
 }
 
 func (s *SecretAgent) Validate() error {
+	if s == nil {
+		return nil
+	}
+
 	// As secret agent is not mandatory, we will validate params only if secret agent is enabled.
 	// If ConnectionType is set, we consider that secret agent is enabled.
 	if s.ConnectionType != nil {

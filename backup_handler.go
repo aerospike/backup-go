@@ -205,13 +205,13 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 	return zippedWriter, nil
 }
 
-func setEncryption(policy *models.EncryptionPolicy, agent *models.SecretAgent, writer io.WriteCloser,
+func setEncryption(policy *models.EncryptionPolicy, secretAgent *models.SecretAgent, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
 	if policy == nil || policy.Mode == models.EncryptNone {
 		return writer, nil
 	}
 
-	privateKey, err := policy.ReadPrivateKey(agent)
+	privateKey, err := policy.ReadPrivateKey(secretAgent)
 	if err != nil {
 		return nil, err
 	}

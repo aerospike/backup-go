@@ -13,9 +13,9 @@ import (
 
 const secretPrefix = "secret:"
 
-// SecretAgent contains secret agent connection information.
-// @Description SecretAgent contains secret agent connection information.
-type SecretAgent struct {
+// SecretAgentConfig contains secret agent connection information.
+// @Description SecretAgentConfig contains secret agent connection information.
+type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
 	// Use constants form `secret-agent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
 	ConnectionType *string `yaml:"sa-connection-type,omitempty" json:"sa-connection-type,omitempty"`
@@ -32,7 +32,7 @@ type SecretAgent struct {
 	IsBase64 *bool `yaml:"sa-is-base64,omitempty" json:"sa-is-base64,omitempty"`
 }
 
-func (s *SecretAgent) Validate() error {
+func (s *SecretAgentConfig) Validate() error {
 	if s == nil {
 		return nil
 	}
@@ -48,7 +48,7 @@ func (s *SecretAgent) Validate() error {
 	return nil
 }
 
-func (s *SecretAgent) GetSecret(key string) (string, error) {
+func (s *SecretAgentConfig) GetSecret(key string) (string, error) {
 	// Getting resource and key.
 	resource, secretKey, err := getResourceKey(key)
 	if err != nil {
@@ -107,7 +107,7 @@ func getResourceKey(key string) (resource, secretKey string, err error) {
 	return keyArr[1], keyArr[2], nil
 }
 
-// getTlSConfig returns *tls.Config if caFile is set, or nil if
+// getTlSConfig returns *tls.Config if caFile is set, or nil if caFile is not set.
 func getTlSConfig(caFile *string) (*tls.Config, error) {
 	if caFile == nil {
 		return nil, nil

@@ -187,7 +187,8 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 	return zstdReaders, nil
 }
 
-func setEncryptionDecoder(policy *models.EncryptionPolicy, secretAgent *models.SecretAgent, readers []io.ReadCloser,
+func setEncryptionDecoder(
+	policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, readers []io.ReadCloser,
 ) ([]io.ReadCloser, error) {
 	if policy == nil {
 		return readers, nil

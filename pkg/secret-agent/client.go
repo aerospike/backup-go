@@ -50,7 +50,8 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 	}, nil
 }
 
-// GetSecret performs request to aerospike secret agent.
+// GetSecret performs request to aerospike secret agent. If key found in external service, then value
+// wil be returned. Otherwise, empty value and an error will be returned.
 func (c *Client) GetSecret(resource, secretKey string) (string, error) {
 	conn, err := connection.Get(c.connectionType, c.address, c.timeout, c.tlsConfig)
 	if err != nil {

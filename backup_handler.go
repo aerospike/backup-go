@@ -183,7 +183,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 
 	encryptedWriter, err := setEncryption(
 		bh.config.EncryptionPolicy,
-		bh.config.SecretAgent,
+		bh.config.SecretAgentConfig,
 		countingWriter,
 	)
 	if err != nil {
@@ -205,7 +205,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 	return zippedWriter, nil
 }
 
-func setEncryption(policy *models.EncryptionPolicy, secretAgent *models.SecretAgent, writer io.WriteCloser,
+func setEncryption(policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
 	if policy == nil || policy.Mode == models.EncryptNone {
 		return writer, nil

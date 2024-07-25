@@ -11,6 +11,8 @@ import (
 	"github.com/aerospike/backup-go/pkg/secret-agent/models"
 )
 
+// magic this const is taken from secret agent service. It is hardcoded in secret agent service.
+// By this magic number secret agent service verify TCP request.
 const magic = 0x51dec1cc
 
 //go:generate mockery

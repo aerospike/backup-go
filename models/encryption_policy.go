@@ -56,7 +56,7 @@ func (p *EncryptionPolicy) Validate() error {
 	return nil
 }
 
-func (p *EncryptionPolicy) ReadPrivateKey(agent *SecretAgent) ([]byte, error) {
+func (p *EncryptionPolicy) ReadPrivateKey(agent *SecretAgentConfig) ([]byte, error) {
 	var (
 		pemData []byte
 		err     error
@@ -115,8 +115,6 @@ func (p *EncryptionPolicy) readPemFromFile() ([]byte, error) {
 
 // readPemFromEnv reads from env variable encrypted in base64 key body without header and footer,
 // decrypt it and adding header and footer.
-// TODO: check out need we decrypt key from env or not, as rsa key is already encrypted in base64.
-// TODO: AS doc says: Grabs the encryption key from the given environment variable, which must be base-64 encoded.
 func (p *EncryptionPolicy) readPemFromEnv() ([]byte, error) {
 	key := os.Getenv(*p.KeyEnv)
 	if key == "" {
@@ -129,7 +127,7 @@ func (p *EncryptionPolicy) readPemFromEnv() ([]byte, error) {
 	return []byte(pemKey), nil
 }
 
-func (p *EncryptionPolicy) readPemFromSecret(agent *SecretAgent) ([]byte, error) {
+func (p *EncryptionPolicy) readPemFromSecret(agent *SecretAgentConfig) ([]byte, error) {
 	if agent == nil {
 		return nil, fmt.Errorf("secret agent not initialized")
 	}

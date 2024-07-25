@@ -20,3 +20,9 @@ func (b *BackupStats) IncFiles() {
 func (b *BackupStats) GetFileCount() uint64 {
 	return b.fileCount.Load()
 }
+
+func (b *BackupStats) IsEmpty() bool {
+	return b.GetUDFs() == 0 &&
+		b.GetSIndexes() == 0 &&
+		b.GetReadRecords() == 0
+}

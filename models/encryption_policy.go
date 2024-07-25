@@ -15,6 +15,8 @@ const (
 	EncryptNone   = "NONE"
 	EncryptAES128 = "AES128"
 	EncryptAES256 = "AES256"
+
+	pemTemplate = "-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----"
 )
 
 // EncryptionPolicy contains backup encryption information.
@@ -44,14 +46,38 @@ func (p *EncryptionPolicy) Validate() error {
 		return errors.New("encryption key location not specified")
 	}
 
+	// Only one parameter allowed to be set.
+	if (p.KeyFile != nil && p.KeyEnv != nil) ||
+		(p.KeyFile != nil && p.KeySecret != nil) ||
+		(p.KeyEnv != nil && p.KeySecret != nil) {
+		return fmt.Errorf("only one encryption key source may be specified")
+	}
+
 	return nil
 }
 
-// TODO: support reading the key from KeyEnv and KeySecret
-func (p *EncryptionPolicy) ReadPrivateKey() ([]byte, error) {
-	pemData, err := os.ReadFile(*p.KeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read PEM file: %w", err)
+func (p *EncryptionPolicy) ReadPrivateKey(agent *SecretAgentConfig) ([]byte, error) {
+	var (
+		pemData []byte
+		err     error
+	)
+
+	switch {
+	case p.KeyFile != nil:
+		pemData, err = p.readPemFromFile()
+		if err != nil {
+			return nil, fmt.Errorf("unable to read PEM from file: %w", err)
+		}
+	case p.KeyEnv != nil:
+		pemData, err = p.readPemFromEnv()
+		if err != nil {
+			return nil, fmt.Errorf("unable to read PEM from ENV: %w", err)
+		}
+	case p.KeySecret != nil:
+		pemData, err = p.readPemFromSecret(agent)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read PEM from secret agent: %w", err)
+		}
 	}
 
 	// Decode the PEM file
@@ -76,4 +102,42 @@ func (p *EncryptionPolicy) ReadPrivateKey() ([]byte, error) {
 	}
 
 	return sum256[:], nil
+}
+
+func (p *EncryptionPolicy) readPemFromFile() ([]byte, error) {
+	pemData, err := os.ReadFile(*p.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read PEM file: %w", err)
+	}
+
+	return pemData, nil
+}
+
+// readPemFromEnv reads from env variable encrypted in base64 key body without header and footer,
+// decrypt it and adding header and footer.
+func (p *EncryptionPolicy) readPemFromEnv() ([]byte, error) {
+	key := os.Getenv(*p.KeyEnv)
+	if key == "" {
+		return nil, fmt.Errorf("environment variable %s not set", *p.KeyEnv)
+	}
+
+	// we just add header and footer to make it parsable.
+	pemKey := fmt.Sprintf(pemTemplate, key)
+
+	return []byte(pemKey), nil
+}
+
+func (p *EncryptionPolicy) readPemFromSecret(agent *SecretAgentConfig) ([]byte, error) {
+	if agent == nil {
+		return nil, fmt.Errorf("secret agent not initialized")
+	}
+
+	key, err := agent.GetSecret(*p.KeySecret)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read secret agent key: %w", err)
+	}
+
+	pemKey := fmt.Sprintf(pemTemplate, key)
+
+	return []byte(pemKey), nil
 }

@@ -181,7 +181,11 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 
 	countingWriter := writers.NewCountingWriter(storageWriter, &bh.stats.BytesWritten)
 
-	encryptedWriter, err := setEncryption(bh.config.EncryptionPolicy, countingWriter)
+	encryptedWriter, err := setEncryption(
+		bh.config.EncryptionPolicy,
+		bh.config.SecretAgentConfig,
+		countingWriter,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot set encryption: %w", err)
 	}
@@ -201,12 +205,13 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 	return zippedWriter, nil
 }
 
-func setEncryption(policy *models.EncryptionPolicy, writer io.WriteCloser) (io.WriteCloser, error) {
+func setEncryption(policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, writer io.WriteCloser,
+) (io.WriteCloser, error) {
 	if policy == nil || policy.Mode == models.EncryptNone {
 		return writer, nil
 	}
 
-	privateKey, err := policy.ReadPrivateKey()
+	privateKey, err := policy.ReadPrivateKey(secretAgent)
 	if err != nil {
 		return nil, err
 	}

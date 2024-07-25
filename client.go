@@ -176,6 +176,8 @@ type BackupConfig struct {
 	EncryptionPolicy *models.EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
+	// Secret agent config.
+	SecretAgentConfig *models.SecretAgentConfig
 	// Namespace is the Aerospike namespace to back up.
 	Namespace string
 	// SetList is the Aerospike set to back up (optional, given an empty list,
@@ -235,6 +237,10 @@ func (c *BackupConfig) validate() error {
 
 	if err := c.EncryptionPolicy.Validate(); err != nil {
 		return fmt.Errorf("encryption policy invalid: %w", err)
+	}
+
+	if err := c.SecretAgentConfig.Validate(); err != nil {
+		return fmt.Errorf("secret agent invalid: %w", err)
 	}
 
 	return nil
@@ -302,6 +308,8 @@ type RestoreConfig struct {
 	EncryptionPolicy *models.EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
+	// Secret agent config.
+	SecretAgent *models.SecretAgentConfig
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
@@ -361,6 +369,10 @@ func (c *RestoreConfig) validate() error {
 
 	if err := c.EncryptionPolicy.Validate(); err != nil {
 		return fmt.Errorf("encryption policy invalid: %w", err)
+	}
+
+	if err := c.SecretAgent.Validate(); err != nil {
+		return fmt.Errorf("secret agent invalid: %w", err)
 	}
 
 	return nil

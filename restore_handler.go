@@ -142,7 +142,11 @@ func (rh *RestoreHandler) processReaders(
 func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
 	defer rh.closeReaders(rs)
 
-	rs, err := setEncryptionDecoder(rh.config.EncryptionPolicy, rs)
+	rs, err := setEncryptionDecoder(
+		rh.config.EncryptionPolicy,
+		rh.config.SecretAgent,
+		rs,
+	)
 	if err != nil {
 		return err
 	}
@@ -183,12 +187,14 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 	return zstdReaders, nil
 }
 
-func setEncryptionDecoder(policy *models.EncryptionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+func setEncryptionDecoder(
+	policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, readers []io.ReadCloser,
+) ([]io.ReadCloser, error) {
 	if policy == nil {
 		return readers, nil
 	}
 
-	privateKey, err := policy.ReadPrivateKey()
+	privateKey, err := policy.ReadPrivateKey(secretAgent)
 	if err != nil {
 		return nil, err
 	}

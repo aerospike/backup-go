@@ -56,5 +56,6 @@ func (s *commonStats) GetDuration() time.Duration {
 	if s.duration == 0 {
 		return time.Since(s.StartTime)
 	}
+
 	return s.duration
 }

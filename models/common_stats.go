@@ -7,7 +7,7 @@ import (
 
 type commonStats struct {
 	StartTime time.Time
-	Duration  time.Duration
+	duration  time.Duration
 	// number of records read from source, before any filtering.
 	ReadRecords atomic.Uint64
 	// The number of successfully created secondary indexes.
@@ -47,7 +47,11 @@ func (s *commonStats) Start() {
 }
 
 func (s *commonStats) Stop() {
-	if s.Duration == 0 {
-		s.Duration = time.Since(s.StartTime)
+	if s.duration == 0 {
+		s.duration = time.Since(s.StartTime)
 	}
+}
+
+func (s *commonStats) GetDuration() time.Duration {
+	return s.duration
 }

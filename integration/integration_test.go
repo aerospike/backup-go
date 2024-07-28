@@ -852,9 +852,9 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	totalDuration := time.Since(now)
 
 	expectedDuration := time.Duration(1000.0*numRec/rps) * time.Millisecond
-	suite.Require().InDelta(expectedDuration, backupStats.Duration, epsilon)
-	suite.Require().InDelta(expectedDuration, restoreStats.Duration, epsilon)
-	suite.Require().InDelta(totalDuration, restoreStats.Duration+backupStats.Duration, epsilon)
+	suite.Require().InDelta(expectedDuration, backupStats.GetDuration(), epsilon)
+	suite.Require().InDelta(expectedDuration, restoreStats.GetDuration(), epsilon)
+	suite.Require().InDelta(totalDuration, restoreStats.GetDuration()+backupStats.GetDuration(), epsilon)
 
 	suite.TearDownTest()
 }

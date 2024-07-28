@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -25,6 +26,10 @@ var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 func NewS3StreamingReader(
 	ctx context.Context, config *StorageConfig, validate func(string) error,
 ) (backup.StreamingReader, error) {
+	if validate == nil {
+		return nil, fmt.Errorf("validation function is required")
+	}
+
 	client, err := newS3Client(ctx, config)
 	if err != nil {
 		return nil, err

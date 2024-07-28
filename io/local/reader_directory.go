@@ -24,6 +24,10 @@ func NewDirectoryStreamingReader(
 	dir string,
 	validate func(string) error,
 ) (*DirectoryStreamingReader, error) {
+	if validate == nil {
+		return nil, fmt.Errorf("validation function is required")
+	}
+
 	return &DirectoryStreamingReader{
 		dir:      dir,
 		validate: validate,

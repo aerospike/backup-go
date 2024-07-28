@@ -20,7 +20,6 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -86,13 +85,13 @@ func (tw *tokenStatsWriter) Close() error {
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
 type tokenWriter struct {
-	encoder encoding.Encoder
+	encoder encoder
 	output  io.Writer
 	logger  *slog.Logger
 }
 
 // newTokenWriter creates a new tokenWriter
-func newTokenWriter(encoder encoding.Encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
+func newTokenWriter(encoder encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
 	logger.Debug("created new token writer")

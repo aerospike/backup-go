@@ -9,27 +9,24 @@ import (
 	"path/filepath"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/encoding"
 )
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 type DirectoryStreamingReader struct {
-	decoder encoding.DecoderFactory
-	dir     string
+	dir      string
+	validate func(string) error
 }
 
 var _ backup.StreamingReader = (*DirectoryStreamingReader)(nil)
 
-func NewDirectoryStreamingReader(dir string, decoder encoding.DecoderFactory,
+func NewDirectoryStreamingReader(
+	dir string,
+	validate func(string) error,
 ) (*DirectoryStreamingReader, error) {
-	if decoder == nil {
-		return nil, errors.New("decoder is nil")
-	}
-
 	return &DirectoryStreamingReader{
-		dir:     dir,
-		decoder: decoder,
+		dir:      dir,
+		validate: validate,
 	}, nil
 }
 
@@ -61,7 +58,7 @@ func (f *DirectoryStreamingReader) StreamFiles(
 		}
 
 		filePath := filepath.Join(f.dir, file.Name())
-		if err = f.decoder.Validate(filePath); err != nil {
+		if err = f.validate(filePath); err != nil {
 			// As we pass invalid files, we don't need process this error and write test for it.
 			// Maybe we need to log this info, for user. So he will understand what happens.
 			continue

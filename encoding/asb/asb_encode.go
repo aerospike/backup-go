@@ -25,35 +25,32 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/models"
 )
 
-// asbEncoder contains logic for encoding backup into .asb format.
+// Encoder contains logic for encoding backup into .asb format.
 // this is stateful object, should create new one for each backup operation.
-type asbEncoder struct {
+type Encoder struct {
 	namespace        string
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
 }
 
-var _ encoding.Encoder = (*asbEncoder)(nil)
-
-func NewEncoder(namespace string) encoding.Encoder {
-	return &asbEncoder{
+func NewEncoder(namespace string) *Encoder {
+	return &Encoder{
 		namespace: namespace,
 	}
 }
 
 // GenerateFilename generates a filename for a given namespace
-func (e *asbEncoder) GenerateFilename() string {
+func (e *Encoder) GenerateFilename() string {
 	return fmt.Sprintf("%s_%d.asb", e.namespace, e.id.Add(1))
 }
 
 // EncodeToken encodes a token to the ASB format.
 // It returns a byte slice of the encoded token
 // and an error if the encoding fails.
-func (e *asbEncoder) EncodeToken(token *models.Token) ([]byte, error) {
+func (e *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 	var (
 		n   int
 		err error
@@ -81,19 +78,19 @@ func (e *asbEncoder) EncodeToken(token *models.Token) ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
-func (e *asbEncoder) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
+func (e *Encoder) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
 	return recordToASB(rec, buff)
 }
 
-func (e *asbEncoder) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
+func (e *Encoder) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
 	return udfToASB(udf, buff)
 }
 
-func (e *asbEncoder) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (int, error) {
+func (e *Encoder) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (int, error) {
 	return sindexToASB(sindex, buff)
 }
 
-func (e *asbEncoder) GetHeader() []byte {
+func (e *Encoder) GetHeader() []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 256))
 

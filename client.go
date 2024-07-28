@@ -19,13 +19,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/encoding"
-	"github.com/aerospike/backup-go/encoding/asb"
 	"github.com/aerospike/backup-go/internal/logging"
-	"github.com/aerospike/backup-go/models"
 )
 
 const (
@@ -35,11 +31,6 @@ const (
 	MaxParallel = 1024
 	// MaxPartitions is the maximum number of partitions in an Aerospike cluster.
 	MaxPartitions = 4096
-)
-
-var (
-	defaultEncoderFactory = asb.NewASBEncoderFactory()
-	defaultDecoderFactory = asb.NewASBDecoderFactory()
 )
 
 // Client is the main entry point for the backup package.
@@ -157,55 +148,6 @@ func (p PartitionRange) validate() error {
 	return nil
 }
 
-// BackupConfig contains configuration for the backup operation.
-type BackupConfig struct {
-	// EncoderFactory is used to specify the encoder with which to encode the backup data
-	// if nil, the default EncoderFactory will be used.
-	EncoderFactory encoding.EncoderFactory
-	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used.
-	InfoPolicy *a.InfoPolicy
-	// ScanPolicy applies to Aerospike scan operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used.
-	ScanPolicy *a.ScanPolicy
-	// Only include records that last changed before the given time (optional).
-	ModBefore *time.Time
-	// Only include records that last changed after the given time (optional).
-	ModAfter *time.Time
-	// Encryption details.
-	EncryptionPolicy *models.EncryptionPolicy
-	// Compression details.
-	CompressionPolicy *models.CompressionPolicy
-	// Secret agent config.
-	SecretAgentConfig *models.SecretAgentConfig
-	// Namespace is the Aerospike namespace to back up.
-	Namespace string
-	// SetList is the Aerospike set to back up (optional, given an empty list,
-	// all sets will be backed up).
-	SetList []string
-	// The list of backup bin names (optional, given an empty list, all bins will be backed up)
-	BinList []string
-	// Partitions specifies the Aerospike partitions to back up.
-	Partitions PartitionRange
-	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
-	Parallel int
-	// Don't back up any records.
-	NoRecords bool
-	// Don't back up any secondary indexes.
-	NoIndexes bool
-	// Don't back up any UDFs.
-	NoUDFs bool
-	// RecordsPerSecond limits backup records per second (rps) rate.
-	// Will not apply rps limit if RecordsPerSecond is zero (default).
-	RecordsPerSecond int
-	// Limits backup bandwidth (bytes per second).
-	// Will not apply rps limit if Bandwidth is zero (default).
-	Bandwidth int
-	// File size limit (in bytes) for the backup. If a backup file crosses this size threshold,
-	// a new file will be created. 0 for no file size limit.
-	FileLimit int64
-}
-
 func (c *BackupConfig) validate() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
@@ -246,16 +188,6 @@ func (c *BackupConfig) validate() error {
 	return nil
 }
 
-// NewBackupConfig returns a new BackupConfig with default values.
-func NewBackupConfig() *BackupConfig {
-	return &BackupConfig{
-		Partitions:     PartitionRange{0, MaxPartitions},
-		Parallel:       1,
-		Namespace:      "test",
-		EncoderFactory: defaultEncoderFactory,
-	}
-}
-
 func (c *BackupConfig) isFullBackup() bool {
 	// full backup doesn't have lower bound
 	return c.ModAfter == nil
@@ -289,52 +221,6 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteF
 }
 
 // **** Restore ****
-
-// RestoreConfig contains configuration for the restore operation.
-type RestoreConfig struct {
-	// DecoderFactory is used to specify the decoder with which to decode the backup data
-	// if nil, the default DecoderFactory will be used.
-	DecoderFactory encoding.DecoderFactory
-	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used.
-	InfoPolicy *a.InfoPolicy
-	// WritePolicy applies to Aerospike write operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used.
-	WritePolicy *a.WritePolicy
-	// Namespace details for the restore operation.
-	// By default, the data is restored to the namespace from which it was taken.
-	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
-	// Encryption details.
-	EncryptionPolicy *models.EncryptionPolicy
-	// Compression details.
-	CompressionPolicy *models.CompressionPolicy
-	// Secret agent config.
-	SecretAgent *models.SecretAgentConfig
-	// The sets to restore (optional, given an empty list, all sets will be restored).
-	SetList []string
-	// The bins to restore (optional, given an empty list, all bins will be restored).
-	BinList []string
-	// Parallel is the number of concurrent record readers from backup files.
-	Parallel int
-	// RecordsPerSecond limits restore records per second (rps) rate.
-	// Will not apply rps limit if RecordsPerSecond is zero (default).
-	RecordsPerSecond int
-	// Limits restore bandwidth (bytes per second).
-	// Will not apply rps limit if Bandwidth is zero (default).
-	Bandwidth int
-	// Don't restore any records.
-	NoRecords bool
-	// Don't restore any secondary indexes.
-	NoIndexes bool
-	// Don't restore any UDFs.
-	NoUDFs bool
-	// Disables the use of batch writes when restoring records to the Aerospike cluster.
-	DisableBatchWrites bool
-	// The max allowed number of records per batch write call.
-	BatchSize int
-	// Max number of parallel writers to target AS cluster.
-	MaxAsyncBatches int
-}
 
 func (c *RestoreConfig) validate() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
@@ -378,22 +264,15 @@ func (c *RestoreConfig) validate() error {
 	return nil
 }
 
-// NewRestoreConfig returns a new RestoreConfig with default values.
-func NewRestoreConfig() *RestoreConfig {
-	return &RestoreConfig{
-		Parallel:        4,
-		DecoderFactory:  defaultDecoderFactory,
-		BatchSize:       128,
-		MaxAsyncBatches: 16,
-	}
-}
-
 // Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
 // ctx can be used to cancel the restore operation.
 // config is the configuration for the restore operation.
 // streamingReader provides readers with access to backup data.
-func (c *Client) Restore(ctx context.Context, config *RestoreConfig, streamingReader StreamingReader,
+func (c *Client) Restore(
+	ctx context.Context,
+	config *RestoreConfig,
+	streamingReader StreamingReader,
 ) (*RestoreHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")

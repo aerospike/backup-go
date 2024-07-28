@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -38,7 +38,7 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilD
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
-	streamingReader, _ := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
+	streamingReader, _ := NewDirectoryStreamingReader(dir, backup.EncoderValidate(backup.EncoderTypeASB))
 	err := streamingReader.checkRestoreDirectory()
 	s.Error(err)
 }
@@ -69,7 +69,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 
 	_ = f.Close()
 
-	streamingReader, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
+	streamingReader, err := NewDirectoryStreamingReader(dir, backup.EncoderValidate(backup.EncoderTypeASB))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -104,7 +104,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 
 	_ = f.Close()
 
-	r, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
+	r, err := NewDirectoryStreamingReader(dir, backup.EncoderValidate(backup.EncoderTypeASB))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)

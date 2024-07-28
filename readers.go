@@ -17,7 +17,6 @@ package backup
 import (
 	"log/slog"
 
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
@@ -28,12 +27,12 @@ import (
 // tokenReader satisfies the DataReader interface
 // It reads data as tokens using a Decoder
 type tokenReader struct {
-	decoder encoding.Decoder
+	decoder decoder
 	logger  *slog.Logger
 }
 
 // newTokenReader creates a new GenericReader
-func newTokenReader(decoder encoding.Decoder, logger *slog.Logger) *tokenReader {
+func newTokenReader(decoder decoder, logger *slog.Logger) *tokenReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeToken)
 	logger.Debug("created new token reader")

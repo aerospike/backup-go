@@ -47,6 +47,7 @@ type StreamingReader interface {
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
 	reader          StreamingReader
+	decoder         decoder
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
@@ -57,8 +58,12 @@ type RestoreHandler struct {
 }
 
 // newRestoreHandler creates a new RestoreHandler
-func newRestoreHandler(config *RestoreConfig,
-	ac *a.Client, logger *slog.Logger, reader StreamingReader) *RestoreHandler {
+func newRestoreHandler(
+	config *RestoreConfig,
+	ac *a.Client,
+	logger *slog.Logger,
+	reader StreamingReader,
+) *RestoreHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 
@@ -226,12 +231,12 @@ func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 
 	for i, reader := range readers {
-		decoder, err := rh.config.DecoderFactory.CreateDecoder(reader)
+		d, err := NewDecoder(rh.config.EncoderType, reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create decoder: %w", err)
 		}
 
-		dr := newTokenReader(decoder, rh.logger)
+		dr := newTokenReader(d, rh.logger)
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](dr)
 	}
 

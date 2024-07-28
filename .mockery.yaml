@@ -7,10 +7,6 @@ packages:
     config:
       dir: ./encoding/asb/mocks
       outpkg: mocks
-  github.com/aerospike/backup-go/encoding:
-    config:
-      dir: ./encoding/mocks
-      outpkg: mocks
   github.com/aerospike/backup-go/internal/asinfo:
     config:
       dir: ./internal/asinfo/mocks

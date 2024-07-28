@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/writers"
@@ -47,7 +46,7 @@ type WriteFactory interface {
 // BackupHandler handles a backup job
 type BackupHandler struct {
 	writeFactory           WriteFactory
-	encoder                encoding.Encoder
+	encoder                encoder
 	config                 *BackupConfig
 	aerospikeClient        *a.Client
 	logger                 *slog.Logger
@@ -60,8 +59,12 @@ type BackupHandler struct {
 }
 
 // newBackupHandler creates a new BackupHandler
-func newBackupHandler(config *BackupConfig,
-	ac *a.Client, logger *slog.Logger, writeFactory WriteFactory) *BackupHandler {
+func newBackupHandler(
+	config *BackupConfig,
+	ac *a.Client,
+	logger *slog.Logger,
+	writeFactory WriteFactory,
+) *BackupHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writeFactory.GetType())
 	limiter := makeBandwidthLimiter(config.Bandwidth)
@@ -73,7 +76,7 @@ func newBackupHandler(config *BackupConfig,
 		logger:                 logger,
 		writeFactory:           writeFactory,
 		firstFileHeaderWritten: &atomic.Bool{},
-		encoder:                config.EncoderFactory.CreateEncoder(config.Namespace),
+		encoder:                NewEncoder(config.EncoderType, config.Namespace),
 		limiter:                limiter,
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
 	}

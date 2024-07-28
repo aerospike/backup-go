@@ -14,8 +14,8 @@ import (
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 type DirectoryStreamingReader struct {
-	dir      string
 	validate func(string) error
+	dir      string
 }
 
 var _ backup.StreamingReader = (*DirectoryStreamingReader)(nil)

@@ -9,9 +9,6 @@ import (
 
 // BackupConfig contains configuration for the backup operation.
 type BackupConfig struct {
-	// EncoderType describes an encoder type that will be used on backing up.
-	// Default `EncoderTypeASB` = 0.
-	EncoderType EncoderType
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -37,6 +34,9 @@ type BackupConfig struct {
 	BinList []string
 	// Partitions specifies the Aerospike partitions to back up.
 	Partitions PartitionRange
+	// EncoderType describes an encoder type that will be used on backing up.
+	// Default `EncoderTypeASB` = 0.
+	EncoderType EncoderType
 	// Parallel is the number of concurrent scans to run against the Aerospike cluster.
 	Parallel int
 	// Don't back up any records.
@@ -68,9 +68,6 @@ func NewBackupConfig() *BackupConfig {
 
 // RestoreConfig contains configuration for the restore operation.
 type RestoreConfig struct {
-	// EncoderType describes an encoder type that will be used on restoring.
-	// Default `EncoderTypeASB` = 0.
-	EncoderType EncoderType
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -90,6 +87,9 @@ type RestoreConfig struct {
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
 	BinList []string
+	// EncoderType describes an encoder type that will be used on restoring.
+	// Default `EncoderTypeASB` = 0.
+	EncoderType EncoderType
 	// Parallel is the number of concurrent record readers from backup files.
 	Parallel int
 	// RecordsPerSecond limits restore records per second (rps) rate.

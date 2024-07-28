@@ -23,6 +23,7 @@ type encoder interface {
 	GenerateFilename() string
 }
 
+// NewEncoder returns new encoder according to `EncoderType`
 func NewEncoder(eType EncoderType, namespace string) encoder {
 	switch eType {
 	case EncoderTypeASB:
@@ -43,6 +44,7 @@ type decoder interface {
 	NextToken() (*models.Token, error)
 }
 
+// NewDecoder returns new decoder according to `EncoderType`
 func NewDecoder(eType EncoderType, src io.Reader) (decoder, error) {
 	switch eType {
 	case EncoderTypeASB:
@@ -52,6 +54,7 @@ func NewDecoder(eType EncoderType, src io.Reader) (decoder, error) {
 	}
 }
 
+// EncoderValidate returns validation func according to `EncoderType`
 func EncoderValidate(eType EncoderType) func(string) error {
 	switch eType {
 	case EncoderTypeASB:

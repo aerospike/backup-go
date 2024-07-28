@@ -47,7 +47,6 @@ type StreamingReader interface {
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
 	reader          StreamingReader
-	decoder         decoder
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger

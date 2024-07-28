@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/s3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -204,7 +204,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 
 func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
 	ctx := context.Background()
-	streamingReader, _ := s3.NewS3StreamingReader(ctx, config, asb.NewDecoder())
+	streamingReader, _ := s3.NewS3StreamingReader(ctx, config, backup.EncoderValidate(backup.EncoderTypeASB))
 
 	readerChan := make(chan io.ReadCloser)
 	errorChan := make(chan error)

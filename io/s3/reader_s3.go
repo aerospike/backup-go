@@ -9,33 +9,22 @@ import (
 	"strings"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type s3StreamingReader struct {
 	client   *s3.Client
 	s3Config *StorageConfig
-	decoder  decoder
+	validate func(string) error
 }
 
 var _ backup.StreamingReader = (*s3StreamingReader)(nil)
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-//go:generate mockery --name decoder
-type decoder interface {
-	NextToken() (*models.Token, error)
-	Validate(fileName string) error
-}
-
 func NewS3StreamingReader(
-	ctx context.Context, config *StorageConfig, decoder decoder,
+	ctx context.Context, config *StorageConfig, validate func(string) error,
 ) (backup.StreamingReader, error) {
-	if decoder == nil {
-		return nil, errors.New("decoder is nil")
-	}
-
 	client, err := newS3Client(ctx, config)
 	if err != nil {
 		return nil, err
@@ -44,7 +33,7 @@ func NewS3StreamingReader(
 	return &s3StreamingReader{
 		client:   client,
 		s3Config: config,
-		decoder:  decoder,
+		validate: validate,
 	}, nil
 }
 
@@ -100,7 +89,7 @@ func (f *s3StreamingReader) streamBackupFiles(
 		defer close(filterFileCh)
 
 		for file := range fileCh {
-			if err := f.decoder.Validate(file); err != nil {
+			if err := f.validate(file); err != nil {
 				continue
 			}
 			filterFileCh <- file

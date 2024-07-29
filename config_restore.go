@@ -23,7 +23,7 @@ type RestoreConfig struct {
 	// Compression details.
 	CompressionPolicy *models.CompressionPolicy
 	// Secret agent config.
-	SecretAgent *models.SecretAgentConfig
+	SecretAgentConfig *models.SecretAgentConfig
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
@@ -98,7 +98,7 @@ func (c *RestoreConfig) validate() error {
 		return fmt.Errorf("encryption policy invalid: %w", err)
 	}
 
-	if err := c.SecretAgent.Validate(); err != nil {
+	if err := c.SecretAgentConfig.Validate(); err != nil {
 		return fmt.Errorf("secret agent invalid: %w", err)
 	}
 

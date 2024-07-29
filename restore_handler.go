@@ -148,7 +148,7 @@ func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) 
 
 	rs, err := setEncryptionDecoder(
 		rh.config.EncryptionPolicy,
-		rh.config.SecretAgent,
+		rh.config.SecretAgentConfig,
 		rs,
 	)
 	if err != nil {

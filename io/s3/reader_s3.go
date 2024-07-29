@@ -9,26 +9,27 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/interfaces"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type s3StreamingReader struct {
-	client    *s3.Client
-	s3Config  *StorageConfig
-	validator interfaces.Validator
+type validator interface {
+	Run(fileName string) error
 }
 
-var _ backup.StreamingReader = (*s3StreamingReader)(nil)
+type StreamingReader struct {
+	client    *s3.Client
+	s3Config  *models.S3Config
+	validator validator
+}
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 func NewS3StreamingReader(
 	ctx context.Context,
-	config *StorageConfig,
-	validator interfaces.Validator,
-) (backup.StreamingReader, error) {
+	config *models.S3Config,
+	validator validator,
+) (*StreamingReader, error) {
 	if validator == nil {
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
@@ -38,7 +39,7 @@ func NewS3StreamingReader(
 		return nil, err
 	}
 
-	return &s3StreamingReader{
+	return &StreamingReader{
 		client:    client,
 		s3Config:  config,
 		validator: validator,
@@ -48,7 +49,7 @@ func NewS3StreamingReader(
 // StreamFiles read files form s3 and send io.Readers to `readersCh` communication
 // chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *s3StreamingReader) StreamFiles(
+func (f *StreamingReader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	fileCh, s3errCh := f.streamBackupFiles(ctx)
@@ -87,7 +88,7 @@ func (f *s3StreamingReader) StreamFiles(
 	close(readersCh)
 }
 
-func (f *s3StreamingReader) streamBackupFiles(
+func (f *StreamingReader) streamBackupFiles(
 	ctx context.Context,
 ) (_ <-chan string, _ <-chan error) {
 	fileCh, errCh := streamFilesFromS3(ctx, f.client, f.s3Config)
@@ -108,7 +109,7 @@ func (f *s3StreamingReader) streamBackupFiles(
 }
 
 func streamFilesFromS3(
-	ctx context.Context, client *s3.Client, s3Config *StorageConfig,
+	ctx context.Context, client *s3.Client, s3Config *models.S3Config,
 ) (_ <-chan string, _ <-chan error) {
 	fileCh := make(chan string)
 	errCh := make(chan error)
@@ -154,7 +155,7 @@ type s3Reader struct {
 
 var _ io.ReadCloser = (*s3Reader)(nil)
 
-func (f *s3StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadCloser, error) {
+func (f *StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadCloser, error) {
 	getObjectOutput, err := f.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &f.s3Config.Bucket,
 		Key:    &key,
@@ -192,6 +193,6 @@ func (r *s3Reader) Close() error {
 	return r.closer.Close()
 }
 
-func (f *s3StreamingReader) GetType() string {
+func (f *StreamingReader) GetType() string {
 	return s3type
 }

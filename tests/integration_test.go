@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integration
+package tests
 
 import (
 	"bytes"
@@ -401,7 +401,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	streamingReader, _ := local.NewDirectoryStreamingReader(backupDir, backup.NewValidator(backupConfig.EncoderType))
+	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -550,7 +550,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewRestoreConfig()
-	streamingReader, _ := local.NewDirectoryStreamingReader(backupDir, backup.NewValidator(restoreConfig.EncoderType))
+	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -863,7 +863,7 @@ type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
-var _ backup.WriteFactory = (*byteReadWriterFactory)(nil)
+var _ backup.Writer = (*byteReadWriterFactory)(nil)
 
 func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))

@@ -33,8 +33,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// StreamingReader provides access to data that should be restored.
-type StreamingReader interface {
+// streamingReader provides access to data that should be restored.
+type streamingReader interface {
 	// StreamFiles create readers from files and send them to chan.
 	// In case of error, send errors to error chan.
 	// Must be run in goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
@@ -46,7 +46,7 @@ type StreamingReader interface {
 
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
-	reader          StreamingReader
+	reader          streamingReader
 	config          *RestoreConfig
 	aerospikeClient *a.Client
 	logger          *slog.Logger
@@ -61,7 +61,7 @@ func newRestoreHandler(
 	config *RestoreConfig,
 	ac *a.Client,
 	logger *slog.Logger,
-	reader StreamingReader,
+	reader streamingReader,
 ) *RestoreHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())

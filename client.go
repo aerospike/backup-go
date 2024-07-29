@@ -116,7 +116,7 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 // ctx can be used to cancel the backup operation.
 // config is the configuration for the backup operation.
 // writer creates new writers for the backup operation.
-func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteFactory) (
+func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer Writer) (
 	*BackupHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("backup config required")
@@ -147,7 +147,7 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer WriteF
 func (c *Client) Restore(
 	ctx context.Context,
 	config *RestoreConfig,
-	streamingReader StreamingReader,
+	streamingReader streamingReader,
 ) (*RestoreHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")

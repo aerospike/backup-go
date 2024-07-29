@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/io/local/mocks"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -38,7 +38,11 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilD
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
-	streamingReader, _ := NewDirectoryStreamingReader(dir, backup.NewValidator(backup.EncoderTypeASB))
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run").Return(nil)
+
+	streamingReader, _ := NewDirectoryStreamingReader(dir, mockValidator)
 	err := streamingReader.checkRestoreDirectory()
 	s.Error(err)
 }
@@ -69,7 +73,10 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 
 	_ = f.Close()
 
-	streamingReader, err := NewDirectoryStreamingReader(dir, backup.NewValidator(backup.EncoderTypeASB))
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run").Return(nil)
+
+	streamingReader, err := NewDirectoryStreamingReader(dir, mockValidator)
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -104,7 +111,10 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 
 	_ = f.Close()
 
-	r, err := NewDirectoryStreamingReader(dir, backup.NewValidator(backup.EncoderTypeASB))
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run").Return(nil)
+
+	r, err := NewDirectoryStreamingReader(dir, mockValidator)
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)

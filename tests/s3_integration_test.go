@@ -1,4 +1,4 @@
-package integration
+package tests
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/s3"
+	"github.com/aerospike/backup-go/models"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -141,7 +142,7 @@ func (s *writeReadTestSuite) TearDownSuite() {
 }
 
 func (s *writeReadTestSuite) TestWriteRead() {
-	config := &s3.StorageConfig{
+	config := &models.S3Config{
 		Bucket:   "backup",
 		Region:   "eu",
 		Endpoint: "http://localhost:9000",
@@ -169,7 +170,7 @@ func randomBytes(n int) []byte {
 	return data
 }
 
-func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3.StorageConfig) []byte {
+func (s *writeReadTestSuite) write(filename string, bytes, times int, config *models.S3Config) []byte {
 	ctx := context.Background()
 	streamingReader, _ := s3.NewS3WriterFactory(ctx, config, true)
 
@@ -202,9 +203,9 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 	return allBytesWritten
 }
 
-func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
+func (s *writeReadTestSuite) read(config *models.S3Config) []byte {
 	ctx := context.Background()
-	streamingReader, _ := s3.NewS3StreamingReader(ctx, config, backup.NewValidator(backup.EncoderTypeASB))
+	streamingReader, _ := backup.NewStreamingReaderS3(ctx, config, backup.EncoderTypeASB)
 
 	readerChan := make(chan io.ReadCloser)
 	errorChan := make(chan error)

@@ -31,7 +31,7 @@ packages:
     config:
       dir: ./pkg/secret-agent/connection/mocks
       outpkg: mocks
-  github.com/aerospike/backup-go/interfaces:
+  github.com/aerospike/backup-go/io/local:
     config:
-      dir: ./interfaces/mocks
+      dir: ./io/local/mocks
       outpkg: mocks

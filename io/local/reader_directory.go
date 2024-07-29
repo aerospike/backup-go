@@ -7,29 +7,32 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/interfaces"
 )
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-type DirectoryStreamingReader struct {
-	validator interfaces.Validator
+// Validator interface that describes backup files validator.
+// Must be part of encoder implementation.
+//
+//go:generate mockery --name Validator
+type validator interface {
+	Run(fileName string) error
+}
+
+type StreamingReader struct {
+	validator validator
 	dir       string
 }
 
-var _ backup.StreamingReader = (*DirectoryStreamingReader)(nil)
-
 func NewDirectoryStreamingReader(
 	dir string,
-	validator interfaces.Validator,
-) (*DirectoryStreamingReader, error) {
+	validator validator,
+) (*StreamingReader, error) {
 	if validator == nil {
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	return &DirectoryStreamingReader{
+	return &StreamingReader{
 		dir:       dir,
 		validator: validator,
 	}, nil
@@ -37,7 +40,7 @@ func NewDirectoryStreamingReader(
 
 // StreamFiles read files from disk and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *DirectoryStreamingReader) StreamFiles(
+func (f *StreamingReader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	err := f.checkRestoreDirectory()
@@ -85,7 +88,7 @@ func (f *DirectoryStreamingReader) StreamFiles(
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format
-func (f *DirectoryStreamingReader) checkRestoreDirectory() error {
+func (f *StreamingReader) checkRestoreDirectory() error {
 	dir := f.dir
 
 	dirInfo, err := os.Stat(dir)
@@ -112,6 +115,6 @@ func (f *DirectoryStreamingReader) checkRestoreDirectory() error {
 	return nil
 }
 
-func (f *DirectoryStreamingReader) GetType() string {
+func (f *StreamingReader) GetType() string {
 	return "directory"
 }

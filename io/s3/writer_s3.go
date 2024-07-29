@@ -3,32 +3,32 @@ package s3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/local"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type s3WriteFactory struct {
+var errBackupDirectoryInvalid = errors.New("backup directory is invalid")
+
+type Writer struct {
 	client   *s3.Client
-	s3Config *StorageConfig
+	s3Config *models.S3Config
 	fileID   *atomic.Uint32 // increments for each new file created
 }
 
-var _ backup.WriteFactory = (*s3WriteFactory)(nil)
-
 func NewS3WriterFactory(
 	ctx context.Context,
-	s3Config *StorageConfig,
+	s3Config *models.S3Config,
 	removeFiles bool,
-) (backup.WriteFactory, error) {
+) (*Writer, error) {
 	if s3Config.ChunkSize > maxS3File {
 		return nil, fmt.Errorf("invalid chunk size %d, should not exceed %d", s3Config.ChunkSize, maxS3File)
 	}
@@ -45,7 +45,7 @@ func NewS3WriterFactory(
 
 	if !isEmpty {
 		if !removeFiles {
-			return nil, fmt.Errorf("%w: %s is not empty", local.ErrBackupDirectoryInvalid, s3Config.Prefix)
+			return nil, fmt.Errorf("%w: %s is not empty", errBackupDirectoryInvalid, s3Config.Prefix)
 		}
 
 		err := deleteAllFilesUnderPrefix(ctx, client, s3Config)
@@ -54,7 +54,7 @@ func NewS3WriterFactory(
 		}
 	}
 
-	return &s3WriteFactory{
+	return &Writer{
 		client:   client,
 		s3Config: s3Config,
 		fileID:   &atomic.Uint32{},
@@ -77,7 +77,7 @@ type s3Writer struct {
 
 var _ io.WriteCloser = (*s3Writer)(nil)
 
-func (f *s3WriteFactory) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+func (f *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	chunkSize := f.s3Config.ChunkSize
 	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
@@ -105,7 +105,7 @@ func (f *s3WriteFactory) NewWriter(ctx context.Context, filename string) (io.Wri
 	}, nil
 }
 
-func (f *s3WriteFactory) GetType() string {
+func (f *Writer) GetType() string {
 	return s3type
 }
 
@@ -179,7 +179,7 @@ func (w *s3Writer) Close() error {
 	return nil
 }
 
-func isEmptyDirectory(ctx context.Context, client *s3.Client, s3config *StorageConfig) (bool, error) {
+func isEmptyDirectory(ctx context.Context, client *s3.Client, s3config *models.S3Config) (bool, error) {
 	resp, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:  &s3config.Bucket,
 		Prefix:  &s3config.Prefix,
@@ -198,7 +198,7 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, s3config *StorageC
 	return len(resp.Contents) == 0, nil
 }
 
-func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, s3config *StorageConfig) error {
+func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, s3config *models.S3Config) error {
 	fileCh, errCh := streamFilesFromS3(ctx, client, s3config)
 
 	for {

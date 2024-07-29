@@ -38,7 +38,7 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilD
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
-	streamingReader, _ := NewDirectoryStreamingReader(dir, backup.EncoderValidate(backup.EncoderTypeASB))
+	streamingReader, _ := NewDirectoryStreamingReader(dir, backup.NewValidator(backup.EncoderTypeASB))
 	err := streamingReader.checkRestoreDirectory()
 	s.Error(err)
 }
@@ -69,7 +69,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 
 	_ = f.Close()
 
-	streamingReader, err := NewDirectoryStreamingReader(dir, backup.EncoderValidate(backup.EncoderTypeASB))
+	streamingReader, err := NewDirectoryStreamingReader(dir, backup.NewValidator(backup.EncoderTypeASB))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -104,7 +104,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 
 	_ = f.Close()
 
-	r, err := NewDirectoryStreamingReader(dir, backup.EncoderValidate(backup.EncoderTypeASB))
+	r, err := NewDirectoryStreamingReader(dir, backup.NewValidator(backup.EncoderTypeASB))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)

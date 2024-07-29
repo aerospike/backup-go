@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"fmt"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -56,6 +57,40 @@ type BackupConfig struct {
 	FileLimit int64
 }
 
+// PartitionRange specifies a range of Aerospike partitions.
+type PartitionRange struct {
+	Begin int
+	Count int
+}
+
+// NewPartitionRange returns a partition range with boundaries specified by the
+// provided values.
+func NewPartitionRange(begin, count int) PartitionRange {
+	return PartitionRange{begin, count}
+}
+
+func (p PartitionRange) validate() error {
+	if p.Begin < 0 || p.Begin >= MaxPartitions {
+		return fmt.Errorf("begin must be between 0 and %d, got %d", MaxPartitions-1, p.Begin)
+	}
+
+	if p.Count < 1 || p.Count > MaxPartitions {
+		return fmt.Errorf("count must be between 1 and %d, got %d", MaxPartitions, p.Count)
+	}
+
+	if p.Begin+p.Count > MaxPartitions {
+		return fmt.Errorf("begin + count is greater than the max partitions count of %d",
+			MaxPartitions)
+	}
+
+	return nil
+}
+
+// PartitionRangeAll returns a partition range containing all partitions.
+func PartitionRangeAll() PartitionRange {
+	return NewPartitionRange(0, MaxPartitions)
+}
+
 // NewBackupConfig returns a new BackupConfig with default values.
 func NewBackupConfig() *BackupConfig {
 	return &BackupConfig{
@@ -66,58 +101,47 @@ func NewBackupConfig() *BackupConfig {
 	}
 }
 
-// RestoreConfig contains configuration for the restore operation.
-type RestoreConfig struct {
-	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used.
-	InfoPolicy *a.InfoPolicy
-	// WritePolicy applies to Aerospike write operations made during backup and restore
-	// If nil, the Aerospike client's default policy will be used.
-	WritePolicy *a.WritePolicy
-	// Namespace details for the restore operation.
-	// By default, the data is restored to the namespace from which it was taken.
-	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
-	// Encryption details.
-	EncryptionPolicy *models.EncryptionPolicy
-	// Compression details.
-	CompressionPolicy *models.CompressionPolicy
-	// Secret agent config.
-	SecretAgent *models.SecretAgentConfig
-	// The sets to restore (optional, given an empty list, all sets will be restored).
-	SetList []string
-	// The bins to restore (optional, given an empty list, all bins will be restored).
-	BinList []string
-	// EncoderType describes an encoder type that will be used on restoring.
-	// Default `EncoderTypeASB` = 0.
-	EncoderType EncoderType
-	// Parallel is the number of concurrent record readers from backup files.
-	Parallel int
-	// RecordsPerSecond limits restore records per second (rps) rate.
-	// Will not apply rps limit if RecordsPerSecond is zero (default).
-	RecordsPerSecond int
-	// Limits restore bandwidth (bytes per second).
-	// Will not apply rps limit if Bandwidth is zero (default).
-	Bandwidth int
-	// Don't restore any records.
-	NoRecords bool
-	// Don't restore any secondary indexes.
-	NoIndexes bool
-	// Don't restore any UDFs.
-	NoUDFs bool
-	// Disables the use of batch writes when restoring records to the Aerospike cluster.
-	DisableBatchWrites bool
-	// The max allowed number of records per batch write call.
-	BatchSize int
-	// Max number of parallel writers to target AS cluster.
-	MaxAsyncBatches int
+func (c *BackupConfig) isFullBackup() bool {
+	// full backup doesn't have lower bound
+	return c.ModAfter == nil
 }
 
-// NewRestoreConfig returns a new RestoreConfig with default values.
-func NewRestoreConfig() *RestoreConfig {
-	return &RestoreConfig{
-		Parallel:        4,
-		BatchSize:       128,
-		MaxAsyncBatches: 16,
-		EncoderType:     EncoderTypeASB,
+func (c *BackupConfig) validate() error {
+	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
+		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
+
+	if c.ModBefore != nil && c.ModAfter != nil && !c.ModBefore.After(*c.ModAfter) {
+		return fmt.Errorf("modified before must be strictly greater than modified after")
+	}
+
+	if err := c.Partitions.validate(); err != nil {
+		return err
+	}
+
+	if c.RecordsPerSecond < 0 {
+		return fmt.Errorf("rps value must not be negative, got %d", c.RecordsPerSecond)
+	}
+
+	if c.Bandwidth < 0 {
+		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
+	}
+
+	if c.FileLimit < 0 {
+		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
+	}
+
+	if err := c.CompressionPolicy.Validate(); err != nil {
+		return fmt.Errorf("compression policy invalid: %w", err)
+	}
+
+	if err := c.EncryptionPolicy.Validate(); err != nil {
+		return fmt.Errorf("encryption policy invalid: %w", err)
+	}
+
+	if err := c.SecretAgentConfig.Validate(); err != nil {
+		return fmt.Errorf("secret agent invalid: %w", err)
+	}
+
+	return nil
 }

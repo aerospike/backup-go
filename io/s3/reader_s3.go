@@ -10,13 +10,14 @@ import (
 	"strings"
 
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/interfaces"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type s3StreamingReader struct {
-	client   *s3.Client
-	s3Config *StorageConfig
-	validate func(string) error
+	client    *s3.Client
+	s3Config  *StorageConfig
+	validator interfaces.Validator
 }
 
 var _ backup.StreamingReader = (*s3StreamingReader)(nil)
@@ -24,10 +25,12 @@ var _ backup.StreamingReader = (*s3StreamingReader)(nil)
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
 func NewS3StreamingReader(
-	ctx context.Context, config *StorageConfig, validate func(string) error,
+	ctx context.Context,
+	config *StorageConfig,
+	validator interfaces.Validator,
 ) (backup.StreamingReader, error) {
-	if validate == nil {
-		return nil, fmt.Errorf("validation function is required")
+	if validator == nil {
+		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
 	client, err := newS3Client(ctx, config)
@@ -36,9 +39,9 @@ func NewS3StreamingReader(
 	}
 
 	return &s3StreamingReader{
-		client:   client,
-		s3Config: config,
-		validate: validate,
+		client:    client,
+		s3Config:  config,
+		validator: validator,
 	}, nil
 }
 
@@ -94,7 +97,7 @@ func (f *s3StreamingReader) streamBackupFiles(
 		defer close(filterFileCh)
 
 		for file := range fileCh {
-			if err := f.validate(file); err != nil {
+			if err := f.validator.Run(file); err != nil {
 				continue
 			}
 			filterFileCh <- file

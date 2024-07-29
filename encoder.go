@@ -4,49 +4,32 @@ import (
 	"io"
 
 	"github.com/aerospike/backup-go/encoding/asb"
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/interfaces"
 )
 
+// EncoderType custom type for encoder types enum.
 type EncoderType int
 
 const (
+	// EncoderTypeASB matches ASB encoder with id 0.
 	EncoderTypeASB EncoderType = iota
 )
 
-// Encoder is an interface for encoding the types from the models package.
-// It is used to support different data formats.
-//
-//go:generate mockery --name Encoder
-type encoder interface {
-	EncodeToken(*models.Token) ([]byte, error)
-	GetHeader() []byte
-	GenerateFilename() string
-}
-
 // NewEncoder returns new encoder according to `EncoderType`
-func NewEncoder(eType EncoderType, namespace string) encoder {
+func NewEncoder(eType EncoderType, namespace string) interfaces.Encoder {
 	switch eType {
+	// As at the moment only one `ASB` encoder supported, we use such construction.
 	case EncoderTypeASB:
 		return asb.NewEncoder(namespace)
 	default:
 		return asb.NewEncoder(namespace)
 	}
-}
-
-// Decoder is an interface for reading backup data as tokens.
-// It is used to support different data formats.
-// While the return type is `any`, the actual types returned should
-// only be the types exposed by the models package.
-// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
-//
-//go:generate mockery --name Decoder
-type decoder interface {
-	NextToken() (*models.Token, error)
 }
 
 // NewDecoder returns new decoder according to `EncoderType`
-func NewDecoder(eType EncoderType, src io.Reader) (decoder, error) {
+func NewDecoder(eType EncoderType, src io.Reader) (interfaces.Decoder, error) {
 	switch eType {
+	// As at the moment only one `ASB` decoder supported, we use such construction.
 	case EncoderTypeASB:
 		return asb.NewDecoder(src)
 	default:
@@ -54,12 +37,13 @@ func NewDecoder(eType EncoderType, src io.Reader) (decoder, error) {
 	}
 }
 
-// EncoderValidate returns validation func according to `EncoderType`
-func EncoderValidate(eType EncoderType) func(string) error {
+// NewValidator returns validation func according to `EncoderType`
+func NewValidator(eType EncoderType) interfaces.Validator {
 	switch eType {
+	// As at the moment only one `ASB` validator supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.Validate
+		return asb.NewValidator()
 	default:
-		return asb.Validate
+		return asb.NewValidator()
 	}
 }

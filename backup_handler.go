@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/interfaces"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/writers"
@@ -46,7 +47,7 @@ type WriteFactory interface {
 // BackupHandler handles a backup job
 type BackupHandler struct {
 	writeFactory           WriteFactory
-	encoder                encoder
+	encoder                interfaces.Encoder
 	config                 *BackupConfig
 	aerospikeClient        *a.Client
 	logger                 *slog.Logger

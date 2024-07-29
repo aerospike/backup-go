@@ -204,7 +204,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 
 func (s *writeReadTestSuite) read(config *s3.StorageConfig) []byte {
 	ctx := context.Background()
-	streamingReader, _ := s3.NewS3StreamingReader(ctx, config, backup.EncoderValidate(backup.EncoderTypeASB))
+	streamingReader, _ := s3.NewS3StreamingReader(ctx, config, backup.NewValidator(backup.EncoderTypeASB))
 
 	readerChan := make(chan io.ReadCloser)
 	errorChan := make(chan error)

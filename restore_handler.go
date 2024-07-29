@@ -230,7 +230,7 @@ func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 
 	for i, reader := range readers {
-		d, err := NewDecoder(rh.config.EncoderType, reader)
+		d, err := newDecoder(rh.config.EncoderType, reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create decoder: %w", err)
 		}

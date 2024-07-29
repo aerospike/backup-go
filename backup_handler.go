@@ -87,7 +87,7 @@ func newBackupHandler(
 		logger:                 logger,
 		writer:                 writer,
 		firstFileHeaderWritten: &atomic.Bool{},
-		encoder:                NewEncoder(config.EncoderType, config.Namespace),
+		encoder:                newEncoder(config.EncoderType, config.Namespace),
 		limiter:                limiter,
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
 	}

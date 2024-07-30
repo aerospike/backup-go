@@ -143,11 +143,11 @@ func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer Writer
 // The backup data may be in a single file or multiple files.
 // ctx can be used to cancel the restore operation.
 // config is the configuration for the restore operation.
-// streamingReader provides readers with access to backup data.
+// StreamingReader provides readers with access to backup data.
 func (c *Client) Restore(
 	ctx context.Context,
 	config *RestoreConfig,
-	streamingReader streamingReader,
+	streamingReader StreamingReader,
 ) (*RestoreHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")

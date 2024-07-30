@@ -4,18 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
-
-type StorageConfig struct {
-	Bucket    string
-	Region    string
-	Endpoint  string
-	Profile   string
-	Prefix    string
-	ChunkSize int
-}
 
 const (
 	s3DefaultChunkSize = 5 * 1024 * 1024                // 5MB, minimum size of a part
@@ -23,7 +15,7 @@ const (
 	s3type             = "s3"
 )
 
-func newS3Client(ctx context.Context, s3Config *StorageConfig) (*s3.Client, error) {
+func newS3Client(ctx context.Context, s3Config *models.S3Config) (*s3.Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithSharedConfigProfile(s3Config.Profile),
 		config.WithRegion(s3Config.Region),

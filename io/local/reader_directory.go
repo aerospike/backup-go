@@ -7,35 +7,40 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/encoding"
 )
 
 var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
 
-type DirectoryStreamingReader struct {
-	decoder encoding.DecoderFactory
-	dir     string
+// Validator interface that describes backup files validator.
+// Must be part of encoder implementation.
+//
+//go:generate mockery --name Validator
+type validator interface {
+	Run(fileName string) error
 }
 
-var _ backup.StreamingReader = (*DirectoryStreamingReader)(nil)
+type StreamingReader struct {
+	validator validator
+	dir       string
+}
 
-func NewDirectoryStreamingReader(dir string, decoder encoding.DecoderFactory,
-) (*DirectoryStreamingReader, error) {
-	if decoder == nil {
-		return nil, errors.New("decoder is nil")
+func NewDirectoryStreamingReader(
+	dir string,
+	validator validator,
+) (*StreamingReader, error) {
+	if validator == nil {
+		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	return &DirectoryStreamingReader{
-		dir:     dir,
-		decoder: decoder,
+	return &StreamingReader{
+		dir:       dir,
+		validator: validator,
 	}, nil
 }
 
 // StreamFiles read files from disk and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *DirectoryStreamingReader) StreamFiles(
+func (f *StreamingReader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	err := f.checkRestoreDirectory()
@@ -61,7 +66,7 @@ func (f *DirectoryStreamingReader) StreamFiles(
 		}
 
 		filePath := filepath.Join(f.dir, file.Name())
-		if err = f.decoder.Validate(filePath); err != nil {
+		if err = f.validator.Run(filePath); err != nil {
 			// As we pass invalid files, we don't need process this error and write test for it.
 			// Maybe we need to log this info, for user. So he will understand what happens.
 			continue
@@ -83,7 +88,7 @@ func (f *DirectoryStreamingReader) StreamFiles(
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format
-func (f *DirectoryStreamingReader) checkRestoreDirectory() error {
+func (f *StreamingReader) checkRestoreDirectory() error {
 	dir := f.dir
 
 	dirInfo, err := os.Stat(dir)
@@ -110,6 +115,6 @@ func (f *DirectoryStreamingReader) checkRestoreDirectory() error {
 	return nil
 }
 
-func (f *DirectoryStreamingReader) GetType() string {
+func (f *StreamingReader) GetType() string {
 	return "directory"
 }

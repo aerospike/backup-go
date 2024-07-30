@@ -24,8 +24,6 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/encoding/asb"
-	"github.com/aerospike/backup-go/io/local"
 )
 
 func main() {
@@ -39,7 +37,7 @@ func main() {
 		panic(err)
 	}
 
-	writers, err := local.NewDirectoryWriterFactory("backups_folder", false)
+	writers, err := backup.NewWriterLocal("backups_folder", false)
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +61,7 @@ func main() {
 	restoreCfg := backup.NewRestoreConfig()
 	restoreCfg.Parallel = 5
 
-	streamingReader, err := local.NewDirectoryStreamingReader("backup_folder", asb.NewASBDecoderFactory())
+	streamingReader, err := backup.NewStreamingReaderLocal("backups_folder", backup.EncoderTypeASB)
 	if err != nil {
 		panic(err)
 	}

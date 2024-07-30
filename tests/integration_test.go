@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integration
+package tests
 
 import (
 	"bytes"
@@ -322,11 +322,11 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "with parallel backup",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.PartitionRangeAll(),
-					SetList:        []string{suite.set},
-					Namespace:      suite.namespace,
-					Parallel:       100,
-					EncoderFactory: asb.NewASBEncoderFactory(),
+					Partitions:  backup.PartitionRangeAll(),
+					SetList:     []string{suite.set},
+					Namespace:   suite.namespace,
+					Parallel:    100,
+					EncoderType: backup.EncoderTypeASB,
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
@@ -337,12 +337,12 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "parallel with file size limit",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:     backup.PartitionRangeAll(),
-					SetList:        []string{suite.set},
-					Namespace:      suite.namespace,
-					Parallel:       2,
-					EncoderFactory: asb.NewASBEncoderFactory(),
-					FileLimit:      3 * 1024 * 1024, // 3mb, full backup ~9mb
+					Partitions:  backup.PartitionRangeAll(),
+					SetList:     []string{suite.set},
+					Namespace:   suite.namespace,
+					Parallel:    2,
+					EncoderType: backup.EncoderTypeASB,
+					FileLimit:   3 * 1024 * 1024, // 3mb, full backup ~9mb
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
@@ -401,7 +401,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	streamingReader, _ := local.NewDirectoryStreamingReader(backupDir, restoreConfig.DecoderFactory)
+	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -550,7 +550,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewRestoreConfig()
-	streamingReader, _ := local.NewDirectoryStreamingReader(backupDir, restoreConfig.DecoderFactory)
+	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -766,12 +766,12 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 	})
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:     backup.PartitionRangeAll(),
-		SetList:        []string{suite.set},
-		Namespace:      suite.namespace,
-		Parallel:       1,
-		EncoderFactory: asb.NewASBEncoderFactory(),
-		BinList:        []string{"BackupRestore", "OnlyBackup"},
+		Partitions:  backup.PartitionRangeAll(),
+		SetList:     []string{suite.set},
+		Namespace:   suite.namespace,
+		Parallel:    1,
+		EncoderType: backup.EncoderTypeASB,
+		BinList:     []string{"BackupRestore", "OnlyBackup"},
 	}
 
 	var restoreConfig = backup.NewRestoreConfig()
@@ -809,13 +809,13 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 	var expectedRecords = Subtract(batch2, batch3)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:     backup.PartitionRangeAll(),
-		SetList:        []string{suite.set},
-		Namespace:      suite.namespace,
-		Parallel:       1,
-		EncoderFactory: asb.NewASBEncoderFactory(),
-		ModAfter:       &lowerLimit,
-		ModBefore:      &upperLimit,
+		Partitions:  backup.PartitionRangeAll(),
+		SetList:     []string{suite.set},
+		Namespace:   suite.namespace,
+		Parallel:    1,
+		EncoderType: backup.EncoderTypeASB,
+		ModAfter:    &lowerLimit,
+		ModBefore:   &upperLimit,
 	}
 
 	var restoreConfig = backup.NewRestoreConfig()
@@ -835,11 +835,11 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	suite.SetupTest(records)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:     backup.PartitionRangeAll(),
-		SetList:        []string{suite.set},
-		Namespace:      suite.namespace,
-		Parallel:       1,
-		EncoderFactory: asb.NewASBEncoderFactory(),
+		Partitions:  backup.PartitionRangeAll(),
+		SetList:     []string{suite.set},
+		Namespace:   suite.namespace,
+		Parallel:    1,
+		EncoderType: backup.EncoderTypeASB,
 	}
 	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
 	backupConfig.ScanPolicy.RecordsPerSecond = rps
@@ -863,7 +863,7 @@ type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
-var _ backup.WriteFactory = (*byteReadWriterFactory)(nil)
+var _ backup.Writer = (*byteReadWriterFactory)(nil)
 
 func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))

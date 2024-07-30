@@ -8,15 +8,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/aerospike/backup-go"
 )
 
-type DirectoryWriterFactory struct {
+type Writer struct {
 	directory string
 }
-
-var _ backup.WriteFactory = (*DirectoryWriterFactory)(nil)
 
 const bufferSize = 4096 * 1024 // 4mb
 
@@ -28,7 +24,7 @@ const bufferSize = 4096 * 1024 // 4mb
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
 // FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
 func NewDirectoryWriterFactory(dir string, removeFiles bool,
-) (*DirectoryWriterFactory, error) {
+) (*Writer, error) {
 	var err error
 	if removeFiles {
 		err = forcePrepareBackupDirectory(dir)
@@ -40,12 +36,12 @@ func NewDirectoryWriterFactory(dir string, removeFiles bool,
 		return nil, err
 	}
 
-	return &DirectoryWriterFactory{
+	return &Writer{
 		directory: dir,
 	}, nil
 }
 
-var ErrBackupDirectoryInvalid = errors.New("backup directory is invalid")
+var errBackupDirectoryInvalid = errors.New("backup directory is invalid")
 
 // prepareBackupDirectory creates backup directory if it not exists.
 // returns error is dir already exits and it is not empty.
@@ -60,16 +56,16 @@ func prepareBackupDirectory(dir string) error {
 	}
 
 	if !dirInfo.IsDir() {
-		return fmt.Errorf("%w: %s is not a directory", ErrBackupDirectoryInvalid, dir)
+		return fmt.Errorf("%w: %s is not a directory", errBackupDirectoryInvalid, dir)
 	}
 
 	fileInfo, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("%w: failed to read %s: %w", ErrBackupDirectoryInvalid, dir, err)
+		return fmt.Errorf("%w: failed to read %s: %w", errBackupDirectoryInvalid, dir, err)
 	}
 
 	if len(fileInfo) > 0 {
-		return fmt.Errorf("%w: %s is not empty", ErrBackupDirectoryInvalid, dir)
+		return fmt.Errorf("%w: %s is not empty", errBackupDirectoryInvalid, dir)
 	}
 
 	return nil
@@ -79,7 +75,7 @@ func prepareBackupDirectory(dir string) error {
 func forcePrepareBackupDirectory(dir string) error {
 	err := os.RemoveAll(dir)
 	if err != nil {
-		return fmt.Errorf("%w: failed to remove directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
+		return fmt.Errorf("%w: failed to remove directory %s: %v", errBackupDirectoryInvalid, dir, err)
 	}
 
 	return makeDir(dir)
@@ -88,7 +84,7 @@ func forcePrepareBackupDirectory(dir string) error {
 func makeDir(dir string) error {
 	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
-		return fmt.Errorf("%w: failed to create backup directory %s: %v", ErrBackupDirectoryInvalid, dir, err)
+		return fmt.Errorf("%w: failed to create backup directory %s: %v", errBackupDirectoryInvalid, dir, err)
 	}
 
 	return nil
@@ -110,7 +106,7 @@ func (bf *bufferedFile) Close() error {
 
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the fileName parameter.
-func (f *DirectoryWriterFactory) NewWriter(_ context.Context, fileName string) (io.WriteCloser, error) {
+func (f *Writer) NewWriter(_ context.Context, fileName string) (io.WriteCloser, error) {
 	filePath := filepath.Join(f.directory, fileName)
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 
@@ -121,6 +117,6 @@ func (f *DirectoryWriterFactory) NewWriter(_ context.Context, fileName string) (
 	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil
 }
 
-func (f *DirectoryWriterFactory) GetType() string {
+func (f *Writer) GetType() string {
 	return "directory"
 }

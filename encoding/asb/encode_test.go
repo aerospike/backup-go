@@ -36,7 +36,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	encoder := NewEncoder("test").(*asbEncoder)
+	encoder := NewEncoder("test")
 
 	key, aerr := a.NewKey("test", "demo", "1234")
 	if aerr != nil {
@@ -66,7 +66,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	encoder := NewEncoder("test").(*asbEncoder)
+	encoder := NewEncoder("test")
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -87,7 +87,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	encoder := NewEncoder("test").(*asbEncoder)
+	encoder := NewEncoder("test")
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -113,7 +113,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	encoder := NewEncoder("test").(*asbEncoder)
+	encoder := NewEncoder("test")
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -126,7 +126,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder := NewEncoder("test").(*asbEncoder)
+	encoder := NewEncoder("test")
 
 	var recExpr int64 = 10
 
@@ -154,7 +154,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder := NewEncoder("test").(*asbEncoder)
+	encoder := NewEncoder("test")
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -1539,7 +1539,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
-	encoder := NewEncoder("test").(*asbEncoder)
+	encoder := NewEncoder("test")
 
 	key := genKey()
 	rec := &models.Record{

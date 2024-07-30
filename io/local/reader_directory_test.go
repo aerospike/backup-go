@@ -16,12 +16,14 @@ package local
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/io/local/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -38,7 +40,16 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilD
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
-	streamingReader, _ := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	streamingReader, _ := NewDirectoryStreamingReader(dir, mockValidator)
 	err := streamingReader.checkRestoreDirectory()
 	s.Error(err)
 }
@@ -69,7 +80,15 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 
 	_ = f.Close()
 
-	streamingReader, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	streamingReader, err := NewDirectoryStreamingReader(dir, mockValidator)
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -104,7 +123,15 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 
 	_ = f.Close()
 
-	r, err := NewDirectoryStreamingReader(dir, asb.NewASBDecoderFactory())
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	r, err := NewDirectoryStreamingReader(dir, mockValidator)
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)

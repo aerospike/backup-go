@@ -17,23 +17,31 @@ package backup
 import (
 	"log/slog"
 
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 )
 
-// **** Token Reader ****
+// decoder is an interface for reading backup data as tokens.
+// It is used to support different data formats.
+// While the return type is `any`, the actual types returned should
+// only be the types exposed by the models package.
+// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
+//
+//go:generate mockery --name Decoder
+type decoder interface {
+	NextToken() (*models.Token, error)
+}
 
 // tokenReader satisfies the DataReader interface
-// It reads data as tokens using a Decoder
+// It reads data as tokens using a decoder
 type tokenReader struct {
-	decoder encoding.Decoder
+	decoder decoder
 	logger  *slog.Logger
 }
 
 // newTokenReader creates a new GenericReader
-func newTokenReader(decoder encoding.Decoder, logger *slog.Logger) *tokenReader {
+func newTokenReader(decoder decoder, logger *slog.Logger) *tokenReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeToken)
 	logger.Debug("created new token reader")

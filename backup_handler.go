@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/encoding"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/writers"
@@ -33,8 +32,9 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// WriteFactory provides access to backup storage.
-type WriteFactory interface {
+// Writer provides access to backup storage.
+// Exported for integration tests.
+type Writer interface {
 	// NewWriter return new writer for backup logic to use.
 	// Each call creates new writer, they might be working in parallel.
 	// Backup logic will close the writer after backup is done.
@@ -44,10 +44,20 @@ type WriteFactory interface {
 	GetType() string
 }
 
+// encoder is an interface for encoding the types from the models package.
+// It is used to support different data formats.
+//
+//go:generate mockery --name Encoder
+type encoder interface {
+	EncodeToken(*models.Token) ([]byte, error)
+	GetHeader() []byte
+	GenerateFilename() string
+}
+
 // BackupHandler handles a backup job
 type BackupHandler struct {
-	writeFactory           WriteFactory
-	encoder                encoding.Encoder
+	writer                 Writer
+	encoder                encoder
 	config                 *BackupConfig
 	aerospikeClient        *a.Client
 	logger                 *slog.Logger
@@ -60,10 +70,14 @@ type BackupHandler struct {
 }
 
 // newBackupHandler creates a new BackupHandler
-func newBackupHandler(config *BackupConfig,
-	ac *a.Client, logger *slog.Logger, writeFactory WriteFactory) *BackupHandler {
+func newBackupHandler(
+	config *BackupConfig,
+	ac *a.Client,
+	logger *slog.Logger,
+	writer Writer,
+) *BackupHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writeFactory.GetType())
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
 	return &BackupHandler{
@@ -71,9 +85,9 @@ func newBackupHandler(config *BackupConfig,
 		aerospikeClient:        ac,
 		id:                     id,
 		logger:                 logger,
-		writeFactory:           writeFactory,
+		writer:                 writer,
 		firstFileHeaderWritten: &atomic.Bool{},
-		encoder:                config.EncoderFactory.CreateEncoder(config.Namespace),
+		encoder:                newEncoder(config.EncoderType, config.Namespace),
 		limiter:                limiter,
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
 	}
@@ -174,7 +188,7 @@ func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) 
 func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
 	filename := bh.encoder.GenerateFilename()
 
-	storageWriter, err := bh.writeFactory.NewWriter(ctx, filename)
+	storageWriter, err := bh.writer.NewWriter(ctx, filename)
 	if err != nil {
 		return nil, err
 	}

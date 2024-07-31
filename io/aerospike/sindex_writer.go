@@ -1,7 +1,6 @@
 package aerospike
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -57,8 +56,7 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		ctx, err = a.Base64ToCDTContext(si.Path.B64Context)
 
 		if err != nil {
-			rw.logger.Error("error decoding sindex context", "context", si.Path.B64Context, "error", err)
-			return err
+			return fmt.Errorf("error decoding sindex context %s: %w", si.Path.B64Context, err)
 		}
 	}
 
@@ -80,8 +78,7 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 
 			err = rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
 			if err != nil {
-				rw.logger.Error("error dropping sindex", "sindex", si.Name, "error", err)
-				return err
+				return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
 			}
 
 			job, err = rw.asc.CreateComplexIndex(
@@ -95,28 +92,22 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 				ctx...,
 			)
 			if err != nil {
-				rw.logger.Error("error creating replacement sindex", "sindex", si.Name, "error", err)
-				return err
+				return fmt.Errorf("error creating replacement sindex %s: %w", si.Name, err)
 			}
 		} else {
-			rw.logger.Error("error creating sindex", "sindex", si.Name, "error", err)
-			return err
+			return fmt.Errorf("error creating sindex %s: %w", si.Name, err)
 		}
 	}
 
 	if job == nil {
-		msg := "error creating sindex: job is nil"
-		rw.logger.Debug(msg, "sindex", si.Name)
-
-		return errors.New(msg)
+		return fmt.Errorf("error creating sindex: job is nil")
 	}
 
 	errs := job.OnComplete()
 
 	err = <-errs
 	if err != nil {
-		rw.logger.Error("error creating sindex", "sindex", si.Name, "error", err)
-		return err
+		return fmt.Errorf("error creating sindex %s: %w", si.Name, err)
 	}
 
 	rw.logger.Debug("created sindex", "sindex", si.Name)

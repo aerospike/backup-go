@@ -1,4 +1,4 @@
-package writers
+package encryption
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ func TestEncryptedWriterAndReader(t *testing.T) {
 	buf := new(bytes.Buffer)
 	key := generateKey(t)
 
-	encryptedWriter, err := NewEncryptedWriter(&writeCloserBuffer{buf}, key)
+	encryptedWriter, err := NewWriter(&writeCloserBuffer{buf}, key)
 	assert.NoError(t, err)
 
 	testData := []byte("Hello, encrypted world!")
@@ -40,7 +40,7 @@ func TestEncryptedWriterAndReader(t *testing.T) {
 
 func TestNegative(t *testing.T) {
 	buf := new(bytes.Buffer)
-	encryptedWriter, _ := NewEncryptedWriter(&writeCloserBuffer{buf}, generateKey(t))
+	encryptedWriter, _ := NewWriter(&writeCloserBuffer{buf}, generateKey(t))
 
 	testData := []byte("Hello, encrypted world!")
 	_, _ = encryptedWriter.Write(testData)

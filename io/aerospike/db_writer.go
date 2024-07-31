@@ -19,6 +19,7 @@ type dbWriter interface {
 		indexCollectionType aerospike.IndexCollectionType,
 		ctx ...*aerospike.CDTContext,
 	) (*aerospike.IndexTask, aerospike.Error)
+
 	DropIndex(policy *aerospike.WritePolicy, namespace, set, indexName string) aerospike.Error
 
 	RegisterUDF(

@@ -1,7 +1,7 @@
 package aerospike
 
 import (
-	"log/slog"
+	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
@@ -12,7 +12,6 @@ type singleRecordWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
 	stats       *models.RestoreStats
-	logger      *slog.Logger
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
@@ -35,9 +34,7 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 			return nil
 		}
 
-		rw.logger.Error("error writing record", "record", record.Key.Digest(), "error", aerr)
-
-		return aerr
+		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), aerr)
 	}
 
 	rw.stats.IncrRecordsInserted()

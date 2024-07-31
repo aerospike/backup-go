@@ -1,4 +1,4 @@
-package tests
+package integration
 
 import (
 	"context"
@@ -172,7 +172,7 @@ func randomBytes(n int) []byte {
 
 func (s *writeReadTestSuite) write(filename string, bytes, times int, config *models.S3Config) []byte {
 	ctx := context.Background()
-	writerFactory, _ := aws.NewS3WriterFactory(ctx, config, true)
+	writerFactory, _ := aws.NewWriter(ctx, config, true)
 
 	writer, err := writerFactory.NewWriter(ctx, filename)
 	if err != nil {
@@ -197,7 +197,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *mo
 	}
 
 	// cannot create new streamingReader because folder is not empty
-	_, err = aws.NewS3WriterFactory(ctx, config, false)
+	_, err = aws.NewWriter(ctx, config, false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
 	return allBytesWritten

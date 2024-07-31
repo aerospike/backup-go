@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package writers
+package sized
 
 import (
 	"bytes"
@@ -56,7 +56,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 		return writer2, nil
 	}
 
-	wcs, err := NewSized(context.Background(), 10, open)
+	wcs, err := NewWriter(context.Background(), 10, open)
 	suite.NotNil(wcs)
 	suite.Nil(err)
 

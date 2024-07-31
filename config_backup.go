@@ -35,7 +35,7 @@ type BackupConfig struct {
 	BinList []string
 	// Partitions specifies the Aerospike partitions to back up.
 	Partitions PartitionRange
-	// EncoderType describes an encoder type that will be used on backing up.
+	// EncoderType describes an Encoder type that will be used on backing up.
 	// Default `EncoderTypeASB` = 0.
 	EncoderType EncoderType
 	// Parallel is the number of concurrent scans to run against the Aerospike cluster.

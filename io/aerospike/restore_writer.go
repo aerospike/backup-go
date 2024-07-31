@@ -68,7 +68,6 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 		asc:         asc,
 		writePolicy: writePolicy,
 		stats:       stats,
-		logger:      logger,
 	}
 }
 

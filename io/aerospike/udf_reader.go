@@ -1,6 +1,7 @@
 package aerospike
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -43,7 +44,7 @@ func (r *UdfReader) Read() (*models.Token, error) {
 
 		udfs, err := r.client.GetUDFs()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to fetch UDFs: %w", err)
 		}
 
 		r.udfs = make(chan *models.UDF, len(udfs))

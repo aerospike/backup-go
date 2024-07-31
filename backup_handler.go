@@ -24,8 +24,11 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
-	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/aerospike/backup-go/io/aerospike"
+	"github.com/aerospike/backup-go/io/compression"
+	"github.com/aerospike/backup-go/io/counter"
+	"github.com/aerospike/backup-go/io/encryption"
+	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
@@ -44,11 +47,11 @@ type Writer interface {
 	GetType() string
 }
 
-// encoder is an interface for encoding the types from the models package.
+// Encoder is an interface for encoding the types from the models package.
 // It is used to support different data formats.
 //
 //go:generate mockery --name Encoder
-type encoder interface {
+type Encoder interface {
 	EncodeToken(*models.Token) ([]byte, error)
 	GetHeader() []byte
 	GenerateFilename() string
@@ -57,7 +60,7 @@ type encoder interface {
 // BackupHandler handles a backup job
 type BackupHandler struct {
 	writer                 Writer
-	encoder                encoder
+	encoder                Encoder
 	config                 *BackupConfig
 	aerospikeClient        *a.Client
 	logger                 *slog.Logger
@@ -118,7 +121,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	// at some point we may want to treat the secondary indexes/UDFs
 	// like records and back them up as part of the same pipeline
 	// but doing so would cause them to be mixed in with records in the backup file(s)
-	err = bh.backupSIndexesAndUdfs(ctx, backupWriters[0])
+	err = bh.backupSIndexesAndUDFs(ctx, backupWriters[0])
 	if err != nil {
 		return err
 	}
@@ -179,7 +182,7 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 // The returned writer may be compressed or encrypted depending on the BackupHandler's configuration.
 func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) {
 	if bh.config.FileLimit > 0 {
-		return writers.NewSized(ctx, bh.config.FileLimit, bh.newConfiguredWriter)
+		return sized.NewWriter(ctx, bh.config.FileLimit, bh.newConfiguredWriter)
 	}
 
 	return bh.newConfiguredWriter(ctx)
@@ -193,9 +196,9 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 		return nil, err
 	}
 
-	countingWriter := writers.NewCountingWriter(storageWriter, &bh.stats.BytesWritten)
+	countingWriter := counter.NewWriter(storageWriter, &bh.stats.BytesWritten)
 
-	encryptedWriter, err := setEncryption(
+	encryptedWriter, err := newEncryptionWriter(
 		bh.config.EncryptionPolicy,
 		bh.config.SecretAgentConfig,
 		countingWriter,
@@ -204,7 +207,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 		return nil, fmt.Errorf("cannot set encryption: %w", err)
 	}
 
-	zippedWriter, err := setCompression(bh.config.CompressionPolicy, encryptedWriter)
+	zippedWriter, err := newCompressionWriter(bh.config.CompressionPolicy, encryptedWriter)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +222,24 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 	return zippedWriter, nil
 }
 
-func setEncryption(policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, writer io.WriteCloser,
+// newCompressionWriter returns compression writer for compressing backup.
+func newCompressionWriter(
+	policy *models.CompressionPolicy, writer io.WriteCloser,
+) (io.WriteCloser, error) {
+	if policy == nil || policy.Mode == models.CompressNone {
+		return writer, nil
+	}
+
+	if policy.Mode == models.CompressZSTD {
+		return compression.NewWriter(writer, policy.Level)
+	}
+
+	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
+}
+
+// newEncryptionWriter returns encryption writer for encrypting backup.
+func newEncryptionWriter(
+	policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
 	if policy == nil || policy.Mode == models.EncryptNone {
 		return writer, nil
@@ -230,19 +250,7 @@ func setEncryption(policy *models.EncryptionPolicy, secretAgent *models.SecretAg
 		return nil, err
 	}
 
-	return writers.NewEncryptedWriter(writer, privateKey)
-}
-
-func setCompression(policy *models.CompressionPolicy, writer io.WriteCloser) (io.WriteCloser, error) {
-	if policy == nil || policy.Mode == models.CompressNone {
-		return writer, nil
-	}
-
-	if policy.Mode == models.CompressZSTD {
-		return writers.NewCompressedWriter(writer, policy.Level)
-	}
-
-	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
+	return encryption.NewWriter(writer, privateKey)
 }
 
 func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
@@ -253,7 +261,7 @@ func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
 	return nil
 }
 
-func (bh *BackupHandler) backupSIndexesAndUdfs(
+func (bh *BackupHandler) backupSIndexesAndUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
 ) error {

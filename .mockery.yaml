@@ -3,7 +3,7 @@ filename: "{{.InterfaceName}}_mock.go"
 all: True
 exported: True
 packages:
-  github.com/aerospike/backup-go/encoding/asb:
+  github.com/aerospike/backup-go/io/encoding/asb:
     config:
       dir: ./encoding/asb/mocks
       outpkg: mocks

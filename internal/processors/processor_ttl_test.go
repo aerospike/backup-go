@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v7"
-	cltime "github.com/aerospike/backup-go/encoding/citrusleaf_time"
+	"github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 )

@@ -3,7 +3,6 @@ package local
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,8 +40,6 @@ func NewDirectoryWriterFactory(dir string, removeFiles bool,
 	}, nil
 }
 
-var errBackupDirectoryInvalid = errors.New("backup directory is invalid")
-
 // prepareBackupDirectory creates backup directory if it not exists.
 // returns error is dir already exits and it is not empty.
 func prepareBackupDirectory(dir string) error {
@@ -56,16 +53,16 @@ func prepareBackupDirectory(dir string) error {
 	}
 
 	if !dirInfo.IsDir() {
-		return fmt.Errorf("%w: %s is not a directory", errBackupDirectoryInvalid, dir)
+		return fmt.Errorf("%s is not a directory", dir)
 	}
 
 	fileInfo, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("%w: failed to read %s: %w", errBackupDirectoryInvalid, dir, err)
+		return fmt.Errorf("failed to read dir %s: %w", dir, err)
 	}
 
 	if len(fileInfo) > 0 {
-		return fmt.Errorf("%w: %s is not empty", errBackupDirectoryInvalid, dir)
+		return fmt.Errorf("%s is not empty", dir)
 	}
 
 	return nil
@@ -75,7 +72,7 @@ func prepareBackupDirectory(dir string) error {
 func forcePrepareBackupDirectory(dir string) error {
 	err := os.RemoveAll(dir)
 	if err != nil {
-		return fmt.Errorf("%w: failed to remove directory %s: %v", errBackupDirectoryInvalid, dir, err)
+		return fmt.Errorf("failed to remove directory %s: %v", dir, err)
 	}
 
 	return makeDir(dir)
@@ -84,7 +81,7 @@ func forcePrepareBackupDirectory(dir string) error {
 func makeDir(dir string) error {
 	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
-		return fmt.Errorf("%w: failed to create backup directory %s: %v", errBackupDirectoryInvalid, dir, err)
+		return fmt.Errorf("failed to create backup directory %s: %v", dir, err)
 	}
 
 	return nil
@@ -106,17 +103,21 @@ func (bf *bufferedFile) Close() error {
 
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the fileName parameter.
-func (f *Writer) NewWriter(_ context.Context, fileName string) (io.WriteCloser, error) {
+func (f *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	filePath := filepath.Join(f.directory, fileName)
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 
 	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil
 }
 
 func (f *Writer) GetType() string {
-	return "directory"
+	return localType
 }

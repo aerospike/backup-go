@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/internal/citrusleaf_time"
+	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 )
 

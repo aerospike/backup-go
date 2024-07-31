@@ -63,7 +63,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-	mockEncoder := mocks.NewMockencoder(suite.T())
+	mockEncoder := mocks.NewMockEncoder(suite.T())
 	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
 	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)

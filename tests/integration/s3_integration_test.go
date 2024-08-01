@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -140,7 +141,7 @@ func (s *writeReadTestSuite) TearDownSuite() {
 }
 
 func (s *writeReadTestSuite) TestWriteRead() {
-	config := &backup.S3Config{
+	config := &s3.Config{
 		Bucket:   "backup",
 		Region:   "eu",
 		Endpoint: "http://localhost:9000",
@@ -168,7 +169,7 @@ func randomBytes(n int) []byte {
 	return data
 }
 
-func (s *writeReadTestSuite) write(filename string, bytes, times int, config *backup.S3Config) []byte {
+func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3.Config) []byte {
 	ctx := context.Background()
 	writerFactory, _ := backup.NewWriterS3(ctx, config, true)
 
@@ -201,7 +202,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *ba
 	return allBytesWritten
 }
 
-func (s *writeReadTestSuite) read(config *backup.S3Config) []byte {
+func (s *writeReadTestSuite) read(config *s3.Config) []byte {
 	ctx := context.Background()
 	streamingReader, _ := backup.NewStreamingReaderS3(ctx, config, backup.EncoderTypeASB)
 

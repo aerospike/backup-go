@@ -90,7 +90,7 @@ func newBackupHandler(
 		logger:                 logger,
 		writer:                 writer,
 		firstFileHeaderWritten: &atomic.Bool{},
-		encoder:                newEncoder(config.EncoderType, config.Namespace),
+		encoder:                NewEncoder(config.EncoderType, config.Namespace),
 		limiter:                limiter,
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
 	}
@@ -224,13 +224,13 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 
 // newCompressionWriter returns compression writer for compressing backup.
 func newCompressionWriter(
-	policy *models.CompressionPolicy, writer io.WriteCloser,
+	policy *CompressionPolicy, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
-	if policy == nil || policy.Mode == models.CompressNone {
+	if policy == nil || policy.Mode == CompressNone {
 		return writer, nil
 	}
 
-	if policy.Mode == models.CompressZSTD {
+	if policy.Mode == CompressZSTD {
 		return compression.NewWriter(writer, policy.Level)
 	}
 
@@ -239,9 +239,9 @@ func newCompressionWriter(
 
 // newEncryptionWriter returns encryption writer for encrypting backup.
 func newEncryptionWriter(
-	policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, writer io.WriteCloser,
+	policy *EncryptionPolicy, secretAgent *SecretAgentConfig, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
-	if policy == nil || policy.Mode == models.EncryptNone {
+	if policy == nil || policy.Mode == EncryptNone {
 		return writer, nil
 	}
 

@@ -1,14 +1,14 @@
-package models
+package backup
 
 import "fmt"
 
-// RestoreNamespace specifies an alternative namespace name for the restore
+// RestoreNamespaceConfig specifies an alternative namespace name for the restore
 // operation, where Source is the original namespace name and Destination is
 // the namespace name to which the backup data is to be restored.
 //
-// @Description RestoreNamespace specifies an alternative namespace name for the restore
+// @Description RestoreNamespaceConfig specifies an alternative namespace name for the restore
 // @Description operation.
-type RestoreNamespace struct {
+type RestoreNamespaceConfig struct {
 	// Original namespace name.
 	Source *string `json:"source,omitempty" example:"source-ns" validate:"required"`
 	// Destination namespace name.
@@ -16,7 +16,7 @@ type RestoreNamespace struct {
 }
 
 // Validate validates the restore namespace.
-func (n *RestoreNamespace) Validate() error {
+func (n *RestoreNamespaceConfig) Validate() error {
 	if n.Source == nil {
 		return fmt.Errorf("source namespace is not specified")
 	}

@@ -9,7 +9,6 @@ import (
 	"path"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -17,13 +16,13 @@ import (
 
 type Writer struct {
 	client   *s3.Client
-	s3Config *models.S3Config
+	s3Config *Config
 	fileID   *atomic.Uint32 // increments for each new file created
 }
 
 func NewWriter(
 	ctx context.Context,
-	s3Config *models.S3Config,
+	s3Config *Config,
 	removeFiles bool,
 ) (*Writer, error) {
 	if s3Config.ChunkSize > s3maxFile {
@@ -176,7 +175,7 @@ func (w *s3Writer) Close() error {
 	return nil
 }
 
-func isEmptyDirectory(ctx context.Context, client *s3.Client, s3Config *models.S3Config) (bool, error) {
+func isEmptyDirectory(ctx context.Context, client *s3.Client, s3Config *Config) (bool, error) {
 	resp, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:  &s3Config.Bucket,
 		Prefix:  &s3Config.Prefix,
@@ -195,7 +194,7 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, s3Config *models.S
 	return len(resp.Contents) == 0, nil
 }
 
-func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, s3Config *models.S3Config) error {
+func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, s3Config *Config) error {
 	fileCh, errCh := streamFilesFromS3(ctx, client, s3Config)
 
 	for {

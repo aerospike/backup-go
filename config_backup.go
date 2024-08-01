@@ -5,7 +5,6 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/models"
 )
 
 // BackupConfig contains configuration for the backup operation.
@@ -21,11 +20,11 @@ type BackupConfig struct {
 	// Only include records that last changed after the given time (optional).
 	ModAfter *time.Time
 	// Encryption details.
-	EncryptionPolicy *models.EncryptionPolicy
+	EncryptionPolicy *EncryptionPolicy
 	// Compression details.
-	CompressionPolicy *models.CompressionPolicy
+	CompressionPolicy *CompressionPolicy
 	// Secret agent config.
-	SecretAgentConfig *models.SecretAgentConfig
+	SecretAgentConfig *SecretAgentConfig
 	// Namespace is the Aerospike namespace to back up.
 	Namespace string
 	// SetList is the Aerospike set to back up (optional, given an empty list,
@@ -91,8 +90,8 @@ func PartitionRangeAll() PartitionRange {
 	return NewPartitionRange(0, MaxPartitions)
 }
 
-// NewBackupConfig returns a new BackupConfig with default values.
-func NewBackupConfig() *BackupConfig {
+// NewDefaultBackupConfig returns a new BackupConfig with default values.
+func NewDefaultBackupConfig() *BackupConfig {
 	return &BackupConfig{
 		Partitions:  PartitionRange{0, MaxPartitions},
 		Parallel:    1,

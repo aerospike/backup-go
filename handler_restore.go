@@ -174,9 +174,9 @@ func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) 
 
 // newCompressionReader returns compression reader for uncompressing backup.
 func newCompressionReader(
-	policy *models.CompressionPolicy, readers []io.ReadCloser,
+	policy *CompressionPolicy, readers []io.ReadCloser,
 ) ([]io.ReadCloser, error) {
-	if policy == nil || policy.Mode == models.CompressNone {
+	if policy == nil || policy.Mode == CompressNone {
 		return readers, nil
 	}
 
@@ -196,7 +196,7 @@ func newCompressionReader(
 
 // newEncryptionReader returns encryption reader for decrypting backup.
 func newEncryptionReader(
-	policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, readers []io.ReadCloser,
+	policy *EncryptionPolicy, secretAgent *SecretAgentConfig, readers []io.ReadCloser,
 ) ([]io.ReadCloser, error) {
 	if policy == nil {
 		return readers, nil
@@ -234,9 +234,9 @@ func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 
 	for i, reader := range readers {
-		d, err := newDecoder(rh.config.EncoderType, reader)
+		d, err := NewDecoder(rh.config.EncoderType, reader)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create decoder: %w", err)
+			return nil, fmt.Errorf("failed to create Decoder: %w", err)
 		}
 
 		dr := newTokenReader(d, rh.logger)
@@ -292,7 +292,12 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 
 	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.ReadRecords))
 	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
-	changeNamespace := newTokenWorker(processors.NewChangeNamespace(rh.config.Namespace))
+	changeNamespace := newTokenWorker(
+		processors.NewChangeNamespace(
+			rh.config.Namespace.Source,
+			rh.config.Namespace.Destination,
+		),
+	)
 	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.logger))
 	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped))
 	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))

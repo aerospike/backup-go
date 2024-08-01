@@ -8,19 +8,21 @@ import (
 )
 
 // NewChangeNamespace creates new changeNamespace
-func NewChangeNamespace(namespace *models.RestoreNamespace) TokenProcessor {
-	if namespace == nil {
+func NewChangeNamespace(source, destination *string) TokenProcessor {
+	if source == nil || destination == nil {
 		return &noopProcessor[*models.Token]{}
 	}
 
 	return &changeNamespace{
-		namespace,
+		source:      source,
+		destination: destination,
 	}
 }
 
 // changeNamespace is used to restore to another namespace.
 type changeNamespace struct {
-	restoreNamespace *models.RestoreNamespace
+	source      *string
+	destination *string
 }
 
 // Process filters tokens by type.
@@ -31,11 +33,11 @@ func (p changeNamespace) Process(token *models.Token) (*models.Token, error) {
 	}
 
 	key := token.Record.Key
-	if key.Namespace() != *p.restoreNamespace.Source {
-		return nil, fmt.Errorf("invalid namespace %s (expected: %s)", key.Namespace(), *p.restoreNamespace.Source)
+	if key.Namespace() != *p.source {
+		return nil, fmt.Errorf("invalid namespace %s (expected: %s)", key.Namespace(), *p.source)
 	}
 
-	newKey, err := a.NewKeyWithDigest(*p.restoreNamespace.Destination, key.SetName(), key.Value(), key.Digest())
+	newKey, err := a.NewKeyWithDigest(*p.destination, key.SetName(), key.Value(), key.Digest())
 	if err != nil {
 		return nil, err
 	}

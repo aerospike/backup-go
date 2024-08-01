@@ -11,7 +11,7 @@ import (
 	secretAgent "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
-const secretPrefix = "secret:"
+const secretPrefix = "secrets:"
 
 // SecretAgentConfig contains secret agent connection information.
 // @Description SecretAgentConfig contains secret agent connection information.

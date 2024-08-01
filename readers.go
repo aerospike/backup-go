@@ -22,17 +22,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Decoder is an interface for reading backup data as tokens.
-// It is used to support different data formats.
-// While the return type is `any`, the actual types returned should
-// only be the types exposed by the models package.
-// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
-//
-//go:generate mockery --name Decoder
-type Decoder interface {
-	NextToken() (*models.Token, error)
-}
-
 // tokenReader satisfies the DataReader interface
 // It reads data as tokens using a Decoder
 type tokenReader struct {

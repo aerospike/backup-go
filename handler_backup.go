@@ -47,16 +47,6 @@ type Writer interface {
 	GetType() string
 }
 
-// Encoder is an interface for encoding the types from the models package.
-// It is used to support different data formats.
-//
-//go:generate mockery --name Encoder
-type Encoder interface {
-	EncodeToken(*models.Token) ([]byte, error)
-	GetHeader() []byte
-	GenerateFilename() string
-}
-
 // BackupHandler handles a backup job
 type BackupHandler struct {
 	writer                 Writer

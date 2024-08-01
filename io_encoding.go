@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/models"
 )
 
 // EncoderType custom type for Encoder types enum.
@@ -14,6 +15,16 @@ const (
 	EncoderTypeASB EncoderType = iota
 )
 
+// Encoder is an interface for encoding the types from the models package.
+// It is used to support different data formats.
+//
+//go:generate mockery --name Encoder
+type Encoder interface {
+	EncodeToken(*models.Token) ([]byte, error)
+	GetHeader() []byte
+	GenerateFilename() string
+}
+
 // NewEncoder returns new Encoder according to `EncoderType`
 func NewEncoder(eType EncoderType, namespace string) Encoder {
 	switch eType {
@@ -23,6 +34,17 @@ func NewEncoder(eType EncoderType, namespace string) Encoder {
 	default:
 		return asb.NewEncoder(namespace)
 	}
+}
+
+// Decoder is an interface for reading backup data as tokens.
+// It is used to support different data formats.
+// While the return type is `any`, the actual types returned should
+// only be the types exposed by the models package.
+// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
+//
+//go:generate mockery --name Decoder
+type Decoder interface {
+	NextToken() (*models.Token, error)
 }
 
 // NewDecoder returns new Decoder according to `EncoderType`

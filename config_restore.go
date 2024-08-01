@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/models"
 )
 
 // RestoreConfig contains configuration for the restore operation.
@@ -17,13 +16,13 @@ type RestoreConfig struct {
 	WritePolicy *a.WritePolicy
 	// Namespace details for the restore operation.
 	// By default, the data is restored to the namespace from which it was taken.
-	Namespace *models.RestoreNamespace `json:"namespace,omitempty"`
+	Namespace *RestoreNamespaceConfig `json:"namespace,omitempty"`
 	// Encryption details.
-	EncryptionPolicy *models.EncryptionPolicy
+	EncryptionPolicy *EncryptionPolicy
 	// Compression details.
-	CompressionPolicy *models.CompressionPolicy
+	CompressionPolicy *CompressionPolicy
 	// Secret agent config.
-	SecretAgentConfig *models.SecretAgentConfig
+	SecretAgentConfig *SecretAgentConfig
 	// The sets to restore (optional, given an empty list, all sets will be restored).
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
@@ -53,8 +52,8 @@ type RestoreConfig struct {
 	MaxAsyncBatches int
 }
 
-// NewRestoreConfig returns a new RestoreConfig with default values.
-func NewRestoreConfig() *RestoreConfig {
+// NewDefaultRestoreConfig returns a new RestoreConfig with default values.
+func NewDefaultRestoreConfig() *RestoreConfig {
 	return &RestoreConfig{
 		Parallel:        4,
 		BatchSize:       128,

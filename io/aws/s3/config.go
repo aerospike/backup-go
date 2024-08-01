@@ -1,8 +1,7 @@
-package models
+package s3
 
-// S3Config represents the AWS S3 configuration.
-// TODO: rename to AWS Config
-type S3Config struct {
+// Config represents the AWS S3 configuration.
+type Config struct {
 	Bucket    string
 	Region    string
 	Endpoint  string
@@ -11,16 +10,16 @@ type S3Config struct {
 	ChunkSize int
 }
 
-// NewS3Config returns new AWS S3 configuration.
-func NewS3Config(
+// NewConfig returns new AWS S3 configuration.
+func NewConfig(
 	bucket string,
 	region string,
 	endpoint string,
 	profile string,
 	prefix string,
 	chunkSize int,
-) *S3Config {
-	return &S3Config{
+) *Config {
+	return &Config{
 		Bucket:    bucket,
 		Region:    region,
 		Endpoint:  endpoint,

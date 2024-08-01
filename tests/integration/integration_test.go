@@ -26,8 +26,6 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/tests"
 	"github.com/aerospike/tools-common-go/testutils"
@@ -212,8 +210,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		{
 			name: "default",
 			args: args{
-				backupConfig:  backup.NewBackupConfig(),
-				restoreConfig: backup.NewRestoreConfig(),
+				backupConfig:  backup.NewDefaultBackupConfig(),
+				restoreConfig: backup.NewDefaultRestoreConfig(),
 				bins:          testBins,
 			},
 		},
@@ -272,11 +270,11 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		bins          a.BinMap
 		expectedFiles int
 	}
-	nonBatchRestore := backup.NewRestoreConfig()
+	nonBatchRestore := backup.NewDefaultRestoreConfig()
 	nonBatchRestore.DisableBatchWrites = true
-	batchRestore := backup.NewRestoreConfig()
+	batchRestore := backup.NewDefaultRestoreConfig()
 	batchRestore.DisableBatchWrites = false
-	configWithFileLimit := backup.NewBackupConfig()
+	configWithFileLimit := backup.NewDefaultBackupConfig()
 	configWithFileLimit.FileLimit = 1024 * 1024
 
 	var tests = []struct {
@@ -286,7 +284,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		{
 			name: "default",
 			args: args{
-				backupConfig:  backup.NewBackupConfig(),
+				backupConfig:  backup.NewDefaultBackupConfig(),
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
 				expectedFiles: 1,
@@ -295,7 +293,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		{
 			name: "default batch",
 			args: args{
-				backupConfig:  backup.NewBackupConfig(),
+				backupConfig:  backup.NewDefaultBackupConfig(),
 				restoreConfig: batchRestore,
 				bins:          testBins,
 				expectedFiles: 1,
@@ -370,7 +368,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, err := local.NewDirectoryWriterFactory(backupDir, false)
+	writerFactory, err := backup.NewWriterLocal(backupDir, false)
 	suite.Nil(err)
 
 	bh, err := suite.backupClient.Backup(
@@ -426,7 +424,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
-	_, err = local.NewDirectoryWriterFactory(backupDir, false)
+	_, err = backup.NewWriterLocal(backupDir, false)
 	suite.ErrorContains(err, "is not empty")
 }
 
@@ -438,7 +436,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	recs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	data := &bytes.Buffer{}
-	encoder := asb.NewEncoder("test")
+	encoder := backup.NewEncoder(backup.EncoderTypeASB, "test")
 
 	header := encoder.GetHeader()
 
@@ -469,7 +467,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	}
 	rh, err := suite.backupClient.Restore(
 		ctx,
-		backup.NewRestoreConfig(),
+		backup.NewDefaultRestoreConfig(),
 		reader,
 	)
 	suite.Nil(err)
@@ -529,11 +527,11 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 
 	ctx := context.Background()
 
-	backupConfig := backup.NewBackupConfig()
+	backupConfig := backup.NewDefaultBackupConfig()
 	backupConfig.Partitions = partitions
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := local.NewDirectoryWriterFactory(backupDir, false)
+	writerFactory, _ := backup.NewWriterLocal(backupDir, false)
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
@@ -550,7 +548,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 		panic(err)
 	}
 
-	restoreConfig := backup.NewRestoreConfig()
+	restoreConfig := backup.NewDefaultRestoreConfig()
 	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
 
 	rh, err := suite.backupClient.Restore(
@@ -574,7 +572,7 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 	writer := byteReadWriterFactory{}
 	bh, err := suite.backupClient.Backup(
 		ctx,
-		backup.NewBackupConfig(),
+		backup.NewDefaultBackupConfig(),
 		&writer,
 	)
 	suite.NotNil(bh)
@@ -589,7 +587,7 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	restoreConfig := backup.NewRestoreConfig()
+	restoreConfig := backup.NewDefaultRestoreConfig()
 	reader := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -775,7 +773,7 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 		BinList:     []string{"BackupRestore", "OnlyBackup"},
 	}
 
-	var restoreConfig = backup.NewRestoreConfig()
+	var restoreConfig = backup.NewDefaultRestoreConfig()
 	restoreConfig.BinList = []string{"BackupRestore", "OnlyRestore"} // only BackupAndRestore should be restored
 
 	suite.SetupTest(initialRecords)
@@ -819,7 +817,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 		ModBefore:   &upperLimit,
 	}
 
-	var restoreConfig = backup.NewRestoreConfig()
+	var restoreConfig = backup.NewDefaultRestoreConfig()
 
 	suite.Run("Filter by bin", func() {
 		runBackupRestore(suite, backupConfig, restoreConfig, expectedRecords)
@@ -845,7 +843,7 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
 	backupConfig.ScanPolicy.RecordsPerSecond = rps
 
-	var restoreConfig = backup.NewRestoreConfig()
+	var restoreConfig = backup.NewDefaultRestoreConfig()
 	restoreConfig.RecordsPerSecond = rps
 
 	now := time.Now()

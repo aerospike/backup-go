@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -18,13 +17,13 @@ type validator interface {
 
 type StreamingReader struct {
 	client    *s3.Client
-	s3Config  *models.S3Config
+	s3Config  *Config
 	validator validator
 }
 
 func NewStreamingReader(
 	ctx context.Context,
-	s3Config *models.S3Config,
+	s3Config *Config,
 	validator validator,
 ) (*StreamingReader, error) {
 	if validator == nil {
@@ -108,7 +107,7 @@ func (r *StreamingReader) streamBackupFiles(
 func streamFilesFromS3(
 	ctx context.Context,
 	client *s3.Client,
-	s3Config *models.S3Config,
+	s3Config *Config,
 ) (_ <-chan string, _ <-chan error) {
 	fileCh := make(chan string)
 	errCh := make(chan error)

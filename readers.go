@@ -22,26 +22,26 @@ import (
 	"github.com/google/uuid"
 )
 
-// decoder is an interface for reading backup data as tokens.
+// Decoder is an interface for reading backup data as tokens.
 // It is used to support different data formats.
 // While the return type is `any`, the actual types returned should
 // only be the types exposed by the models package.
 // e.g. *models.Record, *models.UDF and *models.SecondaryIndex
 //
 //go:generate mockery --name Decoder
-type decoder interface {
+type Decoder interface {
 	NextToken() (*models.Token, error)
 }
 
 // tokenReader satisfies the DataReader interface
-// It reads data as tokens using a decoder
+// It reads data as tokens using a Decoder
 type tokenReader struct {
-	decoder decoder
+	decoder Decoder
 	logger  *slog.Logger
 }
 
 // newTokenReader creates a new GenericReader
-func newTokenReader(decoder decoder, logger *slog.Logger) *tokenReader {
+func newTokenReader(decoder Decoder, logger *slog.Logger) *tokenReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeToken)
 	logger.Debug("created new token reader")
@@ -52,7 +52,7 @@ func newTokenReader(decoder decoder, logger *slog.Logger) *tokenReader {
 	}
 }
 
-// Read reads the next token from the decoder
+// Read reads the next token from the Decoder
 func (dr *tokenReader) Read() (*models.Token, error) {
 	return dr.decoder.NextToken()
 }

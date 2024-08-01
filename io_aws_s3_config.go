@@ -1,7 +1,8 @@
-package models
+package backup
+
+import "github.com/aerospike/backup-go/io/aws/s3"
 
 // S3Config represents the AWS S3 configuration.
-// TODO: rename to AWS Config
 type S3Config struct {
 	Bucket    string
 	Region    string
@@ -27,5 +28,17 @@ func NewS3Config(
 		Profile:   profile,
 		Prefix:    prefix,
 		ChunkSize: chunkSize,
+	}
+}
+
+// mapS3Config maps config from package backup to internal s3 config.
+func mapS3Config(cfg *S3Config) *s3.Config {
+	return &s3.Config{
+		Bucket:    cfg.Bucket,
+		Region:    cfg.Region,
+		Endpoint:  cfg.Endpoint,
+		Profile:   cfg.Profile,
+		Prefix:    cfg.Prefix,
+		ChunkSize: cfg.ChunkSize,
 	}
 }

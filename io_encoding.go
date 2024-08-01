@@ -14,8 +14,8 @@ const (
 	EncoderTypeASB EncoderType = iota
 )
 
-// newEncoder returns new Encoder according to `EncoderType`
-func newEncoder(eType EncoderType, namespace string) Encoder {
+// NewEncoder returns new Encoder according to `EncoderType`
+func NewEncoder(eType EncoderType, namespace string) Encoder {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
@@ -25,10 +25,10 @@ func newEncoder(eType EncoderType, namespace string) Encoder {
 	}
 }
 
-// newDecoder returns new decoder according to `EncoderType`
-func newDecoder(eType EncoderType, src io.Reader) (decoder, error) {
+// NewDecoder returns new Decoder according to `EncoderType`
+func NewDecoder(eType EncoderType, src io.Reader) (Decoder, error) {
 	switch eType {
-	// As at the moment only one `ASB` decoder supported, we use such construction.
+	// As at the moment only one `ASB` Decoder supported, we use such construction.
 	case EncoderTypeASB:
 		return asb.NewDecoder(src)
 	default:

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package writers
+package sized
 
 import (
 	"context"
@@ -20,10 +20,10 @@ import (
 	"io"
 )
 
-// Sized wraps an io.WriteCloser and adds a size limit.
+// Writer wraps an io.WriteCloser and adds a size limit.
 // when the size limit is reached, the io.WriteCloser is closed and a new one is created
 // using the open function.
-type Sized struct {
+type Writer struct {
 	ctx    context.Context // stored internally to be used by the Write method
 	writer io.WriteCloser
 	open   func(context.Context) (io.WriteCloser, error)
@@ -31,28 +31,26 @@ type Sized struct {
 	limit  int64
 }
 
-var _ io.WriteCloser = (*Sized)(nil)
-
-// NewSized creates a new Sized writer with a size limit.
+// NewWriter creates a new Writer writer with a size limit.
 // limit must be greater than 0.
-func NewSized(ctx context.Context, limit int64,
-	open func(context.Context) (io.WriteCloser, error)) (*Sized, error) {
+func NewWriter(ctx context.Context, limit int64,
+	open func(context.Context) (io.WriteCloser, error)) (*Writer, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be greater than 0, got %d", limit)
 	}
 
-	return &Sized{
+	return &Writer{
 		ctx:   ctx,
 		limit: limit,
 		open:  open,
 	}, nil
 }
 
-func (f *Sized) Write(p []byte) (n int, err error) {
+func (f *Writer) Write(p []byte) (n int, err error) {
 	if f.size >= f.limit {
-		err := f.writer.Close()
+		err = f.writer.Close()
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to close writer: %w", err)
 		}
 
 		f.size = 0
@@ -62,7 +60,7 @@ func (f *Sized) Write(p []byte) (n int, err error) {
 	if f.writer == nil {
 		f.writer, err = f.open(f.ctx)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to open writer: %w", err)
 		}
 	}
 
@@ -72,7 +70,7 @@ func (f *Sized) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-func (f *Sized) Close() error {
+func (f *Writer) Close() error {
 	if f.writer == nil { // in case there were no writes
 		return nil
 	}

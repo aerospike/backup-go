@@ -24,8 +24,8 @@ import (
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
-	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/aerospike/backup-go/io/aerospike"
+	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
@@ -146,7 +146,7 @@ func (rh *RestoreHandler) processReaders(
 func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
 	defer rh.closeReaders(rs)
 
-	rs, err := setEncryptionDecoder(
+	rs, err := newEncryptionReader(
 		rh.config.EncryptionPolicy,
 		rh.config.SecretAgentConfig,
 		rs,
@@ -155,7 +155,7 @@ func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) 
 		return err
 	}
 
-	rs, err = setCompressionDecoder(rh.config.CompressionPolicy, rs)
+	rs, err = newCompressionReader(rh.config.CompressionPolicy, rs)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,10 @@ func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) 
 	return nil
 }
 
-func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
+// newCompressionReader returns compression reader for uncompressing backup.
+func newCompressionReader(
+	policy *models.CompressionPolicy, readers []io.ReadCloser,
+) ([]io.ReadCloser, error) {
 	if policy == nil || policy.Mode == models.CompressNone {
 		return readers, nil
 	}
@@ -191,7 +194,8 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 	return zstdReaders, nil
 }
 
-func setEncryptionDecoder(
+// newEncryptionReader returns encryption reader for decrypting backup.
+func newEncryptionReader(
 	policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, readers []io.ReadCloser,
 ) ([]io.ReadCloser, error) {
 	if policy == nil {
@@ -206,7 +210,7 @@ func setEncryptionDecoder(
 	decryptedReaders := make([]io.ReadCloser, len(readers))
 
 	for i, reader := range readers {
-		encryptedReader, err := writers.NewEncryptedReader(reader, privateKey)
+		encryptedReader, err := encryption.NewEncryptedReader(reader, privateKey)
 		if err != nil {
 			return nil, err
 		}

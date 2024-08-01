@@ -3,7 +3,6 @@ package s3
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,25 +22,23 @@ type StreamingReader struct {
 	validator validator
 }
 
-var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
-
-func NewS3StreamingReader(
+func NewStreamingReader(
 	ctx context.Context,
-	config *models.S3Config,
+	s3Config *models.S3Config,
 	validator validator,
 ) (*StreamingReader, error) {
 	if validator == nil {
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	client, err := newS3Client(ctx, config)
+	client, err := newS3Client(ctx, s3Config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &StreamingReader{
 		client:    client,
-		s3Config:  config,
+		s3Config:  s3Config,
 		validator: validator,
 	}, nil
 }
@@ -49,10 +46,10 @@ func NewS3StreamingReader(
 // StreamFiles read files form s3 and send io.Readers to `readersCh` communication
 // chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
-func (f *StreamingReader) StreamFiles(
+func (r *StreamingReader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	fileCh, s3errCh := f.streamBackupFiles(ctx)
+	fileCh, s3errCh := r.streamBackupFiles(ctx)
 
 	for {
 		select {
@@ -62,7 +59,7 @@ func (f *StreamingReader) StreamFiles(
 			if !ok {
 				fileCh = nil
 			} else {
-				reader, err := f.newS3Reader(ctx, file)
+				reader, err := r.newS3Reader(ctx, file)
 				if err != nil {
 					errorsCh <- err
 					return
@@ -88,17 +85,17 @@ func (f *StreamingReader) StreamFiles(
 	close(readersCh)
 }
 
-func (f *StreamingReader) streamBackupFiles(
+func (r *StreamingReader) streamBackupFiles(
 	ctx context.Context,
 ) (_ <-chan string, _ <-chan error) {
-	fileCh, errCh := streamFilesFromS3(ctx, f.client, f.s3Config)
+	fileCh, errCh := streamFilesFromS3(ctx, r.client, r.s3Config)
 	filterFileCh := make(chan string)
 
 	go func() {
 		defer close(filterFileCh)
 
 		for file := range fileCh {
-			if err := f.validator.Run(file); err != nil {
+			if err := r.validator.Run(file); err != nil {
 				continue
 			}
 			filterFileCh <- file
@@ -109,7 +106,9 @@ func (f *StreamingReader) streamBackupFiles(
 }
 
 func streamFilesFromS3(
-	ctx context.Context, client *s3.Client, s3Config *models.S3Config,
+	ctx context.Context,
+	client *s3.Client,
+	s3Config *models.S3Config,
 ) (_ <-chan string, _ <-chan error) {
 	fileCh := make(chan string)
 	errCh := make(chan error)
@@ -129,7 +128,7 @@ func streamFilesFromS3(
 			})
 
 			if err != nil {
-				errCh <- err
+				errCh <- fmt.Errorf("failed to list objects: %w", err)
 				return
 			}
 
@@ -155,16 +154,16 @@ type s3Reader struct {
 
 var _ io.ReadCloser = (*s3Reader)(nil)
 
-func (f *StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadCloser, error) {
-	getObjectOutput, err := f.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &f.s3Config.Bucket,
+func (r *StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadCloser, error) {
+	getObjectOutput, err := r.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &r.s3Config.Bucket,
 		Key:    &key,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get s3 object: %w", err)
 	}
 
-	chunkSize := f.s3Config.ChunkSize
+	chunkSize := r.s3Config.ChunkSize
 	if chunkSize == 0 {
 		chunkSize = s3DefaultChunkSize
 	}
@@ -193,6 +192,7 @@ func (r *s3Reader) Close() error {
 	return r.closer.Close()
 }
 
-func (f *StreamingReader) GetType() string {
+// GetType return `s3type` type of storage. Used in logging.
+func (r *StreamingReader) GetType() string {
 	return s3type
 }

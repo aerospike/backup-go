@@ -8,6 +8,7 @@ import "github.com/aerospike/aerospike-client-go/v7"
 //go:generate mockery --name dbWriter
 type dbWriter interface {
 	Put(policy *aerospike.WritePolicy, key *aerospike.Key, bins aerospike.BinMap) aerospike.Error
+
 	CreateComplexIndex(
 		policy *aerospike.WritePolicy,
 		namespace,
@@ -18,11 +19,14 @@ type dbWriter interface {
 		indexCollectionType aerospike.IndexCollectionType,
 		ctx ...*aerospike.CDTContext,
 	) (*aerospike.IndexTask, aerospike.Error)
+
 	DropIndex(policy *aerospike.WritePolicy, namespace, set, indexName string) aerospike.Error
+
 	RegisterUDF(
 		policy *aerospike.WritePolicy,
 		udfBody []byte, serverPath string,
 		language aerospike.Language,
 	) (*aerospike.RegisterTask, aerospike.Error)
+
 	BatchOperate(policy *aerospike.BatchPolicy, records []aerospike.BatchRecordIfc) aerospike.Error
 }

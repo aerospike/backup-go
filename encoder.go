@@ -3,21 +3,21 @@ package backup
 import (
 	"io"
 
-	"github.com/aerospike/backup-go/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asb"
 )
 
-// EncoderType custom type for encoder types enum.
+// EncoderType custom type for Encoder types enum.
 type EncoderType int
 
 const (
-	// EncoderTypeASB matches ASB encoder with id 0.
+	// EncoderTypeASB matches ASB Encoder with id 0.
 	EncoderTypeASB EncoderType = iota
 )
 
-// newEncoder returns new encoder according to `EncoderType`
-func newEncoder(eType EncoderType, namespace string) encoder {
+// newEncoder returns new Encoder according to `EncoderType`
+func newEncoder(eType EncoderType, namespace string) Encoder {
 	switch eType {
-	// As at the moment only one `ASB` encoder supported, we use such construction.
+	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
 		return asb.NewEncoder(namespace)
 	default:

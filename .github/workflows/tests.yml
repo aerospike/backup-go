@@ -12,18 +12,18 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Get go version from go.mod
       run: |
         echo "GO_VERSION=$(grep '^go ' go.mod | cut -d " " -f 2)" >> $GITHUB_ENV
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-    - name: Test with go 
+    - name: Test with coverage 
       run: |
         make coverage
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         token: ${{secrets.CODECOV_TOKEN}}
         files: coverage.cov

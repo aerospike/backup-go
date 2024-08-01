@@ -2,14 +2,13 @@ package local
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 )
 
-var ErrRestoreDirectoryInvalid = errors.New("restore directory is invalid")
+const localType = "directory"
 
 // Validator interface that describes backup files validator.
 // Must be part of encoder implementation.
@@ -51,7 +50,7 @@ func (f *StreamingReader) StreamFiles(
 
 	fileInfo, err := os.ReadDir(f.dir)
 	if err != nil {
-		errorsCh <- fmt.Errorf("%w failed to read %s: %w", ErrRestoreDirectoryInvalid, f.dir, err)
+		errorsCh <- fmt.Errorf("failed to read dir %s: %w", f.dir, err)
 		return
 	}
 
@@ -76,7 +75,7 @@ func (f *StreamingReader) StreamFiles(
 
 		reader, err = os.Open(filePath)
 		if err != nil {
-			errorsCh <- fmt.Errorf("%w failed to open %s: %w", ErrRestoreDirectoryInvalid, filePath, err)
+			errorsCh <- fmt.Errorf("failed to open %s: %w", filePath, err)
 			return
 		}
 
@@ -94,27 +93,27 @@ func (f *StreamingReader) checkRestoreDirectory() error {
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
 		// Handle the error
-		return fmt.Errorf("%w: failed to read %s: %w", ErrRestoreDirectoryInvalid, dir, err)
+		return fmt.Errorf("failed to get dir info %s: %w", dir, err)
 	}
 
 	if !dirInfo.IsDir() {
 		// Handle the case when it's not a directory
-		return fmt.Errorf("%w: %s is not a directory", ErrRestoreDirectoryInvalid, dir)
+		return fmt.Errorf("%s is not a directory", dir)
 	}
 
 	fileInfo, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("%w: failed to read %s: %w", ErrRestoreDirectoryInvalid, dir, err)
+		return fmt.Errorf("failed to read dir %s: %w", dir, err)
 	}
 
 	// Check if the directory is empty
 	if len(fileInfo) == 0 {
-		return fmt.Errorf("%w: %s is empty", ErrRestoreDirectoryInvalid, dir)
+		return fmt.Errorf("%s is empty", dir)
 	}
 
 	return nil
 }
 
 func (f *StreamingReader) GetType() string {
-	return "directory"
+	return localType
 }

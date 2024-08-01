@@ -28,7 +28,7 @@ type RestoreConfig struct {
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
 	BinList []string
-	// EncoderType describes an encoder type that will be used on restoring.
+	// EncoderType describes an Encoder type that will be used on restoring.
 	// Default `EncoderTypeASB` = 0.
 	EncoderType EncoderType
 	// Parallel is the number of concurrent record readers from backup files.

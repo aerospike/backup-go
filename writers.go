@@ -83,15 +83,15 @@ func (tw *tokenStatsWriter) Close() error {
 
 // tokenWriter satisfies the DataWriter interface
 // It writes the types from the models package as encoded data
-// to an io.Writer. It uses an encoder to encode the data.
+// to an io.Writer. It uses an Encoder to encode the data.
 type tokenWriter struct {
-	encoder encoder
+	encoder Encoder
 	output  io.Writer
 	logger  *slog.Logger
 }
 
 // newTokenWriter creates a new tokenWriter
-func newTokenWriter(encoder encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
+func newTokenWriter(encoder Encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
 	logger.Debug("created new token writer")

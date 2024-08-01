@@ -11,7 +11,7 @@ import (
 
 const (
 	s3DefaultChunkSize = 5 * 1024 * 1024                // 5MB, minimum size of a part
-	maxS3File          = s3DefaultChunkSize * 1_000_000 // 5 TB
+	s3maxFile          = s3DefaultChunkSize * 1_000_000 // 5 TB
 	s3type             = "s3"
 )
 

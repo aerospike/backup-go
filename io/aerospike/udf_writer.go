@@ -1,7 +1,7 @@
 package aerospike
 
 import (
-	"errors"
+	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -24,31 +24,23 @@ func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	case models.UDFTypeLUA:
 		UDFLang = a.LUA
 	default:
-		msg := "error registering UDF: invalid UDF language"
-		rw.logger.Debug(msg, "udf", udf.Name, "language", udf.UDFType)
-
-		return errors.New(msg)
+		return fmt.Errorf("error registering UDF %s: invalid UDF language %b", udf.Name, udf.UDFType)
 	}
 
 	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, UDFLang)
 	if aerr != nil {
-		rw.logger.Error("error registering UDF", "udf", udf.Name, "error", aerr)
-		return aerr
+		return fmt.Errorf("error registering UDF %s: %w", udf.Name, aerr)
 	}
 
 	if job == nil {
-		msg := "error registering UDF: job is nil"
-		rw.logger.Debug(msg, "udf", udf.Name)
-
-		return errors.New(msg)
+		return fmt.Errorf("error registering UDF %s: job is nil", udf.Name)
 	}
 
 	errs := job.OnComplete()
 
 	err := <-errs
 	if err != nil {
-		rw.logger.Error("error registering UDF", "udf", udf.Name, "error", err)
-		return err
+		return fmt.Errorf("error registering UDF %s: %w", udf.Name, err)
 	}
 
 	rw.logger.Debug("registered UDF", "udf", udf.Name)

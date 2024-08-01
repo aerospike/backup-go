@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/aws"
+	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/models"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -172,7 +172,7 @@ func randomBytes(n int) []byte {
 
 func (s *writeReadTestSuite) write(filename string, bytes, times int, config *models.S3Config) []byte {
 	ctx := context.Background()
-	writerFactory, _ := aws.NewWriter(ctx, config, true)
+	writerFactory, _ := s3.NewWriter(ctx, config, true)
 
 	writer, err := writerFactory.NewWriter(ctx, filename)
 	if err != nil {
@@ -197,7 +197,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *mo
 	}
 
 	// cannot create new streamingReader because folder is not empty
-	_, err = aws.NewWriter(ctx, config, false)
+	_, err = s3.NewWriter(ctx, config, false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
 	return allBytesWritten

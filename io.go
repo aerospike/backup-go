@@ -3,7 +3,7 @@ package backup
 import (
 	"context"
 
-	"github.com/aerospike/backup-go/io/aws"
+	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
@@ -28,7 +28,7 @@ func NewStreamingReaderLocal(dir string, eType EncoderType) (StreamingReader, er
 
 // NewWriterS3 initialize a writer for s3 directory.
 func NewWriterS3(ctx context.Context, cfg *models.S3Config, removeFiles bool) (Writer, error) {
-	return aws.NewWriter(ctx, cfg, removeFiles)
+	return s3.NewWriter(ctx, cfg, removeFiles)
 }
 
 // NewStreamingReaderS3 initialize reader from the s3 directory.
@@ -37,8 +37,8 @@ func NewStreamingReaderS3(ctx context.Context, cfg *models.S3Config, eType Encod
 	switch eType {
 	// As at the moment only one `ASB` validator supported, we use such construction.
 	case EncoderTypeASB:
-		return aws.NewStreamingReader(ctx, cfg, asb.NewValidator())
+		return s3.NewStreamingReader(ctx, cfg, asb.NewValidator())
 	default:
-		return aws.NewStreamingReader(ctx, cfg, asb.NewValidator())
+		return s3.NewStreamingReader(ctx, cfg, asb.NewValidator())
 	}
 }

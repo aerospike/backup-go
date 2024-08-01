@@ -427,7 +427,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
 	_, err = local.NewDirectoryWriterFactory(backupDir, false)
-	suite.ErrorContains(err, "backup directory is invalid")
+	suite.ErrorContains(err, "is not empty")
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {

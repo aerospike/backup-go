@@ -1,4 +1,4 @@
-package aws
+package s3
 
 import (
 	"bufio"
@@ -18,27 +18,27 @@ type validator interface {
 
 type StreamingReader struct {
 	client    *s3.Client
-	awsConfig *models.S3Config
+	s3Config  *models.S3Config
 	validator validator
 }
 
 func NewStreamingReader(
 	ctx context.Context,
-	awsConfig *models.S3Config,
+	s3Config *models.S3Config,
 	validator validator,
 ) (*StreamingReader, error) {
 	if validator == nil {
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	client, err := newS3Client(ctx, awsConfig)
+	client, err := newS3Client(ctx, s3Config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &StreamingReader{
 		client:    client,
-		awsConfig: awsConfig,
+		s3Config:  s3Config,
 		validator: validator,
 	}, nil
 }
@@ -88,7 +88,7 @@ func (r *StreamingReader) StreamFiles(
 func (r *StreamingReader) streamBackupFiles(
 	ctx context.Context,
 ) (_ <-chan string, _ <-chan error) {
-	fileCh, errCh := streamFilesFromS3(ctx, r.client, r.awsConfig)
+	fileCh, errCh := streamFilesFromS3(ctx, r.client, r.s3Config)
 	filterFileCh := make(chan string)
 
 	go func() {
@@ -108,7 +108,7 @@ func (r *StreamingReader) streamBackupFiles(
 func streamFilesFromS3(
 	ctx context.Context,
 	client *s3.Client,
-	awsConfig *models.S3Config,
+	s3Config *models.S3Config,
 ) (_ <-chan string, _ <-chan error) {
 	fileCh := make(chan string)
 	errCh := make(chan error)
@@ -120,9 +120,9 @@ func streamFilesFromS3(
 		var continuationToken *string
 
 		for {
-			prefix := strings.Trim(awsConfig.Prefix, "/") + "/"
+			prefix := strings.Trim(s3Config.Prefix, "/") + "/"
 			listResponse, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-				Bucket:            &awsConfig.Bucket,
+				Bucket:            &s3Config.Bucket,
 				Prefix:            &prefix,
 				ContinuationToken: continuationToken,
 			})
@@ -152,16 +152,18 @@ type s3Reader struct {
 	closed bool
 }
 
+var _ io.ReadCloser = (*s3Reader)(nil)
+
 func (r *StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadCloser, error) {
 	getObjectOutput, err := r.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &r.awsConfig.Bucket,
+		Bucket: &r.s3Config.Bucket,
 		Key:    &key,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get s3 object: %w", err)
 	}
 
-	chunkSize := r.awsConfig.ChunkSize
+	chunkSize := r.s3Config.ChunkSize
 	if chunkSize == 0 {
 		chunkSize = s3DefaultChunkSize
 	}
@@ -171,8 +173,6 @@ func (r *StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadC
 		closer: getObjectOutput.Body,
 	}, nil
 }
-
-var _ io.ReadCloser = (*s3Reader)(nil)
 
 func (r *s3Reader) Read(p []byte) (int, error) {
 	if r.closed {
@@ -192,6 +192,7 @@ func (r *s3Reader) Close() error {
 	return r.closer.Close()
 }
 
+// GetType return `s3type` type of storage. Used in logging.
 func (r *StreamingReader) GetType() string {
 	return s3type
 }

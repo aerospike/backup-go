@@ -1,4 +1,4 @@
-package aws
+package s3
 
 import (
 	"context"
@@ -15,10 +15,10 @@ const (
 	s3type             = "s3"
 )
 
-func newS3Client(ctx context.Context, awsConfig *models.S3Config) (*s3.Client, error) {
+func newS3Client(ctx context.Context, s3Config *models.S3Config) (*s3.Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithSharedConfigProfile(awsConfig.Profile),
-		config.WithRegion(awsConfig.Region),
+		config.WithSharedConfigProfile(s3Config.Profile),
+		config.WithRegion(s3Config.Region),
 	)
 
 	if err != nil {
@@ -26,8 +26,8 @@ func newS3Client(ctx context.Context, awsConfig *models.S3Config) (*s3.Client, e
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		if awsConfig.Endpoint != "" {
-			o.BaseEndpoint = &awsConfig.Endpoint
+		if s3Config.Endpoint != "" {
+			o.BaseEndpoint = &s3Config.Endpoint
 		}
 
 		o.UsePathStyle = true

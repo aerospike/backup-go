@@ -36,8 +36,6 @@ type Record struct {
 	VoidTime int64
 }
 
-// **** SIndexes ****
-
 type SIPathBinType byte
 
 const (
@@ -72,8 +70,6 @@ type SIndex struct {
 	IndexType SIndexType
 }
 
-// **** UDFs ****
-
 type UDFType byte
 
 const (
@@ -85,8 +81,6 @@ type UDF struct {
 	Content []byte
 	UDFType UDFType
 }
-
-// **** Token ****
 
 type TokenType uint8
 

@@ -82,6 +82,10 @@ func (bh *backupRecordsHandler) countRecords(infoClient *asinfo.InfoClient) (uin
 		return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
 	}
 
+	return bh.countRecordsUsingScan()
+}
+
+func (bh *backupRecordsHandler) countRecordsUsingScan() (uint64, error) {
 	scanPolicy := *bh.config.ScanPolicy
 
 	scanPolicy.IncludeBinData = false
@@ -92,6 +96,7 @@ func (bh *backupRecordsHandler) countRecords(infoClient *asinfo.InfoClient) (uin
 		bh.recordReaderConfigForPartition(PartitionRangeAll(), &scanPolicy),
 		bh.logger,
 	)
+	defer recordReader.Close()
 
 	var count uint64
 

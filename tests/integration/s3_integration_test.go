@@ -1,4 +1,4 @@
-package tests
+package integration
 
 import (
 	"context"
@@ -12,8 +12,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/s3"
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -142,7 +141,7 @@ func (s *writeReadTestSuite) TearDownSuite() {
 }
 
 func (s *writeReadTestSuite) TestWriteRead() {
-	config := &models.S3Config{
+	config := &s3.Config{
 		Bucket:   "backup",
 		Region:   "eu",
 		Endpoint: "http://localhost:9000",
@@ -170,11 +169,11 @@ func randomBytes(n int) []byte {
 	return data
 }
 
-func (s *writeReadTestSuite) write(filename string, bytes, times int, config *models.S3Config) []byte {
+func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3.Config) []byte {
 	ctx := context.Background()
-	streamingReader, _ := s3.NewS3WriterFactory(ctx, config, true)
+	writerFactory, _ := backup.NewWriterS3(ctx, config, true)
 
-	writer, err := streamingReader.NewWriter(ctx, filename)
+	writer, err := writerFactory.NewWriter(ctx, filename)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}
@@ -197,13 +196,13 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *mo
 	}
 
 	// cannot create new streamingReader because folder is not empty
-	_, err = s3.NewS3WriterFactory(ctx, config, false)
+	_, err = backup.NewWriterS3(ctx, config, false)
 	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
 
 	return allBytesWritten
 }
 
-func (s *writeReadTestSuite) read(config *models.S3Config) []byte {
+func (s *writeReadTestSuite) read(config *s3.Config) []byte {
 	ctx := context.Background()
 	streamingReader, _ := backup.NewStreamingReaderS3(ctx, config, backup.EncoderTypeASB)
 

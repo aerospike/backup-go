@@ -24,8 +24,8 @@ import (
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
-	"github.com/aerospike/backup-go/internal/writers"
 	"github.com/aerospike/backup-go/io/aerospike"
+	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
@@ -146,7 +146,7 @@ func (rh *RestoreHandler) processReaders(
 func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
 	defer rh.closeReaders(rs)
 
-	rs, err := setEncryptionDecoder(
+	rs, err := newEncryptionReader(
 		rh.config.EncryptionPolicy,
 		rh.config.SecretAgentConfig,
 		rs,
@@ -155,7 +155,7 @@ func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) 
 		return err
 	}
 
-	rs, err = setCompressionDecoder(rh.config.CompressionPolicy, rs)
+	rs, err = newCompressionReader(rh.config.CompressionPolicy, rs)
 	if err != nil {
 		return err
 	}
@@ -172,8 +172,11 @@ func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) 
 	return nil
 }
 
-func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCloser) ([]io.ReadCloser, error) {
-	if policy == nil || policy.Mode == models.CompressNone {
+// newCompressionReader returns compression reader for uncompressing backup.
+func newCompressionReader(
+	policy *CompressionPolicy, readers []io.ReadCloser,
+) ([]io.ReadCloser, error) {
+	if policy == nil || policy.Mode == CompressNone {
 		return readers, nil
 	}
 
@@ -191,8 +194,9 @@ func setCompressionDecoder(policy *models.CompressionPolicy, readers []io.ReadCl
 	return zstdReaders, nil
 }
 
-func setEncryptionDecoder(
-	policy *models.EncryptionPolicy, secretAgent *models.SecretAgentConfig, readers []io.ReadCloser,
+// newEncryptionReader returns encryption reader for decrypting backup.
+func newEncryptionReader(
+	policy *EncryptionPolicy, secretAgent *SecretAgentConfig, readers []io.ReadCloser,
 ) ([]io.ReadCloser, error) {
 	if policy == nil {
 		return readers, nil
@@ -206,7 +210,7 @@ func setEncryptionDecoder(
 	decryptedReaders := make([]io.ReadCloser, len(readers))
 
 	for i, reader := range readers {
-		encryptedReader, err := writers.NewEncryptedReader(reader, privateKey)
+		encryptedReader, err := encryption.NewEncryptedReader(reader, privateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -230,9 +234,9 @@ func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
 
 	for i, reader := range readers {
-		d, err := newDecoder(rh.config.EncoderType, reader)
+		d, err := NewDecoder(rh.config.EncoderType, reader)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create decoder: %w", err)
+			return nil, fmt.Errorf("failed to create Decoder: %w", err)
 		}
 
 		dr := newTokenReader(d, rh.logger)
@@ -286,9 +290,16 @@ func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipelin
 		writeWorkers[i] = pipeline.NewWriteWorker[*models.Token](statsWriter, rh.limiter)
 	}
 
+	// Namespace Source and Destination
+	var nsSource, nsDest *string
+	if rh.config.Namespace != nil {
+		nsSource = rh.config.Namespace.Source
+		nsDest = rh.config.Namespace.Destination
+	}
+
 	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.ReadRecords))
 	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
-	changeNamespace := newTokenWorker(processors.NewChangeNamespace(rh.config.Namespace))
+	changeNamespace := newTokenWorker(processors.NewChangeNamespace(nsSource, nsDest))
 	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.logger))
 	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped))
 	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))

@@ -10,7 +10,8 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-// Subtract one list from another
+// Subtract returns a new list containing elements of list1 that are
+// not contained in list2.
 func Subtract(list1, list2 []*a.Record) (result []*a.Record) {
 	for _, v := range list1 {
 		if !contains(v, list2) {
@@ -21,7 +22,7 @@ func Subtract(list1, list2 []*a.Record) (result []*a.Record) {
 	return
 }
 
-// contains checks whether a record is in the list
+// contains checks whether a record is in the list.
 func contains(record *a.Record, list []*a.Record) bool {
 	for _, v := range list {
 		if bytes.Equal(record.Key.Digest(), v.Key.Digest()) {
@@ -32,6 +33,7 @@ func contains(record *a.Record, list []*a.Record) bool {
 	return false
 }
 
+// DirSize returns the size, in bytes, of the directory specified by the given path.
 func DirSize(path string) int64 {
 	var size int64
 
@@ -46,6 +48,8 @@ func DirSize(path string) int64 {
 	return size
 }
 
+// GetFileSizes builds and returns an info string containing information about
+// file sizes under the specified dirName.
 func GetFileSizes(dirName string) string {
 	var sb strings.Builder
 

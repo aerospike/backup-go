@@ -25,6 +25,7 @@ import (
 	secretAgent "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
+//nolint:unused // It will be used in the future.
 const secretPrefix = "secrets:"
 
 // SecretAgentConfig contains secret agent connection information.
@@ -143,6 +144,8 @@ func getTlSConfig(caFile *string) (*tls.Config, error) {
 }
 
 // isSecret checks if string is secret. e.g.: secrets:resource2:cacert
+//
+//nolint:unused // It will be used in the future.
 func isSecret(secret string) bool {
 	return strings.HasPrefix(secret, secretPrefix)
 }

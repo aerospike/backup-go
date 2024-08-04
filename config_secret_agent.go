@@ -28,7 +28,6 @@ import (
 const secretPrefix = "secrets:"
 
 // SecretAgentConfig contains secret agent connection information.
-// @Description SecretAgentConfig contains secret agent connection information.
 type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
 	// Use constants form `secret-agent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
@@ -143,7 +142,7 @@ func getTlSConfig(caFile *string) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// IsSecret checks if string is secret. e.g.: secrets:resource2:cacert
-func IsSecret(secret string) bool {
+// isSecret checks if string is secret. e.g.: secrets:resource2:cacert
+func isSecret(secret string) bool {
 	return strings.HasPrefix(secret, secretPrefix)
 }

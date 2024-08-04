@@ -37,25 +37,36 @@ const (
 // It wraps an aerospike client and provides methods to start backup and restore operations.
 // Example usage:
 //
-//		asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
-//		if aerr != nil {
-//			// handle error
-//		}
-//		backupClient, err := backup.NewClient(asc, "id", nil)	// create a backup client
-//		if err != nil {
-//			// handle error
-//		}
-//		// use the backup client to start backup and restore operations
-//	 ctx := context.Background()
-//		backupHandler, err := backupClient.Backup(ctx, writers, nil)
-//		if err != nil {
-//			// handle error
-//	 }
-//	 // optionally, check the stats of the backup operation
-//		stats := backupHandler.Stats()
-//		// use the backupHandler to wait for the backup operation to finish
-//	 ctx := context.Background()
-//		// err = backupHandler.Wait(ctx)
+//	asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
+//	if aerr != nil {
+//		// handle error
+//	}
+//
+//	backupClient, err := backup.NewClient(asc, "id", nil)	// create a backup client
+//	if err != nil {
+//		// handle error
+//	}
+//
+//	writers, err := backup.NewWriterLocal("backups_folder", false)
+//	if err != nil {
+//		// handle error
+//	}
+//
+//	// use the backup client to start backup and restore operations
+//	ctx := context.Background()
+//	backupHandler, err := backupClient.Backup(ctx, writers, nil)
+//	if err != nil {
+//		// handle error
+//	}
+//
+//	// optionally, check the stats of the backup operation
+//	stats := backupHandler.Stats()
+//
+//	// use the backupHandler to wait for the backup operation to finish
+//	ctx := context.Background()
+//	if err = backupHandler.Wait(ctx); err != nil {
+//		// handle error
+//	}
 type Client struct {
 	aerospikeClient *a.Client
 	logger          *slog.Logger
@@ -116,8 +127,11 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 // ctx can be used to cancel the backup operation.
 // config is the configuration for the backup operation.
 // writer creates new writers for the backup operation.
-func (c *Client) Backup(ctx context.Context, config *BackupConfig, writer Writer) (
-	*BackupHandler, error) {
+func (c *Client) Backup(
+	ctx context.Context,
+	config *BackupConfig,
+	writer Writer,
+) (*BackupHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("backup config required")
 	}

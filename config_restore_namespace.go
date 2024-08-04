@@ -19,9 +19,6 @@ import "fmt"
 // RestoreNamespaceConfig specifies an alternative namespace name for the restore
 // operation, where Source is the original namespace name and Destination is
 // the namespace name to which the backup data is to be restored.
-//
-// @Description RestoreNamespaceConfig specifies an alternative namespace name for the restore
-// @Description operation.
 type RestoreNamespaceConfig struct {
 	// Original namespace name.
 	Source *string `json:"source,omitempty" example:"source-ns" validate:"required"`

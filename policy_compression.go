@@ -20,12 +20,13 @@ import (
 
 // Compression modes
 const (
+	// CompressNone no compression.
 	CompressNone = "NONE"
+	// CompressZSTD compression using ZSTD.
 	CompressZSTD = "ZSTD"
 )
 
 // CompressionPolicy contains backup compression information.
-// @Description CompressionPolicy contains backup compression information.
 type CompressionPolicy struct {
 	// The compression mode to be used (default is NONE).
 	Mode string `yaml:"mode,omitempty" json:"mode,omitempty" default:"NONE" enums:"NONE,ZSTD"`
@@ -33,7 +34,7 @@ type CompressionPolicy struct {
 	Level int `yaml:"level,omitempty" json:"level,omitempty"`
 }
 
-// Validate validates the compression policy.
+// Validate validates the compression policy parameters.
 func (p *CompressionPolicy) Validate() error {
 	if p == nil {
 		return nil

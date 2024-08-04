@@ -26,15 +26,17 @@ import (
 
 // Encryption modes
 const (
-	EncryptNone   = "NONE"
+	// EncryptNone no encryption.
+	EncryptNone = "NONE"
+	// EncryptAES128 encryption using AES128 algorithm.
 	EncryptAES128 = "AES128"
+	// EncryptAES256 encryption using AES256 algorithm.
 	EncryptAES256 = "AES256"
 
 	pemTemplate = "-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----"
 )
 
 // EncryptionPolicy contains backup encryption information.
-// @Description EncryptionPolicy contains backup encryption information.
 type EncryptionPolicy struct {
 	// The path to the file containing the encryption key.
 	KeyFile *string `yaml:"key-file,omitempty" json:"key-file,omitempty"`
@@ -70,6 +72,9 @@ func (p *EncryptionPolicy) Validate() error {
 	return nil
 }
 
+// ReadPrivateKey parse and load private key according to EncryptionPolicy configuration.
+// Loads private key from file, env variable, secret agent. If you want to load key from secret agent you should pass
+// SecretAgentConfig to this function, otherwise pass nil.
 func (p *EncryptionPolicy) ReadPrivateKey(agent *SecretAgentConfig) ([]byte, error) {
 	var (
 		pemData []byte

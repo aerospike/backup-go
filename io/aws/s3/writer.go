@@ -28,12 +28,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+// Writer represents the factory for creating objects that can write to S3.
 type Writer struct {
 	client   *s3.Client
 	s3Config *Config
 	fileID   *atomic.Uint32 // increments for each new file created
 }
 
+// NewWriter returns a new Writer.
 func NewWriter(
 	ctx context.Context,
 	s3Config *Config,
@@ -71,6 +73,7 @@ func NewWriter(
 	}, nil
 }
 
+// NewWriter returns a new S3 writer to the specified path.
 func (f *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	chunkSize := f.s3Config.ChunkSize
 	if chunkSize < s3DefaultChunkSize {
@@ -99,6 +102,7 @@ func (f *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}, nil
 }
 
+// GetType returns the type of the writer.
 func (f *Writer) GetType() string {
 	return s3type
 }

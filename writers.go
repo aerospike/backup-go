@@ -28,7 +28,7 @@ import (
 
 // **** Token Stats Writer ****
 
-// statsSetterToken is an interface for setting the stats of a backup job
+// statsSetterToken is an interface for setting the stats of a backup job.
 //
 //go:generate mockery --name statsSetterToken --inpackage --exported=false
 type statsSetterToken interface {
@@ -81,7 +81,7 @@ func (tw *tokenStatsWriter) Close() error {
 
 // **** Token Writer ****
 
-// tokenWriter satisfies the DataWriter interface
+// tokenWriter satisfies the DataWriter interface.
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
 type tokenWriter struct {
@@ -90,7 +90,7 @@ type tokenWriter struct {
 	logger  *slog.Logger
 }
 
-// newTokenWriter creates a new tokenWriter
+// newTokenWriter creates a new tokenWriter.
 func newTokenWriter(encoder Encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
@@ -103,7 +103,7 @@ func newTokenWriter(encoder Encoder, output io.Writer, logger *slog.Logger) *tok
 	}
 }
 
-// Write encodes v and writes it to the output
+// Write encodes v and writes it to the output.
 func (w *tokenWriter) Write(v *models.Token) (int, error) {
 	data, err := w.encoder.EncodeToken(v)
 	if err != nil {
@@ -114,7 +114,7 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 }
 
 // Close satisfies the DataWriter interface
-// but is a no-op for the tokenWriter
+// but is a no-op for the tokenWriter.
 func (w *tokenWriter) Close() error {
 	w.logger.Debug("closed token writer")
 	return nil

@@ -28,28 +28,29 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-// Encoder contains logic for encoding backup into .asb format.
-// this is stateful object, should create new one for each backup operation.
+// Encoder contains logic for encoding backup data into the .asb format.
+// This is a stateful object that must be created for every backup operation.
 type Encoder struct {
 	namespace        string
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
 }
 
+// NewEncoder creates a new Encoder.
 func NewEncoder(namespace string) *Encoder {
 	return &Encoder{
 		namespace: namespace,
 	}
 }
 
-// GenerateFilename generates a filename for a given namespace
+// GenerateFilename generates a file name for the given namespace.
 func (e *Encoder) GenerateFilename() string {
 	return fmt.Sprintf("%s_%d.asb", e.namespace, e.id.Add(1))
 }
 
 // EncodeToken encodes a token to the ASB format.
-// It returns a byte slice of the encoded token
-// and an error if the encoding fails.
+// It returns a byte slice of the encoded token and an error if the encoding
+// fails.
 func (e *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 	var (
 		n   int

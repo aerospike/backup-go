@@ -60,7 +60,8 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 
 func splitPartitions(startPartition, numPartitions, numWorkers int) ([]PartitionRange, error) {
 	if startPartition+numPartitions > MaxPartitions {
-		return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitions count of %d", MaxPartitions)
+		return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitions: %d",
+			MaxPartitions)
 	}
 
 	if numWorkers < 1 {

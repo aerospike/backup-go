@@ -33,8 +33,8 @@ type Worker[T any] interface {
 
 // Pipeline runs a series of workers in parallel.
 // All workers run at the same time in separate goroutines.
-// Each stage of workers are connected by a single channel that is
-// the size of the number of workers in the stage.
+// Each stage of workers are connected by a single channel that is the size
+// of the number of workers in the stage.
 // The pipeline stops when a worker returns an error or all workers are done.
 // workers should not close the send channel, the pipeline stages handle that.
 // Pipelines can be chained together by using them as workers.

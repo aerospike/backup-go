@@ -74,9 +74,9 @@ type Client struct {
 }
 
 // NewClient creates a new backup client.
-// ac is the aerospike client to use for backup and restore operations.
-// id is an identifier for the client.
-// logger is the logger that this client will log to.
+//   - ac is the aerospike client to use for backup and restore operations.
+//   - id is an identifier for the client.
+//   - logger is the logger that this client will log to.
 func NewClient(ac *a.Client, id string, logger *slog.Logger) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
@@ -124,9 +124,9 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 }
 
 // Backup starts a backup operation that writes data to a provided writer.
-// ctx can be used to cancel the backup operation.
-// config is the configuration for the backup operation.
-// writer creates new writers for the backup operation.
+//   - ctx can be used to cancel the backup operation.
+//   - config is the configuration for the backup operation.
+//   - writer creates new writers for the backup operation.
 func (c *Client) Backup(
 	ctx context.Context,
 	config *BackupConfig,
@@ -155,9 +155,9 @@ func (c *Client) Backup(
 
 // Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
-// ctx can be used to cancel the restore operation.
-// config is the configuration for the restore operation.
-// StreamingReader provides readers with access to backup data.
+//   - ctx can be used to cancel the restore operation.
+//   - config is the configuration for the restore operation.
+//   - streamingReader provides readers with access to backup data.
 func (c *Client) Restore(
 	ctx context.Context,
 	config *RestoreConfig,

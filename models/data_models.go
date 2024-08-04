@@ -23,16 +23,18 @@ import (
 // **** Records ****
 
 const (
-	// VoidTimeNeverExpire is used when a record should never expire
+	// VoidTimeNeverExpire is used when a record should never expire.
 	VoidTimeNeverExpire int64 = 0
-	// ExpirationNever is the Aerospike server's special TTL value for records that should never expire
+	// ExpirationNever is the Aerospike server's special TTL value for records
+	// that should never expire.
 	ExpirationNever uint32 = math.MaxUint32
 )
 
 type Record struct {
 	*a.Record
 
-	// VoidTime is the time in seconds since the citrusleaf epoch when the record will expire.
+	// VoidTime is the time in seconds since the citrusleaf epoch when the
+	// record will expire.
 	VoidTime int64
 }
 
@@ -91,8 +93,8 @@ const (
 	TokenTypeUDF
 )
 
-// Token encompasses the other data models
-// fields should be accessed based on the tokenType
+// Token encompasses the other data models.
+// The fields should be accessed based on the tokenType.
 type Token struct {
 	SIndex *SIndex
 	UDF    *UDF
@@ -101,7 +103,7 @@ type Token struct {
 	Size   uint64
 }
 
-// NewRecordToken creates a new token with the given record
+// NewRecordToken creates a new token with the given record.
 func NewRecordToken(r Record, size uint64) *Token {
 	return &Token{
 		Record: r,
@@ -110,7 +112,7 @@ func NewRecordToken(r Record, size uint64) *Token {
 	}
 }
 
-// NewSIndexToken creates a new token with the given secondary index
+// NewSIndexToken creates a new token with the given secondary index.
 func NewSIndexToken(s *SIndex, size uint64) *Token {
 	return &Token{
 		SIndex: s,
@@ -119,7 +121,7 @@ func NewSIndexToken(s *SIndex, size uint64) *Token {
 	}
 }
 
-// NewUDFToken creates a new token with the given UDF
+// NewUDFToken creates a new token with the given UDF.
 func NewUDFToken(u *UDF, size uint64) *Token {
 	return &Token{
 		UDF:  u,

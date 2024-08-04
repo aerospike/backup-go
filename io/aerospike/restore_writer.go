@@ -30,7 +30,7 @@ type recordWriter interface {
 	close() error
 }
 
-// restoreWriter satisfies the DataWriter interface
+// restoreWriter satisfies the DataWriter interface.
 // It writes the types from the models package to an Aerospike client
 // It is used to restore data from a backup.
 type restoreWriter struct {
@@ -40,7 +40,7 @@ type restoreWriter struct {
 	logger *slog.Logger
 }
 
-// NewRestoreWriter creates a new RestoreWriter
+// NewRestoreWriter creates a new restoreWriter.
 func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.RestoreStats,
 	logger *slog.Logger, useBatchWrites bool, batchSize int) pipeline.DataWriter[*models.Token] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
@@ -101,8 +101,7 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	}
 }
 
-// Close satisfies the DataWriter interface
-// but is a no-op for the RestoreWriter
+// Close satisfies the DataWriter interface.
 func (rw *restoreWriter) Close() error {
 	rw.logger.Debug("closed restore writer")
 	return rw.close()

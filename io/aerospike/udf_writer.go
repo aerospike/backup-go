@@ -28,7 +28,7 @@ type udfWriter struct {
 	logger      *slog.Logger
 }
 
-// writeUDF writes a UDF to Aerospike
+// writeUDF writes a UDF to Aerospike.
 // TODO check that this does not overwrite existing UDFs
 // TODO support write policy
 func (rw udfWriter) writeUDF(udf *models.UDF) error {

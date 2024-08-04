@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 )
 
-// RestoreStats stores the stats of a restore from reader job
+// RestoreStats stores the stats of a restore operation from the reader job.
 type RestoreStats struct {
 	commonStats
 	// The number of records dropped because they were expired.

@@ -21,7 +21,7 @@ import (
 	"github.com/aerospike/backup-go/internal/util"
 )
 
-// recordSets contains multiple Aerospike Recordset objects
+// recordSets contains multiple Aerospike Recordset objects.
 type recordSets struct {
 	resultsChannel <-chan *a.Result
 	logger         *slog.Logger
@@ -51,6 +51,7 @@ func (r *recordSets) Close() {
 	}
 }
 
+// Results returns the results channel of the recordSets.
 func (r *recordSets) Results() <-chan *a.Result {
 	return r.resultsChannel
 }

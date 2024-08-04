@@ -29,14 +29,15 @@ type DataWriter[T any] interface {
 	Close() (err error)
 }
 
-// writeWorker implements the pipeline.Worker interface
-// It wraps a DataWriter and writes data to it
+// writeWorker implements the pipeline.Worker interface.
+// It wraps a DataWriter and writes data to it.
 type writeWorker[T any] struct {
 	DataWriter[T]
 	receive <-chan T
 	limiter *rate.Limiter
 }
 
+// NewWriteWorker creates a new Worker.
 func NewWriteWorker[T any](writer DataWriter[T], limiter *rate.Limiter) Worker[T] {
 	return &writeWorker[T]{
 		DataWriter: writer,
@@ -44,18 +45,18 @@ func NewWriteWorker[T any](writer DataWriter[T], limiter *rate.Limiter) Worker[T
 	}
 }
 
-// SetReceiveChan sets receive channel for the writeWorker
+// SetReceiveChan sets receive channel for the writeWorker.
 func (w *writeWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
 }
 
 // SetSendChan satisfies the pipeline.Worker interface
-// but is a no-op for the writeWorker
+// but is a no-op for the writeWorker.
 func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
 	// no-op
 }
 
-// Run runs the writeWorker
+// Run runs the writeWorker.
 func (w *writeWorker[T]) Run(ctx context.Context) (err error) {
 	defer func() {
 		closeErr := w.Close()

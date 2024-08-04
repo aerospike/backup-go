@@ -72,9 +72,10 @@ func (p *EncryptionPolicy) Validate() error {
 	return nil
 }
 
-// ReadPrivateKey parse and load private key according to EncryptionPolicy configuration.
-// Loads private key from file, env variable, secret agent. If you want to load key from secret agent you should pass
-// SecretAgentConfig to this function, otherwise pass nil.
+// ReadPrivateKey parses and loads a private key according to the EncryptionPolicy
+// configuration. It can load the private key from a file, env variable or Secret Agent.
+// A valid agent parameter is required to load the key from Aerospike Secret Agent.
+// Pass in nil for any other option.
 func (p *EncryptionPolicy) ReadPrivateKey(agent *SecretAgentConfig) ([]byte, error) {
 	var (
 		pemData []byte
@@ -114,7 +115,8 @@ func (p *EncryptionPolicy) ReadPrivateKey(agent *SecretAgentConfig) ([]byte, err
 	// Originally asbackup converts the key to the PKCS1 format
 	decodedKey := x509.MarshalPKCS1PrivateKey(key)
 
-	sum256 := sha256.Sum256(decodedKey) // AES encrypt require 128 or 256 bits for key
+	// AES requires 128 or 256 bits for the key
+	sum256 := sha256.Sum256(decodedKey)
 
 	if p.Mode == EncryptAES128 {
 		return sum256[:16], nil
@@ -132,15 +134,15 @@ func (p *EncryptionPolicy) readPemFromFile() ([]byte, error) {
 	return pemData, nil
 }
 
-// readPemFromEnv reads from env variable encrypted in base64 key body without header and footer,
-// decrypt it and adding header and footer.
+// readPemFromEnv reads the key from an env variable encrypted in base64 without header
+// and footer, decrypts it adding the header and footer.
 func (p *EncryptionPolicy) readPemFromEnv() ([]byte, error) {
 	key := os.Getenv(*p.KeyEnv)
 	if key == "" {
 		return nil, fmt.Errorf("environment variable %s not set", *p.KeyEnv)
 	}
 
-	// we just add header and footer to make it parsable.
+	// add header and footer to make it parsable
 	pemKey := fmt.Sprintf(pemTemplate, key)
 
 	return []byte(pemKey), nil

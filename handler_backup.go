@@ -38,16 +38,16 @@ import (
 // Writer provides access to backup storage.
 // Exported for integration tests.
 type Writer interface {
-	// NewWriter return new writer for backup logic to use.
-	// Each call creates new writer, they might be working in parallel.
-	// Backup logic will close the writer after backup is done.
-	// header func is executed on a writer after creation (on each one in case of multipart file)
+	// NewWriter returns new writer for backup logic to use. Each call creates
+	// a new writer, they might be working in parallel. Backup logic will close
+	// the writer after backup is done. Header func is executed on a writer
+	// after creation (on each one in case of multipart file).
 	NewWriter(ctx context.Context, filename string) (io.WriteCloser, error)
-	// GetType return type of storage. Used in logging.
+	// GetType returns the type of storage. Used in logging.
 	GetType() string
 }
 
-// BackupHandler handles a backup job
+// BackupHandler handles a backup job.
 type BackupHandler struct {
 	writer                 Writer
 	encoder                Encoder
@@ -62,7 +62,7 @@ type BackupHandler struct {
 	stats                  models.BackupStats
 }
 
-// newBackupHandler creates a new BackupHandler
+// newBackupHandler creates a new BackupHandler.
 func newBackupHandler(
 	config *BackupConfig,
 	ac *a.Client,
@@ -86,8 +86,8 @@ func newBackupHandler(
 	}
 }
 
-// run runs the backup job
-// currently this should only be run once
+// run runs the backup job.
+// currently this should only be run once.
 func (bh *BackupHandler) run(ctx context.Context) {
 	bh.errors = make(chan error, 1)
 	bh.stats.Start()
@@ -132,7 +132,9 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	return handler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
 }
 
-func (bh *BackupHandler) makeWriteWorkers(backupWriters []io.WriteCloser) []pipeline.Worker[*models.Token] {
+func (bh *BackupHandler) makeWriteWorkers(
+	backupWriters []io.WriteCloser,
+) []pipeline.Worker[*models.Token] {
 	writeWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
 
 	for i, w := range backupWriters {
@@ -169,7 +171,8 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 
 // newWriter creates a new writer based on the current configuration.
 // If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
-// The returned writer may be compressed or encrypted depending on the BackupHandler's configuration.
+// The returned writer may be compressed or encrypted depending on the BackupHandler's
+// configuration.
 func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) {
 	if bh.config.FileLimit > 0 {
 		return sized.NewWriter(ctx, bh.config.FileLimit, bh.newConfiguredWriter)
@@ -277,7 +280,7 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 	return &bh.stats
 }
 
-// Wait waits for the backup job to complete and returns an error if the job failed
+// Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *BackupHandler) Wait(ctx context.Context) error {
 	defer func() {
 		bh.stats.Stop()

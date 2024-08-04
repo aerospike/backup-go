@@ -29,7 +29,7 @@ type sindexWriter struct {
 	logger      *slog.Logger
 }
 
-// writeSecondaryIndex writes a secondary index to Aerospike
+// writeSecondaryIndex writes a secondary index to Aerospike.
 // TODO check that this does not overwrite existing sindexes
 // TODO support write policy
 func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {

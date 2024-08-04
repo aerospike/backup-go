@@ -1,9 +1,9 @@
 .PHONY: test
-test: test_deps
+test:
 	go test -v ./...
 
 .PHONY: coverage
-coverage: test_deps
+coverage:
 	go test ./... -coverprofile to_filter.cov -coverpkg ./...
 	grep -v "test\|mocks" to_filter.cov > coverage.cov
 	rm -f to_filter.cov
@@ -12,9 +12,6 @@ coverage: test_deps
 .PHONY: clean
 clean: mocks-clean
 	rm -f coverage.cov
-
-.PHONY: test_deps
-test_deps: mocks-generate
 
 # Install mockery for generating test mocks
 .PHONY: mockery-install

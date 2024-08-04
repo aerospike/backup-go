@@ -39,7 +39,7 @@ type Encoder interface {
 	GenerateFilename() string
 }
 
-// NewEncoder returns new Encoder according to `EncoderType`
+// NewEncoder returns a new Encoder according to `EncoderType`.
 func NewEncoder(eType EncoderType, namespace string) Encoder {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
@@ -61,7 +61,7 @@ type Decoder interface {
 	NextToken() (*models.Token, error)
 }
 
-// NewDecoder returns new Decoder according to `EncoderType`
+// NewDecoder returns a new Decoder according to `EncoderType`.
 func NewDecoder(eType EncoderType, src io.Reader) (Decoder, error) {
 	switch eType {
 	// As at the moment only one `ASB` Decoder supported, we use such construction.

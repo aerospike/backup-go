@@ -37,6 +37,7 @@ type StreamingReader struct {
 	dir       string
 }
 
+// NewDirectoryStreamingReader creates a new StreamingReader.
 func NewDirectoryStreamingReader(
 	dir string,
 	validator validator,
@@ -51,8 +52,9 @@ func NewDirectoryStreamingReader(
 	}, nil
 }
 
-// StreamFiles read files from disk and send io.Readers to `readersCh` communication chan for lazy loading.
-// In case of error we send error to `errorsCh` channel.
+// StreamFiles reads files from disk and sends io.Readers to the `readersCh`
+// communication channel for lazy loading.
+// In case of an error, it is sent to the `errorsCh` channel.
 func (f *StreamingReader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
@@ -80,8 +82,9 @@ func (f *StreamingReader) StreamFiles(
 
 		filePath := filepath.Join(f.dir, file.Name())
 		if err = f.validator.Run(filePath); err != nil {
-			// As we pass invalid files, we don't need process this error and write test for it.
-			// Maybe we need to log this info, for user. So he will understand what happens.
+			// Since we are passing invalid files, we don't need to handle this
+			// error and write a test for it. Maybe we should log this information
+			// for the user so they know what is going on.
 			continue
 		}
 
@@ -100,7 +103,7 @@ func (f *StreamingReader) StreamFiles(
 }
 
 // checkRestoreDirectory checks that the restore directory exists,
-// is a readable directory, and contains backup files of the correct format
+// is a readable directory, and contains backup files of the correct format.
 func (f *StreamingReader) checkRestoreDirectory() error {
 	dir := f.dir
 
@@ -128,6 +131,7 @@ func (f *StreamingReader) checkRestoreDirectory() error {
 	return nil
 }
 
+// GetType returns the type of the reader.
 func (f *StreamingReader) GetType() string {
 	return localType
 }

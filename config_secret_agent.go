@@ -25,10 +25,10 @@ import (
 	secretAgent "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
+//nolint:unused // It will be used in the future.
 const secretPrefix = "secrets:"
 
-// SecretAgentConfig contains secret agent connection information.
-// @Description SecretAgentConfig contains secret agent connection information.
+// SecretAgentConfig contains Secret Agent connection information.
 type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
 	// Use constants form `secret-agent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
@@ -46,13 +46,15 @@ type SecretAgentConfig struct {
 	IsBase64 *bool `yaml:"sa-is-base64,omitempty" json:"sa-is-base64,omitempty"`
 }
 
+// Validate validates the SecretAgentConfig.
 func (s *SecretAgentConfig) Validate() error {
 	if s == nil {
 		return nil
 	}
 
-	// As secret agent is not mandatory, we will validate params only if secret agent is enabled.
-	// If ConnectionType is set, we consider that secret agent is enabled.
+	// As Secret Agent configuration is not mandatory, we will validate params
+	// only if the secret agent is enabled.
+	// If ConnectionType is set, we assume that the secret agent is enabled.
 	if s.ConnectionType != nil {
 		if s.Address == nil {
 			return fmt.Errorf("secret agent address is required")
@@ -143,7 +145,9 @@ func getTlSConfig(caFile *string) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// IsSecret checks if string is secret. e.g.: secrets:resource2:cacert
-func IsSecret(secret string) bool {
+// isSecret checks if string is secret. e.g.: secrets:resource2:cacert
+//
+//nolint:unused // It will be used in the future.
+func isSecret(secret string) bool {
 	return strings.HasPrefix(secret, secretPrefix)
 }

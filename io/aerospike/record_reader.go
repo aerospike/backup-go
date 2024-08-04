@@ -35,6 +35,7 @@ type RecordReaderConfig struct {
 	binList         []string
 }
 
+// NewRecordReaderConfig creates a new RecordReaderConfig.
 func NewRecordReaderConfig(namespace string,
 	setList []string,
 	partitionFilter *a.PartitionFilter,
@@ -64,8 +65,9 @@ type scanner interface {
 		binNames ...string) (*a.Recordset, a.Error)
 }
 
-// RecordReader satisfies the pipeline DataReader interface
-// It reads records from an Aerospike database and returns them as *models.Record
+// RecordReader satisfies the pipeline DataReader interface.
+// It reads records from an Aerospike database and returns them as
+// *models.Record.
 type RecordReader struct {
 	client     scanner
 	logger     *slog.Logger
@@ -73,7 +75,7 @@ type RecordReader struct {
 	scanResult *recordSets
 }
 
-// NewRecordReader creates a new RecordReader
+// NewRecordReader creates a new RecordReader.
 func NewRecordReader(client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
@@ -89,7 +91,7 @@ func NewRecordReader(client scanner,
 	}
 }
 
-// Read reads the next record from the Aerospike database
+// Read reads the next record from the Aerospike database.
 func (r *RecordReader) Read() (*models.Token, error) {
 	if r.scanResult == nil {
 		scan, err := r.startScan()
@@ -120,7 +122,7 @@ func (r *RecordReader) Read() (*models.Token, error) {
 }
 
 // Close cancels the Aerospike scan used to read records
-// if it was started
+// if it was started.
 func (r *RecordReader) Close() {
 	if r.scanResult != nil {
 		r.scanResult.Close()
@@ -129,7 +131,7 @@ func (r *RecordReader) Close() {
 	r.logger.Debug("closed aerospike record reader")
 }
 
-// startScan starts the scan for RecordReader
+// startScan starts the scan for the RecordReader.
 func (r *RecordReader) startScan() (*recordSets, error) {
 	scanPolicy := *r.config.scanPolicy
 

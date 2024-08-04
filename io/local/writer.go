@@ -29,13 +29,16 @@ type Writer struct {
 
 const bufferSize = 4096 * 1024 // 4mb
 
-// NewDirectoryWriterFactory creates new factory for directory backups
-// dir is target folder for backup
-// fileSizeLimit is the maximum size of each backup file in bytes.
+// NewDirectoryWriterFactory creates a new factory for directory backups
+//   - dir is the target folder for backup.
+//   - fileSizeLimit is the maximum size of each backup file in bytes.
+//
 // If FileSizeLimit is 0, backup file size is unbounded.
-// If non-zero, backup files will be split into multiple files if their size exceeds this limit.
+// If non-zero, backup files will be split into multiple files if their size
+// exceeds this limit.
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
-// FileSizeLimit is not a strict limit, the actual file size may exceed this limit by a small amount.
+// FileSizeLimit is not a strict limit, the actual file size may exceed this
+// limit by a small amount.
 func NewDirectoryWriterFactory(dir string, removeFiles bool,
 ) (*Writer, error) {
 	var err error
@@ -54,8 +57,8 @@ func NewDirectoryWriterFactory(dir string, removeFiles bool,
 	}, nil
 }
 
-// prepareBackupDirectory creates backup directory if it not exists.
-// returns error is dir already exits and it is not empty.
+// prepareBackupDirectory creates the backup directory if it does not exist.
+// It returns an error is the dir already exits and it is not empty.
 func prepareBackupDirectory(dir string) error {
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
@@ -82,7 +85,8 @@ func prepareBackupDirectory(dir string) error {
 	return nil
 }
 
-// forcePrepareBackupDirectory removes any existing directory and its contents and creates a new directory.
+// forcePrepareBackupDirectory removes any existing directory and its contents
+// and creates a new directory.
 func forcePrepareBackupDirectory(dir string) error {
 	err := os.RemoveAll(dir)
 	if err != nil {
@@ -116,7 +120,7 @@ func (bf *bufferedFile) Close() error {
 }
 
 // NewWriter creates a new backup file in the given directory.
-// The file name is based on the fileName parameter.
+// The file name is based on the specified fileName.
 func (f *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()

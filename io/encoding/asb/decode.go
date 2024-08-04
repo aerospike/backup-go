@@ -90,13 +90,14 @@ type metaData struct {
 	First     bool
 }
 
-// Decoder is used to decode an asb file
+// Decoder contains logic for decoding backup data from the .asb format.
 type Decoder struct {
 	header   *header
 	metaData *metaData
 	countingByteScanner
 }
 
+// NewDecoder creates a new Decoder.
 func NewDecoder(src io.Reader) (*Decoder, error) {
 	cbs := bufio.NewReader(src)
 	asb := Decoder{

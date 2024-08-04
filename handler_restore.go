@@ -35,12 +35,12 @@ import (
 
 // StreamingReader provides access to data that should be restored.
 type StreamingReader interface {
-	// StreamFiles create readers from files and send them to chan.
-	// In case of error, send errors to error chan.
-	// Must be run in goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
+	// StreamFiles creates readers from files and sends them to the channel.
+	// In case of an error, the error is sent to the error channel.
+	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
 	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
 
-	// GetType return type of storage. Used in logging.
+	// GetType returns the type of storage. Used in logging.
 	GetType() string
 }
 
@@ -56,7 +56,7 @@ type RestoreHandler struct {
 	stats           models.RestoreStats
 }
 
-// newRestoreHandler creates a new RestoreHandler
+// newRestoreHandler creates a new RestoreHandler.
 func newRestoreHandler(
 	config *RestoreConfig,
 	ac *a.Client,
@@ -114,7 +114,8 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 
 // processReaders serving go routine for processing batches.
 func (rh *RestoreHandler) processReaders(
-	ctx context.Context, readersCh <-chan io.ReadCloser, doneCh chan<- struct{}, errorsCh chan<- error,
+	ctx context.Context, readersCh <-chan io.ReadCloser,
+	doneCh chan<- struct{}, errorsCh chan<- error,
 ) {
 	batchSize := rh.config.Parallel
 
@@ -246,12 +247,12 @@ func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
 	return readWorkers, nil
 }
 
-// GetStats returns the stats of the restore job
+// GetStats returns the stats of the restore job.
 func (rh *RestoreHandler) GetStats() *models.RestoreStats {
 	return &rh.stats
 }
 
-// Wait waits for the restore job to complete and returns an error if the job failed
+// Wait waits for the restore job to complete and returns an error if the job failed.
 func (rh *RestoreHandler) Wait(ctx context.Context) error {
 	defer func() {
 		rh.stats.Stop()
@@ -265,8 +266,11 @@ func (rh *RestoreHandler) Wait(ctx context.Context) error {
 	}
 }
 
-// run runs the restore job
-func (rh *RestoreHandler) runRestoreBatch(ctx context.Context, readers []pipeline.Worker[*models.Token]) error {
+// runRestoreBatch runs the restore job.
+func (rh *RestoreHandler) runRestoreBatch(
+	ctx context.Context,
+	readers []pipeline.Worker[*models.Token],
+) error {
 	rh.logger.Debug("running restore base handler")
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.MaxAsyncBatches)

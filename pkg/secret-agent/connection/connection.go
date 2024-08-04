@@ -25,8 +25,8 @@ import (
 	"github.com/aerospike/backup-go/pkg/secret-agent/models"
 )
 
-// magic this const is taken from secret agent service. It is hardcoded in secret agent service.
-// By this magic number secret agent service verify TCP request.
+// magic const is taken from the Secret Agent service. It is used
+// by the service to validate TCP requests.
 const magic = 0x51dec1cc
 
 //go:generate mockery
@@ -37,8 +37,12 @@ type connector interface {
 	SetWriteDeadline(t time.Time) error
 }
 
-// Get returns connector according to initialized params.
-func Get(connectionType, address string, timeout time.Duration, tlsConfig *tls.Config) (net.Conn, error) {
+// Get returns a connector according to initialized params.
+func Get(
+	connectionType, address string,
+	timeout time.Duration,
+	tlsConfig *tls.Config,
+) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: timeout}
 	if tlsConfig != nil {
 		return tls.DialWithDialer(dialer, connectionType, address, tlsConfig)
@@ -47,7 +51,7 @@ func Get(connectionType, address string, timeout time.Duration, tlsConfig *tls.C
 	return dialer.Dial(connectionType, address)
 }
 
-// Write forms and executes request to secret agent.
+// Write forms and executes a request to the secret agent.
 func Write(conn connector, timeout time.Duration, resource, secretKey string) error {
 	// Setting writing timout.
 	deadline := time.Now().Add(timeout)

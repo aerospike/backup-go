@@ -25,31 +25,33 @@ import (
 )
 
 const (
-	// ConnectionTypeTCP  connection type for TCP.
+	// ConnectionTypeTCP connection type for TCP.
 	ConnectionTypeTCP = "tcp"
-	// ConnectionTypeUDS  connection type for unix socket.
+	// ConnectionTypeUDS connection type for unix socket.
 	ConnectionTypeUDS = "unix"
 )
 
-// Client initialize client for connecting to aerospike secret agent.
+// Client represents the client to communicate with Aerospike Secret Agent.
 type Client struct {
-	// tlsConfig contains tls config for secure connection.go over TCP.
+	// tlsConfig contains the TLS configuration for secure connection.go over TCP.
 	tlsConfig *tls.Config
-	// connectionType describes connection.go type. Use `ConnectionTypeUDS` and `ConnectionTypeTCP` constants to define.
+	// connectionType describes connection.go type. Use `ConnectionTypeUDS` and
+	// `ConnectionTypeTCP` constants to define.
 	connectionType string
-	// address contains address of aerospike secret agent.
+	// address contains the address of the Aerospike Secret Agent.
 	// for `ConnectionTypeTCP` it will be host + port, e.g.: "127.0.0.1:3005"
 	// for `ConnectionTypeUDS` it will be path to unix socket, e.g.: "/tmp/test.sock"
 	address string
-	// timeout contains timeouts for connection, read and write operations.
+	// timeout contains connection timeout for read and write operations.
 	timeout time.Duration
-	// isBase64 contains flag, do we need to decode keys from secret agent or not.
-	// If agent is configured to return base64 encoded results.
+	// isBase64 determines whether we need to base64 decode the response returned
+	// by the secret agent.
 	isBase64 bool
 }
 
-// NewClient returns new aerospike secret agent client.
-func NewClient(connectionType, address string, timeout time.Duration, isBase64 bool, tlsConfig *tls.Config,
+// NewClient returns a new Aerospike Secret Agent client.
+func NewClient(connectionType, address string, timeout time.Duration, isBase64 bool,
+	tlsConfig *tls.Config,
 ) (*Client, error) {
 	if tlsConfig != nil && connectionType != ConnectionTypeTCP {
 		return nil, fmt.Errorf("tls connection type %s is not supported", connectionType)
@@ -64,8 +66,9 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 	}, nil
 }
 
-// GetSecret performs request to aerospike secret agent. If key found in external service, then value
-// wil be returned. Otherwise, empty value and an error will be returned.
+// GetSecret performs a request to the Aerospike Secret Agent. If the key is found
+// in the external service, the corresponding value will be returned. Otherwise,
+// an empty value and an error will be returned.
 func (c *Client) GetSecret(resource, secretKey string) (string, error) {
 	conn, err := connection.Get(c.connectionType, c.address, c.timeout, c.tlsConfig)
 	if err != nil {
@@ -74,7 +77,7 @@ func (c *Client) GetSecret(resource, secretKey string) (string, error) {
 
 	defer conn.Close()
 
-	//nolint:gocritic // I want to write if inline.
+	//nolint:gocritic // inline if
 	if err = connection.Write(conn, c.timeout, resource, secretKey); err != nil {
 		return "", err
 	}
@@ -84,7 +87,8 @@ func (c *Client) GetSecret(resource, secretKey string) (string, error) {
 		return "", err
 	}
 
-	// If secret agent configured to encrypt all responses to base64, we decrypt it.
+	// If the secret agent is configured to encode all responses to base64,
+	// we need to decode the response.
 	if c.isBase64 {
 		var decoded []byte
 		decoded, err = base64.StdEncoding.DecodeString(response)

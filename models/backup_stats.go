@@ -27,14 +27,17 @@ type BackupStats struct {
 	TotalRecords uint64
 }
 
+// IncFiles increments by one the number of files per backup.
 func (b *BackupStats) IncFiles() {
 	b.fileCount.Add(1)
 }
 
+// GetFileCount returns the number of files per backup.
 func (b *BackupStats) GetFileCount() uint64 {
 	return b.fileCount.Load()
 }
 
+// IsEmpty determines whether the BackupStats is empty.
 func (b *BackupStats) IsEmpty() bool {
 	return b.GetUDFs() == 0 &&
 		b.GetSIndexes() == 0 &&

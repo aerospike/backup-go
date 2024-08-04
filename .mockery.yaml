@@ -5,7 +5,7 @@ exported: True
 packages:
   github.com/aerospike/backup-go/io/encoding/asb:
     config:
-      dir: ./encoding/asb/mocks
+      dir: ./io/encoding/asb/mocks
       outpkg: mocks
   github.com/aerospike/backup-go/internal/asinfo:
     config:

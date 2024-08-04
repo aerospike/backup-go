@@ -28,14 +28,14 @@ type dataReader[T any] interface {
 	Close()
 }
 
-// readWorker implements the pipeline.Worker interface
-// It wraps a DataReader and reads data from it
+// readWorker implements the pipeline.Worker interface.
+// It wraps a DataReader and reads data from it.
 type readWorker[T any] struct {
 	reader dataReader[T]
 	send   chan<- T
 }
 
-// NewReadWorker creates a new ReadWorker
+// NewReadWorker creates a new ReadWorker.
 func NewReadWorker[T any](reader dataReader[T]) Worker[T] {
 	return &readWorker[T]{
 		reader: reader,
@@ -43,17 +43,17 @@ func NewReadWorker[T any](reader dataReader[T]) Worker[T] {
 }
 
 // SetReceiveChan satisfies the pipeline.Worker interface
-// but is a no-op for the ReadWorker
+// but is a no-op for the ReadWorker.
 func (w *readWorker[T]) SetReceiveChan(_ <-chan T) {
 	// no-op
 }
 
-// SetSendChan sets the send channel for the ReadWorker
+// SetSendChan sets the send channel for the ReadWorker.
 func (w *readWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
-// Run runs the ReadWorker
+// Run runs the ReadWorker.
 func (w *readWorker[T]) Run(ctx context.Context) error {
 	defer w.reader.Close()
 

@@ -35,7 +35,11 @@ type backupRecordsHandler struct {
 	logger          *slog.Logger
 }
 
-func newBackupRecordsHandler(config *BackupConfig, ac *a.Client, logger *slog.Logger) *backupRecordsHandler {
+func newBackupRecordsHandler(
+	config *BackupConfig,
+	ac *a.Client,
+	logger *slog.Logger,
+) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
 	return &backupRecordsHandler{
@@ -57,7 +61,8 @@ func (bh *backupRecordsHandler) run(
 
 	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsReadTotal))
 	voidTimeSetter := newTokenWorker(processors.NewVoidTimeSetter(bh.logger))
-	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, bh.config.RecordsPerSecond))
+	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](
+		ctx, bh.config.RecordsPerSecond))
 
 	job := pipeline.NewPipeline[*models.Token](
 		readWorkers,
@@ -115,8 +120,13 @@ func (bh *backupRecordsHandler) countRecordsUsingScan() (uint64, error) {
 	return count, nil
 }
 
-func (bh *backupRecordsHandler) makeAerospikeReadWorkers(n int) ([]pipeline.Worker[*models.Token], error) {
-	partitionRanges, err := splitPartitions(bh.config.Partitions.Begin, bh.config.Partitions.Count, n)
+func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
+	n int,
+) ([]pipeline.Worker[*models.Token], error) {
+	partitionRanges, err := splitPartitions(
+		bh.config.Partitions.Begin,
+		bh.config.Partitions.Count,
+		n)
 	if err != nil {
 		return nil, err
 	}

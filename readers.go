@@ -22,14 +22,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// tokenReader satisfies the DataReader interface
-// It reads data as tokens using a Decoder
+// tokenReader satisfies the DataReader interface.
+// It reads data as tokens using a Decoder.
 type tokenReader struct {
 	decoder Decoder
 	logger  *slog.Logger
 }
 
-// newTokenReader creates a new GenericReader
+// newTokenReader creates a new tokenReader.
 func newTokenReader(decoder Decoder, logger *slog.Logger) *tokenReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeToken)
@@ -41,13 +41,13 @@ func newTokenReader(decoder Decoder, logger *slog.Logger) *tokenReader {
 	}
 }
 
-// Read reads the next token from the Decoder
+// Read reads the next token from the Decoder.
 func (dr *tokenReader) Read() (*models.Token, error) {
 	return dr.decoder.NextToken()
 }
 
 // Close satisfies the DataReader interface
-// but is a no-op for the tokenReader
+// but is a no-op for the tokenReader.
 func (dr *tokenReader) Close() {
 	dr.logger.Debug("closed token reader")
 }

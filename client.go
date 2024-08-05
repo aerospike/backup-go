@@ -115,9 +115,13 @@ func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
 	return *p
 }
 
-func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy, noBins bool) a.ScanPolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultScanPolicy
+	}
+
+	if noBins {
+		p.IncludeBinData = false
 	}
 
 	return *p
@@ -140,7 +144,7 @@ func (c *Client) Backup(
 	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
 	config.InfoPolicy = &infoPolicy
 
-	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
+	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy, config.NoBins)
 	config.ScanPolicy = &scanPolicy
 
 	if err := config.validate(); err != nil {

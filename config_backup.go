@@ -61,6 +61,8 @@ type BackupConfig struct {
 	NoIndexes bool
 	// Don't back up any UDFs.
 	NoUDFs bool
+	// Exclude bind data from backup.
+	NoBins bool
 	// RecordsPerSecond limits backup records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int

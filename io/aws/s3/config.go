@@ -16,12 +16,14 @@ package s3
 
 // Config represents the AWS S3 configuration.
 type Config struct {
-	Bucket    string
-	Region    string
-	Endpoint  string
-	Profile   string
-	Prefix    string
-	ChunkSize int
+	Bucket            string
+	Region            string
+	Endpoint          string
+	Profile           string
+	Prefix            string
+	MinPartSize       int
+	MaxAsyncDownloads int
+	MaxAsyncUploads   int
 }
 
 // NewConfig returns new AWS S3 configuration.
@@ -31,14 +33,18 @@ func NewConfig(
 	endpoint string,
 	profile string,
 	prefix string,
-	chunkSize int,
+	minPartSize int,
+	maxAsyncDownloads int,
+	maxAsyncUploads int,
 ) *Config {
 	return &Config{
-		Bucket:    bucket,
-		Region:    region,
-		Endpoint:  endpoint,
-		Profile:   profile,
-		Prefix:    prefix,
-		ChunkSize: chunkSize,
+		Bucket:            bucket,
+		Region:            region,
+		Endpoint:          endpoint,
+		Profile:           profile,
+		Prefix:            prefix,
+		MinPartSize:       minPartSize,
+		MaxAsyncDownloads: maxAsyncDownloads,
+		MaxAsyncUploads:   maxAsyncUploads,
 	}
 }

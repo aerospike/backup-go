@@ -44,7 +44,7 @@ func NewStreamingReader(
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	client, err := newS3Client(ctx, s3Config)
+	client, err := newS3DownloadClient(ctx, s3Config)
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +176,8 @@ func (r *StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadC
 		return nil, fmt.Errorf("failed to get s3 object: %w", err)
 	}
 
-	chunkSize := r.s3Config.ChunkSize
-	if chunkSize == 0 {
+	chunkSize := r.s3Config.MinPartSize
+	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
 	}
 

@@ -17,6 +17,7 @@ package s3
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -28,7 +29,15 @@ const (
 	s3type             = "s3"
 )
 
-func newS3Client(ctx context.Context, s3Config *Config) (*s3.Client, error) {
+func newS3DownloadClient(ctx context.Context, s3Config *Config) (*s3.Client, error) {
+	return newS3ClientWithConcurrency(ctx, s3Config, s3Config.MaxAsyncDownloads)
+}
+
+func newS3UploadClient(ctx context.Context, s3Config *Config) (*s3.Client, error) {
+	return newS3ClientWithConcurrency(ctx, s3Config, s3Config.MaxAsyncUploads)
+}
+
+func newS3ClientWithConcurrency(ctx context.Context, s3Config *Config, maxConcurrency int) (*s3.Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithSharedConfigProfile(s3Config.Profile),
 		config.WithRegion(s3Config.Region),
@@ -44,6 +53,14 @@ func newS3Client(ctx context.Context, s3Config *Config) (*s3.Client, error) {
 		}
 
 		o.UsePathStyle = true
+
+		if maxConcurrency > 0 {
+			o.HTTPClient = &http.Client{
+				Transport: &http.Transport{
+					MaxConnsPerHost: maxConcurrency,
+				},
+			}
+		}
 	})
 
 	return client, nil

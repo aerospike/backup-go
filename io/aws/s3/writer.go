@@ -41,11 +41,11 @@ func NewWriter(
 	s3Config *Config,
 	removeFiles bool,
 ) (*Writer, error) {
-	if s3Config.ChunkSize > s3maxFile {
-		return nil, fmt.Errorf("invalid chunk size %d, should not exceed %d", s3Config.ChunkSize, s3maxFile)
+	if s3Config.MinPartSize > s3maxFile {
+		return nil, fmt.Errorf("invalid min part size %d, should not exceed %d", s3Config.MinPartSize, s3maxFile)
 	}
 
-	client, err := newS3Client(ctx, s3Config)
+	client, err := newS3UploadClient(ctx, s3Config)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func NewWriter(
 
 // NewWriter returns a new S3 writer to the specified path.
 func (f *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
-	chunkSize := f.s3Config.ChunkSize
+	chunkSize := f.s3Config.MinPartSize
 	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
 	}

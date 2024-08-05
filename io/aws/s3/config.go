@@ -21,7 +21,7 @@ type Config struct {
 	// Folder name for the backup.
 	Prefix string
 
-	// These properties identical to C client:
+	// The following property names are identical with the C library
 
 	// The S3 region that the bucket(s) exist in.
 	Region string

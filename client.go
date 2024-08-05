@@ -115,9 +115,14 @@ func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
 	return *p
 }
 
-func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy, maxRecords int64) a.ScanPolicy {
 	if p == nil {
 		p = c.aerospikeClient.DefaultScanPolicy
+	}
+
+	// Set maxRecords.
+	if maxRecords != 0 {
+		p.MaxRecords = maxRecords
 	}
 
 	return *p
@@ -140,7 +145,7 @@ func (c *Client) Backup(
 	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
 	config.InfoPolicy = &infoPolicy
 
-	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
+	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy, config.MaxRecords)
 	config.ScanPolicy = &scanPolicy
 
 	if err := config.validate(); err != nil {

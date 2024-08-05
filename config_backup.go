@@ -70,6 +70,8 @@ type BackupConfig struct {
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
 	FileLimit int64
+	// The number of records to back up.
+	MaxRecords int64
 }
 
 // PartitionRange specifies a range of Aerospike partitions.

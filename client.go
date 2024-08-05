@@ -33,10 +33,10 @@ const (
 	MaxPartitions = 4096
 )
 
-// AsClient describes aerospike client interface for easy mocking.
+// AerospikeClient describes aerospike client interface for easy mocking.
 //
-// go:generate mockery --name AsClient
-type AsClient interface {
+// go:generate mockery --name AerospikeClient
+type AerospikeClient interface {
 	GetDefaultScanPolicy() *a.ScanPolicy
 	GetDefaultInfoPolicy() *a.InfoPolicy
 	GetDefaultWritePolicy() *a.WritePolicy
@@ -88,7 +88,7 @@ type AsClient interface {
 //		// handle error
 //	}
 type Client struct {
-	aerospikeClient AsClient
+	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	id              string
 }
@@ -97,7 +97,7 @@ type Client struct {
 //   - ac is the aerospike client to use for backup and restore operations.
 //   - id is an identifier for the client.
 //   - logger is the logger that this client will log to.
-func NewClient(ac AsClient, id string, logger *slog.Logger) (*Client, error) {
+func NewClient(ac AerospikeClient, id string, logger *slog.Logger) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}

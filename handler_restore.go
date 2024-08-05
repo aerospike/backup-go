@@ -47,7 +47,7 @@ type StreamingReader interface {
 type RestoreHandler struct {
 	reader          StreamingReader
 	config          *RestoreConfig
-	aerospikeClient AsClient
+	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	limiter         *rate.Limiter
 	errors          chan error
@@ -58,7 +58,7 @@ type RestoreHandler struct {
 // newRestoreHandler creates a new RestoreHandler.
 func newRestoreHandler(
 	config *RestoreConfig,
-	ac AsClient,
+	ac AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,
 ) *RestoreHandler {

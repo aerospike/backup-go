@@ -75,7 +75,7 @@ type infoGetter interface {
 	RequestInfo(infoPolicy *a.InfoPolicy, commands ...string) (map[string]string, a.Error)
 }
 
-type asClient interface {
+type aerospikeClient interface {
 	Cluster() *a.Cluster
 }
 
@@ -84,7 +84,7 @@ type InfoClient struct {
 	cluster *a.Cluster
 }
 
-func NewInfoClientFromAerospike(aeroClient asClient, policy *a.InfoPolicy) *InfoClient {
+func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy) *InfoClient {
 	return &InfoClient{
 		cluster: aeroClient.Cluster(),
 		policy:  policy,

@@ -51,7 +51,7 @@ type BackupHandler struct {
 	writer                 Writer
 	encoder                Encoder
 	config                 *BackupConfig
-	aerospikeClient        AsClient
+	aerospikeClient        AerospikeClient
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *rate.Limiter
@@ -64,7 +64,7 @@ type BackupHandler struct {
 // newBackupHandler creates a new BackupHandler.
 func newBackupHandler(
 	config *BackupConfig,
-	ac AsClient,
+	ac AerospikeClient,
 	logger *slog.Logger,
 	writer Writer,
 ) *BackupHandler {

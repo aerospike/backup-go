@@ -20,7 +20,6 @@ import (
 	"io"
 	"log/slog"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
@@ -48,7 +47,7 @@ type StreamingReader interface {
 type RestoreHandler struct {
 	reader          StreamingReader
 	config          *RestoreConfig
-	aerospikeClient *a.Client
+	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	limiter         *rate.Limiter
 	errors          chan error
@@ -59,7 +58,7 @@ type RestoreHandler struct {
 // newRestoreHandler creates a new RestoreHandler.
 func newRestoreHandler(
 	config *RestoreConfig,
-	ac *a.Client,
+	ac AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,
 ) *RestoreHandler {

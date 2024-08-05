@@ -31,13 +31,13 @@ import (
 
 type backupRecordsHandler struct {
 	config          *BackupConfig
-	aerospikeClient *a.Client
+	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 }
 
 func newBackupRecordsHandler(
 	config *BackupConfig,
-	ac *a.Client,
+	ac AerospikeClient,
 	logger *slog.Logger,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")

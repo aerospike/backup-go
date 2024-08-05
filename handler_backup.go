@@ -21,7 +21,6 @@ import (
 	"log/slog"
 	"sync/atomic"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/io/aerospike"
@@ -52,7 +51,7 @@ type BackupHandler struct {
 	writer                 Writer
 	encoder                Encoder
 	config                 *BackupConfig
-	aerospikeClient        *a.Client
+	aerospikeClient        AerospikeClient
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *rate.Limiter
@@ -65,7 +64,7 @@ type BackupHandler struct {
 // newBackupHandler creates a new BackupHandler.
 func newBackupHandler(
 	config *BackupConfig,
-	ac *a.Client,
+	ac AerospikeClient,
 	logger *slog.Logger,
 	writer Writer,
 ) *BackupHandler {

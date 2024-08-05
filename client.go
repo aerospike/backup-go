@@ -33,6 +33,26 @@ const (
 	MaxPartitions = 4096
 )
 
+// AerospikeClient describes aerospike client interface for easy mocking.
+//
+// go:generate mockery --name AerospikeClient
+type AerospikeClient interface {
+	GetDefaultScanPolicy() *a.ScanPolicy
+	GetDefaultInfoPolicy() *a.InfoPolicy
+	GetDefaultWritePolicy() *a.WritePolicy
+	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
+	CreateComplexIndex(policy *a.WritePolicy, namespace string, set string, indexName string, binName string,
+		indexType a.IndexType, indexCollectionType a.IndexCollectionType, ctx ...*a.CDTContext,
+	) (*a.IndexTask, a.Error)
+	DropIndex(policy *a.WritePolicy, namespace string, set string, indexName string) a.Error
+	RegisterUDF(policy *a.WritePolicy, udfBody []byte, serverPath string, language a.Language,
+	) (*a.RegisterTask, a.Error)
+	BatchOperate(policy *a.BatchPolicy, records []a.BatchRecordIfc) a.Error
+	Cluster() *a.Cluster
+	ScanPartitions(scanPolicy *a.ScanPolicy, partitionFilter *a.PartitionFilter, namespace string,
+		setName string, binNames ...string) (*a.Recordset, a.Error)
+}
+
 // Client is the main entry point for the backup package.
 // It wraps an aerospike client and provides methods to start backup and restore operations.
 // Example usage:
@@ -68,7 +88,7 @@ const (
 //		// handle error
 //	}
 type Client struct {
-	aerospikeClient *a.Client
+	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	id              string
 }
@@ -77,7 +97,7 @@ type Client struct {
 //   - ac is the aerospike client to use for backup and restore operations.
 //   - id is an identifier for the client.
 //   - logger is the logger that this client will log to.
-func NewClient(ac *a.Client, id string, logger *slog.Logger) (*Client, error) {
+func NewClient(ac AerospikeClient, id string, logger *slog.Logger) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}
@@ -101,7 +121,7 @@ func NewClient(ac *a.Client, id string, logger *slog.Logger) (*Client, error) {
 
 func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
 	if p == nil {
-		p = c.aerospikeClient.DefaultInfoPolicy
+		p = c.aerospikeClient.GetDefaultInfoPolicy()
 	}
 
 	return *p
@@ -109,7 +129,7 @@ func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
 
 func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
 	if p == nil {
-		p = c.aerospikeClient.DefaultWritePolicy
+		p = c.aerospikeClient.GetDefaultWritePolicy()
 	}
 
 	return *p
@@ -117,7 +137,7 @@ func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
 
 func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
 	if p == nil {
-		p = c.aerospikeClient.DefaultScanPolicy
+		p = c.aerospikeClient.GetDefaultScanPolicy()
 	}
 
 	return *p

@@ -17,6 +17,7 @@ package s3
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -44,6 +45,14 @@ func newS3Client(ctx context.Context, s3Config *Config) (*s3.Client, error) {
 		}
 
 		o.UsePathStyle = true
+
+		if s3Config.MaxConnsPerHost > 0 {
+			o.HTTPClient = &http.Client{
+				Transport: &http.Transport{
+					MaxConnsPerHost: s3Config.MaxConnsPerHost,
+				},
+			}
+		}
 	})
 
 	return client, nil

@@ -71,6 +71,8 @@ type BackupConfig struct {
 	// size threshold, a new file will be created. 0 for no file size limit.
 	FileLimit int64
 	// The number of records to back up.
+	// This param will overwrite ScanPolicy.MaxRecords.
+	// If it is set with ScanPolicy.IncludeBinData = false, then backup will not contain data to restore.
 	MaxRecords int64
 }
 

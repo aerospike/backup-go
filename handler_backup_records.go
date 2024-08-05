@@ -31,13 +31,13 @@ import (
 
 type backupRecordsHandler struct {
 	config          *BackupConfig
-	aerospikeClient *a.Client
+	aerospikeClient AsClient
 	logger          *slog.Logger
 }
 
 func newBackupRecordsHandler(
 	config *BackupConfig,
-	ac *a.Client,
+	ac AsClient,
 	logger *slog.Logger,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
@@ -138,6 +138,8 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	scanPolicy.RawCDT = true
 
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
+
+	// counter inject
 
 	for i := 0; i < n; i++ {
 		recordReader := aerospike.NewRecordReader(

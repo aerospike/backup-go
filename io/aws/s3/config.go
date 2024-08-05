@@ -16,14 +16,25 @@ package s3
 
 // Config represents the AWS S3 configuration.
 type Config struct {
-	Bucket            string
-	Region            string
-	Endpoint          string
-	Profile           string
-	Prefix            string
-	MinPartSize       int
+	// The S3 bucket to store backup
+	Bucket string
+	// Folder name for the backup.
+	Prefix string
+
+	// These properties identical to c client:
+
+	// The S3 region that the bucket(s) exist in.
+	Region string
+	// The S3 profile to use for credentials.
+	Profile string
+	// An alternate url endpoint to send S3 API calls to.
+	Endpoint string
+	// The minimum size in megabytes of individual S3 UploadParts.
+	MinPartSize int
+	// The maximum number of simultaneous download requests from S3.
 	MaxAsyncDownloads int
-	MaxAsyncUploads   int
+	// The maximum number of simultaneous upload requests from S3.
+	MaxAsyncUploads int
 }
 
 // NewConfig returns new AWS S3 configuration.

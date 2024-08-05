@@ -29,7 +29,7 @@ type Config struct {
 	Profile string
 	// An alternate url endpoint to send S3 API calls to.
 	Endpoint string
-	// The minimum size in megabytes of individual S3 UploadParts.
+	// The minimum size in bytes of individual S3 UploadParts.
 	MinPartSize int
 	// The maximum number of simultaneous download requests from S3.
 	MaxAsyncDownloads int

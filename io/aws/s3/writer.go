@@ -75,7 +75,7 @@ func NewWriter(
 
 // NewWriter returns a new S3 writer to the specified path.
 func (f *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
-	chunkSize := f.s3Config.MinPartSize * 1024 * 1024
+	chunkSize := f.s3Config.MinPartSize
 	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
 	}

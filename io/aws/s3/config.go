@@ -16,12 +16,12 @@ package s3
 
 // Config represents the AWS S3 configuration.
 type Config struct {
-	// The S3 bucket to store backup
+	// The S3 bucket to store backup.
 	Bucket string
 	// Folder name for the backup.
 	Prefix string
 
-	// These properties identical to c client:
+	// These properties identical to C client:
 
 	// The S3 region that the bucket(s) exist in.
 	Region string

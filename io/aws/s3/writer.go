@@ -45,7 +45,7 @@ func NewWriter(
 		return nil, fmt.Errorf("invalid min part size %d, should not exceed %d", s3Config.MinPartSize, s3maxFile)
 	}
 
-	client, err := newS3UploadClient(ctx, s3Config)
+	client, err := newS3Client(ctx, s3Config)
 	if err != nil {
 		return nil, err
 	}

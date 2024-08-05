@@ -20,9 +20,6 @@ type Config struct {
 	Bucket string
 	// Folder name for the backup.
 	Prefix string
-
-	// The following property names are identical with the C library
-
 	// The S3 region that the bucket(s) exist in.
 	Region string
 	// The S3 profile to use for credentials.
@@ -31,10 +28,8 @@ type Config struct {
 	Endpoint string
 	// The minimum size in bytes of individual S3 UploadParts.
 	MinPartSize int
-	// The maximum number of simultaneous download requests from S3.
-	MaxAsyncDownloads int
-	// The maximum number of simultaneous upload requests from S3.
-	MaxAsyncUploads int
+	// The maximum number of simultaneous requests from S3.
+	MaxConnsPerHost int
 }
 
 // NewConfig returns new AWS S3 configuration.
@@ -45,17 +40,15 @@ func NewConfig(
 	profile string,
 	prefix string,
 	minPartSize int,
-	maxAsyncDownloads int,
-	maxAsyncUploads int,
+	maxConnsPerHost int,
 ) *Config {
 	return &Config{
-		Bucket:            bucket,
-		Region:            region,
-		Endpoint:          endpoint,
-		Profile:           profile,
-		Prefix:            prefix,
-		MinPartSize:       minPartSize,
-		MaxAsyncDownloads: maxAsyncDownloads,
-		MaxAsyncUploads:   maxAsyncUploads,
+		Bucket:          bucket,
+		Region:          region,
+		Endpoint:        endpoint,
+		Profile:         profile,
+		Prefix:          prefix,
+		MinPartSize:     minPartSize,
+		MaxConnsPerHost: maxConnsPerHost,
 	}
 }

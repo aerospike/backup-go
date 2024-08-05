@@ -142,13 +142,12 @@ func (s *writeReadTestSuite) TearDownSuite() {
 
 func (s *writeReadTestSuite) TestWriteRead() {
 	config := &s3.Config{
-		Bucket:            "backup",
-		Region:            "eu",
-		Endpoint:          "http://localhost:9000",
-		Profile:           "minio",
-		Prefix:            "test",
-		MaxAsyncUploads:   1,
-		MaxAsyncDownloads: 2,
+		Bucket:          "backup",
+		Region:          "eu",
+		Endpoint:        "http://localhost:9000",
+		Profile:         "minio",
+		Prefix:          "test",
+		MaxConnsPerHost: 1,
 	}
 
 	size := 500_000

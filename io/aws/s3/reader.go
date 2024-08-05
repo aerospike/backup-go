@@ -44,7 +44,7 @@ func NewStreamingReader(
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	client, err := newS3DownloadClient(ctx, s3Config)
+	client, err := newS3Client(ctx, s3Config)
 	if err != nil {
 		return nil, err
 	}

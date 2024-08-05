@@ -29,15 +29,7 @@ const (
 	s3type             = "s3"
 )
 
-func newS3DownloadClient(ctx context.Context, s3Config *Config) (*s3.Client, error) {
-	return newS3ClientWithConcurrency(ctx, s3Config, s3Config.MaxAsyncDownloads)
-}
-
-func newS3UploadClient(ctx context.Context, s3Config *Config) (*s3.Client, error) {
-	return newS3ClientWithConcurrency(ctx, s3Config, s3Config.MaxAsyncUploads)
-}
-
-func newS3ClientWithConcurrency(ctx context.Context, s3Config *Config, maxConcurrency int) (*s3.Client, error) {
+func newS3Client(ctx context.Context, s3Config *Config) (*s3.Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithSharedConfigProfile(s3Config.Profile),
 		config.WithRegion(s3Config.Region),
@@ -54,10 +46,10 @@ func newS3ClientWithConcurrency(ctx context.Context, s3Config *Config, maxConcur
 
 		o.UsePathStyle = true
 
-		if maxConcurrency > 0 {
+		if s3Config.MaxConnsPerHost > 0 {
 			o.HTTPClient = &http.Client{
 				Transport: &http.Transport{
-					MaxConnsPerHost: maxConcurrency,
+					MaxConnsPerHost: s3Config.MaxConnsPerHost,
 				},
 			}
 		}

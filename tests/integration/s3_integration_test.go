@@ -142,11 +142,13 @@ func (s *writeReadTestSuite) TearDownSuite() {
 
 func (s *writeReadTestSuite) TestWriteRead() {
 	config := &s3.Config{
-		Bucket:   "backup",
-		Region:   "eu",
-		Endpoint: "http://localhost:9000",
-		Profile:  "minio",
-		Prefix:   "test",
+		Bucket:            "backup",
+		Region:            "eu",
+		Endpoint:          "http://localhost:9000",
+		Profile:           "minio",
+		Prefix:            "test",
+		MaxAsyncUploads:   1,
+		MaxAsyncDownloads: 2,
 	}
 
 	size := 500_000
@@ -216,7 +218,7 @@ func (s *writeReadTestSuite) read(config *s3.Config) []byte {
 		if err != nil {
 			s.FailNow("failed to read", err)
 		}
-		reader.Close()
+		_ = reader.Close()
 		return buffer
 	case err := <-errorChan:
 		require.NoError(s.T(), err)

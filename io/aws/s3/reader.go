@@ -176,7 +176,7 @@ func (r *StreamingReader) newS3Reader(ctx context.Context, key string) (io.ReadC
 		return nil, fmt.Errorf("failed to get s3 object: %w", err)
 	}
 
-	chunkSize := r.s3Config.MinPartSize
+	chunkSize := r.s3Config.MinPartSize * 1024 * 1024
 	if chunkSize < s3DefaultChunkSize {
 		chunkSize = s3DefaultChunkSize
 	}

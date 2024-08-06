@@ -602,6 +602,126 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	suite.NotNil(err)
 }
 
+func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryption() {
+	type args struct {
+		backupConfig  *backup.BackupConfig
+		restoreConfig *backup.RestoreConfig
+		bins          a.BinMap
+	}
+
+	privatKeyFile := "pkey_test"
+	bCfg := backup.NewDefaultBackupConfig()
+	bCfg.EncryptionPolicy = &backup.EncryptionPolicy{
+		KeyFile: &privatKeyFile,
+		Mode:    backup.EncryptAES128,
+	}
+	rCfg := backup.NewDefaultRestoreConfig()
+	rCfg.EncryptionPolicy = &backup.EncryptionPolicy{
+		KeyFile: &privatKeyFile,
+		Mode:    backup.EncryptAES128,
+	}
+
+	var tests = []struct {
+		args args
+		name string
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  bCfg,
+				restoreConfig: rCfg,
+				bins:          testBins,
+			},
+		},
+	}
+	for _, tt := range tests {
+		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
+		suite.SetupTest(expectedRecs)
+		suite.Run(tt.name, func() {
+			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, expectedRecs)
+		})
+		suite.TearDownTest()
+	}
+}
+
+func (suite *backupRestoreTestSuite) TestBackupRestoreIONamespace() {
+	type args struct {
+		backupConfig  *backup.BackupConfig
+		restoreConfig *backup.RestoreConfig
+		bins          a.BinMap
+	}
+
+	source := "test"
+	destination := "test"
+	rCfg := backup.NewDefaultRestoreConfig()
+	rCfg.Namespace = &backup.RestoreNamespaceConfig{
+		Source:      &source,
+		Destination: &destination,
+	}
+
+	var tests = []struct {
+		args args
+		name string
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  backup.NewDefaultBackupConfig(),
+				restoreConfig: rCfg,
+				bins:          testBins,
+			},
+		},
+	}
+	for _, tt := range tests {
+		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
+		suite.SetupTest(expectedRecs)
+		suite.Run(tt.name, func() {
+			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, expectedRecs)
+		})
+		suite.TearDownTest()
+	}
+}
+
+func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
+	type args struct {
+		backupConfig  *backup.BackupConfig
+		restoreConfig *backup.RestoreConfig
+		bins          a.BinMap
+	}
+
+	bCfg := backup.NewDefaultBackupConfig()
+	bCfg.CompressionPolicy = &backup.CompressionPolicy{
+		Mode:  backup.CompressZSTD,
+		Level: 20,
+	}
+	rCfg := backup.NewDefaultRestoreConfig()
+	rCfg.CompressionPolicy = &backup.CompressionPolicy{
+		Mode: backup.CompressZSTD,
+	}
+
+	var tests = []struct {
+		args args
+		name string
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  bCfg,
+				restoreConfig: rCfg,
+				bins:          testBins,
+			},
+		},
+	}
+	for _, tt := range tests {
+		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
+		suite.SetupTest(expectedRecs)
+		suite.Run(tt.name, func() {
+			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, expectedRecs)
+		})
+		suite.TearDownTest()
+	}
+}
+
 func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 	userKeys := []any{1, "string", []byte("bytes")}
 	recs := make([]*a.Record, numRec)

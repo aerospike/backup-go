@@ -20,6 +20,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -35,6 +36,10 @@ type mockWriteCloser struct {
 func (m *mockWriteCloser) Close() error {
 	m.closed = true
 	return nil
+}
+
+func Test_SizedTestSuite(t *testing.T) {
+	suite.Run(t, new(sizedTestSuite))
 }
 
 func (suite *sizedTestSuite) Test_writeCloserSized() {
@@ -59,6 +64,8 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	wcs, err := NewWriter(context.Background(), 10, open)
 	suite.NotNil(wcs)
 	suite.Nil(err)
+
+	defer wcs.Close()
 
 	n, err := wcs.Write([]byte("test"))
 	suite.NoError(err)
@@ -85,6 +92,25 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	suite.Equal("test1", writer2.Writer.(*bytes.Buffer).String())
 }
 
-func Test_SizedTestSuite(t *testing.T) {
-	suite.Run(t, new(sizedTestSuite))
+func (suite *sizedTestSuite) Test_writeCloserSized_ErrLimit() {
+	var writer1 *mockWriteCloser
+	var writer2 *mockWriteCloser
+
+	open := func(_ context.Context) (io.WriteCloser, error) {
+		if writer1 == nil {
+			writer1 = &mockWriteCloser{
+				Writer: &bytes.Buffer{},
+			}
+
+			return writer1, nil
+		}
+		writer2 = &mockWriteCloser{
+			Writer: &bytes.Buffer{},
+		}
+
+		return writer2, nil
+	}
+
+	_, err := NewWriter(context.Background(), -1, open)
+	require.ErrorContains(suite.T(), err, "limit must be greater than 0")
 }

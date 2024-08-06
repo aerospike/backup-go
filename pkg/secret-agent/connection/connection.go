@@ -92,7 +92,7 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 		return "", fmt.Errorf("failed to set read deadline: %w", err)
 	}
 	// Reading headers.
-	header, err := readBytes(conn, 8)
+	header, err := ReadBytes(conn, 8)
 	if err != nil {
 		return "", fmt.Errorf("failed to read header: %w", err)
 	}
@@ -106,7 +106,7 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 	}
 
 	// Reading body.
-	body, err := readBytes(conn, int(length))
+	body, err := ReadBytes(conn, int(length))
 	if err != nil {
 		return "", fmt.Errorf("failed to read header: %w", err)
 	}
@@ -123,7 +123,7 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 	return res.SecretValue, nil
 }
 
-func readBytes(conn connector, length int) ([]byte, error) {
+func ReadBytes(conn connector, length int) ([]byte, error) {
 	buffer := make([]byte, length)
 	total := 0
 

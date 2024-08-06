@@ -60,25 +60,13 @@ func TestCheckRestoreDirectory(t *testing.T) {
 
 func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 	dir := s.T().TempDir()
-	file := "file1.asb"
-	filePath := filepath.Join(dir, file)
 
-	f, err := os.Create(filePath)
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	_ = f.Close()
-
-	file = "file2.asb"
-	filePath = filepath.Join(dir, file)
-
-	f, err = os.Create(filePath)
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	_ = f.Close()
+	err := createTmpFile(dir, "file1.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file2.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file3.txt")
+	require.NoError(s.T(), err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -113,15 +101,8 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 
 func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 	dir := s.T().TempDir()
-	file := "file1.asb"
-	filePath := filepath.Join(dir, file)
-
-	f, err := os.Create(filePath)
-	if err != nil {
-		s.FailNow("Failed to create file: %v", err)
-	}
-
-	_ = f.Close()
+	err := createTmpFile(dir, "file1.asb")
+	require.NoError(s.T(), err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -152,4 +133,104 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 			require.NoError(s.T(), err)
 		}
 	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
+	dir := s.T().TempDir()
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	streamingReader, err := NewDirectoryStreamingReader(dir, mockValidator)
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(2, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.ErrorContains(s.T(), err, "is empty")
+			return
+		}
+	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
+	dir := s.T().TempDir()
+	err := createTmpFile(dir, "file1.asb")
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	streamingReader, err := NewDirectoryStreamingReader("file1.asb", mockValidator)
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(2, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.ErrorContains(s.T(), err, "no such file or directory")
+			return
+		}
+	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_GetType() {
+	dir := s.T().TempDir()
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	r, err := NewDirectoryStreamingReader(dir, mockValidator)
+	s.Require().NoError(err)
+
+	s.Equal(localType, r.GetType())
+}
+
+func createTmpFile(dir, fileName string) error {
+	filePath := filepath.Join(dir, fileName)
+	f, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %v", err)
+	}
+	_ = f.Close()
+
+	return nil
 }

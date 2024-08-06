@@ -30,7 +30,7 @@ import (
 const (
 	testResource  = "resource"
 	testSecretKey = "secret-key"
-	//nolint:gosec // it is not hardcoded creds, it is test hash sting.
+	//nolint:gosec // it is not hardcoded credentials, it is test hash string.
 	testSecretValue = "e1518262adfdd22c3617c8a606f24c02a18f19aae1d300903e0e4c05eae8ba70"
 	testTimeout     = 10 * time.Second
 )
@@ -41,6 +41,7 @@ func TestConnection_WriteOK(t *testing.T) {
 	mockConn := new(mocks.Mockconnector)
 	mockConn.On("Write", mock.Anything).Return(42, nil)
 	mockConn.On("SetWriteDeadline", mock.Anything).Return(nil)
+
 	err := Write(mockConn, testTimeout, testResource, testSecretKey)
 	require.NoError(t, err)
 
@@ -51,6 +52,16 @@ func TestConnection_WriteError(t *testing.T) {
 	mockConn := new(mocks.Mockconnector)
 	mockConn.On("SetWriteDeadline", mock.Anything).Return(nil)
 	mockConn.On("Write", mock.Anything).Return(0, errTest)
+
+	err := Write(mockConn, testTimeout, testResource, testSecretKey)
+	require.ErrorIs(t, err, errTest)
+
+	mockConn.AssertExpectations(t)
+}
+
+func TestConnection_WriteTimeout(t *testing.T) {
+	mockConn := new(mocks.Mockconnector)
+	mockConn.On("SetWriteDeadline", mock.Anything).Return(errTest)
 
 	err := Write(mockConn, testTimeout, testResource, testSecretKey)
 	require.ErrorIs(t, err, errTest)
@@ -98,6 +109,16 @@ func TestConnection_ReadError(t *testing.T) {
 
 	_, err := Read(mockConn, testTimeout)
 	require.ErrorIs(t, err, headerError)
+
+	mockConn.AssertExpectations(t)
+}
+
+func TestConnection_ReadTimeout(t *testing.T) {
+	mockConn := new(mocks.Mockconnector)
+	mockConn.On("SetReadDeadline", mock.Anything).Return(errTest)
+
+	_, err := Read(mockConn, testTimeout)
+	require.ErrorIs(t, err, errTest)
 
 	mockConn.AssertExpectations(t)
 }

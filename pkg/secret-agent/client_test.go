@@ -53,7 +53,6 @@ func mockHandler(conn net.Conn) {
 	defer conn.Close()
 	_, _ = connection.ReadBytes(conn, 10)
 	_ = connection.Write(conn, testTimeout, "", testSecretKey)
-	return
 }
 
 func TestClient_GetSecret(t *testing.T) {

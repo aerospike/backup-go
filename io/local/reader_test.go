@@ -221,7 +221,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_GetType() {
 	r, err := NewDirectoryStreamingReader(dir, mockValidator)
 	s.Require().NoError(err)
 
-	s.Equal(s.T(), localType, r.GetType())
+	s.Equal(localType, r.GetType())
 }
 
 func createTmpFile(dir, fileName string) error {

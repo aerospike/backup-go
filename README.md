@@ -1,16 +1,17 @@
 # backup-go
+[![Tests](https://github.com/aerospike/backup-go/actions/workflows/tests.yml/badge.svg)](https://github.com/aerospike/backup-go/actions/workflows/tests.yml)
 
-A library for backing up and restoring Aerospike data.
+A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data.
 
-### Design
+## Design
 
-This Aerospike backup package is built around the [Aerospike Go client](https://github.com/aerospike/aerospike-client-go). The package uses a client structure to start backup and restore jobs. The client structure is thread safe, backup and restore jobs can be started by multiple threads. When the client is used to start backup and restore jobs, a handler is immediately returned that is used to check the job's status, errors, and wait for it to finish. Here is how to use the package at a high level.
+This Aerospike backup package is built around the [Aerospike Go client](https://github.com/aerospike/aerospike-client-go). The package uses a client structure to start backup and restore jobs. The client structure is thread safe, backup and restore jobs can be started in multiple goroutines. When the client is used to start backup and restore jobs, a handler is immediately returned that is used to check the job's status, errors, and wait for it to finish. Here is how to use the package at a high level.
 
 - Wrap Aerospike Go clients with the backup package Client object.
 - Start backup and restore jobs using that backup client. These client methods return a handler which is used to monitor the started job. Started jobs run in parallel.
 - Use the returned handlers to monitor the started jobs.
 
-### Usage
+## Usage
 
 The following is a simple example using a backup client to start backup and restore jobs. Errors should be properly handled in production code.
 
@@ -42,7 +43,7 @@ func main() {
 		panic(err)
 	}
 
-	backupCfg := backup.NewBackupConfig()
+	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = "test"
 	backupCfg.Parallel = 5
 	ctx := context.Background()
@@ -58,7 +59,7 @@ func main() {
 		log.Printf("Backup failed: %v", err)
 	}
 
-	restoreCfg := backup.NewRestoreConfig()
+	restoreCfg := backup.NewDefaultRestoreConfig()
 	restoreCfg.Parallel = 5
 
 	streamingReader, err := backup.NewStreamingReaderLocal("backups_folder", backup.EncoderTypeASB)
@@ -81,8 +82,9 @@ func main() {
 	_ = restoreHandler.GetStats()
 }
 ```
+More examples can be found under the [examples](examples) folder.
 
-### Prerequisites
+## Prerequisites
 
 Requirements
 
@@ -93,12 +95,12 @@ Testing Requirements
 
 - [Mockery](https://github.com/vektra/mockery) to generate test mocks
 
-### Installation
+## Installation
 
 1. Install requirements.
 2. Use `go get https://github.com/aerospike/backup-go`
 
-### License
+## License
 
 The Aerospike Backup package is made available under the terms of the Apache License, Version 2, as stated in the file LICENSE.
 

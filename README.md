@@ -1,5 +1,7 @@
 # backup-go
 [![Tests](https://github.com/aerospike/backup-go/actions/workflows/tests.yml/badge.svg)](https://github.com/aerospike/backup-go/actions/workflows/tests.yml)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/aerospike/backup-go)](https://pkg.go.dev/github.com/aerospike/backup-go)
+[![codecov](https://codecov.io/gh/aerospike/backup-go/graph/badge.svg?token=S0gfl2zCcZ)](https://codecov.io/gh/aerospike/backup-go)
 
 A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data.
 

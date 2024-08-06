@@ -21,6 +21,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -602,23 +603,73 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	suite.NotNil(err)
 }
 
-func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryption() {
+func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryptionFile() {
 	type args struct {
 		backupConfig  *backup.BackupConfig
 		restoreConfig *backup.RestoreConfig
 		bins          a.BinMap
 	}
 
-	privatKeyFile := "pkey_test"
+	privateKeyFile := "pkey_test"
 	bCfg := backup.NewDefaultBackupConfig()
 	bCfg.EncryptionPolicy = &backup.EncryptionPolicy{
-		KeyFile: &privatKeyFile,
+		KeyFile: &privateKeyFile,
 		Mode:    backup.EncryptAES128,
 	}
 	rCfg := backup.NewDefaultRestoreConfig()
 	rCfg.EncryptionPolicy = &backup.EncryptionPolicy{
-		KeyFile: &privatKeyFile,
+		KeyFile: &privateKeyFile,
 		Mode:    backup.EncryptAES128,
+	}
+
+	var tests = []struct {
+		args args
+		name string
+	}{
+		{
+			name: "default",
+			args: args{
+				backupConfig:  bCfg,
+				restoreConfig: rCfg,
+				bins:          testBins,
+			},
+		},
+	}
+	for _, tt := range tests {
+		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
+		suite.SetupTest(expectedRecs)
+		suite.Run(tt.name, func() {
+			runBackupRestore(suite, tt.args.backupConfig, tt.args.restoreConfig, expectedRecs)
+		})
+		suite.TearDownTest()
+	}
+}
+
+func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryptionEnv() {
+	type args struct {
+		backupConfig  *backup.BackupConfig
+		restoreConfig *backup.RestoreConfig
+		bins          a.BinMap
+	}
+
+	envVar := "secret"
+	privateKeyFile := "pkey_test"
+	data, err := os.ReadFile(privateKeyFile)
+	suite.NoError(err)
+	lines := strings.Split(string(data), "\n")
+	lines = lines[1 : len(lines)-1]
+	os.Setenv(envVar, strings.Join(lines, "\n"))
+	defer os.Unsetenv(envVar)
+
+	bCfg := backup.NewDefaultBackupConfig()
+	bCfg.EncryptionPolicy = &backup.EncryptionPolicy{
+		KeyEnv: &envVar,
+		Mode:   backup.EncryptAES128,
+	}
+	rCfg := backup.NewDefaultRestoreConfig()
+	rCfg.EncryptionPolicy = &backup.EncryptionPolicy{
+		KeyEnv: &envVar,
+		Mode:   backup.EncryptAES128,
 	}
 
 	var tests = []struct {

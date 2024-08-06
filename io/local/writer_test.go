@@ -90,6 +90,15 @@ func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_DirNotEmpty() 
 	suite.Error(err)
 }
 
+func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
+	tmpDir := suite.T().TempDir()
+
+	w, err := NewDirectoryWriterFactory(tmpDir, true)
+	suite.NoError(err)
+
+	suite.Equal(localType, w.GetType())
+}
+
 func Test_backupDirectoryTestSuite(t *testing.T) {
 	suite.Run(t, new(writerTestSuite))
 }

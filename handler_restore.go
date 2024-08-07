@@ -45,6 +45,8 @@ type StreamingReader interface {
 
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
+	// Global backup context for a whole restore process.
+	ctx             context.Context
 	reader          StreamingReader
 	config          *RestoreConfig
 	aerospikeClient AerospikeClient
@@ -57,6 +59,7 @@ type RestoreHandler struct {
 
 // newRestoreHandler creates a new RestoreHandler.
 func newRestoreHandler(
+	ctx context.Context,
 	config *RestoreConfig,
 	ac AerospikeClient,
 	logger *slog.Logger,
@@ -66,6 +69,7 @@ func newRestoreHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 
 	return &RestoreHandler{
+		ctx:             ctx,
 		config:          config,
 		aerospikeClient: ac,
 		id:              id,
@@ -252,14 +256,14 @@ func (rh *RestoreHandler) GetStats() *models.RestoreStats {
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
-func (rh *RestoreHandler) Wait(ctx context.Context) error {
+func (rh *RestoreHandler) Wait() error {
 	defer func() {
 		rh.stats.Stop()
 	}()
 
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
+	case <-rh.ctx.Done():
+		return rh.ctx.Err()
 	case err := <-rh.errors:
 		return err
 	}

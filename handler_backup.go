@@ -48,6 +48,8 @@ type Writer interface {
 
 // BackupHandler handles a backup job.
 type BackupHandler struct {
+	// Global backup context for a whole backup process.
+	ctx                    context.Context
 	writer                 Writer
 	encoder                Encoder
 	config                 *BackupConfig
@@ -63,6 +65,7 @@ type BackupHandler struct {
 
 // newBackupHandler creates a new BackupHandler.
 func newBackupHandler(
+	ctx context.Context,
 	config *BackupConfig,
 	ac AerospikeClient,
 	logger *slog.Logger,
@@ -73,6 +76,7 @@ func newBackupHandler(
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
 	return &BackupHandler{
+		ctx:                    ctx,
 		config:                 config,
 		aerospikeClient:        ac,
 		id:                     id,
@@ -280,14 +284,14 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
-func (bh *BackupHandler) Wait(ctx context.Context) error {
+func (bh *BackupHandler) Wait() error {
 	defer func() {
 		bh.stats.Stop()
 	}()
 
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
+	case <-bh.ctx.Done():
+		return bh.ctx.Err()
 	case err := <-bh.errors:
 		return err
 	}

@@ -1,0 +1,41 @@
+name: Snyk scan
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  snyk-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/golang@master
+        continue-on-error: true # To make sure that SARIF upload gets called
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --all-projects --sarif-file-output=snyk.sarif
+
+      - name: Handle undefined security-severity
+        run: |
+          sed -i 's/"security-severity": "undefined"/"security-severity": "0"/g' snyk.sarif
+
+      - name: Check output file
+        id: out-file
+        run: |
+          if test -f "snyk.sarif"; then
+            echo "::set-output name=exists::true"; else
+            echo "::set-output name=exists::false"
+          fi
+
+      - name: Upload result to GitHub Code Scanning
+        if: steps.out-file.outputs.exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk.sarif

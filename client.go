@@ -167,7 +167,7 @@ func (c *Client) Backup(
 		return nil, err
 	}
 
-	handler := newBackupHandler(config, c.aerospikeClient, c.logger, writer)
+	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer)
 	handler.run(ctx)
 
 	return handler, nil
@@ -198,7 +198,7 @@ func (c *Client) Restore(
 		return nil, err
 	}
 
-	handler := newRestoreHandler(config, c.aerospikeClient, c.logger, streamingReader)
+	handler := newRestoreHandler(ctx, config, c.aerospikeClient, c.logger, streamingReader)
 	handler.startAsync(ctx)
 
 	return handler, nil

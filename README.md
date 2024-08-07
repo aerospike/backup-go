@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// use backupHandler.Wait() to wait for the job to finish or fail
-	err = backupHandler.Wait(ctx)
+	err = backupHandler.Wait()
 	if err != nil {
 		log.Printf("Backup failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func main() {
 	}
 
 	// use restoreHandler.Wait() to wait for the job to finish or fail
-	err = restoreHandler.Wait(ctx)
+	err = restoreHandler.Wait()
 	if err != nil {
 		log.Printf("Restore failed: %v", err)
 	}

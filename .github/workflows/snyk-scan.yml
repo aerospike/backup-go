@@ -24,7 +24,7 @@ jobs:
 
       - name: Handle undefined security-severity
         run: |
-          sed -i 's/"security-severity": "undefined"/"security-severity": "0"/g' snyk.sarif
+          if [ -f snyk.sarif ]; then sed -i 's/"security-severity": "undefined"/"security-severity": "0"/g' snyk.sarif; fi
 
       - name: Check output file
         id: out-file

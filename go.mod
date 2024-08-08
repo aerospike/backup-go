@@ -16,7 +16,7 @@ require (
 	github.com/klauspost/compress v1.17.9
 	github.com/minio/minio-go/v7 v7.0.74
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/time v0.5.0
+	golang.org/x/time v0.6.0
 )
 
 require (

@@ -54,6 +54,7 @@ type AerospikeClient interface {
 	Cluster() *a.Cluster
 	ScanPartitions(scanPolicy *a.ScanPolicy, partitionFilter *a.PartitionFilter, namespace string,
 		setName string, binNames ...string) (*a.Recordset, a.Error)
+	Close()
 }
 
 // Client is the main entry point for the backup package.
@@ -237,4 +238,9 @@ func (c *Client) Restore(
 	handler.startAsync(ctx)
 
 	return handler, nil
+}
+
+// AerospikeClient returns the underlying aerospike client.
+func (c *Client) AerospikeClient() AerospikeClient {
+	return c.aerospikeClient
 }

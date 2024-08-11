@@ -105,7 +105,7 @@ func WithID(id string) Option {
 	}
 }
 
-// WithLogger sets the logger for the Client.
+// WithLogger sets the logger for the [Client].
 func WithLogger(logger *slog.Logger) Option {
 	return func(c *Client) {
 		c.logger = logger

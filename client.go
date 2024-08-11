@@ -95,25 +95,25 @@ type Client struct {
 	id              string
 }
 
-// Option is a functional option that allows configuring the [Client].
-type Option func(*Client)
+// ClientOpt is a functional option that allows configuring the [Client].
+type ClientOpt func(*Client)
 
 // WithID sets the ID for the Client.
-func WithID(id string) Option {
+func WithID(id string) ClientOpt {
 	return func(c *Client) {
 		c.id = id
 	}
 }
 
 // WithLogger sets the logger for the [Client].
-func WithLogger(logger *slog.Logger) Option {
+func WithLogger(logger *slog.Logger) ClientOpt {
 	return func(c *Client) {
 		c.logger = logger
 	}
 }
 
 // WithScanLimiter sets the scan limiter for the [Client].
-func WithScanLimiter(sem *semaphore.Weighted) Option {
+func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 	return func(c *Client) {
 		c.scanLimiter = sem
 	}
@@ -128,7 +128,7 @@ func WithScanLimiter(sem *semaphore.Weighted) Option {
 //   - [WithScanLimiter] to set a semaphore that is used to limit number of
 //     concurrent scans.
 //   - scan limiter semaphore that is used to limit number of concurrent scans.
-func NewClient(ac AerospikeClient, opts ...Option) (*Client, error) {
+func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}

@@ -16,9 +16,10 @@ package main
 
 import (
 	"context"
+	"log"
+
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
-	"log"
 )
 
 func main() {

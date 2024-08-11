@@ -17,10 +17,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/aws/s3"
-	"log"
 )
 
 const (

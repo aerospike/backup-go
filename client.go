@@ -19,7 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
+	"math/rand"
 	"strconv"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -139,7 +139,7 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 		aerospikeClient: ac,
 		logger:          slog.Default(),
 		// #nosec G404
-		id: strconv.Itoa(rand.IntN(1000)),
+		id: strconv.Itoa(rand.Intn(1000)),
 	}
 
 	// Apply all options to the Client

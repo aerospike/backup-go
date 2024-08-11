@@ -120,10 +120,13 @@ func WithScanLimiter(sem *semaphore.Weighted) Option {
 }
 
 // NewClient creates a new backup client.
-// Options:
 //   - ac is the aerospike client to use for backup and restore operations.
-//   - id is an identifier for the client.
-//   - logger is the logger that this client will log to.
+//
+// Options:
+//   - [WithID] to set an identifier for the client.
+//   - [WithLogger] to set a logger that this client will log to.
+//   - [WithScanLimiter] to set a semaphore that is used to limit number of
+//     concurrent scans.
 //   - scan limiter semaphore that is used to limit number of concurrent scans.
 func NewClient(ac AerospikeClient, opts ...Option) (*Client, error) {
 	if ac == nil {

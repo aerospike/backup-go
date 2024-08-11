@@ -22,6 +22,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -35,7 +36,7 @@ const (
 
 // AerospikeClient describes aerospike client interface for easy mocking.
 //
-// go:generate mockery --name AerospikeClient
+//go:generate mockery --name AerospikeClient
 type AerospikeClient interface {
 	GetDefaultScanPolicy() *a.ScanPolicy
 	GetDefaultInfoPolicy() *a.InfoPolicy
@@ -90,33 +91,60 @@ type AerospikeClient interface {
 type Client struct {
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
+	scanLimiter     *semaphore.Weighted
 	id              string
 }
 
+type Option func(*Client)
+
+// WithID sets the ID for the Client.
+func WithID(id string) Option {
+	return func(c *Client) {
+		c.id = id
+	}
+}
+
+// WithLogger sets the logger for the Client.
+func WithLogger(logger *slog.Logger) Option {
+	return func(c *Client) {
+		c.logger = logger
+	}
+}
+
+// WithScanLimiter sets the scanLimiter for the Client.
+func WithScanLimiter(sem *semaphore.Weighted) Option {
+	return func(c *Client) {
+		c.scanLimiter = sem
+	}
+}
+
 // NewClient creates a new backup client.
+// Options:
 //   - ac is the aerospike client to use for backup and restore operations.
 //   - id is an identifier for the client.
 //   - logger is the logger that this client will log to.
-func NewClient(ac AerospikeClient, id string, logger *slog.Logger) (*Client, error) {
+//   - scan limiter semaphore that is used to limit number of concurrent scans.
+func NewClient(ac AerospikeClient, opts ...Option) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}
 
-	if logger == nil {
-		logger = slog.Default()
+	// Initialize the Client with default values
+	client := &Client{
+		aerospikeClient: ac,
+		logger:          slog.Default(), // Default logger
 	}
 
-	// qualify the logger with a backup lib group
-	logger = logger.WithGroup("backup")
+	// Apply all options to the Client
+	for _, opt := range opts {
+		opt(client)
+	}
 
-	// add a client group to the logger
-	logger = logging.WithClient(logger, id)
+	// Further customization after applying options
+	client.logger = client.logger.WithGroup("backup")
+	client.logger = logging.WithClient(client.logger, client.id)
 
-	return &Client{
-		aerospikeClient: ac,
-		id:              id,
-		logger:          logger,
-	}, nil
+	return client, nil
 }
 
 func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
@@ -167,7 +195,7 @@ func (c *Client) Backup(
 		return nil, err
 	}
 
-	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer)
+	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
 	handler.run(ctx)
 
 	return handler, nil

@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -23,6 +24,7 @@ import (
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
+	"golang.org/x/sync/semaphore"
 )
 
 // RecordReaderConfig represents the configuration for scanning Aerospike records.
@@ -30,6 +32,7 @@ type RecordReaderConfig struct {
 	timeBounds      models.TimeBounds
 	partitionFilter *a.PartitionFilter
 	scanPolicy      *a.ScanPolicy
+	scanLimiter     *semaphore.Weighted
 	namespace       string
 	setList         []string
 	binList         []string
@@ -41,7 +44,9 @@ func NewRecordReaderConfig(namespace string,
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	binList []string,
-	timeBounds models.TimeBounds) *RecordReaderConfig {
+	timeBounds models.TimeBounds,
+	scanLimiter *semaphore.Weighted,
+) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		namespace:       namespace,
 		setList:         setList,
@@ -49,6 +54,7 @@ func NewRecordReaderConfig(namespace string,
 		scanPolicy:      scanPolicy,
 		binList:         binList,
 		timeBounds:      timeBounds,
+		scanLimiter:     scanLimiter,
 	}
 }
 
@@ -69,6 +75,7 @@ type scanner interface {
 // It reads records from an Aerospike database and returns them as
 // *models.Record.
 type RecordReader struct {
+	ctx        context.Context
 	client     scanner
 	logger     *slog.Logger
 	config     *RecordReaderConfig
@@ -76,7 +83,9 @@ type RecordReader struct {
 }
 
 // NewRecordReader creates a new RecordReader.
-func NewRecordReader(client scanner,
+func NewRecordReader(
+	ctx context.Context,
+	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
 ) *RecordReader {
@@ -85,6 +94,7 @@ func NewRecordReader(client scanner,
 	logger.Debug("created new aerospike record reader")
 
 	return &RecordReader{
+		ctx:    ctx,
 		config: cfg,
 		client: client,
 		logger: logger,
@@ -124,6 +134,8 @@ func (r *RecordReader) Read() (*models.Token, error) {
 // Close cancels the Aerospike scan used to read records
 // if it was started.
 func (r *RecordReader) Close() {
+	r.config.scanLimiter.Release(int64(len(r.scanResult.data)))
+
 	if r.scanResult != nil {
 		r.scanResult.Close()
 	}
@@ -140,6 +152,11 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {
 		setsToScan = []string{""}
+	}
+
+	err := r.config.scanLimiter.Acquire(r.ctx, int64(len(setsToScan)))
+	if err != nil {
+		return nil, err
 	}
 
 	scans := make([]*a.Recordset, 0, len(setsToScan))

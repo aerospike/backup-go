@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -70,6 +71,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	)
 
 	reader := NewRecordReader(
+		context.TODO(),
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
@@ -124,6 +126,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	)
 
 	reader := NewRecordReader(
+		context.TODO(),
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
@@ -163,6 +166,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 	)
 
 	reader := NewRecordReader(
+		context.TODO(),
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
@@ -196,6 +200,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 	)
 
 	reader := NewRecordReader(
+		context.TODO(),
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
@@ -254,6 +259,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	)
 
 	reader := NewRecordReader(
+		context.TODO(),
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,

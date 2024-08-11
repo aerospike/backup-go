@@ -27,18 +27,21 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
+	"golang.org/x/sync/semaphore"
 )
 
 type backupRecordsHandler struct {
 	config          *BackupConfig
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
+	scanLimiter     *semaphore.Weighted
 }
 
 func newBackupRecordsHandler(
 	config *BackupConfig,
 	ac AerospikeClient,
 	logger *slog.Logger,
+	scanLimiter *semaphore.Weighted,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
@@ -46,6 +49,7 @@ func newBackupRecordsHandler(
 		config:          config,
 		aerospikeClient: ac,
 		logger:          logger,
+		scanLimiter:     scanLimiter,
 	}
 }
 
@@ -54,7 +58,7 @@ func (bh *backupRecordsHandler) run(
 	writers []pipeline.Worker[*models.Token],
 	recordsReadTotal *atomic.Uint64,
 ) error {
-	readWorkers, err := bh.makeAerospikeReadWorkers(bh.config.Parallel)
+	readWorkers, err := bh.makeAerospikeReadWorkers(ctx, bh.config.Parallel)
 	if err != nil {
 		return err
 	}
@@ -82,25 +86,23 @@ func (bh *backupRecordsHandler) run(
 	return job.Run(ctx)
 }
 
-func (bh *backupRecordsHandler) countRecords(infoClient *asinfo.InfoClient) (uint64, error) {
+func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
 	if bh.config.isFullBackup() {
 		return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
 	}
 
-	return bh.countRecordsUsingScan()
+	return bh.countRecordsUsingScan(ctx)
 }
 
-func (bh *backupRecordsHandler) countRecordsUsingScan() (uint64, error) {
+func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint64, error) {
 	scanPolicy := *bh.config.ScanPolicy
 
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	recordReader := aerospike.NewRecordReader(
-		bh.aerospikeClient,
-		bh.recordReaderConfigForPartition(PartitionRangeAll(), &scanPolicy),
-		bh.logger,
-	)
+	readerConfig := bh.recordReaderConfigForPartition(PartitionRangeAll(), &scanPolicy)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+
 	defer recordReader.Close()
 
 	var count uint64
@@ -121,7 +123,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScan() (uint64, error) {
 }
 
 func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
-	n int,
+	ctx context.Context, n int,
 ) ([]pipeline.Worker[*models.Token], error) {
 	partitionRanges, err := splitPartitions(
 		bh.config.Partitions.Begin,
@@ -141,6 +143,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 
 	for i := 0; i < n; i++ {
 		recordReader := aerospike.NewRecordReader(
+			ctx,
 			bh.aerospikeClient,
 			bh.recordReaderConfigForPartition(partitionRanges[i], &scanPolicy),
 			bh.logger,
@@ -166,5 +169,6 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 			FromTime: bh.config.ModAfter,
 			ToTime:   bh.config.ModBefore,
 		},
+		bh.scanLimiter,
 	)
 }

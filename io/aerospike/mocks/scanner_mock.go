@@ -4,7 +4,6 @@ package mocks
 
 import (
 	aerospike "github.com/aerospike/aerospike-client-go/v7"
-
 	mock "github.com/stretchr/testify/mock"
 )
 

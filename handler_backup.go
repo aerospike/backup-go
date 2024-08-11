@@ -31,6 +31,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
 
@@ -59,6 +60,7 @@ type BackupHandler struct {
 	limiter                *rate.Limiter
 	errors                 chan error
 	infoClient             *asinfo.InfoClient
+	scanLimiter            *semaphore.Weighted
 	id                     string
 	stats                  models.BackupStats
 }
@@ -70,6 +72,7 @@ func newBackupHandler(
 	ac AerospikeClient,
 	logger *slog.Logger,
 	writer Writer,
+	scanLimiter *semaphore.Weighted,
 ) *BackupHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
@@ -86,6 +89,7 @@ func newBackupHandler(
 		encoder:                NewEncoder(config.EncoderType, config.Namespace),
 		limiter:                limiter,
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
+		scanLimiter:            scanLimiter,
 	}
 }
 
@@ -125,9 +129,9 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	}
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger)
+	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)
 
-	bh.stats.TotalRecords, err = handler.countRecords(bh.infoClient)
+	bh.stats.TotalRecords, err = handler.countRecords(ctx, bh.infoClient)
 	if err != nil {
 		return err
 	}

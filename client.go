@@ -95,6 +95,7 @@ type Client struct {
 	id              string
 }
 
+// Option is a functional option that allows configuring the [Client].
 type Option func(*Client)
 
 // WithID sets the ID for the Client.

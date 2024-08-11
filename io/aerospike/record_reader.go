@@ -134,7 +134,9 @@ func (r *RecordReader) Read() (*models.Token, error) {
 // Close cancels the Aerospike scan used to read records
 // if it was started.
 func (r *RecordReader) Close() {
-	r.config.scanLimiter.Release(int64(len(r.scanResult.data)))
+	if r.config.scanLimiter != nil {
+		r.config.scanLimiter.Release(int64(len(r.scanResult.data)))
+	}
 
 	if r.scanResult != nil {
 		r.scanResult.Close()
@@ -154,9 +156,11 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 		setsToScan = []string{""}
 	}
 
-	err := r.config.scanLimiter.Acquire(r.ctx, int64(len(setsToScan)))
-	if err != nil {
-		return nil, err
+	if r.config.scanLimiter != nil {
+		err := r.config.scanLimiter.Acquire(r.ctx, int64(len(setsToScan)))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	scans := make([]*a.Recordset, 0, len(setsToScan))

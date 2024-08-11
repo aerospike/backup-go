@@ -15,7 +15,13 @@
 package backup
 
 import (
+	"log/slog"
+	"strings"
 	"testing"
+
+	"github.com/aerospike/backup-go/mocks"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestPartitionRange_validate(t *testing.T) {
@@ -80,4 +86,29 @@ func TestPartitionRange_validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNilClient(t *testing.T) {
+	_, err := NewClient(nil)
+	assert.Error(t, err, "aerospike client is required")
+}
+
+func TestClientOptions(t *testing.T) {
+	var logBuffer strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logBuffer, nil))
+	sem := semaphore.NewWeighted(10)
+	id := "ID"
+
+	client, err := NewClient(&mocks.MockAerospikeClient{},
+		WithID(id),
+		WithLogger(logger),
+		WithScanLimiter(sem),
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, id, client.id)
+	assert.Equal(t, sem, client.scanLimiter)
+
+	client.logger.Info("test")
+	assert.Contains(t, logBuffer.String(), "level=INFO msg=test backup.client.id=ID")
 }

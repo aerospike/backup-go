@@ -1,13 +1,14 @@
 name: golangci-lint
 on:
   push:
-    tags:
-      - v*
     branches:
       - '*'
   pull_request:
     branches:
       - main
+
+permissions:
+  contents: read
 
 jobs:
   golangci:
@@ -16,17 +17,18 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+
       - name: Get go version from go.mod
         run: |
           echo "GO_VERSION=$(grep '^go ' go.mod | cut -d " " -f 2)" >> $GITHUB_ENV
+
       - name: Setup-go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: "generate-mocks"
-        run: make mocks-generate
+
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
           version: v1.56.2
           args: --timeout=5m

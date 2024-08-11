@@ -138,7 +138,8 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	client := &Client{
 		aerospikeClient: ac,
 		logger:          slog.Default(),
-		id:              strconv.Itoa(rand.IntN(1000)),
+		// #nosec G404
+		id: strconv.Itoa(rand.IntN(1000)),
 	}
 
 	// Apply all options to the Client

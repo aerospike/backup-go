@@ -98,7 +98,7 @@ type Client struct {
 // ClientOpt is a functional option that allows configuring the [Client].
 type ClientOpt func(*Client)
 
-// WithID sets the ID for the Client.
+// WithID sets the ID for the [Client].
 func WithID(id string) ClientOpt {
 	return func(c *Client) {
 		c.id = id

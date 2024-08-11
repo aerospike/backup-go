@@ -19,6 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
+	"strconv"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -63,7 +65,7 @@ type AerospikeClient interface {
 //		// handle error
 //	}
 //
-//	backupClient, err := backup.NewClient(asc, "id", nil)	// create a backup client
+//	backupClient, err := backup.NewClient(asc, backup.WithID("id"))	// create a backup client
 //	if err != nil {
 //		// handle error
 //	}
@@ -127,7 +129,6 @@ func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 //   - [WithLogger] to set a logger that this client will log to.
 //   - [WithScanLimiter] to set a semaphore that is used to limit number of
 //     concurrent scans.
-//   - scan limiter semaphore that is used to limit number of concurrent scans.
 func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
@@ -136,7 +137,8 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	// Initialize the Client with default values
 	client := &Client{
 		aerospikeClient: ac,
-		logger:          slog.Default(), // Default logger
+		logger:          slog.Default(),
+		id:              strconv.Itoa(rand.IntN(1000)),
 	}
 
 	// Apply all options to the Client

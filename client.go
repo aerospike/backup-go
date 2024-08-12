@@ -19,9 +19,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand"
+	"strconv"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -35,7 +38,7 @@ const (
 
 // AerospikeClient describes aerospike client interface for easy mocking.
 //
-// go:generate mockery --name AerospikeClient
+//go:generate mockery --name AerospikeClient
 type AerospikeClient interface {
 	GetDefaultScanPolicy() *a.ScanPolicy
 	GetDefaultInfoPolicy() *a.InfoPolicy
@@ -51,6 +54,8 @@ type AerospikeClient interface {
 	Cluster() *a.Cluster
 	ScanPartitions(scanPolicy *a.ScanPolicy, partitionFilter *a.PartitionFilter, namespace string,
 		setName string, binNames ...string) (*a.Recordset, a.Error)
+	Close()
+	GetNodes() []*a.Node
 }
 
 // Client is the main entry point for the backup package.
@@ -62,7 +67,7 @@ type AerospikeClient interface {
 //		// handle error
 //	}
 //
-//	backupClient, err := backup.NewClient(asc, "id", nil)	// create a backup client
+//	backupClient, err := backup.NewClient(asc, backup.WithID("id"))	// create a backup client
 //	if err != nil {
 //		// handle error
 //	}
@@ -90,33 +95,65 @@ type AerospikeClient interface {
 type Client struct {
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
+	scanLimiter     *semaphore.Weighted
 	id              string
+}
+
+// ClientOpt is a functional option that allows configuring the [Client].
+type ClientOpt func(*Client)
+
+// WithID sets the ID for the [Client].
+func WithID(id string) ClientOpt {
+	return func(c *Client) {
+		c.id = id
+	}
+}
+
+// WithLogger sets the logger for the [Client].
+func WithLogger(logger *slog.Logger) ClientOpt {
+	return func(c *Client) {
+		c.logger = logger
+	}
+}
+
+// WithScanLimiter sets the scan limiter for the [Client].
+func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
+	return func(c *Client) {
+		c.scanLimiter = sem
+	}
 }
 
 // NewClient creates a new backup client.
 //   - ac is the aerospike client to use for backup and restore operations.
-//   - id is an identifier for the client.
-//   - logger is the logger that this client will log to.
-func NewClient(ac AerospikeClient, id string, logger *slog.Logger) (*Client, error) {
+//
+// Options:
+//   - [WithID] to set an identifier for the client.
+//   - [WithLogger] to set a logger that this client will log to.
+//   - [WithScanLimiter] to set a semaphore that is used to limit number of
+//     concurrent scans.
+func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	if ac == nil {
 		return nil, errors.New("aerospike client pointer is nil")
 	}
 
-	if logger == nil {
-		logger = slog.Default()
+	// Initialize the Client with default values
+	client := &Client{
+		aerospikeClient: ac,
+		logger:          slog.Default(),
+		// #nosec G404
+		id: strconv.Itoa(rand.Intn(1000)),
 	}
 
-	// qualify the logger with a backup lib group
-	logger = logger.WithGroup("backup")
+	// Apply all options to the Client
+	for _, opt := range opts {
+		opt(client)
+	}
 
-	// add a client group to the logger
-	logger = logging.WithClient(logger, id)
+	// Further customization after applying options
+	client.logger = client.logger.WithGroup("backup")
+	client.logger = logging.WithClient(client.logger, client.id)
 
-	return &Client{
-		aerospikeClient: ac,
-		id:              id,
-		logger:          logger,
-	}, nil
+	return client, nil
 }
 
 func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
@@ -167,7 +204,7 @@ func (c *Client) Backup(
 		return nil, err
 	}
 
-	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer)
+	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
 	handler.run(ctx)
 
 	return handler, nil
@@ -202,4 +239,9 @@ func (c *Client) Restore(
 	handler.startAsync(ctx)
 
 	return handler, nil
+}
+
+// AerospikeClient returns the underlying aerospike client.
+func (c *Client) AerospikeClient() AerospikeClient {
+	return c.aerospikeClient
 }

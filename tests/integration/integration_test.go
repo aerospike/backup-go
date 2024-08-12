@@ -138,7 +138,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	testClient := tests.NewTestClient(testAeroClient)
 	suite.testClient = testClient
 
-	backupClient, err := backup.NewClient(testAeroClient, "test_client", slog.Default())
+	backupClient, err := backup.NewClient(testAeroClient, backup.WithID("test_client"))
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -203,7 +203,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 		restoreConfig *backup.RestoreConfig
 		bins          a.BinMap
 	}
-	var tests = []struct {
+	var testsCases = []struct {
 		args args
 		name string
 	}{
@@ -216,7 +216,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 			},
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range testsCases {
 		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
 		suite.SetupTest(expectedRecs)
 		suite.Run(tt.name, func() {
@@ -277,7 +277,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 	configWithFileLimit := backup.NewDefaultBackupConfig()
 	configWithFileLimit.FileLimit = 1024 * 1024
 
-	var tests = []struct {
+	var testsCases = []struct {
 		name string
 		args args
 	}{
@@ -349,7 +349,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			},
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range testsCases {
 		var initialRecords = genRecords(suite.namespace, suite.set, 20_000, tt.args.bins)
 		suite.SetupTest(initialRecords)
 		suite.Run(tt.name, func() {
@@ -619,7 +619,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryptionFile() {
 		Mode:    backup.EncryptAES128,
 	}
 
-	var tests = []struct {
+	var testsCases = []struct {
 		args args
 		name string
 	}{
@@ -632,7 +632,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryptionFile() {
 			},
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range testsCases {
 		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
 		suite.SetupTest(expectedRecs)
 		suite.Run(tt.name, func() {
@@ -657,7 +657,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIONamespace() {
 		Destination: &destination,
 	}
 
-	var tests = []struct {
+	var testsCases = []struct {
 		args args
 		name string
 	}{
@@ -670,7 +670,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIONamespace() {
 			},
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range testsCases {
 		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
 		suite.SetupTest(expectedRecs)
 		suite.Run(tt.name, func() {
@@ -697,7 +697,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 		Mode: backup.CompressZSTD,
 	}
 
-	var tests = []struct {
+	var testsCases = []struct {
 		args args
 		name string
 	}{
@@ -710,7 +710,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 			},
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range testsCases {
 		expectedRecs := genRecords(suite.namespace, suite.set, 1000, tt.args.bins)
 		suite.SetupTest(expectedRecs)
 		suite.Run(tt.name, func() {

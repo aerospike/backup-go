@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
@@ -58,7 +57,7 @@ func initBackupClient() *backup.Client {
 		panic(aerr)
 	}
 
-	backupClient, err := backup.NewClient(aerospikeClient, "client_id", slog.Default())
+	backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
 	if err != nil {
 		panic(err)
 	}

@@ -55,6 +55,7 @@ type AerospikeClient interface {
 	ScanPartitions(scanPolicy *a.ScanPolicy, partitionFilter *a.PartitionFilter, namespace string,
 		setName string, binNames ...string) (*a.Recordset, a.Error)
 	Close()
+	GetNodes() []*a.Node
 }
 
 // Client is the main entry point for the backup package.

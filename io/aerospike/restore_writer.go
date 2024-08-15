@@ -136,5 +136,12 @@ func isAcceptableError(err a.Error) bool {
 }
 
 func shouldRetry(err a.Error) bool {
-	return err.Matches(atypes.NO_AVAILABLE_CONNECTIONS_TO_NODE, atypes.TIMEOUT)
+	return err.Matches(
+		atypes.NO_AVAILABLE_CONNECTIONS_TO_NODE,
+		atypes.TIMEOUT,
+		atypes.DEVICE_OVERLOAD,
+		atypes.NETWORK_ERROR,
+		atypes.SERVER_NOT_AVAILABLE,
+		atypes.BATCH_FAILED,
+	)
 }

@@ -100,11 +100,13 @@ func (rw *batchRecordWriter) executeBatchOperation() error {
 
 	for attemptsLeft(rw.retryPolicy, attempt) {
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
+
 		if err == nil || isAcceptableError(err) {
 			return nil
 		}
 
 		if shouldRetry(err) {
+			rw.handleBatchError(err)
 			sleep(rw.retryPolicy, attempt)
 
 			attempt++
@@ -116,6 +118,19 @@ func (rw *batchRecordWriter) executeBatchOperation() error {
 	}
 
 	return fmt.Errorf("max retryPolicy reached: %w", err)
+}
+
+func (rw *batchRecordWriter) handleBatchError(err a.Error) {
+	if err.Matches(atypes.BATCH_FAILED) {
+		opsBuffer := rw.operationBuffer
+		rw.operationBuffer = make([]a.BatchRecordIfc, 0)
+
+		for _, batchRecord := range opsBuffer {
+			if batchRecord.BatchRec().ResultCode != 0 {
+				rw.operationBuffer = append(rw.operationBuffer, batchRecord)
+			}
+		}
+	}
 }
 
 func (rw *batchRecordWriter) processOperationResults() {

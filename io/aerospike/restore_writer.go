@@ -143,5 +143,6 @@ func shouldRetry(err a.Error) bool {
 		atypes.NETWORK_ERROR,
 		atypes.SERVER_NOT_AVAILABLE,
 		atypes.BATCH_FAILED,
+		atypes.MAX_ERROR_RATE,
 	)
 }

@@ -114,7 +114,7 @@ func (rw *batchRecordWriter) executeBatchOperation() error {
 			continue
 		}
 
-		return err
+		return fmt.Errorf("not retryable error on restore: %w", err)
 	}
 
 	return fmt.Errorf("max retryPolicy reached: %w", err)

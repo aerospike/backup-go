@@ -17,7 +17,6 @@ package aerospike
 import (
 	"fmt"
 	"log/slog"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
@@ -29,9 +28,9 @@ type batchRecordWriter struct {
 	writePolicy     *a.WritePolicy
 	stats           *models.RestoreStats
 	logger          *slog.Logger
+	retry           *models.RetryConfig
 	operationBuffer []a.BatchRecordIfc
 	batchSize       int
-	maxRetries      int
 }
 
 func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
@@ -95,21 +94,27 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 func (rw *batchRecordWriter) executeBatchOperation() error {
 	var err a.Error
-	for attempt := 0; attempt <= rw.maxRetries; attempt++ {
+
+	var attempt int
+
+	for attemptsLeft(rw.retry, attempt) {
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
 		if err == nil || isAcceptableError(err) {
 			return nil
 		}
 
 		if shouldRetry(err) {
-			time.Sleep(calculateBackoff(attempt))
+			sleep(rw.retry, attempt)
+
+			attempt++
+
 			continue
 		}
 
 		return err
 	}
 
-	return fmt.Errorf("max retries reached: %w", err)
+	return fmt.Errorf("max retry reached: %w", err)
 }
 
 func (rw *batchRecordWriter) processOperationResults() {

@@ -28,8 +28,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const baseDelay = 1 * time.Second
-
 type recordWriter interface {
 	writeRecord(record *models.Record) error
 	close() error
@@ -47,7 +45,7 @@ type restoreWriter struct {
 
 // NewRestoreWriter creates a new restoreWriter.
 func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.RestoreStats,
-	logger *slog.Logger, useBatchWrites bool, batchSize int, maxRetries int,
+	logger *slog.Logger, useBatchWrites bool, batchSize int, maxRetries *models.RetryConfig,
 ) pipeline.DataWriter[*models.Token] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
@@ -73,7 +71,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	logger *slog.Logger,
 	useBatchWrites bool,
 	batchSize int,
-	maxRetries int,
+	retry *models.RetryConfig,
 ) recordWriter {
 	if useBatchWrites {
 		return &batchRecordWriter{
@@ -82,7 +80,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 			stats:       stats,
 			logger:      logger,
 			batchSize:   batchSize,
-			maxRetries:  maxRetries,
+			retry:       retry,
 		}
 	}
 
@@ -90,7 +88,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 		asc:         asc,
 		writePolicy: writePolicy,
 		stats:       stats,
-		maxRetries:  maxRetries,
+		retry:       retry,
 	}
 }
 
@@ -116,14 +114,27 @@ func (rw *restoreWriter) Close() error {
 	return rw.close()
 }
 
+func attemptsLeft(rc *models.RetryConfig, attempt int) bool {
+	if rc == nil {
+		return false
+	}
+
+	return attempt <= rc.MaxRetries
+}
+
+func sleep(rc *models.RetryConfig, attempt int) {
+	if rc == nil {
+		return
+	}
+
+	duration := time.Duration(float64(rc.BaseTimeout) * math.Pow(rc.Multiplier, float64(attempt)))
+	time.Sleep(duration)
+}
+
 func isAcceptableError(err a.Error) bool {
 	return err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR)
 }
 
 func shouldRetry(err a.Error) bool {
 	return err.Matches(atypes.NO_AVAILABLE_CONNECTIONS_TO_NODE, atypes.TIMEOUT)
-}
-
-func calculateBackoff(attempt int) time.Duration {
-	return time.Duration(math.Pow(2, float64(attempt))) * baseDelay
 }

@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/models"
 )
 
 // RestoreConfig contains configuration for the restore operation.
@@ -35,6 +36,8 @@ type RestoreConfig struct {
 	EncryptionPolicy *EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *CompressionPolicy
+	// Number of retries for each restore write operation.
+	Retry *models.RetryConfig
 	// Secret agent config.
 	SecretAgentConfig *SecretAgentConfig
 	// The sets to restore (optional, given an empty list, all sets will be restored).
@@ -64,8 +67,6 @@ type RestoreConfig struct {
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
-	// Number of retries for each restore write operation.
-	Retries int
 }
 
 // NewDefaultRestoreConfig returns a new RestoreConfig with default values.

@@ -16,7 +16,6 @@ package aerospike
 
 import (
 	"fmt"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
@@ -27,7 +26,7 @@ type singleRecordWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
 	stats       *models.RestoreStats
-	maxRetries  int
+	retry       *models.RetryConfig
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
@@ -48,10 +47,14 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 
 func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
 	var aerr a.Error
-	for attempt := 0; attempt <= rw.maxRetries; attempt++ {
+
+	var attempt int
+
+	for attemptsLeft(rw.retry, attempt) {
 		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
 		if aerr == nil {
 			rw.stats.IncrRecordsInserted()
+
 			return nil
 		}
 
@@ -67,7 +70,10 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 		}
 
 		if shouldRetry(aerr) {
-			time.Sleep(calculateBackoff(attempt))
+			sleep(rw.retry, attempt)
+
+			attempt++
+
 			continue
 		}
 

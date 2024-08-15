@@ -37,6 +37,7 @@ type RestoreConfig struct {
 	// Compression details.
 	CompressionPolicy *CompressionPolicy
 	// Configuration of retries for each restore write operation.
+	// If nil, no retries will be performed.
 	Retry *models.RetryPolicy
 	// Secret agent config.
 	SecretAgentConfig *SecretAgentConfig

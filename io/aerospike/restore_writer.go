@@ -17,9 +17,11 @@ package aerospike
 import (
 	"errors"
 	"log/slog"
+	"math"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	atypes "github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -45,7 +47,8 @@ type restoreWriter struct {
 
 // NewRestoreWriter creates a new restoreWriter.
 func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.RestoreStats,
-	logger *slog.Logger, useBatchWrites bool, batchSize int) pipeline.DataWriter[*models.Token] {
+	logger *slog.Logger, useBatchWrites bool, batchSize int, maxRetries int,
+) pipeline.DataWriter[*models.Token] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
 
@@ -60,7 +63,7 @@ func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.Re
 			writePolicy: writePolicy,
 			logger:      logger,
 		},
-		recordWriter: newRecordWriter(asc, writePolicy, stats, logger, useBatchWrites, batchSize),
+		recordWriter: newRecordWriter(asc, writePolicy, stats, logger, useBatchWrites, batchSize, maxRetries),
 		logger:       logger,
 	}
 }
@@ -70,6 +73,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	logger *slog.Logger,
 	useBatchWrites bool,
 	batchSize int,
+	maxRetries int,
 ) recordWriter {
 	if useBatchWrites {
 		return &batchRecordWriter{
@@ -78,6 +82,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 			stats:       stats,
 			logger:      logger,
 			batchSize:   batchSize,
+			maxRetries:  maxRetries,
 		}
 	}
 
@@ -85,6 +90,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 		asc:         asc,
 		writePolicy: writePolicy,
 		stats:       stats,
+		maxRetries:  maxRetries,
 	}
 }
 
@@ -108,4 +114,16 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 func (rw *restoreWriter) Close() error {
 	rw.logger.Debug("closed restore writer")
 	return rw.close()
+}
+
+func isAcceptableError(err a.Error) bool {
+	return err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR)
+}
+
+func shouldRetry(err a.Error) bool {
+	return err.Matches(atypes.NO_AVAILABLE_CONNECTIONS_TO_NODE, atypes.TIMEOUT)
+}
+
+func calculateBackoff(attempt int) time.Duration {
+	return time.Duration(math.Pow(2, float64(attempt))) * baseDelay
 }

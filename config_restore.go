@@ -64,6 +64,8 @@ type RestoreConfig struct {
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
+	// Number of retries for each restore write operation.
+	Retries int
 }
 
 // NewDefaultRestoreConfig returns a new RestoreConfig with default values.

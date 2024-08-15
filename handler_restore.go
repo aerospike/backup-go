@@ -291,6 +291,7 @@ func (rh *RestoreHandler) runRestoreBatch(
 			rh.logger,
 			useBatchWrites,
 			rh.config.BatchSize,
+			rh.config.Retries,
 		)
 
 		statsWriter := newWriterWithTokenStats(writer, &rh.stats, rh.logger)

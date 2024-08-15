@@ -17,7 +17,6 @@ package aerospike
 import (
 	"fmt"
 	"log/slog"
-	"math"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -32,6 +31,7 @@ type batchRecordWriter struct {
 	logger          *slog.Logger
 	operationBuffer []a.BatchRecordIfc
 	batchSize       int
+	maxRetries      int
 }
 
 func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
@@ -82,25 +82,37 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		return nil
 	}
 
+	err := rw.executeBatchOperation()
+	if err != nil {
+		return fmt.Errorf("failed to execute batch operation: %w", err)
+	}
+
+	rw.processOperationResults()
+	rw.operationBuffer = nil
+
+	return nil
+}
+
+func (rw *batchRecordWriter) executeBatchOperation() error {
 	var err a.Error
-	for attempt := 0; attempt <= rw.writePolicy.MaxRetries; attempt++ {
+	for attempt := 0; attempt <= rw.maxRetries; attempt++ {
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
-		if err == nil {
-			break
+		if err == nil || isAcceptableError(err) {
+			return nil
 		}
 
-		if err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {
-			// These errors are acceptable, proceed with processing results
-			break
+		if shouldRetry(err) {
+			time.Sleep(calculateBackoff(attempt))
+			continue
 		}
 
-		time.Sleep(time.Duration(math.Pow(2, float64(attempt))) * baseDelay)
+		return err
 	}
 
-	if err != nil && !err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {
-		return fmt.Errorf("max retries reached: %w", err)
-	}
+	return fmt.Errorf("max retries reached: %w", err)
+}
 
+func (rw *batchRecordWriter) processOperationResults() {
 	for _, op := range rw.operationBuffer {
 		switch op.BatchRec().ResultCode {
 		case atypes.OK:
@@ -111,8 +123,4 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			rw.stats.IncrRecordsExisted()
 		}
 	}
-
-	rw.operationBuffer = nil
-
-	return nil
 }

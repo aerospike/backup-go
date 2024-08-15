@@ -16,7 +16,6 @@ package aerospike
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -28,6 +27,7 @@ type singleRecordWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
 	stats       *models.RestoreStats
+	maxRetries  int
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
@@ -38,30 +38,43 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 		writePolicy = &setGenerationPolicy
 	}
 
-	retries := writePolicy.MaxRetries
+	err := rw.executeWrite(writePolicy, record)
+	if err != nil {
+		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), err)
+	}
 
+	return nil
+}
+
+func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
 	var aerr a.Error
-	for attempt := 0; attempt <= retries; attempt++ {
+	for attempt := 0; attempt <= rw.maxRetries; attempt++ {
 		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
 		if aerr == nil {
 			rw.stats.IncrRecordsInserted()
 			return nil
 		}
 
-		if aerr.Matches(atypes.GENERATION_ERROR) {
-			rw.stats.IncrRecordsFresher()
+		if isAcceptableError(aerr) {
+			switch {
+			case aerr.Matches(atypes.GENERATION_ERROR):
+				rw.stats.IncrRecordsFresher()
+			case aerr.Matches(atypes.KEY_EXISTS_ERROR):
+				rw.stats.IncrRecordsExisted()
+			}
+
 			return nil
 		}
 
-		if aerr.Matches(atypes.KEY_EXISTS_ERROR) {
-			rw.stats.IncrRecordsExisted()
-			return nil
+		if shouldRetry(aerr) {
+			time.Sleep(calculateBackoff(attempt))
+			continue
 		}
 
-		time.Sleep(time.Duration(math.Pow(2, float64(attempt))) * baseDelay)
+		return aerr
 	}
 
-	return fmt.Errorf("max retries reached: error writing record %s: %w", record.Key.Digest(), aerr)
+	return aerr
 }
 
 func (rw *singleRecordWriter) close() error {

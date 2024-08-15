@@ -16,6 +16,8 @@ package aerospike
 
 import (
 	"fmt"
+	"math"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
@@ -36,8 +38,16 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 		writePolicy = &setGenerationPolicy
 	}
 
-	aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
-	if aerr != nil {
+	retries := writePolicy.MaxRetries
+
+	var aerr a.Error
+	for attempt := 0; attempt <= retries; attempt++ {
+		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
+		if aerr == nil {
+			rw.stats.IncrRecordsInserted()
+			return nil
+		}
+
 		if aerr.Matches(atypes.GENERATION_ERROR) {
 			rw.stats.IncrRecordsFresher()
 			return nil
@@ -48,12 +58,10 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 			return nil
 		}
 
-		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), aerr)
+		time.Sleep(time.Duration(math.Pow(2, float64(attempt))) * baseDelay)
 	}
 
-	rw.stats.IncrRecordsInserted()
-
-	return nil
+	return fmt.Errorf("max retries reached: error writing record %s: %w", record.Key.Digest(), aerr)
 }
 
 func (rw *singleRecordWriter) close() error {

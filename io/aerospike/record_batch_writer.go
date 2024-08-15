@@ -15,7 +15,10 @@
 package aerospike
 
 import (
+	"fmt"
 	"log/slog"
+	"math"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
@@ -79,15 +82,27 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		return nil
 	}
 
-	err := rw.asc.BatchOperate(nil, rw.operationBuffer)
-	if err != nil {
-		if !err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {
-			return err
+	var err a.Error
+	for attempt := 0; attempt <= rw.writePolicy.MaxRetries; attempt++ {
+		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
+		if err == nil {
+			break
 		}
+
+		if err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {
+			// These errors are acceptable, proceed with processing results
+			break
+		}
+
+		time.Sleep(time.Duration(math.Pow(2, float64(attempt))) * baseDelay)
 	}
 
-	for i := 0; i < len(rw.operationBuffer); i++ {
-		switch rw.operationBuffer[i].BatchRec().ResultCode {
+	if err != nil && !err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {
+		return fmt.Errorf("max retries reached: %w", err)
+	}
+
+	for _, op := range rw.operationBuffer {
+		switch op.BatchRec().ResultCode {
 		case atypes.OK:
 			rw.stats.IncrRecordsInserted()
 		case atypes.GENERATION_ERROR:

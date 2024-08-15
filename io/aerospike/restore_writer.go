@@ -17,6 +17,7 @@ package aerospike
 import (
 	"errors"
 	"log/slog"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -24,6 +25,8 @@ import (
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 )
+
+const baseDelay = 1 * time.Second
 
 type recordWriter interface {
 	writeRecord(record *models.Record) error

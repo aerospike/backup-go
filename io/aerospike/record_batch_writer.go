@@ -135,13 +135,18 @@ func (rw *batchRecordWriter) handleBatchError(err a.Error) {
 
 func (rw *batchRecordWriter) processOperationResults() {
 	for _, op := range rw.operationBuffer {
-		switch op.BatchRec().ResultCode {
+		code := op.BatchRec().ResultCode
+		switch code {
 		case atypes.OK:
 			rw.stats.IncrRecordsInserted()
 		case atypes.GENERATION_ERROR:
 			rw.stats.IncrRecordsFresher()
 		case atypes.KEY_EXISTS_ERROR:
 			rw.stats.IncrRecordsExisted()
+		default:
+			rw.logger.Info("unexpected batch operation error code",
+				slog.String("code", code.String()),
+			)
 		}
 	}
 }

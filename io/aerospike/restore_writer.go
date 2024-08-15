@@ -45,7 +45,7 @@ type restoreWriter struct {
 
 // NewRestoreWriter creates a new restoreWriter.
 func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.RestoreStats,
-	logger *slog.Logger, useBatchWrites bool, batchSize int, maxRetries *models.RetryConfig,
+	logger *slog.Logger, useBatchWrites bool, batchSize int, maxRetries *models.RetryPolicy,
 ) pipeline.DataWriter[*models.Token] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
@@ -71,7 +71,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	logger *slog.Logger,
 	useBatchWrites bool,
 	batchSize int,
-	retry *models.RetryConfig,
+	retry *models.RetryPolicy,
 ) recordWriter {
 	if useBatchWrites {
 		return &batchRecordWriter{
@@ -114,7 +114,7 @@ func (rw *restoreWriter) Close() error {
 	return rw.close()
 }
 
-func attemptsLeft(rc *models.RetryConfig, attempt int) bool {
+func attemptsLeft(rc *models.RetryPolicy, attempt int) bool {
 	if rc == nil {
 		return false
 	}
@@ -122,7 +122,7 @@ func attemptsLeft(rc *models.RetryConfig, attempt int) bool {
 	return attempt <= rc.MaxRetries
 }
 
-func sleep(rc *models.RetryConfig, attempt int) {
+func sleep(rc *models.RetryPolicy, attempt int) {
 	if rc == nil {
 		return
 	}

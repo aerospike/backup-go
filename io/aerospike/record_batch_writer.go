@@ -28,7 +28,7 @@ type batchRecordWriter struct {
 	writePolicy     *a.WritePolicy
 	stats           *models.RestoreStats
 	logger          *slog.Logger
-	retry           *models.RetryConfig
+	retry           *models.RetryPolicy
 	operationBuffer []a.BatchRecordIfc
 	batchSize       int
 }

@@ -36,8 +36,8 @@ type RestoreConfig struct {
 	EncryptionPolicy *EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *CompressionPolicy
-	// Number of retries for each restore write operation.
-	Retry *models.RetryConfig
+	// Configuration of retries for each restore write operation.
+	Retry *models.RetryPolicy
 	// Secret agent config.
 	SecretAgentConfig *SecretAgentConfig
 	// The sets to restore (optional, given an empty list, all sets will be restored).

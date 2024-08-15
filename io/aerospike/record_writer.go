@@ -26,7 +26,7 @@ type singleRecordWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
 	stats       *models.RestoreStats
-	retry       *models.RetryConfig
+	retry       *models.RetryPolicy
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {

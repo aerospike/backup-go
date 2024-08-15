@@ -45,7 +45,7 @@ type restoreWriter struct {
 
 // NewRestoreWriter creates a new restoreWriter.
 func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.RestoreStats,
-	logger *slog.Logger, useBatchWrites bool, batchSize int, maxRetries *models.RetryPolicy,
+	logger *slog.Logger, useBatchWrites bool, batchSize int, retryPolicy *models.RetryPolicy,
 ) pipeline.DataWriter[*models.Token] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
@@ -61,7 +61,7 @@ func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.Re
 			writePolicy: writePolicy,
 			logger:      logger,
 		},
-		recordWriter: newRecordWriter(asc, writePolicy, stats, logger, useBatchWrites, batchSize, maxRetries),
+		recordWriter: newRecordWriter(asc, writePolicy, stats, logger, useBatchWrites, batchSize, retryPolicy),
 		logger:       logger,
 	}
 }
@@ -71,7 +71,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	logger *slog.Logger,
 	useBatchWrites bool,
 	batchSize int,
-	retry *models.RetryPolicy,
+	retryPolicy *models.RetryPolicy,
 ) recordWriter {
 	if useBatchWrites {
 		return &batchRecordWriter{
@@ -80,7 +80,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 			stats:       stats,
 			logger:      logger,
 			batchSize:   batchSize,
-			retry:       retry,
+			retryPolicy: retryPolicy,
 		}
 	}
 
@@ -88,7 +88,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 		asc:         asc,
 		writePolicy: writePolicy,
 		stats:       stats,
-		retry:       retry,
+		retryPolicy: retryPolicy,
 	}
 }
 

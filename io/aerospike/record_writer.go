@@ -26,7 +26,7 @@ type singleRecordWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
 	stats       *models.RestoreStats
-	retry       *models.RetryPolicy
+	retryPolicy *models.RetryPolicy
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
@@ -46,11 +46,12 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 }
 
 func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
-	var aerr a.Error
+	var (
+		aerr    a.Error
+		attempt int
+	)
 
-	var attempt int
-
-	for attemptsLeft(rw.retry, attempt) {
+	for attemptsLeft(rw.retryPolicy, attempt) {
 		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
 		if aerr == nil {
 			rw.stats.IncrRecordsInserted()
@@ -70,7 +71,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 		}
 
 		if shouldRetry(aerr) {
-			sleep(rw.retry, attempt)
+			sleep(rw.retryPolicy, attempt)
 
 			attempt++
 

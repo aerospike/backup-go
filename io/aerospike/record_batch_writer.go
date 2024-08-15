@@ -28,7 +28,7 @@ type batchRecordWriter struct {
 	writePolicy     *a.WritePolicy
 	stats           *models.RestoreStats
 	logger          *slog.Logger
-	retry           *models.RetryPolicy
+	retryPolicy     *models.RetryPolicy
 	operationBuffer []a.BatchRecordIfc
 	batchSize       int
 }
@@ -93,18 +93,19 @@ func (rw *batchRecordWriter) flushBuffer() error {
 }
 
 func (rw *batchRecordWriter) executeBatchOperation() error {
-	var err a.Error
+	var (
+		err     a.Error
+		attempt int
+	)
 
-	var attempt int
-
-	for attemptsLeft(rw.retry, attempt) {
+	for attemptsLeft(rw.retryPolicy, attempt) {
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
 		if err == nil || isAcceptableError(err) {
 			return nil
 		}
 
 		if shouldRetry(err) {
-			sleep(rw.retry, attempt)
+			sleep(rw.retryPolicy, attempt)
 
 			attempt++
 
@@ -114,7 +115,7 @@ func (rw *batchRecordWriter) executeBatchOperation() error {
 		return err
 	}
 
-	return fmt.Errorf("max retry reached: %w", err)
+	return fmt.Errorf("max retryPolicy reached: %w", err)
 }
 
 func (rw *batchRecordWriter) processOperationResults() {

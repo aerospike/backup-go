@@ -17,10 +17,13 @@ package aerospike
 import (
 	"log/slog"
 	"testing"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -123,4 +126,89 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 
 	suite.Nil(err)
 	suite.Equal(1, int(stats.GetRecordsInserted()))
+}
+
+func (suite *writersTestSuite) TestSingleRecordWriterRetry() {
+	namespace := "test"
+	set := ""
+	key, _ := a.NewKey(namespace, set, "key")
+	mockDBWriter := mocks.NewMockdbWriter(suite.T())
+	policy := &a.WritePolicy{}
+	stats := &models.RestoreStats{}
+	retryPolicy := &models.RetryPolicy{
+		BaseTimeout: 10 * time.Millisecond,
+		Multiplier:  1,
+		MaxRetries:  2,
+	}
+	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, retryPolicy)
+	rec := models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
+		},
+	}
+
+	mockDBWriter.On("Put", policy, rec.Key, rec.Bins).
+		Return(a.ErrConnectionPoolEmpty).Once()
+	mockDBWriter.On("Put", policy, rec.Key, rec.Bins).
+		Return(a.ErrTimeout).Once()
+	mockDBWriter.On("Put", policy, rec.Key, rec.Bins).
+		Return(nil).Once()
+
+	err := writer.writeRecord(&rec)
+	suite.Nil(err)
+
+	err = writer.close()
+	suite.Nil(err)
+	suite.Equal(1, int(stats.GetRecordsInserted()))
+
+	mockDBWriter.AssertExpectations(suite.T())
+}
+
+func (suite *writersTestSuite) TestBatchRecordWriterRetry() {
+	namespace := "test"
+	set := ""
+	key, _ := a.NewKey(namespace, set, "key")
+	mockDBWriter := mocks.NewMockdbWriter(suite.T())
+	policy := &a.WritePolicy{}
+	stats := &models.RestoreStats{}
+	retryPolicy := &models.RetryPolicy{
+		BaseTimeout: 10 * time.Millisecond,
+		Multiplier:  1,
+		MaxRetries:  2,
+	}
+	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), true, 1, retryPolicy)
+	rec := models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"key0": "hi",
+				"key1": 1,
+			},
+		},
+	}
+
+	mockDBWriter.On("BatchOperate", mock.Anything, mock.Anything).
+		Return(a.ErrConnectionPoolEmpty).Once()
+	mockDBWriter.On("BatchOperate", mock.Anything, mock.Anything).
+		Return(a.ErrTimeout).Once()
+	mockDBWriter.On("BatchOperate", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			batchOps := args.Get(1).([]a.BatchRecordIfc)
+			for _, op := range batchOps {
+				op.BatchRec().ResultCode = types.OK
+			}
+		}).Return(nil).Once()
+
+	err := writer.writeRecord(&rec)
+	suite.Nil(err)
+
+	err = writer.close()
+	suite.Nil(err)
+	suite.Equal(1, int(stats.GetRecordsInserted()))
+
+	mockDBWriter.AssertExpectations(suite.T())
 }

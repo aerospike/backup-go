@@ -81,72 +81,58 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		return nil
 	}
 
-	err := rw.executeBatchOperation()
-	if err != nil {
-		return fmt.Errorf("failed to execute batch operation: %w", err)
-	}
-
-	rw.processOperationResults()
-	rw.operationBuffer = nil
-
-	return nil
-}
-
-func (rw *batchRecordWriter) executeBatchOperation() error {
-	var (
-		err     a.Error
-		attempt int
-	)
-
+	var attempt int
 	for attemptsLeft(rw.retryPolicy, attempt) {
-		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
+		err := rw.asc.BatchOperate(nil, rw.operationBuffer)
 
 		if err == nil || isAcceptableError(err) {
-			return nil
-		}
-
-		if shouldRetry(err) {
-			rw.handleBatchError(err)
-			sleep(rw.retryPolicy, attempt)
-
-			attempt++
-
-			continue
-		}
-
-		return fmt.Errorf("not retryable error on restore: %w", err)
-	}
-
-	return fmt.Errorf("max retryPolicy reached: %w", err)
-}
-
-func (rw *batchRecordWriter) handleBatchError(err a.Error) {
-	if err.Matches(atypes.BATCH_FAILED) {
-		opsBuffer := rw.operationBuffer
-		rw.operationBuffer = make([]a.BatchRecordIfc, 0)
-
-		for _, batchRecord := range opsBuffer {
-			if batchRecord.BatchRec().ResultCode != 0 {
-				rw.operationBuffer = append(rw.operationBuffer, batchRecord)
+			rw.operationBuffer = rw.processAndFilterOperations()
+			if len(rw.operationBuffer) == 0 {
+				return nil // All operations succeeded
 			}
+		} else if err != nil && !shouldRetry(err) {
+			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}
+
+		sleep(rw.retryPolicy, attempt)
+
+		attempt++
 	}
+
+	return fmt.Errorf("max retries reached, %d operations failed", len(rw.operationBuffer))
 }
 
-func (rw *batchRecordWriter) processOperationResults() {
+func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {
+	failedOps := make([]a.BatchRecordIfc, 0)
+
 	for _, op := range rw.operationBuffer {
-		code := op.BatchRec().ResultCode
-		switch code {
-		case atypes.OK:
-			rw.stats.IncrRecordsInserted()
-		case atypes.GENERATION_ERROR:
-			rw.stats.IncrRecordsFresher()
-		case atypes.KEY_EXISTS_ERROR:
-			rw.stats.IncrRecordsExisted()
-		default:
-			rw.logger.Info("unexpected batch operation error code",
-				slog.String("code", code.String()),
-			)
+		if rw.processOperationResult(op) {
+			failedOps = append(failedOps, op)
 		}
+	}
+
+	return failedOps
+}
+
+// processOperationResult increases statistics counters.
+// return true if operation should be retried.
+func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
+	code := op.BatchRec().ResultCode
+	switch code {
+	case atypes.OK:
+		rw.stats.IncrRecordsInserted()
+		return false
+	case atypes.GENERATION_ERROR:
+		rw.stats.IncrRecordsFresher()
+		return false
+	case atypes.KEY_EXISTS_ERROR:
+		rw.stats.IncrRecordsExisted()
+		return false
+	default:
+		rw.logger.Info("Unexpected batch operation result code",
+			slog.String("code", code.String()),
+			slog.String("key", op.BatchRec().Key.String()))
+
+		return true
 	}
 }

@@ -19,6 +19,7 @@ import (
 
 	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
 
@@ -54,5 +55,23 @@ func NewStreamingReaderS3(ctx context.Context, cfg *s3.Config,
 		return s3.NewStreamingReader(ctx, cfg, asb.NewValidator())
 	default:
 		return s3.NewStreamingReader(ctx, cfg, asb.NewValidator())
+	}
+}
+
+// NewWriterGCP initializes a writer to the GCP storage.
+func NewWriterGCP(ctx context.Context, cfg *storage.Config, removeFiles bool) (Writer, error) {
+	return storage.NewWriter(ctx, cfg, removeFiles)
+}
+
+// NewStreamingReaderGCP initializes a reader from the GCP storage.
+// At the moment we support only `EncoderTypeASB` Encoder type.
+func NewStreamingReaderGCP(ctx context.Context, cfg *s3.Config,
+	eType EncoderType) (StreamingReader, error) {
+	switch eType {
+	// As at the moment only one `ASB` validator supported, we use such construction.
+	case EncoderTypeASB:
+		return storage.NewStreamingReader(ctx, cfg, asb.NewValidator())
+	default:
+		return storage.NewStreamingReader(ctx, cfg, asb.NewValidator())
 	}
 }

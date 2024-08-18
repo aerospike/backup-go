@@ -110,7 +110,7 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 
 // Close satisfies the DataWriter interface.
 func (rw *restoreWriter) Close() error {
-	rw.logger.Debug("closed restore writer")
+	rw.logger.Debug("close restore writer")
 	return rw.close()
 }
 

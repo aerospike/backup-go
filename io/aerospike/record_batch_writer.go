@@ -37,7 +37,7 @@ func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
 	writeOp := rw.batchWrite(record)
 	rw.operationBuffer = append(rw.operationBuffer, writeOp)
 
-	if len(rw.operationBuffer) > rw.batchSize {
+	if len(rw.operationBuffer) >= rw.batchSize {
 		return rw.flushBuffer()
 	}
 
@@ -90,6 +90,12 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			if len(rw.operationBuffer) == 0 {
 				return nil // All operations succeeded
 			}
+
+			rw.logger.Debug("Retryable error occurred, will retry",
+				slog.Any("error", err),
+				slog.Int("buffer", len(rw.operationBuffer)),
+				slog.Int("attempts", int(attempt)),
+			)
 		} else if !shouldRetry(err) {
 			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}

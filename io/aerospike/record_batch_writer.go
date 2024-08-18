@@ -115,7 +115,7 @@ func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {
 }
 
 // processOperationResult increases statistics counters.
-// return true if operation should be retried.
+// it returns true if operation should be retried.
 func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	code := op.BatchRec().ResultCode
 	switch code {

@@ -59,7 +59,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return nil
 		}
 
-		if isAcceptableError(aerr) {
+		if isNilOrAcceptableError(aerr) {
 			switch {
 			case aerr.Matches(atypes.GENERATION_ERROR):
 				rw.stats.IncrRecordsFresher()

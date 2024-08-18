@@ -131,12 +131,12 @@ func sleep(rc *models.RetryPolicy, attempt int) {
 	time.Sleep(duration)
 }
 
-func isAcceptableError(err a.Error) bool {
-	return err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR)
+func isNilOrAcceptableError(err a.Error) bool {
+	return err == nil || err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR)
 }
 
 func shouldRetry(err a.Error) bool {
-	return err.Matches(
+	return err != nil && err.Matches(
 		atypes.NO_AVAILABLE_CONNECTIONS_TO_NODE,
 		atypes.TIMEOUT,
 		atypes.DEVICE_OVERLOAD,

@@ -85,12 +85,12 @@ func (rw *batchRecordWriter) flushBuffer() error {
 	for attemptsLeft(rw.retryPolicy, attempt) {
 		err := rw.asc.BatchOperate(nil, rw.operationBuffer)
 
-		if err == nil || isAcceptableError(err) {
+		if isNilOrAcceptableError(err) {
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
 				return nil // All operations succeeded
 			}
-		} else if err != nil && !shouldRetry(err) {
+		} else if !shouldRetry(err) {
 			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}
 

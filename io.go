@@ -17,6 +17,7 @@ package backup
 import (
 	"context"
 
+	gcpStorage "cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/gcp/storage"
@@ -29,7 +30,7 @@ func NewWriterLocal(dir string, removeFiles bool) (Writer, error) {
 }
 
 // NewStreamingReaderLocal initializes a reader from the local directory.
-// At the moment we support only `EncoderTypeASB` Encoder type.
+// At the moment, we support only `EncoderTypeASB` Encoder type.
 func NewStreamingReaderLocal(dir string, eType EncoderType) (StreamingReader, error) {
 	switch eType {
 	// As at the moment only one `ASB` validator supported, we use such construction.
@@ -46,7 +47,7 @@ func NewWriterS3(ctx context.Context, cfg *s3.Config, removeFiles bool) (Writer,
 }
 
 // NewStreamingReaderS3 initializes a reader from the S3 directory.
-// At the moment we support only `EncoderTypeASB` Encoder type.
+// At the moment, we support only `EncoderTypeASB` Encoder type.
 func NewStreamingReaderS3(ctx context.Context, cfg *s3.Config,
 	eType EncoderType) (StreamingReader, error) {
 	switch eType {
@@ -59,19 +60,29 @@ func NewStreamingReaderS3(ctx context.Context, cfg *s3.Config,
 }
 
 // NewWriterGCP initializes a writer to the GCP storage.
-func NewWriterGCP(ctx context.Context, cfg *storage.Config, removeFiles bool) (Writer, error) {
-	return storage.NewWriter(ctx, cfg, removeFiles)
+func NewWriterGCP(
+	ctx context.Context,
+	client *gcpStorage.Client,
+	bucketName string,
+	folderName string,
+	removeFiles bool,
+) (Writer, error) {
+	return storage.NewWriter(ctx, client, bucketName, folderName, removeFiles)
 }
 
 // NewStreamingReaderGCP initializes a reader from the GCP storage.
-// At the moment we support only `EncoderTypeASB` Encoder type.
-func NewStreamingReaderGCP(ctx context.Context, cfg *s3.Config,
-	eType EncoderType) (StreamingReader, error) {
+// At the moment, we support only `EncoderTypeASB` Encoder type.
+func NewStreamingReaderGCP(
+	client *gcpStorage.Client,
+	bucketName string,
+	folderName string,
+	eType EncoderType,
+) (StreamingReader, error) {
 	switch eType {
 	// As at the moment only one `ASB` validator supported, we use such construction.
 	case EncoderTypeASB:
-		return storage.NewStreamingReader(ctx, cfg, asb.NewValidator())
+		return storage.NewStreamingReader(client, bucketName, folderName, asb.NewValidator())
 	default:
-		return storage.NewStreamingReader(ctx, cfg, asb.NewValidator())
+		return storage.NewStreamingReader(client, bucketName, folderName, asb.NewValidator())
 	}
 }

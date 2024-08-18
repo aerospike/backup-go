@@ -19,9 +19,8 @@ func TestWriter_NewWriter(t *testing.T) {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	require.NoError(t, err)
-	cfg := testConfig()
 
-	writer, err := NewWriter(ctx, client, cfg, true)
+	writer, err := NewWriter(ctx, client, testBucketName, testFolderName, true)
 	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFileName)
@@ -34,4 +33,17 @@ func TestWriter_NewWriter(t *testing.T) {
 
 	err = w.Close()
 	require.NoError(t, err)
+}
+
+func TestWriter_isEmptyDirectory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	require.NoError(t, err)
+
+	isEmpty, err := isEmptyDirectory(ctx, client, testBucketName, "empty_folder")
+	require.NoError(t, err)
+
+	t.Log(isEmpty)
 }

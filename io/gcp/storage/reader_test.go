@@ -13,7 +13,7 @@ import (
 
 const (
 	testBucketName = "backup-go-tests"
-	testFolderName = ""
+	testFolderName = "test/"
 )
 
 type validatorMock struct{}
@@ -25,13 +25,7 @@ func (mock validatorMock) Run(fileName string) error {
 	return nil
 }
 
-func testConfig() *Config {
-	return &Config{
-		Bucket: testBucketName,
-	}
-}
-
-func TestStreamingReader_StreamFiles(t *testing.T) {
+func TestStreamingReader_StreamFilesFolder(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -39,6 +33,26 @@ func TestStreamingReader_StreamFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	reader, err := NewStreamingReader(client, testBucketName, testFolderName, validatorMock{})
+	require.NoError(t, err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	for msg := range rCH {
+		t.Log(msg)
+	}
+}
+
+func TestStreamingReader_StreamFilesRoot(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	require.NoError(t, err)
+
+	reader, err := NewStreamingReader(client, testBucketName, "", validatorMock{})
 	require.NoError(t, err)
 
 	rCH := make(chan io.ReadCloser)

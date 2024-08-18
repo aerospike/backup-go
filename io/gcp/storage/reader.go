@@ -40,9 +40,9 @@ func NewStreamingReader(
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	prefix := ""
+	prefix := folderName
 	// Protection from incorrect input.
-	if strings.HasSuffix(folderName, "/") {
+	if !strings.HasSuffix(folderName, "/") && folderName != "/" && folderName != "" {
 		prefix = fmt.Sprintf("%s/", folderName)
 	}
 
@@ -69,10 +69,9 @@ func (r *StreamingReader) StreamFiles(
 	it := bucket.Objects(ctx, &storage.Query{
 		Prefix: r.prefix,
 	})
-
-	var objAttrs *storage.ObjectAttrs
-
+	
 	for {
+		var objAttrs *storage.ObjectAttrs
 		// Iterate over bucket until we're done.
 		objAttrs, err = it.Next()
 		if errors.Is(err, iterator.Done) {
@@ -81,6 +80,12 @@ func (r *StreamingReader) StreamFiles(
 
 		if err != nil {
 			errorsCh <- fmt.Errorf("failed to read object attr from bucket %s: %w", r.bucketName, err)
+		}
+
+		// Skip files in folders.
+		if r.prefix == "" && strings.Contains(objAttrs.Name, "/") {
+			fmt.Println("dir")
+			continue
 		}
 
 		// Skip not valid files.

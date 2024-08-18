@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -17,14 +18,30 @@ const (
 
 // Writer represents a GCP storage writer.
 type Writer struct {
+	// client contains configured gcp storage client.
 	client *storage.Client
-	config *Config
+	// bucketName contains name of the bucket to read from.
+	bucketName string
+	// prefix contains folder name if we have folders inside the bucket.
+	prefix string
 }
 
 // NewWriter returns new GCP storage writer.
-func NewWriter(ctx context.Context, client *storage.Client, config *Config, removeFiles bool) (*Writer, error) {
+func NewWriter(
+	ctx context.Context,
+	client *storage.Client,
+	bucketName string,
+	folderName string,
+	removeFiles bool,
+) (*Writer, error) {
+	prefix := folderName
+	// Protection from incorrect input.
+	if !strings.HasSuffix(folderName, "/") && folderName != "/" && folderName != "" {
+		prefix = fmt.Sprintf("%s/", folderName)
+	}
+
 	// Check if backup dir is empty.
-	isEmpty, err := isEmptyBucket(ctx, client, config.Bucket)
+	isEmpty, err := isEmptyDirectory(ctx, client, bucketName, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if bucket is empty: %w", err)
 	}
@@ -34,19 +51,20 @@ func NewWriter(ctx context.Context, client *storage.Client, config *Config, remo
 	}
 
 	// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
-	if err = removeFilesFromBucket(ctx, client, config.Bucket); err != nil {
+	if err = removeFilesFromBucket(ctx, client, bucketName); err != nil {
 		return nil, fmt.Errorf("failed to remove files from bucket: %w", err)
 	}
 
 	return &Writer{
-		client: client,
-		config: config,
+		client:     client,
+		bucketName: bucketName,
+		prefix:     prefix,
 	}, nil
 }
 
 // NewWriter testing upload.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
-	sw := w.client.Bucket(w.config.Bucket).Object(filename).NewWriter(ctx)
+	sw := w.client.Bucket(w.bucketName).Object(filename).NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = defaultChunkSize
 
@@ -72,7 +90,7 @@ func (w *gcpWriter) Close() error {
 	return w.sw.Close()
 }
 
-func isEmptyBucket(ctx context.Context, client *storage.Client, bucketName string) (bool, error) {
+func isEmptyDirectory(ctx context.Context, client *storage.Client, bucketName, prefix string) (bool, error) {
 	bucket := client.Bucket(bucketName)
 	// Check if bucket exists, to avoid nil pointer error.
 	_, err := bucket.Attrs(ctx)
@@ -80,21 +98,44 @@ func isEmptyBucket(ctx context.Context, client *storage.Client, bucketName strin
 		return false, fmt.Errorf("failed to get bucket attr:%s:  %v", bucketName, err)
 	}
 
-	it := bucket.Objects(ctx, nil)
-	_, err = it.Next()
-	// Success.
-	if errors.Is(err, iterator.Done) {
-		return true, nil
-	}
+	it := bucket.Objects(ctx, &storage.Query{
+		Prefix: prefix,
+	})
 
-	if err != nil {
-		return false, fmt.Errorf("failed to list bucket objects: %v", err)
+	var filesCount uint
+
+	for {
+		var objAttrs *storage.ObjectAttrs
+		// Iterate over bucket until we're done.
+		objAttrs, err = it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+
+		if err != nil {
+			return false, fmt.Errorf("failed to list bucket objects: %v", err)
+		}
+
+		// TODO: fix check of empty folder
+
+		// Skip files in folders.
+		if prefix == "" && strings.Contains(objAttrs.Name, "/") {
+			fmt.Println("dir")
+			continue
+		}
+
+		filesCount++
+	}
+	// Success.
+	if filesCount == 0 {
+		return true, nil
 	}
 
 	return false, nil
 }
 
 func removeFilesFromBucket(ctx context.Context, client *storage.Client, bucketName string) error {
+	// TODO: remove only from current folder
 	bucket := client.Bucket(bucketName)
 	// Check if bucket exists, to avoid nil pointer error.
 	_, err := bucket.Attrs(ctx)

@@ -48,7 +48,7 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
 	var (
 		aerr    a.Error
-		attempt int
+		attempt uint
 	)
 
 	for attemptsLeft(rw.retryPolicy, attempt) {

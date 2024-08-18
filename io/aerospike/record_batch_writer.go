@@ -81,7 +81,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		return nil
 	}
 
-	var attempt int
+	var attempt uint
 	for attemptsLeft(rw.retryPolicy, attempt) {
 		err := rw.asc.BatchOperate(nil, rw.operationBuffer)
 

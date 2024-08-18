@@ -27,5 +27,5 @@ type RetryPolicy struct {
 
 	// MaxRetries is the maximum number of retry attempts that will be made.
 	// If set to 0, no retries will be performed.
-	MaxRetries int
+	MaxRetries uint
 }

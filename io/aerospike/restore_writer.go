@@ -114,7 +114,7 @@ func (rw *restoreWriter) Close() error {
 	return rw.close()
 }
 
-func attemptsLeft(rc *models.RetryPolicy, attempt int) bool {
+func attemptsLeft(rc *models.RetryPolicy, attempt uint) bool {
 	if rc == nil {
 		return attempt == 0 // only pass on 1st try.
 	}
@@ -122,7 +122,7 @@ func attemptsLeft(rc *models.RetryPolicy, attempt int) bool {
 	return attempt <= rc.MaxRetries
 }
 
-func sleep(rc *models.RetryPolicy, attempt int) {
+func sleep(rc *models.RetryPolicy, attempt uint) {
 	if rc == nil {
 		return
 	}

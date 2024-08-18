@@ -88,6 +88,10 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		if isNilOrAcceptableError(err) {
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
+				rw.logger.Debug("batch operation succeed",
+					slog.Int("buffer", len(rw.operationBuffer)),
+				)
+
 				return nil // All operations succeeded
 			}
 

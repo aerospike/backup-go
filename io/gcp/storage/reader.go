@@ -1,3 +1,17 @@
+// Copyright 2024 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
@@ -19,8 +33,8 @@ type validator interface {
 
 // StreamingReader describes GCP Storage streaming reader.
 type StreamingReader struct {
-	// client contains configured gcp storage client.
-	client *storage.Client
+	// bucketHandle contains storage bucket handler for performing reading and writing operations.
+	bucketHandle *storage.BucketHandle
 	// bucketName contains name of the bucket to read from.
 	bucketName string
 	// prefix contains folder name if we have folders inside the bucket.
@@ -31,6 +45,7 @@ type StreamingReader struct {
 
 // NewStreamingReader returns new GCP storage streaming reader.
 func NewStreamingReader(
+	ctx context.Context,
 	client *storage.Client,
 	bucketName string,
 	folderName string,
@@ -46,11 +61,18 @@ func NewStreamingReader(
 		prefix = fmt.Sprintf("%s/", folderName)
 	}
 
+	bucket := client.Bucket(bucketName)
+	// Check if bucket exists, to avoid errors.
+	_, err := bucket.Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket attr:%s:  %v", bucketName, err)
+	}
+
 	return &StreamingReader{
-		client:     client,
-		bucketName: bucketName,
-		prefix:     prefix,
-		validator:  validator,
+		bucketHandle: bucket,
+		bucketName:   bucketName,
+		prefix:       prefix,
+		validator:    validator,
 	}, nil
 }
 
@@ -59,21 +81,13 @@ func NewStreamingReader(
 func (r *StreamingReader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	bucket := r.client.Bucket(r.bucketName)
-	// Check if bucket exists, to avoid nil pointer error.
-	_, err := bucket.Attrs(ctx)
-	if err != nil {
-		errorsCh <- fmt.Errorf("failed to get bucket attr:%s:  %v", r.bucketName, err)
-	}
-
-	it := bucket.Objects(ctx, &storage.Query{
+	it := r.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix: r.prefix,
 	})
-	
+
 	for {
-		var objAttrs *storage.ObjectAttrs
 		// Iterate over bucket until we're done.
-		objAttrs, err = it.Next()
+		objAttrs, err := it.Next()
 		if errors.Is(err, iterator.Done) {
 			break
 		}
@@ -83,8 +97,7 @@ func (r *StreamingReader) StreamFiles(
 		}
 
 		// Skip files in folders.
-		if r.prefix == "" && strings.Contains(objAttrs.Name, "/") {
-			fmt.Println("dir")
+		if isDirectory(r.prefix, objAttrs.Name) {
 			continue
 		}
 
@@ -96,7 +109,7 @@ func (r *StreamingReader) StreamFiles(
 		// Create readers for files.
 		var reader *storage.Reader
 
-		reader, err = bucket.Object(objAttrs.Name).NewReader(ctx)
+		reader, err = r.bucketHandle.Object(objAttrs.Name).NewReader(ctx)
 		if err != nil {
 			errorsCh <- fmt.Errorf("failerd to create reader from file %s: %w", objAttrs.Name, err)
 		}
@@ -110,4 +123,19 @@ func (r *StreamingReader) StreamFiles(
 // GetType return `gcpStorageType` type of storage. Used in logging.
 func (r *StreamingReader) GetType() string {
 	return gcpStorageType
+}
+
+func isDirectory(prefix, fileName string) bool {
+	// If file name ends with / it is 100% dir.
+	if strings.HasSuffix(fileName, "/") {
+		return true
+	}
+
+	// If we look inside some folder.
+	if strings.HasPrefix(fileName, prefix) {
+		clean := strings.TrimPrefix(fileName, prefix)
+		return strings.Contains(clean, "/")
+	}
+	// All other variants.
+	return strings.Contains(fileName, "/")
 }

@@ -1,3 +1,17 @@
+// Copyright 2024 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
@@ -20,7 +34,7 @@ const (
 type Writer struct {
 	// client contains configured gcp storage client.
 	client *storage.Client
-	// bucketName contains name of the bucket to read from.
+	// bucketName contains the name of the bucket to read from.
 	bucketName string
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
@@ -47,12 +61,12 @@ func NewWriter(
 	}
 
 	if !isEmpty && !removeFiles {
-		return nil, fmt.Errorf("backup bucket must be empty or set removeFiles = true")
+		return nil, fmt.Errorf("backup folder must be empty or set removeFiles = true")
 	}
 
 	// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
-	if err = removeFilesFromBucket(ctx, client, bucketName); err != nil {
-		return nil, fmt.Errorf("failed to remove files from bucket: %w", err)
+	if err = removeFilesFromFolder(ctx, client, prefix, bucketName); err != nil {
+		return nil, fmt.Errorf("failed to remove files from folder: %w", err)
 	}
 
 	return &Writer{
@@ -116,11 +130,8 @@ func isEmptyDirectory(ctx context.Context, client *storage.Client, bucketName, p
 			return false, fmt.Errorf("failed to list bucket objects: %v", err)
 		}
 
-		// TODO: fix check of empty folder
-
 		// Skip files in folders.
-		if prefix == "" && strings.Contains(objAttrs.Name, "/") {
-			fmt.Println("dir")
+		if isDirectory(prefix, objAttrs.Name) {
 			continue
 		}
 
@@ -134,8 +145,7 @@ func isEmptyDirectory(ctx context.Context, client *storage.Client, bucketName, p
 	return false, nil
 }
 
-func removeFilesFromBucket(ctx context.Context, client *storage.Client, bucketName string) error {
-	// TODO: remove only from current folder
+func removeFilesFromFolder(ctx context.Context, client *storage.Client, prefix, bucketName string) error {
 	bucket := client.Bucket(bucketName)
 	// Check if bucket exists, to avoid nil pointer error.
 	_, err := bucket.Attrs(ctx)
@@ -143,11 +153,12 @@ func removeFilesFromBucket(ctx context.Context, client *storage.Client, bucketNa
 		return fmt.Errorf("failed to get bucket attr:%s:  %v", bucketName, err)
 	}
 
-	it := bucket.Objects(ctx, nil)
-
-	var objAttrs *storage.ObjectAttrs
+	it := bucket.Objects(ctx, &storage.Query{
+		Prefix: prefix,
+	})
 
 	for {
+		var objAttrs *storage.ObjectAttrs
 		// Iterate over bucket until we're done.
 		objAttrs, err = it.Next()
 		if errors.Is(err, iterator.Done) {
@@ -156,6 +167,11 @@ func removeFilesFromBucket(ctx context.Context, client *storage.Client, bucketNa
 
 		if err != nil {
 			return fmt.Errorf("failed to read object attr from bucket %s: %w", bucketName, err)
+		}
+
+		// Skip files in folders.
+		if isDirectory(prefix, objAttrs.Name) {
+			continue
 		}
 
 		if err = bucket.Object(objAttrs.Name).Delete(ctx); err != nil {

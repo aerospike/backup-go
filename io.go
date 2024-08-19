@@ -73,6 +73,7 @@ func NewWriterGCP(
 // NewStreamingReaderGCP initializes a reader from the GCP storage.
 // At the moment, we support only `EncoderTypeASB` Encoder type.
 func NewStreamingReaderGCP(
+	ctx context.Context,
 	client *gcpStorage.Client,
 	bucketName string,
 	folderName string,
@@ -81,8 +82,8 @@ func NewStreamingReaderGCP(
 	switch eType {
 	// As at the moment only one `ASB` validator supported, we use such construction.
 	case EncoderTypeASB:
-		return storage.NewStreamingReader(client, bucketName, folderName, asb.NewValidator())
+		return storage.NewStreamingReader(ctx, client, bucketName, folderName, asb.NewValidator())
 	default:
-		return storage.NewStreamingReader(client, bucketName, folderName, asb.NewValidator())
+		return storage.NewStreamingReader(ctx, client, bucketName, folderName, asb.NewValidator())
 	}
 }

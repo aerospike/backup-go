@@ -106,7 +106,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		panic(err)
 	}
 
-	readers, err := backup.NewStreamingReaderGCP(client, bucketName, folderName, backup.EncoderTypeASB)
+	readers, err := backup.NewStreamingReaderGCP(ctx, client, bucketName, folderName, backup.EncoderTypeASB)
 	if err != nil {
 		panic(err)
 	}

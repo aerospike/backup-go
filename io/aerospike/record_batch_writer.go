@@ -77,9 +77,7 @@ func (rw *batchRecordWriter) close() error {
 }
 
 func (rw *batchRecordWriter) flushBuffer() error {
-	bufferLength := len(rw.operationBuffer)
-	if bufferLength == 0 {
-		rw.logger.Debug("Flush empty buffer")
+	if len(rw.operationBuffer) == 0 {
 		return nil
 	}
 
@@ -93,21 +91,17 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		if isNilOrAcceptableError(err) {
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
-				rw.logger.Debug("batch operation succeed",
-					slog.Int("buffer", bufferLength),
-				)
-
 				return nil // All operations succeeded
 			}
-
-			rw.logger.Debug("Retryable error occurred, will retry",
-				slog.Any("error", err),
-				slog.Int("buffer", len(rw.operationBuffer)),
-				slog.Int("attempts", int(attempt)),
-			)
 		} else if !shouldRetry(err) {
 			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}
+
+		rw.logger.Debug("Retryable error occurred, will retry",
+			slog.Any("error", err),
+			slog.Int("buffer", len(rw.operationBuffer)),
+			slog.Int("attempts", int(attempt)),
+		)
 
 		sleep(rw.retryPolicy, attempt)
 

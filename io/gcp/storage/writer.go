@@ -114,8 +114,6 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 		Prefix: prefix,
 	})
 
-	var filesCount uint
-
 	for {
 		// Iterate over bucket until we're done.
 		objAttrs, err := it.Next()
@@ -132,14 +130,10 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 			continue
 		}
 
-		filesCount++
-	}
-	// Success.
-	if filesCount == 0 {
-		return true, nil
+		return false, nil
 	}
 
-	return false, nil
+	return true, nil
 }
 
 func removeFilesFromFolder(ctx context.Context, bucketHandle *storage.BucketHandle, prefix, bucketName string) error {

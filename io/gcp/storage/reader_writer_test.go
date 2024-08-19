@@ -55,7 +55,7 @@ type GCPSuite struct {
 func (s *GCPSuite) SetupSuite() {
 	fmt.Println("setting up suite")
 	ctx := context.Background()
-	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress))
+	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress), option.WithoutAuthentication())
 	if err != nil {
 		s.T().Fatal(err)
 	}

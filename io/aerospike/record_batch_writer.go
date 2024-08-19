@@ -77,19 +77,23 @@ func (rw *batchRecordWriter) close() error {
 }
 
 func (rw *batchRecordWriter) flushBuffer() error {
-	if len(rw.operationBuffer) == 0 {
+	bufferLength := len(rw.operationBuffer)
+	if bufferLength == 0 {
 		return nil
 	}
 
-	var attempt uint
-	for attemptsLeft(rw.retryPolicy, attempt) {
-		err := rw.asc.BatchOperate(nil, rw.operationBuffer)
+	var (
+		attempt uint
+		err     a.Error
+	)
 
+	for attemptsLeft(rw.retryPolicy, attempt) {
+		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
 		if isNilOrAcceptableError(err) {
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
 				rw.logger.Debug("batch operation succeed",
-					slog.Int("buffer", len(rw.operationBuffer)),
+					slog.Int("buffer", bufferLength),
 				)
 
 				return nil // All operations succeeded
@@ -109,7 +113,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		attempt++
 	}
 
-	return fmt.Errorf("max retries reached, %d operations failed", len(rw.operationBuffer))
+	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), err)
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {

@@ -79,6 +79,7 @@ func (rw *batchRecordWriter) close() error {
 func (rw *batchRecordWriter) flushBuffer() error {
 	bufferLength := len(rw.operationBuffer)
 	if bufferLength == 0 {
+		rw.logger.Debug("Flush empty buffer")
 		return nil
 	}
 

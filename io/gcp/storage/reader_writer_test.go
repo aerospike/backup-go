@@ -30,20 +30,21 @@ import (
 )
 
 const (
-	testServiceAddress        = "http://127.0.0.1:4443/storage/v1/b"
-	testProjectID             = "test-project"
-	testBucketName            = "test-bucket"
-	testReadFolderEmpty       = "folder_read_empty/"
-	testReadFolderWithData    = "folder_read_with_data/"
-	testReadFolderMixedData   = "folder_read_mixed_data/"
-	testWriteFolderEmpty      = "folder_write_empty/"
-	testWriteFolderWithData   = "folder_write_with_data/"
-	testWriteFolderMixedData  = "folder_read_mixed_data/"
-	testFileNameTemplate      = "backup_%d.asb"
-	testFileNameTemplateWrong = "file_%d.zip"
-	testFileContent           = "content"
-	testFileContentLength     = 7
-	testFilesNumber           = 5
+	testServiceAddress           = "http://127.0.0.1:4443/storage/v1/b"
+	testProjectID                = "test-project"
+	testBucketName               = "test-bucket"
+	testReadFolderEmpty          = "folder_read_empty/"
+	testReadFolderWithData       = "folder_read_with_data/"
+	testReadFolderMixedData      = "folder_read_mixed_data/"
+	testWriteFolderEmpty         = "folder_write_empty/"
+	testWriteFolderWithData      = "folder_write_with_data/"
+	testWriteFolderWithDataError = "folder_write_with_data_error/"
+	testWriteFolderMixedData     = "folder_read_mixed_data/"
+	testFileNameTemplate         = "backup_%d.asb"
+	testFileNameTemplateWrong    = "file_%d.zip"
+	testFileContent              = "content"
+	testFileContentLength        = 7
+	testFilesNumber              = 5
 )
 
 type GCPSuite struct {
@@ -119,8 +120,15 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 		if err := writeContent(sw, testFileContent); err != nil {
 			return err
 		}
-		// for writing tests./
+		// for writing tests.
 		fileName = fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
+		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+		sw.ContentType = fileType
+		if err := writeContent(sw, testFileContent); err != nil {
+			return err
+		}
+
+		fileName = fmt.Sprintf("%s%s", testWriteFolderWithDataError, fmt.Sprintf(testFileNameTemplate, i))
 		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
 		sw.ContentType = fileType
 		if err := writeContent(sw, testFileContent); err != nil {
@@ -399,7 +407,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderWithData,
+		testWriteFolderWithDataError,
 		false,
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")

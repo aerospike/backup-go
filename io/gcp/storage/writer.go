@@ -34,8 +34,6 @@ const (
 type Writer struct {
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
 	bucketHandle *storage.BucketHandle
-	// bucketName contains the name of the bucket to read from.
-	bucketName string
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
 }
@@ -78,13 +76,13 @@ func NewWriter(
 
 	return &Writer{
 		bucketHandle: bucket,
-		bucketName:   bucketName,
 		prefix:       prefix,
 	}, nil
 }
 
 // NewWriter testing upload.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	sw := w.bucketHandle.Object(filename).NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = defaultChunkSize

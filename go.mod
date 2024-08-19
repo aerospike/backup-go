@@ -3,7 +3,6 @@ module github.com/aerospike/backup-go
 go 1.21
 
 require (
-	cloud.google.com/go/auth v0.6.1
 	cloud.google.com/go/storage v1.43.0
 	github.com/aerospike/aerospike-client-go/v7 v7.6.0
 	github.com/aerospike/tools-common-go v0.0.0-20240701164814-36eec593d9c6
@@ -18,7 +17,6 @@ require (
 	github.com/klauspost/compress v1.17.9
 	github.com/minio/minio-go/v7 v7.0.74
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sync v0.8.0
 	golang.org/x/time v0.6.0
 	google.golang.org/api v0.187.0
@@ -26,6 +24,7 @@ require (
 
 require (
 	cloud.google.com/go v0.115.0 // indirect
+	cloud.google.com/go/auth v0.6.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.8 // indirect
@@ -86,6 +85,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto v0.0.0-20240624140628-dc46fd24d27d // indirect

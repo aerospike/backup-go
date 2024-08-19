@@ -3,7 +3,7 @@ module github.com/aerospike/backup-go
 go 1.21
 
 require (
-	github.com/aerospike/aerospike-client-go/v7 v7.6.0
+	github.com/aerospike/aerospike-client-go/v7 v7.6.1
 	github.com/aerospike/tools-common-go v0.0.0-20240701164814-36eec593d9c6
 	github.com/aws/aws-sdk-go-v2 v1.30.3
 	github.com/aws/aws-sdk-go-v2/config v1.27.27

@@ -92,6 +92,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 	for attemptsLeft(rw.retryPolicy, attempt) {
 		policy := a.NewBatchPolicy()
 		policy.TotalTimeout = 5 * time.Second // TODO: make configurable
+
 		err = rw.asc.BatchOperate(policy, rw.operationBuffer)
 		if isNilOrAcceptableError(err) {
 			rw.operationBuffer = rw.processAndFilterOperations()

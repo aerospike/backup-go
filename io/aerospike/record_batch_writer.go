@@ -17,7 +17,6 @@ package aerospike
 import (
 	"fmt"
 	"log/slog"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
@@ -90,10 +89,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 	)
 
 	for attemptsLeft(rw.retryPolicy, attempt) {
-		policy := a.NewBatchPolicy()
-		policy.TotalTimeout = 5 * time.Second // TODO: make configurable
-
-		err = rw.asc.BatchOperate(policy, rw.operationBuffer)
+		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
 		if isNilOrAcceptableError(err) {
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {

@@ -78,6 +78,7 @@ func (rw *batchRecordWriter) close() error {
 
 func (rw *batchRecordWriter) flushBuffer() error {
 	if len(rw.operationBuffer) == 0 {
+		rw.logger.Debug("Flush empty buffer")
 		return nil
 	}
 
@@ -86,31 +87,51 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		err     a.Error
 	)
 
-	for attemptsLeft(rw.retryPolicy, attempt) {
+	rw.logger.Debug("Starting batch operation",
+		slog.Int("bufferSize", len(rw.operationBuffer)),
+		slog.Any("retryPolicy", rw.retryPolicy),
+	)
+
+	for {
+		rw.logger.Debug("Attempting batch operation",
+			slog.Any("attempt", attempt),
+			slog.Int("bufferSize", len(rw.operationBuffer)),
+		)
+
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
+
 		if isNilOrAcceptableError(err) {
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
-				return nil // All operations succeeded
+				rw.logger.Debug("All operations succeeded")
+				return nil
 			}
 		} else if !shouldRetry(err) {
 			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}
 
-		rw.logger.Debug("Retryable error occurred, will retry",
-			slog.Any("error", err),
-			slog.Int("buffer", len(rw.operationBuffer)),
-			slog.Int("attempts", int(attempt)),
-		)
+		attempt++
 
+		if !attemptsLeft(rw.retryPolicy, attempt) {
+			break
+		}
+
+		rw.logger.Debug("Retryable error occurred",
+			slog.Any("error", err),
+			slog.Int("remainingOperations", len(rw.operationBuffer)),
+		)
 		sleep(rw.retryPolicy, attempt)
 
-		attempt++
 	}
+
+	rw.logger.Error("Max retries reached",
+		slog.Any("attempts", attempt),
+		slog.Int("failedOperations", len(rw.operationBuffer)),
+		slog.Any("lastError", err),
+	)
 
 	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), err)
 }
-
 func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {
 	failedOps := make([]a.BatchRecordIfc, 0)
 

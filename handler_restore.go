@@ -200,13 +200,13 @@ func newCompressionReader(
 
 // newEncryptionReader returns encryption reader for decrypting backup.
 func newEncryptionReader(
-	policy *EncryptionPolicy, secretAgent *SecretAgentConfig, readers []io.ReadCloser,
+	policy *EncryptionPolicy, saConfig *SecretAgentConfig, readers []io.ReadCloser,
 ) ([]io.ReadCloser, error) {
 	if policy == nil {
 		return readers, nil
 	}
 
-	privateKey, err := policy.ReadPrivateKey(secretAgent)
+	privateKey, err := readPrivateKey(policy, saConfig)
 	if err != nil {
 		return nil, err
 	}

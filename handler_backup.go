@@ -239,13 +239,13 @@ func newCompressionWriter(
 
 // newEncryptionWriter returns encryption writer for encrypting backup.
 func newEncryptionWriter(
-	policy *EncryptionPolicy, secretAgent *SecretAgentConfig, writer io.WriteCloser,
+	policy *EncryptionPolicy, saConfig *SecretAgentConfig, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
 	if policy == nil || policy.Mode == EncryptNone {
 		return writer, nil
 	}
 
-	privateKey, err := policy.ReadPrivateKey(secretAgent)
+	privateKey, err := readPrivateKey(policy, saConfig)
 	if err != nil {
 		return nil, err
 	}

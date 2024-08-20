@@ -17,8 +17,11 @@ package aerospike
 import (
 	"errors"
 	"log/slog"
+	"math"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	atypes "github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -42,7 +45,8 @@ type restoreWriter struct {
 
 // NewRestoreWriter creates a new restoreWriter.
 func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.RestoreStats,
-	logger *slog.Logger, useBatchWrites bool, batchSize int) pipeline.DataWriter[*models.Token] {
+	logger *slog.Logger, useBatchWrites bool, batchSize int, retryPolicy *models.RetryPolicy,
+) pipeline.DataWriter[*models.Token] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
 
@@ -57,7 +61,7 @@ func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.Re
 			writePolicy: writePolicy,
 			logger:      logger,
 		},
-		recordWriter: newRecordWriter(asc, writePolicy, stats, logger, useBatchWrites, batchSize),
+		recordWriter: newRecordWriter(asc, writePolicy, stats, logger, useBatchWrites, batchSize, retryPolicy),
 		logger:       logger,
 	}
 }
@@ -67,6 +71,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	logger *slog.Logger,
 	useBatchWrites bool,
 	batchSize int,
+	retryPolicy *models.RetryPolicy,
 ) recordWriter {
 	if useBatchWrites {
 		return &batchRecordWriter{
@@ -75,6 +80,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 			stats:       stats,
 			logger:      logger,
 			batchSize:   batchSize,
+			retryPolicy: retryPolicy,
 		}
 	}
 
@@ -82,6 +88,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 		asc:         asc,
 		writePolicy: writePolicy,
 		stats:       stats,
+		retryPolicy: retryPolicy,
 	}
 }
 
@@ -103,6 +110,39 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 
 // Close satisfies the DataWriter interface.
 func (rw *restoreWriter) Close() error {
-	rw.logger.Debug("closed restore writer")
+	rw.logger.Debug("close restore writer")
 	return rw.close()
+}
+
+func attemptsLeft(rc *models.RetryPolicy, attempt uint) bool {
+	if rc == nil {
+		return attempt == 0 // only pass on 1st try.
+	}
+
+	return attempt <= rc.MaxRetries
+}
+
+func sleep(rc *models.RetryPolicy, attempt uint) {
+	if rc == nil {
+		return
+	}
+
+	duration := time.Duration(float64(rc.BaseTimeout) * math.Pow(rc.Multiplier, float64(attempt)))
+	time.Sleep(duration)
+}
+
+func isNilOrAcceptableError(err a.Error) bool {
+	return err == nil || err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR)
+}
+
+func shouldRetry(err a.Error) bool {
+	return err != nil && err.Matches(
+		atypes.NO_AVAILABLE_CONNECTIONS_TO_NODE,
+		atypes.TIMEOUT,
+		atypes.DEVICE_OVERLOAD,
+		atypes.NETWORK_ERROR,
+		atypes.SERVER_NOT_AVAILABLE,
+		atypes.BATCH_FAILED,
+		atypes.MAX_ERROR_RATE,
+	)
 }

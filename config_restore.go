@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/models"
 )
 
 // RestoreConfig contains configuration for the restore operation.
@@ -35,6 +36,9 @@ type RestoreConfig struct {
 	EncryptionPolicy *EncryptionPolicy
 	// Compression details.
 	CompressionPolicy *CompressionPolicy
+	// Configuration of retries for each restore write operation.
+	// If nil, no retries will be performed.
+	RetryPolicy *models.RetryPolicy
 	// Secret agent config.
 	SecretAgentConfig *SecretAgentConfig
 	// The sets to restore (optional, given an empty list, all sets will be restored).

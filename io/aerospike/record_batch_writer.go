@@ -120,8 +120,8 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			slog.Any("error", err),
 			slog.Int("remainingOperations", len(rw.operationBuffer)),
 		)
-		sleep(rw.retryPolicy, attempt)
 
+		sleep(rw.retryPolicy, attempt)
 	}
 
 	rw.logger.Error("Max retries reached",

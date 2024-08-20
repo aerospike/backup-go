@@ -90,7 +90,7 @@ func prepareBackupDirectory(dir string) error {
 func forcePrepareBackupDirectory(dir string) error {
 	err := os.RemoveAll(dir)
 	if err != nil {
-		return fmt.Errorf("failed to remove directory %s: %v", dir, err)
+		return fmt.Errorf("failed to remove directory %s: %w", dir, err)
 	}
 
 	return makeDir(dir)
@@ -99,7 +99,7 @@ func forcePrepareBackupDirectory(dir string) error {
 func makeDir(dir string) error {
 	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
-		return fmt.Errorf("failed to create backup directory %s: %v", dir, err)
+		return fmt.Errorf("failed to create backup directory %s: %w", dir, err)
 	}
 
 	return nil

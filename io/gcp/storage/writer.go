@@ -38,7 +38,7 @@ type Writer struct {
 	prefix string
 }
 
-// NewWriter returns new GCP storage writer.
+// NewWriter initialize and return new writer for GCP storage.
 func NewWriter(
 	ctx context.Context,
 	client *storage.Client,
@@ -56,7 +56,7 @@ func NewWriter(
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket attr:%s:  %v", bucketName, err)
+		return nil, fmt.Errorf("failed to get bucket %s attr: %w", bucketName, err)
 	}
 
 	// Check if backup dir is empty.
@@ -80,7 +80,7 @@ func NewWriter(
 	}, nil
 }
 
-// NewWriter testing upload.
+// NewWriter returns a new GCP storage writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	sw := w.bucketHandle.Object(filename).NewWriter(ctx)
@@ -122,7 +122,7 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 		}
 
 		if err != nil {
-			return false, fmt.Errorf("failed to list bucket objects: %v", err)
+			return false, fmt.Errorf("failed to list bucket objects: %w", err)
 		}
 
 		// Skip files in folders.

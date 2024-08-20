@@ -159,10 +159,6 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 		rw.stats.IncrRecordsExisted()
 		return false
 	default:
-		rw.logger.Info("Unexpected batch operation result code",
-			slog.String("code", code.String()),
-			slog.String("key", op.BatchRec().Key.String()))
-
 		return true
 	}
 }

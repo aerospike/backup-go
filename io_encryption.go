@@ -105,10 +105,6 @@ func readPemFromEnv(keyEnv string) ([]byte, error) {
 // readPemFromSecret reads the key from secret agent without a header
 // and footer, decrypts it adding the header and footer.
 func readPemFromSecret(secret string, config *SecretAgentConfig) ([]byte, error) {
-	if config == nil {
-		return nil, fmt.Errorf("secret config not initialized")
-	}
-
 	key, err := getSecret(config, secret)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read secret config key: %w", err)

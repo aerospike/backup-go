@@ -28,6 +28,9 @@ import (
 const secretPrefix = "secrets:"
 
 func getSecret(config *SecretAgentConfig, key string) (string, error) {
+	if config == nil {
+		return "", fmt.Errorf("secret config not initialized")
+	}
 	// Getting resource and key.
 	resource, secretKey, err := getResourceKey(key)
 	if err != nil {

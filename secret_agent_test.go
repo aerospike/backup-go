@@ -188,17 +188,19 @@ func TestSecretAgent_getSecret(t *testing.T) {
 	cfg := testSecretAgentConfig()
 
 	testCases := []struct {
+		config     *SecretAgentConfig
 		key        string
 		errContent string
 	}{
-		{testSASecretKey, ""},
-		{testSASecretKeyErr, "invalid secret key format"},
-		{testSASecretErrPrefix, "invalid secret key format"},
-		{testSASecretKeyErrLong, "invalid secret key format"},
+		{cfg, testSASecretKey, ""},
+		{nil, testSASecretKey, "secret config not initialized"},
+		{cfg, testSASecretKeyErr, "invalid secret key format"},
+		{cfg, testSASecretErrPrefix, "invalid secret key format"},
+		{cfg, testSASecretKeyErrLong, "invalid secret key format"},
 	}
 
 	for i, tt := range testCases {
-		_, err = getSecret(cfg, tt.key)
+		_, err = getSecret(tt.config, tt.key)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
 		} else {

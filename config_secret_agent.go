@@ -16,6 +16,8 @@ package backup
 
 import (
 	"fmt"
+
+	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
 // SecretAgentConfig contains Secret Agent connection information.
@@ -42,13 +44,21 @@ func (s *SecretAgentConfig) Validate() error {
 		return nil
 	}
 
-	// As Secret Agent configuration is not mandatory, we will validate params
-	// only if the secret agent is enabled.
-	// If ConnectionType is set, we assume that the secret agent is enabled.
-	if s.ConnectionType != nil {
-		if s.Address == nil {
-			return fmt.Errorf("secret agent address is required")
-		}
+	if s.TimeoutMillisecond != nil && *s.TimeoutMillisecond <= 0 {
+		return fmt.Errorf("invalid timeout: %d", *s.TimeoutMillisecond)
+	}
+
+	if s.ConnectionType == nil {
+		return fmt.Errorf("connection type is required")
+	}
+
+	cType := *s.ConnectionType
+	if cType != saClient.ConnectionTypeTCP && cType != saClient.ConnectionTypeUDS {
+		return fmt.Errorf("unsupported connection type: %s", cType)
+	}
+
+	if s.Address == nil {
+		return fmt.Errorf("secret agent address is required")
 	}
 
 	return nil

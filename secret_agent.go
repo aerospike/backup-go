@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	secretAgent "github.com/aerospike/backup-go/pkg/secret-agent"
+	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
 const secretPrefix = "secrets:"
@@ -44,7 +44,7 @@ func getSecret(config *SecretAgentConfig, key string) (string, error) {
 	}
 
 	// Initializing client.
-	saClient, err := secretAgent.NewClient(
+	client, err := saClient.NewClient(
 		*config.ConnectionType,
 		address,
 		timeout,
@@ -55,7 +55,7 @@ func getSecret(config *SecretAgentConfig, key string) (string, error) {
 		return "", fmt.Errorf("failed to initialize secret agent client: %w", err)
 	}
 
-	result, err := saClient.GetSecret(resource, secretKey)
+	result, err := client.GetSecret(resource, secretKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret from secret agent: %w", err)
 	}

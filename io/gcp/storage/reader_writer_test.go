@@ -56,12 +56,10 @@ func (s *GCPSuite) SetupSuite() {
 	fmt.Println("setting up suite")
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress), option.WithoutAuthentication())
-	if err != nil {
-		s.T().Fatal(err)
-	}
-	if err = fillTestData(ctx, client); err != nil {
-		s.T().Fatal(err)
-	}
+	s.Require().NoError(err)
+
+	err = fillTestData(ctx, client)
+	s.Require().NoError(err)
 	s.client = client
 }
 

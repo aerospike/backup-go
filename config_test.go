@@ -106,30 +106,30 @@ func TestRestoreConfig_validate(t *testing.T) {
 
 func TestRestoreNamespaceConfig_Validate(t *testing.T) {
 	var config RestoreNamespaceConfig
-	assert.ErrorContains(t, config.Validate(), "source namespace")
+	assert.ErrorContains(t, config.validate(), "source namespace")
 	source := "ns1"
 	config.Source = &source
-	assert.ErrorContains(t, config.Validate(), "destination namespace")
+	assert.ErrorContains(t, config.validate(), "destination namespace")
 }
 
 func TestCompressionPolicy_Validate(t *testing.T) {
 	var policy CompressionPolicy
 	policy.Mode = "NA"
-	assert.ErrorContains(t, policy.Validate(), "invalid compression mode")
+	assert.ErrorContains(t, policy.validate(), "invalid compression mode")
 	policy.Mode = CompressNone
 	policy.Level = -2
-	assert.ErrorContains(t, policy.Validate(), "invalid compression level")
+	assert.ErrorContains(t, policy.validate(), "invalid compression level")
 }
 
 func TestEncryptionPolicy_Validate(t *testing.T) {
 	var policy EncryptionPolicy
 	policy.Mode = "NA"
-	assert.ErrorContains(t, policy.Validate(), "invalid encryption mode")
+	assert.ErrorContains(t, policy.validate(), "invalid encryption mode")
 	policy.Mode = CompressNone
-	assert.ErrorContains(t, policy.Validate(), "encryption key location not specified")
+	assert.ErrorContains(t, policy.validate(), "encryption key location not specified")
 	keyFile := "keyFile"
 	policy.KeyFile = &keyFile
 	keyEnv := "keyEnv"
 	policy.KeyEnv = &keyEnv
-	assert.ErrorContains(t, policy.Validate(), "only one encryption key source may be specified")
+	assert.ErrorContains(t, policy.validate(), "only one encryption key source may be specified")
 }

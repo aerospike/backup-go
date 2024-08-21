@@ -71,7 +71,7 @@ func getResourceKey(key string) (resource, secretKey string, err error) {
 
 	keyArr := strings.Split(key, ":")
 	if len(keyArr) != 3 {
-		return "", "", fmt.Errorf("invalid secret format")
+		return "", "", fmt.Errorf("invalid secret key format")
 	}
 	// We believe that keyArr[0] == secretPrefix
 	return keyArr[1], keyArr[2], nil
@@ -89,7 +89,11 @@ func getTlSConfig(caFile *string) (*tls.Config, error) {
 	}
 
 	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+
+	ok := caCertPool.AppendCertsFromPEM(caCert)
+	if !ok {
+		return nil, fmt.Errorf("nothing to append to ca cert pool")
+	}
 
 	//nolint:gosec // we must support any tls configuration for legacy.
 	tlsConfig := &tls.Config{

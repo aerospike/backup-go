@@ -53,7 +53,7 @@ function writeUnique(r,name,value)
     end
 end
 
--- Validate value before writing.
+-- validate value before writing.
 function writeWithValidation(r,name,value)
     if (value >= 1 and value <= 10) then
         putBin(r,name,value)

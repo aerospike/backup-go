@@ -41,8 +41,8 @@ type EncryptionPolicy struct {
 	Mode string `yaml:"mode,omitempty" json:"mode,omitempty" default:"NONE" enums:"NONE,AES128,AES256"`
 }
 
-// Validate validates the encryption policy.
-func (p *EncryptionPolicy) Validate() error {
+// validate validates the encryption policy.
+func (p *EncryptionPolicy) validate() error {
 	if p == nil {
 		return nil
 	}

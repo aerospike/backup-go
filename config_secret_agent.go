@@ -38,10 +38,14 @@ type SecretAgentConfig struct {
 	IsBase64 *bool `yaml:"sa-is-base64,omitempty" json:"sa-is-base64,omitempty"`
 }
 
-// Validate validates the SecretAgentConfig.
-func (s *SecretAgentConfig) Validate() error {
+// validate validates the SecretAgentConfig.
+func (s *SecretAgentConfig) validate() error {
 	if s == nil {
 		return nil
+	}
+
+	if s.Address == nil || (s.Address != nil && *s.Address == "") {
+		return fmt.Errorf("address is required")
 	}
 
 	if s.TimeoutMillisecond != nil && *s.TimeoutMillisecond <= 0 {
@@ -55,10 +59,6 @@ func (s *SecretAgentConfig) Validate() error {
 	cType := *s.ConnectionType
 	if cType != saClient.ConnectionTypeTCP && cType != saClient.ConnectionTypeUDS {
 		return fmt.Errorf("unsupported connection type: %s", cType)
-	}
-
-	if s.Address == nil {
-		return fmt.Errorf("secret agent address is required")
 	}
 
 	return nil

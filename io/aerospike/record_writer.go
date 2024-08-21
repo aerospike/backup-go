@@ -26,6 +26,7 @@ type singleRecordWriter struct {
 	asc         dbWriter
 	writePolicy *a.WritePolicy
 	stats       *models.RestoreStats
+	retryPolicy *models.RetryPolicy
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
@@ -36,24 +37,51 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 		writePolicy = &setGenerationPolicy
 	}
 
-	aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
-	if aerr != nil {
-		if aerr.Matches(atypes.GENERATION_ERROR) {
-			rw.stats.IncrRecordsFresher()
-			return nil
-		}
-
-		if aerr.Matches(atypes.KEY_EXISTS_ERROR) {
-			rw.stats.IncrRecordsExisted()
-			return nil
-		}
-
-		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), aerr)
+	err := rw.executeWrite(writePolicy, record)
+	if err != nil {
+		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), err)
 	}
 
-	rw.stats.IncrRecordsInserted()
-
 	return nil
+}
+
+func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
+	var (
+		aerr    a.Error
+		attempt uint
+	)
+
+	for attemptsLeft(rw.retryPolicy, attempt) {
+		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
+		if aerr == nil {
+			rw.stats.IncrRecordsInserted()
+
+			return nil
+		}
+
+		if isNilOrAcceptableError(aerr) {
+			switch {
+			case aerr.Matches(atypes.GENERATION_ERROR):
+				rw.stats.IncrRecordsFresher()
+			case aerr.Matches(atypes.KEY_EXISTS_ERROR):
+				rw.stats.IncrRecordsExisted()
+			}
+
+			return nil
+		}
+
+		if shouldRetry(aerr) {
+			sleep(rw.retryPolicy, attempt)
+
+			attempt++
+
+			continue
+		}
+
+		return aerr
+	}
+
+	return aerr
 }
 
 func (rw *singleRecordWriter) close() error {

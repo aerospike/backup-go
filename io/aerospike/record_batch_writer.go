@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -27,6 +28,7 @@ type batchRecordWriter struct {
 	writePolicy     *a.WritePolicy
 	stats           *models.RestoreStats
 	logger          *slog.Logger
+	retryPolicy     *models.RetryPolicy
 	operationBuffer []a.BatchRecordIfc
 	batchSize       int
 }
@@ -35,7 +37,7 @@ func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
 	writeOp := rw.batchWrite(record)
 	rw.operationBuffer = append(rw.operationBuffer, writeOp)
 
-	if len(rw.operationBuffer) > rw.batchSize {
+	if len(rw.operationBuffer) >= rw.batchSize {
 		return rw.flushBuffer()
 	}
 
@@ -76,28 +78,87 @@ func (rw *batchRecordWriter) close() error {
 
 func (rw *batchRecordWriter) flushBuffer() error {
 	if len(rw.operationBuffer) == 0 {
+		rw.logger.Debug("Flush empty buffer")
 		return nil
 	}
 
-	err := rw.asc.BatchOperate(nil, rw.operationBuffer)
-	if err != nil {
-		if !err.Matches(atypes.GENERATION_ERROR, atypes.KEY_EXISTS_ERROR) {
-			return err
+	var (
+		attempt uint
+		err     a.Error
+	)
+
+	rw.logger.Debug("Starting batch operation",
+		slog.Int("bufferSize", len(rw.operationBuffer)),
+		slog.Any("retryPolicy", rw.retryPolicy),
+	)
+
+	for {
+		rw.logger.Debug("Attempting batch operation",
+			slog.Any("attempt", attempt),
+			slog.Int("bufferSize", len(rw.operationBuffer)),
+		)
+
+		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
+
+		if isNilOrAcceptableError(err) {
+			rw.operationBuffer = rw.processAndFilterOperations()
+			if len(rw.operationBuffer) == 0 {
+				rw.logger.Debug("All operations succeeded")
+				return nil
+			}
+		} else if !shouldRetry(err) {
+			return fmt.Errorf("non-retryable error on restore: %w", err)
+		}
+
+		attempt++
+
+		if !attemptsLeft(rw.retryPolicy, attempt) {
+			break
+		}
+
+		rw.logger.Debug("Retryable error occurred",
+			slog.Any("error", err),
+			slog.Int("remainingOperations", len(rw.operationBuffer)),
+		)
+
+		sleep(rw.retryPolicy, attempt)
+	}
+
+	rw.logger.Error("Max retries reached",
+		slog.Any("attempts", attempt),
+		slog.Int("failedOperations", len(rw.operationBuffer)),
+		slog.Any("lastError", err),
+	)
+
+	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), err)
+}
+func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {
+	failedOps := make([]a.BatchRecordIfc, 0)
+
+	for _, op := range rw.operationBuffer {
+		if rw.processOperationResult(op) {
+			failedOps = append(failedOps, op)
 		}
 	}
 
-	for i := 0; i < len(rw.operationBuffer); i++ {
-		switch rw.operationBuffer[i].BatchRec().ResultCode {
-		case atypes.OK:
-			rw.stats.IncrRecordsInserted()
-		case atypes.GENERATION_ERROR:
-			rw.stats.IncrRecordsFresher()
-		case atypes.KEY_EXISTS_ERROR:
-			rw.stats.IncrRecordsExisted()
-		}
+	return failedOps
+}
+
+// processOperationResult increases statistics counters.
+// it returns true if operation should be retried.
+func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
+	code := op.BatchRec().ResultCode
+	switch code {
+	case atypes.OK:
+		rw.stats.IncrRecordsInserted()
+		return false
+	case atypes.GENERATION_ERROR:
+		rw.stats.IncrRecordsFresher()
+		return false
+	case atypes.KEY_EXISTS_ERROR:
+		rw.stats.IncrRecordsExisted()
+		return false
+	default:
+		return true
 	}
-
-	rw.operationBuffer = nil
-
-	return nil
 }

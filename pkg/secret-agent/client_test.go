@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	testAddress   = ":1234"
+	testAddress   = ":1111"
 	testTimeout   = 10 * time.Second
 	testSecretKey = "testSecretKey"
 	magic         = 0x51dec1cc

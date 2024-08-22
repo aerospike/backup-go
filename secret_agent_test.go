@@ -29,8 +29,7 @@ import (
 )
 
 const (
-	testSAAddress          = ":7890"
-	testSATimeout          = 10 * time.Second
+	testSAAddress          = ":3333"
 	testSASecretKey        = "secrets:resource:key"
 	testSASecretErrPrefix  = "sacred:resource:key"
 	testSASecretKeyErr     = "resource:key"

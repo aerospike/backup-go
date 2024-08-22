@@ -156,28 +156,37 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	return client, nil
 }
 
-func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
+func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 	if p == nil {
-		p = c.aerospikeClient.GetDefaultInfoPolicy()
+		dp := c.aerospikeClient.GetDefaultInfoPolicy()
+		cp := *dp
+
+		return &cp
 	}
 
-	return *p
+	return p
 }
 
-func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
+func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
 	if p == nil {
-		p = c.aerospikeClient.GetDefaultWritePolicy()
+		dp := c.aerospikeClient.GetDefaultWritePolicy()
+		cp := *dp
+
+		return &cp
 	}
 
-	return *p
+	return p
 }
 
-func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	if p == nil {
-		p = c.aerospikeClient.GetDefaultScanPolicy()
+		dp := c.aerospikeClient.GetDefaultScanPolicy()
+		cp := *dp
+
+		return &cp
 	}
 
-	return *p
+	return p
 }
 
 // Backup starts a backup operation that writes data to a provided writer.
@@ -194,18 +203,15 @@ func (c *Client) Backup(
 	}
 
 	// copy the policies so we don't modify the original
-	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
-	config.InfoPolicy = &infoPolicy
-
-	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
-	config.ScanPolicy = &scanPolicy
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
 	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
-	handler.run(ctx)
+	handler.run()
 
 	return handler, nil
 }
@@ -225,18 +231,15 @@ func (c *Client) Restore(
 	}
 
 	// copy the policies so we don't modify the original
-	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
-	config.InfoPolicy = &infoPolicy
-
-	writePolicy := c.getUsableWritePolicy(config.WritePolicy)
-	config.WritePolicy = &writePolicy
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
 
 	if err := config.validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate restore config: %w", err)
 	}
 
 	handler := newRestoreHandler(ctx, config, c.aerospikeClient, c.logger, streamingReader)
-	handler.startAsync(ctx)
+	handler.startAsync()
 
 	return handler, nil
 }

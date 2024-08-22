@@ -46,15 +46,19 @@ type StreamingReader interface {
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
 	// Global backup context for a whole restore process.
-	ctx             context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	reader          StreamingReader
 	config          *RestoreConfig
 	aerospikeClient AerospikeClient
-	logger          *slog.Logger
-	limiter         *rate.Limiter
-	errors          chan error
-	id              string
-	stats           models.RestoreStats
+
+	logger  *slog.Logger
+	limiter *rate.Limiter
+	errors  chan error
+	id      string
+
+	stats models.RestoreStats
 }
 
 // newRestoreHandler creates a new RestoreHandler.
@@ -67,9 +71,12 @@ func newRestoreHandler(
 ) *RestoreHandler {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
+	// redefine context cancel.
+	ctx, cancel := context.WithCancel(ctx)
 
 	return &RestoreHandler{
 		ctx:             ctx,
+		cancel:          cancel,
 		config:          config,
 		aerospikeClient: ac,
 		id:              id,
@@ -79,12 +86,12 @@ func newRestoreHandler(
 	}
 }
 
-func (rh *RestoreHandler) startAsync(ctx context.Context) {
+func (rh *RestoreHandler) startAsync() {
 	rh.errors = make(chan error, 1)
 	rh.stats.Start()
 
 	go doWork(rh.errors, rh.logger, func() error {
-		return rh.restore(ctx)
+		return rh.restore(rh.ctx)
 	})
 }
 
@@ -256,14 +263,19 @@ func (rh *RestoreHandler) GetStats() *models.RestoreStats {
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
-func (rh *RestoreHandler) Wait() error {
+func (rh *RestoreHandler) Wait(ctx context.Context) error {
 	defer func() {
 		rh.stats.Stop()
 	}()
 
 	select {
 	case <-rh.ctx.Done():
+		// Wait for global context.
 		return rh.ctx.Err()
+	case <-ctx.Done():
+		// Process local context.
+		rh.cancel()
+		return ctx.Err()
 	case err := <-rh.errors:
 		return err
 	}

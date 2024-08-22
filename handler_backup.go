@@ -50,19 +50,23 @@ type Writer interface {
 // BackupHandler handles a backup job.
 type BackupHandler struct {
 	// Global backup context for a whole backup process.
-	ctx                    context.Context
-	writer                 Writer
-	encoder                Encoder
-	config                 *BackupConfig
-	aerospikeClient        AerospikeClient
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	writer          Writer
+	encoder         Encoder
+	config          *BackupConfig
+	aerospikeClient AerospikeClient
+
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *rate.Limiter
-	errors                 chan error
 	infoClient             *asinfo.InfoClient
 	scanLimiter            *semaphore.Weighted
+	errors                 chan error
 	id                     string
-	stats                  models.BackupStats
+
+	stats models.BackupStats
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -78,8 +82,12 @@ func newBackupHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
+	// redefine context cancel.
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &BackupHandler{
 		ctx:                    ctx,
+		cancel:                 cancel,
 		config:                 config,
 		aerospikeClient:        ac,
 		id:                     id,
@@ -95,12 +103,12 @@ func newBackupHandler(
 
 // run runs the backup job.
 // currently this should only be run once.
-func (bh *BackupHandler) run(ctx context.Context) {
+func (bh *BackupHandler) run() {
 	bh.errors = make(chan error, 1)
 	bh.stats.Start()
 
 	go doWork(bh.errors, bh.logger, func() error {
-		return bh.backupSync(ctx)
+		return bh.backupSync(bh.ctx)
 	})
 }
 
@@ -288,14 +296,19 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
-func (bh *BackupHandler) Wait() error {
+func (bh *BackupHandler) Wait(ctx context.Context) error {
 	defer func() {
 		bh.stats.Stop()
 	}()
 
 	select {
 	case <-bh.ctx.Done():
+		// Wait for global context.
 		return bh.ctx.Err()
+	case <-ctx.Done():
+		// Process local context.
+		bh.cancel()
+		return ctx.Err()
 	case err := <-bh.errors:
 		return err
 	}

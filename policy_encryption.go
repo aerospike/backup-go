@@ -15,13 +15,8 @@
 package backup
 
 import (
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
 )
 
 // Encryption modes
@@ -32,8 +27,6 @@ const (
 	EncryptAES128 = "AES128"
 	// EncryptAES256 encryption using AES256 algorithm.
 	EncryptAES256 = "AES256"
-
-	pemTemplate = "-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----"
 )
 
 // EncryptionPolicy contains backup encryption information.
@@ -48,8 +41,8 @@ type EncryptionPolicy struct {
 	Mode string `yaml:"mode,omitempty" json:"mode,omitempty" default:"NONE" enums:"NONE,AES128,AES256"`
 }
 
-// Validate validates the encryption policy.
-func (p *EncryptionPolicy) Validate() error {
+// validate validates the encryption policy.
+func (p *EncryptionPolicy) validate() error {
 	if p == nil {
 		return nil
 	}
@@ -70,95 +63,4 @@ func (p *EncryptionPolicy) Validate() error {
 	}
 
 	return nil
-}
-
-// ReadPrivateKey parses and loads a private key according to the EncryptionPolicy
-// configuration. It can load the private key from a file, env variable or Secret Agent.
-// A valid agent parameter is required to load the key from Aerospike Secret Agent.
-// Pass in nil for any other option.
-func (p *EncryptionPolicy) ReadPrivateKey(agent *SecretAgentConfig) ([]byte, error) {
-	var (
-		pemData []byte
-		err     error
-	)
-
-	switch {
-	case p.KeyFile != nil:
-		pemData, err = p.readPemFromFile()
-		if err != nil {
-			return nil, fmt.Errorf("unable to read PEM from file: %w", err)
-		}
-	case p.KeyEnv != nil:
-		pemData, err = p.readPemFromEnv()
-		if err != nil {
-			return nil, fmt.Errorf("unable to read PEM from ENV: %w", err)
-		}
-	case p.KeySecret != nil:
-		pemData, err = p.readPemFromSecret(agent)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read PEM from secret agent: %w", err)
-		}
-	}
-
-	// Decode the PEM file
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block containing private key")
-	}
-
-	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
-	}
-
-	key := privateKey.(*rsa.PrivateKey)
-	// Originally asbackup converts the key to the PKCS1 format
-	decodedKey := x509.MarshalPKCS1PrivateKey(key)
-
-	// AES requires 128 or 256 bits for the key
-	sum256 := sha256.Sum256(decodedKey)
-
-	if p.Mode == EncryptAES128 {
-		return sum256[:16], nil
-	}
-
-	return sum256[:], nil
-}
-
-func (p *EncryptionPolicy) readPemFromFile() ([]byte, error) {
-	pemData, err := os.ReadFile(*p.KeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read PEM file: %w", err)
-	}
-
-	return pemData, nil
-}
-
-// readPemFromEnv reads the key from an env variable encrypted in base64 without header
-// and footer, decrypts it adding the header and footer.
-func (p *EncryptionPolicy) readPemFromEnv() ([]byte, error) {
-	key := os.Getenv(*p.KeyEnv)
-	if key == "" {
-		return nil, fmt.Errorf("environment variable %s not set", *p.KeyEnv)
-	}
-
-	// add header and footer to make it parsable
-	pemKey := fmt.Sprintf(pemTemplate, key)
-
-	return []byte(pemKey), nil
-}
-
-func (p *EncryptionPolicy) readPemFromSecret(agent *SecretAgentConfig) ([]byte, error) {
-	if agent == nil {
-		return nil, fmt.Errorf("secret agent not initialized")
-	}
-
-	key, err := agent.GetSecret(*p.KeySecret)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read secret agent key: %w", err)
-	}
-
-	pemKey := fmt.Sprintf(pemTemplate, key)
-
-	return []byte(pemKey), nil
 }

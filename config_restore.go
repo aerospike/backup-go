@@ -86,7 +86,7 @@ func (c *RestoreConfig) validate() error {
 	}
 
 	if c.Namespace != nil {
-		if err := c.Namespace.Validate(); err != nil {
+		if err := c.Namespace.validate(); err != nil {
 			return fmt.Errorf("invalid restore namespace: %w", err)
 		}
 	}
@@ -107,15 +107,15 @@ func (c *RestoreConfig) validate() error {
 		return fmt.Errorf("max async batches must be positive, got %d", c.MaxAsyncBatches)
 	}
 
-	if err := c.CompressionPolicy.Validate(); err != nil {
+	if err := c.CompressionPolicy.validate(); err != nil {
 		return fmt.Errorf("compression policy invalid: %w", err)
 	}
 
-	if err := c.EncryptionPolicy.Validate(); err != nil {
+	if err := c.EncryptionPolicy.validate(); err != nil {
 		return fmt.Errorf("encryption policy invalid: %w", err)
 	}
 
-	if err := c.SecretAgentConfig.Validate(); err != nil {
+	if err := c.SecretAgentConfig.validate(); err != nil {
 		return fmt.Errorf("secret agent invalid: %w", err)
 	}
 

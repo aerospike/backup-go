@@ -92,8 +92,10 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		panic(err)
 	}
 
-	// use backupHandler.Wait() to wait for the job to finish or fail
-	err = backupHandler.Wait()
+	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
+	// You can use different context here, and if it is canceled
+	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
+	err = backupHandler.Wait(ctx)
 	if err != nil {
 		log.Printf("Backup failed: %v", err)
 	}
@@ -134,8 +136,10 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		panic(err)
 	}
 
-	// use restoreHandler.Wait() to wait for the job to finish or fail
-	err = restoreHandler.Wait()
+	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.
+	// You can use different context here, and if it is canceled
+	// backupClient.Restore(ctx, restoreCfg, streamingReader) context will be cancelled too.
+	err = restoreHandler.Wait(ctx)
 	if err != nil {
 		log.Printf("Restore failed: %v", err)
 	}

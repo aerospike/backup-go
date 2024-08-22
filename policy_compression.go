@@ -34,8 +34,8 @@ type CompressionPolicy struct {
 	Level int `yaml:"level,omitempty" json:"level,omitempty"`
 }
 
-// Validate validates the compression policy parameters.
-func (p *CompressionPolicy) Validate() error {
+// validate validates the compression policy parameters.
+func (p *CompressionPolicy) validate() error {
 	if p == nil {
 		return nil
 	}

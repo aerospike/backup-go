@@ -87,7 +87,7 @@ func TestConnection_ReadOK(t *testing.T) {
 	mockConn.On("SetReadDeadline", mock.Anything).Return(nil)
 	mockConn.On("Read", mock.Anything).Return(func(b []byte) (int, error) {
 		if readIndex+len(b) > len(response) {
-			b = b[:len(response)-readIndex] // Адаптируем размер, если выходим за пределы
+			b = b[:len(response)-readIndex]
 		}
 		copy(b, response[readIndex:readIndex+len(b)])
 		readIndex += len(b)

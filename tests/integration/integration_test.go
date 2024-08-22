@@ -239,7 +239,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	suite.Nil(err)
 	suite.NotNil(bh)
 
-	err = bh.Wait()
+	err = bh.Wait(ctx)
 	suite.Nil(err)
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
@@ -255,7 +255,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	suite.Nil(err)
 	suite.NotNil(rh)
 
-	err = rh.Wait()
+	err = rh.Wait(ctx)
 	suite.Nil(err)
 
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
@@ -382,7 +382,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	statsBackup := bh.GetStats()
 	suite.NotNil(statsBackup)
 
-	err = bh.Wait()
+	err = bh.Wait(ctx)
 	suite.Nil(err)
 
 	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetReadRecords())
@@ -411,7 +411,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	statsRestore := rh.GetStats()
 	suite.NotNil(statsRestore)
 
-	err = rh.Wait()
+	err = rh.Wait(ctx)
 	suite.Nil(err)
 
 	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetReadRecords())
@@ -476,7 +476,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	restoreStats := rh.GetStats()
 	suite.NotNil(restoreStats)
 
-	err = rh.Wait()
+	err = rh.Wait(ctx)
 	suite.Nil(err)
 
 	statsRestore := rh.GetStats()
@@ -540,7 +540,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	suite.Nil(err)
 	suite.NotNil(bh)
 
-	err = bh.Wait()
+	err = bh.Wait(ctx)
 	suite.Nil(err)
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
@@ -559,7 +559,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	suite.Nil(err)
 	suite.NotNil(rh)
 
-	err = rh.Wait()
+	err = rh.Wait(ctx)
 	suite.Nil(err)
 
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
@@ -578,7 +578,7 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 	suite.NotNil(bh)
 	suite.Nil(err)
 
-	err = bh.Wait()
+	err = bh.Wait(ctx)
 	suite.NotNil(err)
 }
 
@@ -596,7 +596,7 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 	suite.NotNil(rh)
 	suite.Nil(err)
 
-	err = rh.Wait()
+	err = rh.Wait(ctx)
 	suite.NotNil(err)
 }
 

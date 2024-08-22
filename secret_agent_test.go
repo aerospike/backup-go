@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//nolint:stylecheck,revive // We want to use package name with underscore.
-package secret_agent
+package backup
 
 import (
 	"encoding/binary"
@@ -23,17 +22,21 @@ import (
 	"testing"
 	"time"
 
+	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
 	"github.com/aerospike/backup-go/pkg/secret-agent/models"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	testAddress   = ":1111"
-	testTimeout   = 10 * time.Second
-	testSecretKey = "testSecretKey"
-	magic         = 0x51dec1cc
-	testPKey      = `MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDq+ku8oxfSQnUF
+	testSAPort             = 2222
+	testSASecretKey        = "secrets:resource:key"
+	testSASecretErrPrefix  = "sacred:resource:key"
+	testSASecretKeyErr     = "resource:key"
+	testSASecretKeyErrLong = "secrets:resource:key:val"
+	testCaFile             = "tests/integration/cert_test.pem"
+	magic                  = 0x51dec1cc
+	testPKey               = `MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDq+ku8oxfSQnUF
 4qs8ctSYwtQwgyGViCfO7fnVf+cyIcKhZSCUlqIQPN17pBzUaWLKaLCSvIhehE1N
 ETAtbUEgMUbn7R4WGV7N5ACl2mgLh6Rczz5FSSSwrZ/YRSHTsp7oaaKE5bA9S2jY
 IKkGMZSGAsh90xVeggDypciI0Pw2aJwed/EXI0PWND2LKut5POJYyHgbxgygp1AC
@@ -62,7 +65,7 @@ ah87+EsQLgoao6VWDlepN54P`
 )
 
 func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error) {
-	listener, err := net.Listen(ConnectionTypeTCP, address)
+	listener, err := net.Listen(saClient.ConnectionTypeTCP, address)
 	if err != nil {
 		return nil, err
 	}
@@ -100,17 +103,107 @@ func mockHandler(conn net.Conn) {
 	}
 }
 
-func TestClient_GetSecret(t *testing.T) {
-	listener, err := mockTCPServer(testAddress, mockHandler)
+func TestSecretAgent_isSecret(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		secret string
+		result bool
+	}{
+		{testSASecretKey, true},
+		{testSASecretKeyErr, false},
+		{"", false},
+	}
+
+	for _, tt := range testCases {
+		result := isSecret(tt.secret)
+		require.Equal(t, tt.result, result)
+	}
+}
+
+func TestSecretAgent_getResourceKey(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		key        string
+		resource   string
+		secretKey  string
+		errContent string
+	}{
+		{testSASecretKey, "resource", "key", ""},
+		{testSASecretErrPrefix, "", "", "invalid secret key format"},
+		{testSASecretKeyErrLong, "", "", "invalid secret key format"},
+	}
+
+	for i, tt := range testCases {
+		res, sk, err := getResourceKey(tt.key)
+		require.Equal(t, tt.resource, res)
+		require.Equal(t, tt.secretKey, sk)
+		if tt.errContent != "" {
+			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+		} else {
+			require.NoError(t, err, fmt.Sprintf("case %d", i))
+		}
+	}
+}
+
+func TestSecretAgent_getTlSConfig(t *testing.T) {
+	t.Parallel()
+
+	filePem := testCaFile
+	filePemNotExist := "tests/integration/smth.pem"
+	filePemWrong := "tests/integration/pkey_test"
+
+	testCases := []struct {
+		file       *string
+		errContent string
+	}{
+		{nil, ""},
+		{&filePem, ""},
+		{&filePemNotExist, "unable to read ca file"},
+		{&filePemWrong, "nothing to append to ca cert pool"},
+	}
+
+	for i, tt := range testCases {
+		_, err := getTlSConfig(tt.file)
+		if tt.errContent != "" {
+			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+		} else {
+			require.NoError(t, err, fmt.Sprintf("case %d", i))
+		}
+	}
+}
+
+func TestSecretAgent_getSecret(t *testing.T) {
+	t.Parallel()
+
+	listener, err := mockTCPServer(fmt.Sprintf(":%d", testSAPort), mockHandler)
 	require.NoError(t, err)
 	defer listener.Close()
 
 	// Wait for server start.
 	time.Sleep(1 * time.Second)
 
-	client, err := NewClient(ConnectionTypeTCP, testAddress, testTimeout, true, nil)
-	require.NoError(t, err)
+	cfg := testSecretAgentConfig()
 
-	_, err = client.GetSecret("", testSecretKey)
-	require.NoError(t, err)
+	testCases := []struct {
+		config     *SecretAgentConfig
+		key        string
+		errContent string
+	}{
+		{cfg, testSASecretKey, ""},
+		{nil, testSASecretKey, "secret config not initialized"},
+		{cfg, testSASecretKeyErr, "invalid secret key format"},
+		{cfg, testSASecretErrPrefix, "invalid secret key format"},
+		{cfg, testSASecretKeyErrLong, "invalid secret key format"},
+	}
+
+	for i, tt := range testCases {
+		_, err = getSecret(tt.config, tt.key)
+		if tt.errContent != "" {
+			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+		} else {
+			require.NoError(t, err, fmt.Sprintf("case %d", i))
+		}
+	}
 }

@@ -158,7 +158,10 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 
 func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 	if p == nil {
-		p = c.aerospikeClient.GetDefaultInfoPolicy()
+		dp := c.aerospikeClient.GetDefaultInfoPolicy()
+		cp := *dp
+
+		return &cp
 	}
 
 	return p
@@ -166,7 +169,10 @@ func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 
 func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
 	if p == nil {
-		p = c.aerospikeClient.GetDefaultWritePolicy()
+		dp := c.aerospikeClient.GetDefaultWritePolicy()
+		cp := *dp
+
+		return &cp
 	}
 
 	return p
@@ -174,7 +180,10 @@ func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
 
 func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	if p == nil {
-		p = c.aerospikeClient.GetDefaultScanPolicy()
+		dp := c.aerospikeClient.GetDefaultScanPolicy()
+		cp := *dp
+
+		return &cp
 	}
 
 	return p

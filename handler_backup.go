@@ -50,8 +50,8 @@ type Writer interface {
 // BackupHandler handles a backup job.
 type BackupHandler struct {
 	// Global backup context for a whole backup process.
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	writer          Writer
 	encoder         Encoder
@@ -83,11 +83,11 @@ func newBackupHandler(
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
 	// redefine context cancel.
-	ctx, ctxCancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
 	return &BackupHandler{
 		ctx:                    ctx,
-		ctxCancel:              ctxCancel,
+		cancel:                 cancel,
 		config:                 config,
 		aerospikeClient:        ac,
 		id:                     id,
@@ -307,7 +307,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 		return bh.ctx.Err()
 	case <-ctx.Done():
 		// Process local context.
-		bh.ctxCancel()
+		bh.cancel()
 		return ctx.Err()
 	case err := <-bh.errors:
 		return err

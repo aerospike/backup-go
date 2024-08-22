@@ -46,8 +46,8 @@ type StreamingReader interface {
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler struct {
 	// Global backup context for a whole restore process.
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	reader          StreamingReader
 	config          *RestoreConfig
@@ -72,11 +72,11 @@ func newRestoreHandler(
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 	// redefine context cancel.
-	ctx, ctxCancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
 	return &RestoreHandler{
 		ctx:             ctx,
-		ctxCancel:       ctxCancel,
+		cancel:          cancel,
 		config:          config,
 		aerospikeClient: ac,
 		id:              id,
@@ -274,7 +274,7 @@ func (rh *RestoreHandler) Wait(ctx context.Context) error {
 		return rh.ctx.Err()
 	case <-ctx.Done():
 		// Process local context.
-		rh.ctxCancel()
+		rh.cancel()
 		return ctx.Err()
 	case err := <-rh.errors:
 		return err

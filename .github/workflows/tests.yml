@@ -19,6 +19,10 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+    - name: Set up Google Cloud Storage API emulator
+      run: |
+        docker run -d --name fake-gcs-server -p 4443:4443 fsouza/fake-gcs-server \
+        -scheme http -public-host 127.0.0.1:4443
     - name: Test with coverage 
       run: |
         make coverage

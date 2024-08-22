@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"log"
 
+	"cloud.google.com/go/storage"
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/aws/s3"
 )
 
 const (
@@ -31,6 +31,8 @@ const (
 	dbPass       = "psw"
 	dbNameSource = "source-ns1"
 	dbNameTarget = "source-ns2"
+	bucketName   = "test-bucket"
+	folderName   = "backups_folder"
 )
 
 func main() {
@@ -65,15 +67,12 @@ func initBackupClient() *backup.Client {
 }
 
 func runBackup(ctx context.Context, c *backup.Client) {
-	s3cfg := &s3.Config{
-		Bucket:   "backup",
-		Region:   "eu-central-1",
-		Endpoint: "http://localhost:9000",
-		Profile:  "minio",
-		Prefix:   "test",
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		panic(err)
 	}
 
-	writers, err := backup.NewWriterS3(ctx, s3cfg, true)
+	writers, err := backup.NewWriterGCP(ctx, client, bucketName, folderName, true)
 	if err != nil {
 		panic(err)
 	}
@@ -92,7 +91,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		panic(err)
 	}
 
-	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
+	// use backupHandler.Wait() to wait for the job to finish or fail.
 	// You can use different context here, and if it is canceled
 	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
 	err = backupHandler.Wait(ctx)
@@ -104,15 +103,12 @@ func runBackup(ctx context.Context, c *backup.Client) {
 }
 
 func runRestore(ctx context.Context, c *backup.Client) {
-	s3cfg := &s3.Config{
-		Bucket:   "backup",
-		Region:   "eu-central-1",
-		Endpoint: "http://localhost:9000",
-		Profile:  "minio",
-		Prefix:   "test",
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		panic(err)
 	}
 
-	readers, err := backup.NewStreamingReaderS3(ctx, s3cfg, backup.EncoderTypeASB)
+	readers, err := backup.NewStreamingReaderGCP(ctx, client, bucketName, folderName, backup.EncoderTypeASB)
 	if err != nil {
 		panic(err)
 	}
@@ -136,7 +132,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		panic(err)
 	}
 
-	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.
+	// use restoreHandler.Wait() to wait for the job to finish or fail.
 	// You can use different context here, and if it is canceled
 	// backupClient.Restore(ctx, restoreCfg, streamingReader) context will be cancelled too.
 	err = restoreHandler.Wait(ctx)

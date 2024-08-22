@@ -26,8 +26,8 @@ type RestoreNamespaceConfig struct {
 	Destination *string `json:"destination,omitempty" example:"destination-ns" validate:"required"`
 }
 
-// Validate validates the restore namespace configuration.
-func (n *RestoreNamespaceConfig) Validate() error {
+// validate validates the restore namespace configuration.
+func (n *RestoreNamespaceConfig) validate() error {
 	if n.Source == nil {
 		return fmt.Errorf("source namespace is not specified")
 	}

@@ -156,32 +156,32 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	return client, nil
 }
 
-func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) a.InfoPolicy {
+func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 	if p == nil {
 		p = c.aerospikeClient.GetDefaultInfoPolicy()
 	}
 
-	return *p
+	return p
 }
 
-func (c *Client) getUsableWritePolicy(p *a.WritePolicy) a.WritePolicy {
+func (c *Client) getUsableWritePolicy(p *a.WritePolicy) *a.WritePolicy {
 	if p == nil {
 		p = c.aerospikeClient.GetDefaultWritePolicy()
 	}
 
-	return *p
+	return p
 }
 
-func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) a.ScanPolicy {
+func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	if p == nil {
 		p = c.aerospikeClient.GetDefaultScanPolicy()
 	}
 
-	return *p
+	return p
 }
 
 // Backup starts a backup operation that writes data to a provided writer.
-//   - ctx can be used to cancel the backup operation.
+//   - ctx can be used to ctxCancel the backup operation.
 //   - config is the configuration for the backup operation.
 //   - writer creates new writers for the backup operation.
 func (c *Client) Backup(
@@ -194,25 +194,22 @@ func (c *Client) Backup(
 	}
 
 	// copy the policies so we don't modify the original
-	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
-	config.InfoPolicy = &infoPolicy
-
-	scanPolicy := c.getUsableScanPolicy(config.ScanPolicy)
-	config.ScanPolicy = &scanPolicy
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
 	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
-	handler.run(ctx)
+	handler.run()
 
 	return handler, nil
 }
 
 // Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
-//   - ctx can be used to cancel the restore operation.
+//   - ctx can be used to ctxCancel the restore operation.
 //   - config is the configuration for the restore operation.
 //   - streamingReader provides readers with access to backup data.
 func (c *Client) Restore(
@@ -225,18 +222,15 @@ func (c *Client) Restore(
 	}
 
 	// copy the policies so we don't modify the original
-	infoPolicy := c.getUsableInfoPolicy(config.InfoPolicy)
-	config.InfoPolicy = &infoPolicy
-
-	writePolicy := c.getUsableWritePolicy(config.WritePolicy)
-	config.WritePolicy = &writePolicy
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
 
 	if err := config.validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate restore config: %w", err)
 	}
 
 	handler := newRestoreHandler(ctx, config, c.aerospikeClient, c.logger, streamingReader)
-	handler.startAsync(ctx)
+	handler.startAsync()
 
 	return handler, nil
 }

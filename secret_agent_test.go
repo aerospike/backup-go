@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	testSAAddress          = ":3333"
+	testSAPort             = 2222
 	testSASecretKey        = "secrets:resource:key"
 	testSASecretErrPrefix  = "sacred:resource:key"
 	testSASecretKeyErr     = "resource:key"
@@ -177,7 +177,7 @@ func TestSecretAgent_getTlSConfig(t *testing.T) {
 func TestSecretAgent_getSecret(t *testing.T) {
 	t.Parallel()
 
-	listener, err := mockTCPServer(testSAAddress, mockHandler)
+	listener, err := mockTCPServer(fmt.Sprintf(":%d", testSAPort), mockHandler)
 	require.NoError(t, err)
 	defer listener.Close()
 

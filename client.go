@@ -181,7 +181,7 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 }
 
 // Backup starts a backup operation that writes data to a provided writer.
-//   - ctx can be used to ctxCancel the backup operation.
+//   - ctx can be used to cancel the backup operation.
 //   - config is the configuration for the backup operation.
 //   - writer creates new writers for the backup operation.
 func (c *Client) Backup(
@@ -209,7 +209,7 @@ func (c *Client) Backup(
 
 // Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
-//   - ctx can be used to ctxCancel the restore operation.
+//   - ctx can be used to cancel the restore operation.
 //   - config is the configuration for the restore operation.
 //   - streamingReader provides readers with access to backup data.
 func (c *Client) Restore(

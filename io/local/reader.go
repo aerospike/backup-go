@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const localType = "directory"
@@ -100,6 +101,30 @@ func (f *StreamingReader) StreamFiles(
 	}
 
 	close(readersCh)
+}
+
+// OpenFile opens single file and sends io.Readers to the `readersCh`
+// In case of an error, it is sent to the `errorsCh` channel.
+func (f *StreamingReader) OpenFile(
+	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	defer close(readersCh)
+
+	if ctx.Err() != nil {
+		errorsCh <- ctx.Err()
+		return
+	}
+
+	if !strings.Contains(filename, "/") {
+		filename = fmt.Sprintf("%s/%s", f.dir, filename)
+	}
+
+	reader, err := os.Open(filename)
+	if err != nil {
+		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)
+		return
+	}
+
+	readersCh <- reader
 }
 
 // checkRestoreDirectory checks that the restore directory exists,

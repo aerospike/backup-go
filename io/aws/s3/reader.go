@@ -98,6 +98,21 @@ func (r *StreamingReader) StreamFiles(
 	close(readersCh)
 }
 
+// OpenFile opens single file from s3 and sends io.Readers to the `readersCh`
+// In case of an error, it is sent to the `errorsCh` channel.
+func (r *StreamingReader) OpenFile(
+	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	defer close(readersCh)
+
+	reader, err := r.newS3Reader(ctx, filename)
+	if err != nil {
+		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)
+		return
+	}
+
+	readersCh <- reader
+}
+
 func (r *StreamingReader) streamBackupFiles(
 	ctx context.Context,
 ) (_ <-chan string, _ <-chan error) {

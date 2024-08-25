@@ -980,9 +980,13 @@ type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
-var _ backup.Writer = (*byteReadWriterFactory)(nil)
-
 func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
+	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
+	readersCh <- reader
+	close(readersCh)
+}
+
+func (b *byteReadWriterFactory) OpenFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	readersCh <- reader
 	close(readersCh)

@@ -234,3 +234,65 @@ func createTmpFile(dir, fileName string) error {
 
 	return nil
 }
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFile() {
+	const fileName = "oneFile.asb"
+
+	dir := s.T().TempDir()
+	err := createTmpFile(dir, fileName)
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+
+	r, err := NewDirectoryStreamingReader(dir, mockValidator)
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.OpenFile(context.Background(), fileName, readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(1, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFileErr() {
+	dir := s.T().TempDir()
+	err := createTmpFile(dir, "oneFile.asb")
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+
+	r, err := NewDirectoryStreamingReader(dir, mockValidator)
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.OpenFile(context.Background(), "errFile", readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(0, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.ErrorContains(s.T(), err, "no such file or directory")
+		}
+	}
+}

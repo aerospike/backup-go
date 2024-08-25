@@ -120,6 +120,25 @@ func (r *StreamingReader) StreamFiles(
 	close(readersCh)
 }
 
+// OpenFile opens single file from GCP cloud storage and sends io.Readers to the `readersCh`
+// In case of an error, it is sent to the `errorsCh` channel.
+func (r *StreamingReader) OpenFile(
+	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	defer close(readersCh)
+
+	if !strings.Contains(filename, "/") {
+		filename = fmt.Sprintf("%s%s", r.prefix, filename)
+	}
+
+	reader, err := r.bucketHandle.Object(filename).NewReader(ctx)
+	if err != nil {
+		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)
+		return
+	}
+
+	readersCh <- reader
+}
+
 // GetType return `gcpStorageType` type of storage. Used in logging.
 func (r *StreamingReader) GetType() string {
 	return gcpStorageType

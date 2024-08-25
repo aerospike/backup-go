@@ -94,7 +94,7 @@ func (c *RestoreConfig) validate() error {
 	}
 
 	if c.InputFile != "" && c.Parallel > MinParallel {
-		return fmt.Errorf("parallel must not be set, if input file is set")
+		return fmt.Errorf("parallel %d must not be set, if input file is set", c.Parallel)
 	}
 
 	if c.Bandwidth < 0 {

@@ -133,7 +133,8 @@ func (c *BackupConfig) validate() error {
 	}
 
 	if c.OutputFile != "" && c.Parallel > MinParallel && c.FileLimit != 0 {
-		return fmt.Errorf("parallel and file limit must not be set, if output file is set")
+		return fmt.Errorf("parallel %d and file limit %d must not be set, if output file is set",
+			c.Parallel, c.FileLimit)
 	}
 
 	if err := c.Partitions.validate(); err != nil {

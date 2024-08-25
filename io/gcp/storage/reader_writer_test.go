@@ -59,16 +59,17 @@ func (s *GCPSuite) SetupSuite() {
 	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress), option.WithoutAuthentication())
 	s.Require().NoError(err)
 
-	err = removeTestData(ctx, client)
-	s.Require().NoError(err)
-
 	err = fillTestData(ctx, client)
 	s.Require().NoError(err)
 	s.client = client
 }
 
 func (s *GCPSuite) TearDownSuite() {
-	err := s.client.Close()
+	ctx := context.Background()
+	err := removeTestData(ctx, s.client)
+	s.Require().NoError(err)
+
+	err = s.client.Close()
 	s.Require().NoError(err)
 }
 

@@ -244,7 +244,8 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFile() {
 
 	mockValidator := new(mocks.Mockvalidator)
 
-	r, err := NewDirectoryStreamingReader(mockValidator, WithFile(dir))
+	path := filepath.Join(dir, fileName)
+	r, err := NewDirectoryStreamingReader(mockValidator, WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -274,7 +275,8 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFileErr() {
 
 	mockValidator := new(mocks.Mockvalidator)
 
-	r, err := NewDirectoryStreamingReader(mockValidator, WithFile(dir))
+	path := filepath.Join(dir, "error")
+	r, err := NewDirectoryStreamingReader(mockValidator, WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)

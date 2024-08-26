@@ -91,15 +91,15 @@ func (r *StreamingReader) StreamFiles(
 ) {
 	// If it is a folder, open and return.
 	if r.isDir {
-		r.openFolder(ctx, readersCh, errorsCh)
+		r.streamFolder(ctx, readersCh, errorsCh)
 		return
 	}
 
 	// If not a folder, only file.
-	r.openFile(ctx, r.path, readersCh, errorsCh)
+	r.streamFile(ctx, r.path, readersCh, errorsCh)
 }
 
-func (r *StreamingReader) openFolder(
+func (r *StreamingReader) streamFolder(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	err := r.checkRestoreDirectory()
@@ -146,9 +146,9 @@ func (r *StreamingReader) openFolder(
 	close(readersCh)
 }
 
-// OpenFile opens single file and sends io.Readers to the `readersCh`
+// streamFile opens single file and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
-func (r *StreamingReader) openFile(
+func (r *StreamingReader) streamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
 

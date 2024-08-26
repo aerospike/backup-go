@@ -21,16 +21,20 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
-
-type Writer struct {
-	directory string
-}
 
 const bufferSize = 4096 * 1024 // 4mb
 
-// NewDirectoryWriterFactory creates a new factory for directory backups
-//   - dir is the target folder for backup.
+type Writer struct {
+	target
+
+	once   sync.Once
+	called bool
+}
+
+// NewDirectoryWriter creates a new writer for directory backups
+//   - path is the target folder for backup.
 //   - fileSizeLimit is the maximum size of each backup file in bytes.
 //
 // If FileSizeLimit is 0, backup file size is unbounded.
@@ -39,26 +43,37 @@ const bufferSize = 4096 * 1024 // 4mb
 // If non-zero, FileSizeLimit must be greater than or equal to 1MB.
 // FileSizeLimit is not a strict limit, the actual file size may exceed this
 // limit by a small amount.
-func NewDirectoryWriterFactory(dir string, removeFiles bool,
+func NewDirectoryWriter(removeFiles bool, opts ...Opts,
 ) (*Writer, error) {
+	if len(opts) < 1 {
+		return nil, fmt.Errorf("at least one option is required")
+	}
+
+	w := &Writer{}
+
+	for _, opt := range opts {
+		opt(&w.target)
+	}
+
 	var err error
-	if removeFiles {
-		err = forcePrepareBackupDirectory(dir)
-	} else {
-		err = prepareBackupDirectory(dir)
+
+	if w.isDir {
+		if removeFiles {
+			err = forcePrepareBackupDirectory(w.path)
+		} else {
+			err = prepareBackupDirectory(w.path)
+		}
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &Writer{
-		directory: dir,
-	}, nil
+	return w, nil
 }
 
 // prepareBackupDirectory creates the backup directory if it does not exist.
-// It returns an error is the dir already exits and it is not empty.
+// It returns an error is the path already exits and it is not empty.
 func prepareBackupDirectory(dir string) error {
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
@@ -75,7 +90,7 @@ func prepareBackupDirectory(dir string) error {
 
 	fileInfo, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("failed to read dir %s: %w", dir, err)
+		return fmt.Errorf("failed to read path %s: %w", dir, err)
 	}
 
 	if len(fileInfo) > 0 {
@@ -121,14 +136,28 @@ func (bf *bufferedFile) Close() error {
 
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the specified fileName.
-func (f *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
+func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 
-	filePath := filepath.Join(f.directory, fileName)
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
+	if w.called {
+		return nil, fmt.Errorf("parallel running for one file is not allowed")
+	}
 
+	if !w.isDir {
+		w.once.Do(func() {
+			w.called = true
+		})
+	}
+
+	// We ignore `fileName` if `Writer` was initialized .WithFile()
+	filePath := w.path
+	if w.isDir {
+		filePath = filepath.Join(w.path, fileName)
+	}
+
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
@@ -137,6 +166,6 @@ func (f *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 }
 
 // GetType return `localType` type of storage. Used in logging.
-func (f *Writer) GetType() string {
+func (w *Writer) GetType() string {
 	return localType
 }

@@ -85,12 +85,6 @@ func newBackupHandler(
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
-	// single file mod.
-	if config.OutputFile != "" {
-		config.Parallel = MinParallel
-		config.FileLimit = 0
-	}
-
 	return &BackupHandler{
 		ctx:                    ctx,
 		cancel:                 cancel,
@@ -204,10 +198,6 @@ func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) 
 
 func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
 	filename := bh.encoder.GenerateFilename()
-	// for single file backup.
-	if bh.config.OutputFile != "" {
-		filename = bh.config.OutputFile
-	}
 
 	storageWriter, err := bh.writer.NewWriter(ctx, filename)
 	if err != nil {

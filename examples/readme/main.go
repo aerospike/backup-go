@@ -33,7 +33,7 @@ func main() {
 		panic(err)
 	}
 
-	writers, err := backup.NewWriterLocal("backups_folder", false)
+	writers, err := backup.NewWriterLocalDir("backups_folder", false)
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +59,7 @@ func main() {
 	restoreCfg := backup.NewDefaultRestoreConfig()
 	restoreCfg.Parallel = 5
 
-	streamingReader, err := backup.NewStreamingReaderLocal("backups_folder", backup.EncoderTypeASB)
+	streamingReader, err := backup.NewStreamingReaderLocalDir("backups_folder", backup.EncoderTypeASB)
 	if err != nil {
 		panic(err)
 	}

@@ -72,7 +72,7 @@ type AerospikeClient interface {
 //		// handle error
 //	}
 //
-//	writers, err := backup.NewWriterLocal("backups_folder", false)
+//	writers, err := backup.NewWriterLocalDir("backups_folder", false)
 //	if err != nil {
 //		// handle error
 //	}

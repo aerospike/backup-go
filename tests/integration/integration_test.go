@@ -368,7 +368,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, err := backup.NewWriterLocal(backupDir, false)
+	writerFactory, err := backup.NewWriterLocalDir(backupDir, false)
 	suite.Nil(err)
 
 	bh, err := suite.backupClient.Backup(
@@ -400,7 +400,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
+	streamingReader, _ := backup.NewStreamingReaderLocalDir(backupDir, backupConfig.EncoderType)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
@@ -424,7 +424,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
-	_, err = backup.NewWriterLocal(backupDir, false)
+	_, err = backup.NewWriterLocalDir(backupDir, false)
 	suite.ErrorContains(err, "is not empty")
 }
 
@@ -531,7 +531,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	backupConfig.Partitions = partitions
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewWriterLocal(backupDir, false)
+	writerFactory, _ := backup.NewWriterLocalDir(backupDir, false)
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
@@ -549,7 +549,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewDefaultRestoreConfig()
-	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
+	streamingReader, _ := backup.NewStreamingReaderLocalDir(backupDir, backupConfig.EncoderType)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,

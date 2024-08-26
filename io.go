@@ -24,20 +24,37 @@ import (
 	"github.com/aerospike/backup-go/io/local"
 )
 
-// NewWriterLocal initializes a writer to the local directory.
-func NewWriterLocal(dir string, removeFiles bool) (Writer, error) {
-	return local.NewDirectoryWriterFactory(dir, removeFiles)
+// NewWriterLocalDir initializes a writer to the local directory.
+func NewWriterLocalDir(path string, removeFiles bool) (Writer, error) {
+	return local.NewDirectoryWriter(removeFiles, local.WithDir(path))
 }
 
-// NewStreamingReaderLocal initializes a reader from the local directory.
+// NewStreamingReaderLocalDir initializes a reader from the local directory.
 // At the moment, we support only `EncoderTypeASB` Encoder type.
-func NewStreamingReaderLocal(dir string, eType EncoderType) (StreamingReader, error) {
+func NewStreamingReaderLocalDir(path string, eType EncoderType) (StreamingReader, error) {
 	switch eType {
 	// As at the moment only one `ASB` validator supported, we use such construction.
 	case EncoderTypeASB:
-		return local.NewDirectoryStreamingReader(dir, asb.NewValidator())
+		return local.NewDirectoryStreamingReader(asb.NewValidator(), local.WithDir(path))
 	default:
-		return local.NewDirectoryStreamingReader(dir, asb.NewValidator())
+		return local.NewDirectoryStreamingReader(asb.NewValidator(), local.WithDir(path))
+	}
+}
+
+// NewWriterLocalFile initializes a writer to the local file.
+func NewWriterLocalFile(path string, removeFiles bool) (Writer, error) {
+	return local.NewDirectoryWriter(removeFiles, local.WithFile(path))
+}
+
+// NewStreamingReaderLocalFile initializes a reader from the local file.
+// At the moment, we support only `EncoderTypeASB` Encoder type.
+func NewStreamingReaderLocalFile(path string, eType EncoderType) (StreamingReader, error) {
+	switch eType {
+	// As at the moment only one `ASB` validator supported, we use such construction.
+	case EncoderTypeASB:
+		return local.NewDirectoryStreamingReader(asb.NewValidator(), local.WithFile(path))
+	default:
+		return local.NewDirectoryStreamingReader(asb.NewValidator(), local.WithFile(path))
 	}
 }
 

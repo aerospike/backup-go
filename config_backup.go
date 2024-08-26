@@ -70,8 +70,6 @@ type BackupConfig struct {
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
 	FileLimit int64
-	// Backup to a single backup file. If is set, params Parallel FileLimit must not be set.
-	OutputFile string
 }
 
 // PartitionRange specifies a range of Aerospike partitions.
@@ -130,11 +128,6 @@ func (c *BackupConfig) validate() error {
 
 	if c.ModBefore != nil && c.ModAfter != nil && !c.ModBefore.After(*c.ModAfter) {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
-	}
-
-	if c.OutputFile != "" && c.Parallel > MinParallel && c.FileLimit != 0 {
-		return fmt.Errorf("parallel %d and file limit %d must not be set, if output file is set",
-			c.Parallel, c.FileLimit)
 	}
 
 	if err := c.Partitions.validate(); err != nil {

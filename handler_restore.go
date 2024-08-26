@@ -39,11 +39,6 @@ type StreamingReader interface {
 	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
 	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
 
-	// OpenFile creates readers from single file and sends them to the channel.
-	// In case of an error, the error is sent to the error channel.
-	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
-	OpenFile(ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error)
-
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
 }
@@ -79,10 +74,6 @@ func newRestoreHandler(
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
-	if config.InputFile != "" {
-		config.Parallel = MinParallel
-	}
-
 	return &RestoreHandler{
 		ctx:             ctx,
 		cancel:          cancel,
@@ -114,12 +105,8 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	if rh.config.InputFile != "" {
-		go rh.reader.OpenFile(ctx, rh.config.InputFile, readersCh, errorsCh)
-	} else {
-		// Start lazy file reading.
-		go rh.reader.StreamFiles(ctx, readersCh, errorsCh)
-	}
+	// Start lazy file reading.
+	go rh.reader.StreamFiles(ctx, readersCh, errorsCh)
 
 	// Start lazy file processing.
 	go rh.processReaders(ctx, readersCh, doneCh, errorsCh)

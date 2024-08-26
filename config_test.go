@@ -59,12 +59,6 @@ func TestBackupConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "encryption")
 	config = NewDefaultBackupConfig()
 
-	config.OutputFile = "file"
-	config.Parallel = 2
-	config.FileLimit = 2
-	assert.ErrorContains(t, config.validate(), "output file")
-	config = NewDefaultBackupConfig()
-
 	connectionType := "tcp"
 	config.SecretAgentConfig = &SecretAgentConfig{ConnectionType: &connectionType}
 	assert.ErrorContains(t, config.validate(), "secret agent")
@@ -103,11 +97,6 @@ func TestRestoreConfig_validate(t *testing.T) {
 
 	config.EncryptionPolicy = &EncryptionPolicy{}
 	assert.ErrorContains(t, config.validate(), "encryption")
-	config = NewDefaultRestoreConfig()
-
-	config.InputFile = "file"
-	config.Parallel = 2
-	assert.ErrorContains(t, config.validate(), "input file")
 	config = NewDefaultRestoreConfig()
 
 	connectionType := "tcp"

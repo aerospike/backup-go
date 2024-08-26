@@ -34,40 +34,83 @@ type validator interface {
 }
 
 type StreamingReader struct {
+	target
 	validator validator
-	dir       string
+}
+
+type target struct {
+	path  string
+	isDir bool
+}
+
+type Opts func(*target)
+
+func WithDir(path string) Opts {
+	return func(r *target) {
+		r.path = path
+		r.isDir = true
+	}
+}
+
+func WithFile(path string) Opts {
+	return func(r *target) {
+		r.path = path
+		r.isDir = false
+	}
 }
 
 // NewDirectoryStreamingReader creates a new StreamingReader.
 func NewDirectoryStreamingReader(
-	dir string,
 	validator validator,
+	opts ...Opts,
 ) (*StreamingReader, error) {
 	if validator == nil {
 		return nil, fmt.Errorf("validator cannot be nil")
 	}
 
-	return &StreamingReader{
-		dir:       dir,
+	if len(opts) < 1 {
+		return nil, fmt.Errorf("at least one option is required")
+	}
+
+	r := &StreamingReader{
 		validator: validator,
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(&r.target)
+	}
+
+	return r, nil
 }
 
 // StreamFiles reads files from disk and sends io.Readers to the `readersCh`
 // communication channel for lazy loading.
 // In case of an error, it is sent to the `errorsCh` channel.
-func (f *StreamingReader) StreamFiles(
+func (r *StreamingReader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	err := f.checkRestoreDirectory()
+	// If it is a folder, open and return.
+	if r.isDir {
+		r.openFolder(ctx, readersCh, errorsCh)
+		return
+	}
+
+	// If not a folder, only file.
+	r.openFile(ctx, r.path, readersCh, errorsCh)
+}
+
+func (r *StreamingReader) openFolder(
+	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+) {
+	err := r.checkRestoreDirectory()
 	if err != nil {
 		errorsCh <- err
 		return
 	}
 
-	fileInfo, err := os.ReadDir(f.dir)
+	fileInfo, err := os.ReadDir(r.path)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to read dir %s: %w", f.dir, err)
+		errorsCh <- fmt.Errorf("failed to read path %s: %w", r.path, err)
 		return
 	}
 
@@ -81,8 +124,8 @@ func (f *StreamingReader) StreamFiles(
 			continue
 		}
 
-		filePath := filepath.Join(f.dir, file.Name())
-		if err = f.validator.Run(filePath); err != nil {
+		filePath := filepath.Join(r.path, file.Name())
+		if err = r.validator.Run(filePath); err != nil {
 			// Since we are passing invalid files, we don't need to handle this
 			// error and write a test for it. Maybe we should log this information
 			// for the user so they know what is going on.
@@ -105,7 +148,7 @@ func (f *StreamingReader) StreamFiles(
 
 // OpenFile opens single file and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
-func (f *StreamingReader) OpenFile(
+func (r *StreamingReader) openFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
 
@@ -115,7 +158,7 @@ func (f *StreamingReader) OpenFile(
 	}
 
 	if !strings.Contains(filename, "/") {
-		filename = fmt.Sprintf("%s/%s", f.dir, filename)
+		filename = fmt.Sprintf("%s/%s", r.path, filename)
 	}
 
 	reader, err := os.Open(filename)
@@ -129,13 +172,13 @@ func (f *StreamingReader) OpenFile(
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format.
-func (f *StreamingReader) checkRestoreDirectory() error {
-	dir := f.dir
+func (r *StreamingReader) checkRestoreDirectory() error {
+	dir := r.path
 
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
 		// Handle the error
-		return fmt.Errorf("failed to get dir info %s: %w", dir, err)
+		return fmt.Errorf("failed to get path info %s: %w", dir, err)
 	}
 
 	if !dirInfo.IsDir() {
@@ -145,7 +188,7 @@ func (f *StreamingReader) checkRestoreDirectory() error {
 
 	fileInfo, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("failed to read dir %s: %w", dir, err)
+		return fmt.Errorf("failed to read path %s: %w", dir, err)
 	}
 
 	// Check if the directory is empty
@@ -157,6 +200,6 @@ func (f *StreamingReader) checkRestoreDirectory() error {
 }
 
 // GetType returns the type of the reader.
-func (f *StreamingReader) GetType() string {
+func (r *StreamingReader) GetType() string {
 	return localType
 }

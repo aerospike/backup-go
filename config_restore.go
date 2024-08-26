@@ -68,8 +68,6 @@ type RestoreConfig struct {
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
-	// Restore from a single backup file. Params Parallel must not be set.
-	InputFile string
 }
 
 // NewDefaultRestoreConfig returns a new RestoreConfig with default values.
@@ -91,10 +89,6 @@ func (c *RestoreConfig) validate() error {
 		if err := c.Namespace.validate(); err != nil {
 			return fmt.Errorf("invalid restore namespace: %w", err)
 		}
-	}
-
-	if c.InputFile != "" && c.Parallel > MinParallel {
-		return fmt.Errorf("parallel %d must not be set, if input file is set", c.Parallel)
 	}
 
 	if c.Bandwidth < 0 {

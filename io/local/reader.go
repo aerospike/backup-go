@@ -91,7 +91,7 @@ func (r *StreamingReader) StreamFiles(
 ) {
 	// If it is a folder, open and return.
 	if r.isDir {
-		r.streamFolder(ctx, readersCh, errorsCh)
+		r.streamDirectory(ctx, readersCh, errorsCh)
 		return
 	}
 
@@ -99,7 +99,7 @@ func (r *StreamingReader) StreamFiles(
 	r.streamFile(ctx, r.path, readersCh, errorsCh)
 }
 
-func (r *StreamingReader) streamFolder(
+func (r *StreamingReader) streamDirectory(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	err := r.checkRestoreDirectory()

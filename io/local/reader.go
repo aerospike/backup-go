@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 const localType = "directory"
@@ -33,60 +32,70 @@ type validator interface {
 	Run(fileName string) error
 }
 
-type StreamingReader struct {
-	target
+// Reader represents local storage reader.
+type Reader struct {
+	// Optional parameters.
+	options
+}
+
+type options struct {
+	// path contains path to file or directory.
+	path string
+	// isDir flag describes what we have in path, file or directory.
+	isDir bool
+	// removeFiles flag describes should we remove everything from backup folder or not.
+	removeFiles bool
+	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
 }
 
-type target struct {
-	path  string
-	isDir bool
-}
+type Opts func(*options)
 
-type Opts func(*target)
-
+// WithDir adds directory to reading files from.
 func WithDir(path string) Opts {
-	return func(r *target) {
+	return func(r *options) {
 		r.path = path
 		r.isDir = true
 	}
 }
 
+// WithFile adds file path to read from.
 func WithFile(path string) Opts {
-	return func(r *target) {
+	return func(r *options) {
 		r.path = path
 		r.isDir = false
 	}
 }
 
-// NewDirectoryStreamingReader creates a new StreamingReader.
-func NewDirectoryStreamingReader(
-	validator validator,
-	opts ...Opts,
-) (*StreamingReader, error) {
-	if validator == nil {
-		return nil, fmt.Errorf("validator cannot be nil")
+// WithValidator adds validator to Reader, so files will be validated before reading.
+// Is used only for Reader.
+func WithValidator(v validator) Opts {
+	return func(r *options) {
+		r.validator = v
 	}
+}
 
-	if len(opts) < 1 {
-		return nil, fmt.Errorf("at least one option is required")
-	}
-
-	r := &StreamingReader{
-		validator: validator,
-	}
+// NewReader creates a new local directory/file Reader.
+// Must be called with WithDir(path string) or WithFile(path string) - mandatory.
+// Can be called with WithValidator(v validator) - optional.
+func NewReader(opts ...Opts) (*Reader, error) {
+	r := &Reader{}
 
 	for _, opt := range opts {
-		opt(&r.target)
+		opt(&r.options)
+	}
+
+	if r.path == "" {
+		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
 	return r, nil
 }
 
-// StreamFiles reads files from disk and sends io.Readers to the `readersCh`
+// StreamFiles reads file/directory from disk and sends io.Readers to the `readersCh`
 // communication channel for lazy loading.
 // In case of an error, it is sent to the `errorsCh` channel.
-func (r *StreamingReader) StreamFiles(
+func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	// If it is a folder, open and return.
@@ -99,9 +108,11 @@ func (r *StreamingReader) StreamFiles(
 	r.streamFile(ctx, r.path, readersCh, errorsCh)
 }
 
-func (r *StreamingReader) streamDirectory(
+func (r *Reader) streamDirectory(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
+	defer close(readersCh)
+
 	err := r.checkRestoreDirectory()
 	if err != nil {
 		errorsCh <- err
@@ -125,11 +136,14 @@ func (r *StreamingReader) streamDirectory(
 		}
 
 		filePath := filepath.Join(r.path, file.Name())
-		if err = r.validator.Run(filePath); err != nil {
-			// Since we are passing invalid files, we don't need to handle this
-			// error and write a test for it. Maybe we should log this information
-			// for the user so they know what is going on.
-			continue
+
+		if r.validator != nil {
+			if err = r.validator.Run(filePath); err != nil {
+				// Since we are passing invalid files, we don't need to handle this
+				// error and write a test for it. Maybe we should log this information
+				// for the user so they know what is going on.
+				continue
+			}
 		}
 
 		var reader io.ReadCloser
@@ -142,23 +156,17 @@ func (r *StreamingReader) streamDirectory(
 
 		readersCh <- reader
 	}
-
-	close(readersCh)
 }
 
 // streamFile opens single file and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
-func (r *StreamingReader) streamFile(
+func (r *Reader) streamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
 
 	if ctx.Err() != nil {
 		errorsCh <- ctx.Err()
 		return
-	}
-
-	if !strings.Contains(filename, "/") {
-		filename = fmt.Sprintf("%s/%s", r.path, filename)
 	}
 
 	reader, err := os.Open(filename)
@@ -172,7 +180,7 @@ func (r *StreamingReader) streamFile(
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format.
-func (r *StreamingReader) checkRestoreDirectory() error {
+func (r *Reader) checkRestoreDirectory() error {
 	dir := r.path
 
 	dirInfo, err := os.Stat(dir)
@@ -200,6 +208,6 @@ func (r *StreamingReader) checkRestoreDirectory() error {
 }
 
 // GetType returns the type of the reader.
-func (r *StreamingReader) GetType() string {
+func (r *Reader) GetType() string {
 	return localType
 }

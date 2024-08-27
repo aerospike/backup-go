@@ -26,43 +26,43 @@ import (
 
 const bufferSize = 4096 * 1024 // 4mb
 
+// Writer represents a local storage writer.
 type Writer struct {
-	target
-
+	// Optional parameters.
+	options
+	// Sync for running backup to one file.
 	once   sync.Once
 	called bool
 }
 
-// NewDirectoryWriter creates a new writer for directory backups
-//   - path is the target folder for backup.
-//   - fileSizeLimit is the maximum size of each backup file in bytes.
-//
-// If FileSizeLimit is 0, backup file size is unbounded.
-// If non-zero, backup files will be split into multiple files if their size
-// exceeds this limit.
-// If non-zero, FileSizeLimit must be greater than or equal to 1MB.
-// FileSizeLimit is not a strict limit, the actual file size may exceed this
-// limit by a small amount.
-func NewDirectoryWriter(removeFiles bool, opts ...Opts,
-) (*Writer, error) {
-	if len(opts) < 1 {
-		return nil, fmt.Errorf("at least one option is required")
+// WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
+// Is used only for Writer.
+func WithRemoveFiles() Opts {
+	return func(r *options) {
+		r.removeFiles = true
 	}
+}
 
+// NewWriter creates a new writer for local directory/file writes.
+// Must be called with WithDir(path string) or WithFile(path string) - mandatory.
+// Can be called with WithRemoveFiles() - optional.
+func NewWriter(opts ...Opts) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {
-		opt(&w.target)
+		opt(&w.options)
+	}
+
+	if w.path == "" {
+		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
 	var err error
 
-	if w.isDir {
-		if removeFiles {
-			err = forcePrepareBackupDirectory(w.path)
-		} else {
-			err = prepareBackupDirectory(w.path)
-		}
+	if w.isDir && w.removeFiles {
+		err = forcePrepareBackupDirectory(w.path)
+	} else if w.isDir {
+		err = prepareBackupDirectory(w.path)
 	}
 
 	if err != nil {

@@ -220,12 +220,12 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderWithData,
-		validatorMock{},
+		WithDir(testReadFolderWithData),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -259,12 +259,12 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderEmpty,
-		validatorMock{},
+		WithDir(testReadFolderEmpty),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -298,12 +298,12 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderMixedData,
-		validatorMock{},
+		WithDir(testReadFolderMixedData),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -337,12 +337,12 @@ func (s *GCPSuite) TestReader_GetType() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderMixedData,
-		validatorMock{},
+		WithDir(testReadFolderMixedData),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -381,8 +381,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderEmpty,
-		false,
+		WithDir(testWriteFolderEmpty),
 	)
 	s.Require().NoError(err)
 
@@ -411,8 +410,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderWithDataError,
-		false,
+		WithDir(testWriteFolderWithDataError),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
 }
@@ -430,8 +428,8 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderWithData,
-		true,
+		WithDir(testWriteFolderWithData),
+		WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -460,8 +458,8 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderMixedData,
-		true,
+		WithDir(testWriteFolderMixedData),
+		WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -490,8 +488,8 @@ func (s *GCPSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderWithData,
-		true,
+		WithDir(testWriteFolderWithData),
+		WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -508,19 +506,18 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderOneFile,
-		validatorMock{},
+		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan io.ReadCloser)
 	eCH := make(chan error)
 
-	go reader.OpenFile(ctx, testFileNameOneFile, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH)
 
 	var filesCounter int
 
@@ -547,19 +544,18 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderOneFile,
-		validatorMock{},
+		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan io.ReadCloser)
 	eCH := make(chan error)
 
-	go reader.OpenFile(ctx, "file_error", rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH)
 
 	for err = range eCH {
 		s.Require().ErrorContains(err, "object doesn't exist")

@@ -20,6 +20,8 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/local"
 )
 
 func main() {
@@ -33,7 +35,12 @@ func main() {
 		panic(err)
 	}
 
-	writers, err := backup.NewWriterLocalDir("backups_folder", false)
+	// For backup to single file use local.WithFile(fileName)
+	writers, err := local.NewWriter(
+		local.WithValidator(asb.NewValidator()),
+		local.WithRemoveFiles(),
+		local.WithDir("backups_folder"),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -59,12 +66,15 @@ func main() {
 	restoreCfg := backup.NewDefaultRestoreConfig()
 	restoreCfg.Parallel = 5
 
-	streamingReader, err := backup.NewStreamingReaderLocalDir("backups_folder", backup.EncoderTypeASB)
+	// For restore from single file use local.WithFile(fileName)
+	reader, err := local.NewReader(
+		local.WithDir("backups_folder"),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, streamingReader)
+	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, reader)
 	if err != nil {
 		panic(err)
 	}

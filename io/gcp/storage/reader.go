@@ -31,34 +31,81 @@ type validator interface {
 	Run(fileName string) error
 }
 
-// StreamingReader describes GCP Storage streaming reader.
-type StreamingReader struct {
+// Reader represents GCP storage reader.
+type Reader struct {
+	// Optional parameters.
+	options
+
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
 	bucketHandle *storage.BucketHandle
 	// bucketName contains name of the bucket to read from.
 	bucketName string
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
-	// validator files validator.
+}
+
+type options struct {
+	// path contains path to file or directory.
+	path string
+	// isDir flag describes what we have in path, file or directory.
+	isDir bool
+	// removeFiles flag describes should we remove everything from backup folder or not.
+	removeFiles bool
+	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
 }
 
-// NewStreamingReader returns new GCP storage streaming reader.
-func NewStreamingReader(
+type Opts func(*options)
+
+// WithDir adds directory to reading files from.
+func WithDir(path string) Opts {
+	return func(r *options) {
+		r.path = path
+		r.isDir = true
+	}
+}
+
+// WithFile adds file path to read from.
+func WithFile(path string) Opts {
+	return func(r *options) {
+		r.path = path
+		r.isDir = false
+	}
+}
+
+// WithValidator adds validator to Reader, so files will be validated before reading.
+// Is used only for Reader.
+func WithValidator(v validator) Opts {
+	return func(r *options) {
+		r.validator = v
+	}
+}
+
+// NewReader returns new GCP storage directory/file reader.
+// Must be called with WithDir(path string) or WithFile(path string) - mandatory.
+// Can be called with WithValidator(v validator) - optional.
+func NewReader(
 	ctx context.Context,
 	client *storage.Client,
 	bucketName string,
-	folderName string,
-	validator validator,
-) (*StreamingReader, error) {
-	if validator == nil {
-		return nil, fmt.Errorf("validator cannot be nil")
+	opts ...Opts,
+) (*Reader, error) {
+	r := &Reader{}
+
+	for _, opt := range opts {
+		opt(&r.options)
 	}
 
-	prefix := folderName
-	// Protection from incorrect input.
-	if !strings.HasSuffix(folderName, "/") && folderName != "/" && folderName != "" {
-		prefix = fmt.Sprintf("%s/", folderName)
+	if r.path == "" {
+		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
+	if r.isDir {
+		r.prefix = r.path
+		// Protection from incorrect input.
+		if !strings.HasSuffix(r.path, "/") && r.path != "/" && r.path != "" {
+			r.prefix = fmt.Sprintf("%s/", r.path)
+		}
 	}
 
 	bucket := client.Bucket(bucketName)
@@ -68,19 +115,32 @@ func NewStreamingReader(
 		return nil, fmt.Errorf("failed to get bucket attr:%s:  %v", bucketName, err)
 	}
 
-	return &StreamingReader{
-		bucketHandle: bucket,
-		bucketName:   bucketName,
-		prefix:       prefix,
-		validator:    validator,
-	}, nil
+	r.bucketHandle = bucket
+	r.bucketName = bucketName
+
+	return r, nil
 }
 
-// StreamFiles streams files form GCP cloud storage to `readersCh`.
+// StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
 // If error occurs, it will be sent to `errorsCh.`
-func (r *StreamingReader) StreamFiles(
+func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
+	// If it is a folder, open and return.
+	if r.isDir {
+		r.streamDirectory(ctx, readersCh, errorsCh)
+		return
+	}
+
+	// If not a folder, only file.
+	r.streamFile(ctx, r.path, readersCh, errorsCh)
+}
+
+func (r *Reader) streamDirectory(
+	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+) {
+	defer close(readersCh)
+
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix: r.prefix,
 	})
@@ -101,9 +161,14 @@ func (r *StreamingReader) StreamFiles(
 			continue
 		}
 
-		// Skip not valid files.
-		if err = r.validator.Run(objAttrs.Name); err != nil {
-			continue
+		// Skip not valid files if validator is set.
+		if r.validator != nil {
+			if err = r.validator.Run(objAttrs.Name); err != nil {
+				// Since we are passing invalid files, we don't need to handle this
+				// error and write a test for it. Maybe we should log this information
+				// for the user so they know what is going on.
+				continue
+			}
 		}
 
 		// Create readers for files.
@@ -116,19 +181,13 @@ func (r *StreamingReader) StreamFiles(
 
 		readersCh <- reader
 	}
-
-	close(readersCh)
 }
 
-// OpenFile opens single file from GCP cloud storage and sends io.Readers to the `readersCh`
+// streamFile opens a single file from GCP cloud storage and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
-func (r *StreamingReader) OpenFile(
+func (r *Reader) streamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
-
-	if !strings.Contains(filename, "/") {
-		filename = fmt.Sprintf("%s%s", r.prefix, filename)
-	}
 
 	reader, err := r.bucketHandle.Object(filename).NewReader(ctx)
 	if err != nil {
@@ -140,7 +199,7 @@ func (r *StreamingReader) OpenFile(
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.
-func (r *StreamingReader) GetType() string {
+func (r *Reader) GetType() string {
 	return gcpStorageType
 }
 

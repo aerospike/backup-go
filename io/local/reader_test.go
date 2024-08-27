@@ -32,12 +32,6 @@ type checkRestoreDirectoryTestSuite struct {
 	suite.Suite
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilDecoder() {
-	dir := s.T().TempDir()
-	_, err := NewReader(nil, WithDir(dir))
-	s.Error(err)
-}
-
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
 

@@ -22,7 +22,7 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
+	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -42,13 +42,12 @@ type Writer struct {
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
 	// Sync for running backup to one file.
-	once   sync.Once
-	called bool
+	called atomic.Bool
 }
 
 // WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
 // Is used only for Writer.
-func WithRemoveFiles() Opts {
+func WithRemoveFiles() Opt {
 	return func(r *options) {
 		r.removeFiles = true
 	}
@@ -64,7 +63,7 @@ func NewWriter(
 	ctx context.Context,
 	client *s3.Client,
 	bucketName string,
-	opts ...Opts,
+	opts ...Opt,
 ) (*Writer, error) {
 	w := &Writer{}
 
@@ -117,14 +116,11 @@ func NewWriter(
 
 // NewWriter returns a new S3 writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
-	if w.called {
-		return nil, fmt.Errorf("parallel running for one file is not allowed")
-	}
-
+	// protection for single file backup.
 	if !w.isDir {
-		w.once.Do(func() {
-			w.called = true
-		})
+		if !w.called.CompareAndSwap(false, true) {
+			return nil, fmt.Errorf("parallel running for single file is not allowed")
+		}
 	}
 
 	// If we use backup to single file, we overwrite the file name.

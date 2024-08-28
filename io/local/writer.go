@@ -21,7 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
+	"sync/atomic"
 )
 
 const bufferSize = 4096 * 1024 // 4mb
@@ -31,13 +31,12 @@ type Writer struct {
 	// Optional parameters.
 	options
 	// Sync for running backup to one file.
-	once   sync.Once
-	called bool
+	called atomic.Bool
 }
 
 // WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
 // Is used only for Writer.
-func WithRemoveFiles() Opts {
+func WithRemoveFiles() Opt {
 	return func(r *options) {
 		r.removeFiles = true
 	}
@@ -46,7 +45,7 @@ func WithRemoveFiles() Opts {
 // NewWriter creates a new writer for local directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
-func NewWriter(opts ...Opts) (*Writer, error) {
+func NewWriter(opts ...Opt) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {
@@ -140,17 +139,12 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-
-	if w.called {
-		return nil, fmt.Errorf("parallel running for one file is not allowed")
-	}
-
+	// protection for single file backup.
 	if !w.isDir {
-		w.once.Do(func() {
-			w.called = true
-		})
+		if !w.called.CompareAndSwap(false, true) {
+			return nil, fmt.Errorf("parallel running for single file is not allowed")
+		}
 	}
-
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
 	filePath := w.path
 	if w.isDir {

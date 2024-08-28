@@ -2,6 +2,7 @@ with-expecter: True
 filename: "{{.InterfaceName}}_mock.go"
 all: True
 exported: True
+disable-func-mocks: True
 packages:
   github.com/aerospike/backup-go/io/encoding/asb:
     config:
@@ -27,6 +28,8 @@ packages:
     config:
       dir: mocks
       outpkg: mocks
+      exclude:
+        - ClientOpt
   github.com/aerospike/backup-go/pkg/secret-agent/connection:
     config:
       dir: ./pkg/secret-agent/connection/mocks
@@ -35,3 +38,5 @@ packages:
     config:
       dir: ./io/local/mocks
       outpkg: mocks
+      exclude:
+        - Opt

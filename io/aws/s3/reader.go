@@ -53,18 +53,18 @@ type options struct {
 	validator validator
 }
 
-type Opts func(*options)
+type Opt func(*options)
 
-// WithDir adds directory to reading files from.
-func WithDir(path string) Opts {
+// WithDir adds directory to reading/writing files from/to.
+func WithDir(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = true
 	}
 }
 
-// WithFile adds file path to read from.
-func WithFile(path string) Opts {
+// WithFile adds a file path to reading/writing from/to.
+func WithFile(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = false
@@ -73,7 +73,7 @@ func WithFile(path string) Opts {
 
 // WithValidator adds validator to Reader, so files will be validated before reading.
 // Is used only for Reader.
-func WithValidator(v validator) Opts {
+func WithValidator(v validator) Opt {
 	return func(r *options) {
 		r.validator = v
 	}
@@ -89,7 +89,7 @@ func NewReader(
 	ctx context.Context,
 	client *s3.Client,
 	bucketName string,
-	opts ...Opts,
+	opts ...Opt,
 ) (*Reader, error) {
 	r := &Reader{}
 

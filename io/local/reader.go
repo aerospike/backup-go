@@ -49,18 +49,18 @@ type options struct {
 	validator validator
 }
 
-type Opts func(*options)
+type Opt func(*options)
 
-// WithDir adds directory to reading files from.
-func WithDir(path string) Opts {
+// WithDir adds directory to reading/writing files from/to.
+func WithDir(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = true
 	}
 }
 
-// WithFile adds file path to read from.
-func WithFile(path string) Opts {
+// WithFile adds a file path to reading/writing from/to.
+func WithFile(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = false
@@ -69,7 +69,7 @@ func WithFile(path string) Opts {
 
 // WithValidator adds validator to Reader, so files will be validated before reading.
 // Is used only for Reader.
-func WithValidator(v validator) Opts {
+func WithValidator(v validator) Opt {
 	return func(r *options) {
 		r.validator = v
 	}
@@ -78,7 +78,7 @@ func WithValidator(v validator) Opts {
 // NewReader creates a new local directory/file Reader.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithValidator(v validator) - optional.
-func NewReader(opts ...Opts) (*Reader, error) {
+func NewReader(opts ...Opt) (*Reader, error) {
 	r := &Reader{}
 
 	for _, opt := range opts {

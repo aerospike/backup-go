@@ -54,6 +54,7 @@ func (rw *batchRecordWriter) batchWrite(record *models.Record) *a.BatchWrite {
 func batchWritePolicy(writePolicy *a.WritePolicy, r *models.Record) *a.BatchWritePolicy {
 	policy := a.NewBatchWritePolicy()
 	policy.RecordExistsAction = writePolicy.RecordExistsAction
+	policy.Expiration = r.Expiration
 
 	if writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {
 		policy.GenerationPolicy = a.EXPECT_GEN_GT

@@ -11,8 +11,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/aws/s3"
+	s3Storasge "github.com/aerospike/backup-go/io/aws/s3"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -24,10 +26,21 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+	backupDir  = "/"
+	backupFile = "/backup_folder/backup_file.txt"
+)
+
 type writeReadTestSuite struct {
 	suite.Suite
 	docker  *client.Client
 	minioID string
+}
+
+func TestReadWrite(t *testing.T) {
+	testSuite := writeReadTestSuite{}
+
+	suite.Run(t, &testSuite)
 }
 
 func (s *writeReadTestSuite) SetupSuite() {
@@ -141,19 +154,36 @@ func (s *writeReadTestSuite) TearDownSuite() {
 }
 
 func (s *writeReadTestSuite) TestWriteRead() {
-	config := &s3.Config{
-		Bucket:          "backup",
-		Region:          "eu",
-		Endpoint:        "http://localhost:9000",
-		Profile:         "minio",
-		Prefix:          "test",
-		MaxConnsPerHost: 1,
-	}
+	s3Client, err := getS3Client(
+		context.Background(),
+		"minio",
+		"eu",
+		"http://localhost:9000",
+	)
+	s.Require().NoError(err)
 
 	size := 500_000
 	times := 100
-	written := s.write("ns1.asb", size, times, config)
-	read := s.read(config)
+	written := s.write("ns1.asb", size, times, s3Client)
+	read := s.read(s3Client)
+
+	s.Assertions.Equal(size*times, len(read))
+	s.Assertions.Equal(written, read)
+}
+
+func (s *writeReadTestSuite) TestWriteReadSingleFile() {
+	s3Client, err := getS3Client(
+		context.Background(),
+		"minio",
+		"eu",
+		"http://localhost:9000",
+	)
+	s.Require().NoError(err)
+
+	size := 500_000
+	times := 100
+	written := s.writeSingleFile("ns1.asb", size, times, s3Client)
+	read := s.readSingleFile(s3Client)
 
 	s.Assertions.Equal(size*times, len(read))
 	s.Assertions.Equal(written, read)
@@ -170,11 +200,18 @@ func randomBytes(n int) []byte {
 	return data
 }
 
-func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3.Config) []byte {
+func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3.Client) []byte {
 	ctx := context.Background()
-	writerFactory, _ := backup.NewWriterS3(ctx, config, true)
+	writers, err := s3Storasge.NewWriter(
+		ctx,
+		client,
+		"backup",
+		s3Storasge.WithDir(backupDir),
+		s3Storasge.WithRemoveFiles(),
+	)
+	s.Require().NoError(err)
 
-	writer, err := writerFactory.NewWriter(ctx, filename)
+	writer, err := writers.NewWriter(ctx, filename)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}
@@ -197,36 +234,134 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, config *s3
 	}
 
 	// cannot create new streamingReader because folder is not empty
-	_, err = backup.NewWriterS3(ctx, config, false)
-	s.Require().ErrorContains(err, "backup directory is invalid: test is not empty")
+	_, err = s3Storasge.NewWriter(
+		ctx,
+		client,
+		"backup",
+		s3Storasge.WithDir(backupDir),
+	)
+	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
 
 	return allBytesWritten
 }
 
-func (s *writeReadTestSuite) read(config *s3.Config) []byte {
-	ctx := context.Background()
-	streamingReader, _ := backup.NewStreamingReaderS3(ctx, config, backup.EncoderTypeASB)
+func (s *writeReadTestSuite) read(client *s3.Client) []byte {
+	reader, err := s3Storasge.NewReader(
+		context.Background(),
+		client,
+		"backup",
+		s3Storasge.WithDir(backupDir),
+		s3Storasge.WithValidator(asb.NewValidator()),
+	)
+	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
 	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
+	go reader.StreamFiles(context.Background(), readerChan, errorChan)
 
 	select {
-	case reader := <-readerChan:
-		buffer, err := io.ReadAll(reader)
+	case r := <-readerChan:
+		buffer, err := io.ReadAll(r)
 		if err != nil {
 			s.FailNow("failed to read", err)
 		}
-		_ = reader.Close()
+		_ = r.Close()
 		return buffer
-	case err := <-errorChan:
+	case err = <-errorChan:
 		require.NoError(s.T(), err)
 	}
 	return nil
 }
 
-func TestReadWrite(t *testing.T) {
-	testSuite := writeReadTestSuite{}
+func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, client *s3.Client) []byte {
+	ctx := context.Background()
+	writers, err := s3Storasge.NewWriter(
+		ctx,
+		client,
+		"backup",
+		s3Storasge.WithFile(backupFile),
+		s3Storasge.WithRemoveFiles(),
+	)
+	s.Require().NoError(err)
 
-	suite.Run(t, &testSuite)
+	writer, err := writers.NewWriter(ctx, filename)
+	if err != nil {
+		s.FailNow("failed to create writer", err)
+	}
+
+	var allBytesWritten []byte
+	for i := 0; i < times; i++ {
+		bytes := randomBytes(bytes)
+		n, err := writer.Write(bytes)
+		if err != nil {
+			s.FailNow("failed to write", err)
+		}
+
+		s.Assertions.Equal(len(bytes), n)
+		allBytesWritten = append(allBytesWritten, bytes...)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		s.FailNow("failed to close writer", err)
+	}
+
+	// cannot create new streamingReader because folder is not empty
+	_, err = s3Storasge.NewWriter(
+		ctx,
+		client,
+		"backup",
+		s3Storasge.WithFile(backupFile),
+	)
+	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
+
+	return allBytesWritten
+}
+
+func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
+	reader, err := s3Storasge.NewReader(
+		context.Background(),
+		client,
+		"backup",
+		s3Storasge.WithFile(backupFile),
+		s3Storasge.WithValidator(asb.NewValidator()),
+	)
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go reader.StreamFiles(context.Background(), readerChan, errorChan)
+
+	select {
+	case r := <-readerChan:
+		buffer, err := io.ReadAll(r)
+		if err != nil {
+			s.FailNow("failed to read", err)
+		}
+		_ = r.Close()
+		return buffer
+	case err = <-errorChan:
+		require.NoError(s.T(), err)
+	}
+	return nil
+}
+
+func getS3Client(ctx context.Context, profile, region, endpoint string) (*s3.Client, error) {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithSharedConfigProfile(profile),
+		config.WithRegion(region),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		if endpoint != "" {
+			o.BaseEndpoint = &endpoint
+		}
+
+		o.UsePathStyle = true
+	})
+
+	return client, nil
 }

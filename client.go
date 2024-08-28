@@ -72,7 +72,7 @@ type AerospikeClient interface {
 //		// handle error
 //	}
 //
-//	writers, err := backup.NewWriterLocal("backups_folder", false)
+//	writers, err := backup.NewWriterLocalDir("backups_folder", false)
 //	if err != nil {
 //		// handle error
 //	}
@@ -126,7 +126,7 @@ func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 // NewClient creates a new backup client.
 //   - ac is the aerospike client to use for backup and restore operations.
 //
-// Options:
+// options:
 //   - [WithID] to set an identifier for the client.
 //   - [WithLogger] to set a logger that this client will log to.
 //   - [WithScanLimiter] to set a semaphore that is used to limit number of

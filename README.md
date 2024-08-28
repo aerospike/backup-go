@@ -26,6 +26,8 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/local"
 )
 
 func main() {
@@ -39,7 +41,12 @@ func main() {
 		panic(err)
 	}
 
-	writers, err := backup.NewWriterLocal("backups_folder", false)
+	// For backup to single file use local.WithFile(fileName)
+	writers, err := local.NewWriter(
+		local.WithValidator(asb.NewValidator()),
+		local.WithRemoveFiles(),
+		local.WithDir("backups_folder"),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -54,8 +61,10 @@ func main() {
 		panic(err)
 	}
 
-	// use backupHandler.Wait() to wait for the job to finish or fail
-	err = backupHandler.Wait()
+	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
+	// You can use different context here, and if it is canceled
+	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
+	err = backupHandler.Wait(ctx)
 	if err != nil {
 		log.Printf("Backup failed: %v", err)
 	}
@@ -63,18 +72,23 @@ func main() {
 	restoreCfg := backup.NewDefaultRestoreConfig()
 	restoreCfg.Parallel = 5
 
-	streamingReader, err := backup.NewStreamingReaderLocal("backups_folder", backup.EncoderTypeASB)
+	// For restore from single file use local.WithFile(fileName)
+	reader, err := local.NewReader(
+		local.WithDir("backups_folder"),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, streamingReader)
+	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, reader)
 	if err != nil {
 		panic(err)
 	}
 
-	// use restoreHandler.Wait() to wait for the job to finish or fail
-	err = restoreHandler.Wait()
+	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.
+	// You can use different context here, and if it is canceled
+	// backupClient.Restore(ctx, restoreCfg, streamingReader) context will be cancelled too.
+	err = restoreHandler.Wait(ctx)
 	if err != nil {
 		log.Printf("Restore failed: %v", err)
 	}

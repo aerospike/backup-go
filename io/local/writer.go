@@ -21,44 +21,58 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 )
-
-type Writer struct {
-	directory string
-}
 
 const bufferSize = 4096 * 1024 // 4mb
 
-// NewDirectoryWriterFactory creates a new factory for directory backups
-//   - dir is the target folder for backup.
-//   - fileSizeLimit is the maximum size of each backup file in bytes.
-//
-// If FileSizeLimit is 0, backup file size is unbounded.
-// If non-zero, backup files will be split into multiple files if their size
-// exceeds this limit.
-// If non-zero, FileSizeLimit must be greater than or equal to 1MB.
-// FileSizeLimit is not a strict limit, the actual file size may exceed this
-// limit by a small amount.
-func NewDirectoryWriterFactory(dir string, removeFiles bool,
-) (*Writer, error) {
+// Writer represents a local storage writer.
+type Writer struct {
+	// Optional parameters.
+	options
+	// Sync for running backup to one file.
+	called atomic.Bool
+}
+
+// WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
+// Is used only for Writer.
+func WithRemoveFiles() Opt {
+	return func(r *options) {
+		r.removeFiles = true
+	}
+}
+
+// NewWriter creates a new writer for local directory/file writes.
+// Must be called with WithDir(path string) or WithFile(path string) - mandatory.
+// Can be called with WithRemoveFiles() - optional.
+func NewWriter(opts ...Opt) (*Writer, error) {
+	w := &Writer{}
+
+	for _, opt := range opts {
+		opt(&w.options)
+	}
+
+	if w.path == "" {
+		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
 	var err error
-	if removeFiles {
-		err = forcePrepareBackupDirectory(dir)
-	} else {
-		err = prepareBackupDirectory(dir)
+
+	if w.isDir && w.removeFiles {
+		err = forcePrepareBackupDirectory(w.path)
+	} else if w.isDir {
+		err = prepareBackupDirectory(w.path)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &Writer{
-		directory: dir,
-	}, nil
+	return w, nil
 }
 
 // prepareBackupDirectory creates the backup directory if it does not exist.
-// It returns an error is the dir already exits and it is not empty.
+// It returns an error is the path already exits and it is not empty.
 func prepareBackupDirectory(dir string) error {
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
@@ -75,7 +89,7 @@ func prepareBackupDirectory(dir string) error {
 
 	fileInfo, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("failed to read dir %s: %w", dir, err)
+		return fmt.Errorf("failed to read path %s: %w", dir, err)
 	}
 
 	if len(fileInfo) > 0 {
@@ -121,14 +135,23 @@ func (bf *bufferedFile) Close() error {
 
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the specified fileName.
-func (f *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
+func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
+	// protection for single file backup.
+	if !w.isDir {
+		if !w.called.CompareAndSwap(false, true) {
+			return nil, fmt.Errorf("parallel running for single file is not allowed")
+		}
+	}
+	// We ignore `fileName` if `Writer` was initialized .WithFile()
+	filePath := w.path
+	if w.isDir {
+		filePath = filepath.Join(w.path, fileName)
+	}
 
-	filePath := filepath.Join(f.directory, fileName)
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
@@ -137,6 +160,6 @@ func (f *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 }
 
 // GetType return `localType` type of storage. Used in logging.
-func (f *Writer) GetType() string {
+func (w *Writer) GetType() string {
 	return localType
 }

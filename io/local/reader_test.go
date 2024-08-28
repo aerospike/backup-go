@@ -32,12 +32,6 @@ type checkRestoreDirectoryTestSuite struct {
 	suite.Suite
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Positive_nilDecoder() {
-	dir := s.T().TempDir()
-	_, err := NewDirectoryStreamingReader(dir, nil)
-	s.Error(err)
-}
-
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
 
@@ -49,8 +43,8 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_Empt
 		return fmt.Errorf("invalid file extension")
 	})
 
-	streamingReader, _ := NewDirectoryStreamingReader(dir, mockValidator)
-	err := streamingReader.checkRestoreDirectory()
+	reader, _ := NewReader(WithValidator(mockValidator), WithDir(dir))
+	err := reader.checkRestoreDirectory()
 	s.Error(err)
 }
 
@@ -76,7 +70,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 		return fmt.Errorf("invalid file extension")
 	})
 
-	streamingReader, err := NewDirectoryStreamingReader(dir, mockValidator)
+	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -112,7 +106,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 		return fmt.Errorf("invalid file extension")
 	})
 
-	r, err := NewDirectoryStreamingReader(dir, mockValidator)
+	r, err := NewReader(WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -146,7 +140,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrEmpt
 		return fmt.Errorf("invalid file extension")
 	})
 
-	streamingReader, err := NewDirectoryStreamingReader(dir, mockValidator)
+	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -183,7 +177,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrNoSu
 		return fmt.Errorf("invalid file extension")
 	})
 
-	streamingReader, err := NewDirectoryStreamingReader("file1.asb", mockValidator)
+	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir("file1.asb"))
 	s.Require().NoError(err)
 
 	readerChan := make(chan io.ReadCloser)
@@ -218,7 +212,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_GetType() {
 		return fmt.Errorf("invalid file extension")
 	})
 
-	r, err := NewDirectoryStreamingReader(dir, mockValidator)
+	r, err := NewReader(WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	s.Equal(localType, r.GetType())
@@ -233,4 +227,68 @@ func createTmpFile(dir, fileName string) error {
 	_ = f.Close()
 
 	return nil
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFile() {
+	const fileName = "oneFile.asb"
+
+	dir := s.T().TempDir()
+	err := createTmpFile(dir, fileName)
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+
+	path := filepath.Join(dir, fileName)
+	r, err := NewReader(WithValidator(mockValidator), WithFile(path))
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(1, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFileErr() {
+	dir := s.T().TempDir()
+	err := createTmpFile(dir, "oneFile.asb")
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+
+	path := filepath.Join(dir, "error")
+	r, err := NewReader(WithValidator(mockValidator), WithFile(path))
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(0, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.ErrorContains(s.T(), err, "no such file or directory")
+		}
+	}
 }

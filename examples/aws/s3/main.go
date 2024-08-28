@@ -21,7 +21,10 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/aws/s3"
+	s3Storasge "github.com/aerospike/backup-go/io/aws/s3"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const (
@@ -31,6 +34,7 @@ const (
 	dbPass       = "psw"
 	dbNameSource = "source-ns1"
 	dbNameTarget = "source-ns2"
+	backupFolder = "backup_folder"
 )
 
 func main() {
@@ -65,15 +69,23 @@ func initBackupClient() *backup.Client {
 }
 
 func runBackup(ctx context.Context, c *backup.Client) {
-	s3cfg := &s3.Config{
-		Bucket:   "backup",
-		Region:   "eu-central-1",
-		Endpoint: "http://localhost:9000",
-		Profile:  "minio",
-		Prefix:   "test",
+	s3Client, err := getS3Client(
+		ctx,
+		"minio",
+		"eu",
+		"http://localhost:9000",
+	)
+	if err != nil {
+		panic(err)
 	}
 
-	writers, err := backup.NewWriterS3(ctx, s3cfg, true)
+	writers, err := s3Storasge.NewWriter(
+		ctx,
+		s3Client,
+		"backup",
+		s3Storasge.WithDir(backupFolder),
+		s3Storasge.WithRemoveFiles(),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -104,15 +116,23 @@ func runBackup(ctx context.Context, c *backup.Client) {
 }
 
 func runRestore(ctx context.Context, c *backup.Client) {
-	s3cfg := &s3.Config{
-		Bucket:   "backup",
-		Region:   "eu-central-1",
-		Endpoint: "http://localhost:9000",
-		Profile:  "minio",
-		Prefix:   "test",
+	s3Client, err := getS3Client(
+		ctx,
+		"minio",
+		"eu",
+		"http://localhost:9000",
+	)
+	if err != nil {
+		panic(err)
 	}
 
-	readers, err := backup.NewStreamingReaderS3(ctx, s3cfg, backup.EncoderTypeASB)
+	reader, err := s3Storasge.NewReader(
+		ctx,
+		s3Client,
+		"backup",
+		s3Storasge.WithDir(backupFolder),
+		s3Storasge.WithValidator(asb.NewValidator()),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -131,7 +151,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		Mode: backup.CompressZSTD,
 	}
 
-	restoreHandler, err := c.Restore(ctx, restoreCfg, readers)
+	restoreHandler, err := c.Restore(ctx, restoreCfg, reader)
 	if err != nil {
 		panic(err)
 	}
@@ -145,4 +165,24 @@ func runRestore(ctx context.Context, c *backup.Client) {
 	}
 
 	fmt.Println("restore done")
+}
+
+func getS3Client(ctx context.Context, profile, region, endpoint string) (*s3.Client, error) {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithSharedConfigProfile(profile),
+		config.WithRegion(region),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		if endpoint != "" {
+			o.BaseEndpoint = &endpoint
+		}
+
+		o.UsePathStyle = true
+	})
+
+	return client, nil
 }

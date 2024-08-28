@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -32,24 +33,50 @@ const (
 
 // Writer represents a GCP storage writer.
 type Writer struct {
+	// Optional parameters.
+	options
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
 	bucketHandle *storage.BucketHandle
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
+	// Sync for running backup to one file.
+	called atomic.Bool
 }
 
-// NewWriter initialize and return new writer for GCP storage.
+// WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
+// Is used only for Writer.
+func WithRemoveFiles() Opt {
+	return func(r *options) {
+		r.removeFiles = true
+	}
+}
+
+// NewWriter creates a new writer for GCP storage directory/file writes.
+// Must be called with WithDir(path string) or WithFile(path string) - mandatory.
+// Can be called with WithRemoveFiles() - optional.
 func NewWriter(
 	ctx context.Context,
 	client *storage.Client,
 	bucketName string,
-	folderName string,
-	removeFiles bool,
+	opts ...Opt,
 ) (*Writer, error) {
-	prefix := folderName
-	// Protection from incorrect input.
-	if !strings.HasSuffix(folderName, "/") && folderName != "/" && folderName != "" {
-		prefix = fmt.Sprintf("%s/", folderName)
+	w := &Writer{}
+
+	for _, opt := range opts {
+		opt(&w.options)
+	}
+
+	if w.path == "" {
+		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
+	var prefix string
+	if w.isDir {
+		prefix = w.path
+		// Protection from incorrect input.
+		if !strings.HasSuffix(w.path, "/") && w.path != "/" && w.path != "" {
+			prefix = fmt.Sprintf("%s/", w.path)
+		}
 	}
 
 	bucket := client.Bucket(bucketName)
@@ -62,51 +89,48 @@ func NewWriter(
 	// Check if backup dir is empty.
 	isEmpty, err := isEmptyDirectory(ctx, bucket, prefix)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if bucket is empty: %w", err)
+		return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 	}
 
-	if !isEmpty && !removeFiles {
+	if !isEmpty && !w.removeFiles {
 		return nil, fmt.Errorf("backup folder must be empty or set removeFiles = true")
 	}
 
 	// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
-	if err = removeFilesFromFolder(ctx, bucket, prefix, bucketName); err != nil {
+	if err = removeFilesFromFolder(ctx, bucket, bucketName, prefix); err != nil {
 		return nil, fmt.Errorf("failed to remove files from folder: %w", err)
 	}
 
-	return &Writer{
-		bucketHandle: bucket,
-		prefix:       prefix,
-	}, nil
+	w.bucketHandle = bucket
+	w.prefix = prefix
+
+	return w, nil
 }
 
 // NewWriter returns a new GCP storage writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+	// protection for single file backup.
+	if !w.isDir {
+		if !w.called.CompareAndSwap(false, true) {
+			return nil, fmt.Errorf("parallel running for single file is not allowed")
+		}
+	}
+	// If we use backup to single file, we overwrite the file name.
+	if !w.isDir {
+		filename = w.path
+	}
+
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	sw := w.bucketHandle.Object(filename).NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = defaultChunkSize
 
-	return &gcpWriter{
-		sw: sw,
-	}, nil
+	return sw, nil
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
 	return gcpStorageType
-}
-
-type gcpWriter struct {
-	sw *storage.Writer
-}
-
-func (w *gcpWriter) Write(p []byte) (n int, err error) {
-	return w.sw.Write(p)
-}
-
-func (w *gcpWriter) Close() error {
-	return w.sw.Close()
 }
 
 func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, prefix string) (bool, error) {
@@ -136,7 +160,7 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 	return true, nil
 }
 
-func removeFilesFromFolder(ctx context.Context, bucketHandle *storage.BucketHandle, prefix, bucketName string) error {
+func removeFilesFromFolder(ctx context.Context, bucketHandle *storage.BucketHandle, bucketName, prefix string) error {
 	it := bucketHandle.Objects(ctx, &storage.Query{
 		Prefix: prefix,
 	})

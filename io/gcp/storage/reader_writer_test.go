@@ -36,12 +36,14 @@ const (
 	testReadFolderEmpty          = "folder_read_empty/"
 	testReadFolderWithData       = "folder_read_with_data/"
 	testReadFolderMixedData      = "folder_read_mixed_data/"
+	testReadFolderOneFile        = "folder_read_one_file/"
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
 	testWriteFolderWithDataError = "folder_write_with_data_error/"
 	testWriteFolderMixedData     = "folder_read_mixed_data/"
 	testFileNameTemplate         = "backup_%d.asb"
 	testFileNameTemplateWrong    = "file_%d.zip"
+	testFileNameOneFile          = "one_file.any"
 	testFileContent              = "content"
 	testFileContentLength        = 7
 	testFilesNumber              = 5
@@ -53,7 +55,6 @@ type GCPSuite struct {
 }
 
 func (s *GCPSuite) SetupSuite() {
-	fmt.Println("setting up suite")
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress), option.WithoutAuthentication())
 	s.Require().NoError(err)
@@ -64,14 +65,12 @@ func (s *GCPSuite) SetupSuite() {
 }
 
 func (s *GCPSuite) TearDownSuite() {
-	fmt.Println("tear down suite")
 	ctx := context.Background()
-	if err := removeTestData(ctx, s.client); err != nil {
-		s.T().Fatal(err)
-	}
-	if err := s.client.Close(); err != nil {
-		s.T().Fatal(err)
-	}
+	err := removeTestData(ctx, s.client)
+	s.Require().NoError(err)
+
+	err = s.client.Close()
+	s.Require().NoError(err)
 }
 
 func TestGCPSuite(t *testing.T) {
@@ -104,6 +103,13 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 	}
 
 	folderName = fmt.Sprintf("%s%s%s", testWriteFolderMixedData, testWriteFolderEmpty, testFileNameTemplate)
+	sw = client.Bucket(testBucketName).Object(folderName).NewWriter(ctx)
+	if err := writeContent(sw, testFileContent); err != nil {
+		return err
+	}
+
+	// one file
+	folderName = fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)
 	sw = client.Bucket(testBucketName).Object(folderName).NewWriter(ctx)
 	if err := writeContent(sw, testFileContent); err != nil {
 		return err
@@ -214,12 +220,12 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderWithData,
-		validatorMock{},
+		WithDir(testReadFolderWithData),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -253,12 +259,12 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderEmpty,
-		validatorMock{},
+		WithDir(testReadFolderEmpty),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -292,12 +298,12 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderMixedData,
-		validatorMock{},
+		WithDir(testReadFolderMixedData),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -331,12 +337,12 @@ func (s *GCPSuite) TestReader_GetType() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewStreamingReader(
+	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		testReadFolderMixedData,
-		validatorMock{},
+		WithDir(testReadFolderMixedData),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -375,8 +381,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderEmpty,
-		false,
+		WithDir(testWriteFolderEmpty),
 	)
 	s.Require().NoError(err)
 
@@ -405,8 +410,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderWithDataError,
-		false,
+		WithDir(testWriteFolderWithDataError),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
 }
@@ -424,8 +428,8 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderWithData,
-		true,
+		WithDir(testWriteFolderWithData),
+		WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -454,8 +458,8 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderMixedData,
-		true,
+		WithDir(testWriteFolderMixedData),
+		WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -484,11 +488,77 @@ func (s *GCPSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		testWriteFolderWithData,
-		true,
+		WithDir(testWriteFolderWithData),
+		WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
 	result := writer.GetType()
 	require.Equal(s.T(), gcpStorageType, result)
+}
+
+func (s *GCPSuite) TestReader_OpenFileOk() {
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err = <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 1, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *GCPSuite) TestReader_OpenFileErr() {
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	for err = range eCH {
+		s.Require().ErrorContains(err, "object doesn't exist")
+		return
+	}
 }

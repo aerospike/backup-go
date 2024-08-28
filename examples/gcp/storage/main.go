@@ -16,12 +16,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+
+	gcpStorage "github.com/aerospike/backup-go/io/gcp/storage"
 )
 
 const (
@@ -72,7 +74,14 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		panic(err)
 	}
 
-	writers, err := backup.NewWriterGCP(ctx, client, bucketName, folderName, true)
+	// For backup to single file use gcpStorage.WithFile(fileName)
+	writers, err := gcpStorage.NewWriter(
+		ctx,
+		client,
+		bucketName,
+		gcpStorage.WithDir(folderName),
+		gcpStorage.WithRemoveFiles(),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -99,7 +108,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		log.Printf("Backup failed: %v", err)
 	}
 
-	fmt.Println("backup done")
+	log.Println("backup done:", backupHandler.GetStats().ReadRecords.Load())
 }
 
 func runRestore(ctx context.Context, c *backup.Client) {
@@ -108,7 +117,14 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		panic(err)
 	}
 
-	readers, err := backup.NewStreamingReaderGCP(ctx, client, bucketName, folderName, backup.EncoderTypeASB)
+	// For restore from single file use gcpStorage.WithFile(fileName)
+	readers, err := gcpStorage.NewReader(
+		ctx,
+		client,
+		bucketName,
+		gcpStorage.WithDir(folderName),
+		gcpStorage.WithValidator(asb.NewValidator()),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -140,5 +156,5 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		log.Printf("Restore failed: %v", err)
 	}
 
-	fmt.Println("restore done")
+	log.Println("restore done:", restoreHandler.GetStats().ReadRecords.Load())
 }

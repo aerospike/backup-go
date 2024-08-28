@@ -26,6 +26,8 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/tests"
 	"github.com/aerospike/tools-common-go/testutils"
@@ -368,13 +370,16 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	ctx := context.Background()
 
 	backupDir := suite.T().TempDir()
-	writerFactory, err := backup.NewWriterLocal(backupDir, false)
+	writers, err := local.NewWriter(
+		local.WithValidator(asb.NewValidator()),
+		local.WithDir(backupDir),
+	)
 	suite.Nil(err)
 
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
-		writerFactory,
+		writers,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -400,11 +405,12 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
+	readers, err := local.NewReader(local.WithDir(backupDir))
+	suite.Nil(err)
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		streamingReader,
+		readers,
 	)
 	suite.Nil(err)
 
@@ -424,7 +430,10 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
-	_, err = backup.NewWriterLocal(backupDir, false)
+	_, err = local.NewWriter(
+		local.WithValidator(asb.NewValidator()),
+		local.WithDir(backupDir),
+	)
 	suite.ErrorContains(err, "is not empty")
 }
 
@@ -531,11 +540,16 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	backupConfig.Partitions = partitions
 
 	backupDir := suite.T().TempDir()
-	writerFactory, _ := backup.NewWriterLocal(backupDir, false)
+	writers, err := local.NewWriter(
+		local.WithValidator(asb.NewValidator()),
+		local.WithDir(backupDir),
+		local.WithRemoveFiles(),
+	)
+	suite.Require().NoError(err)
 	bh, err := suite.backupClient.Backup(
 		ctx,
 		backupConfig,
-		writerFactory,
+		writers,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -549,12 +563,13 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	}
 
 	restoreConfig := backup.NewDefaultRestoreConfig()
-	streamingReader, _ := backup.NewStreamingReaderLocal(backupDir, backupConfig.EncoderType)
+	readers, err := local.NewReader(local.WithDir(backupDir))
+	suite.Nil(err)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
 		restoreConfig,
-		streamingReader,
+		readers,
 	)
 	suite.Nil(err)
 	suite.NotNil(rh)
@@ -980,9 +995,13 @@ type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
-var _ backup.Writer = (*byteReadWriterFactory)(nil)
-
 func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
+	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
+	readersCh <- reader
+	close(readersCh)
+}
+
+func (b *byteReadWriterFactory) OpenFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	readersCh <- reader
 	close(readersCh)

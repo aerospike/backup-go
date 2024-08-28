@@ -69,7 +69,6 @@ type RestoreConfig struct {
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
 	// Amount of extra time-to-live to add to records that have expirable void-times.
-	// TODO: check if we have such scenario that we can set extrta ttl negative to invalidate records.
 	ExtraTTL int64
 }
 

@@ -65,10 +65,10 @@ func NewWriter(opts ...Opt) (*Writer, error) {
 		case false:
 			err = removeFileIfExists(w.path)
 		}
-	} else {
-		if w.isDir {
-			err = prepareBackupDirectory(w.path)
-		}
+	}
+
+	if !w.removeFiles && w.isDir {
+		err = prepareBackupDirectory(w.path)
 	}
 
 	if err != nil {

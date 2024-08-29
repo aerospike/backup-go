@@ -71,6 +71,10 @@ type RestoreConfig struct {
 	// Amount of extra time-to-live to add to records that have expirable void-times.
 	// Must be set in seconds.
 	ExtraTTL int64
+	// Ignore permanent record-specific error.
+	// E.g.: AEROSPIKE_RECORD_TOO_BIG.
+	// By default, such errors are not ignored and restore terminates.
+	IgnoreRecordError bool
 }
 
 // NewDefaultRestoreConfig returns a new RestoreConfig with default values.

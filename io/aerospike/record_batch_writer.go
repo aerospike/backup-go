@@ -24,13 +24,14 @@ import (
 )
 
 type batchRecordWriter struct {
-	asc             dbWriter
-	writePolicy     *a.WritePolicy
-	stats           *models.RestoreStats
-	logger          *slog.Logger
-	retryPolicy     *models.RetryPolicy
-	operationBuffer []a.BatchRecordIfc
-	batchSize       int
+	asc               dbWriter
+	writePolicy       *a.WritePolicy
+	stats             *models.RestoreStats
+	logger            *slog.Logger
+	retryPolicy       *models.RetryPolicy
+	operationBuffer   []a.BatchRecordIfc
+	batchSize         int
+	ignoreRecordError bool
 }
 
 func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
@@ -101,13 +102,15 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
 
-		if isNilOrAcceptableError(err) {
+		switch {
+		case isNilOrAcceptableError(err),
+			rw.ignoreRecordError && shouldIgnore(err):
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
 				rw.logger.Debug("All operations succeeded")
 				return nil
 			}
-		} else if !shouldRetry(err) {
+		case !shouldRetry(err):
 			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}
 
@@ -150,6 +153,15 @@ func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {
 func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	code := op.BatchRec().ResultCode
 	switch code {
+	case atypes.RECORD_TOO_BIG,
+		atypes.KEY_MISMATCH,
+		atypes.BIN_NAME_TOO_LONG,
+		atypes.ALWAYS_FORBIDDEN,
+		atypes.FAIL_FORBIDDEN,
+		atypes.BIN_TYPE_ERROR,
+		atypes.BIN_NOT_FOUND:
+		rw.stats.IncrRecordsIgnored()
+		return false
 	case atypes.OK:
 		rw.stats.IncrRecordsInserted()
 		return false

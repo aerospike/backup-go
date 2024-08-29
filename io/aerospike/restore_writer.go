@@ -44,8 +44,15 @@ type restoreWriter struct {
 }
 
 // NewRestoreWriter creates a new restoreWriter.
-func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.RestoreStats,
-	logger *slog.Logger, useBatchWrites bool, batchSize int, retryPolicy *models.RetryPolicy,
+func NewRestoreWriter(
+	asc dbWriter,
+	writePolicy *a.WritePolicy,
+	stats *models.RestoreStats,
+	logger *slog.Logger,
+	useBatchWrites bool,
+	batchSize int,
+	retryPolicy *models.RetryPolicy,
+	ignoreRecordError bool,
 ) pipeline.DataWriter[*models.Token] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer")
@@ -61,8 +68,17 @@ func NewRestoreWriter(asc dbWriter, writePolicy *a.WritePolicy, stats *models.Re
 			writePolicy: writePolicy,
 			logger:      logger,
 		},
-		recordWriter: newRecordWriter(asc, writePolicy, stats, logger, useBatchWrites, batchSize, retryPolicy),
-		logger:       logger,
+		recordWriter: newRecordWriter(
+			asc,
+			writePolicy,
+			stats,
+			logger,
+			useBatchWrites,
+			batchSize,
+			retryPolicy,
+			ignoreRecordError,
+		),
+		logger: logger,
 	}
 }
 
@@ -72,23 +88,26 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	useBatchWrites bool,
 	batchSize int,
 	retryPolicy *models.RetryPolicy,
+	ignoreRecordError bool,
 ) recordWriter {
 	if useBatchWrites {
 		return &batchRecordWriter{
-			asc:         asc,
-			writePolicy: writePolicy,
-			stats:       stats,
-			logger:      logger,
-			batchSize:   batchSize,
-			retryPolicy: retryPolicy,
+			asc:               asc,
+			writePolicy:       writePolicy,
+			stats:             stats,
+			logger:            logger,
+			batchSize:         batchSize,
+			retryPolicy:       retryPolicy,
+			ignoreRecordError: ignoreRecordError,
 		}
 	}
 
 	return &singleRecordWriter{
-		asc:         asc,
-		writePolicy: writePolicy,
-		stats:       stats,
-		retryPolicy: retryPolicy,
+		asc:               asc,
+		writePolicy:       writePolicy,
+		stats:             stats,
+		retryPolicy:       retryPolicy,
+		ignoreRecordError: ignoreRecordError,
 	}
 }
 
@@ -144,5 +163,17 @@ func shouldRetry(err a.Error) bool {
 		atypes.SERVER_NOT_AVAILABLE,
 		atypes.BATCH_FAILED,
 		atypes.MAX_ERROR_RATE,
+	)
+}
+
+func shouldIgnore(err a.Error) bool {
+	return err != nil && err.Matches(
+		atypes.RECORD_TOO_BIG,
+		atypes.KEY_MISMATCH,
+		atypes.BIN_NAME_TOO_LONG,
+		atypes.ALWAYS_FORBIDDEN,
+		atypes.FAIL_FORBIDDEN,
+		atypes.BIN_TYPE_ERROR,
+		atypes.BIN_NOT_FOUND,
 	)
 }

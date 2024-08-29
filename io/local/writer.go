@@ -57,11 +57,18 @@ func NewWriter(opts ...Opt) (*Writer, error) {
 	}
 
 	var err error
-
-	if w.isDir && w.removeFiles {
-		err = forcePrepareBackupDirectory(w.path)
-	} else if w.isDir {
-		err = prepareBackupDirectory(w.path)
+	// If we want to remove files from backup path.
+	if w.removeFiles {
+		switch w.isDir {
+		case true:
+			err = forcePrepareBackupDirectory(w.path)
+		case false:
+			err = removeFileIfExists(w.path)
+		}
+	} else {
+		if w.isDir {
+			err = prepareBackupDirectory(w.path)
+		}
 	}
 
 	if err != nil {
@@ -108,6 +115,23 @@ func forcePrepareBackupDirectory(dir string) error {
 	}
 
 	return makeDir(dir)
+}
+
+func removeFileIfExists(path string) error {
+	_, err := os.Stat(path)
+
+	switch {
+	case err == nil:
+		if err = os.Remove(path); err != nil {
+			return fmt.Errorf("failed to remove %s: %w", path, err)
+		}
+	case os.IsNotExist(err):
+		return nil
+	default:
+		return fmt.Errorf("failed to remove if exist %s: %w", path, err)
+	}
+
+	return nil
 }
 
 func makeDir(dir string) error {

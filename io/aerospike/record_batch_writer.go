@@ -103,15 +103,13 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
 
 		switch {
-		case isNilOrAcceptableError(err):
+		case isNilOrAcceptableError(err),
+			rw.ignoreRecordError && shouldIgnore(err):
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
 				rw.logger.Debug("All operations succeeded")
 				return nil
 			}
-		case rw.ignoreRecordError && shouldIgnore(err):
-			rw.stats.IncrRecordsIgnored()
-			return nil
 		case !shouldRetry(err):
 			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}
@@ -155,6 +153,15 @@ func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {
 func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	code := op.BatchRec().ResultCode
 	switch code {
+	case atypes.RECORD_TOO_BIG,
+		atypes.KEY_MISMATCH,
+		atypes.BIN_NAME_TOO_LONG,
+		atypes.ALWAYS_FORBIDDEN,
+		atypes.FAIL_FORBIDDEN,
+		atypes.BIN_TYPE_ERROR,
+		atypes.BIN_NOT_FOUND:
+		rw.stats.IncrRecordsIgnored()
+		return false
 	case atypes.OK:
 		rw.stats.IncrRecordsInserted()
 		return false

@@ -68,6 +68,9 @@ type RestoreConfig struct {
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
+	// Amount of extra time-to-live to add to records that have expirable void-times.
+	// Must be set in seconds.
+	ExtraTTL int64
 }
 
 // NewDefaultRestoreConfig returns a new RestoreConfig with default values.
@@ -105,6 +108,10 @@ func (c *RestoreConfig) validate() error {
 
 	if c.MaxAsyncBatches <= 0 {
 		return fmt.Errorf("max async batches must be positive, got %d", c.MaxAsyncBatches)
+	}
+
+	if c.ExtraTTL < 0 {
+		return fmt.Errorf("extra ttl value must not be negative, got %d", c.ExtraTTL)
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

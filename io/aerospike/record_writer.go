@@ -37,6 +37,8 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 		writePolicy = &setGenerationPolicy
 	}
 
+	writePolicy.Expiration = record.Expiration
+
 	err := rw.executeWrite(writePolicy, record)
 	if err != nil {
 		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), err)

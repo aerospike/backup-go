@@ -31,21 +31,23 @@ import (
 type expirationSetter struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
-	getNow  func() cltime.CLTime
-	expired *atomic.Uint64
-	logger  *slog.Logger
+	getNow   func() cltime.CLTime
+	expired  *atomic.Uint64
+	extraTTL int64
+	logger   *slog.Logger
 }
 
 // NewExpirationSetter creates a new expirationSetter processor
-func NewExpirationSetter(expired *atomic.Uint64, logger *slog.Logger) TokenProcessor {
+func NewExpirationSetter(expired *atomic.Uint64, extraTTL int64, logger *slog.Logger) TokenProcessor {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
 	logger.Debug("created new TTL processor")
 
 	return &expirationSetter{
-		getNow:  cltime.Now,
-		expired: expired,
-		logger:  logger,
+		getNow:   cltime.Now,
+		expired:  expired,
+		extraTTL: extraTTL,
+		logger:   logger,
 	}
 }
 
@@ -66,7 +68,7 @@ func (p *expirationSetter) Process(token *models.Token) (*models.Token, error) {
 
 	switch {
 	case record.VoidTime > 0:
-		ttl := record.VoidTime - now.Seconds
+		ttl := record.VoidTime - now.Seconds + p.extraTTL
 		if ttl <= 0 {
 			// the record is expired
 			p.logger.Debug("record is expired", "digest", record.Key.Digest())

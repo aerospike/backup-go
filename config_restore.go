@@ -69,6 +69,7 @@ type RestoreConfig struct {
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
 	// Amount of extra time-to-live to add to records that have expirable void-times.
+	// Must be set in seconds.
 	ExtraTTL int64
 }
 

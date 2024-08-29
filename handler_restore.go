@@ -321,7 +321,7 @@ func (rh *RestoreHandler) runRestoreBatch(
 	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.ReadRecords))
 	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
 	changeNamespace := newTokenWorker(processors.NewChangeNamespace(nsSource, nsDest))
-	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.logger))
+	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger))
 	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped))
 	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))
 	tokenTypeFilter := newTokenWorker(

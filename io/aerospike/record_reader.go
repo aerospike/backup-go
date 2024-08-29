@@ -134,12 +134,12 @@ func (r *RecordReader) Read() (*models.Token, error) {
 // Close cancels the Aerospike scan used to read records
 // if it was started.
 func (r *RecordReader) Close() {
-	if r.config.scanLimiter != nil {
-		r.config.scanLimiter.Release(int64(len(r.scanResult.data)))
-	}
-
 	if r.scanResult != nil {
 		r.scanResult.Close()
+
+		if r.config.scanLimiter != nil {
+			r.config.scanLimiter.Release(int64(len(r.scanResult.data)))
+		}
 	}
 
 	r.logger.Debug("closed aerospike record reader")

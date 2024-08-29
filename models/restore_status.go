@@ -26,6 +26,10 @@ type RestoreStats struct {
 	// The number of records dropped because they didn't contain any of the
 	// selected bins or didn't belong to any of the selected sets.
 	RecordsSkipped atomic.Uint64
+	// The number of records ignored because of record level permanent error while
+	// restoring.
+	// E.g.: if RestoreConfig.IgnoreRecordError = true.
+	RecordsIgnored atomic.Uint64
 	// The number of records dropped because the database already contained the
 	// records with a higher generation count.
 	recordsFresher atomic.Uint64
@@ -72,4 +76,12 @@ func (rs *RestoreStats) IncrRecordsInserted() {
 
 func (rs *RestoreStats) GetTotalBytesRead() uint64 {
 	return rs.TotalBytesRead.Load()
+}
+
+func (rs *RestoreStats) GetRecordsIgnored() uint64 {
+	return rs.RecordsIgnored.Load()
+}
+
+func (rs *RestoreStats) IncrRecordsIgnored() {
+	rs.RecordsIgnored.Add(1)
 }

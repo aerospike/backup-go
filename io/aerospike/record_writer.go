@@ -23,10 +23,11 @@ import (
 )
 
 type singleRecordWriter struct {
-	asc         dbWriter
-	writePolicy *a.WritePolicy
-	stats       *models.RestoreStats
-	retryPolicy *models.RetryPolicy
+	asc               dbWriter
+	writePolicy       *a.WritePolicy
+	stats             *models.RestoreStats
+	retryPolicy       *models.RetryPolicy
+	ignoreRecordError bool
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
@@ -59,7 +60,8 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return nil
 		}
 
-		if isNilOrAcceptableError(aerr) {
+		switch {
+		case isNilOrAcceptableError(aerr):
 			switch {
 			case aerr.Matches(atypes.GENERATION_ERROR):
 				rw.stats.IncrRecordsFresher()
@@ -68,9 +70,12 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			}
 
 			return nil
-		}
 
-		if shouldRetry(aerr) {
+		case rw.ignoreRecordError && shouldIgnore(aerr):
+			rw.stats.IncrRecordsIgnored()
+			return nil
+
+		case shouldRetry(aerr):
 			sleep(rw.retryPolicy, attempt)
 
 			attempt++

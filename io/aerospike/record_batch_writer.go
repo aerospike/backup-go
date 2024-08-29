@@ -24,13 +24,14 @@ import (
 )
 
 type batchRecordWriter struct {
-	asc             dbWriter
-	writePolicy     *a.WritePolicy
-	stats           *models.RestoreStats
-	logger          *slog.Logger
-	retryPolicy     *models.RetryPolicy
-	operationBuffer []a.BatchRecordIfc
-	batchSize       int
+	asc               dbWriter
+	writePolicy       *a.WritePolicy
+	stats             *models.RestoreStats
+	logger            *slog.Logger
+	retryPolicy       *models.RetryPolicy
+	operationBuffer   []a.BatchRecordIfc
+	batchSize         int
+	ignoreRecordError bool
 }
 
 func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
@@ -100,13 +101,17 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
 
-		if isNilOrAcceptableError(err) {
+		switch {
+		case isNilOrAcceptableError(err):
 			rw.operationBuffer = rw.processAndFilterOperations()
 			if len(rw.operationBuffer) == 0 {
 				rw.logger.Debug("All operations succeeded")
 				return nil
 			}
-		} else if !shouldRetry(err) {
+		case rw.ignoreRecordError && shouldIgnore(err):
+			rw.stats.IncrRecordsIgnored()
+			return nil
+		case !shouldRetry(err):
 			return fmt.Errorf("non-retryable error on restore: %w", err)
 		}
 

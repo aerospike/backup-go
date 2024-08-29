@@ -68,6 +68,10 @@ type RestoreConfig struct {
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.
 	MaxAsyncBatches int
+	//  Ignore permanent record-specific error.
+	//  E.g.: AEROSPIKE_RECORD_TOO_BIG.
+	// By default, such errors are not ignored and restore terminates.
+	IgnoreRecordError bool
 }
 
 // NewDefaultRestoreConfig returns a new RestoreConfig with default values.

@@ -79,7 +79,7 @@ type RecordReader struct {
 	client     scanner
 	logger     *slog.Logger
 	config     *RecordReaderConfig
-	scanResult *recordSets
+	scanResult *recordSets // initialized on first Read() call
 }
 
 // NewRecordReader creates a new RecordReader.
@@ -103,7 +103,7 @@ func NewRecordReader(
 
 // Read reads the next record from the Aerospike database.
 func (r *RecordReader) Read() (*models.Token, error) {
-	if r.scanResult == nil {
+	if !r.isScanStarted() {
 		scan, err := r.startScan()
 		if err != nil {
 			return nil, fmt.Errorf("failed to start scan: %w", err)
@@ -134,12 +134,13 @@ func (r *RecordReader) Read() (*models.Token, error) {
 // Close cancels the Aerospike scan used to read records
 // if it was started.
 func (r *RecordReader) Close() {
-	if r.config.scanLimiter != nil {
-		r.config.scanLimiter.Release(int64(len(r.scanResult.data)))
-	}
-
-	if r.scanResult != nil {
+	if r.isScanStarted() {
 		r.scanResult.Close()
+
+		if r.config.scanLimiter != nil {
+			acquired := max(1, len(r.config.setList)) // when setList is empty, weight 1 is acquired.
+			r.config.scanLimiter.Release(int64(acquired))
+		}
 	}
 
 	r.logger.Debug("closed aerospike record reader")
@@ -181,6 +182,10 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 	}
 
 	return newRecordSets(scans, r.logger), nil
+}
+
+func (r *RecordReader) isScanStarted() bool {
+	return r.scanResult != nil
 }
 
 func timeBoundExpression(bounds models.TimeBounds) *a.Expression {

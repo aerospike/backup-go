@@ -138,7 +138,8 @@ func (r *RecordReader) Close() {
 		r.scanResult.Close()
 
 		if r.config.scanLimiter != nil {
-			r.config.scanLimiter.Release(int64(len(r.scanResult.data)))
+			acquired := max(1, len(r.config.setList)) // when setList is empty, weight 1 is acquired.
+			r.config.scanLimiter.Release(int64(acquired))
 		}
 	}
 

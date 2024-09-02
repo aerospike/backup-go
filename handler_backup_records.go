@@ -202,7 +202,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 func (bh *backupRecordsHandler) setAfterDigest() error {
 	digestBytes, err := base64.StdEncoding.DecodeString(bh.config.AfterDigest)
 	if err != nil {
-		return fmt.Errorf("faile to decode after-digest: %w", err)
+		return fmt.Errorf("failed to decode after-digest: %w", err)
 	}
 
 	keyDigest, err := a.NewKeyWithDigest(bh.config.Namespace, "", "", digestBytes)

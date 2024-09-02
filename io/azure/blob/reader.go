@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package s3
+package blob
 
 import (
 	"context"
@@ -20,24 +20,23 @@ import (
 	"io"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
-const s3type = "s3"
+const azureBlobType = "azure-blob"
 
 type validator interface {
 	Run(fileName string) error
 }
 
-// Reader represents S3 storage reader.
+// Reader represents GCP storage reader.
 type Reader struct {
 	// Optional parameters.
 	options
 
-	client *s3.Client
-	// bucketName contains name of the bucket to read from.
-	bucketName string
+	client *azblob.Client
+	// containerName contains name of the container to read from.
+	containerName string
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
 }
@@ -79,19 +78,18 @@ func WithValidator(v validator) Opt {
 	}
 }
 
-// NewReader returns new S3 storage reader.
+// NewReader returns new Azure blob directory/file reader.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithValidator(v validator) - optional.
-// For S3 client next parameters must be set:
-//   - o.UsePathStyle = true
-//   - o.BaseEndpoint = &endpoint - if endpoint != ""
 func NewReader(
 	ctx context.Context,
-	client *s3.Client,
-	bucketName string,
+	client *azblob.Client,
+	containerName string,
 	opts ...Opt,
 ) (*Reader, error) {
-	r := &Reader{}
+	r := &Reader{
+		client: client,
+	}
 
 	for _, opt := range opts {
 		opt(&r.options)
@@ -109,27 +107,18 @@ func NewReader(
 		}
 	}
 
-	// Check if the bucket exists and we have permissions.
-	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(bucketName),
-	}); err != nil {
-		return nil, fmt.Errorf("bucket does not exist or you don't have access: %w", err)
+	// Check if container exists.
+	if _, err := client.ServiceClient().NewContainerClient(containerName).GetProperties(ctx, nil); err != nil {
+		return nil, fmt.Errorf("unable to get container properties: %w", err)
 	}
 
-	// S3 storage can read/write to "/" prefix, so we should replace it with "".
-	if r.prefix == "/" {
-		r.prefix = ""
-	}
-
-	r.client = client
-	r.bucketName = bucketName
+	r.containerName = containerName
 
 	return r, nil
 }
 
-// StreamFiles read files form s3 and send io.Readers to `readersCh` communication
-// chan for lazy loading.
-// In case of error we send error to `errorsCh` channel.
+// StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
+// If error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
@@ -148,28 +137,25 @@ func (r *Reader) streamDirectory(
 ) {
 	defer close(readersCh)
 
-	var continuationToken *string
+	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
+		Prefix: &r.prefix,
+	})
 
-	for {
-		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-			Bucket:            &r.bucketName,
-			Prefix:            &r.prefix,
-			ContinuationToken: continuationToken,
-		})
-
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
 		if err != nil {
-			errorsCh <- fmt.Errorf("failed to list objects: %w", err)
-			return
+			errorsCh <- fmt.Errorf("failed to get next page: %w", err)
 		}
 
-		for _, p := range listResponse.Contents {
-			if p.Key == nil {
+		for _, blob := range page.Segment.BlobItems {
+			// Skip files in folders.
+			if isDirectory(r.prefix, *blob.Name) {
 				continue
 			}
 
 			// Skip not valid files if validator is set.
 			if r.validator != nil {
-				if err = r.validator.Run(*p.Key); err != nil {
+				if err = r.validator.Run(*blob.Name); err != nil {
 					// Since we are passing invalid files, we don't need to handle this
 					// error and write a test for it. Maybe we should log this information
 					// for the user, so they know what is going on.
@@ -177,46 +163,48 @@ func (r *Reader) streamDirectory(
 				}
 			}
 
-			var object *s3.GetObjectOutput
+			var resp azblob.DownloadStreamResponse
 
-			object, err = r.client.GetObject(ctx, &s3.GetObjectInput{
-				Bucket: &r.bucketName,
-				Key:    p.Key,
-			})
+			resp, err = r.client.DownloadStream(ctx, r.containerName, *blob.Name, nil)
 			if err != nil {
-				// We check *p.Key == nil in the beginning.
-				errorsCh <- fmt.Errorf("failerd to create reader from file %s: %w", *p.Key, err)
+				errorsCh <- fmt.Errorf("failerd to create reader from file %s: %w", *blob.Name, err)
 			}
 
-			readersCh <- object.Body
-		}
-
-		continuationToken = listResponse.NextContinuationToken
-		if continuationToken == nil {
-			break
+			readersCh <- resp.Body
 		}
 	}
 }
 
-// streamFile opens single file from s3 and sends io.Readers to the `readersCh`
+// streamFile opens a single file from GCP cloud storage and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) streamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
 
-	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &r.bucketName,
-		Key:    &filename,
-	})
+	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failerd to create reader from file %s: %w", filename, err)
-		return
 	}
 
-	readersCh <- object.Body
+	readersCh <- resp.Body
 }
 
-// GetType return `s3type` type of storage. Used in logging.
+// GetType return `gcpStorageType` type of storage. Used in logging.
 func (r *Reader) GetType() string {
-	return s3type
+	return azureBlobType
+}
+
+func isDirectory(prefix, fileName string) bool {
+	// If file name ends with / it is 100% dir.
+	if strings.HasSuffix(fileName, "/") {
+		return true
+	}
+
+	// If we look inside some folder.
+	if strings.HasPrefix(fileName, prefix) {
+		clean := strings.TrimPrefix(fileName, prefix)
+		return strings.Contains(clean, "/")
+	}
+	// All other variants.
+	return strings.Contains(fileName, "/")
 }

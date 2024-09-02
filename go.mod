@@ -8,7 +8,7 @@ require (
 	github.com/aerospike/tools-common-go v0.0.0-20240701164814-36eec593d9c6
 	github.com/aws/aws-sdk-go-v2 v1.30.4
 	github.com/aws/aws-sdk-go-v2/config v1.27.28
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.59.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.61.0
 	github.com/aws/smithy-go v1.20.4
 	github.com/docker/docker v27.1.2+incompatible
 	github.com/docker/go-connections v0.5.0

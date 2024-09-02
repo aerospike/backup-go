@@ -51,6 +51,16 @@ func TestBackupConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "filelimit")
 	config = NewDefaultBackupConfig()
 
+	config.AfterDigest = "te/&st"
+	assert.ErrorContains(t, config.validate(), "after digest")
+	config = NewDefaultBackupConfig()
+
+	config.AfterDigest = "EjRWeJq83vEjRRI0VniavN7xI0U="
+	config.Partitions.Begin = 2
+	config.Partitions.Count = 10
+	assert.ErrorContains(t, config.validate(), "after digest")
+	config = NewDefaultBackupConfig()
+
 	config.CompressionPolicy = &CompressionPolicy{Level: -1}
 	assert.ErrorContains(t, config.validate(), "compression")
 	config = NewDefaultBackupConfig()

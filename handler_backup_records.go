@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -55,14 +56,10 @@ func newBackupRecordsHandler(
 	}
 
 	// For resuming backup from config.AfterDigest, we have to get and check key info, then set additional params.
-	if config.AfterDigest != nil {
-		keyDigest, err := a.NewKeyWithDigest(config.Namespace, "", "", config.AfterDigest)
-		if err != nil {
-			return nil, fmt.Errorf("failed to init key from digest: %w", err)
+	if config.AfterDigest != "" {
+		if err := h.setAfterDigest(); err != nil {
+			return nil, err
 		}
-
-		h.config.Partitions.Begin = keyDigest.PartitionId()
-		h.afterDigest = keyDigest.Digest()
 	}
 
 	return h, nil
@@ -200,4 +197,22 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 		},
 		bh.scanLimiter,
 	)
+}
+
+func (bh *backupRecordsHandler) setAfterDigest() error {
+	digestBytes, err := base64.StdEncoding.DecodeString(bh.config.AfterDigest)
+	if err != nil {
+		return fmt.Errorf("faile to decode after-digest: %w", err)
+	}
+
+	keyDigest, err := a.NewKeyWithDigest(bh.config.Namespace, "", "", digestBytes)
+	if err != nil {
+		return fmt.Errorf("failed to init key from digest: %w", err)
+	}
+
+	bh.config.Partitions.Begin = keyDigest.PartitionId()
+	bh.config.Partitions.Count -= bh.config.Partitions.Begin
+	bh.afterDigest = keyDigest.Digest()
+
+	return nil
 }

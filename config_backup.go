@@ -78,7 +78,7 @@ type BackupConfig struct {
 	// This parameter is mutually exclusive to partition-list (not implemented).
 	// Format: base64 encoded string.
 	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
-	AfterDigest []byte
+	AfterDigest string
 }
 
 // PartitionRange specifies a range of Aerospike partitions.
@@ -127,7 +127,7 @@ func NewDefaultBackupConfig() *BackupConfig {
 
 func (c *BackupConfig) isFullBackup() bool {
 	// full backup doesn't have lower bound
-	return c.ModAfter == nil && c.AfterDigest == nil
+	return c.ModAfter == nil && c.AfterDigest == ""
 }
 
 func (c *BackupConfig) validate() error {
@@ -143,8 +143,8 @@ func (c *BackupConfig) validate() error {
 		return err
 	}
 
-	if c.AfterDigest != nil {
-		if _, err := base64.StdEncoding.Decode(nil, c.AfterDigest); err != nil {
+	if c.AfterDigest != "" {
+		if _, err := base64.StdEncoding.DecodeString(c.AfterDigest); err != nil {
 			return fmt.Errorf("after digest must be base64 encoded string: %w", err)
 		}
 

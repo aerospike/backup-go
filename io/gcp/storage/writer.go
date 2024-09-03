@@ -114,9 +114,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		if !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
-	}
-	// If we use backup to single file, we overwrite the file name.
-	if !w.isDir {
+		// If we use backup to single file, we overwrite the file name.
 		filename = w.path
 	}
 

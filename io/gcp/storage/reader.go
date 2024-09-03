@@ -70,6 +70,7 @@ func WithFile(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = false
+		r.removeFiles = true
 	}
 }
 

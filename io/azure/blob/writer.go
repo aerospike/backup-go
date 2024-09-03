@@ -102,6 +102,7 @@ func NewWriter(
 	}
 
 	w.containerName = containerName
+	w.prefix = prefix
 
 	return w, nil
 }
@@ -203,6 +204,10 @@ func isEmptyDirectory(ctx context.Context, client *azblob.Client, containerName,
 		}
 
 		if len(page.Segment.BlobItems) == 0 {
+			return true, nil
+		}
+		// For nested folders azure return folder itself.
+		if *page.Segment.BlobItems[0].Name == prefix {
 			return true, nil
 		}
 	}

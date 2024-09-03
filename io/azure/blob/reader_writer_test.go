@@ -12,27 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package blob
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 const (
-	testServiceAddress           = "http://127.0.0.1:4443/storage/v1/b"
-	testProjectID                = "test-project"
-	testBucketName               = "test-bucket"
+	azuritAccountName = "devstoreaccount1"
+	azuritAccountKey  = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+
+	testServiceAddress = "http://127.0.0.1:10000/devstoreaccount1"
+	testContainerName  = "test-container"
+
 	testReadFolderEmpty          = "folder_read_empty/"
 	testReadFolderWithData       = "folder_read_with_data/"
 	testReadFolderMixedData      = "folder_read_mixed_data/"
@@ -45,19 +45,23 @@ const (
 	testFileNameTemplate         = "backup_%d.asb"
 	testFileNameTemplateWrong    = "file_%d.zip"
 	testFileNameOneFile          = "one_file.any"
-	testFileContent              = "content"
-	testFileContentLength        = 7
-	testFilesNumber              = 5
+
+	testFileContent       = "content"
+	testFileContentLength = 7
+
+	testFilesNumber = 5
 )
 
-type GCPSuite struct {
+type AzureSuite struct {
 	suite.Suite
-	client *storage.Client
+	client *azblob.Client
 }
 
-func (s *GCPSuite) SetupSuite() {
+func (s *AzureSuite) SetupSuite() {
 	ctx := context.Background()
-	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress), option.WithoutAuthentication())
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	err = fillTestData(ctx, client)
@@ -65,83 +69,65 @@ func (s *GCPSuite) SetupSuite() {
 	s.client = client
 }
 
-func (s *GCPSuite) TearDownSuite() {
+func (s *AzureSuite) TearDownSuite() {
 	ctx := context.Background()
 	err := removeTestData(ctx, s.client)
-	s.Require().NoError(err)
-
-	err = s.client.Close()
 	s.Require().NoError(err)
 }
 
 func TestGCPSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(GCPSuite))
+	suite.Run(t, new(AzureSuite))
 }
 
-// fillTestData creates test data in different folders.
-func fillTestData(ctx context.Context, client *storage.Client) error {
-	bucket := client.Bucket(testBucketName)
-	if err := bucket.Create(ctx, testProjectID, nil); err != nil {
+func fillTestData(ctx context.Context, client *azblob.Client) error {
+	if _, err := client.CreateContainer(ctx, testContainerName, nil); err != nil {
 		return err
 	}
 
-	// empty folders.
-	sw := client.Bucket(testBucketName).Object(testReadFolderEmpty).NewWriter(ctx)
-	if err := writeContent(sw, ""); err != nil {
+	containerClient := client.ServiceClient().NewContainerClient(testContainerName)
+
+	blockBlobClient := containerClient.NewBlockBlobClient(testReadFolderEmpty)
+	if _, err := blockBlobClient.Upload(ctx, nil, nil); err != nil {
 		return err
 	}
 
-	sw = client.Bucket(testBucketName).Object(testWriteFolderEmpty).NewWriter(ctx)
-	if err := writeContent(sw, ""); err != nil {
+	blockBlobClient = containerClient.NewBlockBlobClient(testWriteFolderEmpty)
+	if _, err := blockBlobClient.Upload(ctx, nil, nil); err != nil {
 		return err
 	}
 
 	folderName := fmt.Sprintf("%s%s%s", testReadFolderMixedData, testWriteFolderEmpty, testFileNameTemplate)
-	sw = client.Bucket(testBucketName).Object(folderName).NewWriter(ctx)
-	if err := writeContent(sw, testFileContent); err != nil {
+	if _, err := client.UploadStream(ctx, testContainerName, folderName, strings.NewReader(testFileContent), nil); err != nil {
 		return err
 	}
 
-	// one file
 	folderName = fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)
-	sw = client.Bucket(testBucketName).Object(folderName).NewWriter(ctx)
-	if err := writeContent(sw, testFileContent); err != nil {
+	if _, err := client.UploadStream(ctx, testContainerName, folderName, strings.NewReader(testFileContent), nil); err != nil {
 		return err
 	}
 
-	// not an empty folders.
 	for i := 0; i < testFilesNumber; i++ {
-		// for reading tests.
 		fileName := fmt.Sprintf("%s%s", testReadFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
-		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-		sw.ContentType = fileType
-		if err := writeContent(sw, testFileContent); err != nil {
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
 		}
-		// for writing tests.
+
 		fileName = fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
-		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-		sw.ContentType = fileType
-		if err := writeContent(sw, testFileContent); err != nil {
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
 		}
 
 		fileName = fmt.Sprintf("%s%s", testWriteFolderWithDataError, fmt.Sprintf(testFileNameTemplate, i))
-		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-		sw.ContentType = fileType
-		if err := writeContent(sw, testFileContent); err != nil {
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
 		}
 
-		// mixed content
 		fileName = fmt.Sprintf("%s%s", testReadFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
 		if i%2 == 0 {
 			fileName = fmt.Sprintf("%s%s", testReadFolderMixedData, fmt.Sprintf(testFileNameTemplateWrong, i))
 		}
-		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-		sw.ContentType = fileType
-		if err := writeContent(sw, testFileContent); err != nil {
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
 		}
 
@@ -149,9 +135,7 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 		if i%2 == 0 {
 			fileName = fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplateWrong, i))
 		}
-		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-		sw.ContentType = fileType
-		if err := writeContent(sw, testFileContent); err != nil {
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
 		}
 	}
@@ -159,38 +143,8 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 	return nil
 }
 
-func removeTestData(ctx context.Context, client *storage.Client) error {
-	bucket := client.Bucket(testBucketName)
-	it := bucket.Objects(ctx, nil)
-	for {
-		// Iterate over bucket until we're done.
-		objAttrs, err := it.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if err := bucket.Object(objAttrs.Name).Delete(ctx); err != nil {
-			return err
-		}
-	}
-
-	if err := bucket.Delete(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func writeContent(sw *storage.Writer, content string) error {
-	if _, err := sw.Write([]byte(content)); err != nil {
-		return err
-	}
-
-	if err := sw.Close(); err != nil {
+func removeTestData(ctx context.Context, client *azblob.Client) error {
+	if _, err := client.DeleteContainer(ctx, testContainerName, nil); err != nil {
 		return err
 	}
 
@@ -206,19 +160,17 @@ func (mock validatorMock) Run(fileName string) error {
 	return nil
 }
 
-func (s *GCPSuite) TestReader_StreamFilesOk() {
+func (s *AzureSuite) TestReader_StreamFilesOk() {
 	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	reader, err := NewReader(
 		ctx,
 		client,
-		testBucketName,
+		testContainerName,
 		WithDir(testReadFolderWithData),
 		WithValidator(validatorMock{}),
 	)
@@ -245,19 +197,17 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	}
 }
 
-func (s *GCPSuite) TestReader_StreamFilesEmpty() {
+func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	reader, err := NewReader(
 		ctx,
 		client,
-		testBucketName,
+		testContainerName,
 		WithDir(testReadFolderEmpty),
 		WithValidator(validatorMock{}),
 	)
@@ -284,19 +234,17 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	}
 }
 
-func (s *GCPSuite) TestReader_StreamFilesMixed() {
+func (s *AzureSuite) TestReader_StreamFilesMixed() {
 	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	reader, err := NewReader(
 		ctx,
 		client,
-		testBucketName,
+		testContainerName,
 		WithDir(testReadFolderMixedData),
 		WithValidator(validatorMock{}),
 	)
@@ -323,29 +271,27 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	}
 }
 
-func (s *GCPSuite) TestReader_GetType() {
+func (s *AzureSuite) TestReader_GetType() {
 	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	reader, err := NewReader(
 		ctx,
 		client,
-		testBucketName,
+		testContainerName,
 		WithDir(testReadFolderMixedData),
 		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
 	result := reader.GetType()
-	require.Equal(s.T(), gcpStorageType, result)
+	require.Equal(s.T(), azureBlobType, result)
 }
 
-func (s *GCPSuite) TestReader_isDirectory() {
+func (s *AzureSuite) TestReader_isDirectory() {
 	prefix := "/"
 	fileNames := []string{
 		"test/innerfldr/",
@@ -363,148 +309,17 @@ func (s *GCPSuite) TestReader_isDirectory() {
 	require.Equal(s.T(), 4, dirCounter)
 }
 
-func (s *GCPSuite) TestWriter_WriteEmptyDir() {
+func (s *AzureSuite) TestReader_OpenFileOk() {
 	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
-
-	writer, err := NewWriter(
-		ctx,
-		client,
-		testBucketName,
-		WithDir(testWriteFolderEmpty),
-	)
-	s.Require().NoError(err)
-
-	for i := 0; i < testFilesNumber; i++ {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
-		s.Require().NoError(err)
-		n, err := w.Write([]byte(testFileContent))
-		s.Require().NoError(err)
-		s.Equal(testFileContentLength, n)
-		err = w.Close()
-		s.Require().NoError(err)
-	}
-}
-
-func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
-	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	_, err = NewWriter(
-		ctx,
-		client,
-		testBucketName,
-		WithDir(testWriteFolderWithDataError),
-	)
-	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
-}
-
-func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
-	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	writer, err := NewWriter(
-		ctx,
-		client,
-		testBucketName,
-		WithDir(testWriteFolderWithData),
-		WithRemoveFiles(),
-	)
-	s.Require().NoError(err)
-
-	for i := 0; i < testFilesNumber; i++ {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
-		s.Require().NoError(err)
-		n, err := w.Write([]byte(testFileContent))
-		s.Require().NoError(err)
-		s.Equal(testFileContentLength, n)
-		err = w.Close()
-		s.Require().NoError(err)
-	}
-}
-
-func (s *GCPSuite) TestWriter_WriteMixedDir() {
-	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	writer, err := NewWriter(
-		ctx,
-		client,
-		testBucketName,
-		WithDir(testWriteFolderMixedData),
-		WithRemoveFiles(),
-	)
-	s.Require().NoError(err)
-
-	for i := 0; i < testFilesNumber; i++ {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
-		s.Require().NoError(err)
-		n, err := w.Write([]byte(testFileContent))
-		s.Require().NoError(err)
-		s.Equal(testFileContentLength, n)
-		err = w.Close()
-		s.Require().NoError(err)
-	}
-}
-
-func (s *GCPSuite) TestWriter_GetType() {
-	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	writer, err := NewWriter(
-		ctx,
-		client,
-		testBucketName,
-		WithDir(testWriteFolderWithData),
-		WithRemoveFiles(),
-	)
-	s.Require().NoError(err)
-
-	result := writer.GetType()
-	require.Equal(s.T(), gcpStorageType, result)
-}
-
-func (s *GCPSuite) TestReader_OpenFileOk() {
-	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	reader, err := NewReader(
 		ctx,
 		client,
-		testBucketName,
+		testContainerName,
 		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
@@ -530,19 +345,17 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 	}
 }
 
-func (s *GCPSuite) TestReader_OpenFileErr() {
+func (s *AzureSuite) TestReader_OpenFileErr() {
 	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	reader, err := NewReader(
 		ctx,
 		client,
-		testBucketName,
+		testContainerName,
 		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
 	)
 	s.Require().NoError(err)
@@ -553,24 +366,121 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 	go reader.StreamFiles(ctx, rCH, eCH)
 
 	for err = range eCH {
-		s.Require().ErrorContains(err, "object doesn't exist")
+		s.Require().ErrorContains(err, "blob does not exist")
 		return
 	}
 }
 
-func (s *GCPSuite) TestWriter_WriteSingleFile() {
+func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
 	writer, err := NewWriter(
 		ctx,
 		client,
-		testBucketName,
+		testContainerName,
+		WithDir(testWriteFolderEmpty),
+	)
+	s.Require().NoError(err)
+
+	for i := 0; i < testFilesNumber; i++ {
+		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
+		w, err := writer.NewWriter(ctx, fileName)
+		s.Require().NoError(err)
+		n, err := w.Write([]byte(testFileContent))
+		s.Require().NoError(err)
+		s.Equal(testFileContentLength, n)
+		err = w.Close()
+		s.Require().NoError(err)
+	}
+}
+
+func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	_, err = NewWriter(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testWriteFolderWithDataError),
+	)
+	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
+}
+
+func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	writer, err := NewWriter(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testWriteFolderWithData),
+		WithRemoveFiles(),
+	)
+	s.Require().NoError(err)
+
+	for i := 0; i < testFilesNumber; i++ {
+		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
+		w, err := writer.NewWriter(ctx, fileName)
+		s.Require().NoError(err)
+		n, err := w.Write([]byte(testFileContent))
+		s.Require().NoError(err)
+		s.Equal(testFileContentLength, n)
+		err = w.Close()
+		s.Require().NoError(err)
+	}
+}
+
+func (s *AzureSuite) TestWriter_WriteMixedDir() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	writer, err := NewWriter(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testWriteFolderMixedData),
+		WithRemoveFiles(),
+	)
+	s.Require().NoError(err)
+
+	for i := 0; i < testFilesNumber; i++ {
+		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
+		w, err := writer.NewWriter(ctx, fileName)
+		s.Require().NoError(err)
+		n, err := w.Write([]byte(testFileContent))
+		s.Require().NoError(err)
+		s.Equal(testFileContentLength, n)
+		err = w.Close()
+		s.Require().NoError(err)
+	}
+}
+
+func (s *AzureSuite) TestWriter_WriteSingleFile() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	writer, err := NewWriter(
+		ctx,
+		client,
+		testContainerName,
 		WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
@@ -582,4 +492,24 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 	s.Equal(testFileContentLength, n)
 	err = w.Close()
 	s.Require().NoError(err)
+}
+
+func (s *AzureSuite) TestWriter_GetType() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	writer, err := NewWriter(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testWriteFolderWithData),
+		WithRemoveFiles(),
+	)
+	s.Require().NoError(err)
+
+	result := writer.GetType()
+	require.Equal(s.T(), azureBlobType, result)
 }

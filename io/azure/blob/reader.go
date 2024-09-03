@@ -50,6 +50,9 @@ type options struct {
 	removeFiles bool
 	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
+	// Concurrency defines the max number of concurrent uploads to be performed to upload the file.
+	// Each concurrent upload will create a buffer of size BlockSize.
+	uploadConcurrency int
 }
 
 type Opt func(*options)
@@ -168,7 +171,7 @@ func (r *Reader) streamDirectory(
 
 			resp, err = r.client.DownloadStream(ctx, r.containerName, *blob.Name, nil)
 			if err != nil {
-				errorsCh <- fmt.Errorf("failerd to create reader from file %s: %w", *blob.Name, err)
+				errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", *blob.Name, err)
 			}
 
 			readersCh <- resp.Body
@@ -184,7 +187,7 @@ func (r *Reader) streamFile(
 
 	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failerd to create reader from file %s: %w", filename, err)
+		errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", filename, err)
 	}
 
 	readersCh <- resp.Body

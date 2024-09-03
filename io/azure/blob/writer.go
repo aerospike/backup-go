@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	uploadStreamFileType    = "application/octet-stream"
-	uploadStreamBlockSize   = 5 * 1024 * 1024 // 5MB, minimum size of a part
-	uploadStreamConcurrency = 5
+	uploadStreamFileType           = "application/octet-stream"
+	uploadStreamBlockSize          = 5 * 1024 * 1024 // 5MB, minimum size of a part
+	uploadStreamConcurrencyDefault = 5
 )
 
 // Writer represents a GCP storage writer.
@@ -54,6 +54,14 @@ func WithRemoveFiles() Opt {
 	}
 }
 
+// WithUploadConcurrency define max number of concurrent uploads to be performed to upload the file.
+// Is used only for Writer.
+func WithUploadConcurrency(v int) Opt {
+	return func(r *options) {
+		r.uploadConcurrency = v
+	}
+}
+
 func NewWriter(
 	ctx context.Context,
 	client *azblob.Client,
@@ -63,6 +71,8 @@ func NewWriter(
 	w := &Writer{
 		client: client,
 	}
+	// Set default value.
+	w.uploadConcurrency = uploadStreamConcurrencyDefault
 
 	for _, opt := range opts {
 		opt(&w.options)
@@ -114,9 +124,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		if !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
-	}
-	// If we use backup to single file, we overwrite the file name.
-	if !w.isDir {
+		// If we use backup to single file, we overwrite the file name.
 		filename = w.path
 	}
 
@@ -145,7 +153,7 @@ func newBlobWriter(ctx context.Context, blobClient *blockblob.Client) io.WriteCl
 		ctx:        ctx,
 		pipeReader: pipeReader,
 		pipeWriter: pipeWriter,
-		done:       make(chan error),
+		done:       make(chan error, 1),
 	}
 
 	go w.uploadStream()
@@ -154,12 +162,10 @@ func newBlobWriter(ctx context.Context, blobClient *blockblob.Client) io.WriteCl
 }
 
 func (w *blobWriter) uploadStream() {
-	defer w.pipeReader.Close()
-
 	contentType := uploadStreamFileType
 	_, err := w.blobClient.UploadStream(w.ctx, w.pipeReader, &azblob.UploadStreamOptions{
 		BlockSize:   uploadStreamBlockSize,
-		Concurrency: uploadStreamConcurrency,
+		Concurrency: uploadStreamConcurrencyDefault,
 		HTTPHeaders: &blob.HTTPHeaders{
 			BlobContentType: &contentType,
 		}})
@@ -177,12 +183,7 @@ func (w *blobWriter) Close() error {
 		return err
 	}
 
-	err = <-w.done
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return <-w.done
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.

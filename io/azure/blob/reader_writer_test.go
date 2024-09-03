@@ -30,7 +30,7 @@ const (
 	azuritAccountName = "devstoreaccount1"
 	azuritAccountKey  = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
 
-	testServiceAddress = "http://127.0.0.1:10000/devstoreaccount1"
+	testServiceAddress = "http://127.0.0.1:10001/devstoreaccount1"
 	testContainerName  = "test-container"
 
 	testReadFolderEmpty          = "folder_read_empty/"

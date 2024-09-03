@@ -37,7 +37,6 @@ func main() {
 
 	// For backup to single file use local.WithFile(fileName)
 	writers, err := local.NewWriter(
-		local.WithValidator(asb.NewValidator()),
 		local.WithRemoveFiles(),
 		local.WithDir("backups_folder"),
 	)
@@ -69,6 +68,7 @@ func main() {
 	// For restore from single file use local.WithFile(fileName)
 	reader, err := local.NewReader(
 		local.WithDir("backups_folder"),
+		local.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
 		panic(err)

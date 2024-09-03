@@ -131,29 +131,31 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
 
-	return newBlobWriter(ctx, blockBlobClient), nil
+	return newBlobWriter(ctx, blockBlobClient, w.uploadConcurrency), nil
 }
 
 var _ io.WriteCloser = (*blobWriter)(nil)
 
 // blobWriter wrapper for io.WriteCloser
 type blobWriter struct {
-	ctx        context.Context
-	blobClient *blockblob.Client
-	pipeReader *io.PipeReader
-	pipeWriter *io.PipeWriter
-	done       chan error
+	ctx               context.Context
+	blobClient        *blockblob.Client
+	pipeReader        *io.PipeReader
+	pipeWriter        *io.PipeWriter
+	done              chan error
+	uploadConcurrency int
 }
 
-func newBlobWriter(ctx context.Context, blobClient *blockblob.Client) io.WriteCloser {
+func newBlobWriter(ctx context.Context, blobClient *blockblob.Client, uploadConcurrency int) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
 
 	w := &blobWriter{
-		blobClient: blobClient,
-		ctx:        ctx,
-		pipeReader: pipeReader,
-		pipeWriter: pipeWriter,
-		done:       make(chan error, 1),
+		blobClient:        blobClient,
+		ctx:               ctx,
+		pipeReader:        pipeReader,
+		pipeWriter:        pipeWriter,
+		done:              make(chan error, 1),
+		uploadConcurrency: uploadConcurrency,
 	}
 
 	go w.uploadStream()
@@ -165,7 +167,7 @@ func (w *blobWriter) uploadStream() {
 	contentType := uploadStreamFileType
 	_, err := w.blobClient.UploadStream(w.ctx, w.pipeReader, &azblob.UploadStreamOptions{
 		BlockSize:   uploadStreamBlockSize,
-		Concurrency: uploadStreamConcurrencyDefault,
+		Concurrency: w.uploadConcurrency,
 		HTTPHeaders: &blob.HTTPHeaders{
 			BlobContentType: &contentType,
 		}})

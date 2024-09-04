@@ -17,6 +17,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -988,6 +989,33 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	suite.Require().InDelta(expectedDuration, restoreStats.GetDuration(), epsilon)
 	suite.Require().InDelta(totalDuration, restoreStats.GetDuration()+backupStats.GetDuration(), epsilon)
 
+	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
+	batch := genRecords(suite.namespace, suite.set, 900, testBins)
+	suite.SetupTest(batch)
+
+	digest := base64.StdEncoding.EncodeToString(batch[0].Key.Digest())
+
+	var backupConfig = &backup.BackupConfig{
+		Partitions:  backup.PartitionRangeAll(),
+		SetList:     []string{suite.set},
+		Namespace:   suite.namespace,
+		Parallel:    1,
+		EncoderType: backup.EncoderTypeASB,
+		AfterDigest: digest,
+	}
+
+	ctx := context.Background()
+	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	bh, err := suite.backupClient.Backup(
+		ctx,
+		backupConfig,
+		&dst,
+	)
+	suite.Nil(err)
+	suite.NotNil(bh)
 	suite.TearDownTest()
 }
 

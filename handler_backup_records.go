@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -35,6 +36,8 @@ type backupRecordsHandler struct {
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
+	// is used when AfterDigest is set.
+	afterDigest []byte
 }
 
 func newBackupRecordsHandler(
@@ -42,15 +45,24 @@ func newBackupRecordsHandler(
 	ac AerospikeClient,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
-) *backupRecordsHandler {
+) (*backupRecordsHandler, error) {
 	logger.Debug("created new backup records handler")
 
-	return &backupRecordsHandler{
+	h := &backupRecordsHandler{
 		config:          config,
 		aerospikeClient: ac,
 		logger:          logger,
 		scanLimiter:     scanLimiter,
 	}
+
+	// For resuming backup from config.AfterDigest, we have to get and check key info, then set additional params.
+	if config.AfterDigest != "" {
+		if err := h.setAfterDigest(); err != nil {
+			return nil, err
+		}
+	}
+
+	return h, nil
 }
 
 func (bh *backupRecordsHandler) run(
@@ -100,7 +112,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	readerConfig := bh.recordReaderConfigForPartition(PartitionRangeAll(), &scanPolicy)
+	readerConfig := bh.recordReaderConfigForPartition(bh.config.Partitions, &scanPolicy, bh.afterDigest)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 	defer recordReader.Close()
@@ -142,10 +154,17 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
 
 	for i := 0; i < n; i++ {
+		recordReaderConfig := bh.recordReaderConfigForPartition(partitionRanges[i], &scanPolicy, nil)
+
+		// For the first partition in the list we start from digest if it is set.
+		if bh.afterDigest != nil && i == 0 {
+			recordReaderConfig = bh.recordReaderConfigForPartition(partitionRanges[i], &scanPolicy, bh.afterDigest)
+		}
+
 		recordReader := aerospike.NewRecordReader(
 			ctx,
 			bh.aerospikeClient,
-			bh.recordReaderConfigForPartition(partitionRanges[i], &scanPolicy),
+			recordReaderConfig,
 			bh.logger,
 		)
 
@@ -158,11 +177,18 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 	partitionRange PartitionRange,
 	scanPolicy *a.ScanPolicy,
+	// We should pass digest as parameter here, for implementing adding digest to first partition logic.
+	digest []byte,
 ) *aerospike.RecordReaderConfig {
+	partitionFilter := a.NewPartitionFilterByRange(partitionRange.Begin, partitionRange.Count)
+	if digest != nil {
+		partitionFilter.Digest = digest
+	}
+
 	return aerospike.NewRecordReaderConfig(
 		bh.config.Namespace,
 		bh.config.SetList,
-		a.NewPartitionFilterByRange(partitionRange.Begin, partitionRange.Count),
+		partitionFilter,
 		scanPolicy,
 		bh.config.BinList,
 		models.TimeBounds{
@@ -171,4 +197,22 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 		},
 		bh.scanLimiter,
 	)
+}
+
+func (bh *backupRecordsHandler) setAfterDigest() error {
+	digestBytes, err := base64.StdEncoding.DecodeString(bh.config.AfterDigest)
+	if err != nil {
+		return fmt.Errorf("failed to decode after-digest: %w", err)
+	}
+
+	keyDigest, err := a.NewKeyWithDigest(bh.config.Namespace, "", "", digestBytes)
+	if err != nil {
+		return fmt.Errorf("failed to init key from digest: %w", err)
+	}
+
+	bh.config.Partitions.Begin = keyDigest.PartitionId()
+	bh.config.Partitions.Count -= bh.config.Partitions.Begin
+	bh.afterDigest = keyDigest.Digest()
+
+	return nil
 }

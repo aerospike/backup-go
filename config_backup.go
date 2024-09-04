@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -70,6 +71,14 @@ type BackupConfig struct {
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
 	FileLimit int64
+	// Backup records after record digest in record's partition plus all succeeding partitions.
+	// Used to resume backup with last record received from previous incomplete backup.
+	// This parameter will overwrite Partitions.Begin value.
+	// Can't be used in full backup mode.
+	// This parameter is mutually exclusive to partition-list (not implemented).
+	// Format: base64 encoded string.
+	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
+	AfterDigest string
 }
 
 // PartitionRange specifies a range of Aerospike partitions.
@@ -118,7 +127,7 @@ func NewDefaultBackupConfig() *BackupConfig {
 
 func (c *BackupConfig) isFullBackup() bool {
 	// full backup doesn't have lower bound
-	return c.ModAfter == nil
+	return c.ModAfter == nil && c.AfterDigest == ""
 }
 
 func (c *BackupConfig) validate() error {
@@ -132,6 +141,16 @@ func (c *BackupConfig) validate() error {
 
 	if err := c.Partitions.validate(); err != nil {
 		return err
+	}
+
+	if c.AfterDigest != "" {
+		if _, err := base64.StdEncoding.DecodeString(c.AfterDigest); err != nil {
+			return fmt.Errorf("after digest must be base64 encoded string: %w", err)
+		}
+
+		if c.Partitions.Begin != 0 {
+			return fmt.Errorf("after digest is set, begin partiotion can't be set")
+		}
 	}
 
 	if c.RecordsPerSecond < 0 {

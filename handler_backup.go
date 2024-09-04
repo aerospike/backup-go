@@ -137,7 +137,11 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	}
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)
+
+	handler, err := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)
+	if err != nil {
+		return err
+	}
 
 	bh.stats.TotalRecords, err = handler.countRecords(ctx, bh.infoClient)
 	if err != nil {

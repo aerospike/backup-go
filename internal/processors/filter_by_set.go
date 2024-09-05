@@ -22,22 +22,22 @@ import (
 	"github.com/aerospike/backup-go/pipeline"
 )
 
-// FilterBySet filter records by set.
-type FilterBySet struct {
+// filterBySet filter records by set.
+type filterBySet struct {
 	setsToRestore map[string]bool
 	skipped       *atomic.Uint64
 }
 
 // NewFilterBySet creates new filterBySet processor with given setList.
 func NewFilterBySet(setList []string, skipped *atomic.Uint64) TokenProcessor {
-	return &FilterBySet{
+	return &filterBySet{
 		setsToRestore: util.ListToMap(setList),
 		skipped:       skipped,
 	}
 }
 
 // Process filters out records that does not belong to setsToRestore
-func (p FilterBySet) Process(token *models.Token) (*models.Token, error) {
+func (p filterBySet) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
 		return token, nil

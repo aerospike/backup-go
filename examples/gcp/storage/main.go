@@ -22,7 +22,6 @@ import (
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-
 	gcpStorage "github.com/aerospike/backup-go/io/gcp/storage"
 )
 
@@ -88,7 +87,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = dbNameSource
-	backupCfg.Parallel = 10
+	backupCfg.ParallelRead = 10
 
 	// set compression policy
 	backupCfg.CompressionPolicy = &backup.CompressionPolicy{

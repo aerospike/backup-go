@@ -70,7 +70,7 @@ func (bh *backupRecordsHandler) run(
 	writers []pipeline.Worker[*models.Token],
 	recordsReadTotal *atomic.Uint64,
 ) error {
-	readWorkers, err := bh.makeAerospikeReadWorkers(ctx, bh.config.Parallel)
+	readWorkers, err := bh.makeAerospikeReadWorkers(ctx, bh.config.ParallelRead)
 	if err != nil {
 		return err
 	}

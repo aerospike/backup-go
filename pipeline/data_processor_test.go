@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package processors
+package pipeline
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/processors/mocks"
+	"github.com/aerospike/backup-go/pipeline/mocks"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -59,7 +59,7 @@ func (suite *processorTestSuite) TestProcessorWorker() {
 
 func (suite *processorTestSuite) TestProcessorWorkerFilteredOut() {
 	mockProcessor := mocks.NewMockDataProcessor[string](suite.T())
-	mockProcessor.EXPECT().Process("test").Return("test", errFilteredOut)
+	mockProcessor.EXPECT().Process("test").Return("test", ErrFilteredOut)
 
 	worker := NewProcessorWorker[string](mockProcessor)
 	suite.NotNil(worker)

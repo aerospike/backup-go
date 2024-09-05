@@ -17,6 +17,7 @@ package processors
 import (
 	"context"
 
+	"github.com/aerospike/backup-go/pipeline"
 	"golang.org/x/time/rate"
 )
 
@@ -30,7 +31,7 @@ type tpsLimiter[T any] struct {
 
 // NewTPSLimiter Create a new TPS limiter.
 // n — allowed  number of tokens per second, n = 0 means no limit.
-func NewTPSLimiter[T any](ctx context.Context, n int) DataProcessor[T] {
+func NewTPSLimiter[T any](ctx context.Context, n int) pipeline.DataProcessor[T] {
 	if n == 0 {
 		return &noopProcessor[T]{}
 	}

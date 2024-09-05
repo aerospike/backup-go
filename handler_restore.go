@@ -365,6 +365,6 @@ func (rh *RestoreHandler) useBatchWrites() (bool, error) {
 
 func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*models.Token] {
 	return []pipeline.Worker[*models.Token]{
-		processors.NewProcessorWorker(processor),
+		pipeline.NewProcessorWorker(processor),
 	}
 }

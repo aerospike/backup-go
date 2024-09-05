@@ -21,8 +21,8 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-// ChangeNamespace is used to restore to another namespace.
-type ChangeNamespace struct {
+// changeNamespace is used to restore to another namespace.
+type changeNamespace struct {
 	source      *string
 	destination *string
 }
@@ -33,14 +33,14 @@ func NewChangeNamespace(source, destination *string) TokenProcessor {
 		return &noopProcessor[*models.Token]{}
 	}
 
-	return &ChangeNamespace{
+	return &changeNamespace{
 		source:      source,
 		destination: destination,
 	}
 }
 
 // Process filters tokens by type.
-func (p ChangeNamespace) Process(token *models.Token) (*models.Token, error) {
+func (p changeNamespace) Process(token *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if token.Type != models.TokenTypeRecord {
 		return token, nil

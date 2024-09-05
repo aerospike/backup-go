@@ -1,5 +1,3 @@
-//go:build !ci
-
 // Copyright 2024 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +20,6 @@ import (
 	"log"
 	"os/exec"
 	"sort"
-	"testing"
 	"time"
 
 	"github.com/aerospike/aerospike-client-go/v7"
@@ -35,7 +32,7 @@ var backupClient = newBackupClient()
 
 const runs = 10
 
-func BenchmarkBackupRestore(_ *testing.B) {
+func main() {
 	folder := "backups_folder"
 
 	backupGo := measureMedianTime(func() {

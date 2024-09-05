@@ -17,6 +17,9 @@ linters-settings:
     require-specific: true
   gocyclo:
     min-complexity: 21
+  gosec:
+    excludes:
+      - G115
 
 linters:
   disable-all: true
@@ -27,7 +30,6 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
     - goconst
     - gocritic
     - gofmt

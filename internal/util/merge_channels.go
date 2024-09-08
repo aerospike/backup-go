@@ -25,7 +25,7 @@ func MergeChannels[T any](channels []<-chan T) <-chan T {
 	}
 
 	var wg sync.WaitGroup
-	// Start an output goroutine for each input channel.
+	// Run an output goroutine for each input channel.
 	output := func(c <-chan T) {
 		for n := range c {
 			out <- n
@@ -40,7 +40,7 @@ func MergeChannels[T any](channels []<-chan T) <-chan T {
 		go output(c)
 	}
 
-	// Start a goroutine to close out once all the output goroutines are done.
+	// Run a goroutine to close out once all the output goroutines are done.
 	go func() {
 		wg.Wait()
 		close(out)

@@ -105,10 +105,10 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	// Start lazy file reading.
+	// Run lazy file reading.
 	go rh.reader.StreamFiles(ctx, readersCh, errorsCh)
 
-	// Start lazy file processing.
+	// Run lazy file processing.
 	go rh.processReaders(ctx, readersCh, doneCh, errorsCh)
 
 	// Process errors if we have them.

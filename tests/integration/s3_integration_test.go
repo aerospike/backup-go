@@ -13,7 +13,6 @@ import (
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -72,10 +71,7 @@ aws_secret_access_key = minioadminpassword`)
 	return nil
 }
 
-func (s *writeReadTestSuite) TearDownSuite() {
-	ctx := context.Background()
-	_ = s.docker.ContainerRemove(ctx, s.minioID, container.RemoveOptions{Force: true})
-}
+func (s *writeReadTestSuite) TearDownSuite() {}
 
 func (s *writeReadTestSuite) TestWriteRead() {
 	s3Client, err := getS3Client(

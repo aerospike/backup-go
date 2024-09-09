@@ -27,7 +27,7 @@ func TestStorage_NewFlagSet(t *testing.T) {
 	flagSet := storage.NewFlagSet()
 
 	args := []string{
-		"--Directory", "/backup/directory",
+		"--directory", "/backup/directory",
 		"--output-file", "backup-file.bak",
 		"--remove-files",
 	}

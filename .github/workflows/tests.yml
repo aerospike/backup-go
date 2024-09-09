@@ -19,6 +19,21 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+    - name: Set up Minio
+      run: |
+        docker run -d \
+        -p 9000:9000 \
+        -p 9001:9001 \
+        --name minio \
+        -e "MINIO_ROOT_USER=minioadmin" \
+        -e "MINIO_ROOT_PASSWORD=minioadminpassword" \
+        -e "MINIO_ACCESS_KEY=minioadmin" \
+        -e "MINIO_SECRET_KEY=minioadminpassword" \
+        quay.io/minio/minio server /data --console-address ":9001" \
+        && until (curl -I http://127.0.0.1:9000/minio/health/live | grep "OK"); do echo "Waiting for MinIO server to be ready..."; sleep 3; done \
+        && docker exec minio sh -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && mc mb myminio/backup && mc mb myminio/asbackup \
+        && mc anonymous set upload myminio/backup && mc anonymous set download myminio/backup && mc anonymous set public myminio/backup \
+        && mc anonymous set upload myminio/asbackup && mc anonymous set download myminio/asbackup && mc anonymous set public myminio/asbackup"
     - name: Set up Google Cloud Storage API emulator
       run: |
         docker run -d --name fake-gcs-server -p 4443:4443 fsouza/fake-gcs-server \

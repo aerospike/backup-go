@@ -15,7 +15,7 @@
 package flags
 
 import (
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
 
@@ -30,7 +30,7 @@ func NewStorage() *Storage {
 func (f *Storage) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	flagSet.StringVarP(&f.Directory, "Directory", "d",
+	flagSet.StringVarP(&f.Directory, "directory", "d",
 		"",
 		"The Directory that holds the backup files. Required, unless -o or -e is used.")
 	flagSet.StringVarP(&f.OutputFile, "output-file", "o",

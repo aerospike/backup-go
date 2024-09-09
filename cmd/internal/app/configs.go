@@ -16,11 +16,12 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 )
 
 func mapBackupConfig(b *models.Backup) (*backup.BackupConfig, error) {
@@ -37,6 +38,7 @@ func mapBackupConfig(b *models.Backup) (*backup.BackupConfig, error) {
 	c.RecordsPerSecond = b.RecordsPerSecond
 	c.FileLimit = b.FileLimit
 	c.AfterDigest = b.AfterDigest
+	c.Parallel = b.Parallel
 
 	sp, err := mapScanPolicy(b)
 	if err != nil {
@@ -76,7 +78,7 @@ func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
 	}
 
 	return &backup.CompressionPolicy{
-		Mode:  c.Mode,
+		Mode:  strings.ToUpper(c.Mode),
 		Level: c.Level,
 	}
 }
@@ -87,7 +89,7 @@ func mapEncryptionPolicy(e *models.Encryption) *backup.EncryptionPolicy {
 	}
 
 	p := &backup.EncryptionPolicy{
-		Mode: e.Mode,
+		Mode: strings.ToUpper(e.Mode),
 	}
 
 	if e.KeyFile != "" {

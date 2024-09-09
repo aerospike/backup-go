@@ -15,7 +15,7 @@
 package flags
 
 import (
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
 

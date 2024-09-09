@@ -18,9 +18,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	asModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
@@ -110,5 +111,10 @@ func (b *ASBackup) Run(ctx context.Context) error {
 }
 
 func printReport(stats *asModels.BackupStats) {
-	fmt.Println("Done:...", stats)
+	fmt.Println("Backup Report")
+	fmt.Println("--------------")
+	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
+	fmt.Printf("Records Read:         %d\n", stats.ReadRecords.Load())
+	fmt.Printf("Bytes Written:        %d bytes\n", stats.BytesWritten.Load())
+	fmt.Printf("Total Records:        %d\n", stats.TotalRecords)
 }

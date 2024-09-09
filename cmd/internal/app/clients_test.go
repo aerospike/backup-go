@@ -17,7 +17,7 @@ package app
 import (
 	"testing"
 
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"

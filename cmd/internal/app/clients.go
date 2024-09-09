@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/aerospike/aerospike-client-go/v7"
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"

@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/local"
 )

@@ -22,15 +22,17 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/aerospike/backup-go/cmd/asbackup/app"
-	"github.com/aerospike/backup-go/cmd/asbackup/flags"
+	"github.com/aerospike/backup-go/cmd/internal/app"
+	"github.com/aerospike/backup-go/cmd/internal/flags"
 	common "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
 )
 
-// Version TODO: override this param with tags
+const devVersion = "dev"
+
 var (
-	appVersion = "dev"
+	appVersion = devVersion
+	commitHash = "dev"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -79,7 +81,7 @@ func init() {
 func run(cmd *cobra.Command, _ []string) error {
 	// Show version.
 	if flagVersion {
-		fmt.Printf("version: %s\n", appVersion)
+		printVersion()
 
 		return nil
 	}
@@ -116,6 +118,15 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 	// Run app.
 	return asb.Run(cmd.Context())
+}
+
+func printVersion() {
+	version := appVersion
+	if appVersion == devVersion {
+		version += "." + commitHash
+	}
+
+	fmt.Printf("version: %s\n", version)
 }
 
 func main() {

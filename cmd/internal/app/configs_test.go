@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 

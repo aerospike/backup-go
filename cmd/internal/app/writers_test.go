@@ -16,9 +16,12 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,8 +72,11 @@ func TestNewLocalWriter(t *testing.T) {
 }
 
 func TestNewS3Writer(t *testing.T) {
+	err := createAwsCredentials()
+	assert.NoError(t, err)
+
 	storage := &models.Storage{
-		Directory:   "as-backup-bucket/" + t.TempDir(),
+		Directory:   "asbackup/" + t.TempDir(),
 		RemoveFiles: true,
 	}
 
@@ -89,7 +95,7 @@ func TestNewS3Writer(t *testing.T) {
 	assert.Equal(t, "s3", writer.GetType())
 
 	storage = &models.Storage{
-		OutputFile:  "as-backup-bucket/" + t.TempDir() + "/file.bak",
+		OutputFile:  "asbackup/" + t.TempDir() + "/file.bak",
 		RemoveFiles: true,
 	}
 
@@ -97,4 +103,34 @@ func TestNewS3Writer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, "s3", writer.GetType())
+}
+
+func createAwsCredentials() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("error getting home directory: %v", err)
+	}
+
+	awsDir := filepath.Join(home, ".aws")
+	err = os.MkdirAll(awsDir, 0o700)
+	if err != nil {
+		return fmt.Errorf("error creating .aws directory: %v", err)
+	}
+
+	filePath := filepath.Join(awsDir, "credentials")
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		credentialsFileBytes := []byte(`[minio]
+aws_access_key_id = minioadmin
+aws_secret_access_key = minioadminpassword`)
+
+		err = os.WriteFile(filePath, credentialsFileBytes, 0o600)
+		if err != nil {
+			return fmt.Errorf("error writing ~/.aws/credentials file: %v", err)
+		}
+
+		fmt.Println("Credentials file created successfully!")
+	}
+
+	return nil
 }

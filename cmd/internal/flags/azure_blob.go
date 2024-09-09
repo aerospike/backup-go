@@ -15,28 +15,28 @@
 package flags
 
 import (
-	"github.com/aerospike/backup-go/cmd/asbackup/models"
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
 
-type GcpStorage struct {
-	models.GcpStorage
+type AzureBlob struct {
+	models.AzureBlob
 }
 
-func NewGcpStorage() *GcpStorage {
-	return &GcpStorage{}
+func NewAzureBlob() *AzureBlob {
+	return &AzureBlob{}
 }
 
-func (f *GcpStorage) NewFlagSet() *pflag.FlagSet {
+func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	flagSet.StringVar(&f.Host, "gcp-template",
+	flagSet.StringVar(&f.Host, "azure-template",
 		"",
 		"The something")
 
 	return flagSet
 }
 
-func (f *GcpStorage) GetGcpStorage() *models.GcpStorage {
-	return &f.GcpStorage
+func (f *AzureBlob) GetAzureBlob() *models.AzureBlob {
+	return &f.AzureBlob
 }

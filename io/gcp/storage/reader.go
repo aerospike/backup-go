@@ -149,12 +149,15 @@ func (r *Reader) streamDirectory(
 	for {
 		// Iterate over bucket until we're done.
 		objAttrs, err := it.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-
 		if err != nil {
-			errorsCh <- fmt.Errorf("failed to read object attr from bucket %s: %w", r.bucketName, err)
+			if !errors.Is(err, iterator.Done) {
+				errorsCh <- fmt.Errorf("failed to read object attr from bucket %s: %w",
+					r.bucketName, err)
+			}
+			// If the previous call to Next returned an error other than iterator.Done, all
+			// subsequent calls will return the same error. To continue iteration, a new
+			// `ObjectIterator` must be created.
+			break
 		}
 
 		// Skip files in folders.
@@ -177,10 +180,12 @@ func (r *Reader) streamDirectory(
 
 		reader, err = r.bucketHandle.Object(objAttrs.Name).NewReader(ctx)
 		if err != nil {
-			errorsCh <- fmt.Errorf("failerd to create reader from file %s: %w", objAttrs.Name, err)
+			errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", objAttrs.Name, err)
 		}
 
-		readersCh <- reader
+		if reader != nil {
+			readersCh <- reader
+		}
 	}
 }
 

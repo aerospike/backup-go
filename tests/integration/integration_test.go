@@ -757,7 +757,7 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 func TestBackupRestoreTestSuite(t *testing.T) {
 	ts := backupRestoreTestSuite{
 		aerospikeIP:       testutils.IP,
-		aerospikePort:     testutils.PortStart,
+		aerospikePort:     3000,
 		aerospikePassword: testutils.Password,
 		aerospikeUser:     testutils.User,
 		namespace:         "test",

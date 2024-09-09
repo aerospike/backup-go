@@ -31,15 +31,15 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		Seeds: client.HostTLSPortSlice{
 			hostPort,
 		},
-		User:     "tester",
-		Password: "psw",
+		User:     "admin",
+		Password: "admin",
 	}
 	_, err := newAerospikeClient(cfg)
 	require.NoError(t, err)
 
 	cfg = &client.AerospikeConfig{
-		User:     "tester",
-		Password: "psw",
+		User:     "admin",
+		Password: "admin",
 	}
 	_, err = newAerospikeClient(cfg)
 	require.ErrorContains(t, err, "at least one seed must be provided")
@@ -48,8 +48,8 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		Seeds: client.HostTLSPortSlice{
 			hostPort,
 		},
-		User:     "tester",
-		Password: "psw",
+		User:     "admin",
+		Password: "admin",
 		TLS: &client.TLSConfig{
 			Cert: []byte("error"),
 		},
@@ -62,8 +62,8 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		Seeds: client.HostTLSPortSlice{
 			hostPort,
 		},
-		User:     "tester",
-		Password: "psw",
+		User:     "admin",
+		Password: "admin",
 	}
 	_, err = newAerospikeClient(cfg)
 	require.ErrorContains(t, err, "failed to create aerospike asClient")

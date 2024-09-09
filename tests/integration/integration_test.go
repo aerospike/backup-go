@@ -81,14 +81,6 @@ type backupRestoreTestSuite struct {
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
-	testutils.Image = "aerospike/aerospike-server-enterprise:7.0.0.2"
-
-	clusterSize := 1
-	err := testutils.Start(clusterSize)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
 	aeroClientPolicy := a.NewClientPolicy()
 	aeroClientPolicy.User = suite.aerospikeUser
 	aeroClientPolicy.Password = suite.aerospikePassword

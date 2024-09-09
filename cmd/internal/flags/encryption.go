@@ -33,7 +33,7 @@ func (f *Encryption) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.Mode, "encrypt",
 		"",
 		"Enables encryption of backup files using the specified encryption algorithm.\n"+
-			"Supported encryption algorithms are: NONE, AES128, AES256.\n"+
+			"Supported encryption algorithms are: none, aes128, aes256.\n"+
 			"A private key must be given, either via the --encryption-key-file option or\n"+
 			"the --encryption-key-env option or the --encryption-key-secret.")
 	flagSet.StringVar(&f.KeyFile, "encryption-key-file",

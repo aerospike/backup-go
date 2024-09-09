@@ -44,6 +44,7 @@ var rootCmd = &cobra.Command{
 }
 
 var (
+	flagsApp         = flags.NewApp()
 	flagsCommon      = common.NewDefaultAerospikeFlags()
 	flagsBackup      = flags.NewBackup()
 	flagsCompression = flags.NewCompression()
@@ -59,23 +60,78 @@ var (
 )
 
 func init() {
-	// Override -h flag
-	rootCmd.PersistentFlags().BoolP("help", "Z", false, "Display help information")
-	rootCmd.PersistentFlags().BoolVarP(&flagVersion, "version", "V",
-		false, "Display version information")
-	rootCmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v",
-		false,
-		"Enable more detailed logging.")
+	// Disable sorting
+	rootCmd.PersistentFlags().SortFlags = false
+
+	appFlagSet := flagsApp.NewFlagSet()
+	commonFlagSet := flagsCommon.NewFlagSet(func(str string) string { return str })
+	backupFlagSet := flagsBackup.NewFlagSet()
+	compressionFlagSet := flagsCompression.NewFlagSet()
+	encryptionFlagSet := flagsEncryption.NewFlagSet()
+	secretAgentFlagSet := flagsSecretAgent.NewFlagSet()
+	storageFlagSet := flagsStorage.NewFlagSet()
+	awsFlagSet := flagsAws.NewFlagSet()
+	gcpFlagSet := flagsGcp.NewFlagSet()
+	azureFlagSet := flagsAzure.NewFlagSet()
+
 	// App flags.
-	rootCmd.PersistentFlags().AddFlagSet(flagsCommon.NewFlagSet(func(str string) string { return str }))
-	rootCmd.PersistentFlags().AddFlagSet(flagsBackup.NewFlagSet())
-	rootCmd.PersistentFlags().AddFlagSet(flagsCompression.NewFlagSet())
-	rootCmd.PersistentFlags().AddFlagSet(flagsEncryption.NewFlagSet())
-	rootCmd.PersistentFlags().AddFlagSet(flagsSecretAgent.NewFlagSet())
-	rootCmd.PersistentFlags().AddFlagSet(flagsStorage.NewFlagSet())
-	rootCmd.PersistentFlags().AddFlagSet(flagsAws.NewFlagSet())
-	rootCmd.PersistentFlags().AddFlagSet(flagsGcp.NewFlagSet())
-	rootCmd.PersistentFlags().AddFlagSet(flagsAzure.NewFlagSet())
+	rootCmd.PersistentFlags().AddFlagSet(appFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(commonFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(backupFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(compressionFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(encryptionFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(secretAgentFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(storageFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(awsFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(gcpFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(azureFlagSet)
+
+	// Beautify help.
+	rootCmd.SetHelpFunc(func(_ *cobra.Command, _ []string) {
+		fmt.Println("Welcome to the Aerospike backup CLI tool!")
+		fmt.Println("\nUsage:")
+		fmt.Println("  asbackup [flags]")
+
+		// Print section: App Flags
+		fmt.Println("\nGeneral Flags:")
+		appFlagSet.PrintDefaults()
+
+		// Print section: Common Flags
+		fmt.Println("\nAerospike Client Flags:")
+		commonFlagSet.PrintDefaults()
+
+		// Print section: Backup Flags
+		fmt.Println("\nBackup Flags:")
+		backupFlagSet.PrintDefaults()
+
+		// Print section: Compression Flags
+		fmt.Println("\nCompression Flags:")
+		compressionFlagSet.PrintDefaults()
+
+		// Print section: Encryption Flags
+		fmt.Println("\nEncryption Flags:")
+		encryptionFlagSet.PrintDefaults()
+
+		// Print section: Secret Agent Flags
+		fmt.Println("\nSecret Agent Flags:")
+		secretAgentFlagSet.PrintDefaults()
+
+		// Print section: Storage Flags
+		fmt.Println("\nStorage Flags:")
+		storageFlagSet.PrintDefaults()
+
+		// Print section: AWS Flags
+		fmt.Println("\nAWS Flags:")
+		awsFlagSet.PrintDefaults()
+
+		// Print section: GCP Flags
+		fmt.Println("\nGCP Flags:")
+		gcpFlagSet.PrintDefaults()
+
+		// Print section: Azure Flags
+		fmt.Println("\nAzure Flags:")
+		azureFlagSet.PrintDefaults()
+	})
 }
 
 func run(cmd *cobra.Command, _ []string) error {

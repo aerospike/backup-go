@@ -15,32 +15,40 @@
 package flags
 
 import (
-	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
 
-type Compression struct {
-	models.Compression
+type App struct {
+	Help    bool
+	Version bool
+	Verbose bool
 }
 
-func NewCompression() *Compression {
-	return &Compression{}
+func NewApp() *App {
+	return &App{}
 }
 
-func (f *Compression) NewFlagSet() *pflag.FlagSet {
+func (f *App) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
-	flagSet.StringVarP(&f.Mode, "compress", "z",
-		"NONE",
-		"Enables compressing of backup files using the specified compression algorithm.\n"+
-			"Supported compression algorithms are: zstd, none\n"+
-			"Set the zstd compression level via the --compression-level option. Default level is 3.")
-	flagSet.IntVar(&f.Level, "compression-level",
-		3,
-		"zstd compression level.")
+
+	flagSet.BoolP("help", "Z", false, "Display help information")
+	flagSet.BoolVarP(&f.Version, "version", "V",
+		false, "Display version information")
+	flagSet.BoolVarP(&f.Verbose, "verbose", "v",
+		false,
+		"Enable more detailed logging.")
 
 	return flagSet
 }
 
-func (f *Compression) GetCompression() *models.Compression {
-	return &f.Compression
+func (f *App) GetHelp() bool {
+	return f.Help
+}
+
+func (f *App) GetVersion() bool {
+	return f.Version
+}
+
+func (f *App) GetVerbose() bool {
+	return f.Verbose
 }

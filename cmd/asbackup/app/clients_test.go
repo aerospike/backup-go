@@ -82,5 +82,4 @@ func TestClients_newS3Client(t *testing.T) {
 	ctx := context.Background()
 	_, err := newS3Client(ctx, cfg)
 	require.NoError(t, err)
-
 }

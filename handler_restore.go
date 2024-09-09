@@ -318,39 +318,18 @@ func (rh *RestoreHandler) runRestoreBatch(
 		nsDest = rh.config.Namespace.Destination
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.ReadRecords))
-	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
-	changeNamespace := newTokenWorker(processors.NewChangeNamespace(nsSource, nsDest))
-	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger))
-	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped))
-	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))
-	tokenTypeFilter := newTokenWorker(
-		processors.NewFilterByType(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
-	recordSetFilter := newTokenWorker(processors.NewFilterBySet(rh.config.SetList, &rh.stats.RecordsSkipped))
+	composeProcessor := newTokenWorker(processors.NewComposeProcessor(
+		processors.NewRecordCounter(&rh.stats.ReadRecords),
+		processors.NewSizeCounter(&rh.stats.TotalBytesRead),
+		processors.NewFilterByType(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs),
+		processors.NewFilterBySet(rh.config.SetList, &rh.stats.RecordsSkipped),
+		processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped),
+		processors.NewChangeNamespace(nsSource, nsDest),
+		processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
+		processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond),
+	))
 
-	job := pipeline.NewPipeline(
-		readers,
-
-		// in the pipeline, first all counters.
-		recordCounter,
-		sizeCounter,
-
-		// filters
-		tokenTypeFilter,
-		recordSetFilter,
-		binFilter,
-
-		// speed limiters.
-		tpsLimiter,
-
-		// modifications.
-		changeNamespace,
-		ttlSetter,
-
-		writeWorkers,
-	)
-
-	return job.Run(ctx)
+	return pipeline.NewPipeline(readers, composeProcessor, writeWorkers).Run(ctx)
 }
 
 func (rh *RestoreHandler) useBatchWrites() (bool, error) {

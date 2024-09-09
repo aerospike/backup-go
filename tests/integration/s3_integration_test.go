@@ -13,7 +13,6 @@ import (
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -25,8 +24,6 @@ const (
 
 type writeReadTestSuite struct {
 	suite.Suite
-	docker  *client.Client
-	minioID string
 }
 
 func TestReadWrite(t *testing.T) {

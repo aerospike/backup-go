@@ -137,7 +137,7 @@ func main() {
 
 	go func() {
 		sig := <-sigChan
-		log.Printf("stopping click-copier: %v\n", sig)
+		log.Printf("stopping asbackup: %v\n", sig)
 		cancel()
 	}()
 

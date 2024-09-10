@@ -37,9 +37,9 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "asbackup",
-	Short: "Aerospike backup CLI tool",
-	Long:  "Welcome to the Aerospike backup CLI tool!",
+	Use:   "asrestore",
+	Short: "Aerospike restore CLI tool",
+	Long:  "Welcome to the Aerospike restore CLI tool!",
 	RunE:  run,
 }
 
@@ -47,7 +47,7 @@ var (
 	flagsApp         = flags.NewApp()
 	flagsAerospike   = asFlags.NewDefaultAerospikeFlags()
 	flagsCommon      = flags.NewCommon()
-	flagsBackup      = flags.NewBackup()
+	flagsRestore     = flags.NewRestore()
 	flagsCompression = flags.NewCompression()
 	flagsEncryption  = flags.NewEncryption()
 	flagsSecretAgent = flags.NewSecretAgent()
@@ -63,7 +63,7 @@ func init() {
 	appFlagSet := flagsApp.NewFlagSet()
 	aerospikeFlagSet := flagsAerospike.NewFlagSet(func(str string) string { return str })
 	commonFlagSet := flagsCommon.NewFlagSet()
-	backupFlagSet := flagsBackup.NewFlagSet()
+	restoreFlagSet := flagsRestore.NewFlagSet()
 	compressionFlagSet := flagsCompression.NewFlagSet()
 	encryptionFlagSet := flagsEncryption.NewFlagSet()
 	secretAgentFlagSet := flagsSecretAgent.NewFlagSet()
@@ -75,7 +75,7 @@ func init() {
 	rootCmd.PersistentFlags().AddFlagSet(appFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(aerospikeFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(commonFlagSet)
-	rootCmd.PersistentFlags().AddFlagSet(backupFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(restoreFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(compressionFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(encryptionFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(secretAgentFlagSet)
@@ -85,10 +85,10 @@ func init() {
 
 	// Beautify help and usage.
 	helpFunc := func() {
-		fmt.Println("Welcome to the Aerospike backup CLI tool!")
+		fmt.Println("Welcome to the Aerospike restore CLI tool!")
 		fmt.Println("-----------------------------------------")
 		fmt.Println("\nUsage:")
-		fmt.Println("  asbackup [flags]")
+		fmt.Println("  asrestore [flags]")
 
 		// Print section: App Flags
 		fmt.Println("\nGeneral Flags:")
@@ -99,9 +99,9 @@ func init() {
 		aerospikeFlagSet.PrintDefaults()
 
 		// Print section: Backup Flags
-		fmt.Println("\nBackup Flags:")
+		fmt.Println("\nRestore Flags:")
 		commonFlagSet.PrintDefaults()
-		backupFlagSet.PrintDefaults()
+		restoreFlagSet.PrintDefaults()
 
 		// Print section: Compression Flags
 		fmt.Println("\nCompression Flags:")
@@ -160,10 +160,10 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, loggerOpt))
 	// Init app.
-	asb, err := app.NewASBackup(
+	asb, err := app.NewASRestore(
 		cmd.Context(),
 		flagsAerospike.NewAerospikeConfig(),
-		flagsBackup.GetBackup(),
+		flagsRestore.GetRestore(),
 		flagsCompression.GetCompression(),
 		flagsEncryption.GetEncryption(),
 		flagsSecretAgent.GetSecretAgent(),

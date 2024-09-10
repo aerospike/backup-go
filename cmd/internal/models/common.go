@@ -14,18 +14,22 @@
 
 package models
 
-type Backup struct {
-	Common
+type Common struct {
+	Directory string
+	File      string
 
-	RemoveFiles bool
+	Namespace        string
+	SetList          []string
+	BinList          []string
+	Parallel         int
+	NoRecords        bool
+	NoIndexes        bool
+	NoUDFs           bool
+	RecordsPerSecond int
+	MaxRetries       int
+	TotalTimeout     int
+	SocketTimeout    int
 
-	ModifiedBefore      string
-	ModifiedAfter       string
-	FileLimit           int64
-	AfterDigest         string
-	MaxRecords          int64
-	NoBins              bool
-	SleepBetweenRetries int
-	FilterExpression    string
-	//	Partitions PartitionRange
+	// is it --nice?
+	// 	Bandwidth int
 }

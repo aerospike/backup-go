@@ -14,9 +14,12 @@
 
 package models
 
-// Storage contains general storage parameters.
-type Storage struct {
-	Directory   string
-	OutputFile  string
-	RemoveFiles bool
+type Restore struct {
+	Common
+
+	DisableBatchWrites bool
+	BatchSize          int
+	MaxAsyncBatches    int
+	ExtraTTL           int64
+	IgnoreRecordError  bool
 }

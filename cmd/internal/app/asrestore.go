@@ -26,17 +26,17 @@ import (
 	"github.com/aerospike/tools-common-go/client"
 )
 
-type ASBackup struct {
-	backupClient *backup.Client
-	backupConfig *backup.BackupConfig
-	writer       backup.Writer
+type ASRestore struct {
+	backupClient  *backup.Client
+	restoreConfig *backup.RestoreConfig
+	reader        backup.StreamingReader
 }
 
-//nolint:dupl // Code is very similar as NewASRestore but different.
-func NewASBackup(
+//nolint:dupl // Code is very similar as NewASBackup but different.
+func NewASRestore(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
-	backupParams *models.Backup,
+	restoreParams *models.Restore,
 	compression *models.Compression,
 	encryption *models.Encryption,
 	secretAgent *models.SecretAgent,
@@ -44,73 +44,73 @@ func NewASBackup(
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
 	logger *slog.Logger,
-) (*ASBackup, error) {
+) (*ASRestore, error) {
 	aerospikeClient, err := newAerospikeClient(clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %v", err)
 	}
 
-	backupConfig, err := mapBackupConfig(backupParams)
+	restoreConfig, err := mapRestoreConfig(restoreParams)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup config: %v", err)
+		return nil, fmt.Errorf("failed to create restore config: %v", err)
 	}
 
-	backupConfig.CompressionPolicy = mapCompressionPolicy(compression)
-	backupConfig.EncryptionPolicy = mapEncryptionPolicy(encryption)
-	backupConfig.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
+	restoreConfig.CompressionPolicy = mapCompressionPolicy(compression)
+	restoreConfig.EncryptionPolicy = mapEncryptionPolicy(encryption)
+	restoreConfig.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
 	// TODO: check if we need to pass ID and ScanLimiter?
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %v", err)
 	}
 
-	writer, err := getWriter(ctx, backupParams, awsS3, gcpStorage, azureBlob)
+	reader, err := getReader(ctx, restoreParams, awsS3, gcpStorage, azureBlob)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup writer: %v", err)
+		return nil, fmt.Errorf("failed to create backup reader: %v", err)
 	}
 
-	return &ASBackup{
-		backupClient: backupClient,
-		backupConfig: backupConfig,
-		writer:       writer,
+	return &ASRestore{
+		backupClient:  backupClient,
+		restoreConfig: restoreConfig,
+		reader:        reader,
 	}, nil
 }
 
-func (b *ASBackup) Run(ctx context.Context) error {
-	h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
+func (r *ASRestore) Run(ctx context.Context) error {
+	h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 	if err != nil {
-		return fmt.Errorf("failed to start backup: %v", err)
+		return fmt.Errorf("failed to start restore: %v", err)
 	}
 
 	if err := h.Wait(ctx); err != nil {
-		return fmt.Errorf("failed to backup: %v", err)
+		return fmt.Errorf("failed to restore: %v", err)
 	}
 
-	printBackupReport(h.GetStats())
+	printRestoreReport(h.GetStats())
 
 	return nil
 }
 
-func getWriter(
+func getReader(
 	ctx context.Context,
-	backupParams *models.Backup,
+	restoreParams *models.Restore,
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
-) (backup.Writer, error) {
+) (backup.StreamingReader, error) {
 	switch {
 	case awsS3.Region != "":
-		return newS3Writer(ctx, awsS3, backupParams)
+		return newS3Reader(ctx, awsS3, restoreParams)
 	case gcpStorage.Host != "":
-		return newGcpWriter()
+		return newGcpReader()
 	case azureBlob.Host != "":
-		return newAzureWriter()
+		return newAzureReader()
 	default:
-		return newLocalWriter(backupParams)
+		return newLocalReader(restoreParams)
 	}
 }
 
-func printBackupReport(stats *asModels.BackupStats) {
+func printRestoreReport(stats *asModels.RestoreStats) {
 	fmt.Println("Backup Report")
 	fmt.Println("--------------")
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
@@ -120,6 +120,11 @@ func printBackupReport(stats *asModels.BackupStats) {
 	fmt.Printf("UDFs Read:            %d\n", stats.GetUDFs())
 	fmt.Printf("Bytes Written:        %d bytes\n", stats.GetBytesWritten())
 
-	fmt.Printf("Total Records:        %d\n", stats.TotalRecords)
-	fmt.Printf("Files Written:        %d\n", stats.GetFileCount())
+	fmt.Printf("Expired Records:      %d\n", stats.GetRecordsExpired())
+	fmt.Printf("Skipped Records:      %d\n", stats.GetRecordsSkipped())
+	fmt.Printf("Ignored Records:      %d\n", stats.GetRecordsIgnored())
+	fmt.Printf("Freasher Records:     %d\n", stats.GetRecordsFresher())
+	fmt.Printf("Existed Records:      %d\n", stats.GetRecordsExisted())
+	fmt.Printf("Inserted Records:     %d\n", stats.GetRecordsInserted())
+	fmt.Printf("Total Bytes Read:     %d\n", stats.GetTotalBytesRead())
 }

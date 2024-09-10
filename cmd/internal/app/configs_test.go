@@ -25,12 +25,14 @@ import (
 func TestMapBackupConfig_Success(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Namespace:        "test-namespace",
-		SetList:          []string{"set1", "set2"},
-		BinList:          []string{"bin1", "bin2"},
-		NoRecords:        true,
-		NoIndexes:        false,
-		RecordsPerSecond: 1000,
+		Common: models.Common{
+			Namespace:        "test-namespace",
+			SetList:          []string{"set1", "set2"},
+			BinList:          []string{"bin1", "bin2"},
+			NoRecords:        true,
+			NoIndexes:        false,
+			RecordsPerSecond: 1000,
+		},
 		FileLimit:        5000,
 		AfterDigest:      "digest",
 		ModifiedBefore:   "2023-09-01_12:00:00",
@@ -66,7 +68,9 @@ func TestMapBackupConfig_MissingNamespace(t *testing.T) {
 func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Namespace:      "test-namespace",
+		Common: models.Common{
+			Namespace: "test-namespace",
+		},
 		ModifiedBefore: "invalid-date",
 	}
 	config, err := mapBackupConfig(backupModel)
@@ -78,7 +82,9 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Namespace:     "test-namespace",
+		Common: models.Common{
+			Namespace: "test-namespace",
+		},
 		ModifiedAfter: "invalid-date",
 	}
 	config, err := mapBackupConfig(backupModel)
@@ -90,7 +96,9 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Namespace:        "test-namespace",
+		Common: models.Common{
+			Namespace: "test-namespace",
+		},
 		FilterExpression: "invalid-exp",
 	}
 	config, err := mapBackupConfig(backupModel)
@@ -175,12 +183,14 @@ func TestMapScanPolicy_Success(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
 		MaxRecords:          1000,
-		MaxRetries:          3,
 		SleepBetweenRetries: 100,
-		TotalTimeout:        5000,
-		SocketTimeout:       3000,
 		NoBins:              true,
 		FilterExpression:    "k1EDpHRlc3Q=",
+		Common: models.Common{
+			MaxRetries:    3,
+			TotalTimeout:  5000,
+			SocketTimeout: 3000,
+		},
 	}
 
 	scanPolicy, err := mapScanPolicy(backupModel)

@@ -72,6 +72,27 @@ func mapBackupConfig(b *models.Backup) (*backup.BackupConfig, error) {
 	return c, nil
 }
 
+func mapRestoreConfig(r *models.Restore) (*backup.RestoreConfig, error) {
+	if r.Namespace == "" {
+		return nil, fmt.Errorf("namespace is required")
+	}
+
+	c := backup.NewDefaultRestoreConfig()
+	c.SetList = r.SetList
+	c.BinList = r.BinList
+	c.NoRecords = r.NoRecords
+	c.NoIndexes = r.NoIndexes
+	c.RecordsPerSecond = r.RecordsPerSecond
+	c.Parallel = r.Parallel
+	c.WritePolicy = mapWritePolicy(r)
+
+	if len(r.SetList) > 0 {
+		c.SetList = r.SetList
+	}
+
+	return c, nil
+}
+
 func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
 	if c.Mode == "" {
 		return nil
@@ -160,4 +181,13 @@ func mapScanPolicy(b *models.Backup) (*aerospike.ScanPolicy, error) {
 	}
 
 	return p, nil
+}
+
+func mapWritePolicy(r *models.Restore) *aerospike.WritePolicy {
+	p := &aerospike.WritePolicy{}
+	p.MaxRetries = r.MaxRetries
+	p.TotalTimeout = time.Duration(r.TotalTimeout) * time.Millisecond
+	p.SocketTimeout = time.Duration(r.SocketTimeout) * time.Millisecond
+
+	return p
 }

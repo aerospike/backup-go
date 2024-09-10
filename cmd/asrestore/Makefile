@@ -3,7 +3,7 @@
 VERSION := dev
 COMMIT := $(shell git rev-parse --short HEAD)
 LDFLAGS := -ldflags "-X 'main.appVersion=$(VERSION)' -X 'main.commitHash=$(COMMIT)'"
-OUTPUT := asbackup
+OUTPUT := asrestore
 
 # Build the application
 build:

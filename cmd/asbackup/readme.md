@@ -9,10 +9,18 @@ make build
 ### Release build
 ```bash
 # for local build
-goreleaser build --snapshot
+make release-test
 # for release
-goreleaser release
+make release
 ```
+
+###  Release requirements.
+For creating releases, you must have `goreleaser` installed on your device.
+```bash
+brew install goreleaser/tap/goreleaser
+```
+Configure `GITHUB_TOKEN`, `GITLAB_TOKEN` and `GITEA_TOKEN`.
+More info here https://goreleaser.com/quick-start/
 
 ## Supported flags
 ```
@@ -197,24 +205,24 @@ Azure Flags:
   
 --only-config-file  Read only this configuration file.
 
-s3-max-async-downloads  The maximum number of simultaneous download requests from S3.
-                        The default is 32.
+--s3-max-async-downloads    The maximum number of simultaneous download requests from S3.
+                            The default is 32.
 
-s3-max-async-uploads    The maximum number of simultaneous upload requests from S3.
-                        The default is 16.
+--s3-max-async-uploads      The maximum number of simultaneous upload requests from S3.
+                            The default is 16.
 
-s3-log-level            The log level of the AWS S3 C++ SDK. The possible levels are,
-                        from least to most granular:
-                         - Off
-                         - Fatal
-                         - Error
-                         - Warn
-                         - Info
-                         - Debug
-                         - Trace
-                        The default is Fatal.
+--s3-log-level              The log level of the AWS S3 C++ SDK. The possible levels are,
+                            from least to most granular:
+                             - Off
+                             - Fatal
+                             - Error
+                             - Warn
+                             - Info
+                             - Debug
+                             - Trace
+                            The default is Fatal.
 
-s3-connect-timeout      The AWS S3 client's connection timeout in milliseconds.
-                        This is equivalent to cli-connect-timeout in the AWS CLI,
-                        or connectTimeoutMS in the aws-sdk-cpp client configuration.
+--s3-connect-timeout        The AWS S3 client's connection timeout in milliseconds.
+                            This is equivalent to cli-connect-timeout in the AWS CLI,
+                            or connectTimeoutMS in the aws-sdk-cpp client configuration.
 ```

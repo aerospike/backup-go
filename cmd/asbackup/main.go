@@ -179,7 +179,7 @@ func run(cmd *cobra.Command, _ []string) error {
 func printVersion() {
 	version := appVersion
 	if appVersion == devVersion {
-		version += "." + commitHash
+		version += " (" + commitHash + ")"
 	}
 
 	fmt.Printf("version: %s\n", version)

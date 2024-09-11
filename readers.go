@@ -64,3 +64,9 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 		}
 	}
 }
+
+// Close satisfies the DataReader interface
+// but is a no-op for the tokenReader.
+func (_ *tokenReader) Close() {
+
+}

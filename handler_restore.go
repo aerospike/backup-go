@@ -129,11 +129,13 @@ func (rh *RestoreHandler) restoreFromReaders(
 ) {
 	readWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		newTokenReader(readersCh, func(r io.ReadCloser) Decoder {
+		reader := newTokenReader(readersCh, func(r io.ReadCloser) Decoder {
 			reader, _ := rh.wrapReader(r)
 			d, _ := NewDecoder(rh.config.EncoderType, reader)
 			return d
 		})
+
+		readWorkers[i] = pipeline.NewReadWorker[*models.Token](reader)
 	}
 	rh.runRestorePipeline(ctx, readWorkers)
 }

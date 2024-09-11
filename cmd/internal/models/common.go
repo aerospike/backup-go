@@ -15,9 +15,7 @@
 package models
 
 type Common struct {
-	Directory string
-	File      string
-
+	Directory        string
 	Namespace        string
 	SetList          []string
 	BinList          []string

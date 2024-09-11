@@ -138,6 +138,7 @@ func (rh *RestoreHandler) restoreFromReaders(
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](reader)
 	}
 	rh.runRestorePipeline(ctx, readWorkers)
+	close(doneCh)
 }
 
 func (rh *RestoreHandler) closeReaders(rs []io.ReadCloser) {

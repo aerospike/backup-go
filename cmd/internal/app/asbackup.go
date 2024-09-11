@@ -26,6 +26,8 @@ import (
 	"github.com/aerospike/tools-common-go/client"
 )
 
+const idBackup = "asbackup-cli"
+
 type ASBackup struct {
 	backupClient *backup.Client
 	backupConfig *backup.BackupConfig
@@ -62,8 +64,7 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create backup config: %v", err)
 	}
 
-	// TODO: check if we need to pass ID and ScanLimiter?
-	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger))
+	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %v", err)
 	}

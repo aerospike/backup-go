@@ -16,6 +16,7 @@ package backup
 
 import (
 	"io"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/models"
 )
@@ -25,14 +26,16 @@ import (
 type tokenReader struct {
 	readersCh <-chan io.ReadCloser
 	decoder   Decoder
+	logger    *slog.Logger
 	convertFn func(io.ReadCloser) Decoder
 }
 
 // newTokenReader creates a new tokenReader.
-func newTokenReader(readersCh <-chan io.ReadCloser, convertFn func(io.ReadCloser) Decoder) *tokenReader {
+func newTokenReader(readersCh <-chan io.ReadCloser, logger *slog.Logger, convertFn func(io.ReadCloser) Decoder) *tokenReader {
 	return &tokenReader{
 		readersCh: readersCh,
 		convertFn: convertFn,
+		logger:    logger,
 	}
 }
 
@@ -57,6 +60,7 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 				// Channel is closed, we're done
 				return nil, io.EOF
 			}
+			tr.logger.Debug("open next file", slog.Any("file", reader))
 			tr.decoder = tr.convertFn(reader)
 		default:
 			// Channel is empty
@@ -67,6 +71,6 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 
 // Close satisfies the DataReader interface
 // but is a no-op for the tokenReader.
-func (_ *tokenReader) Close() {
-
+func (tr *tokenReader) Close() {
+	tr.logger.Debug("closed token reader")
 }

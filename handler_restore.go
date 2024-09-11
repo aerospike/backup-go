@@ -129,15 +129,29 @@ func (rh *RestoreHandler) restoreFromReaders(
 ) {
 	readWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		reader := newTokenReader(readersCh, func(r io.ReadCloser) Decoder {
-			reader, _ := rh.wrapReader(r)
-			d, _ := NewDecoder(rh.config.EncoderType, reader)
+		reader := newTokenReader(readersCh, rh.logger, func(r io.ReadCloser) Decoder {
+			reader, err := rh.wrapReader(r)
+			if err != nil {
+				errorsCh <- err
+				return nil
+			}
+			d, err := NewDecoder(rh.config.EncoderType, reader)
+			if err != nil {
+				errorsCh <- err
+				return nil
+			}
+
 			return d
 		})
 
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](reader)
 	}
-	rh.runRestorePipeline(ctx, readWorkers)
+	err := rh.runRestorePipeline(ctx, readWorkers)
+	if err != nil {
+		errorsCh <- err
+	}
+
+	rh.logger.Info("Restore done")
 	close(doneCh)
 }
 

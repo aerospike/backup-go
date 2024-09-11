@@ -22,7 +22,7 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	asModels "github.com/aerospike/backup-go/models"
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -37,6 +37,7 @@ func NewASBackup(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
 	backupParams *models.Backup,
+	commonParams *models.Common,
 	compression *models.Compression,
 	encryption *models.Encryption,
 	secretAgent *models.SecretAgent,
@@ -50,21 +51,24 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create aerospike client: %v", err)
 	}
 
-	backupConfig, err := mapBackupConfig(backupParams)
+	backupConfig, err := mapBackupConfig(
+		backupParams,
+		commonParams,
+		compression,
+		encryption,
+		secretAgent,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup config: %v", err)
 	}
 
-	backupConfig.CompressionPolicy = mapCompressionPolicy(compression)
-	backupConfig.EncryptionPolicy = mapEncryptionPolicy(encryption)
-	backupConfig.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
 	// TODO: check if we need to pass ID and ScanLimiter?
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %v", err)
 	}
 
-	writer, err := getWriter(ctx, backupParams, awsS3, gcpStorage, azureBlob)
+	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup writer: %v", err)
 	}
@@ -94,23 +98,24 @@ func (b *ASBackup) Run(ctx context.Context) error {
 func getWriter(
 	ctx context.Context,
 	backupParams *models.Backup,
+	commonParams *models.Common,
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
 ) (backup.Writer, error) {
 	switch {
 	case awsS3.Region != "":
-		return newS3Writer(ctx, awsS3, backupParams)
+		return newS3Writer(ctx, awsS3, backupParams, commonParams)
 	case gcpStorage.Host != "":
 		return newGcpWriter()
 	case azureBlob.Host != "":
 		return newAzureWriter()
 	default:
-		return newLocalWriter(backupParams)
+		return newLocalWriter(backupParams, commonParams)
 	}
 }
 
-func printBackupReport(stats *asModels.BackupStats) {
+func printBackupReport(stats *bModels.BackupStats) {
 	fmt.Println("Backup Report")
 	fmt.Println("--------------")
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))

@@ -40,7 +40,7 @@ func TestRestore_NewFlagSet(t *testing.T) {
 
 	result := restore.GetRestore()
 
-	assert.Equal(t, "backup-file.bak", result.File, "The input-file flag should be parsed correctly")
+	assert.Equal(t, "backup-file.bak", result.InputFile, "The input-file flag should be parsed correctly")
 	assert.True(t, result.IgnoreRecordError, "The ignore-record-error flag should be parsed correctly")
 	assert.True(t, result.DisableBatchWrites, "The disable-batch-writes flag should be parsed correctly")
 	assert.Equal(t, 64, result.MaxAsyncBatches, "The max-async-batches flag should be parsed correctly")
@@ -60,7 +60,7 @@ func TestRestore_NewFlagSet_DefaultValues(t *testing.T) {
 	result := restore.GetRestore()
 
 	// Verify default values
-	assert.Equal(t, "", result.File, "The default value for input-file should be an empty string")
+	assert.Equal(t, "", result.InputFile, "The default value for input-file should be an empty string")
 	assert.False(t, result.IgnoreRecordError, "The default value for ignore-record-error should be false")
 	assert.False(t, result.DisableBatchWrites, "The default value for disable-batch-writes should be false")
 	assert.Equal(t, 32, result.MaxAsyncBatches, "The default value for max-async-batches should be 32")

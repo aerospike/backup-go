@@ -48,23 +48,37 @@ Aerospike Client Flags:
       --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
 
 Backup Flags:
-  -n, --namespace string            The namespace to be backed up. Required.
-  -s, --set stringArray             The set(s) to be backed up.
-                                    If multiple sets are being backed up, filter-exp cannot be used.
-                                    Default: all sets.
+  -d, --directory string         The Directory that holds the backup files. Required, unless -o or -e is used.
+  -n, --namespace string         The namespace to be backed up. Required.
+  -s, --set stringArray          The set(s) to be backed up.
+                                 If multiple sets are being backed up, filter-exp cannot be used.
+                                 Default: all sets.
+  -L, --records-per-second int   Limit total returned records per second (rps).
+                                 Do not apply rps limit if records-per-second is zero.
+                                 Default: 0.
+  -B, --bin-list stringArray     Only include the given bins in the backup.
+                                 Default: include all bins.
+  -w, --parallel int             Maximum number of scan calls to run in parallel.
+                                 If only one partition range is given, or the entire namespace is being backed up, the range
+                                 of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
+                                 filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
+                                 partition filters.
+                                 Default: 1 (default 1)
+  -R, --no-records               Don't backup any records.
+  -I, --no-indexes               Don't backup any indexes.
+      --no-udfs                  Don't backup any UDFs.
+      --max-retries int          Maximum number of retries before aborting the current transaction.
+                                 Default: 5 (default 5)
+      --total-timeout int        Total socket timeout in milliseconds.
+                                 Default: 0 - no timeout.
+      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
+                                 there is no socket idle time limit
+                                 Default: 10 seconds. (default 10000)
+  -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
+  -o, --output-file string          Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
+  -r, --remove-files                Remove existing backup file (-o) or files (-d).
   -F, --file-limit int              Rotate backup files, when their size crosses the given
                                     value (in bytes) Only used when backing up to a Directory. Default: 0.
-  -L, --records-per-second int      Limit total returned records per second (rps).
-                                    Do not apply rps limit if records-per-second is zero.
-                                    Default: 0.
-  -B, --bin-list stringArray        Only include the given bins in the backup.
-                                    Default: include all bins.
-  -w, --parallel int                Maximum number of scan calls to run in parallel.
-                                    If only one partition range is given, or the entire namespace is being backed up, the range
-                                    of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
-                                    filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
-                                    partition filters.
-                                    Default: 1 (default 1)
   -D, --after-digest string         Backup records after record digest in record's partition plus all succeeding
                                     partitions. Used to resume backup with last record received from previous
                                     incomplete backup.
@@ -72,9 +86,6 @@ Backup Flags:
                                     Format: base64 encoded string
                                     Example: EjRWeJq83vEjRRI0VniavN7xI0U=
                                     
-  -R, --no-records                  Don't backup any records.
-  -I, --no-indexes                  Don't backup any indexes.
-  -u, --no-udfs                     Don't backup any UDFs.
   -a, --modified-before string      <YYYY-MM-DD_HH:MM:SS>
                                     Perform an incremental backup; only include records 
                                     that changed after the given date and time. The system's 
@@ -85,8 +96,6 @@ Backup Flags:
   -b, --modified-after string       <YYYY-MM-DD_HH:MM:SS>
                                     Only include records that last changed before the given
                                     date and time. May combined with --modified-after to specify a range.
-      --max-retries int             Maximum number of retries before aborting the current transaction.
-                                    Default: 5 (default 5)
   -M, --max-records int             The number of records approximately to back up.
                                     Default: all records
   -x, --no-bins                     Do not include bin data in the backup.
@@ -96,11 +105,6 @@ Backup Flags:
                                     which can be used to do a partial backup. The expression to be used can be base64 
                                     encoded through any client. This argument is mutually exclusive with multi-set backup.
                                     
-      --total-timeout int           Total socket timeout in milliseconds.
-                                    Default: 0 - no timeout.
-      --socket-timeout int          Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
-                                    there is no socket idle time limit
-                                    Default: 10 seconds. (default 10000)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -124,11 +128,6 @@ Secret Agent Flags:
       --sa-timeout int              Secret agent connection and reading timeout.
       --sa-cafile string            Path to ca file for encrypted connection.
       --sa-is-base64                Flag that shows if secret agent responses are encrypted with base64.
-
-Storage Flags:
-  -d, --directory string     The Directory that holds the backup files. Required, unless -o or -e is used.
-  -o, --output-file string   Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
-  -r, --remove-files         Remove existing backup file (-o) or files (-d).
 
 AWS Flags:
       --s3-region string             The S3 region that the bucket(s) exist in.
@@ -188,8 +187,6 @@ Azure Flags:
                     10,000 (default) records at 99.9999%% confidence.
 
 --estimate-samples  The number of samples to take when running a backup estimate.
-
---nice              The limit for write storage bandwidth in MiB/s.
 
 --no-ttl-only       Only include records that have no ttl set (persistent records).
 

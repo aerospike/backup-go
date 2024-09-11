@@ -24,21 +24,26 @@ import (
 	"github.com/aerospike/backup-go/io/local"
 )
 
-func newLocalReader(r *models.Restore) (backup.StreamingReader, error) {
+func newLocalReader(r *models.Restore, c *models.Common) (backup.StreamingReader, error) {
 	var opts []local.Opt
 
-	if r.Directory != "" && r.File == "" {
-		opts = append(opts, local.WithDir(r.Directory), local.WithValidator(asb.NewValidator()))
+	if c.Directory != "" && r.InputFile == "" {
+		opts = append(opts, local.WithDir(c.Directory), local.WithValidator(asb.NewValidator()))
 	}
 
-	if r.File != "" && r.Directory == "" {
-		opts = append(opts, local.WithFile(r.File))
+	if r.InputFile != "" && c.Directory == "" {
+		opts = append(opts, local.WithFile(r.InputFile))
 	}
 
 	return local.NewReader(opts...)
 }
 
-func newS3Reader(ctx context.Context, a *models.AwsS3, r *models.Restore) (backup.StreamingReader, error) {
+func newS3Reader(
+	ctx context.Context,
+	a *models.AwsS3,
+	r *models.Restore,
+	c *models.Common,
+) (backup.StreamingReader, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
 		return nil, err
@@ -49,13 +54,13 @@ func newS3Reader(ctx context.Context, a *models.AwsS3, r *models.Restore) (backu
 		bucketName, path string
 	)
 
-	if r.Directory != "" && r.File == "" {
-		bucketName, path = getBucketFromPath(r.Directory)
+	if c.Directory != "" && r.InputFile == "" {
+		bucketName, path = getBucketFromPath(c.Directory)
 		opts = append(opts, s3.WithDir(path), s3.WithValidator(asb.NewValidator()))
 	}
 
-	if r.File != "" && r.Directory == "" {
-		bucketName, path = getBucketFromPath(r.File)
+	if r.InputFile != "" && c.Directory == "" {
+		bucketName, path = getBucketFromPath(r.InputFile)
 		opts = append(opts, s3.WithFile(path))
 	}
 

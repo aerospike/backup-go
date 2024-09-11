@@ -23,30 +23,28 @@ import (
 )
 
 func TestNewLocalReader(t *testing.T) {
-	r := &models.Restore{
-		Common: models.Common{
-			Directory: t.TempDir(),
-		},
+	r := &models.Restore{}
+	c := &models.Common{
+		Directory: t.TempDir(),
 	}
 
-	reader, err := newLocalReader(r)
+	reader, err := newLocalReader(r, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, "directory", reader.GetType())
 
 	r = &models.Restore{
-		Common: models.Common{
-			File: t.TempDir() + "/file.bak",
-		},
+		InputFile: t.TempDir() + "/file.bak",
 	}
+	c = &models.Common{}
 
-	reader, err = newLocalReader(r)
+	reader, err = newLocalReader(r, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, "directory", reader.GetType())
 
 	r = &models.Restore{}
-	reader, err = newLocalReader(r)
+	reader, err = newLocalReader(r, c)
 	assert.Error(t, err)
 	assert.Nil(t, reader)
 }
@@ -55,10 +53,9 @@ func TestNewS3Reader(t *testing.T) {
 	err := createAwsCredentials()
 	assert.NoError(t, err)
 
-	r := &models.Restore{
-		Common: models.Common{
-			Directory: "asbackup/" + t.TempDir(),
-		},
+	r := &models.Restore{}
+	c := &models.Common{
+		Directory: "asbackup/" + t.TempDir(),
 	}
 
 	s3cfg := &models.AwsS3{
@@ -70,18 +67,17 @@ func TestNewS3Reader(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newS3Reader(ctx, s3cfg, r)
+	writer, err := newS3Reader(ctx, s3cfg, r, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, "s3", writer.GetType())
 
 	r = &models.Restore{
-		Common: models.Common{
-			File: "asbackup/" + t.TempDir() + "/file.bak",
-		},
+		InputFile: "asbackup/" + t.TempDir() + "/file.bak",
 	}
+	c = &models.Common{}
 
-	writer, err = newS3Reader(ctx, s3cfg, r)
+	writer, err = newS3Reader(ctx, s3cfg, r, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, "s3", writer.GetType())

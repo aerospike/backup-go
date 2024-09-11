@@ -22,7 +22,7 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	asModels "github.com/aerospike/backup-go/models"
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -37,6 +37,7 @@ func NewASRestore(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
 	restoreParams *models.Restore,
+	commonParams *models.Common,
 	compression *models.Compression,
 	encryption *models.Encryption,
 	secretAgent *models.SecretAgent,
@@ -50,21 +51,24 @@ func NewASRestore(
 		return nil, fmt.Errorf("failed to create aerospike client: %v", err)
 	}
 
-	restoreConfig, err := mapRestoreConfig(restoreParams)
+	restoreConfig, err := mapRestoreConfig(
+		restoreParams,
+		commonParams,
+		compression,
+		encryption,
+		secretAgent,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create restore config: %v", err)
 	}
 
-	restoreConfig.CompressionPolicy = mapCompressionPolicy(compression)
-	restoreConfig.EncryptionPolicy = mapEncryptionPolicy(encryption)
-	restoreConfig.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
 	// TODO: check if we need to pass ID and ScanLimiter?
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %v", err)
 	}
 
-	reader, err := getReader(ctx, restoreParams, awsS3, gcpStorage, azureBlob)
+	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup reader: %v", err)
 	}
@@ -94,23 +98,24 @@ func (r *ASRestore) Run(ctx context.Context) error {
 func getReader(
 	ctx context.Context,
 	restoreParams *models.Restore,
+	commonParams *models.Common,
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
 ) (backup.StreamingReader, error) {
 	switch {
 	case awsS3.Region != "":
-		return newS3Reader(ctx, awsS3, restoreParams)
+		return newS3Reader(ctx, awsS3, restoreParams, commonParams)
 	case gcpStorage.Host != "":
 		return newGcpReader()
 	case azureBlob.Host != "":
 		return newAzureReader()
 	default:
-		return newLocalReader(restoreParams)
+		return newLocalReader(restoreParams, commonParams)
 	}
 }
 
-func printRestoreReport(stats *asModels.RestoreStats) {
+func printRestoreReport(stats *bModels.RestoreStats) {
 	fmt.Println("Backup Report")
 	fmt.Println("--------------")
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))

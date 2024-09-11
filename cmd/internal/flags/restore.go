@@ -30,7 +30,7 @@ func NewRestore() *Restore {
 func (f *Restore) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	flagSet.StringVarP(&f.File, "input-file", "i",
+	flagSet.StringVarP(&f.InputFile, "input-file", "i",
 		"",
 		"Restore from a single backup file. Use - for stdin.\n"+
 			"Required, unless --directory or --directory-list is used.\n")
@@ -61,6 +61,35 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		0,
 		"For records with expirable void-times, add N seconds of extra-ttl to the\n"+
 			"recorded void-time.")
+
+	flagSet.BoolVarP(&f.Uniq, "unique", "u",
+		false,
+		"Skip records that already exist in the namespace;\n"+
+			"Don't touch them.\n")
+	flagSet.BoolVarP(&f.Replace, "replace", "r",
+		false,
+		"Fully replace records that already exist in the namespace;\n"+
+			"Don't update them.\n")
+	flagSet.BoolVarP(&f.NoGeneration, "no-generation", "g",
+		false,
+		"Don't check the generation of records that already exist in the namespace.")
+	flagSet.Int64VarP(&f.TimeOut, "timeout", "T",
+		10000,
+		"Set the timeout (ms) for commands. \n"+
+			"Default: 10000")
+	flagSet.Int64Var(&f.RetryBaseTimeout, "retry-base-timeout",
+		10000,
+		"Set the initial delay between retry attempts in milliseconds\n"+
+			"Default: 10000")
+	flagSet.Float64Var(&f.RetryMultiplier, "retry-multiplier",
+		0,
+		"retry-multiplier is used to increase the delay between subsequent retry attempts.\n"+
+			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)\n"+
+			"Default: 0")
+	flagSet.UintVar(&f.RetryMaxRetries, "retry-max-retries",
+		0,
+		"Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.\n"+
+			"Default: 0")
 
 	return flagSet
 }

@@ -48,29 +48,28 @@ func TestGetBucketFromPath(t *testing.T) {
 func TestNewLocalWriter(t *testing.T) {
 	b := &models.Backup{
 		RemoveFiles: true,
-		Common: models.Common{
-			Directory: t.TempDir(),
-		},
+	}
+	c := &models.Common{
+		Directory: t.TempDir(),
 	}
 
-	writer, err := newLocalWriter(b)
+	writer, err := newLocalWriter(b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, "directory", writer.GetType())
 
 	b = &models.Backup{
-		Common: models.Common{
-			File: t.TempDir() + "/file.bak",
-		},
+		OutputFile: t.TempDir() + "/file.bak",
 	}
+	c = &models.Common{}
 
-	writer, err = newLocalWriter(b)
+	writer, err = newLocalWriter(b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, "directory", writer.GetType())
 
 	b = &models.Backup{}
-	writer, err = newLocalWriter(b)
+	writer, err = newLocalWriter(b, c)
 	assert.Error(t, err)
 	assert.Nil(t, writer)
 }
@@ -81,9 +80,9 @@ func TestNewS3Writer(t *testing.T) {
 
 	b := &models.Backup{
 		RemoveFiles: true,
-		Common: models.Common{
-			Directory: "asbackup/" + t.TempDir(),
-		},
+	}
+	c := &models.Common{
+		Directory: "asbackup/" + t.TempDir(),
 	}
 
 	s3cfg := &models.AwsS3{
@@ -95,19 +94,18 @@ func TestNewS3Writer(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newS3Writer(ctx, s3cfg, b)
+	writer, err := newS3Writer(ctx, s3cfg, b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, "s3", writer.GetType())
 
 	b = &models.Backup{
-		Common: models.Common{
-			File: "asbackup/" + t.TempDir() + "/file.bak",
-		},
+		OutputFile:  "asbackup/" + t.TempDir() + "/file.bak",
 		RemoveFiles: true,
 	}
+	c = &models.Common{}
 
-	writer, err = newS3Writer(ctx, s3cfg, b)
+	writer, err = newS3Writer(ctx, s3cfg, b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, "s3", writer.GetType())

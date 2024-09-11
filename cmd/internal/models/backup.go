@@ -15,10 +15,8 @@
 package models
 
 type Backup struct {
-	Common
-
-	RemoveFiles bool
-
+	OutputFile          string
+	RemoveFiles         bool
 	ModifiedBefore      string
 	ModifiedAfter       string
 	FileLimit           int64
@@ -27,5 +25,4 @@ type Backup struct {
 	NoBins              bool
 	SleepBetweenRetries int
 	FilterExpression    string
-	//	Partitions PartitionRange
 }

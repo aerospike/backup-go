@@ -59,6 +59,7 @@ var (
 func init() {
 	// Disable sorting
 	rootCmd.PersistentFlags().SortFlags = false
+	rootCmd.SilenceUsage = true
 
 	appFlagSet := flagsApp.NewFlagSet()
 	aerospikeFlagSet := flagsAerospike.NewFlagSet(func(str string) string { return str })
@@ -164,6 +165,7 @@ func run(cmd *cobra.Command, _ []string) error {
 		cmd.Context(),
 		flagsAerospike.NewAerospikeConfig(),
 		flagsBackup.GetBackup(),
+		flagsCommon.GetCommon(),
 		flagsCompression.GetCompression(),
 		flagsEncryption.GetEncryption(),
 		flagsSecretAgent.GetSecretAgent(),

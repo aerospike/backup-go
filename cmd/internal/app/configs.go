@@ -22,33 +22,46 @@ import (
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	bModels "github.com/aerospike/backup-go/models"
 )
 
-func mapBackupConfig(b *models.Backup) (*backup.BackupConfig, error) {
-	if b.Namespace == "" {
+func mapBackupConfig(
+	backupParams *models.Backup,
+	commonParams *models.Common,
+	compression *models.Compression,
+	encryption *models.Encryption,
+	secretAgent *models.SecretAgent,
+) (*backup.BackupConfig, error) {
+	if commonParams.Namespace == "" {
 		return nil, fmt.Errorf("namespace is required")
 	}
 
 	c := backup.NewDefaultBackupConfig()
-	c.Namespace = b.Namespace
-	c.SetList = b.SetList
-	c.BinList = b.BinList
-	c.NoRecords = b.NoRecords
-	c.NoIndexes = b.NoIndexes
-	c.RecordsPerSecond = b.RecordsPerSecond
-	c.FileLimit = b.FileLimit
-	c.AfterDigest = b.AfterDigest
-	c.Parallel = b.Parallel
+	c.Namespace = commonParams.Namespace
+	c.SetList = commonParams.SetList
+	c.BinList = commonParams.BinList
+	c.NoRecords = commonParams.NoRecords
+	c.NoIndexes = commonParams.NoIndexes
+	c.RecordsPerSecond = commonParams.RecordsPerSecond
+	c.FileLimit = backupParams.FileLimit
+	c.AfterDigest = backupParams.AfterDigest
+	c.Parallel = commonParams.Parallel
+	// As we set --nice in MiB we must convert it to bytes
+	// TODO: make Bandwidth int64 to avoid overflow.
+	c.Bandwidth = commonParams.Nice * 1024 * 1024
 
-	sp, err := mapScanPolicy(b)
+	sp, err := mapScanPolicy(backupParams, commonParams)
 	if err != nil {
 		return nil, err
 	}
 
 	c.ScanPolicy = sp
+	c.CompressionPolicy = mapCompressionPolicy(compression)
+	c.EncryptionPolicy = mapEncryptionPolicy(encryption)
+	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
 
-	if b.ModifiedBefore != "" {
-		modBeforeTime, err := time.Parse("2006-01-02_15:04:05", b.ModifiedBefore)
+	if backupParams.ModifiedBefore != "" {
+		modBeforeTime, err := time.Parse("2006-01-02_15:04:05", backupParams.ModifiedBefore)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified before date: %v", err)
 		}
@@ -56,8 +69,8 @@ func mapBackupConfig(b *models.Backup) (*backup.BackupConfig, error) {
 		c.ModBefore = &modBeforeTime
 	}
 
-	if b.ModifiedAfter != "" {
-		modAfterTime, err := time.Parse("2006-01-02_15:04:05", b.ModifiedAfter)
+	if backupParams.ModifiedAfter != "" {
+		modAfterTime, err := time.Parse("2006-01-02_15:04:05", backupParams.ModifiedAfter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified after date: %v", err)
 		}
@@ -65,32 +78,68 @@ func mapBackupConfig(b *models.Backup) (*backup.BackupConfig, error) {
 		c.ModAfter = &modAfterTime
 	}
 
-	if len(b.SetList) > 0 {
-		c.SetList = b.SetList
+	if len(commonParams.SetList) > 0 {
+		c.SetList = commonParams.SetList
 	}
 
 	return c, nil
 }
 
-func mapRestoreConfig(r *models.Restore) (*backup.RestoreConfig, error) {
-	if r.Namespace == "" {
+func mapRestoreConfig(
+	restoreParams *models.Restore,
+	commonParams *models.Common,
+	compression *models.Compression,
+	encryption *models.Encryption,
+	secretAgent *models.SecretAgent,
+) (*backup.RestoreConfig, error) {
+	if commonParams.Namespace == "" {
 		return nil, fmt.Errorf("namespace is required")
 	}
 
 	c := backup.NewDefaultRestoreConfig()
-	c.SetList = r.SetList
-	c.BinList = r.BinList
-	c.NoRecords = r.NoRecords
-	c.NoIndexes = r.NoIndexes
-	c.RecordsPerSecond = r.RecordsPerSecond
-	c.Parallel = r.Parallel
-	c.WritePolicy = mapWritePolicy(r)
+	c.Namespace = mapRestoreNamespace(commonParams.Namespace)
+	c.SetList = commonParams.SetList
+	c.BinList = commonParams.BinList
+	c.NoRecords = commonParams.NoRecords
+	c.NoIndexes = commonParams.NoIndexes
+	c.RecordsPerSecond = commonParams.RecordsPerSecond
+	c.Parallel = commonParams.Parallel
+	c.WritePolicy = mapWritePolicy(restoreParams, commonParams)
+	c.InfoPolicy = mapInfoPolicy(restoreParams.TimeOut)
+	// As we set --nice in MiB we must convert it to bytes
+	// TODO: make Bandwidth int64 to avoid overflow.
+	c.Bandwidth = commonParams.Nice * 1024 * 1024
 
-	if len(r.SetList) > 0 {
-		c.SetList = r.SetList
+	c.CompressionPolicy = mapCompressionPolicy(compression)
+	c.EncryptionPolicy = mapEncryptionPolicy(encryption)
+	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
+	c.RetryPolicy = mapRetryPolicy(restoreParams)
+
+	if len(commonParams.SetList) > 0 {
+		c.SetList = commonParams.SetList
 	}
 
 	return c, nil
+}
+
+func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
+	nsArr := strings.Split(n, ",")
+
+	var source, destination string
+
+	switch len(nsArr) {
+	case 1:
+		source, destination = nsArr[0], nsArr[0]
+	case 2:
+		source, destination = nsArr[0], nsArr[1]
+	default:
+		return nil
+	}
+
+	return &backup.RestoreNamespaceConfig{
+		Source:      &source,
+		Destination: &destination,
+	}
 }
 
 func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
@@ -159,13 +208,13 @@ func mapSecretAgentConfig(s *models.SecretAgent) *backup.SecretAgentConfig {
 	return c
 }
 
-func mapScanPolicy(b *models.Backup) (*aerospike.ScanPolicy, error) {
-	p := &aerospike.ScanPolicy{}
+func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, error) {
+	p := aerospike.NewScanPolicy()
 	p.MaxRecords = b.MaxRecords
-	p.MaxRetries = b.MaxRetries
+	p.MaxRetries = c.MaxRetries
 	p.SleepBetweenRetries = time.Duration(b.SleepBetweenRetries) * time.Millisecond
-	p.TotalTimeout = time.Duration(b.TotalTimeout) * time.Millisecond
-	p.SocketTimeout = time.Duration(b.SocketTimeout) * time.Millisecond
+	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
+	p.SocketTimeout = time.Duration(c.SocketTimeout) * time.Millisecond
 
 	if b.NoBins {
 		p.IncludeBinData = false
@@ -183,11 +232,45 @@ func mapScanPolicy(b *models.Backup) (*aerospike.ScanPolicy, error) {
 	return p, nil
 }
 
-func mapWritePolicy(r *models.Restore) *aerospike.WritePolicy {
-	p := &aerospike.WritePolicy{}
-	p.MaxRetries = r.MaxRetries
-	p.TotalTimeout = time.Duration(r.TotalTimeout) * time.Millisecond
-	p.SocketTimeout = time.Duration(r.SocketTimeout) * time.Millisecond
+func mapWritePolicy(r *models.Restore, c *models.Common) *aerospike.WritePolicy {
+	p := aerospike.NewWritePolicy(0, 0)
+	p.MaxRetries = c.MaxRetries
+	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
+	p.SocketTimeout = time.Duration(c.SocketTimeout) * time.Millisecond
+	p.RecordExistsAction = recordExistsAction(r.Replace, r.Uniq)
+	p.GenerationPolicy = aerospike.EXPECT_GEN_GT
+
+	if r.NoGeneration {
+		p.GenerationPolicy = aerospike.NONE
+	}
 
 	return p
+}
+
+func recordExistsAction(replace, unique bool) aerospike.RecordExistsAction {
+	switch {
+	case replace:
+		return aerospike.REPLACE
+	case unique:
+		return aerospike.CREATE_ONLY
+	default:
+		return aerospike.UPDATE
+	}
+}
+
+// TODO: why no info policy timeout is set for backup in C tool?
+func mapInfoPolicy(timeOut int64) *aerospike.InfoPolicy {
+	p := aerospike.NewInfoPolicy()
+	p.Timeout = time.Duration(timeOut) * time.Millisecond
+
+	return p
+}
+
+func mapRetryPolicy(r *models.Restore) *bModels.RetryPolicy {
+	// TODO: make constructor for bModels.RetryPolicy
+	return &bModels.RetryPolicy{
+		BaseTimeout: time.Duration(r.RetryBaseTimeout) * time.Millisecond,
+		Multiplier:  r.RetryMultiplier,
+		MaxRetries:  r.RetryMaxRetries,
+	}
 }

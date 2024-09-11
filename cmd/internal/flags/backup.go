@@ -30,7 +30,7 @@ func NewBackup() *Backup {
 func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	flagSet.StringVarP(&f.File, "output-file", "o",
+	flagSet.StringVarP(&f.OutputFile, "output-file", "o",
 		"",
 		"Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.")
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",

@@ -22,17 +22,34 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func testCompression() *models.Compression {
+	return &models.Compression{
+		Mode:  "ZSTD",
+		Level: 3,
+	}
+}
+
+func testEncryption() *models.Encryption {
+	return &models.Encryption{
+		Mode:    "AES256",
+		KeyFile: "/path/to/keyfile",
+	}
+}
+
+func testSecretAgent() *models.SecretAgent {
+	return &models.SecretAgent{
+		Address:            "localhost",
+		ConnectionType:     "tcp",
+		Port:               8080,
+		TimeoutMillisecond: 1000,
+		CaFile:             "/path/to/ca.pem",
+		IsBase64:           true,
+	}
+}
+
 func TestMapBackupConfig_Success(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Common: models.Common{
-			Namespace:        "test-namespace",
-			SetList:          []string{"set1", "set2"},
-			BinList:          []string{"bin1", "bin2"},
-			NoRecords:        true,
-			NoIndexes:        false,
-			RecordsPerSecond: 1000,
-		},
 		FileLimit:        5000,
 		AfterDigest:      "digest",
 		ModifiedBefore:   "2023-09-01_12:00:00",
@@ -40,7 +57,21 @@ func TestMapBackupConfig_Success(t *testing.T) {
 		FilterExpression: "k1EDpHRlc3Q=",
 	}
 
-	config, err := mapBackupConfig(backupModel)
+	commonModel := &models.Common{
+		Namespace:        "test-namespace",
+		SetList:          []string{"set1", "set2"},
+		BinList:          []string{"bin1", "bin2"},
+		NoRecords:        true,
+		NoIndexes:        false,
+		RecordsPerSecond: 1000,
+		Nice:             10, // 10 MiB
+	}
+
+	compression := testCompression()
+	encryption := testEncryption()
+	secretAgent := testSecretAgent()
+
+	config, err := mapBackupConfig(backupModel, commonModel, compression, encryption, secretAgent)
 	assert.NoError(t, err)
 	assert.Equal(t, "test-namespace", config.Namespace)
 	assert.ElementsMatch(t, []string{"set1", "set2"}, config.SetList)
@@ -54,12 +85,27 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	modAfter, _ := time.Parse("2006-01-02_15:04:05", "2023-09-02_12:00:00")
 	assert.Equal(t, &modBefore, config.ModBefore)
 	assert.Equal(t, &modAfter, config.ModAfter)
+
+	// Compression, Encryption, and Secret Agent
+	assert.NotNil(t, config.CompressionPolicy)
+	assert.Equal(t, "ZSTD", config.CompressionPolicy.Mode)
+	assert.Equal(t, 3, config.CompressionPolicy.Level)
+
+	assert.NotNil(t, config.EncryptionPolicy)
+	assert.Equal(t, "AES256", config.EncryptionPolicy.Mode)
+	assert.Equal(t, "/path/to/keyfile", *config.EncryptionPolicy.KeyFile)
+
+	assert.NotNil(t, config.SecretAgentConfig)
+	assert.Equal(t, "localhost", *config.SecretAgentConfig.Address)
+	assert.Equal(t, "tcp", *config.SecretAgentConfig.ConnectionType)
+	assert.Equal(t, 8080, *config.SecretAgentConfig.Port)
 }
 
 func TestMapBackupConfig_MissingNamespace(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{}
-	config, err := mapBackupConfig(backupModel)
+	commonModel := &models.Common{}
+	config, err := mapBackupConfig(backupModel, commonModel, nil, nil, nil)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Equal(t, "namespace is required", err.Error())
@@ -68,12 +114,12 @@ func TestMapBackupConfig_MissingNamespace(t *testing.T) {
 func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Common: models.Common{
-			Namespace: "test-namespace",
-		},
 		ModifiedBefore: "invalid-date",
 	}
-	config, err := mapBackupConfig(backupModel)
+	commonModel := &models.Common{
+		Namespace: "test-namespace",
+	}
+	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified before date")
@@ -82,12 +128,12 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Common: models.Common{
-			Namespace: "test-namespace",
-		},
 		ModifiedAfter: "invalid-date",
 	}
-	config, err := mapBackupConfig(backupModel)
+	commonModel := &models.Common{
+		Namespace: "test-namespace",
+	}
+	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified after date")
@@ -96,28 +142,65 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
-		Common: models.Common{
-			Namespace: "test-namespace",
-		},
 		FilterExpression: "invalid-exp",
 	}
-	config, err := mapBackupConfig(backupModel)
+	commonModel := &models.Common{
+		Namespace: "test-namespace",
+	}
+	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse filter expression")
 }
 
-func TestMapCompressionPolicy(t *testing.T) {
+func TestMapRestoreConfig_Success(t *testing.T) {
 	t.Parallel()
-	compressionModel := &models.Compression{
-		Mode:  "ZSTD",
-		Level: 5,
+	restoreModel := &models.Restore{}
+	commonModel := &models.Common{
+		Namespace:        "test-namespace",
+		SetList:          []string{"set1", "set2"},
+		BinList:          []string{"bin1", "bin2"},
+		NoRecords:        true,
+		NoIndexes:        false,
+		RecordsPerSecond: 1000,
+		Nice:             10, // 10 MiB
 	}
+
+	compression := testCompression()
+	encryption := testEncryption()
+	secretAgent := testSecretAgent()
+
+	config, err := mapRestoreConfig(restoreModel, commonModel, compression, encryption, secretAgent)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-namespace", *config.Namespace.Source)
+	assert.Equal(t, "test-namespace", *config.Namespace.Destination)
+	assert.ElementsMatch(t, []string{"set1", "set2"}, config.SetList)
+	assert.ElementsMatch(t, []string{"bin1", "bin2"}, config.BinList)
+	assert.True(t, config.NoRecords)
+	assert.Equal(t, 1000, config.RecordsPerSecond)
+
+	assert.NotNil(t, config.CompressionPolicy)
+	assert.Equal(t, "ZSTD", config.CompressionPolicy.Mode)
+	assert.Equal(t, 3, config.CompressionPolicy.Level)
+
+	assert.NotNil(t, config.EncryptionPolicy)
+	assert.Equal(t, "AES256", config.EncryptionPolicy.Mode)
+	assert.Equal(t, "/path/to/keyfile", *config.EncryptionPolicy.KeyFile)
+
+	assert.NotNil(t, config.SecretAgentConfig)
+	assert.Equal(t, "localhost", *config.SecretAgentConfig.Address)
+	assert.Equal(t, "tcp", *config.SecretAgentConfig.ConnectionType)
+	assert.Equal(t, 8080, *config.SecretAgentConfig.Port)
+}
+
+func TestMapCompressionPolicy_Success(t *testing.T) {
+	t.Parallel()
+	compressionModel := testCompression()
 
 	compressionPolicy := mapCompressionPolicy(compressionModel)
 	assert.NotNil(t, compressionPolicy)
 	assert.Equal(t, "ZSTD", compressionPolicy.Mode)
-	assert.Equal(t, 5, compressionPolicy.Level)
+	assert.Equal(t, 3, compressionPolicy.Level)
 }
 
 func TestMapCompressionPolicy_EmptyMode(t *testing.T) {
@@ -127,7 +210,21 @@ func TestMapCompressionPolicy_EmptyMode(t *testing.T) {
 	assert.Nil(t, compressionPolicy)
 }
 
-func TestMapEncryptionPolicy(t *testing.T) {
+func TestMapCompressionPolicy_CaseInsensitiveMode(t *testing.T) {
+	t.Parallel()
+	compressionModel := &models.Compression{
+		Mode:  "zstd", // Lowercase mode
+		Level: 3,
+	}
+
+	compressionPolicy := mapCompressionPolicy(compressionModel)
+	assert.NotNil(t, compressionPolicy)
+	assert.Equal(t, "ZSTD", compressionPolicy.Mode, "Compression mode should be converted to uppercase")
+	assert.Equal(t, 3, compressionPolicy.Level)
+}
+
+// Encryption Tests
+func TestMapEncryptionPolicy_Success(t *testing.T) {
 	t.Parallel()
 	encryptionModel := &models.Encryption{
 		Mode:      "AES256",
@@ -151,16 +248,21 @@ func TestMapEncryptionPolicy_EmptyMode(t *testing.T) {
 	assert.Nil(t, encryptionPolicy)
 }
 
-func TestMapSecretAgentConfig(t *testing.T) {
+func TestMapEncryptionPolicy_UpperCaseMode(t *testing.T) {
 	t.Parallel()
-	secretAgentModel := &models.SecretAgent{
-		Address:            "localhost",
-		ConnectionType:     "tcp",
-		Port:               8080,
-		TimeoutMillisecond: 1000,
-		CaFile:             "/path/to/ca.pem",
-		IsBase64:           true,
+	encryptionModel := &models.Encryption{
+		Mode: "aes256", // Lowercase mode
 	}
+
+	encryptionPolicy := mapEncryptionPolicy(encryptionModel)
+	assert.NotNil(t, encryptionPolicy)
+	assert.Equal(t, "AES256", encryptionPolicy.Mode, "Encryption mode should be converted to uppercase")
+}
+
+// Secret Agent Tests
+func TestMapSecretAgentConfig_Success(t *testing.T) {
+	t.Parallel()
+	secretAgentModel := testSecretAgent()
 
 	secretAgentConfig := mapSecretAgentConfig(secretAgentModel)
 	assert.NotNil(t, secretAgentConfig)
@@ -179,38 +281,41 @@ func TestMapSecretAgentConfig_EmptyAddress(t *testing.T) {
 	assert.Nil(t, secretAgentConfig)
 }
 
-func TestMapScanPolicy_Success(t *testing.T) {
+func TestMapSecretAgentConfig_PartialConfig(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		MaxRecords:          1000,
-		SleepBetweenRetries: 100,
-		NoBins:              true,
-		FilterExpression:    "k1EDpHRlc3Q=",
-		Common: models.Common{
-			MaxRetries:    3,
-			TotalTimeout:  5000,
-			SocketTimeout: 3000,
-		},
+	secretAgentModel := &models.SecretAgent{
+		Address: "localhost",
+		Port:    8080,
 	}
 
-	scanPolicy, err := mapScanPolicy(backupModel)
-	assert.NoError(t, err)
-	assert.Equal(t, int64(1000), scanPolicy.MaxRecords)
-	assert.Equal(t, 3, scanPolicy.MaxRetries)
-	assert.Equal(t, 100*time.Millisecond, scanPolicy.SleepBetweenRetries)
-	assert.Equal(t, 5000*time.Millisecond, scanPolicy.TotalTimeout)
-	assert.Equal(t, 3000*time.Millisecond, scanPolicy.SocketTimeout)
-	assert.False(t, scanPolicy.IncludeBinData)
+	secretAgentConfig := mapSecretAgentConfig(secretAgentModel)
+	assert.NotNil(t, secretAgentConfig)
+	assert.Equal(t, "localhost", *secretAgentConfig.Address)
+	assert.Equal(t, 8080, *secretAgentConfig.Port)
+	assert.Nil(t, secretAgentConfig.CaFile, "CaFile should be nil if not set")
 }
 
-func TestMapScanPolicy_FailedFilterExpression(t *testing.T) {
+func TestMapRestoreNamespace_SuccessSingleNamespace(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		FilterExpression: "invalid-base64",
-	}
+	ns := "source-ns"
+	result := mapRestoreNamespace(ns)
+	assert.NotNil(t, result, "Result should not be nil")
+	assert.Equal(t, "source-ns", *result.Source, "Source should be 'source-ns'")
+	assert.Equal(t, "source-ns", *result.Destination, "Destination should be the same as Source")
+}
 
-	scanPolicy, err := mapScanPolicy(backupModel)
-	assert.Error(t, err)
-	assert.Nil(t, scanPolicy)
-	assert.Contains(t, err.Error(), "failed to parse filter expression")
+func TestMapRestoreNamespace_SuccessDifferentNamespaces(t *testing.T) {
+	t.Parallel()
+	ns := "source-ns,destination-ns"
+	result := mapRestoreNamespace(ns)
+	assert.NotNil(t, result, "Result should not be nil")
+	assert.Equal(t, "source-ns", *result.Source, "Source should be 'source-ns'")
+	assert.Equal(t, "destination-ns", *result.Destination, "Destination should be 'destination-ns'")
+}
+
+func TestMapRestoreNamespace_InvalidNamespace(t *testing.T) {
+	t.Parallel()
+	ns := "source-ns,destination-ns,extra-ns"
+	result := mapRestoreNamespace(ns)
+	assert.Nil(t, result, "Result should be nil for invalid input")
 }

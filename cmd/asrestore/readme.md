@@ -66,7 +66,7 @@ Restore Flags:
                                  Default: 1 (default 1)
   -R, --no-records               Don't backup any records.
   -I, --no-indexes               Don't backup any indexes.
-  -u, --no-udfs                  Don't backup any UDFs.
+      --no-udfs                  Don't backup any UDFs.
       --max-retries int          Maximum number of retries before aborting the current transaction.
                                  Default: 5 (default 5)
       --total-timeout int        Total socket timeout in milliseconds.
@@ -74,28 +74,45 @@ Restore Flags:
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
                                  there is no socket idle time limit
                                  Default: 10 seconds. (default 10000)
-  -i, --input-file string       Restore from a single backup file. Use - for stdin.
-                                Required, unless --directory or --directory-list is used.
-                                
-      --ignore-record-error     Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
-                                By default such errors are not ignored and asrestore terminates.
-                                Optional: Use verbose mode to see errors in detail.
-      --disable-batch-writes    Disables the use of batch writes when restoring records to the Aerospike cluster.
-                                By default, the cluster is checked for batch write support, so only set this flag if you explicitly
-                                don't want
-                                batch writes to be used or asrestore is failing to recognize that batch writes are disabled
-                                and is failing to work because of it.
-      --max-async-batches int   The max number of outstanding async record batch write calls at a time.
-                                For pre-6.0 servers, 'batches' are only a logical grouping of
-                                records, and each record is uploaded individually. The true max
-                                number of async aerospike calls would then be
-                                <max-async-batches> * <batch-size>
-                                Default is 32. (default 32)
-      --batch-size int          The max allowed number of records to simultaneously upload
-                                in an async batch write calls to make to aerospike at a time.
-                                Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
-      --extra-ttl int           For records with expirable void-times, add N seconds of extra-ttl to the
-                                recorded void-time.
+  -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
+  -i, --input-file string        Restore from a single backup file. Use - for stdin.
+                                 Required, unless --directory or --directory-list is used.
+                                 
+      --ignore-record-error      Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
+                                 By default such errors are not ignored and asrestore terminates.
+                                 Optional: Use verbose mode to see errors in detail.
+      --disable-batch-writes     Disables the use of batch writes when restoring records to the Aerospike cluster.
+                                 By default, the cluster is checked for batch write support, so only set this flag if you explicitly
+                                 don't want
+                                 batch writes to be used or asrestore is failing to recognize that batch writes are disabled
+                                 and is failing to work because of it.
+      --max-async-batches int    The max number of outstanding async record batch write calls at a time.
+                                 For pre-6.0 servers, 'batches' are only a logical grouping of
+                                 records, and each record is uploaded individually. The true max
+                                 number of async aerospike calls would then be
+                                 <max-async-batches> * <batch-size>
+                                 Default is 32. (default 32)
+      --batch-size int           The max allowed number of records to simultaneously upload
+                                 in an async batch write calls to make to aerospike at a time.
+                                 Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
+      --extra-ttl int            For records with expirable void-times, add N seconds of extra-ttl to the
+                                 recorded void-time.
+  -u, --unique                   Skip records that already exist in the namespace;
+                                 Don't touch them.
+                                 
+  -r, --replace                  Fully replace records that already exist in the namespace;
+                                 Don't update them.
+                                 
+  -g, --no-generation            Don't check the generation of records that already exist in the namespace.
+  -T, --timeout int              Set the timeout (ms) for commands. 
+                                 Default: 10000 (default 10000)
+      --retry-base-timeout int   Set the initial delay between retry attempts in milliseconds
+                                 Default: 10000 (default 10000)
+      --retry-multiplier float   retry-multiplier is used to increase the delay between subsequent retry attempts.
+                                 The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)
+                                 Default: 0
+      --retry-max-retries uint   Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.
+                                 Default: 0
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -148,17 +165,6 @@ Azure Flags:
 -m, --machine <path>    Output machine-readable status updates to the given path, 
                         typically a FIFO.
                         
---unique        Skip records that already exist in the namespace
-                Don't touch them.
-                
---replace       Fully replace records that already exist in the 
-                namespace; don't update them.
-                
---no-generation Don't check the generation of records that already
-                exist in the namespace.
-                
---nice          The limits for read storage bandwidth in MiB/s and write operations in TPS.
-
 --validate      Validate backup files but don't restore anything.
 
 --indexes-last  Restore secondary indexes only after UDFs and records have been restored.
@@ -166,8 +172,10 @@ Azure Flags:
 --wait          Wait for restored secondary indexes to finish building. 
                 Wait for restored UDFs to be distributed across the cluster.
 
---timeout       Set the timeout (ms) for commands. Default: 10000
-
+// Replaced with:
+//  --retry-base-timeout
+//  --retry-multiplier
+//  --retry-max-retries
 --retry-scale-factor        The scale factor to use in the exponential backoff retry
                             strategy, in microseconds.
                             Default is 150000 us (150 ms).

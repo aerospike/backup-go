@@ -30,6 +30,7 @@ type Common struct {
 	TotalTimeout     int
 	SocketTimeout    int
 
-	// is it --nice?
-	// 	Bandwidth int
+	// Nice is mapped to config.Bandwidth
+	// Is set in MiB then converted to bytes.
+	Nice int
 }

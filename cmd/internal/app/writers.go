@@ -24,15 +24,15 @@ import (
 	"github.com/aerospike/backup-go/io/local"
 )
 
-func newLocalWriter(b *models.Backup) (backup.Writer, error) {
+func newLocalWriter(b *models.Backup, c *models.Common) (backup.Writer, error) {
 	var opts []local.Opt
 
-	if b.Directory != "" && b.File == "" {
-		opts = append(opts, local.WithDir(b.Directory))
+	if c.Directory != "" && b.OutputFile == "" {
+		opts = append(opts, local.WithDir(c.Directory))
 	}
 
-	if b.File != "" && b.Directory == "" {
-		opts = append(opts, local.WithFile(b.File))
+	if b.OutputFile != "" && c.Directory == "" {
+		opts = append(opts, local.WithFile(b.OutputFile))
 	}
 
 	if b.RemoveFiles {
@@ -42,7 +42,12 @@ func newLocalWriter(b *models.Backup) (backup.Writer, error) {
 	return local.NewWriter(opts...)
 }
 
-func newS3Writer(ctx context.Context, a *models.AwsS3, b *models.Backup) (backup.Writer, error) {
+func newS3Writer(
+	ctx context.Context,
+	a *models.AwsS3,
+	b *models.Backup,
+	c *models.Common,
+) (backup.Writer, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
 		return nil, err
@@ -53,13 +58,13 @@ func newS3Writer(ctx context.Context, a *models.AwsS3, b *models.Backup) (backup
 		bucketName, path string
 	)
 
-	if b.Directory != "" && b.File == "" {
-		bucketName, path = getBucketFromPath(b.Directory)
+	if c.Directory != "" && b.OutputFile == "" {
+		bucketName, path = getBucketFromPath(c.Directory)
 		opts = append(opts, s3.WithDir(path))
 	}
 
-	if b.File != "" && b.Directory == "" {
-		bucketName, path = getBucketFromPath(b.File)
+	if b.OutputFile != "" && c.Directory == "" {
+		bucketName, path = getBucketFromPath(b.OutputFile)
 		opts = append(opts, s3.WithFile(path))
 	}
 

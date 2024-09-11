@@ -27,6 +27,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 	flagSet := backup.NewFlagSet()
 
 	args := []string{
+		"--output-file", "backup-file.bak",
 		"--file-limit", "5000",
 		"--after-digest", "some-digest",
 		"--modified-before", "2023-09-01_12:00:00",
@@ -42,6 +43,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 
 	result := backup.GetBackup()
 
+	assert.Equal(t, "backup-file.bak", result.OutputFile, "The output-file flag should be parsed correctly")
 	assert.Equal(t, int64(5000), result.FileLimit, "The file-limit flag should be parsed correctly")
 	assert.Equal(t, "some-digest", result.AfterDigest, "The after-digest flag should be parsed correctly")
 	assert.Equal(t, "2023-09-01_12:00:00", result.ModifiedBefore, "The modified-before flag should be parsed correctly")
@@ -63,6 +65,7 @@ func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
 
 	result := backup.GetBackup()
 
+	assert.Equal(t, "", result.OutputFile, "The default value for output-file should be an empty string")
 	assert.Equal(t, int64(0), result.FileLimit, "The default value for file-limit should be 0")
 	assert.Equal(t, "", result.AfterDigest, "The default value for after-digest should be an empty string")
 	assert.Equal(t, "", result.ModifiedBefore, "The default value for modified-before should be an empty string")

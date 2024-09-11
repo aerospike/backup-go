@@ -64,7 +64,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVarP(&f.NoIndexes, "no-indexes", "I",
 		false,
 		"Don't backup any indexes.")
-	flagSet.BoolVarP(&f.NoUDFs, "no-udfs", "u",
+	flagSet.BoolVar(&f.NoUDFs, "no-udfs",
 		false,
 		"Don't backup any UDFs.")
 	flagSet.IntVar(&f.MaxRetries, "max-retries",
@@ -80,6 +80,10 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		"Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,\n"+
 			"there is no socket idle time limit\n"+
 			"Default: 10 seconds.")
+
+	flagSet.IntVarP(&f.TotalTimeout, "nice", "N",
+		0,
+		"The limits for read/write storage bandwidth in MiB/s")
 
 	return flagSet
 }

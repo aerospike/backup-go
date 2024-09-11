@@ -15,39 +15,52 @@
 package backup
 
 import (
-	"log/slog"
+	"io"
 
-	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
-	"github.com/google/uuid"
 )
 
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
 type tokenReader struct {
-	decoder Decoder
-	logger  *slog.Logger
+	readersCh <-chan io.ReadCloser
+	decoder   Decoder
+	convertFn func(io.ReadCloser) Decoder
 }
 
 // newTokenReader creates a new tokenReader.
-func newTokenReader(decoder Decoder, logger *slog.Logger) *tokenReader {
-	id := uuid.NewString()
-	logger = logging.WithReader(logger, id, logging.ReaderTypeToken)
-	logger.Debug("created new token reader")
-
+func newTokenReader(readersCh <-chan io.ReadCloser, convertFn func(io.ReadCloser) Decoder) *tokenReader {
 	return &tokenReader{
-		decoder: decoder,
-		logger:  logger,
+		readersCh: readersCh,
+		convertFn: convertFn,
 	}
 }
 
-// Read reads the next token from the Decoder.
-func (dr *tokenReader) Read() (*models.Token, error) {
-	return dr.decoder.NextToken()
-}
+func (tr *tokenReader) Read() (*models.Token, error) {
+	for {
+		if tr.decoder != nil {
+			token, err := tr.decoder.NextToken()
+			if err == nil {
+				return token, nil
+			}
+			if err != io.EOF {
+				return nil, err
+			}
+			// If we get here, the current decoder has finished (EOF)
+			tr.decoder = nil
+		}
 
-// Close satisfies the DataReader interface
-// but is a no-op for the tokenReader.
-func (dr *tokenReader) Close() {
-	dr.logger.Debug("closed token reader")
+		// We need a new decoder
+		select {
+		case reader, ok := <-tr.readersCh:
+			if !ok {
+				// Channel is closed, we're done
+				return nil, io.EOF
+			}
+			tr.decoder = tr.convertFn(reader)
+		default:
+			// Channel is empty
+			return nil, io.EOF
+		}
+	}
 }

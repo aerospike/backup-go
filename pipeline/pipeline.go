@@ -16,7 +16,6 @@ package pipeline
 
 import (
 	"context"
-	"fmt"
 	"sync"
 )
 
@@ -82,7 +81,6 @@ func (dp *Pipeline[T]) SetSendChan(c chan<- T) {
 // The pipeline stops when a worker returns an error,
 // all workers are done, or the context is canceled.
 func (dp *Pipeline[T]) Run(ctx context.Context) error {
-	emptyChannel.Store(0)
 	if len(dp.stages) == 0 {
 		return nil
 	}
@@ -93,30 +91,9 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	errors := make(chan error, len(dp.stages))
 
 	var lastSend chan T
-	var channels []chan T
-	//
-	//go func() {
-	//	for {
-	//		time.Sleep(100 * time.Millisecond)
-	//		buffer := &bytes.Buffer{}
-	//		if len(channels) == 0 {
-	//			break
-	//		}
-	//		for i, ch := range channels {
-	//			lench := len(ch)
-	//			//if lench > 0 {
-	//			fmt.Fprintf(buffer, "ch %d len = %d\n", i, lench)
-	//			//}
-	//		}
-	//		if len(buffer.String()) > 0 {
-	//			fmt.Printf(buffer.String())
-	//		}
-	//	}
-	//}()
 
 	for _, s := range dp.stages {
 		send := make(chan T, channelSize)
-		channels = append(channels, send)
 		s.SetSendChan(send)
 
 		s.SetReceiveChan(lastSend)
@@ -152,7 +129,6 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 		return <-errors
 	}
 
-	fmt.Printf("Emopty counter: %d\n", emptyChannel.Load())
 	return nil
 }
 

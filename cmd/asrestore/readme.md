@@ -1,12 +1,12 @@
 # ASBackup
 Aerospike Restore CLI tool.
 
-## Building
-### Dev build
+## Build
+### Dev
 ```bash
 make build
 ```
-### Release build
+### Release
 ```bash
 # for local build
 make release-test
@@ -14,7 +14,7 @@ make release-test
 make release
 ```
 
-###  Release requirements.
+### Release requirements
 For creating releases, you must have `goreleaser` installed on your device.
 ```bash
 brew install goreleaser/tap/goreleaser

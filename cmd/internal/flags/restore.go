@@ -51,8 +51,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"For pre-6.0 servers, 'batches' are only a logical grouping of\n"+
 			"records, and each record is uploaded individually. The true max\n"+
 			"number of async aerospike calls would then be\n"+
-			"<max-async-batches> * <batch-size>.\n"+
-			"Default: 32")
+			"<max-async-batches> * <batch-size>.")
 	flagSet.IntVar(&f.BatchSize, "batch-size", 128,
 		"The max allowed number of records to simultaneously upload\n"+
 			"in an async batch write calls to make to aerospike at a time.\n"+
@@ -61,7 +60,6 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		0,
 		"For records with expirable void-times, add N seconds of extra-ttl to the\n"+
 			"recorded void-time.")
-
 	flagSet.BoolVarP(&f.Uniq, "unique", "u",
 		false,
 		"Skip records that already exist in the namespace;\n"+
@@ -75,21 +73,17 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		"Don't check the generation of records that already exist in the namespace.")
 	flagSet.Int64VarP(&f.TimeOut, "timeout", "T",
 		10000,
-		"Set the timeout (ms) for commands. \n"+
-			"Default: 10000")
+		"Set the timeout (ms) for commands.")
 	flagSet.Int64Var(&f.RetryBaseTimeout, "retry-base-timeout",
 		10000,
-		"Set the initial delay between retry attempts in milliseconds\n"+
-			"Default: 10000")
+		"Set the initial delay between retry attempts in milliseconds")
 	flagSet.Float64Var(&f.RetryMultiplier, "retry-multiplier",
 		0,
 		"retry-multiplier is used to increase the delay between subsequent retry attempts.\n"+
-			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)\n"+
-			"Default: 0")
+			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.RetryMaxRetries, "retry-max-retries",
 		0,
-		"Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.\n"+
-			"Default: 0")
+		"Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.")
 
 	return flagSet
 }

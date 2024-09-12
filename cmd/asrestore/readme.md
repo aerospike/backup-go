@@ -52,28 +52,23 @@ Restore Flags:
   -n, --namespace string         The namespace to be backed up. Required.
   -s, --set stringArray          The set(s) to be backed up.
                                  If multiple sets are being backed up, filter-exp cannot be used.
-                                 Default: all sets.
+                                 if empty all sets.
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
-                                 Default: 0.
   -B, --bin-list stringArray     Only include the given bins in the backup.
-                                 Default: include all bins.
+                                 If empty include all bins.
   -w, --parallel int             Maximum number of scan calls to run in parallel.
                                  If only one partition range is given, or the entire namespace is being backed up, the range
                                  of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
                                  filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
-                                 partition filters.
-                                 Default: 1 (default 1)
+                                 partition filters. (default 1)
   -R, --no-records               Don't backup any records.
   -I, --no-indexes               Don't backup any indexes.
       --no-udfs                  Don't backup any UDFs.
-      --max-retries int          Maximum number of retries before aborting the current transaction.
-                                 Default: 5 (default 5)
-      --total-timeout int        Total socket timeout in milliseconds.
-                                 Default: 0 - no timeout.
+      --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
+      --total-timeout int        Total socket timeout in milliseconds. 0 - no timeout.
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
-                                 there is no socket idle time limit
-                                 Default: 10 seconds. (default 10000)
+                                 there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -i, --input-file string        Restore from a single backup file. Use - for stdin.
                                  Required, unless --directory or --directory-list is used.
@@ -90,8 +85,7 @@ Restore Flags:
                                  For pre-6.0 servers, 'batches' are only a logical grouping of
                                  records, and each record is uploaded individually. The true max
                                  number of async aerospike calls would then be
-                                 <max-async-batches> * <batch-size>.
-                                 Default: 32 (default 32)
+                                 <max-async-batches> * <batch-size>. (default 32)
       --batch-size int           The max allowed number of records to simultaneously upload
                                  in an async batch write calls to make to aerospike at a time.
                                  Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
@@ -104,15 +98,11 @@ Restore Flags:
                                  Don't update them.
                                  
   -g, --no-generation            Don't check the generation of records that already exist in the namespace.
-  -T, --timeout int              Set the timeout (ms) for commands. 
-                                 Default: 10000 (default 10000)
-      --retry-base-timeout int   Set the initial delay between retry attempts in milliseconds
-                                 Default: 10000 (default 10000)
+  -T, --timeout int              Set the timeout (ms) for commands. (default 10000)
+      --retry-base-timeout int   Set the initial delay between retry attempts in milliseconds (default 10000)
       --retry-multiplier float   retry-multiplier is used to increase the delay between subsequent retry attempts.
                                  The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)
-                                 Default: 0
       --retry-max-retries uint   Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.
-                                 Default: 0
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -139,7 +129,7 @@ Secret Agent Flags:
 
 AWS Flags:
       --s3-region string              The S3 region that the bucket(s) exist in.
-      --s3-profile string             The S3 profile to use for credentials (the default is 'default'). (default "default")
+      --s3-profile string             The S3 profile to use for credentials. (default "default")
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
       --s3-min-part-size int          Secret agent port (only for TCP connection). (default 3005)
 

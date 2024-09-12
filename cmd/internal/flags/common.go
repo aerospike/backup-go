@@ -40,24 +40,22 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		nil,
 		"The set(s) to be backed up.\n"+
 			"If multiple sets are being backed up, filter-exp cannot be used.\n"+
-			"Default: all sets.")
+			"if empty all sets.")
 	flagSet.IntVarP(&f.RecordsPerSecond, "records-per-second", "L",
 		0,
 		"Limit total returned records per second (rps).\n"+
-			"Do not apply rps limit if records-per-second is zero.\n"+
-			"Default: 0.")
+			"Do not apply rps limit if records-per-second is zero.")
 	flagSet.StringArrayVarP(&f.BinList, "bin-list", "B",
 		nil,
 		"Only include the given bins in the backup.\n"+
-			"Default: include all bins.")
+			"If empty include all bins.")
 	flagSet.IntVarP(&f.Parallel, "parallel", "w",
 		1,
 		"Maximum number of scan calls to run in parallel.\n"+
 			"If only one partition range is given, or the entire namespace is being backed up, the range\n"+
 			"of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each\n"+
 			"filter cannot be parallelized individually, so you may only achieve as much parallelism as there are\n"+
-			"partition filters.\n"+
-			"Default: 1")
+			"partition filters.")
 	flagSet.BoolVarP(&f.NoRecords, "no-records", "R",
 		false,
 		"Don't backup any records.")
@@ -69,17 +67,14 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		"Don't backup any UDFs.")
 	flagSet.IntVar(&f.MaxRetries, "max-retries",
 		5,
-		"Maximum number of retries before aborting the current transaction.\n"+
-			"Default: 5")
+		"Maximum number of retries before aborting the current transaction.")
 	flagSet.IntVar(&f.TotalTimeout, "total-timeout",
 		0,
-		"Total socket timeout in milliseconds.\n"+
-			"Default: 0 - no timeout.")
+		"Total socket timeout in milliseconds. 0 - no timeout.")
 	flagSet.IntVar(&f.SocketTimeout, "socket-timeout",
 		10000,
 		"Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,\n"+
-			"there is no socket idle time limit\n"+
-			"Default: 10 seconds.")
+			"there is no socket idle time limit")
 
 	flagSet.IntVarP(&f.TotalTimeout, "nice", "N",
 		0,

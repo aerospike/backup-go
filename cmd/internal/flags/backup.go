@@ -39,8 +39,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
 		0,
 		"Rotate backup files, when their size crosses the given\n"+
-			"value (in bytes) Only used when backing up to a Directory. "+
-			"Default: 0")
+			"value (in bytes) Only used when backing up to a Directory.")
 	flagSet.StringVarP(&f.AfterDigest, "after-digest", "D",
 		"",
 		"Backup records after record digest in record's partition plus all succeeding\n"+
@@ -64,15 +63,13 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"date and time. May combined with --modified-after to specify a range.")
 	flagSet.Int64VarP(&f.MaxRecords, "max-records", "M",
 		0,
-		"The number of records approximately to back up.\n"+
-			"Default: all records")
+		"The number of records approximately to back up. 0 - all records")
 	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
 		false,
 		"Do not include bin data in the backup.")
 	flagSet.IntVar(&f.SleepBetweenRetries, "sleep-between-retries",
 		5,
-		"The amount of milliseconds to sleep between retries.\n"+
-			"Default: 0")
+		"The amount of milliseconds to sleep between retries.")
 	flagSet.StringVarP(&f.FilterExpression, "filter-exp", "f",
 		"",
 		"Base64 encoded expression. Use the encoded filter expression in each scan call,\n"+

@@ -35,7 +35,7 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 		"The S3 region that the bucket(s) exist in.")
 	flagSet.StringVar(&f.Profile, "s3-profile",
 		"default",
-		"The S3 profile to use for credentials (the default is 'default').")
+		"The S3 profile to use for credentials.")
 	flagSet.StringVar(&f.Endpoint, "s3-endpoint-override",
 		"",
 		"An alternate url endpoint to send S3 API calls to.")

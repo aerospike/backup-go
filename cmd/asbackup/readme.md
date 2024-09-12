@@ -52,33 +52,28 @@ Backup Flags:
   -n, --namespace string         The namespace to be backed up. Required.
   -s, --set stringArray          The set(s) to be backed up.
                                  If multiple sets are being backed up, filter-exp cannot be used.
-                                 Default: all sets.
+                                 if empty all sets.
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
-                                 Default: 0.
   -B, --bin-list stringArray     Only include the given bins in the backup.
-                                 Default: include all bins.
+                                 If empty include all bins.
   -w, --parallel int             Maximum number of scan calls to run in parallel.
                                  If only one partition range is given, or the entire namespace is being backed up, the range
                                  of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
                                  filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
-                                 partition filters.
-                                 Default: 1 (default 1)
+                                 partition filters. (default 1)
   -R, --no-records               Don't backup any records.
   -I, --no-indexes               Don't backup any indexes.
       --no-udfs                  Don't backup any UDFs.
-      --max-retries int          Maximum number of retries before aborting the current transaction.
-                                 Default: 5 (default 5)
-      --total-timeout int        Total socket timeout in milliseconds.
-                                 Default: 0 - no timeout.
+      --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
+      --total-timeout int        Total socket timeout in milliseconds. 0 - no timeout.
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
-                                 there is no socket idle time limit
-                                 Default: 10 seconds. (default 10000)
+                                 there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -o, --output-file string          Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
   -r, --remove-files                Remove existing backup file (-o) or files (-d).
   -F, --file-limit int              Rotate backup files, when their size crosses the given
-                                    value (in bytes) Only used when backing up to a Directory. Default: 0
+                                    value (in bytes) Only used when backing up to a Directory.
   -D, --after-digest string         Backup records after record digest in record's partition plus all succeeding
                                     partitions. Used to resume backup with last record received from previous
                                     incomplete backup.
@@ -96,11 +91,9 @@ Backup Flags:
   -b, --modified-after string       <YYYY-MM-DD_HH:MM:SS>
                                     Only include records that last changed before the given
                                     date and time. May combined with --modified-after to specify a range.
-  -M, --max-records int             The number of records approximately to back up.
-                                    Default: all records
+  -M, --max-records int             The number of records approximately to back up. 0 - all records
   -x, --no-bins                     Do not include bin data in the backup.
-      --sleep-between-retries int   The amount of milliseconds to sleep between retries.
-                                    Default: 0 (default 5)
+      --sleep-between-retries int   The amount of milliseconds to sleep between retries. (default 5)
   -f, --filter-exp string           Base64 encoded expression. Use the encoded filter expression in each scan call,
                                     which can be used to do a partial backup. The expression to be used can be base64 
                                     encoded through any client. This argument is mutually exclusive with multi-set backup.
@@ -131,7 +124,7 @@ Secret Agent Flags:
 
 AWS Flags:
       --s3-region string              The S3 region that the bucket(s) exist in.
-      --s3-profile string             The S3 profile to use for credentials (the default is 'default'). (default "default")
+      --s3-profile string             The S3 profile to use for credentials. (default "default")
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
       --s3-min-part-size int          Secret agent port (only for TCP connection). (default 3005)
 
@@ -141,12 +134,12 @@ GCP Flags:
       --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
 
 Azure Flags:
-      --azure-account-name string      Azure account name for account name, key authorization.
-      --azure-account-key string       Azure account key for account name, key authorization.
-      --azure-tenant-id string         Azure tenant ID for Azure Active Directory authorization.
-      --azure-client-id string         Azure Client ID for Azure Active Directory authorization.
-      --azure-client-secret string     Azure client secret for Azure Active Directory authorization.
-      --azure-endpoint string          Azure endpoint.
+      --azure-account-name string     Azure account name for account name, key authorization.
+      --azure-account-key string      Azure account key for account name, key authorization.
+      --azure-tenant-id string        Azure tenant ID for Azure Active Directory authorization.
+      --azure-client-id string        Azure Client ID for Azure Active Directory authorization.
+      --azure-client-secret string    Azure client secret for Azure Active Directory authorization.
+      --azure-endpoint string         Azure endpoint.
       --azure-container-name string   Azure container Name.
 ```
 

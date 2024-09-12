@@ -72,8 +72,6 @@ func newGcpClient(ctx context.Context, g *models.GcpStorage) (*storage.Client, e
 
 	if g.KeyFile != "" {
 		opts = append(opts, option.WithCredentialsFile(g.KeyFile))
-	} else {
-		opts = append(opts, option.WithoutAuthentication())
 	}
 
 	if g.Endpoint != "" {

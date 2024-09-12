@@ -50,7 +50,7 @@ func NewASBackup(
 ) (*ASBackup, error) {
 	aerospikeClient, err := newAerospikeClient(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create aerospike client: %v", err)
+		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
 
 	backupConfig, err := mapBackupConfig(
@@ -61,17 +61,17 @@ func NewASBackup(
 		secretAgent,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup config: %v", err)
+		return nil, fmt.Errorf("failed to create backup config: %w", err)
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup client: %v", err)
+		return nil, fmt.Errorf("failed to create backup client: %w", err)
 	}
 
 	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup writer: %v", err)
+		return nil, fmt.Errorf("failed to create backup writer: %w", err)
 	}
 
 	return &ASBackup{
@@ -84,11 +84,11 @@ func NewASBackup(
 func (b *ASBackup) Run(ctx context.Context) error {
 	h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
 	if err != nil {
-		return fmt.Errorf("failed to start backup: %v", err)
+		return fmt.Errorf("failed to start backup: %w", err)
 	}
 
 	if err := h.Wait(ctx); err != nil {
-		return fmt.Errorf("failed to backup: %v", err)
+		return fmt.Errorf("failed to backup: %w", err)
 	}
 
 	printBackupReport(h.GetStats())
@@ -107,10 +107,10 @@ func getWriter(
 	switch {
 	case awsS3.Region != "":
 		return newS3Writer(ctx, awsS3, backupParams, commonParams)
-	case gcpStorage.Host != "":
-		return newGcpWriter()
-	case azureBlob.Host != "":
-		return newAzureWriter()
+	case gcpStorage.BucketName != "":
+		return newGcpWriter(ctx, gcpStorage, backupParams, commonParams)
+	case azureBlob.ContainerName != "":
+		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
 	default:
 		return newLocalWriter(backupParams, commonParams)
 	}

@@ -31,24 +31,12 @@ func NewApp() *App {
 func (f *App) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	flagSet.BoolP("help", "Z", false, "Display help information")
+	flagSet.BoolP("help", "Z", false, "Display help information.")
 	flagSet.BoolVarP(&f.Version, "version", "V",
-		false, "Display version information")
+		false, "Display version information.")
 	flagSet.BoolVarP(&f.Verbose, "verbose", "v",
 		false,
 		"Enable more detailed logging.")
 
 	return flagSet
-}
-
-func (f *App) GetHelp() bool {
-	return f.Help
-}
-
-func (f *App) GetVersion() bool {
-	return f.Version
-}
-
-func (f *App) GetVerbose() bool {
-	return f.Verbose
 }

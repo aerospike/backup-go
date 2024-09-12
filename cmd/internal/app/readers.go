@@ -20,7 +20,9 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/aws/s3"
+	"github.com/aerospike/backup-go/io/azure/blob"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
 
@@ -49,10 +51,9 @@ func newS3Reader(
 		return nil, err
 	}
 
-	var (
-		opts             []s3.Opt
-		bucketName, path string
-	)
+	var bucketName, path string
+
+	opts := make([]s3.Opt, 0)
 
 	if c.Directory != "" && r.InputFile == "" {
 		bucketName, path = getBucketFromPath(c.Directory)
@@ -67,10 +68,50 @@ func newS3Reader(
 	return s3.NewReader(ctx, client, bucketName, opts...)
 }
 
-func newGcpReader() (backup.StreamingReader, error) {
-	return nil, nil
+func newGcpReader(
+	ctx context.Context,
+	g *models.GcpStorage,
+	r *models.Restore,
+	c *models.Common,
+) (backup.StreamingReader, error) {
+	client, err := newGcpClient(ctx, g)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := make([]storage.Opt, 0)
+
+	if c.Directory != "" && r.InputFile == "" {
+		opts = append(opts, storage.WithDir(c.Directory), storage.WithValidator(asb.NewValidator()))
+	}
+
+	if r.InputFile != "" && c.Directory == "" {
+		opts = append(opts, storage.WithFile(r.InputFile))
+	}
+
+	return storage.NewReader(ctx, client, g.BucketName, opts...)
 }
 
-func newAzureReader() (backup.StreamingReader, error) {
-	return nil, nil
+func newAzureReader(
+	ctx context.Context,
+	a *models.AzureBlob,
+	r *models.Restore,
+	c *models.Common,
+) (backup.StreamingReader, error) {
+	client, err := newAzureClient(a)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := make([]blob.Opt, 0)
+
+	if c.Directory != "" && r.InputFile == "" {
+		opts = append(opts, blob.WithDir(c.Directory), blob.WithValidator(asb.NewValidator()))
+	}
+
+	if r.InputFile != "" && c.Directory == "" {
+		opts = append(opts, blob.WithFile(r.InputFile))
+	}
+
+	return blob.NewReader(ctx, client, a.ContainerName, opts...)
 }

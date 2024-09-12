@@ -38,9 +38,9 @@ func TestApp_NewFlagSet(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check if the flags were parsed correctly
-	assert.False(t, app.GetHelp(), "Help flag should default to false")
-	assert.True(t, app.GetVersion(), "Version flag should be true when set")
-	assert.True(t, app.GetVerbose(), "Verbose flag should be true when set")
+	assert.False(t, app.Help, "Help flag should default to false")
+	assert.True(t, app.Version, "Version flag should be true when set")
+	assert.True(t, app.Verbose, "Verbose flag should be true when set")
 }
 
 func TestApp_NewFlagSet_DefaultValues(t *testing.T) {
@@ -55,7 +55,7 @@ func TestApp_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify default values
-	assert.False(t, app.GetHelp(), "Help flag should default to false")
-	assert.False(t, app.GetVersion(), "Version flag should default to false")
-	assert.False(t, app.GetVerbose(), "Verbose flag should default to false")
+	assert.False(t, app.Help, "Help flag should default to false")
+	assert.False(t, app.Version, "Version flag should default to false")
+	assert.False(t, app.Verbose, "Verbose flag should default to false")
 }

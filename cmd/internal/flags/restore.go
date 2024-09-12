@@ -51,8 +51,8 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"For pre-6.0 servers, 'batches' are only a logical grouping of\n"+
 			"records, and each record is uploaded individually. The true max\n"+
 			"number of async aerospike calls would then be\n"+
-			"<max-async-batches> * <batch-size>\n"+
-			"Default is 32.")
+			"<max-async-batches> * <batch-size>.\n"+
+			"Default: 32")
 	flagSet.IntVar(&f.BatchSize, "batch-size", 128,
 		"The max allowed number of records to simultaneously upload\n"+
 			"in an async batch write calls to make to aerospike at a time.\n"+

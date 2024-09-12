@@ -15,5 +15,11 @@
 package models
 
 type GcpStorage struct {
-	Host string
+	// Path to file containing Service Account JSON Key.
+	KeyFile string
+	// For GPC storage bucket is not part of the path as in S3.
+	// So we should set it separately.
+	BucketName string
+	// Alternative url.
+	Endpoint string
 }

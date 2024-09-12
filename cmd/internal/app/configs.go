@@ -63,7 +63,7 @@ func mapBackupConfig(
 	if backupParams.ModifiedBefore != "" {
 		modBeforeTime, err := time.Parse("2006-01-02_15:04:05", backupParams.ModifiedBefore)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse modified before date: %v", err)
+			return nil, fmt.Errorf("failed to parse modified before date: %w", err)
 		}
 
 		c.ModBefore = &modBeforeTime
@@ -72,7 +72,7 @@ func mapBackupConfig(
 	if backupParams.ModifiedAfter != "" {
 		modAfterTime, err := time.Parse("2006-01-02_15:04:05", backupParams.ModifiedAfter)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse modified after date: %v", err)
+			return nil, fmt.Errorf("failed to parse modified after date: %w", err)
 		}
 
 		c.ModAfter = &modAfterTime
@@ -223,7 +223,7 @@ func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, e
 	if b.FilterExpression != "" {
 		exp, err := aerospike.ExpFromBase64(b.FilterExpression)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse filter expression: %v", err)
+			return nil, fmt.Errorf("failed to parse filter expression: %w", err)
 		}
 
 		p.FilterExpression = exp

@@ -36,7 +36,7 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.Profile, "s3-profile",
 		"default",
 		"The S3 profile to use for credentials (the default is 'default').")
-	flagSet.StringVar(&f.Endpoint, "s3-endpoint-overrid",
+	flagSet.StringVar(&f.Endpoint, "s3-endpoint-override",
 		"",
 		"An alternate url endpoint to send S3 API calls to.")
 	flagSet.IntVar(&f.MinPartSize, "s3-min-part-size",

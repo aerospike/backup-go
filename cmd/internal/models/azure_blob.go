@@ -15,5 +15,14 @@
 package models
 
 type AzureBlob struct {
-	Host string
+	// Account name + key auth
+	AccountName string
+	AccountKey  string
+	// Azure Active directory
+	TenantID     string
+	ClientID     string
+	ClientSecret string
+
+	Endpoint      string
+	ContainerName string
 }

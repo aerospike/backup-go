@@ -30,9 +30,15 @@ func NewGcpStorage() *GcpStorage {
 func (f *GcpStorage) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	flagSet.StringVar(&f.Host, "gcp-template",
+	flagSet.StringVar(&f.KeyFile, "gcp-key-path",
 		"",
-		"The something")
+		"Path to file containing Service Account JSON Key.")
+	flagSet.StringVar(&f.BucketName, "gcp-bucket-name",
+		"",
+		"Name of the Google Cloud Storage bucket.")
+	flagSet.StringVar(&f.Endpoint, "gcp-endpoint-override",
+		"",
+		"An alternate url endpoint to send GCP API calls to.")
 
 	return flagSet
 }

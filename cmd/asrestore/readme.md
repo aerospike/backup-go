@@ -28,8 +28,8 @@ Usage:
   asrestore [flags]
 
 General Flags:
-  -Z, --help      Display help information
-  -V, --version   Display version information
+  -Z, --help      Display help information.
+  -V, --version   Display version information.
   -v, --verbose   Enable more detailed logging.
 
 Aerospike Client Flags:
@@ -90,8 +90,8 @@ Restore Flags:
                                  For pre-6.0 servers, 'batches' are only a logical grouping of
                                  records, and each record is uploaded individually. The true max
                                  number of async aerospike calls would then be
-                                 <max-async-batches> * <batch-size>
-                                 Default is 32. (default 32)
+                                 <max-async-batches> * <batch-size>.
+                                 Default: 32 (default 32)
       --batch-size int           The max allowed number of records to simultaneously upload
                                  in an async batch write calls to make to aerospike at a time.
                                  Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
@@ -138,16 +138,24 @@ Secret Agent Flags:
       --sa-is-base64                Flag that shows if secret agent responses are encrypted with base64.
 
 AWS Flags:
-      --s3-region string             The S3 region that the bucket(s) exist in.
-      --s3-profile string            The S3 profile to use for credentials (the default is 'default'). (default "default")
-      --s3-endpoint-overrid string   An alternate url endpoint to send S3 API calls to.
-      --s3-min-part-size int         Secret agent port (only for TCP connection). (default 3005)
+      --s3-region string              The S3 region that the bucket(s) exist in.
+      --s3-profile string             The S3 profile to use for credentials (the default is 'default'). (default "default")
+      --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
+      --s3-min-part-size int          Secret agent port (only for TCP connection). (default 3005)
 
 GCP Flags:
-      --gcp-template string   The something
+      --gcp-key-path string            Path to file containing Service Account JSON Key.
+      --gcp-bucket-name string         Name of the Google Cloud Storage bucket.
+      --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
 
 Azure Flags:
-      --azure-template string   The something
+      --azure-account-name string     Azure account name for account name, key authorization.
+      --azure-account-key string      Azure account key for account name, key authorization.
+      --azure-tenant-id string        Azure tenant ID for Azure Active Directory authorization.
+      --azure-client-id string        Azure Client ID for Azure Active Directory authorization.
+      --azure-client-secret string    Azure client secret for Azure Active Directory authorization.
+      --azure-endpoint string         Azure endpoint.
+      --azure-container-name string   Azure container Name.
 ```
 
 ## Unsupported flags

@@ -40,7 +40,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		0,
 		"Rotate backup files, when their size crosses the given\n"+
 			"value (in bytes) Only used when backing up to a Directory. "+
-			"Default: 0.")
+			"Default: 0")
 	flagSet.StringVarP(&f.AfterDigest, "after-digest", "D",
 		"",
 		"Backup records after record digest in record's partition plus all succeeding\n"+

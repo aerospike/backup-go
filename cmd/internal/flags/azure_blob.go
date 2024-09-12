@@ -30,9 +30,27 @@ func NewAzureBlob() *AzureBlob {
 func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	flagSet.StringVar(&f.Host, "azure-template",
+	flagSet.StringVar(&f.AccountName, "azure-account-name",
 		"",
-		"The something")
+		"Azure account name for account name, key authorization.")
+	flagSet.StringVar(&f.AccountKey, "azure-account-key",
+		"",
+		"Azure account key for account name, key authorization.")
+	flagSet.StringVar(&f.TenantID, "azure-tenant-id",
+		"",
+		"Azure tenant ID for Azure Active Directory authorization.")
+	flagSet.StringVar(&f.ClientID, "azure-client-id",
+		"",
+		"Azure Client ID for Azure Active Directory authorization.")
+	flagSet.StringVar(&f.ClientSecret, "azure-client-secret",
+		"",
+		"Azure client secret for Azure Active Directory authorization.")
+	flagSet.StringVar(&f.Endpoint, "azure-endpoint",
+		"",
+		"Azure endpoint.")
+	flagSet.StringVar(&f.ContainerName, "azure-container-name",
+		"",
+		"Azure container Name.")
 
 	return flagSet
 }

@@ -25,6 +25,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	testBucket    = "test"
+	testProjectID = "test-id"
+	testFileName  = "/file.bak"
+
+	testLocalType = "directory"
+
+	testS3Endpoint = "http://localhost:9000"
+	testS3Region   = "eu"
+	testS3Profile  = "minio"
+	testS3Type     = "s3"
+
+	testGcpEndpoint = "http://127.0.0.1:4443/storage/v1/b"
+	testGcpType     = "gcp-storage"
+
+	testAzureEndpoint    = "http://127.0.0.1:5000/devstoreaccount1"
+	testAzureAccountName = "devstoreaccount1"
+	testAzureAccountKey  = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+	testAzureType        = "azure-blob"
+)
+
 func TestGetBucketFromPath(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -56,17 +77,17 @@ func TestNewLocalWriter(t *testing.T) {
 	writer, err := newLocalWriter(b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
-	assert.Equal(t, "directory", writer.GetType())
+	assert.Equal(t, testLocalType, writer.GetType())
 
 	b = &models.Backup{
-		OutputFile: t.TempDir() + "/file.bak",
+		OutputFile: t.TempDir() + testFileName,
 	}
 	c = &models.Common{}
 
 	writer, err = newLocalWriter(b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
-	assert.Equal(t, "directory", writer.GetType())
+	assert.Equal(t, testLocalType, writer.GetType())
 
 	b = &models.Backup{}
 	writer, err = newLocalWriter(b, c)
@@ -86,9 +107,9 @@ func TestNewS3Writer(t *testing.T) {
 	}
 
 	s3cfg := &models.AwsS3{
-		Region:      "eu",
-		Profile:     "minio",
-		Endpoint:    "http://localhost:9000",
+		Region:      testS3Region,
+		Profile:     testS3Profile,
+		Endpoint:    testS3Endpoint,
 		MinPartSize: 10,
 	}
 
@@ -97,10 +118,10 @@ func TestNewS3Writer(t *testing.T) {
 	writer, err := newS3Writer(ctx, s3cfg, b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
-	assert.Equal(t, "s3", writer.GetType())
+	assert.Equal(t, testS3Type, writer.GetType())
 
 	b = &models.Backup{
-		OutputFile:  "asbackup/" + t.TempDir() + "/file.bak",
+		OutputFile:  "asbackup/" + t.TempDir() + testFileName,
 		RemoveFiles: true,
 	}
 	c = &models.Common{}
@@ -108,7 +129,7 @@ func TestNewS3Writer(t *testing.T) {
 	writer, err = newS3Writer(ctx, s3cfg, b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
-	assert.Equal(t, "s3", writer.GetType())
+	assert.Equal(t, testS3Type, writer.GetType())
 }
 
 func createAwsCredentials() error {
@@ -137,6 +158,120 @@ aws_secret_access_key = minioadminpassword`)
 
 		fmt.Println("Credentials file created successfully!")
 	}
+
+	return nil
+}
+
+func TestGcpWriter(t *testing.T) {
+	err := createGcpBucket()
+	assert.NoError(t, err)
+
+	b := &models.Backup{
+		RemoveFiles: true,
+	}
+	c := &models.Common{
+		Directory: t.TempDir(),
+	}
+
+	cfg := &models.GcpStorage{
+		BucketName: testBucket,
+		Endpoint:   testGcpEndpoint,
+	}
+
+	ctx := context.Background()
+
+	writer, err := newGcpWriter(ctx, cfg, b, c)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+	assert.Equal(t, testGcpType, writer.GetType())
+
+	b = &models.Backup{
+		OutputFile:  t.TempDir() + testFileName,
+		RemoveFiles: true,
+	}
+	c = &models.Common{}
+
+	writer, err = newGcpWriter(ctx, cfg, b, c)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+	assert.Equal(t, testGcpType, writer.GetType())
+}
+
+func createGcpBucket() error {
+	ctx := context.Background()
+	cfg := &models.GcpStorage{
+		BucketName: testBucket,
+		Endpoint:   testGcpEndpoint,
+	}
+	c, err := newGcpClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	bucket := c.Bucket(testBucket)
+	if _, err = bucket.Attrs(ctx); err != nil {
+		//  if not exist
+		if err := bucket.Create(ctx, testProjectID, nil); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func TestAzureWriter(t *testing.T) {
+	err := createAzureContainer()
+	assert.NoError(t, err)
+
+	b := &models.Backup{
+		RemoveFiles: true,
+	}
+	c := &models.Common{
+		Directory: t.TempDir(),
+	}
+
+	cfg := &models.AzureBlob{
+		AccountName:   testAzureAccountName,
+		AccountKey:    testAzureAccountKey,
+		Endpoint:      testAzureEndpoint,
+		ContainerName: testBucket,
+	}
+
+	ctx := context.Background()
+
+	writer, err := newAzureWriter(ctx, cfg, b, c)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+	assert.Equal(t, testAzureType, writer.GetType())
+
+	b = &models.Backup{
+		OutputFile:  t.TempDir() + testFileName,
+		RemoveFiles: true,
+	}
+	c = &models.Common{}
+
+	writer, err = newAzureWriter(ctx, cfg, b, c)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+	assert.Equal(t, testAzureType, writer.GetType())
+}
+
+func createAzureContainer() error {
+	cfg := &models.AzureBlob{
+		AccountName:   testAzureAccountName,
+		AccountKey:    testAzureAccountKey,
+		Endpoint:      testAzureEndpoint,
+		ContainerName: testBucket,
+	}
+
+	c, err := newAzureClient(cfg)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	_, _ = c.CreateContainer(ctx, testBucket, nil)
 
 	return nil
 }

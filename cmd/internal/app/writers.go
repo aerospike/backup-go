@@ -21,6 +21,9 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/aws/s3"
+	"github.com/aerospike/backup-go/io/azure/blob"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
 
@@ -53,10 +56,9 @@ func newS3Writer(
 		return nil, err
 	}
 
-	var (
-		opts             []s3.Opt
-		bucketName, path string
-	)
+	var bucketName, path string
+
+	opts := make([]s3.Opt, 0)
 
 	if c.Directory != "" && b.OutputFile == "" {
 		bucketName, path = getBucketFromPath(c.Directory)
@@ -75,12 +77,60 @@ func newS3Writer(
 	return s3.NewWriter(ctx, client, bucketName, opts...)
 }
 
-func newGcpWriter() (backup.Writer, error) {
-	return nil, nil
+func newGcpWriter(
+	ctx context.Context,
+	g *models.GcpStorage,
+	b *models.Backup,
+	c *models.Common,
+) (backup.Writer, error) {
+	client, err := newGcpClient(ctx, g)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := make([]storage.Opt, 0)
+
+	if c.Directory != "" && b.OutputFile == "" {
+		opts = append(opts, storage.WithDir(c.Directory), storage.WithValidator(asb.NewValidator()))
+	}
+
+	if b.OutputFile != "" && c.Directory == "" {
+		opts = append(opts, storage.WithFile(b.OutputFile))
+	}
+
+	if b.RemoveFiles {
+		opts = append(opts, storage.WithRemoveFiles())
+	}
+
+	return storage.NewWriter(ctx, client, g.BucketName, opts...)
 }
 
-func newAzureWriter() (backup.Writer, error) {
-	return nil, nil
+func newAzureWriter(
+	ctx context.Context,
+	a *models.AzureBlob,
+	b *models.Backup,
+	c *models.Common,
+) (backup.Writer, error) {
+	client, err := newAzureClient(a)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := make([]blob.Opt, 0)
+
+	if c.Directory != "" && b.OutputFile == "" {
+		opts = append(opts, blob.WithDir(c.Directory), blob.WithValidator(asb.NewValidator()))
+	}
+
+	if b.OutputFile != "" && c.Directory == "" {
+		opts = append(opts, blob.WithFile(b.OutputFile))
+	}
+
+	if b.RemoveFiles {
+		opts = append(opts, blob.WithRemoveFiles())
+	}
+
+	return blob.NewWriter(ctx, client, a.ContainerName, opts...)
 }
 
 // getBucketFromPath returns the first part of path as bucket name.

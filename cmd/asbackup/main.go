@@ -140,7 +140,7 @@ func init() {
 
 func run(cmd *cobra.Command, _ []string) error {
 	// Show version.
-	if flagsApp.GetVersion() {
+	if flagsApp.Version {
 		printVersion()
 
 		return nil
@@ -155,7 +155,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 	// Init logger.
 	loggerOpt := &slog.HandlerOptions{}
-	if flagsApp.GetVerbose() {
+	if flagsApp.Verbose {
 		loggerOpt.Level = slog.LevelDebug
 	}
 

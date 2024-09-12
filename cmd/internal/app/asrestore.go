@@ -50,7 +50,7 @@ func NewASRestore(
 ) (*ASRestore, error) {
 	aerospikeClient, err := newAerospikeClient(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create aerospike client: %v", err)
+		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
 
 	restoreConfig, err := mapRestoreConfig(
@@ -61,17 +61,17 @@ func NewASRestore(
 		secretAgent,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create restore config: %v", err)
+		return nil, fmt.Errorf("failed to create restore config: %w", err)
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idRestore))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup client: %v", err)
+		return nil, fmt.Errorf("failed to create backup client: %w", err)
 	}
 
 	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup reader: %v", err)
+		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
 
 	return &ASRestore{
@@ -84,11 +84,11 @@ func NewASRestore(
 func (r *ASRestore) Run(ctx context.Context) error {
 	h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 	if err != nil {
-		return fmt.Errorf("failed to start restore: %v", err)
+		return fmt.Errorf("failed to start restore: %w", err)
 	}
 
 	if err := h.Wait(ctx); err != nil {
-		return fmt.Errorf("failed to restore: %v", err)
+		return fmt.Errorf("failed to restore: %w", err)
 	}
 
 	printRestoreReport(h.GetStats())
@@ -107,17 +107,17 @@ func getReader(
 	switch {
 	case awsS3.Region != "":
 		return newS3Reader(ctx, awsS3, restoreParams, commonParams)
-	case gcpStorage.Host != "":
-		return newGcpReader()
-	case azureBlob.Host != "":
-		return newAzureReader()
+	case gcpStorage.BucketName != "":
+		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams)
+	case azureBlob.ContainerName != "":
+		return newAzureReader(ctx, azureBlob, restoreParams, commonParams)
 	default:
 		return newLocalReader(restoreParams, commonParams)
 	}
 }
 
 func printRestoreReport(stats *bModels.RestoreStats) {
-	fmt.Println("Backup Report")
+	fmt.Println("Restore Report")
 	fmt.Println("--------------")
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
 	fmt.Printf("Duration:             %s\n", stats.GetDuration())

@@ -23,6 +23,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+const testASLoginPassword = "admin"
+
 func TestClients_newAerospikeClient(t *testing.T) {
 	t.Parallel()
 
@@ -31,15 +33,15 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		Seeds: client.HostTLSPortSlice{
 			hostPort,
 		},
-		User:     "admin",
-		Password: "admin",
+		User:     testASLoginPassword,
+		Password: testASLoginPassword,
 	}
 	_, err := newAerospikeClient(cfg)
 	require.NoError(t, err)
 
 	cfg = &client.AerospikeConfig{
-		User:     "admin",
-		Password: "admin",
+		User:     testASLoginPassword,
+		Password: testASLoginPassword,
 	}
 	_, err = newAerospikeClient(cfg)
 	require.ErrorContains(t, err, "at least one seed must be provided")
@@ -48,8 +50,8 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		Seeds: client.HostTLSPortSlice{
 			hostPort,
 		},
-		User:     "admin",
-		Password: "admin",
+		User:     testASLoginPassword,
+		Password: testASLoginPassword,
 		TLS: &client.TLSConfig{
 			Cert: []byte("error"),
 		},
@@ -62,8 +64,8 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		Seeds: client.HostTLSPortSlice{
 			hostPort,
 		},
-		User:     "admin",
-		Password: "admin",
+		User:     testASLoginPassword,
+		Password: testASLoginPassword,
 	}
 	_, err = newAerospikeClient(cfg)
 	require.ErrorContains(t, err, "failed to create aerospike asClient")
@@ -73,13 +75,39 @@ func TestClients_newS3Client(t *testing.T) {
 	t.Parallel()
 
 	cfg := &models.AwsS3{
-		Region:      "eu",
-		Profile:     "minio",
-		Endpoint:    "http://localhost:9000",
+		Region:      testS3Region,
+		Profile:     testS3Profile,
+		Endpoint:    testS3Endpoint,
 		MinPartSize: 10,
 	}
 
 	ctx := context.Background()
 	_, err := newS3Client(ctx, cfg)
+	require.NoError(t, err)
+}
+
+func TestClients_newGcpClient(t *testing.T) {
+	t.Parallel()
+
+	cfg := &models.GcpStorage{
+		Endpoint: testGcpEndpoint,
+	}
+
+	ctx := context.Background()
+	_, err := newGcpClient(ctx, cfg)
+	require.NoError(t, err)
+}
+
+func TestClients_newAzureClient(t *testing.T) {
+	t.Parallel()
+
+	cfg := &models.AzureBlob{
+		AccountName:   testAzureAccountName,
+		AccountKey:    testAzureAccountKey,
+		Endpoint:      testAzureEndpoint,
+		ContainerName: testBucket,
+	}
+
+	_, err := newAzureClient(cfg)
 	require.NoError(t, err)
 }

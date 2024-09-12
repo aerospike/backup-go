@@ -44,6 +44,7 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 		if tr.decoder != nil {
 			token, err := tr.decoder.NextToken()
 			if err == nil {
+				tr.logger.Info("read", slog.Any("token", token.Type))
 				return token, nil
 			}
 			if err != io.EOF {
@@ -58,12 +59,14 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 		case reader, ok := <-tr.readersCh:
 			if !ok {
 				// Channel is closed, we're done
+				tr.logger.Info("channel closed")
 				return nil, io.EOF
 			}
-			tr.logger.Debug("open next file", slog.Any("file", reader))
+			tr.logger.Info("open next file", slog.Any("file", reader))
 			tr.decoder = tr.convertFn(reader)
 		default:
 			// Channel is empty
+			tr.logger.Info("default branch")
 			return nil, io.EOF
 		}
 	}

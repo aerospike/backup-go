@@ -54,14 +54,13 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 		}
 
 		// We need a new decoder
-		select {
-		case reader, ok := <-tr.readersCh:
-			if !ok {
-				// Channel is closed, we're done
-				return nil, io.EOF
-			}
-			tr.decoder = tr.convertFn(reader)
+		reader, ok := <-tr.readersCh
+		if !ok {
+			// Channel is closed, we're done
+			return nil, io.EOF
 		}
+
+		tr.decoder = tr.convertFn(reader)
 	}
 }
 

@@ -59,10 +59,9 @@ func TestNewS3Reader(t *testing.T) {
 	}
 
 	s3cfg := &models.AwsS3{
-		Region:      testS3Region,
-		Profile:     testS3Profile,
-		Endpoint:    testS3Endpoint,
-		MinPartSize: 10,
+		Region:   testS3Region,
+		Profile:  testS3Profile,
+		Endpoint: testS3Endpoint,
 	}
 
 	ctx := context.Background()

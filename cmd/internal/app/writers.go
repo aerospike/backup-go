@@ -16,6 +16,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aerospike/backup-go"
@@ -62,6 +63,7 @@ func newS3Writer(
 
 	if c.Directory != "" && b.OutputFile == "" {
 		bucketName, path = getBucketFromPath(c.Directory)
+		fmt.Println("=========bucketName, path", bucketName, path)
 		opts = append(opts, s3.WithDir(path))
 	}
 

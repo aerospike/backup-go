@@ -24,10 +24,11 @@ import (
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
 type tokenReader struct {
-	readersCh    <-chan io.ReadCloser
-	decoder      Decoder
-	logger       *slog.Logger
-	newDecoderFn func(io.ReadCloser) Decoder
+	readersCh     <-chan io.ReadCloser
+	decoder       Decoder
+	logger        *slog.Logger
+	newDecoderFn  func(io.ReadCloser) Decoder
+	currentReader io.Closer
 }
 
 // newTokenReader creates a new tokenReader.
@@ -44,8 +45,6 @@ func newTokenReader(
 }
 
 func (tr *tokenReader) Read() (*models.Token, error) {
-	var currentReader io.Closer
-
 	for {
 		if tr.decoder != nil {
 			token, err := tr.decoder.NextToken()
@@ -54,12 +53,12 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 				return token, nil
 			case io.EOF:
 				// Current decoder has finished, close the current reader
-				if currentReader != nil {
-					_ = currentReader.Close()
+				if tr.currentReader != nil {
+					_ = tr.currentReader.Close()
 				}
 
 				tr.decoder = nil
-				currentReader = nil
+				tr.currentReader = nil
 			default:
 				return nil, err
 			}
@@ -74,7 +73,7 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 			}
 
 			// Assign the new reader
-			currentReader = reader
+			tr.currentReader = reader
 			tr.decoder = tr.newDecoderFn(reader)
 		}
 	}

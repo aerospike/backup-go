@@ -17,8 +17,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
-	"time"
 
 	"golang.org/x/time/rate"
 )
@@ -58,8 +56,6 @@ func (w *writeWorker[T]) SetSendChan(_ chan<- T) {
 	// no-op
 }
 
-var emptyChannel atomic.Int32
-
 // Run runs the writeWorker.
 func (w *writeWorker[T]) Run(ctx context.Context) (err error) {
 	defer func() {
@@ -91,9 +87,6 @@ func (w *writeWorker[T]) Run(ctx context.Context) (err error) {
 					return err
 				}
 			}
-		default:
-			emptyChannel.Add(1)
-			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }

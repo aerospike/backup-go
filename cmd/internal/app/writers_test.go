@@ -134,13 +134,13 @@ func TestNewS3Writer(t *testing.T) {
 func createAwsCredentials() error {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("error getting home directory: %v", err)
+		return fmt.Errorf("error getting home directory: %w", err)
 	}
 
 	awsDir := filepath.Join(home, ".aws")
 	err = os.MkdirAll(awsDir, 0o700)
 	if err != nil {
-		return fmt.Errorf("error creating .aws directory: %v", err)
+		return fmt.Errorf("error creating .aws directory: %w", err)
 	}
 
 	filePath := filepath.Join(awsDir, "credentials")
@@ -152,7 +152,7 @@ aws_secret_access_key = minioadminpassword`)
 
 		err = os.WriteFile(filePath, credentialsFileBytes, 0o600)
 		if err != nil {
-			return fmt.Errorf("error writing ~/.aws/credentials file: %v", err)
+			return fmt.Errorf("error writing ~/.aws/credentials file: %w", err)
 		}
 
 		fmt.Println("Credentials file created successfully!")

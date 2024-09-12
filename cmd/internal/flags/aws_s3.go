@@ -39,9 +39,6 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.Endpoint, "s3-endpoint-override",
 		"",
 		"An alternate url endpoint to send S3 API calls to.")
-	flagSet.IntVar(&f.MinPartSize, "s3-min-part-size",
-		3005,
-		"Secret agent port (only for TCP connection).")
 
 	return flagSet
 }

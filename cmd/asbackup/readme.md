@@ -126,7 +126,6 @@ AWS Flags:
       --s3-region string              The S3 region that the bucket(s) exist in.
       --s3-profile string             The S3 profile to use for credentials. (default "default")
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
-      --s3-min-part-size int          Secret agent port (only for TCP connection). (default 3005)
 
 GCP Flags:
       --gcp-key-path string            Path to file containing Service Account JSON Key.
@@ -144,8 +143,6 @@ Azure Flags:
 ```
 
 ## Unsupported flags
-- azure blob connection flags
-- gcp storage connection flags
 ```
 --remove-artifacts  Remove existing backup file (-o) or files (-d) without performing a backup.
                     This option is mutually exclusive to --continue and --estimate.
@@ -223,4 +220,6 @@ Azure Flags:
 --s3-connect-timeout        The AWS S3 client's connection timeout in milliseconds.
                             This is equivalent to cli-connect-timeout in the AWS CLI,
                             or connectTimeoutMS in the aws-sdk-cpp client configuration.
+                            
+--s3-min-part-size int
 ```

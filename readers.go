@@ -47,6 +47,24 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 	var currentReader io.Closer
 
 	for {
+		if tr.decoder != nil {
+			token, err := tr.decoder.NextToken()
+			switch err {
+			case nil:
+				return token, nil
+			case io.EOF:
+				// Current decoder has finished, close the current reader
+				if currentReader != nil {
+					_ = currentReader.Close()
+				}
+
+				tr.decoder = nil
+				currentReader = nil
+			default:
+				return nil, err
+			}
+		}
+
 		if tr.decoder == nil {
 			// We need a new decoder
 			reader, ok := <-tr.readersCh
@@ -58,22 +76,6 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 			// Assign the new reader
 			currentReader = reader
 			tr.decoder = tr.newDecoderFn(reader)
-		}
-
-		token, err := tr.decoder.NextToken()
-		switch err {
-		case nil:
-			return token, nil
-		case io.EOF:
-			// Current decoder has finished, close the current reader
-			if currentReader != nil {
-				_ = currentReader.Close()
-			}
-			// Set decoder to nil to get a new one in the next iteration
-			tr.decoder = nil
-			currentReader = nil
-		default:
-			return nil, err
 		}
 	}
 }

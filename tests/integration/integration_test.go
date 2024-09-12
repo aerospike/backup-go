@@ -423,7 +423,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetReadRecords())
+	suite.Require().EqualValues(uint64(len(expectedRecs)), statsRestore.GetReadRecords())
 	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsInserted())
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
@@ -455,7 +455,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	data.Write(header)
 
 	for _, rec := range recs {
-		modelRec := models.Record{
+		modelRec := &models.Record{
 			Record: rec,
 			// guaranteed to be expired
 			VoidTime: 1,

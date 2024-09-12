@@ -127,25 +127,27 @@ func (rh *RestoreHandler) restoreFromReaders(
 	ctx context.Context, readersCh <-chan io.ReadCloser,
 	doneCh chan<- struct{}, errorsCh chan<- error,
 ) {
+	fn := func(r io.ReadCloser) Decoder {
+		reader, err := rh.wrapReader(r)
+		if err != nil {
+			errorsCh <- err
+			return nil
+		}
+
+		d, err := NewDecoder(rh.config.EncoderType, reader)
+		if err != nil {
+			errorsCh <- err
+			return nil
+		}
+
+		return d
+	}
+
 	readWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
 	for i := 0; i < rh.config.Parallel; i++ {
-		reader := newTokenReader(readersCh, rh.logger, func(r io.ReadCloser) Decoder {
-			reader, err := rh.wrapReader(r)
-			if err != nil {
-				errorsCh <- err
-				return nil
-			}
-			d, err := NewDecoder(rh.config.EncoderType, reader)
-			if err != nil {
-				errorsCh <- err
-				return nil
-			}
-
-			return d
-		})
-
-		readWorkers[i] = pipeline.NewReadWorker[*models.Token](reader)
+		readWorkers[i] = pipeline.NewReadWorker(newTokenReader(readersCh, rh.logger, fn))
 	}
+
 	err := rh.runRestorePipeline(ctx, readWorkers)
 	if err != nil {
 		errorsCh <- err
@@ -153,14 +155,6 @@ func (rh *RestoreHandler) restoreFromReaders(
 
 	rh.logger.Info("Restore done")
 	close(doneCh)
-}
-
-func (rh *RestoreHandler) closeReaders(rs []io.ReadCloser) {
-	for _, r := range rs {
-		if err := r.Close(); err != nil {
-			rh.logger.Error("failed to close aerospike backup reader", "error", err)
-		}
-	}
 }
 
 // GetStats returns the stats of the restore job.

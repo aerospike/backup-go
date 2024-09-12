@@ -53,7 +53,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	mockRes := &a.Result{
 		Record: rec,
 	}
-	mockRec := models.Record{
+	mockRec := &models.Record{
 		Record: rec,
 	}
 	mockResults <- mockRes
@@ -238,7 +238,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	mockRes := &a.Result{
 		Record: rec,
 	}
-	mockRec := models.Record{
+	mockRec := &models.Record{
 		Record: rec,
 	}
 	mockResults <- mockRes

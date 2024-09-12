@@ -24,43 +24,57 @@ import (
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
 type tokenReader struct {
-	readersCh <-chan io.ReadCloser
-	decoder   Decoder
-	logger    *slog.Logger
-	convertFn func(io.ReadCloser) Decoder
+	readersCh    <-chan io.ReadCloser
+	decoder      Decoder
+	logger       *slog.Logger
+	newDecoderFn func(io.ReadCloser) Decoder
 }
 
 // newTokenReader creates a new tokenReader.
-func newTokenReader(readersCh <-chan io.ReadCloser, logger *slog.Logger, convertFn func(io.ReadCloser) Decoder) *tokenReader {
+func newTokenReader(
+	readersCh <-chan io.ReadCloser,
+	logger *slog.Logger,
+	newDecoderFn func(io.ReadCloser) Decoder,
+) *tokenReader {
 	return &tokenReader{
-		readersCh: readersCh,
-		convertFn: convertFn,
-		logger:    logger,
+		readersCh:    readersCh,
+		newDecoderFn: newDecoderFn,
+		logger:       logger,
 	}
 }
 
 func (tr *tokenReader) Read() (*models.Token, error) {
+	var currentReader io.Closer
+
 	for {
-		if tr.decoder != nil {
-			token, err := tr.decoder.NextToken()
-			if err == nil {
-				return token, nil
+		if tr.decoder == nil {
+			// We need a new decoder
+			reader, ok := <-tr.readersCh
+			if !ok {
+				// Channel is closed, return EOF
+				return nil, io.EOF
 			}
-			if err != io.EOF {
-				return nil, err
+
+			// Assign the new reader
+			currentReader = reader
+			tr.decoder = tr.newDecoderFn(reader)
+		}
+
+		token, err := tr.decoder.NextToken()
+		switch err {
+		case nil:
+			return token, nil
+		case io.EOF:
+			// Current decoder has finished, close the current reader
+			if currentReader != nil {
+				_ = currentReader.Close()
 			}
-			// If we get here, the current decoder has finished (EOF)
+			// Set decoder to nil to get a new one in the next iteration
 			tr.decoder = nil
+			currentReader = nil
+		default:
+			return nil, err
 		}
-
-		// We need a new decoder
-		reader, ok := <-tr.readersCh
-		if !ok {
-			// Channel is closed, we're done
-			return nil, io.EOF
-		}
-
-		tr.decoder = tr.convertFn(reader)
 	}
 }
 

@@ -40,7 +40,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 		panic(aerr)
 	}
 
-	expRecord := models.Record{
+	expRecord := &models.Record{
 		Record: &a.Record{
 			Key: key,
 			Bins: a.BinMap{
@@ -89,7 +89,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	suite.NotNil(err)
 	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
 
-	failRec := models.Record{
+	failRec := &models.Record{
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec, 0)
@@ -103,7 +103,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter := pipemocks.NewMockDataWriter[*models.Token](suite.T())
-	mockWriter.EXPECT().Write(models.NewRecordToken(models.Record{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(models.NewRecordToken(&models.Record{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(&models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
@@ -116,7 +116,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
-	_, err := writer.Write(models.NewRecordToken(models.Record{}, 0))
+	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0))
 	suite.Nil(err)
 
 	_, err = writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))

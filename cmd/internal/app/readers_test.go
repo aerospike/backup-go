@@ -23,6 +23,7 @@ import (
 )
 
 func TestNewLocalReader(t *testing.T) {
+	t.Parallel()
 	r := &models.Restore{}
 	c := &models.Common{
 		Directory: t.TempDir(),
@@ -50,6 +51,7 @@ func TestNewLocalReader(t *testing.T) {
 }
 
 func TestNewS3Reader(t *testing.T) {
+	t.Parallel()
 	err := createAwsCredentials()
 	assert.NoError(t, err)
 
@@ -83,6 +85,7 @@ func TestNewS3Reader(t *testing.T) {
 }
 
 func TestNewGcpReader(t *testing.T) {
+	t.Parallel()
 	err := createGcpBucket()
 	assert.NoError(t, err)
 
@@ -115,6 +118,7 @@ func TestNewGcpReader(t *testing.T) {
 }
 
 func TestNewAzureReader(t *testing.T) {
+	t.Parallel()
 	err := createAzureContainer()
 	assert.NoError(t, err)
 

@@ -75,7 +75,7 @@ func newGcpClient(ctx context.Context, g *models.GcpStorage) (*storage.Client, e
 	}
 
 	if g.Endpoint != "" {
-		opts = append(opts, option.WithEndpoint(g.Endpoint))
+		opts = append(opts, option.WithEndpoint(g.Endpoint), option.WithoutAuthentication())
 	}
 
 	gcpClient, err := storage.NewClient(ctx, opts...)

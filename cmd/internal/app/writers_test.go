@@ -67,6 +67,7 @@ func TestGetBucketFromPath(t *testing.T) {
 }
 
 func TestNewLocalWriter(t *testing.T) {
+	t.Parallel()
 	b := &models.Backup{
 		RemoveFiles: true,
 	}
@@ -96,6 +97,7 @@ func TestNewLocalWriter(t *testing.T) {
 }
 
 func TestNewS3Writer(t *testing.T) {
+	t.Parallel()
 	err := createAwsCredentials()
 	assert.NoError(t, err)
 
@@ -162,6 +164,7 @@ aws_secret_access_key = minioadminpassword`)
 }
 
 func TestGcpWriter(t *testing.T) {
+	t.Parallel()
 	err := createGcpBucket()
 	assert.NoError(t, err)
 
@@ -219,6 +222,7 @@ func createGcpBucket() error {
 }
 
 func TestAzureWriter(t *testing.T) {
+	t.Parallel()
 	err := createAzureContainer()
 	assert.NoError(t, err)
 

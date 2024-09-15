@@ -126,7 +126,7 @@ func (r *RecordReader) Read() (*models.Token, error) {
 	rec := models.Record{
 		Record: res.Record,
 	}
-	recToken := models.NewRecordToken(rec, 0)
+	recToken := models.NewRecordToken(&rec, 0)
 
 	return recToken, nil
 }

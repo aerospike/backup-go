@@ -324,11 +324,12 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "with parallel backup",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:  backup.PartitionRangeAll(),
-					SetList:     []string{suite.set},
-					Namespace:   suite.namespace,
-					Parallel:    100,
-					EncoderType: backup.EncoderTypeASB,
+					Partitions:    backup.PartitionRangeAll(),
+					SetList:       []string{suite.set},
+					Namespace:     suite.namespace,
+					ParallelRead:  1,
+					ParallelWrite: 100,
+					EncoderType:   backup.EncoderTypeASB,
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
@@ -339,12 +340,13 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "parallel with file size limit",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:  backup.PartitionRangeAll(),
-					SetList:     []string{suite.set},
-					Namespace:   suite.namespace,
-					Parallel:    2,
-					EncoderType: backup.EncoderTypeASB,
-					FileLimit:   3 * 1024 * 1024, // 3mb, full backup ~9mb
+					Partitions:    backup.PartitionRangeAll(),
+					SetList:       []string{suite.set},
+					Namespace:     suite.namespace,
+					ParallelRead:  1,
+					ParallelWrite: 2,
+					EncoderType:   backup.EncoderTypeASB,
+					FileLimit:     3 * 1024 * 1024, // 3mb, full backup ~9mb
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
@@ -421,7 +423,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetReadRecords())
+	suite.Require().EqualValues(uint64(len(expectedRecs)), statsRestore.GetReadRecords())
 	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsInserted())
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
@@ -453,7 +455,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 	data.Write(header)
 
 	for _, rec := range recs {
-		modelRec := models.Record{
+		modelRec := &models.Record{
 			Record: rec,
 			// guaranteed to be expired
 			VoidTime: 1,
@@ -899,12 +901,13 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 	})
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:  backup.PartitionRangeAll(),
-		SetList:     []string{suite.set},
-		Namespace:   suite.namespace,
-		Parallel:    1,
-		EncoderType: backup.EncoderTypeASB,
-		BinList:     []string{"BackupRestore", "OnlyBackup"},
+		Partitions:    backup.PartitionRangeAll(),
+		SetList:       []string{suite.set},
+		Namespace:     suite.namespace,
+		ParallelRead:  1,
+		ParallelWrite: 1,
+		EncoderType:   backup.EncoderTypeASB,
+		BinList:       []string{"BackupRestore", "OnlyBackup"},
 	}
 
 	var restoreConfig = backup.NewDefaultRestoreConfig()
@@ -942,13 +945,14 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 	var expectedRecords = tests.Subtract(batch2, batch3)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:  backup.PartitionRangeAll(),
-		SetList:     []string{suite.set},
-		Namespace:   suite.namespace,
-		Parallel:    1,
-		EncoderType: backup.EncoderTypeASB,
-		ModAfter:    &lowerLimit,
-		ModBefore:   &upperLimit,
+		Partitions:    backup.PartitionRangeAll(),
+		SetList:       []string{suite.set},
+		Namespace:     suite.namespace,
+		ParallelRead:  1,
+		ParallelWrite: 1,
+		EncoderType:   backup.EncoderTypeASB,
+		ModAfter:      &lowerLimit,
+		ModBefore:     &upperLimit,
 	}
 
 	var restoreConfig = backup.NewDefaultRestoreConfig()
@@ -968,11 +972,12 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	suite.SetupTest(records)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:  backup.PartitionRangeAll(),
-		SetList:     []string{suite.set},
-		Namespace:   suite.namespace,
-		Parallel:    1,
-		EncoderType: backup.EncoderTypeASB,
+		Partitions:    backup.PartitionRangeAll(),
+		SetList:       []string{suite.set},
+		Namespace:     suite.namespace,
+		ParallelRead:  1,
+		ParallelWrite: 1,
+		EncoderType:   backup.EncoderTypeASB,
 	}
 	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
 	backupConfig.ScanPolicy.RecordsPerSecond = rps
@@ -999,12 +1004,13 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 	digest := base64.StdEncoding.EncodeToString(batch[0].Key.Digest())
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:  backup.PartitionRangeAll(),
-		SetList:     []string{suite.set},
-		Namespace:   suite.namespace,
-		Parallel:    1,
-		EncoderType: backup.EncoderTypeASB,
-		AfterDigest: digest,
+		Partitions:    backup.PartitionRangeAll(),
+		SetList:       []string{suite.set},
+		Namespace:     suite.namespace,
+		ParallelRead:  1,
+		ParallelWrite: 1,
+		EncoderType:   backup.EncoderTypeASB,
+		AfterDigest:   digest,
 	}
 
 	ctx := context.Background()

@@ -45,7 +45,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 
 	token := &models.Token{
 		Type: models.TokenTypeRecord,
-		Record: models.Record{
+		Record: &models.Record{
 			Record: &a.Record{
 				Key: key,
 				Bins: a.BinMap{
@@ -56,7 +56,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 	}
 
 	buff := &bytes.Buffer{}
-	_, err := encoder.encodeRecord(&token.Record, buff)
+	_, err := encoder.encodeRecord(token.Record, buff)
 	suite.Assert().NoError(err)
 	expected := bytes.Clone(buff.Bytes())
 

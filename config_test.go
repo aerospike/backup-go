@@ -24,7 +24,11 @@ import (
 func TestBackupConfig_validate(t *testing.T) {
 	config := NewDefaultBackupConfig()
 
-	config.Parallel = -1
+	config.ParallelRead = -1
+	assert.ErrorContains(t, config.validate(), "parallel")
+	config = NewDefaultBackupConfig()
+
+	config.ParallelWrite = -1
 	assert.ErrorContains(t, config.validate(), "parallel")
 	config = NewDefaultBackupConfig()
 

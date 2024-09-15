@@ -115,7 +115,7 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	switch data.Type {
 	case models.TokenTypeRecord:
-		return int(data.Size), rw.writeRecord(&data.Record)
+		return int(data.Size), rw.writeRecord(data.Record)
 	case models.TokenTypeUDF:
 		return int(data.Size), rw.writeUDF(data.UDF)
 	case models.TokenTypeSIndex:

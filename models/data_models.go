@@ -98,13 +98,13 @@ const (
 type Token struct {
 	SIndex *SIndex
 	UDF    *UDF
-	Record Record
+	Record *Record
 	Type   TokenType
 	Size   uint64
 }
 
 // NewRecordToken creates a new token with the given record.
-func NewRecordToken(r Record, size uint64) *Token {
+func NewRecordToken(r *Record, size uint64) *Token {
 	return &Token{
 		Record: r,
 		Type:   TokenTypeRecord,

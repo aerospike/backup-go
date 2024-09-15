@@ -23,6 +23,7 @@ import (
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 )
 
@@ -54,7 +55,7 @@ func NewExpirationSetter(expired *atomic.Uint64, extraTTL int64, logger *slog.Lo
 // errExpiredRecord is returned when a record is expired
 // by embedding errFilteredOut, the processor worker will filter out the token
 // containing the expired record
-var errExpiredRecord = fmt.Errorf("%w: record is expired", errFilteredOut)
+var errExpiredRecord = fmt.Errorf("%w: record is expired", pipeline.ErrFilteredOut)
 
 // Process sets the TTL of a record based on its VoidTime
 func (p *expirationSetter) Process(token *models.Token) (*models.Token, error) {
@@ -63,7 +64,7 @@ func (p *expirationSetter) Process(token *models.Token) (*models.Token, error) {
 		return token, nil
 	}
 
-	record := &token.Record
+	record := token.Record
 	now := p.getNow()
 
 	switch {

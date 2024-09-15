@@ -52,7 +52,7 @@ func (p *voidTimeSetter) Process(token *models.Token) (*models.Token, error) {
 		return token, nil
 	}
 
-	record := &token.Record
+	record := token.Record
 	now := p.getNow()
 
 	if record.Expiration == models.ExpirationNever {

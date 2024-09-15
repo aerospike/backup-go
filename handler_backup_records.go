@@ -70,32 +70,19 @@ func (bh *backupRecordsHandler) run(
 	writers []pipeline.Worker[*models.Token],
 	recordsReadTotal *atomic.Uint64,
 ) error {
-	readWorkers, err := bh.makeAerospikeReadWorkers(ctx, bh.config.Parallel)
+	readWorkers, err := bh.makeAerospikeReadWorkers(ctx, bh.config.ParallelRead)
 	if err != nil {
 		return err
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(recordsReadTotal))
-	voidTimeSetter := newTokenWorker(processors.NewVoidTimeSetter(bh.logger))
-	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](
-		ctx, bh.config.RecordsPerSecond))
+	composeProcessor := newTokenWorker(processors.NewComposeProcessor(
+		processors.NewRecordCounter(recordsReadTotal),
+		processors.NewVoidTimeSetter(bh.logger),
+		processors.NewTPSLimiter[*models.Token](
+			ctx, bh.config.RecordsPerSecond),
+	))
 
-	job := pipeline.NewPipeline[*models.Token](
-		readWorkers,
-
-		// in the pipeline, first all counters.
-		recordCounter,
-
-		// speed limiters.
-		tpsLimiter,
-
-		// modifications.
-		voidTimeSetter,
-
-		writers,
-	)
-
-	return job.Run(ctx)
+	return pipeline.NewPipeline(readWorkers, composeProcessor, writers).Run(ctx)
 }
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {

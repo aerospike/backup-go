@@ -92,7 +92,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = dbNameSource
-	backupCfg.Parallel = 10
+	backupCfg.ParallelRead = 10
 
 	// set compression policy
 	backupCfg.CompressionPolicy = &backup.CompressionPolicy{

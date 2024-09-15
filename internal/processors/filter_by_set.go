@@ -19,6 +19,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // filterBySet filter records by set.
@@ -54,5 +55,5 @@ func (p filterBySet) Process(token *models.Token) (*models.Token, error) {
 
 	p.skipped.Add(1)
 
-	return nil, errFilteredOut
+	return nil, pipeline.ErrFilteredOut
 }

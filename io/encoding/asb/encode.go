@@ -61,7 +61,7 @@ func (e *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 
 	switch token.Type {
 	case models.TokenTypeRecord:
-		n, err = e.encodeRecord(&token.Record, buff)
+		n, err = e.encodeRecord(token.Record, buff)
 	case models.TokenTypeUDF:
 		n, err = e.encodeUDF(token.UDF, buff)
 	case models.TokenTypeSIndex:

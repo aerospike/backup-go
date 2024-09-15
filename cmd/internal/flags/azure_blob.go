@@ -41,7 +41,7 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 		"Azure tenant ID for Azure Active Directory authorization.")
 	flagSet.StringVar(&f.ClientID, "azure-client-id",
 		"",
-		"Azure Client ID for Azure Active Directory authorization.")
+		"Azure client ID for Azure Active Directory authorization.")
 	flagSet.StringVar(&f.ClientSecret, "azure-client-secret",
 		"",
 		"Azure client secret for Azure Active Directory authorization.")

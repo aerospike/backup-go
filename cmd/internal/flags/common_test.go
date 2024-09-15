@@ -58,8 +58,8 @@ func TestCommon_NewFlagSet(t *testing.T) {
 	assert.True(t, result.NoIndexes, "The no-indexes flag should be parsed correctly")
 	assert.True(t, result.NoUDFs, "The no-udfs flag should be parsed correctly")
 	assert.Equal(t, 3, result.MaxRetries, "The max-retries flag should be parsed correctly")
-	assert.Equal(t, 30000, result.TotalTimeout, "The total-timeout flag should be parsed correctly")
-	assert.Equal(t, 15000, result.SocketTimeout, "The socket-timeout flag should be parsed correctly")
+	assert.Equal(t, int64(30000), result.TotalTimeout, "The total-timeout flag should be parsed correctly")
+	assert.Equal(t, int64(15000), result.SocketTimeout, "The socket-timeout flag should be parsed correctly")
 }
 
 func TestCommon_NewFlagSet_DefaultValues(t *testing.T) {
@@ -84,6 +84,6 @@ func TestCommon_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.False(t, result.NoIndexes, "The default value for no-indexes should be false")
 	assert.False(t, result.NoUDFs, "The default value for no-udfs should be false")
 	assert.Equal(t, 5, result.MaxRetries, "The default value for max-retries should be 5")
-	assert.Equal(t, 0, result.TotalTimeout, "The default value for total-timeout should be 0")
-	assert.Equal(t, 10000, result.SocketTimeout, "The default value for socket-timeout should be 10000")
+	assert.Equal(t, int64(0), result.TotalTimeout, "The default value for total-timeout should be 0")
+	assert.Equal(t, int64(10000), result.SocketTimeout, "The default value for socket-timeout should be 10000")
 }

@@ -12,39 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package models
 
-import "sync"
+type Common struct {
+	Directory        string
+	Namespace        string
+	SetList          []string
+	BinList          []string
+	Parallel         int
+	NoRecords        bool
+	NoIndexes        bool
+	NoUDFs           bool
+	RecordsPerSecond int
+	MaxRetries       int
+	TotalTimeout     int64
+	SocketTimeout    int64
 
-func MergeChannels[T any](channels []<-chan T) <-chan T {
-	out := make(chan T)
-
-	if len(channels) == 0 {
-		close(out)
-		return out
-	}
-
-	var wg sync.WaitGroup
-	// Run an output goroutine for each input channel.
-	output := func(c <-chan T) {
-		for n := range c {
-			out <- n
-		}
-
-		wg.Done()
-	}
-
-	wg.Add(len(channels))
-
-	for _, c := range channels {
-		go output(c)
-	}
-
-	// Run a goroutine to close out once all the output goroutines are done.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-
-	return out
+	// Nice is mapped to config.Bandwidth
+	// Is set in MiB then converted to bytes.
+	Nice int
 }

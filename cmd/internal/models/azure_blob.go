@@ -12,39 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package models
 
-import "sync"
+type AzureBlob struct {
+	// Account name + key auth
+	AccountName string
+	AccountKey  string
+	// Azure Active directory
+	TenantID     string
+	ClientID     string
+	ClientSecret string
 
-func MergeChannels[T any](channels []<-chan T) <-chan T {
-	out := make(chan T)
-
-	if len(channels) == 0 {
-		close(out)
-		return out
-	}
-
-	var wg sync.WaitGroup
-	// Run an output goroutine for each input channel.
-	output := func(c <-chan T) {
-		for n := range c {
-			out <- n
-		}
-
-		wg.Done()
-	}
-
-	wg.Add(len(channels))
-
-	for _, c := range channels {
-		go output(c)
-	}
-
-	// Run a goroutine to close out once all the output goroutines are done.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-
-	return out
+	Endpoint      string
+	ContainerName string
 }

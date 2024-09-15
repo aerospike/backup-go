@@ -12,39 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package flags
 
-import "sync"
+import (
+	"github.com/spf13/pflag"
+)
 
-func MergeChannels[T any](channels []<-chan T) <-chan T {
-	out := make(chan T)
+type App struct {
+	Help    bool
+	Version bool
+	Verbose bool
+}
 
-	if len(channels) == 0 {
-		close(out)
-		return out
-	}
+func NewApp() *App {
+	return &App{}
+}
 
-	var wg sync.WaitGroup
-	// Run an output goroutine for each input channel.
-	output := func(c <-chan T) {
-		for n := range c {
-			out <- n
-		}
+func (f *App) NewFlagSet() *pflag.FlagSet {
+	flagSet := &pflag.FlagSet{}
 
-		wg.Done()
-	}
+	flagSet.BoolP("help", "Z", false, "Display help information.")
+	flagSet.BoolVarP(&f.Version, "version", "V",
+		false, "Display version information.")
+	flagSet.BoolVarP(&f.Verbose, "verbose", "v",
+		false,
+		"Enable more detailed logging.")
 
-	wg.Add(len(channels))
-
-	for _, c := range channels {
-		go output(c)
-	}
-
-	// Run a goroutine to close out once all the output goroutines are done.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-
-	return out
+	return flagSet
 }

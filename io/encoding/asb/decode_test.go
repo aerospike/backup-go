@@ -3708,7 +3708,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					),
 				},
 			},
-			want: models.NewRecordToken(models.Record{
+			want: models.NewRecordToken(&models.Record{
 				Record: &a.Record{
 					Key: intKey,
 					Bins: map[string]any{

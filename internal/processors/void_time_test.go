@@ -47,7 +47,7 @@ func Test_processorVoidTime_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Expiration: 100,
 						},
@@ -56,7 +56,7 @@ func Test_processorVoidTime_Process(t *testing.T) {
 			},
 			want: &models.Token{
 				Type: models.TokenTypeRecord,
-				Record: models.Record{
+				Record: &models.Record{
 					Record: &aerospike.Record{
 						Expiration: 100,
 					},
@@ -75,7 +75,7 @@ func Test_processorVoidTime_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Expiration: models.ExpirationNever,
 						},
@@ -84,7 +84,7 @@ func Test_processorVoidTime_Process(t *testing.T) {
 			},
 			want: &models.Token{
 				Type: models.TokenTypeRecord,
-				Record: models.Record{
+				Record: &models.Record{
 					Record: &aerospike.Record{
 						Expiration: models.ExpirationNever,
 					},

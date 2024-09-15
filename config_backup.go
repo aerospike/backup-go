@@ -53,9 +53,10 @@ type BackupConfig struct {
 	// EncoderType describes an Encoder type that will be used on backing up.
 	// Default `EncoderTypeASB` = 0.
 	EncoderType EncoderType
-	// Parallel is the number of concurrent scans to run against the Aerospike
-	// cluster.
-	Parallel int
+	// ParallelRead is the number of concurrent scans to run against the Aerospike cluster.
+	ParallelRead int
+	// ParallelWrite is the number of concurrent backup files writing.
+	ParallelWrite int
 	// Don't back up any records.
 	NoRecords bool
 	// Don't back up any secondary indexes.
@@ -118,10 +119,11 @@ func PartitionRangeAll() PartitionRange {
 // NewDefaultBackupConfig returns a new BackupConfig with default values.
 func NewDefaultBackupConfig() *BackupConfig {
 	return &BackupConfig{
-		Partitions:  PartitionRange{0, MaxPartitions},
-		Parallel:    1,
-		Namespace:   "test",
-		EncoderType: EncoderTypeASB,
+		Partitions:    PartitionRangeAll(),
+		ParallelRead:  1,
+		ParallelWrite: 1,
+		Namespace:     "test",
+		EncoderType:   EncoderTypeASB,
 	}
 }
 
@@ -131,8 +133,12 @@ func (c *BackupConfig) isFullBackup() bool {
 }
 
 func (c *BackupConfig) validate() error {
-	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
-		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
+	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
+		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
+	}
+
+	if c.ParallelWrite < MinParallel || c.ParallelWrite > MaxParallel {
+		return fmt.Errorf("parallel write must be between 1 and 1024, got %d", c.ParallelWrite)
 	}
 
 	if c.ModBefore != nil && c.ModAfter != nil && !c.ModBefore.After(*c.ModAfter) {

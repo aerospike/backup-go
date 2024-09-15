@@ -41,7 +41,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 			name:        "nil restore Source",
 			source:      nil,
 			destination: destination,
-			initialToken: models.NewRecordToken(models.Record{
+			initialToken: models.NewRecordToken(&models.Record{
 				Record: &aerospike.Record{
 					Key: key,
 				},
@@ -52,7 +52,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 			name:        "nil restore Destination",
 			source:      source,
 			destination: nil,
-			initialToken: models.NewRecordToken(models.Record{
+			initialToken: models.NewRecordToken(&models.Record{
 				Record: &aerospike.Record{
 					Key: key,
 				},
@@ -70,7 +70,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 			name:        "invalid source namespace",
 			source:      source,
 			destination: destination,
-			initialToken: models.NewRecordToken(models.Record{
+			initialToken: models.NewRecordToken(&models.Record{
 				Record: &aerospike.Record{
 					Key: invalidKey,
 				},
@@ -81,7 +81,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 			name:        "valid process",
 			source:      source,
 			destination: destination,
-			initialToken: models.NewRecordToken(models.Record{
+			initialToken: models.NewRecordToken(&models.Record{
 				Record: &aerospike.Record{
 					Key: key,
 				},

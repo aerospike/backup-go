@@ -113,7 +113,7 @@ func (bh *BackupHandler) run() {
 }
 
 func (bh *BackupHandler) backupSync(ctx context.Context) error {
-	backupWriters, err := bh.makeWriters(ctx, bh.config.Parallel)
+	backupWriters, err := bh.makeWriters(ctx, bh.config.ParallelWrite)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 func (bh *BackupHandler) makeWriteWorkers(
 	backupWriters []io.WriteCloser,
 ) []pipeline.Worker[*models.Token] {
-	writeWorkers := make([]pipeline.Worker[*models.Token], bh.config.Parallel)
+	writeWorkers := make([]pipeline.Worker[*models.Token], len(backupWriters))
 
 	for i, w := range backupWriters {
 		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger)

@@ -59,7 +59,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Key: key,
 						},
@@ -81,7 +81,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Key: key,
 						},
@@ -122,7 +122,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Key: key,
 						},
@@ -132,7 +132,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			},
 			want: &models.Token{
 				Type: models.TokenTypeRecord,
-				Record: models.Record{
+				Record: &models.Record{
 					Record: &aerospike.Record{
 						Expiration: 50,
 						Key:        key,
@@ -154,7 +154,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Key: key,
 						},
@@ -164,7 +164,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			},
 			want: &models.Token{
 				Type: models.TokenTypeRecord,
-				Record: models.Record{
+				Record: &models.Record{
 					Record: &aerospike.Record{
 						Expiration: models.ExpirationNever,
 						Key:        key,
@@ -186,7 +186,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Key: key,
 						},
@@ -208,7 +208,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 			args: args{
 				token: &models.Token{
 					Type: models.TokenTypeRecord,
-					Record: models.Record{
+					Record: &models.Record{
 						Record: &aerospike.Record{
 							Key: key,
 						},

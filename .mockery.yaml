@@ -12,10 +12,6 @@ packages:
     config:
       dir: ./internal/asinfo/mocks
       outpkg: mocks
-  github.com/aerospike/backup-go/internal/processors:
-    config:
-      dir: ./internal/processors/mocks
-      outpkg: mocks
   github.com/aerospike/backup-go/io/aerospike:
     config:
       dir: ./io/aerospike/mocks

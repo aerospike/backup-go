@@ -19,6 +19,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // filterByBin will remove bins with names in binsToRemove from every record it receives.
@@ -54,7 +55,7 @@ func (p filterByBin) Process(token *models.Token) (*models.Token, error) {
 
 	if len(token.Record.Bins) == 0 {
 		p.skipped.Add(1)
-		return nil, errFilteredOut
+		return nil, pipeline.ErrFilteredOut
 	}
 
 	return token, nil

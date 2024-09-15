@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package processors
+package pipeline
 
 import (
 	"context"
 	"errors"
-
-	"github.com/aerospike/backup-go/models"
 )
 
 // **** Processor Worker ****
@@ -29,8 +27,6 @@ import (
 type DataProcessor[T any] interface {
 	Process(T) (T, error)
 }
-
-type TokenProcessor = DataProcessor[*models.Token]
 
 // ProcessorWorker implements the pipeline.Worker interface
 // It wraps a DataProcessor and processes data with it
@@ -57,9 +53,9 @@ func (w *ProcessorWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
-// errFilteredOut is returned by a processor when a token
+// ErrFilteredOut is returned by a processor when a token
 // should be filtered out of the pipeline
-var errFilteredOut = errors.New("filtered out")
+var ErrFilteredOut = errors.New("filtered out")
 
 // Run starts the ProcessorWorker
 func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
@@ -73,7 +69,7 @@ func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 			}
 
 			processed, err := w.processor.Process(data)
-			if errors.Is(err, errFilteredOut) {
+			if errors.Is(err, ErrFilteredOut) {
 				continue
 			} else if err != nil {
 				return err
@@ -86,12 +82,4 @@ func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 			}
 		}
 	}
-}
-
-// noopProcessor is a no-op implementation of a processor.
-type noopProcessor[T any] struct{}
-
-// Process just passes the token through for noopProcessor.
-func (n *noopProcessor[T]) Process(token T) (T, error) {
-	return token, nil
 }

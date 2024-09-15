@@ -46,7 +46,7 @@ func main() {
 
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = "test"
-	backupCfg.Parallel = 5
+	backupCfg.ParallelRead = 5
 	ctx := context.Background()
 
 	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers)

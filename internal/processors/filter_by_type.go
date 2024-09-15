@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // tokenTypeFilterProcessor is used to support no-records, no-indexes and no-udf flags.
@@ -43,15 +44,15 @@ func NewFilterByType(noRecords, noIndexes, noUdf bool) TokenProcessor {
 // Process filters tokens by type.
 func (p filterByType) Process(token *models.Token) (*models.Token, error) {
 	if p.noRecords && token.Type == models.TokenTypeRecord {
-		return nil, fmt.Errorf("%w: record is filtered with no-records flag", errFilteredOut)
+		return nil, fmt.Errorf("%w: record is filtered with no-records flag", pipeline.ErrFilteredOut)
 	}
 
 	if p.noIndexes && token.Type == models.TokenTypeSIndex {
-		return nil, fmt.Errorf("%w: index is filtered with no-indexes flag", errFilteredOut)
+		return nil, fmt.Errorf("%w: index is filtered with no-indexes flag", pipeline.ErrFilteredOut)
 	}
 
 	if p.noUdf && token.Type == models.TokenTypeUDF {
-		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", errFilteredOut)
+		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", pipeline.ErrFilteredOut)
 	}
 
 	return token, nil

@@ -33,7 +33,7 @@ func TestSetFilter(t *testing.T) {
 
 	setName := "set"
 	key, _ := aerospike.NewKey("", setName, "")
-	record := models.Record{
+	record := &models.Record{
 		Record: &aerospike.Record{
 			Key: key,
 		},

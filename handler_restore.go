@@ -109,7 +109,7 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	go rh.reader.StreamFiles(ctx, readersCh, errorsCh)
 
 	// Start lazy file processing.
-	go rh.processReaders(ctx, readersCh, doneCh, errorsCh)
+	go rh.restoreFromReaders(ctx, readersCh, doneCh, errorsCh)
 
 	// Process errors if we have them.
 	select {
@@ -122,139 +122,39 @@ func (rh *RestoreHandler) restore(ctx context.Context) error {
 	}
 }
 
-// processReaders serving go routine for processing batches.
-func (rh *RestoreHandler) processReaders(
+// restoreFromReaders serving go routine for processing batches.
+func (rh *RestoreHandler) restoreFromReaders(
 	ctx context.Context, readersCh <-chan io.ReadCloser,
 	doneCh chan<- struct{}, errorsCh chan<- error,
 ) {
-	batchSize := rh.config.Parallel
-
-	for {
-		batch := make([]io.ReadCloser, 0, batchSize)
-
-		for i := 0; i < batchSize; i++ {
-			reader, ok := <-readersCh
-			if !ok {
-				break
-			}
-
-			batch = append(batch, reader)
-		}
-
-		if len(batch) == 0 {
-			break
-		}
-
-		if err := rh.processBatch(ctx, batch); err != nil {
-			errorsCh <- fmt.Errorf("failed to process batch: %w", err)
-			return
-		}
-	}
-
-	close(doneCh)
-}
-
-func (rh *RestoreHandler) processBatch(ctx context.Context, rs []io.ReadCloser) error {
-	defer rh.closeReaders(rs)
-
-	rs, err := newEncryptionReader(
-		rh.config.EncryptionPolicy,
-		rh.config.SecretAgentConfig,
-		rs,
-	)
-	if err != nil {
-		return err
-	}
-
-	rs, err = newCompressionReader(rh.config.CompressionPolicy, rs)
-	if err != nil {
-		return err
-	}
-
-	readWorkers, err := rh.readersToReadWorkers(rs)
-	if err != nil {
-		return fmt.Errorf("failed to convert readers to read workers: %w", err)
-	}
-
-	if err = rh.runRestoreBatch(ctx, readWorkers); err != nil {
-		return fmt.Errorf("failed to run restore batch: %w", err)
-	}
-
-	return nil
-}
-
-// newCompressionReader returns compression reader for uncompressing backup.
-func newCompressionReader(
-	policy *CompressionPolicy, readers []io.ReadCloser,
-) ([]io.ReadCloser, error) {
-	if policy == nil || policy.Mode == CompressNone {
-		return readers, nil
-	}
-
-	zstdReaders := make([]io.ReadCloser, len(readers))
-
-	for i, reader := range readers {
-		zstdDecoder, err := zstd.NewReader(reader)
+	fn := func(r io.ReadCloser) Decoder {
+		reader, err := rh.wrapReader(r)
 		if err != nil {
-			return nil, err
+			errorsCh <- err
+			return nil
 		}
 
-		zstdReaders[i] = zstdDecoder.IOReadCloser()
-	}
-
-	return zstdReaders, nil
-}
-
-// newEncryptionReader returns encryption reader for decrypting backup.
-func newEncryptionReader(
-	policy *EncryptionPolicy, saConfig *SecretAgentConfig, readers []io.ReadCloser,
-) ([]io.ReadCloser, error) {
-	if policy == nil {
-		return readers, nil
-	}
-
-	privateKey, err := ReadPrivateKey(policy, saConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	decryptedReaders := make([]io.ReadCloser, len(readers))
-
-	for i, reader := range readers {
-		encryptedReader, err := encryption.NewEncryptedReader(reader, privateKey)
-		if err != nil {
-			return nil, err
-		}
-
-		decryptedReaders[i] = encryptedReader
-	}
-
-	return decryptedReaders, nil
-}
-
-func (rh *RestoreHandler) closeReaders(rs []io.ReadCloser) {
-	for _, r := range rs {
-		if err := r.Close(); err != nil {
-			rh.logger.Error("failed to close aerospike backup reader", "error", err)
-		}
-	}
-}
-
-func (rh *RestoreHandler) readersToReadWorkers(readers []io.ReadCloser) (
-	[]pipeline.Worker[*models.Token], error) {
-	readWorkers := make([]pipeline.Worker[*models.Token], len(readers))
-
-	for i, reader := range readers {
 		d, err := NewDecoder(rh.config.EncoderType, reader)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Decoder: %w", err)
+			errorsCh <- err
+			return nil
 		}
 
-		dr := newTokenReader(d, rh.logger)
-		readWorkers[i] = pipeline.NewReadWorker[*models.Token](dr)
+		return d
 	}
 
-	return readWorkers, nil
+	readWorkers := make([]pipeline.Worker[*models.Token], rh.config.Parallel)
+	for i := 0; i < rh.config.Parallel; i++ {
+		readWorkers[i] = pipeline.NewReadWorker(newTokenReader(readersCh, rh.logger, fn))
+	}
+
+	err := rh.runRestorePipeline(ctx, readWorkers)
+	if err != nil {
+		errorsCh <- err
+	}
+
+	rh.logger.Info("Restore done")
+	close(doneCh)
 }
 
 // GetStats returns the stats of the restore job.
@@ -281,11 +181,8 @@ func (rh *RestoreHandler) Wait(ctx context.Context) error {
 	}
 }
 
-// runRestoreBatch runs the restore job.
-func (rh *RestoreHandler) runRestoreBatch(
-	ctx context.Context,
-	readers []pipeline.Worker[*models.Token],
-) error {
+// runRestorePipeline runs the restore job.
+func (rh *RestoreHandler) runRestorePipeline(ctx context.Context, readers []pipeline.Worker[*models.Token]) error {
 	rh.logger.Debug("running restore base handler")
 
 	writeWorkers := make([]pipeline.Worker[*models.Token], rh.config.MaxAsyncBatches)
@@ -318,39 +215,18 @@ func (rh *RestoreHandler) runRestoreBatch(
 		nsDest = rh.config.Namespace.Destination
 	}
 
-	recordCounter := newTokenWorker(processors.NewRecordCounter(&rh.stats.ReadRecords))
-	sizeCounter := newTokenWorker(processors.NewSizeCounter(&rh.stats.TotalBytesRead))
-	changeNamespace := newTokenWorker(processors.NewChangeNamespace(nsSource, nsDest))
-	ttlSetter := newTokenWorker(processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger))
-	binFilter := newTokenWorker(processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped))
-	tpsLimiter := newTokenWorker(processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond))
-	tokenTypeFilter := newTokenWorker(
-		processors.NewFilterByType(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs))
-	recordSetFilter := newTokenWorker(processors.NewFilterBySet(rh.config.SetList, &rh.stats.RecordsSkipped))
+	composeProcessor := newTokenWorker(processors.NewComposeProcessor(
+		processors.NewRecordCounter(&rh.stats.ReadRecords),
+		processors.NewSizeCounter(&rh.stats.TotalBytesRead),
+		processors.NewFilterByType(rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs),
+		processors.NewFilterBySet(rh.config.SetList, &rh.stats.RecordsSkipped),
+		processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped),
+		processors.NewChangeNamespace(nsSource, nsDest),
+		processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
+		processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond),
+	))
 
-	job := pipeline.NewPipeline(
-		readers,
-
-		// in the pipeline, first all counters.
-		recordCounter,
-		sizeCounter,
-
-		// filters
-		tokenTypeFilter,
-		recordSetFilter,
-		binFilter,
-
-		// speed limiters.
-		tpsLimiter,
-
-		// modifications.
-		changeNamespace,
-		ttlSetter,
-
-		writeWorkers,
-	)
-
-	return job.Run(ctx)
+	return pipeline.NewPipeline(readers, composeProcessor, writeWorkers).Run(ctx)
 }
 
 func (rh *RestoreHandler) useBatchWrites() (bool, error) {
@@ -365,6 +241,58 @@ func (rh *RestoreHandler) useBatchWrites() (bool, error) {
 
 func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*models.Token] {
 	return []pipeline.Worker[*models.Token]{
-		processors.NewProcessorWorker(processor),
+		pipeline.NewProcessorWorker(processor),
 	}
+}
+
+// wrapReader applies encryption and compression wrappers to the reader based on the configuration
+func (rh *RestoreHandler) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
+	r, err := newEncryptionReader(rh.config.EncryptionPolicy, rh.config.SecretAgentConfig, reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encryption reader: %w", err)
+	}
+
+	r, err = newCompressionReader(rh.config.CompressionPolicy, r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create compression reader: %w", err)
+	}
+
+	return r, nil
+}
+
+// newCompressionReader returns compression reader for uncompressing backup.
+func newCompressionReader(
+	policy *CompressionPolicy, reader io.ReadCloser,
+) (io.ReadCloser, error) {
+	if policy == nil || policy.Mode == CompressNone {
+		return reader, nil
+	}
+
+	zstdDecoder, err := zstd.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return zstdDecoder.IOReadCloser(), nil
+}
+
+// newEncryptionReader returns encryption reader for decrypting backup.
+func newEncryptionReader(
+	policy *EncryptionPolicy, saConfig *SecretAgentConfig, reader io.ReadCloser,
+) (io.ReadCloser, error) {
+	if policy == nil {
+		return reader, nil
+	}
+
+	privateKey, err := ReadPrivateKey(policy, saConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptedReader, err := encryption.NewEncryptedReader(reader, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return encryptedReader, nil
 }

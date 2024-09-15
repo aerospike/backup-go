@@ -25,8 +25,8 @@ type Common struct {
 	NoUDFs           bool
 	RecordsPerSecond int
 	MaxRetries       int
-	TotalTimeout     int
-	SocketTimeout    int
+	TotalTimeout     int64
+	SocketTimeout    int64
 
 	// Nice is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.

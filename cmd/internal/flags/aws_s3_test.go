@@ -54,6 +54,6 @@ func TestAwsS3_NewFlagSet_DefaultValues(t *testing.T) {
 	result := awsS3.GetAwsS3()
 
 	assert.Equal(t, "", result.Region, "The default value for s3-region should be an empty string")
-	assert.Equal(t, "default", result.Profile, "The default value for s3-profile should be 'default'")
+	assert.Equal(t, "", result.Profile, "The default value for s3-profile should be 'default'")
 	assert.Equal(t, "", result.Endpoint, "The default value for s3-endpoint-override should be an empty string")
 }

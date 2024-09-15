@@ -21,6 +21,6 @@ type GcpStorage struct {
 	// So we should set it separately.
 	BucketName string
 	// Alternative url.
-	// (This parameter is used only for tests, in real life i don't think that someone would use a fake server.)
+	// It is not recommended to use an alternate URL in a production environment.
 	Endpoint string
 }

@@ -68,15 +68,14 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 	flagSet.IntVar(&f.MaxRetries, "max-retries",
 		5,
 		"Maximum number of retries before aborting the current transaction.")
-	flagSet.IntVar(&f.TotalTimeout, "total-timeout",
+	flagSet.Int64Var(&f.TotalTimeout, "total-timeout",
 		0,
 		"Total socket timeout in milliseconds. 0 - no timeout.")
-	flagSet.IntVar(&f.SocketTimeout, "socket-timeout",
+	flagSet.Int64Var(&f.SocketTimeout, "socket-timeout",
 		10000,
 		"Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,\n"+
 			"there is no socket idle time limit")
-
-	flagSet.IntVarP(&f.TotalTimeout, "nice", "N",
+	flagSet.IntVarP(&f.Nice, "nice", "N",
 		0,
 		"The limits for read/write storage bandwidth in MiB/s")
 

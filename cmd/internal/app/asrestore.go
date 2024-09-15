@@ -48,6 +48,10 @@ func NewASRestore(
 	azureBlob *models.AzureBlob,
 	logger *slog.Logger,
 ) (*ASRestore, error) {
+	if err := validateStorages(awsS3, gcpStorage, azureBlob); err != nil {
+		return nil, err
+	}
+
 	aerospikeClient, err := newAerospikeClient(clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)

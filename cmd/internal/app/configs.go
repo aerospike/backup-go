@@ -45,6 +45,8 @@ func mapBackupConfig(
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
 	c.FileLimit = backupParams.FileLimit
 	c.AfterDigest = backupParams.AfterDigest
+	// The original backup tools have a single parallelism configuration property.
+	// We may consider splitting the configuration in the future.
 	c.ParallelWrite = commonParams.Parallel
 	c.ParallelRead = commonParams.Parallel
 	// As we set --nice in MiB we must convert it to bytes

@@ -45,7 +45,8 @@ func mapBackupConfig(
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
 	c.FileLimit = backupParams.FileLimit
 	c.AfterDigest = backupParams.AfterDigest
-	c.Parallel = commonParams.Parallel
+	c.ParallelWrite = commonParams.Parallel
+	c.ParallelRead = commonParams.Parallel
 	// As we set --nice in MiB we must convert it to bytes
 	// TODO: make Bandwidth int64 to avoid overflow.
 	c.Bandwidth = commonParams.Nice * 1024 * 1024

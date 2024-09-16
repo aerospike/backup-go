@@ -57,7 +57,7 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		},
 	}
 	_, err = newAerospikeClient(cfg)
-	require.ErrorContains(t, err, "failed to create new aerospike policy")
+	require.ErrorContains(t, err, "failed to create Aerospike client policy")
 
 	hostPort.Host = "255.255.255.255"
 	cfg = &client.AerospikeConfig{
@@ -68,7 +68,7 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		Password: testASLoginPassword,
 	}
 	_, err = newAerospikeClient(cfg)
-	require.ErrorContains(t, err, "failed to create aerospike asClient")
+	require.ErrorContains(t, err, "failed to create Aerospike client")
 }
 
 func TestClients_newS3Client(t *testing.T) {

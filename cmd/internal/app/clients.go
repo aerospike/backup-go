@@ -36,12 +36,12 @@ func newAerospikeClient(cfg *client.AerospikeConfig) (*aerospike.Client, error) 
 
 	p, err := cfg.NewClientPolicy()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new aerospike policy: %w", err)
+		return nil, fmt.Errorf("failed to create Aerospike client policy: %w", err)
 	}
 
-	asClient, err := aerospike.NewClientWithPolicy(p, cfg.Seeds[0].Host, cfg.Seeds[0].Port)
+	asClient, err := aerospike.NewClientWithPolicyAndHost(p, toHosts(cfg.Seeds)...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create aerospike asClient: %w", err)
+		return nil, fmt.Errorf("failed to create Aerospike client: %w", err)
 	}
 
 	return asClient, nil
@@ -53,7 +53,7 @@ func newS3Client(ctx context.Context, a *models.AwsS3) (*s3.Client, error) {
 		config.WithRegion(a.Region),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load aws config: %w", err)
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -80,7 +80,7 @@ func newGcpClient(ctx context.Context, g *models.GcpStorage) (*storage.Client, e
 
 	gcpClient, err := storage.NewClient(ctx, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gcp client: %w", err)
+		return nil, fmt.Errorf("failed to create GCP client: %w", err)
 	}
 
 	return gcpClient, nil
@@ -96,7 +96,7 @@ func newAzureClient(a *models.AzureBlob) (*azblob.Client, error) {
 	case a.AccountName != "" && a.AccountKey != "":
 		cred, err := azblob.NewSharedKeyCredential(a.AccountName, a.AccountKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create azure sahred key credentials: %w", err)
+			return nil, fmt.Errorf("failed to create Azure shared key credentials: %w", err)
 		}
 
 		azClient, err = azblob.NewClientWithSharedKeyCredential(a.Endpoint, cred, nil)
@@ -106,7 +106,7 @@ func newAzureClient(a *models.AzureBlob) (*azblob.Client, error) {
 	case a.TenantID != "" && a.ClientID != "" && a.ClientSecret != "":
 		cred, err := azidentity.NewClientSecretCredential(a.TenantID, a.ClientID, a.ClientSecret, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create azure AAD credentials: %w", err)
+			return nil, fmt.Errorf("failed to create Azure AAD credentials: %w", err)
 		}
 
 		azClient, err = azblob.NewClient(a.Endpoint, cred, nil)
@@ -121,4 +121,17 @@ func newAzureClient(a *models.AzureBlob) (*azblob.Client, error) {
 	}
 
 	return azClient, nil
+}
+
+func toHosts(htpSlice client.HostTLSPortSlice) []*aerospike.Host {
+	hosts := make([]*aerospike.Host, len(htpSlice))
+	for i, htp := range htpSlice {
+		hosts[i] = &aerospike.Host{
+			Name:    htp.Host,
+			TLSName: htp.TLSName,
+			Port:    htp.Port,
+		}
+	}
+
+	return hosts
 }

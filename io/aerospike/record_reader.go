@@ -31,8 +31,8 @@ import (
 type RecordReaderConfig struct {
 	timeBounds      models.TimeBounds
 	partitionFilter *a.PartitionFilter
-	// If node is set we ignore partitionFilter.
-	node        *a.Node
+	// If nodes is set we ignore partitionFilter.
+	nodes       []*a.Node
 	scanPolicy  *a.ScanPolicy
 	scanLimiter *semaphore.Weighted
 	namespace   string
@@ -44,7 +44,7 @@ type RecordReaderConfig struct {
 func NewRecordReaderConfig(namespace string,
 	setList []string,
 	partitionFilter *a.PartitionFilter,
-	node *a.Node,
+	nodes []*a.Node,
 	scanPolicy *a.ScanPolicy,
 	binList []string,
 	timeBounds models.TimeBounds,
@@ -54,7 +54,7 @@ func NewRecordReaderConfig(namespace string,
 		namespace:       namespace,
 		setList:         setList,
 		partitionFilter: partitionFilter,
-		node:            node,
+		nodes:           nodes,
 		scanPolicy:      scanPolicy,
 		binList:         binList,
 		timeBounds:      timeBounds,
@@ -185,15 +185,17 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 		)
 
 		switch {
-		case r.config.node != nil:
-			recSet, err = r.client.ScanNode(
+		case len(r.config.nodes) > 0:
+			recSets, err := r.scanNodes(
 				&scanPolicy,
-				r.config.node,
-				r.config.namespace,
+				r.config.nodes,
 				set,
-				r.config.binList...,
 			)
+			if err != nil {
+				return nil, err
+			}
 
+			scans = append(scans, recSets...)
 		case r.config.partitionFilter != nil:
 			recSet, err = r.client.ScanPartitions(
 				&scanPolicy,
@@ -206,17 +208,38 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 				return nil, err
 			}
 
+			scans = append(scans, recSet)
 		default:
 			return nil, fmt.Errorf("invalid scan parameters")
 		}
-
-		scans = append(scans, recSet)
 	}
 
 	return newRecordSets(scans, r.logger), nil
 }
 
-func (r *RecordReader) scanNodes()
+func (r *RecordReader) scanNodes(scanPolicy *a.ScanPolicy,
+	nodes []*a.Node,
+	set string,
+) ([]*a.Recordset, error) {
+	sets := make([]*a.Recordset, 0, len(nodes))
+
+	for i := range nodes {
+		recSet, err := r.client.ScanNode(
+			scanPolicy,
+			nodes[i],
+			r.config.namespace,
+			set,
+			r.config.binList...,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan nodes: %w", err)
+		}
+
+		sets = append(sets, recSet)
+	}
+
+	return sets, nil
+}
 
 func (r *RecordReader) isScanStarted() bool {
 	return r.scanResult != nil

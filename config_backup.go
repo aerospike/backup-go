@@ -138,6 +138,7 @@ func (c *BackupConfig) isFullBackup() bool {
 	return c.ModAfter == nil && c.AfterDigest == ""
 }
 
+//nolint:gocyclo // Long validation function with a lot of checks.
 func (c *BackupConfig) validate() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
@@ -151,8 +152,14 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if err := c.Partitions.validate(); err != nil {
-		return err
+	if c.ParallelByNodes && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
+		return fmt.Errorf("parallel by nodes and partiotions and the same time not allowed")
+	}
+
+	if !c.ParallelByNodes {
+		if err := c.Partitions.validate(); err != nil {
+			return err
+		}
 	}
 
 	if c.AfterDigest != "" {
@@ -175,10 +182,6 @@ func (c *BackupConfig) validate() error {
 
 	if c.FileLimit < 0 {
 		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
-	}
-
-	if c.ParallelByNodes && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
-		return fmt.Errorf("parallel by nodes and partiotions and the same time not allowed")
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

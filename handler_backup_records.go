@@ -124,7 +124,6 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	ctx context.Context, n int,
 ) ([]pipeline.Worker[*models.Token], error) {
-
 	scanPolicy := *bh.config.ScanPolicy
 
 	// we need to set the RawCDT flag
@@ -178,12 +177,15 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNode(
 ) ([]pipeline.Worker[*models.Token], error) {
 	nodes := bh.aerospikeClient.GetNodes()
 
-	//  TODO: split nodes to bathes!
+	nodesGpoups, err := splitNodes(nodes, n)
+	if err != nil {
+		return nil, err
+	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
 
 	for i := 0; i < n; i++ {
-		recordReaderConfig := bh.recordReaderConfigForNode(nodes[i], scanPolicy)
+		recordReaderConfig := bh.recordReaderConfigForNode(nodesGpoups[i], scanPolicy)
 
 		recordReader := aerospike.NewRecordReader(
 			ctx,
@@ -225,14 +227,14 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 }
 
 func (bh *backupRecordsHandler) recordReaderConfigForNode(
-	node *a.Node,
+	nodes []*a.Node,
 	scanPolicy *a.ScanPolicy,
 ) *aerospike.RecordReaderConfig {
 	return aerospike.NewRecordReaderConfig(
 		bh.config.Namespace,
 		bh.config.SetList,
 		nil,
-		node,
+		nodes,
 		scanPolicy,
 		bh.config.BinList,
 		models.TimeBounds{

@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+
+	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 func handlePanic(errors chan<- error, logger *slog.Logger) {
@@ -84,4 +86,23 @@ func splitPartitions(startPartition, numPartitions, numWorkers int) ([]Partition
 	}
 
 	return pSpecs, nil
+}
+
+func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {
+	if numWorkers < 1 {
+		return nil, fmt.Errorf("numWorkers is less than 1, cannot split nodes")
+	}
+
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("number of nodes is less than 1, cannot split nodes")
+	}
+
+	result := make([][]*a.Node, numWorkers)
+
+	for i, node := range nodes {
+		workerIndex := i % numWorkers
+		result[workerIndex] = append(result[workerIndex], node)
+	}
+
+	return result, nil
 }

@@ -31,17 +31,20 @@ import (
 type RecordReaderConfig struct {
 	timeBounds      models.TimeBounds
 	partitionFilter *a.PartitionFilter
-	scanPolicy      *a.ScanPolicy
-	scanLimiter     *semaphore.Weighted
-	namespace       string
-	setList         []string
-	binList         []string
+	// If node is set we ignore partitionFilter.
+	node        *a.Node
+	scanPolicy  *a.ScanPolicy
+	scanLimiter *semaphore.Weighted
+	namespace   string
+	setList     []string
+	binList     []string
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
 func NewRecordReaderConfig(namespace string,
 	setList []string,
 	partitionFilter *a.PartitionFilter,
+	node *a.Node,
 	scanPolicy *a.ScanPolicy,
 	binList []string,
 	timeBounds models.TimeBounds,
@@ -51,6 +54,7 @@ func NewRecordReaderConfig(namespace string,
 		namespace:       namespace,
 		setList:         setList,
 		partitionFilter: partitionFilter,
+		node:            node,
 		scanPolicy:      scanPolicy,
 		binList:         binList,
 		timeBounds:      timeBounds,
@@ -68,7 +72,15 @@ type scanner interface {
 		partitionFilter *a.PartitionFilter,
 		namespace string,
 		setName string,
-		binNames ...string) (*a.Recordset, a.Error)
+		binNames ...string,
+	) (*a.Recordset, a.Error)
+	ScanNode(
+		scanPolicy *a.ScanPolicy,
+		node *a.Node,
+		namespace string,
+		setName string,
+		binNames ...string,
+	) (*a.Recordset, a.Error)
 }
 
 // RecordReader satisfies the pipeline DataReader interface.
@@ -167,15 +179,35 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 	scans := make([]*a.Recordset, 0, len(setsToScan))
 
 	for _, set := range setsToScan {
-		recSet, err := r.client.ScanPartitions(
-			&scanPolicy,
-			r.config.partitionFilter,
-			r.config.namespace,
-			set,
-			r.config.binList...,
+		var (
+			recSet *a.Recordset
+			err    error
 		)
-		if err != nil {
-			return nil, err
+
+		switch {
+		case r.config.node != nil:
+			recSet, err = r.client.ScanNode(
+				&scanPolicy,
+				r.config.node,
+				r.config.namespace,
+				set,
+				r.config.binList...,
+			)
+
+		case r.config.partitionFilter != nil:
+			recSet, err = r.client.ScanPartitions(
+				&scanPolicy,
+				r.config.partitionFilter,
+				r.config.namespace,
+				set,
+				r.config.binList...,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+		default:
+			return nil, fmt.Errorf("invalid scan parameters")
 		}
 
 		scans = append(scans, recSet)
@@ -183,6 +215,8 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 
 	return newRecordSets(scans, r.logger), nil
 }
+
+func (r *RecordReader) scanNodes()
 
 func (r *RecordReader) isScanStarted() bool {
 	return r.scanResult != nil

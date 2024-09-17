@@ -50,12 +50,10 @@ type BackupConfig struct {
 	BinList []string
 	// Partitions specifies the Aerospike partitions to back up.
 	Partitions PartitionRange
-
-	// TODO: think about naming and description.
-	// ParallelByNodes specifies how to iterate over nodes. If set to true, we launch workers for partitions.
+	// ParallelNodes specifies how to perform scan.
+	// If set to true, we launch parallel workers for nodes; otherwise workers run in parallel for partitions.
 	// Excludes Partitions param.
-	ParallelByNodes bool
-
+	ParallelNodes bool
 	// EncoderType describes an Encoder type that will be used on backing up.
 	// Default `EncoderTypeASB` = 0.
 	EncoderType EncoderType
@@ -152,11 +150,11 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if c.ParallelByNodes && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
+	if c.ParallelNodes && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
 		return fmt.Errorf("parallel by nodes and partitions and the same time not allowed")
 	}
 
-	if !c.ParallelByNodes {
+	if !c.ParallelNodes {
 		if err := c.Partitions.validate(); err != nil {
 			return err
 		}

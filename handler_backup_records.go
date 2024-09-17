@@ -131,7 +131,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	scanPolicy.RawCDT = true
 
 	// If we are paralleling scans by nodes.
-	if bh.config.ParallelByNodes {
+	if bh.config.ParallelNodes {
 		return bh.makeAerospikeReadWorkersForNode(ctx, n, &scanPolicy)
 	}
 

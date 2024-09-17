@@ -49,7 +49,7 @@ func TestBackupConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "rps")
 	config = NewDefaultBackupConfig()
 
-	config.ParallelByNodes = true
+	config.ParallelNodes = true
 	assert.ErrorContains(t, config.validate(), "parallel by nodes and partitions")
 	config = NewDefaultBackupConfig()
 

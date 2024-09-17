@@ -741,7 +741,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 	bCfg := backup.NewDefaultBackupConfig()
 	bCfg.Partitions = backup.PartitionRange{}
-	bCfg.ParallelByNodes = true
+	bCfg.ParallelNodes = true
 
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}

@@ -29,8 +29,9 @@ type writerTestSuite struct {
 
 func (suite *writerTestSuite) Test_openBackupFile() {
 	tmpDir := suite.T().TempDir()
+	ctx := context.Background()
 
-	factory, err := NewWriter(WithRemoveFiles(), WithDir(tmpDir))
+	factory, err := NewWriter(ctx, WithRemoveFiles(), WithDir(tmpDir))
 	suite.NoError(err)
 
 	w, err := factory.NewWriter(context.Background(), "test")
@@ -92,8 +93,8 @@ func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_DirNotEmpty() 
 
 func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
 	tmpDir := suite.T().TempDir()
-
-	w, err := NewWriter(WithRemoveFiles(), WithDir(tmpDir))
+	ctx := context.Background()
+	w, err := NewWriter(ctx, WithRemoveFiles(), WithDir(tmpDir))
 	suite.NoError(err)
 
 	suite.Equal(localType, w.GetType())

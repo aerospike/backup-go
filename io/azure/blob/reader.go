@@ -46,8 +46,8 @@ type options struct {
 	path string
 	// isDir flag describes what we have in path, file or directory.
 	isDir bool
-	// removeFiles flag describes should we remove everything from backup folder or not.
-	removeFiles bool
+	// isRemovingFiles flag describes should we remove everything from backup folder or not.
+	isRemovingFiles bool
 	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
 	// Concurrency defines the max number of concurrent uploads to be performed to upload the file.
@@ -70,7 +70,7 @@ func WithFile(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = false
-		r.removeFiles = true
+		r.isRemovingFiles = true
 	}
 }
 

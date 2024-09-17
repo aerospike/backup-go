@@ -34,7 +34,6 @@ type ASRestore struct {
 	reader        backup.StreamingReader
 }
 
-//nolint:dupl // Code is very similar as NewASBackup but different.
 func NewASRestore(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
@@ -50,6 +49,11 @@ func NewASRestore(
 ) (*ASRestore, error) {
 	if err := validateStorages(awsS3, gcpStorage, azureBlob); err != nil {
 		return nil, err
+	}
+
+	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
 
 	aerospikeClient, err := newAerospikeClient(clientConfig)
@@ -71,11 +75,6 @@ func NewASRestore(
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idRestore))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %w", err)
-	}
-
-	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
 
 	return &ASRestore{

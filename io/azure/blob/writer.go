@@ -50,7 +50,7 @@ type Writer struct {
 // Is used only for Writer.
 func WithRemoveFiles() Opt {
 	return func(r *options) {
-		r.removeFiles = true
+		r.isRemovingFiles = true
 	}
 }
 
@@ -102,17 +102,17 @@ func NewWriter(
 		return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 	}
 
-	if !isEmpty && !w.removeFiles {
-		return nil, fmt.Errorf("backup folder must be empty or set removeFiles = true")
-	}
-
-	// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
-	if err = removeFilesFromFolder(ctx, client, containerName, prefix); err != nil {
-		return nil, fmt.Errorf("failed to remove files from folder: %w", err)
+	if !isEmpty && !w.isRemovingFiles {
+		return nil, fmt.Errorf("backup folder must be empty or set isRemovingFiles = true")
 	}
 
 	w.containerName = containerName
 	w.prefix = prefix
+
+	// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
+	if err = w.RemoveFiles(ctx); err != nil {
+		return nil, fmt.Errorf("failed to remove files from folder: %w", err)
+	}
 
 	return w, nil
 }
@@ -218,9 +218,20 @@ func isEmptyDirectory(ctx context.Context, client *azblob.Client, containerName,
 	return false, nil
 }
 
-func removeFilesFromFolder(ctx context.Context, client *azblob.Client, containerName, prefix string) error {
-	pager := client.NewListBlobsFlatPager(containerName, &azblob.ListBlobsFlatOptions{
-		Prefix: &prefix,
+// RemoveFiles removes a backup file or files from directory.
+func (w *Writer) RemoveFiles(ctx context.Context) error {
+	// Remove file.
+	if !w.isDir {
+		_, err := w.client.DeleteBlob(ctx, w.containerName, w.path, nil)
+		if err != nil {
+			return fmt.Errorf("failed to delete blob %s: %w", w.path, err)
+		}
+
+		return nil
+	}
+	// Remove files from dir.
+	pager := w.client.NewListBlobsFlatPager(w.containerName, &azblob.ListBlobsFlatOptions{
+		Prefix: &w.prefix,
 	})
 
 	for pager.More() {
@@ -231,11 +242,11 @@ func removeFilesFromFolder(ctx context.Context, client *azblob.Client, container
 
 		for _, blob := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if isDirectory(prefix, *blob.Name) {
+			if isDirectory(w.prefix, *blob.Name) {
 				continue
 			}
 
-			_, err = client.DeleteBlob(ctx, containerName, *blob.Name, nil)
+			_, err = w.client.DeleteBlob(ctx, w.containerName, *blob.Name, nil)
 			if err != nil {
 				return fmt.Errorf("failed to delete blob %s: %w", *blob.Name, err)
 			}

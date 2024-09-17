@@ -38,14 +38,14 @@ type Writer struct {
 // Is used only for Writer.
 func WithRemoveFiles() Opt {
 	return func(r *options) {
-		r.removeFiles = true
+		r.isRemovingFiles = true
 	}
 }
 
 // NewWriter creates a new writer for local directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
-func NewWriter(opts ...Opt) (*Writer, error) {
+func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {
@@ -58,16 +58,16 @@ func NewWriter(opts ...Opt) (*Writer, error) {
 
 	var err error
 	// If we want to remove files from backup path.
-	if w.removeFiles {
+	if w.isRemovingFiles {
 		switch w.isDir {
 		case true:
 			err = forcePrepareBackupDirectory(w.path)
 		case false:
-			err = removeFileIfExists(w.path)
+			err = w.RemoveFiles(ctx)
 		}
 	}
 
-	if !w.removeFiles && w.isDir {
+	if !w.isRemovingFiles && w.isDir {
 		err = prepareBackupDirectory(w.path)
 	}
 
@@ -117,18 +117,23 @@ func forcePrepareBackupDirectory(dir string) error {
 	return makeDir(dir)
 }
 
-func removeFileIfExists(path string) error {
-	_, err := os.Stat(path)
+// RemoveFiles removes a backup file or files from directory.
+func (w *Writer) RemoveFiles(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	_, err := os.Stat(w.path)
 
 	switch {
 	case err == nil:
-		if err = os.Remove(path); err != nil {
-			return fmt.Errorf("failed to remove %s: %w", path, err)
+		if err = os.Remove(w.path); err != nil {
+			return fmt.Errorf("failed to remove %s: %w", w.path, err)
 		}
 	case os.IsNotExist(err):
 		return nil
 	default:
-		return fmt.Errorf("failed to remove if exist %s: %w", path, err)
+		return fmt.Errorf("failed to remove if exist %s: %w", w.path, err)
 	}
 
 	return nil

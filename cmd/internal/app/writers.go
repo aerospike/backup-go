@@ -27,7 +27,7 @@ import (
 	"github.com/aerospike/backup-go/io/local"
 )
 
-func newLocalWriter(b *models.Backup, c *models.Common) (backup.Writer, error) {
+func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (backup.Writer, error) {
 	var opts []local.Opt
 
 	if c.Directory != "" && b.OutputFile == "" {
@@ -42,7 +42,7 @@ func newLocalWriter(b *models.Backup, c *models.Common) (backup.Writer, error) {
 		opts = append(opts, local.WithRemoveFiles())
 	}
 
-	return local.NewWriter(opts...)
+	return local.NewWriter(ctx, opts...)
 }
 
 func newS3Writer(

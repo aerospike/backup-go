@@ -34,7 +34,6 @@ type ASBackup struct {
 	writer       backup.Writer
 }
 
-//nolint:dupl // Code is very similar as NewASRestore but different.
 func NewASBackup(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
@@ -50,6 +49,19 @@ func NewASBackup(
 ) (*ASBackup, error) {
 	if err := validateStorages(awsS3, gcpStorage, azureBlob); err != nil {
 		return nil, err
+	}
+
+	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup writer: %w", err)
+	}
+
+	if backupParams.RemoveArtifacts {
+		if err = writer.RemoveFiles(ctx); err != nil {
+			return nil, fmt.Errorf("failed to remove artifacts: %w", err)
+		}
+
+		return nil, nil
 	}
 
 	aerospikeClient, err := newAerospikeClient(clientConfig)
@@ -71,11 +83,6 @@ func NewASBackup(
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %w", err)
-	}
-
-	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup writer: %w", err)
 	}
 
 	return &ASBackup{
@@ -116,7 +123,7 @@ func getWriter(
 	case azureBlob.ContainerName != "":
 		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
 	default:
-		return newLocalWriter(backupParams, commonParams)
+		return newLocalWriter(ctx, backupParams, commonParams)
 	}
 }
 

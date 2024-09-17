@@ -411,7 +411,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 		testContainerName,
 		WithDir(testWriteFolderWithDataError),
 	)
-	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
+	s.Require().ErrorContains(err, "backup folder must be empty or set isRemovingFiles = true")
 }
 
 func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {

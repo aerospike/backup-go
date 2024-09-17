@@ -74,8 +74,8 @@ func TestNewLocalWriter(t *testing.T) {
 	c := &models.Common{
 		Directory: t.TempDir(),
 	}
-
-	writer, err := newLocalWriter(b, c)
+	ctx := context.Background()
+	writer, err := newLocalWriter(ctx, b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
@@ -85,13 +85,13 @@ func TestNewLocalWriter(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	writer, err = newLocalWriter(b, c)
+	writer, err = newLocalWriter(ctx, b, c)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
 
 	b = &models.Backup{}
-	writer, err = newLocalWriter(b, c)
+	writer, err = newLocalWriter(ctx, b, c)
 	assert.Error(t, err)
 	assert.Nil(t, writer)
 }

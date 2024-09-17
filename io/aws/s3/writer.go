@@ -49,7 +49,7 @@ type Writer struct {
 // Is used only for Writer.
 func WithRemoveFiles() Opt {
 	return func(r *options) {
-		r.removeFiles = true
+		r.isRemovingFiles = true
 	}
 }
 
@@ -98,18 +98,18 @@ func NewWriter(
 		return nil, fmt.Errorf("failed to check if the directory is empty: %w", err)
 	}
 
-	if !isEmpty && !w.removeFiles {
-		return nil, fmt.Errorf("backup folder must be empty or set removeFiles = true")
-	}
-
-	err = deleteAllFilesUnderPrefix(ctx, client, bucketName, prefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete files under prefix %s: %w", prefix, err)
+	if !isEmpty && !w.isRemovingFiles {
+		return nil, fmt.Errorf("backup folder must be empty or set isRemovingFiles = true")
 	}
 
 	w.client = client
 	w.bucketName = bucketName
 	w.prefix = prefix
+
+	err = w.RemoveFiles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete files under prefix %s: %w", prefix, err)
+	}
 
 	return w, nil
 }
@@ -265,13 +265,24 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix
 	return len(resp.Contents) == 0, nil
 }
 
-func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, bucketName, prefix string) error {
+// RemoveFiles removes a backup file or files from directory.
+func (w *Writer) RemoveFiles(ctx context.Context) error {
+	// Remove file.
+	if !w.isDir {
+		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: &w.bucketName,
+			Key:    &w.path,
+		}); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", w.path, err)
+		}
+	}
+	// Remove files from dir.
 	var continuationToken *string
 
 	for {
-		listResponse, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-			Bucket:            &bucketName,
-			Prefix:            &prefix,
+		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            &w.bucketName,
+			Prefix:            &w.prefix,
 			ContinuationToken: continuationToken,
 		})
 
@@ -284,8 +295,8 @@ func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, bucketNam
 				continue
 			}
 
-			_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{
-				Bucket: &bucketName,
+			_, err = w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+				Bucket: &w.bucketName,
 				Key:    p.Key,
 			})
 			if err != nil {

@@ -407,7 +407,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		testBucketName,
 		WithDir(testWriteFolderWithDataError),
 	)
-	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
+	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {

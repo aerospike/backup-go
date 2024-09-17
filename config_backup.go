@@ -153,7 +153,7 @@ func (c *BackupConfig) validate() error {
 	}
 
 	if c.ParallelByNodes && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
-		return fmt.Errorf("parallel by nodes and partiotions and the same time not allowed")
+		return fmt.Errorf("parallel by nodes and partitions and the same time not allowed")
 	}
 
 	if !c.ParallelByNodes {

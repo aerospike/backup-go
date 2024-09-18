@@ -98,6 +98,8 @@ Backup Flags:
                                     which can be used to do a partial backup. The expression to be used can be base64 
                                     encoded through any client. This argument is mutually exclusive with multi-set backup.
                                     
+      --parallel-nodes              Specifies how to perform scan. If set to true, we launch parallel workers for nodes;
+                                    otherwise workers run in parallel for partitions.
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -124,19 +126,19 @@ Secret Agent Flags:
 
 AWS Flags:
       --s3-region string              The S3 region that the bucket(s) exist in.
-      --s3-profile string             The S3 profile to use for credentials. (default "default")
+      --s3-profile string             The S3 profile to use for credentials.
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
 
 GCP Flags:
-      --gcp-key-path string            Path to file containing Service Account JSON Key.
-      --gcp-bucket-name string         Name of the Google Cloud Storage bucket.
+      --gcp-key-path string            Path to file containing service account JSON key.
+      --gcp-bucket-name string         Name of the Google cloud storage bucket.
       --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
 
 Azure Flags:
       --azure-account-name string     Azure account name for account name, key authorization.
       --azure-account-key string      Azure account key for account name, key authorization.
       --azure-tenant-id string        Azure tenant ID for Azure Active Directory authorization.
-      --azure-client-id string        Azure Client ID for Azure Active Directory authorization.
+      --azure-client-id string        Azure client ID for Azure Active Directory authorization.
       --azure-client-secret string    Azure client secret for Azure Active Directory authorization.
       --azure-endpoint string         Azure endpoint.
       --azure-container-name string   Azure container Name.

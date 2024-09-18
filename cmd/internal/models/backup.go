@@ -25,5 +25,6 @@ type Backup struct {
 	NoBins              bool
 	SleepBetweenRetries int
 	FilterExpression    string
+	ParallelNodes       bool
 	RemoveArtifacts     bool
 }

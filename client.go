@@ -54,6 +54,8 @@ type AerospikeClient interface {
 	Cluster() *a.Cluster
 	ScanPartitions(scanPolicy *a.ScanPolicy, partitionFilter *a.PartitionFilter, namespace string,
 		setName string, binNames ...string) (*a.Recordset, a.Error)
+	ScanNode(scanPolicy *a.ScanPolicy, node *a.Node, namespace string, setName string, binNames ...string,
+	) (*a.Recordset, a.Error)
 	Close()
 	GetNodes() []*a.Node
 }

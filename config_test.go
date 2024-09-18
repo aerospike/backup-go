@@ -23,6 +23,8 @@ import (
 
 func TestBackupConfig_validate(t *testing.T) {
 	config := NewDefaultBackupConfig()
+	assert.NoError(t, config.validate())
+	assert.Equal(t, true, config.isFullBackup())
 
 	config.ParallelRead = -1
 	assert.ErrorContains(t, config.validate(), "parallel")
@@ -45,6 +47,10 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.RecordsPerSecond = -1
 	assert.ErrorContains(t, config.validate(), "rps")
+	config = NewDefaultBackupConfig()
+
+	config.ParallelNodes = true
+	assert.ErrorContains(t, config.validate(), "parallel by nodes and partitions")
 	config = NewDefaultBackupConfig()
 
 	config.Bandwidth = -1

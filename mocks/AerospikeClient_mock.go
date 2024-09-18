@@ -4,6 +4,7 @@ package mocks
 
 import (
 	aerospike "github.com/aerospike/aerospike-client-go/v7"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -577,6 +578,84 @@ func (_c *MockAerospikeClient_RegisterUDF_Call) Return(_a0 *aerospike.RegisterTa
 }
 
 func (_c *MockAerospikeClient_RegisterUDF_Call) RunAndReturn(run func(*aerospike.WritePolicy, []byte, string, aerospike.Language) (*aerospike.RegisterTask, aerospike.Error)) *MockAerospikeClient_RegisterUDF_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ScanNode provides a mock function with given fields: scanPolicy, node, namespace, setName, binNames
+func (_m *MockAerospikeClient) ScanNode(scanPolicy *aerospike.ScanPolicy, node *aerospike.Node, namespace string, setName string, binNames ...string) (*aerospike.Recordset, aerospike.Error) {
+	_va := make([]interface{}, len(binNames))
+	for _i := range binNames {
+		_va[_i] = binNames[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, scanPolicy, node, namespace, setName)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ScanNode")
+	}
+
+	var r0 *aerospike.Recordset
+	var r1 aerospike.Error
+	if rf, ok := ret.Get(0).(func(*aerospike.ScanPolicy, *aerospike.Node, string, string, ...string) (*aerospike.Recordset, aerospike.Error)); ok {
+		return rf(scanPolicy, node, namespace, setName, binNames...)
+	}
+	if rf, ok := ret.Get(0).(func(*aerospike.ScanPolicy, *aerospike.Node, string, string, ...string) *aerospike.Recordset); ok {
+		r0 = rf(scanPolicy, node, namespace, setName, binNames...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*aerospike.Recordset)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*aerospike.ScanPolicy, *aerospike.Node, string, string, ...string) aerospike.Error); ok {
+		r1 = rf(scanPolicy, node, namespace, setName, binNames...)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(aerospike.Error)
+		}
+	}
+
+	return r0, r1
+}
+
+// MockAerospikeClient_ScanNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ScanNode'
+type MockAerospikeClient_ScanNode_Call struct {
+	*mock.Call
+}
+
+// ScanNode is a helper method to define mock.On call
+//   - scanPolicy *aerospike.ScanPolicy
+//   - node *aerospike.Node
+//   - namespace string
+//   - setName string
+//   - binNames ...string
+func (_e *MockAerospikeClient_Expecter) ScanNode(scanPolicy interface{}, node interface{}, namespace interface{}, setName interface{}, binNames ...interface{}) *MockAerospikeClient_ScanNode_Call {
+	return &MockAerospikeClient_ScanNode_Call{Call: _e.mock.On("ScanNode",
+		append([]interface{}{scanPolicy, node, namespace, setName}, binNames...)...)}
+}
+
+func (_c *MockAerospikeClient_ScanNode_Call) Run(run func(scanPolicy *aerospike.ScanPolicy, node *aerospike.Node, namespace string, setName string, binNames ...string)) *MockAerospikeClient_ScanNode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]string, len(args)-4)
+		for i, a := range args[4:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
+		}
+		run(args[0].(*aerospike.ScanPolicy), args[1].(*aerospike.Node), args[2].(string), args[3].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockAerospikeClient_ScanNode_Call) Return(_a0 *aerospike.Recordset, _a1 aerospike.Error) *MockAerospikeClient_ScanNode_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAerospikeClient_ScanNode_Call) RunAndReturn(run func(*aerospike.ScanPolicy, *aerospike.Node, string, string, ...string) (*aerospike.Recordset, aerospike.Error)) *MockAerospikeClient_ScanNode_Call {
 	_c.Call.Return(run)
 	return _c
 }

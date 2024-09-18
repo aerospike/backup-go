@@ -57,10 +57,7 @@ func NewASBackup(
 	}
 
 	if backupParams.RemoveArtifacts {
-		if err = writer.RemoveFiles(ctx); err != nil {
-			return nil, fmt.Errorf("failed to remove artifacts: %w", err)
-		}
-
+		// We clean the folder on initialization.
 		return nil, nil
 	}
 
@@ -93,6 +90,10 @@ func NewASBackup(
 }
 
 func (b *ASBackup) Run(ctx context.Context) error {
+	if b == nil {
+		return nil
+	}
+
 	h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
 	if err != nil {
 		return fmt.Errorf("failed to start backup: %w", err)

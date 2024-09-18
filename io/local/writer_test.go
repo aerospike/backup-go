@@ -51,14 +51,14 @@ func (suite *writerTestSuite) Test_openBackupFile() {
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive() {
 	dir := suite.T().TempDir()
-	err := prepareBackupDirectory(dir)
+	err := prepareBackupDirectory(dir, true)
 	suite.NoError(err)
 }
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 	dir := suite.T().TempDir()
 	dir += "/test"
-	err := prepareBackupDirectory(dir)
+	err := prepareBackupDirectory(dir, true)
 	suite.NoError(err)
 	suite.DirExists(dir)
 }
@@ -73,7 +73,7 @@ func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_IsNotDir() {
 	}
 	_ = f.Close()
 
-	err = prepareBackupDirectory(file)
+	err = prepareBackupDirectory(file, true)
 	suite.Error(err)
 }
 
@@ -87,7 +87,7 @@ func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_DirNotEmpty() 
 	}
 	_ = f.Close()
 
-	err = prepareBackupDirectory(dir)
+	err = prepareBackupDirectory(dir, true)
 	suite.Error(err)
 }
 

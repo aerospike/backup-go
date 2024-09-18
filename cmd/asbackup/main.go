@@ -176,13 +176,8 @@ func run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	// If RemoveArtifacts is set to true, we shall do it on ASBackup initialization.
-	// So asb will be nil, as we shouldn't do the backup, only remove artifacts.
-	if asb != nil {
-		return asb.Run(cmd.Context())
-	}
 
-	return nil
+	return asb.Run(cmd.Context())
 }
 
 func printVersion() {

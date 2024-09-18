@@ -70,7 +70,6 @@ func WithFile(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = false
-		r.isRemovingFiles = true
 	}
 }
 
@@ -217,7 +216,7 @@ func isDirectory(prefix, fileName string) bool {
 
 	// If we look inside some folder.
 	if strings.HasPrefix(fileName, prefix) {
-		clean := strings.TrimPrefix(fileName, prefix)
+		clean := strings.TrimPrefix(fileName, prefix+"/")
 		return strings.Contains(clean, "/")
 	}
 	// All other variants.

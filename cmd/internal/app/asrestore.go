@@ -85,6 +85,10 @@ func NewASRestore(
 }
 
 func (r *ASRestore) Run(ctx context.Context) error {
+	if r == nil {
+		return nil
+	}
+
 	h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 	if err != nil {
 		return fmt.Errorf("failed to start restore: %w", err)

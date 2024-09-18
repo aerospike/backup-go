@@ -76,6 +76,7 @@ func NewWriter(
 	}
 
 	var prefix string
+
 	if w.isDir {
 		w.prefix = w.path
 		// Protection from incorrect input.
@@ -110,9 +111,11 @@ func NewWriter(
 	w.client = client
 	w.bucketName = bucketName
 
-	err = w.RemoveFiles(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete files under prefix %s: %w", prefix, err)
+	if w.isRemovingFiles {
+		err = w.RemoveFiles(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete files under prefix %s: %w", prefix, err)
+		}
 	}
 
 	return w, nil
@@ -266,7 +269,6 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix
 
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
-
 	// Remove file.
 	if !w.isDir {
 		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
@@ -322,7 +324,7 @@ func isDirectory(prefix, fileName string) bool {
 
 	// If we look inside some folder.
 	if strings.HasPrefix(fileName, prefix) {
-		clean := strings.TrimPrefix(fileName, prefix)
+		clean := strings.TrimPrefix(fileName, prefix+"/")
 		return strings.Contains(clean, "/")
 	}
 	// All other variants.

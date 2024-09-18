@@ -738,6 +738,24 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 	}
 }
 
+func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
+	bCfg := backup.NewDefaultBackupConfig()
+	bCfg.Partitions = backup.PartitionRange{}
+	bCfg.ParallelNodes = true
+
+	ctx := context.Background()
+	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	bh, err := suite.backupClient.Backup(
+		ctx,
+		bCfg,
+		&dst,
+	)
+	suite.NotNil(bh)
+	suite.Nil(err)
+	err = bh.Wait(ctx)
+	suite.Nil(err)
+}
+
 func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 	userKeys := []any{1, "string", []byte("bytes")}
 	recs := make([]*a.Record, numRec)

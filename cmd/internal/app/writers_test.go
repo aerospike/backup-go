@@ -211,12 +211,7 @@ func createGcpBucket() error {
 	}
 
 	bucket := c.Bucket(testBucket)
-	if _, err = bucket.Attrs(ctx); err != nil {
-		//  if not exist
-		if err := bucket.Create(ctx, testProjectID, nil); err != nil {
-			return err
-		}
-	}
+	_ = bucket.Create(ctx, testProjectID, nil)
 
 	return nil
 }

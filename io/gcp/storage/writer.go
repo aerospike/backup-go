@@ -132,8 +132,10 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 func (w *Writer) RemoveFiles(
 	ctx context.Context,
 ) error {
+	fmt.Println("isDIr=", w.isDir)
 	// Remove file.
 	if !w.isDir {
+		fmt.Println("deleting one file:", w.path)
 		if err := w.bucketHandle.Object(w.path).Delete(ctx); err != nil {
 			return fmt.Errorf("failed to delete object %s: %w", w.path, err)
 		}
@@ -156,11 +158,14 @@ func (w *Writer) RemoveFiles(
 			return fmt.Errorf("failed to read object attr from bucket %s: %w", w.bucketName, err)
 		}
 
+		fmt.Println("w.path=", w.path)
+		fmt.Println("objAttrs.Name=", objAttrs.Name)
+		fmt.Println("isDirectory(w.path, objAttrs.Name)=", isDirectory(w.path, objAttrs.Name))
 		// Skip files in folders.
 		if isDirectory(w.path, objAttrs.Name) {
 			continue
 		}
-
+		fmt.Println("deleting folder file file:", objAttrs.Name)
 		if err = w.bucketHandle.Object(objAttrs.Name).Delete(ctx); err != nil {
 			return fmt.Errorf("failed to delete object %s: %w", objAttrs.Name, err)
 		}

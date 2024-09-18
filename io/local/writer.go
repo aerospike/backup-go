@@ -59,11 +59,9 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 	var err error
 	// If we want to remove files from backup path.
 	if w.isRemovingFiles {
-		switch w.isDir {
-		case true:
-			err = forcePrepareBackupDirectory(w.path)
-		case false:
-			err = w.RemoveFiles(ctx)
+		err = w.RemoveFiles(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to remove files: %w", err)
 		}
 	}
 
@@ -106,34 +104,47 @@ func prepareBackupDirectory(dir string) error {
 	return nil
 }
 
-// forcePrepareBackupDirectory removes any existing directory and its contents
-// and creates a new directory.
-func forcePrepareBackupDirectory(dir string) error {
-	err := os.RemoveAll(dir)
-	if err != nil {
-		return fmt.Errorf("failed to remove directory %s: %w", dir, err)
-	}
-
-	return makeDir(dir)
-}
-
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	_, err := os.Stat(w.path)
-
+	info, err := os.Stat(w.path)
 	switch {
-	case err == nil:
-		if err = os.Remove(w.path); err != nil {
-			return fmt.Errorf("failed to remove %s: %w", w.path, err)
-		}
 	case os.IsNotExist(err):
+		// File doesn't exist, it's ok.
 		return nil
+	case err != nil:
+		return fmt.Errorf("failed to stat path %s: %w", w.path, err)
+
 	default:
-		return fmt.Errorf("failed to remove if exist %s: %w", w.path, err)
+		// nothing
+	}
+
+	// if it is a file.
+	if !info.IsDir() {
+		if err = os.Remove(w.path); err != nil {
+			return fmt.Errorf("failed to remove file %s: %w", w.path, err)
+		}
+
+		return nil
+	}
+	// If it is a dir.
+	files, err := os.ReadDir(w.path)
+	if err != nil {
+		return fmt.Errorf("failed to read directory %s: %w", w.path, err)
+	}
+	fmt.Println("files:", files)
+	for _, file := range files {
+		filePath := filepath.Join(w.path, file.Name())
+		fmt.Println("filePath:", filePath)
+		fmt.Println("file.IsDir()", file.IsDir())
+		if !file.IsDir() {
+			if err = os.Remove(filePath); err != nil {
+				return fmt.Errorf("failed to remove file %s: %w", filePath, err)
+			}
+		}
 	}
 
 	return nil

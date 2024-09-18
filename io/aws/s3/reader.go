@@ -163,7 +163,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil {
+			if p.Key == nil || isDirectory(r.prefix, *p.Key) {
 				continue
 			}
 

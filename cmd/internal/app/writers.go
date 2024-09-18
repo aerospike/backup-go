@@ -138,10 +138,13 @@ func newAzureWriter(
 func getBucketFromPath(path string) (bucket, cleanPath string) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
-		return "", path
+		return path, "/"
 	}
 
 	cleanPath = strings.Join(parts[1:], "/")
+	if cleanPath == "" {
+		cleanPath = "/"
+	}
 
 	return parts[0], cleanPath
 }

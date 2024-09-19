@@ -27,7 +27,7 @@ import (
 	"github.com/aerospike/backup-go/io/local"
 )
 
-func newLocalWriter(b *models.Backup, c *models.Common) (backup.Writer, error) {
+func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (backup.Writer, error) {
 	var opts []local.Opt
 
 	if c.Directory != "" && b.OutputFile == "" {
@@ -38,11 +38,13 @@ func newLocalWriter(b *models.Backup, c *models.Common) (backup.Writer, error) {
 		opts = append(opts, local.WithFile(b.OutputFile))
 	}
 
-	if b.RemoveFiles {
+	if b.ShouldClearTarget() {
 		opts = append(opts, local.WithRemoveFiles())
 	}
 
-	return local.NewWriter(opts...)
+	opts = append(opts, local.WithValidator(asb.NewValidator()))
+
+	return local.NewWriter(ctx, opts...)
 }
 
 func newS3Writer(
@@ -70,9 +72,11 @@ func newS3Writer(
 		opts = append(opts, s3.WithFile(path))
 	}
 
-	if b.RemoveFiles {
+	if b.ShouldClearTarget() {
 		opts = append(opts, s3.WithRemoveFiles())
 	}
+
+	opts = append(opts, s3.WithValidator(asb.NewValidator()))
 
 	return s3.NewWriter(ctx, client, bucketName, opts...)
 }
@@ -98,9 +102,11 @@ func newGcpWriter(
 		opts = append(opts, storage.WithFile(b.OutputFile))
 	}
 
-	if b.RemoveFiles {
+	if b.ShouldClearTarget() {
 		opts = append(opts, storage.WithRemoveFiles())
 	}
+
+	opts = append(opts, storage.WithValidator(asb.NewValidator()))
 
 	return storage.NewWriter(ctx, client, g.BucketName, opts...)
 }
@@ -126,9 +132,11 @@ func newAzureWriter(
 		opts = append(opts, blob.WithFile(b.OutputFile))
 	}
 
-	if b.RemoveFiles {
+	if b.ShouldClearTarget() {
 		opts = append(opts, blob.WithRemoveFiles())
 	}
+
+	opts = append(opts, blob.WithValidator(asb.NewValidator()))
 
 	return blob.NewWriter(ctx, client, a.ContainerName, opts...)
 }
@@ -138,10 +146,13 @@ func newAzureWriter(
 func getBucketFromPath(path string) (bucket, cleanPath string) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
-		return "", path
+		return path, "/"
 	}
 
 	cleanPath = strings.Join(parts[1:], "/")
+	if cleanPath == "" {
+		cleanPath = "/"
+	}
 
 	return parts[0], cleanPath
 }

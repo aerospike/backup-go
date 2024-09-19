@@ -374,6 +374,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	backupDir := suite.T().TempDir()
 	writers, err := local.NewWriter(
+		ctx,
 		local.WithValidator(asb.NewValidator()),
 		local.WithDir(backupDir),
 	)
@@ -434,10 +435,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
 
 	_, err = local.NewWriter(
+		ctx,
 		local.WithValidator(asb.NewValidator()),
 		local.WithDir(backupDir),
 	)
-	suite.ErrorContains(err, "is not empty")
+	suite.ErrorContains(err, "must be empty")
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
@@ -544,6 +546,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 
 	backupDir := suite.T().TempDir()
 	writers, err := local.NewWriter(
+		ctx,
 		local.WithValidator(asb.NewValidator()),
 		local.WithDir(backupDir),
 		local.WithRemoveFiles(),
@@ -1066,6 +1069,10 @@ func (b *byteReadWriterFactory) Readers() ([]io.ReadCloser, error) {
 
 func (b *byteReadWriterFactory) GetType() string {
 	return "byte buffer"
+}
+
+func (b *byteReadWriterFactory) RemoveFiles(_ context.Context) error {
+	return nil
 }
 
 type nopWriteCloser struct {

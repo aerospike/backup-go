@@ -100,6 +100,7 @@ Backup Flags:
                                     
       --parallel-nodes              Specifies how to perform scan. If set to true, we launch parallel workers for nodes;
                                     otherwise workers run in parallel for partitions.
+      --remove-artifacts            Remove existing backup file (-o) or files (-d) without performing a backup.
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -146,9 +147,6 @@ Azure Flags:
 
 ## Unsupported flags
 ```
---remove-artifacts  Remove existing backup file (-o) or files (-d) without performing a backup.
-                    This option is mutually exclusive to --continue and --estimate.
-
 --continue          Resumes an interrupted/failed backup from where it was left off, given the .state file
                     that was generated from the interrupted/failed run.
 

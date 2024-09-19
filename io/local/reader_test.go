@@ -229,6 +229,16 @@ func createTmpFile(dir, fileName string) error {
 	return nil
 }
 
+func createTempNestedDir(rootPath, nestedDir string) error {
+	nestedPath := filepath.Join(rootPath, nestedDir)
+	if _, err := os.Stat(nestedPath); os.IsNotExist(err) {
+		if err = os.MkdirAll(nestedPath, os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+	}
+	return nil
+}
+
 func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFile() {
 	const fileName = "oneFile.asb"
 
@@ -289,6 +299,51 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFileErr() {
 			counter++
 		case err = <-errorChan:
 			require.ErrorContains(s.T(), err, "no such file or directory")
+		}
+	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
+	dir := s.T().TempDir()
+
+	err := createTempNestedDir(dir, "nested1")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "nested1/file1.asb")
+	require.NoError(s.T(), err)
+	err = createTempNestedDir(dir, "nested2")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "nested2/file2.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file3.txt")
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir), WithNestedDir())
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(2, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
 		}
 	}
 }

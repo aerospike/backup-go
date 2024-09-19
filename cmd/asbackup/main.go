@@ -176,7 +176,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	// Run app.
+
 	return asb.Run(cmd.Context())
 }
 

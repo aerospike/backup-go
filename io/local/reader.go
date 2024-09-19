@@ -43,10 +43,14 @@ type options struct {
 	path string
 	// isDir flag describes what we have in path, file or directory.
 	isDir bool
-	// removeFiles flag describes should we remove everything from backup folder or not.
-	removeFiles bool
+	// isRemovingFiles flag describes should we remove everything from backup folder or not.
+	isRemovingFiles bool
 	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
+	// withNestedDir describes if we should check for if an object is a directory for read/write operations.
+	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
+	// Default: true
+	withNestedDir bool
 }
 
 type Opt func(*options)
@@ -75,6 +79,13 @@ func WithValidator(v validator) Opt {
 	}
 }
 
+// WithNestedDir adds withNestedDir = true parameter. That means that we won't skip nested folders.
+func WithNestedDir() Opt {
+	return func(r *options) {
+		r.withNestedDir = true
+	}
+}
+
 // NewReader creates a new local directory/file Reader.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithValidator(v validator) - optional.
@@ -98,9 +109,17 @@ func NewReader(opts ...Opt) (*Reader, error) {
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
+	defer close(readersCh)
 	// If it is a folder, open and return.
 	if r.isDir {
+		err := r.checkRestoreDirectory()
+		if err != nil {
+			errorsCh <- err
+			return
+		}
+
 		r.streamDirectory(ctx, readersCh, errorsCh)
+
 		return
 	}
 
@@ -111,14 +130,6 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	defer close(readersCh)
-
-	err := r.checkRestoreDirectory()
-	if err != nil {
-		errorsCh <- err
-		return
-	}
-
 	fileInfo, err := os.ReadDir(r.path)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to read path %s: %w", r.path, err)
@@ -132,6 +143,18 @@ func (r *Reader) streamDirectory(
 		}
 
 		if file.IsDir() {
+			// Itterate over nested dirs recursively.
+			if r.withNestedDir {
+				nestedDir := filepath.Join(r.path, file.Name())
+
+				subReader, err := NewReader(WithDir(nestedDir), WithValidator(r.validator), WithNestedDir())
+				if err != nil {
+					errorsCh <- fmt.Errorf("failed to read nested dir %s: %w", nestedDir, err)
+				}
+
+				subReader.streamDirectory(ctx, readersCh, errorsCh)
+			}
+
 			continue
 		}
 
@@ -162,8 +185,6 @@ func (r *Reader) streamDirectory(
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) streamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
-	defer close(readersCh)
-
 	if ctx.Err() != nil {
 		errorsCh <- ctx.Err()
 		return

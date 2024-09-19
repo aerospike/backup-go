@@ -49,7 +49,7 @@ type Writer struct {
 // Is used only for Writer.
 func WithRemoveFiles() Opt {
 	return func(r *options) {
-		r.removeFiles = true
+		r.isRemovingFiles = true
 	}
 }
 
@@ -76,12 +76,18 @@ func NewWriter(
 	}
 
 	var prefix string
+
 	if w.isDir {
-		prefix = w.path
+		w.prefix = w.path
 		// Protection from incorrect input.
 		if !strings.HasSuffix(w.path, "/") && w.path != "/" && w.path != "" {
 			prefix = fmt.Sprintf("%s/", w.path)
 		}
+	}
+
+	// For s3 we should use empty prefix for root.
+	if w.prefix == "/" {
+		w.prefix = ""
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -93,23 +99,24 @@ func NewWriter(
 	}
 
 	// Check if backup dir is empty.
-	isEmpty, err := isEmptyDirectory(ctx, client, bucketName, prefix)
+	isEmpty, err := isEmptyDirectory(ctx, client, bucketName, w.prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if the directory is empty: %w", err)
 	}
 
-	if !isEmpty && !w.removeFiles {
-		return nil, fmt.Errorf("backup folder must be empty or set removeFiles = true")
-	}
-
-	err = deleteAllFilesUnderPrefix(ctx, client, bucketName, prefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete files under prefix %s: %w", prefix, err)
+	if !isEmpty && !w.isRemovingFiles {
+		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 	}
 
 	w.client = client
 	w.bucketName = bucketName
-	w.prefix = prefix
+
+	if w.isRemovingFiles {
+		err = w.RemoveFiles(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete files under prefix %s: %w", prefix, err)
+		}
+	}
 
 	return w, nil
 }
@@ -243,11 +250,6 @@ func (w *s3Writer) Close() error {
 }
 
 func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix string) (bool, error) {
-	// S3 storage can write to "/" prefix, but can't read from "/", so we should replace it with "".
-	if prefix == "/" {
-		prefix = ""
-	}
-
 	resp, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:  &bucketName,
 		Prefix:  &prefix,
@@ -265,27 +267,46 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix
 	return len(resp.Contents) == 0, nil
 }
 
-func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, bucketName, prefix string) error {
+// RemoveFiles removes a backup file or files from directory.
+func (w *Writer) RemoveFiles(ctx context.Context) error {
+	// Remove file.
+	if !w.isDir {
+		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(w.bucketName),
+			Key:    aws.String(w.path),
+		}); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", w.path, err)
+		}
+
+		return nil
+	}
+	// Remove files from dir.
 	var continuationToken *string
 
 	for {
-		listResponse, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-			Bucket:            &bucketName,
-			Prefix:            &prefix,
+		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(w.bucketName),
+			Prefix:            aws.String(w.prefix),
 			ContinuationToken: continuationToken,
 		})
-
 		if err != nil {
 			return fmt.Errorf("failed to list objects: %w", err)
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil {
+			if p.Key == nil || isDirectory(w.prefix, *p.Key) && !w.withNestedDir {
 				continue
 			}
 
-			_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{
-				Bucket: &bucketName,
+			// If validator is set, remove only valid files.
+			if w.validator != nil {
+				if err = w.validator.Run(*p.Key); err != nil {
+					continue
+				}
+			}
+
+			_, err = w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+				Bucket: &w.bucketName,
 				Key:    p.Key,
 			})
 			if err != nil {
@@ -300,4 +321,19 @@ func deleteAllFilesUnderPrefix(ctx context.Context, client *s3.Client, bucketNam
 	}
 
 	return nil
+}
+
+func isDirectory(prefix, fileName string) bool {
+	// If file name ends with / it is 100% dir.
+	if strings.HasSuffix(fileName, "/") {
+		return true
+	}
+
+	// If we look inside some folder.
+	if strings.HasPrefix(fileName, prefix) {
+		clean := strings.TrimPrefix(fileName, prefix+"/")
+		return strings.Contains(clean, "/")
+	}
+	// All other variants.
+	return strings.Contains(fileName, "/")
 }

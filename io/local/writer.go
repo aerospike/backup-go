@@ -38,14 +38,14 @@ type Writer struct {
 // Is used only for Writer.
 func WithRemoveFiles() Opt {
 	return func(r *options) {
-		r.removeFiles = true
+		r.isRemovingFiles = true
 	}
 }
 
 // NewWriter creates a new writer for local directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
-func NewWriter(opts ...Opt) (*Writer, error) {
+func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {
@@ -56,23 +56,29 @@ func NewWriter(opts ...Opt) (*Writer, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	var err error
-	// If we want to remove files from backup path.
-	if w.removeFiles {
-		switch w.isDir {
-		case true:
-			err = forcePrepareBackupDirectory(w.path)
-		case false:
-			err = removeFileIfExists(w.path)
+	err := prepareBackupDirectory(w.path, w.isDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
+	}
+
+	if w.isDir {
+		// Check if backup dir is empty.
+		isEmpty, err := isEmptyDirectory(w.path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+		}
+
+		if !isEmpty && !w.isRemovingFiles {
+			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 		}
 	}
 
-	if !w.removeFiles && w.isDir {
-		err = prepareBackupDirectory(w.path)
-	}
-
-	if err != nil {
-		return nil, err
+	// If we want to remove files from backup path.
+	if w.isRemovingFiles {
+		err := w.RemoveFiles(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to remove files: %w", err)
+		}
 	}
 
 	return w, nil
@@ -80,64 +86,80 @@ func NewWriter(opts ...Opt) (*Writer, error) {
 
 // prepareBackupDirectory creates the backup directory if it does not exist.
 // It returns an error is the path already exits and it is not empty.
-func prepareBackupDirectory(dir string) error {
-	dirInfo, err := os.Stat(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return makeDir(dir)
+func prepareBackupDirectory(path string, isDir bool) error {
+	if !isDir {
+		path = filepath.Dir(path)
+	}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err = os.MkdirAll(path, os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
 		}
-
-		return err
 	}
 
-	if !dirInfo.IsDir() {
-		return fmt.Errorf("%s is not a directory", dir)
-	}
+	return nil
+}
 
-	fileInfo, err := os.ReadDir(dir)
+func isEmptyDirectory(path string) (bool, error) {
+	fileInfo, err := os.ReadDir(path)
 	if err != nil {
-		return fmt.Errorf("failed to read path %s: %w", dir, err)
+		return false, fmt.Errorf("failed to read path %s: %w", path, err)
 	}
 
 	if len(fileInfo) > 0 {
-		return fmt.Errorf("%s is not empty", dir)
+		return false, nil
 	}
 
-	return nil
+	return true, nil
 }
 
-// forcePrepareBackupDirectory removes any existing directory and its contents
-// and creates a new directory.
-func forcePrepareBackupDirectory(dir string) error {
-	err := os.RemoveAll(dir)
-	if err != nil {
-		return fmt.Errorf("failed to remove directory %s: %w", dir, err)
+// RemoveFiles removes a backup file or files from directory.
+func (w *Writer) RemoveFiles(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 
-	return makeDir(dir)
-}
-
-func removeFileIfExists(path string) error {
-	_, err := os.Stat(path)
+	info, err := os.Stat(w.path)
 
 	switch {
 	case err == nil:
-		if err = os.Remove(path); err != nil {
-			return fmt.Errorf("failed to remove %s: %w", path, err)
-		}
+		// ok.
 	case os.IsNotExist(err):
+		// File doesn't exist, it's ok.
 		return nil
 	default:
-		return fmt.Errorf("failed to remove if exist %s: %w", path, err)
+		return fmt.Errorf("failed to stat path %s: %w", w.path, err)
+	}
+	// if it is a file.
+	if !info.IsDir() {
+		if err = os.Remove(w.path); err != nil {
+			return fmt.Errorf("failed to remove file %s: %w", w.path, err)
+		}
+
+		return nil
+	}
+	// If it is a dir.
+	files, err := os.ReadDir(w.path)
+	if err != nil {
+		return fmt.Errorf("failed to read directory %s: %w", w.path, err)
 	}
 
-	return nil
-}
+	for _, file := range files {
+		filePath := filepath.Join(w.path, file.Name())
+		// Skip folders.
+		if file.IsDir() && !w.withNestedDir {
+			continue
+		}
+		// If validator is set, remove only valid files.
+		if w.validator != nil {
+			if err = w.validator.Run(filePath); err != nil {
+				continue
+			}
+		}
 
-func makeDir(dir string) error {
-	err := os.MkdirAll(dir, 0o755)
-	if err != nil {
-		return fmt.Errorf("failed to create backup directory %s: %w", dir, err)
+		if err = os.Remove(filePath); err != nil {
+			return fmt.Errorf("failed to remove file %s: %w", filePath, err)
+		}
 	}
 
 	return nil

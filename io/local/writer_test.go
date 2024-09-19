@@ -29,8 +29,9 @@ type writerTestSuite struct {
 
 func (suite *writerTestSuite) Test_openBackupFile() {
 	tmpDir := suite.T().TempDir()
+	ctx := context.Background()
 
-	factory, err := NewWriter(WithRemoveFiles(), WithDir(tmpDir))
+	factory, err := NewWriter(ctx, WithRemoveFiles(), WithDir(tmpDir))
 	suite.NoError(err)
 
 	w, err := factory.NewWriter(context.Background(), "test")
@@ -50,50 +51,22 @@ func (suite *writerTestSuite) Test_openBackupFile() {
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive() {
 	dir := suite.T().TempDir()
-	err := prepareBackupDirectory(dir)
+	err := prepareBackupDirectory(dir, true)
 	suite.NoError(err)
 }
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 	dir := suite.T().TempDir()
 	dir += "/test"
-	err := prepareBackupDirectory(dir)
+	err := prepareBackupDirectory(dir, true)
 	suite.NoError(err)
 	suite.DirExists(dir)
 }
 
-func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_IsNotDir() {
-	dir := suite.T().TempDir()
-
-	file := dir + "/test"
-	f, err := os.Create(file)
-	if err != nil {
-		suite.FailNow("Failed to create file: %v", err)
-	}
-	_ = f.Close()
-
-	err = prepareBackupDirectory(file)
-	suite.Error(err)
-}
-
-func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_DirNotEmpty() {
-	dir := suite.T().TempDir()
-
-	file := dir + "/test"
-	f, err := os.Create(file)
-	if err != nil {
-		suite.FailNow("Failed to create file: %v", err)
-	}
-	_ = f.Close()
-
-	err = prepareBackupDirectory(dir)
-	suite.Error(err)
-}
-
 func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
 	tmpDir := suite.T().TempDir()
-
-	w, err := NewWriter(WithRemoveFiles(), WithDir(tmpDir))
+	ctx := context.Background()
+	w, err := NewWriter(ctx, WithRemoveFiles(), WithDir(tmpDir))
 	suite.NoError(err)
 
 	suite.Equal(localType, w.GetType())

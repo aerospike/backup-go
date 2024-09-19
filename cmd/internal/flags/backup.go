@@ -79,6 +79,11 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		false,
 		"Specifies how to perform scan. If set to true, we launch parallel workers for nodes;\n"+
 			"otherwise workers run in parallel for partitions.")
+	// After implementing --continue and --estimate add this line here:
+	// "This option is mutually exclusive to --continue and --estimate."
+	flagSet.BoolVar(&f.RemoveArtifacts, "remove-artifacts",
+		false,
+		"Remove existing backup file (-o) or files (-d) without performing a backup.")
 
 	return flagSet
 }

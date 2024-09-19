@@ -45,6 +45,8 @@ type Writer interface {
 	NewWriter(ctx context.Context, filename string) (io.WriteCloser, error)
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
+	// RemoveFiles removes a backup file or files from directory.
+	RemoveFiles(ctx context.Context) error
 }
 
 // BackupHandler handles a backup job.

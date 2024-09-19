@@ -49,10 +49,14 @@ type options struct {
 	path string
 	// isDir flag describes what we have in path, file or directory.
 	isDir bool
-	// removeFiles flag describes should we remove everything from backup folder or not.
-	removeFiles bool
+	// isRemovingFiles flag describes should we remove everything from backup folder or not.
+	isRemovingFiles bool
 	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
+	// withNestedDir describes if we should check for if an object is a directory for read/write operations.
+	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
+	// Default: true
+	withNestedDir bool
 }
 
 type Opt func(*options)
@@ -70,7 +74,6 @@ func WithFile(path string) Opt {
 	return func(r *options) {
 		r.path = path
 		r.isDir = false
-		r.removeFiles = true
 	}
 }
 
@@ -79,6 +82,13 @@ func WithFile(path string) Opt {
 func WithValidator(v validator) Opt {
 	return func(r *options) {
 		r.validator = v
+	}
+}
+
+// WithNestedDir adds withNestedDir = true parameter. That means that we won't skip nested folders.
+func WithNestedDir() Opt {
+	return func(r *options) {
+		r.withNestedDir = true
 	}
 }
 
@@ -161,7 +171,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		// Skip files in folders.
-		if isDirectory(r.prefix, objAttrs.Name) {
+		if isDirectory(r.prefix, objAttrs.Name) && !r.withNestedDir {
 			continue
 		}
 
@@ -217,7 +227,13 @@ func isDirectory(prefix, fileName string) bool {
 
 	// If we look inside some folder.
 	if strings.HasPrefix(fileName, prefix) {
+		// For root folder we should add.
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+
 		clean := strings.TrimPrefix(fileName, prefix)
+
 		return strings.Contains(clean, "/")
 	}
 	// All other variants.

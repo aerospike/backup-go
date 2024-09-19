@@ -157,7 +157,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		"backup",
 		s3Storasge.WithDir(backupDir),
 	)
-	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
+	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 
 	return allBytesWritten
 }
@@ -230,7 +230,7 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 		"backup",
 		s3Storasge.WithFile(backupFile),
 	)
-	s.Require().ErrorContains(err, "backup folder must be empty or set removeFiles = true")
+	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 
 	return allBytesWritten
 }

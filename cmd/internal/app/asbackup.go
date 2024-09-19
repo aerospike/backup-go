@@ -34,7 +34,6 @@ type ASBackup struct {
 	writer       backup.Writer
 }
 
-//nolint:dupl // Code is very similar as NewASRestore but different.
 func NewASBackup(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
@@ -50,6 +49,16 @@ func NewASBackup(
 ) (*ASBackup, error) {
 	if err := validateStorages(awsS3, gcpStorage, azureBlob); err != nil {
 		return nil, err
+	}
+
+	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup writer: %w", err)
+	}
+
+	if backupParams.RemoveArtifacts {
+		// We clean the folder on initialization.
+		return nil, nil
 	}
 
 	aerospikeClient, err := newAerospikeClient(clientConfig)
@@ -73,11 +82,6 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create backup client: %w", err)
 	}
 
-	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup writer: %w", err)
-	}
-
 	return &ASBackup{
 		backupClient: backupClient,
 		backupConfig: backupConfig,
@@ -86,6 +90,10 @@ func NewASBackup(
 }
 
 func (b *ASBackup) Run(ctx context.Context) error {
+	if b == nil {
+		return nil
+	}
+
 	h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
 	if err != nil {
 		return fmt.Errorf("failed to start backup: %w", err)
@@ -116,7 +124,7 @@ func getWriter(
 	case azureBlob.ContainerName != "":
 		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
 	default:
-		return newLocalWriter(backupParams, commonParams)
+		return newLocalWriter(ctx, backupParams, commonParams)
 	}
 }
 

@@ -35,6 +35,8 @@ const (
 type Writer struct {
 	// Optional parameters.
 	options
+	// bucketName contains bucket name, is used for logging.
+	bucketName string
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
 	bucketHandle *storage.BucketHandle
 	// prefix contains folder name if we have folders inside the bucket.
@@ -47,7 +49,7 @@ type Writer struct {
 // Is used only for Writer.
 func WithRemoveFiles() Opt {
 	return func(r *options) {
-		r.removeFiles = true
+		r.isRemovingFiles = true
 	}
 }
 
@@ -79,30 +81,32 @@ func NewWriter(
 		}
 	}
 
-	bucket := client.Bucket(bucketName)
-	// Check if bucket exists, to avoid errors.
-	_, err := bucket.Attrs(ctx)
+	bucketHandler := client.Bucket(bucketName)
+	// Check if bucketHandler exists, to avoid errors.
+	_, err := bucketHandler.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket %s attr: %w", bucketName, err)
+		return nil, fmt.Errorf("failed to get bucketHandler %s attr: %w", bucketName, err)
 	}
 
 	// Check if backup dir is empty.
-	isEmpty, err := isEmptyDirectory(ctx, bucket, prefix)
+	isEmpty, err := isEmptyDirectory(ctx, bucketHandler, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 	}
 
-	if !isEmpty && !w.removeFiles {
-		return nil, fmt.Errorf("backup folder must be empty or set removeFiles = true")
+	if !isEmpty && !w.isRemovingFiles && w.isDir {
+		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 	}
 
-	// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
-	if err = removeFilesFromFolder(ctx, bucket, bucketName, prefix); err != nil {
-		return nil, fmt.Errorf("failed to remove files from folder: %w", err)
-	}
-
-	w.bucketHandle = bucket
+	w.bucketHandle = bucketHandler
 	w.prefix = prefix
+
+	if w.isRemovingFiles {
+		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucketHandler.
+		if err = w.RemoveFiles(ctx); err != nil {
+			return nil, fmt.Errorf("failed to remove files from folder: %w", err)
+		}
+	}
 
 	return w, nil
 }
@@ -124,6 +128,54 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	sw.ChunkSize = defaultChunkSize
 
 	return sw, nil
+}
+
+// RemoveFiles removes a backup file or files from directory.
+func (w *Writer) RemoveFiles(
+	ctx context.Context,
+) error {
+	// Remove file.
+	if !w.isDir {
+		if err := w.bucketHandle.Object(w.path).Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", w.path, err)
+		}
+
+		return nil
+	}
+	// Remove files from dir.
+	it := w.bucketHandle.Objects(ctx, &storage.Query{
+		Prefix: w.path,
+	})
+
+	for {
+		// Iterate over bucket until we're done.
+		objAttrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to read object attr from bucket %s: %w", w.bucketName, err)
+		}
+
+		// Skip files in folders.
+		if isDirectory(w.path, objAttrs.Name) && !w.withNestedDir {
+			continue
+		}
+
+		// If validator is set, remove only valid files.
+		if w.validator != nil {
+			if err = w.validator.Run(objAttrs.Name); err != nil {
+				continue
+			}
+		}
+
+		if err = w.bucketHandle.Object(objAttrs.Name).Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", objAttrs.Name, err)
+		}
+	}
+
+	return nil
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.
@@ -156,33 +208,4 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 	}
 
 	return true, nil
-}
-
-func removeFilesFromFolder(ctx context.Context, bucketHandle *storage.BucketHandle, bucketName, prefix string) error {
-	it := bucketHandle.Objects(ctx, &storage.Query{
-		Prefix: prefix,
-	})
-
-	for {
-		// Iterate over bucket until we're done.
-		objAttrs, err := it.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to read object attr from bucket %s: %w", bucketName, err)
-		}
-
-		// Skip files in folders.
-		if isDirectory(prefix, objAttrs.Name) {
-			continue
-		}
-
-		if err = bucketHandle.Object(objAttrs.Name).Delete(ctx); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", objAttrs.Name, err)
-		}
-	}
-
-	return nil
 }

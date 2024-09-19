@@ -35,8 +35,11 @@ func main() {
 		panic(err)
 	}
 
+	ctx := context.Background()
+
 	// For backup to single file use local.WithFile(fileName)
 	writers, err := local.NewWriter(
+		ctx,
 		local.WithRemoveFiles(),
 		local.WithDir("backups_folder"),
 	)
@@ -47,7 +50,6 @@ func main() {
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = "test"
 	backupCfg.ParallelRead = 5
-	ctx := context.Background()
 
 	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers)
 	if err != nil {

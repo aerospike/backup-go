@@ -161,8 +161,15 @@ func (w *Writer) RemoveFiles(
 		}
 
 		// Skip files in folders.
-		if isDirectory(w.path, objAttrs.Name) {
+		if isDirectory(w.path, objAttrs.Name) && !w.withNestedDir {
 			continue
+		}
+
+		// If validator is set, remove only valid files.
+		if w.validator != nil {
+			if err = w.validator.Run(objAttrs.Name); err != nil {
+				continue
+			}
 		}
 
 		if err = w.bucketHandle.Object(objAttrs.Name).Delete(ctx); err != nil {

@@ -294,8 +294,15 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || isDirectory(w.prefix, *p.Key) {
+			if p.Key == nil || isDirectory(w.prefix, *p.Key) && !w.withNestedDir {
 				continue
+			}
+
+			// If validator is set, remove only valid files.
+			if w.validator != nil {
+				if err = w.validator.Run(*p.Key); err != nil {
+					continue
+				}
 			}
 
 			_, err = w.client.DeleteObject(ctx, &s3.DeleteObjectInput{

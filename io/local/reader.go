@@ -47,6 +47,10 @@ type options struct {
 	isRemovingFiles bool
 	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
+	// withNestedDir describes if we should check for if an object is a directory for read/write operations.
+	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
+	// Default: true
+	withNestedDir bool
 }
 
 type Opt func(*options)
@@ -72,6 +76,13 @@ func WithFile(path string) Opt {
 func WithValidator(v validator) Opt {
 	return func(r *options) {
 		r.validator = v
+	}
+}
+
+// WithNestedDir adds withNestedDir = true parameter. That means that we won't skip nested folders.
+func WithNestedDir() Opt {
+	return func(r *options) {
+		r.withNestedDir = true
 	}
 }
 
@@ -131,7 +142,7 @@ func (r *Reader) streamDirectory(
 			return
 		}
 
-		if file.IsDir() {
+		if file.IsDir() && !r.withNestedDir {
 			continue
 		}
 

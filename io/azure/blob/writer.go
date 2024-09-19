@@ -244,8 +244,15 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 
 		for _, blob := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if isDirectory(w.prefix, *blob.Name) {
+			if isDirectory(w.prefix, *blob.Name) && !w.withNestedDir {
 				continue
+			}
+
+			// If validator is set, remove only valid files.
+			if w.validator != nil {
+				if err = w.validator.Run(*blob.Name); err != nil {
+					continue
+				}
 			}
 
 			_, err = w.client.DeleteBlob(ctx, w.containerName, *blob.Name, nil)

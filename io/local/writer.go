@@ -122,10 +122,19 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 
 	for _, file := range files {
 		filePath := filepath.Join(w.path, file.Name())
-		if !file.IsDir() {
-			if err = os.Remove(filePath); err != nil {
-				return fmt.Errorf("failed to remove file %s: %w", filePath, err)
+		// Skip folders.
+		if file.IsDir() && !w.withNestedDir {
+			continue
+		}
+		// If validator is set, remove only valid files.
+		if w.validator != nil {
+			if err = w.validator.Run(filePath); err != nil {
+				continue
 			}
+		}
+
+		if err = os.Remove(filePath); err != nil {
+			return fmt.Errorf("failed to remove file %s: %w", filePath, err)
 		}
 	}
 

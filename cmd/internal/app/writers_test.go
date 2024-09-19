@@ -48,21 +48,51 @@ const (
 
 func TestGetBucketFromPath(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
-		input          string
-		expectedBucket string
-		expectedPath   string
+		name          string
+		path          string
+		wantBucket    string
+		wantCleanPath string
 	}{
-		{input: "bucket/path/to/file", expectedBucket: "bucket", expectedPath: "path/to/file"},
-		{input: "single-part", expectedBucket: "", expectedPath: "single-part"},
-		{input: "bucket/", expectedBucket: "bucket", expectedPath: ""},
-		{input: "", expectedBucket: "", expectedPath: ""},
+		{
+			name:          "Single part path",
+			path:          "bucketname",
+			wantBucket:    "bucketname",
+			wantCleanPath: "/",
+		},
+		{
+			name:          "Path with bucket and folder",
+			path:          "bucketname/folder",
+			wantBucket:    "bucketname",
+			wantCleanPath: "folder",
+		},
+		{
+			name:          "Path with multiple folders",
+			path:          "bucketname/folder/subfolder",
+			wantBucket:    "bucketname",
+			wantCleanPath: "folder/subfolder",
+		},
+		{
+			name:          "Path with trailing slash",
+			path:          "bucketname/",
+			wantBucket:    "bucketname",
+			wantCleanPath: "/",
+		},
+		{
+			name:          "Empty path",
+			path:          "",
+			wantBucket:    "",
+			wantCleanPath: "/",
+		},
 	}
 
-	for _, test := range tests {
-		bucket, path := getBucketFromPath(test.input)
-		assert.Equal(t, test.expectedBucket, bucket)
-		assert.Equal(t, test.expectedPath, path)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bucket, cleanPath := getBucketFromPath(tt.path)
+			assert.Equal(t, tt.wantBucket, bucket)
+			assert.Equal(t, tt.wantCleanPath, cleanPath)
+		})
 	}
 }
 
@@ -188,8 +218,7 @@ func TestGcpWriter(t *testing.T) {
 	assert.Equal(t, testGcpType, writer.GetType())
 
 	b = &models.Backup{
-		OutputFile:  t.TempDir() + testFileName,
-		RemoveFiles: true,
+		OutputFile: t.TempDir() + testFileName,
 	}
 	c = &models.Common{}
 
@@ -243,8 +272,7 @@ func TestAzureWriter(t *testing.T) {
 	assert.Equal(t, testAzureType, writer.GetType())
 
 	b = &models.Backup{
-		OutputFile:  t.TempDir() + testFileName,
-		RemoveFiles: true,
+		OutputFile: t.TempDir() + testFileName,
 	}
 	c = &models.Common{}
 

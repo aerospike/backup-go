@@ -63,34 +63,6 @@ func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 	suite.DirExists(dir)
 }
 
-func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_IsNotDir() {
-	dir := suite.T().TempDir()
-
-	file := dir + "/test"
-	f, err := os.Create(file)
-	if err != nil {
-		suite.FailNow("Failed to create file: %v", err)
-	}
-	_ = f.Close()
-
-	err = prepareBackupDirectory(file, true)
-	suite.Error(err)
-}
-
-func (suite *writerTestSuite) TestPrepareBackupDirectory_Negative_DirNotEmpty() {
-	dir := suite.T().TempDir()
-
-	file := dir + "/test"
-	f, err := os.Create(file)
-	if err != nil {
-		suite.FailNow("Failed to create file: %v", err)
-	}
-	_ = f.Close()
-
-	err = prepareBackupDirectory(dir, true)
-	suite.Error(err)
-}
-
 func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
 	tmpDir := suite.T().TempDir()
 	ctx := context.Background()

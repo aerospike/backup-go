@@ -227,7 +227,13 @@ func isDirectory(prefix, fileName string) bool {
 
 	// If we look inside some folder.
 	if strings.HasPrefix(fileName, prefix) {
-		clean := strings.TrimPrefix(fileName, prefix+"/")
+		// For root folder we should add.
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+
+		clean := strings.TrimPrefix(fileName, prefix)
+
 		return strings.Contains(clean, "/")
 	}
 	// All other variants.

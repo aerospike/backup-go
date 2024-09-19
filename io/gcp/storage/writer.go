@@ -136,8 +136,6 @@ func (w *Writer) RemoveFiles(
 ) error {
 	// Remove file.
 	if !w.isDir {
-		fmt.Println("deleting one file:", w.path)
-
 		if err := w.bucketHandle.Object(w.path).Delete(ctx); err != nil {
 			return fmt.Errorf("failed to delete object %s: %w", w.path, err)
 		}

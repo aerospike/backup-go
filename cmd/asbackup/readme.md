@@ -147,9 +147,6 @@ Azure Flags:
 
 ## Unsupported flags
 ```
---remove-artifacts  Remove existing backup file (-o) or files (-d) without performing a backup.
-                    This option is mutually exclusive to --continue and --estimate.
-
 --continue          Resumes an interrupted/failed backup from where it was left off, given the .state file
                     that was generated from the interrupted/failed run.
 

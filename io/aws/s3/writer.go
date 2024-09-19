@@ -105,7 +105,7 @@ func NewWriter(
 	}
 
 	if !isEmpty && !w.isRemovingFiles {
-		return nil, fmt.Errorf("backup folder must be empty or set isRemovingFiles = true")
+		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 	}
 
 	w.client = client

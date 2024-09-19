@@ -103,7 +103,7 @@ func NewWriter(
 	}
 
 	if !isEmpty && !w.isRemovingFiles && w.isDir {
-		return nil, fmt.Errorf("backup folder must be empty or set isRemovingFiles = true")
+		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 	}
 
 	w.containerName = containerName

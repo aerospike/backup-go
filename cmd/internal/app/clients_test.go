@@ -19,6 +19,7 @@ import (
 
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 )
@@ -73,6 +74,8 @@ func TestClients_newAerospikeClient(t *testing.T) {
 
 func TestClients_newS3Client(t *testing.T) {
 	t.Parallel()
+	err := createAwsCredentials()
+	assert.NoError(t, err)
 
 	cfg := &models.AwsS3{
 		Region:   testS3Region,
@@ -81,7 +84,7 @@ func TestClients_newS3Client(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := newS3Client(ctx, cfg)
+	_, err = newS3Client(ctx, cfg)
 	require.NoError(t, err)
 }
 

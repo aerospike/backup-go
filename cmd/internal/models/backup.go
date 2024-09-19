@@ -28,3 +28,8 @@ type Backup struct {
 	ParallelNodes       bool
 	RemoveArtifacts     bool
 }
+
+// ShouldClearTarget check if we should clean target directory.
+func (b *Backup) ShouldClearTarget() bool {
+	return b.RemoveFiles || b.RemoveArtifacts
+}

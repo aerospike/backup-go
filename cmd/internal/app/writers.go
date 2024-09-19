@@ -38,7 +38,7 @@ func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (ba
 		opts = append(opts, local.WithFile(b.OutputFile))
 	}
 
-	if b.RemoveFiles || b.RemoveArtifacts {
+	if b.ShouldClearTarget() {
 		opts = append(opts, local.WithRemoveFiles())
 	}
 
@@ -72,7 +72,7 @@ func newS3Writer(
 		opts = append(opts, s3.WithFile(path))
 	}
 
-	if b.RemoveFiles || b.RemoveArtifacts {
+	if b.ShouldClearTarget() {
 		opts = append(opts, s3.WithRemoveFiles())
 	}
 
@@ -102,7 +102,7 @@ func newGcpWriter(
 		opts = append(opts, storage.WithFile(b.OutputFile))
 	}
 
-	if b.RemoveFiles || b.RemoveArtifacts {
+	if b.ShouldClearTarget() {
 		opts = append(opts, storage.WithRemoveFiles())
 	}
 
@@ -132,7 +132,7 @@ func newAzureWriter(
 		opts = append(opts, blob.WithFile(b.OutputFile))
 	}
 
-	if b.RemoveFiles || b.RemoveArtifacts {
+	if b.ShouldClearTarget() {
 		opts = append(opts, blob.WithRemoveFiles())
 	}
 

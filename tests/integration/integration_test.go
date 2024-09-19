@@ -439,7 +439,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		local.WithValidator(asb.NewValidator()),
 		local.WithDir(backupDir),
 	)
-	suite.ErrorContains(err, "is not empty")
+	suite.ErrorContains(err, "must be empty")
 }
 
 func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {

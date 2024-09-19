@@ -56,16 +56,27 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	var err error
+	if w.isDir {
+		// Check if backup dir is empty.
+		isEmpty, err := isEmptyDirectory(w.path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+		}
+
+		if !isEmpty && !w.isRemovingFiles {
+			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+		}
+	}
+
 	// If we want to remove files from backup path.
 	if w.isRemovingFiles {
-		err = w.RemoveFiles(ctx)
+		err := w.RemoveFiles(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to remove files: %w", err)
 		}
 	}
 
-	err = prepareBackupDirectory(w.path, w.isDir)
+	err := prepareBackupDirectory(w.path, w.isDir)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +98,19 @@ func prepareBackupDirectory(path string, isDir bool) error {
 	}
 
 	return nil
+}
+
+func isEmptyDirectory(path string) (bool, error) {
+	fileInfo, err := os.ReadDir(path)
+	if err != nil {
+		return false, fmt.Errorf("failed to read path %s: %w", path, err)
+	}
+
+	if len(fileInfo) > 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // RemoveFiles removes a backup file or files from directory.

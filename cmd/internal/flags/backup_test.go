@@ -36,8 +36,8 @@ func TestBackup_NewFlagSet(t *testing.T) {
 		"--no-bins",
 		"--sleep-between-retries", "10",
 		"--filter-exp", "encoded-filter-exp",
-		"--parallel-nodes", "true",
-		"--remove-artifacts", "true",
+		"--parallel-nodes",
+		"--remove-artifacts",
 	}
 
 	err := flagSet.Parse(args)

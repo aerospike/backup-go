@@ -112,6 +112,11 @@ func (r *Reader) StreamFiles(
 	defer close(readersCh)
 	// If it is a folder, open and return.
 	if r.isDir {
+		err := r.checkRestoreDirectory()
+		if err != nil {
+			errorsCh <- err
+			return
+		}
 		r.streamDirectory(ctx, readersCh, errorsCh)
 		return
 	}
@@ -123,12 +128,6 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	err := r.checkRestoreDirectory()
-	if err != nil {
-		errorsCh <- err
-		return
-	}
-
 	fileInfo, err := os.ReadDir(r.path)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to read path %s: %w", r.path, err)

@@ -117,7 +117,9 @@ func (r *Reader) StreamFiles(
 			errorsCh <- err
 			return
 		}
+
 		r.streamDirectory(ctx, readersCh, errorsCh)
+
 		return
 	}
 

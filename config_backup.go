@@ -84,6 +84,9 @@ type BackupConfig struct {
 	// Format: base64 encoded string.
 	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
 	AfterDigest string
+	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
+	// Results in smaller backup files.
+	Compact bool
 }
 
 // PartitionRange specifies a range of Aerospike partitions.

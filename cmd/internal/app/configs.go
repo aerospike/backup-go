@@ -53,6 +53,7 @@ func mapBackupConfig(
 	// TODO: make Bandwidth int64 to avoid overflow.
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
 	c.ParallelNodes = backupParams.ParallelNodes
+	c.Compact = backupParams.Compact
 
 	sp, err := mapScanPolicy(backupParams, commonParams)
 	if err != nil {

@@ -31,15 +31,19 @@ import (
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
 type Encoder struct {
-	namespace        string
+	namespace string
+	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
+	compact bool
+
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder(namespace string) *Encoder {
+func NewEncoder(namespace string, compact bool) *Encoder {
 	return &Encoder{
 		namespace: namespace,
+		compact:   compact,
 	}
 }
 
@@ -80,7 +84,7 @@ func (e *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 }
 
 func (e *Encoder) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
-	return recordToASB(rec, buff)
+	return recordToASB(e.compact, rec, buff)
 }
 
 func (e *Encoder) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
@@ -122,7 +126,7 @@ func writeFirstMetaText(w io.Writer) {
 
 // **** RECORD ****
 
-func recordToASB(r *models.Record, w io.Writer) (int, error) {
+func recordToASB(c bool, r *models.Record, w io.Writer) (int, error) {
 	var bytesWritten int
 
 	n, err := keyToASB(r.Key, w)
@@ -153,7 +157,7 @@ func recordToASB(r *models.Record, w io.Writer) (int, error) {
 		return bytesWritten, err
 	}
 
-	n, err = binsToASB(r.Bins, w)
+	n, err = binsToASB(c, r.Bins, w)
 	bytesWritten += n
 
 	if err != nil {
@@ -176,7 +180,7 @@ func writeRecordHeaderBinCount(binCount int, w io.Writer) (int, error) {
 	return writeBytes(w, headerBinCount, []byte(strconv.Itoa(binCount)))
 }
 
-func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
+func binsToASB(compact bool, bins a.BinMap, w io.Writer) (int, error) {
 	var bytesWritten int
 
 	// NOTE golang's random order map iteration
@@ -184,7 +188,7 @@ func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 	// multi element bin maps may not be identical
 	// over multiple backups even if the data is the same
 	for k, v := range bins {
-		n, err := binToASB(k, v, w)
+		n, err := binToASB(k, compact, v, w)
 		bytesWritten += n
 
 		if err != nil {
@@ -195,7 +199,7 @@ func binsToASB(bins a.BinMap, w io.Writer) (int, error) {
 	return bytesWritten, nil
 }
 
-func binToASB(k string, v any, w io.Writer) (int, error) {
+func binToASB(k string, c bool, v any, w io.Writer) (int, error) {
 	var (
 		bytesWritten int
 		err          error
@@ -219,11 +223,11 @@ func binToASB(k string, v any, w io.Writer) (int, error) {
 	case string:
 		bytesWritten, err = writeBinString(k, v, w)
 	case []byte:
-		bytesWritten, err = writeBinBytes(k, v, w)
+		bytesWritten, err = writeBinBytes(k, c, v, w)
 	case *a.RawBlobValue:
-		bytesWritten, err = writeRawBlobBin(v, k, w)
+		bytesWritten, err = writeRawBlobBin(v, k, c, w)
 	case a.HLLValue:
-		bytesWritten, err = writeBinHLL(k, v, w)
+		bytesWritten, err = writeBinHLL(k, c, v, w)
 	case a.GeoJSONValue:
 		bytesWritten, err = writeBinGeoJSON(k, v, w)
 	case nil:
@@ -256,14 +260,32 @@ func writeBinString(name, v string, w io.Writer) (int, error) {
 	return writeBytes(w, binStringTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, []byte(v))
 }
 
-func writeBinBytes(name string, v []byte, w io.Writer) (int, error) {
-	encoded := base64Encode(v)
-	return writeBytes(w, binBytesTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error) {
+	var prefix []byte
+
+	switch compact {
+	case true:
+		prefix = binBytesTypeCompactPrefix
+	case false:
+		prefix = binBytesTypePrefix
+		v = base64Encode(v)
+	}
+
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
-func writeBinHLL(name string, v a.HLLValue, w io.Writer) (int, error) {
-	encoded := base64Encode(v)
-	return writeBytes(w, binHLLTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, error) {
+	var prefix []byte
+
+	switch compact {
+	case true:
+		prefix = binHLLTypeCompactPrefix
+	case false:
+		prefix = binHLLTypePrefix
+		v = base64Encode(v)
+	}
+
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func writeBinGeoJSON(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
@@ -274,25 +296,45 @@ func writeBinNil(name string, w io.Writer) (int, error) {
 	return writeBytes(w, binNilTypePrefix, escapeASB(name))
 }
 
-func writeRawBlobBin(cdt *a.RawBlobValue, name string, w io.Writer) (int, error) {
+func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
 	switch cdt.ParticleType {
 	case particleType.MAP:
-		return writeRawMapBin(cdt, name, w)
+		return writeRawMapBin(cdt, name, compact, w)
 	case particleType.LIST:
-		return writeRawListBin(cdt, name, w)
+		return writeRawListBin(cdt, name, compact, w)
 	default:
 		return 0, fmt.Errorf("invalid raw blob bin particle type: %v", cdt.ParticleType)
 	}
 }
 
-func writeRawMapBin(cdt *a.RawBlobValue, name string, w io.Writer) (int, error) {
-	encoded := base64Encode(cdt.Data)
-	return writeBytes(w, binMapTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
+	var prefix, v []byte
+
+	switch compact {
+	case true:
+		prefix = binMapTypeCompactPrefix
+		v = cdt.Data
+	case false:
+		prefix = binMapTypePrefix
+		v = base64Encode(cdt.Data)
+	}
+
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
-func writeRawListBin(cdt *a.RawBlobValue, name string, w io.Writer) (int, error) {
-	encoded := base64Encode(cdt.Data)
-	return writeBytes(w, binListTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
+	var prefix, v []byte
+
+	switch compact {
+	case true:
+		prefix = binListTypeCompactPrefix
+		v = cdt.Data
+	case false:
+		prefix = binListTypePrefix
+		v = base64Encode(cdt.Data)
+	}
+
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func blobBinToASB(val []byte, bytesType byte, name string) []byte {

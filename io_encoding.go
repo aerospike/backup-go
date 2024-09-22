@@ -40,13 +40,13 @@ type Encoder interface {
 }
 
 // NewEncoder returns a new Encoder according to `EncoderType`.
-func NewEncoder(eType EncoderType, namespace string) Encoder {
+func NewEncoder(eType EncoderType, namespace string, compact bool) Encoder {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewEncoder(namespace, false)
+		return asb.NewEncoder(namespace, compact)
 	default:
-		return asb.NewEncoder(namespace, false)
+		return asb.NewEncoder(namespace, compact)
 	}
 }
 

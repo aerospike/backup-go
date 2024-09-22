@@ -55,7 +55,7 @@ type options struct {
 	validator validator
 	// withNestedDir describes if we should check for if an object is a directory for read/write operations.
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
-	// Default: true
+	// Default: false
 	withNestedDir bool
 }
 

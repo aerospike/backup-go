@@ -169,4 +169,5 @@ var (
 	headerGeneration     = []byte("+ g ")
 	headerExpiration     = []byte("+ t ")
 	headerBinCount       = []byte("+ b ")
+	compactSuffix        = []byte("!")
 )

@@ -84,6 +84,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVar(&f.RemoveArtifacts, "remove-artifacts",
 		false,
 		"Remove existing backup file (-o) or files (-d) without performing a backup.")
+	flagSet.BoolVarP(&f.Compact, "compact", "C",
+		false,
+		"Do not apply base-64 encoding to BLOBs; results in smaller backup files.")
 
 	return flagSet
 }

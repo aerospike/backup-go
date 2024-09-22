@@ -101,6 +101,7 @@ Backup Flags:
       --parallel-nodes              Specifies how to perform scan. If set to true, we launch parallel workers for nodes;
                                     otherwise workers run in parallel for partitions.
       --remove-artifacts            Remove existing backup file (-o) or files (-d) without performing a backup.
+  -C, --compact                     Do not apply base-64 encoding to BLOBs; results in smaller backup files.
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -155,8 +156,6 @@ Azure Flags:
                     exact path is where the backup file will be placed. If a directory is given, the backup
                     state will be placed in the directory with name `<namespace>.asb.state`, or
                     `<prefix>.asb.state` if `--output-file-prefix` is given.
-
---compact           Do not apply base-64 encoding to BLOBs; results in smaller backup files.
                     
 --node-list         <IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]
                     <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]

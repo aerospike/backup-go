@@ -261,19 +261,25 @@ func writeBinString(name, v string, w io.Writer) (int, error) {
 }
 
 func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error) {
+	prefix := makeCompactPrefix(binBytesTypePrefix)
+
 	if !compact {
 		v = base64Encode(v)
+		prefix = binBytesTypePrefix
 	}
 
-	return writeBytes(w, binBytesTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, error) {
+	prefix := makeCompactPrefix(binHLLTypePrefix)
+
 	if !compact {
 		v = base64Encode(v)
+		prefix = binHLLTypePrefix
 	}
 
-	return writeBytes(w, binHLLTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func writeBinGeoJSON(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
@@ -297,20 +303,26 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 
 func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
 	v := cdt.Data
+	prefix := makeCompactPrefix(binMapTypePrefix)
+
 	if !compact {
 		v = base64Encode(cdt.Data)
+		prefix = binMapTypePrefix
 	}
 
-	return writeBytes(w, binMapTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
 	v := cdt.Data
+	prefix := makeCompactPrefix(binListTypePrefix)
+
 	if !compact {
 		v = base64Encode(cdt.Data)
+		prefix = binListTypePrefix
 	}
 
-	return writeBytes(w, binListTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func blobBinToASB(val []byte, bytesType byte, name string) []byte {
@@ -542,4 +554,10 @@ func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
 		len(udf.Content),
 		udf.Content,
 	)
+}
+
+// makeCompactPrefix adds ! to prefix, to show decoder that data in this string is not encoded with base64.
+// We don't do any safety check here to make it fast.
+func makeCompactPrefix(p []byte) []byte {
+	return append(p[:3], append(compactSuffix, p[3:]...)...)
 }

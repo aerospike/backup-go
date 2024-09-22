@@ -261,22 +261,26 @@ func writeBinString(name, v string, w io.Writer) (int, error) {
 }
 
 func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error) {
-	prefix := makeCompactPrefix(binBytesTypePrefix)
-
-	if !compact {
-		v = base64Encode(v)
+	var prefix []byte
+	switch compact {
+	case true:
+		prefix = makeCompactPrefix(binBytesTypePrefix)
+	case false:
 		prefix = binBytesTypePrefix
+		v = base64Encode(v)
 	}
 
 	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, error) {
-	prefix := makeCompactPrefix(binHLLTypePrefix)
-
-	if !compact {
-		v = base64Encode(v)
+	var prefix []byte
+	switch compact {
+	case true:
+		prefix = makeCompactPrefix(binHLLTypePrefix)
+	case false:
 		prefix = binHLLTypePrefix
+		v = base64Encode(v)
 	}
 
 	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
@@ -302,24 +306,28 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 }
 
 func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
-	v := cdt.Data
-	prefix := makeCompactPrefix(binMapTypePrefix)
-
-	if !compact {
-		v = base64Encode(cdt.Data)
+	var prefix, v []byte
+	switch compact {
+	case true:
+		prefix = makeCompactPrefix(binMapTypePrefix)
+		v = cdt.Data
+	case false:
 		prefix = binMapTypePrefix
+		v = base64Encode(cdt.Data)
 	}
 
 	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 }
 
 func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
-	v := cdt.Data
-	prefix := makeCompactPrefix(binListTypePrefix)
-
-	if !compact {
-		v = base64Encode(cdt.Data)
+	var prefix, v []byte
+	switch compact {
+	case true:
+		prefix = makeCompactPrefix(binListTypePrefix)
+		v = cdt.Data
+	case false:
 		prefix = binListTypePrefix
+		v = base64Encode(cdt.Data)
 	}
 
 	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)

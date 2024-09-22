@@ -36,7 +36,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
 	if aerr != nil {
@@ -66,7 +66,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -87,7 +87,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -113,7 +113,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -126,7 +126,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 
 	var recExpr int64 = 10
 
@@ -154,7 +154,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -177,7 +177,7 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 	firstHeader := encoder.GetHeader()
 	suite.Assert().Equal(expected, string(firstHeader))
 
@@ -472,7 +472,7 @@ func Test_binToASB(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dst := &bytes.Buffer{}
-			n, err := binToASB(tt.args.k, tt.args.v, dst)
+			n, err := binToASB(tt.args.k, false, tt.args.v, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeBinToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -553,7 +553,7 @@ func Test_binsToASB(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dst := &bytes.Buffer{}
-			n, err := binsToASB(tt.args.bins, dst)
+			n, err := binsToASB(false, tt.args.bins, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeBinsToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -765,7 +765,7 @@ func Test_recordToASB(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dst := &bytes.Buffer{}
-			n, err := recordToASB(tt.args.r, dst)
+			n, err := recordToASB(false, tt.args.r, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("recordToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1082,7 +1082,7 @@ func Test_writeBinBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeBinBytes(tt.args.name, tt.args.v, w)
+			got, err := writeBinBytes(tt.args.name, false, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeBinBytes() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1135,7 +1135,7 @@ func Test_writeBinHLL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeBinHLL(tt.args.name, tt.args.v, w)
+			got, err := writeBinHLL(tt.args.name, false, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeBinHLL() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1539,7 +1539,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
-	encoder := NewEncoder("test")
+	encoder := NewEncoder("test", false)
 
 	key := genKey()
 	rec := &models.Record{
@@ -1756,7 +1756,7 @@ func Test_writeRawListBin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeRawListBin(tt.args.cdt, tt.args.name, w)
+			got, err := writeRawListBin(tt.args.cdt, tt.args.name, false, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeRawListBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1811,7 +1811,7 @@ func Test_writeRawMapBin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, w)
+			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, false, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeRawMapBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1879,7 +1879,7 @@ func Test_writeRawBlobBin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			got, err := writeRawBlobBin(tt.args.cdt, tt.args.name, w)
+			got, err := writeRawBlobBin(tt.args.cdt, tt.args.name, false, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeRawBlobBin() error = %v, wantErr %v", err, tt.wantErr)
 				return

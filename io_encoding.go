@@ -44,9 +44,9 @@ func NewEncoder(eType EncoderType, namespace string) Encoder {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewEncoder(namespace)
+		return asb.NewEncoder(namespace, false)
 	default:
-		return asb.NewEncoder(namespace)
+		return asb.NewEncoder(namespace, false)
 	}
 }
 

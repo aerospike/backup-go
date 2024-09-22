@@ -1947,21 +1947,3 @@ func Test_udfToASB(t *testing.T) {
 		})
 	}
 }
-
-func Test_makeCompactPrefix(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		prefix []byte
-		result []byte
-	}{
-		{binMapTypePrefix, []byte("- M! ")},
-		{binListTypePrefix, []byte("- L! ")},
-		{binHLLTypePrefix, []byte("- Y! ")},
-		{binBytesTypePrefix, []byte("- B! ")},
-	}
-	for _, tt := range testCases {
-		result := makeCompactPrefix(tt.prefix)
-		assert.Equal(t, tt.result, result)
-	}
-}

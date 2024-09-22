@@ -265,7 +265,7 @@ func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error
 
 	switch compact {
 	case true:
-		prefix = makeCompactPrefix(binBytesTypePrefix)
+		prefix = binBytesTypeCompactPrefix
 	case false:
 		prefix = binBytesTypePrefix
 		v = base64Encode(v)
@@ -279,7 +279,7 @@ func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, err
 
 	switch compact {
 	case true:
-		prefix = makeCompactPrefix(binHLLTypePrefix)
+		prefix = binHLLTypeCompactPrefix
 	case false:
 		prefix = binHLLTypePrefix
 		v = base64Encode(v)
@@ -312,7 +312,7 @@ func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer)
 
 	switch compact {
 	case true:
-		prefix = makeCompactPrefix(binMapTypePrefix)
+		prefix = binMapTypeCompactPrefix
 		v = cdt.Data
 	case false:
 		prefix = binMapTypePrefix
@@ -327,7 +327,7 @@ func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 
 	switch compact {
 	case true:
-		prefix = makeCompactPrefix(binListTypePrefix)
+		prefix = binListTypeCompactPrefix
 		v = cdt.Data
 	case false:
 		prefix = binListTypePrefix
@@ -566,10 +566,4 @@ func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
 		len(udf.Content),
 		udf.Content,
 	)
-}
-
-// makeCompactPrefix adds ! to prefix, to show decoder that data in this string is not encoded with base64.
-// We don't do any safety check here to make it fast.
-func makeCompactPrefix(p []byte) []byte {
-	return append(p[:3], append(compactSuffix, p[3:]...)...)
 }

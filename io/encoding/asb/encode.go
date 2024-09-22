@@ -262,6 +262,7 @@ func writeBinString(name, v string, w io.Writer) (int, error) {
 
 func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error) {
 	var prefix []byte
+
 	switch compact {
 	case true:
 		prefix = makeCompactPrefix(binBytesTypePrefix)
@@ -275,6 +276,7 @@ func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error
 
 func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, error) {
 	var prefix []byte
+
 	switch compact {
 	case true:
 		prefix = makeCompactPrefix(binHLLTypePrefix)
@@ -307,6 +309,7 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 
 func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
 	var prefix, v []byte
+
 	switch compact {
 	case true:
 		prefix = makeCompactPrefix(binMapTypePrefix)
@@ -321,6 +324,7 @@ func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer)
 
 func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
 	var prefix, v []byte
+
 	switch compact {
 	case true:
 		prefix = makeCompactPrefix(binListTypePrefix)

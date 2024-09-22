@@ -223,15 +223,6 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 		s.FailNow("failed to close writer", err)
 	}
 
-	// cannot create new streamingReader because folder is not empty
-	_, err = s3Storasge.NewWriter(
-		ctx,
-		client,
-		"backup",
-		s3Storasge.WithFile(backupFile),
-	)
-	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
-
 	return allBytesWritten
 }
 

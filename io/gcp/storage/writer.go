@@ -88,14 +88,16 @@ func NewWriter(
 		return nil, fmt.Errorf("failed to get bucketHandler %s attr: %w", bucketName, err)
 	}
 
-	// Check if backup dir is empty.
-	isEmpty, err := isEmptyDirectory(ctx, bucketHandler, prefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
-	}
+	if w.isDir {
+		// Check if backup dir is empty.
+		isEmpty, err := isEmptyDirectory(ctx, bucketHandler, prefix)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+		}
 
-	if !isEmpty && !w.isRemovingFiles && w.isDir {
-		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+		if !isEmpty && !w.isRemovingFiles {
+			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+		}
 	}
 
 	w.bucketHandle = bucketHandler

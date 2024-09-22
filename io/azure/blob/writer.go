@@ -96,14 +96,16 @@ func NewWriter(
 		return nil, fmt.Errorf("unable to get container properties: %w", err)
 	}
 
-	// Check if backup dir is empty.
-	isEmpty, err := isEmptyDirectory(ctx, client, containerName, prefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
-	}
+	if w.isDir {
+		// Check if backup dir is empty.
+		isEmpty, err := isEmptyDirectory(ctx, client, containerName, prefix)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+		}
 
-	if !isEmpty && !w.isRemovingFiles && w.isDir {
-		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+		if !isEmpty && !w.isRemovingFiles {
+			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+		}
 	}
 
 	w.containerName = containerName
@@ -111,7 +113,7 @@ func NewWriter(
 
 	if w.isRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
-		if err = w.RemoveFiles(ctx); err != nil {
+		if err := w.RemoveFiles(ctx); err != nil {
 			return nil, fmt.Errorf("failed to remove files from folder: %w", err)
 		}
 	}

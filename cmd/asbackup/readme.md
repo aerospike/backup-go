@@ -102,6 +102,7 @@ Backup Flags:
                                     otherwise workers run in parallel for partitions.
       --remove-artifacts            Remove existing backup file (-o) or files (-d) without performing a backup.
   -C, --compact                     Do not apply base-64 encoding to BLOBs; results in smaller backup files.
+      --no-ttl-only                 Only include records that have no ttl set (persistent records).
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -184,8 +185,6 @@ Azure Flags:
                     10,000 (default) records at 99.9999%% confidence.
 
 --estimate-samples  The number of samples to take when running a backup estimate.
-
---no-ttl-only       Only include records that have no ttl set (persistent records).
 
 --prefer-racks      <rack id 1>[,<rack id 2>[,...]]
                     A list of Aerospike Server rack IDs to prefer when reading records for a backup.

@@ -223,6 +223,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartition(
 			ToTime:   bh.config.ModBefore,
 		},
 		bh.scanLimiter,
+		bh.config.NoTTLOnly,
 	)
 }
 
@@ -242,6 +243,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 			ToTime:   bh.config.ModBefore,
 		},
 		bh.scanLimiter,
+		bh.config.NoTTLOnly,
 	)
 }
 

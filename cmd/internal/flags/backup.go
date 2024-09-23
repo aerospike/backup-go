@@ -87,6 +87,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVarP(&f.Compact, "compact", "C",
 		false,
 		"Do not apply base-64 encoding to BLOBs; results in smaller backup files.")
+	flagSet.BoolVar(&f.NoTTLOnly, "no-ttl-only",
+		false,
+		"Only include records that have no ttl set (persistent records).")
 
 	return flagSet
 }

@@ -54,6 +54,7 @@ func mapBackupConfig(
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
 	c.ParallelNodes = backupParams.ParallelNodes
 	c.Compact = backupParams.Compact
+	c.NoTTLOnly = backupParams.NoTTLOnly
 
 	sp, err := mapScanPolicy(backupParams, commonParams)
 	if err != nil {

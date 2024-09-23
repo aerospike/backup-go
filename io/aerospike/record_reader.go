@@ -38,6 +38,7 @@ type RecordReaderConfig struct {
 	namespace   string
 	setList     []string
 	binList     []string
+	noTTLOnly   bool
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -49,6 +50,7 @@ func NewRecordReaderConfig(namespace string,
 	binList []string,
 	timeBounds models.TimeBounds,
 	scanLimiter *semaphore.Weighted,
+	noTTLOnly bool,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		namespace:       namespace,
@@ -59,6 +61,7 @@ func NewRecordReaderConfig(namespace string,
 		binList:         binList,
 		timeBounds:      timeBounds,
 		scanLimiter:     scanLimiter,
+		noTTLOnly:       noTTLOnly,
 	}
 }
 
@@ -161,8 +164,7 @@ func (r *RecordReader) Close() {
 // startScan starts the scan for the RecordReader.
 func (r *RecordReader) startScan() (*recordSets, error) {
 	scanPolicy := *r.config.scanPolicy
-
-	scanPolicy.FilterExpression = timeBoundExpression(r.config.timeBounds)
+	scanPolicy.FilterExpression = getScanExpression(r.config.timeBounds, r.config.noTTLOnly)
 
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {
@@ -245,6 +247,29 @@ func (r *RecordReader) isScanStarted() bool {
 	return r.scanResult != nil
 }
 
+func getScanExpression(bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
+	expressions := make([]*a.Expression, 0)
+
+	exp := timeBoundExpression(bounds)
+	if exp != nil {
+		expressions = append(expressions, exp)
+	}
+
+	exp = noTTLExpression(noTTLOnly)
+	if exp != nil {
+		expressions = append(expressions, exp)
+	}
+
+	switch {
+	case len(expressions) > 1:
+		return a.ExpAnd(expressions...)
+	case len(expressions) == 1:
+		return expressions[0]
+	default:
+		return nil
+	}
+}
+
 func timeBoundExpression(bounds models.TimeBounds) *a.Expression {
 	if bounds.FromTime == nil && bounds.ToTime == nil {
 		return nil
@@ -262,4 +287,12 @@ func timeBoundExpression(bounds models.TimeBounds) *a.Expression {
 		a.ExpGreaterEq(a.ExpLastUpdate(), a.ExpIntVal(bounds.FromTime.UnixNano())),
 		a.ExpLess(a.ExpLastUpdate(), a.ExpIntVal(bounds.ToTime.UnixNano())),
 	)
+}
+
+func noTTLExpression(noTTLOnly bool) *a.Expression {
+	if !noTTLOnly {
+		return nil
+	}
+	// Unexpired records has TTL = -1.
+	return a.ExpEq(a.ExpTTL(), a.ExpIntVal(-1))
 }

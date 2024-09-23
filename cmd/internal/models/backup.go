@@ -29,6 +29,7 @@ type Backup struct {
 	RemoveArtifacts     bool
 	Compact             bool
 	NodeList            string
+	NoTTLOnly           bool
 }
 
 // ShouldClearTarget check if we should clean target directory.

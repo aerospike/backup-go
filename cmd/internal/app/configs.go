@@ -57,6 +57,7 @@ func mapBackupConfig(
 	c.ParallelNodes = backupParams.ParallelNodes
 	c.Compact = backupParams.Compact
 	c.NodeList = strings.Split(backupParams.NodeList, sliceSeparator)
+	c.NoTTLOnly = backupParams.NoTTLOnly
 
 	sp, err := mapScanPolicy(backupParams, commonParams)
 	if err != nil {

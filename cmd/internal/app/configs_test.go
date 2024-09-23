@@ -58,6 +58,7 @@ func TestMapBackupConfig_Success(t *testing.T) {
 		ParallelNodes:    true,
 		Compact:          true,
 		NodeList:         "node1,node2",
+		NoTTLOnly:        true,
 	}
 
 	commonModel := &models.Common{
@@ -86,6 +87,7 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	assert.Equal(t, 1000, config.RecordsPerSecond)
 	assert.Equal(t, int64(5000), config.FileLimit)
 	assert.Equal(t, "digest", config.AfterDigest)
+	assert.Equal(t, true, config.NoTTLOnly)
 
 	modBefore, _ := time.Parse("2006-01-02_15:04:05", "2023-09-01_12:00:00")
 	modAfter, _ := time.Parse("2006-01-02_15:04:05", "2023-09-02_12:00:00")

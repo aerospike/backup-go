@@ -108,6 +108,7 @@ Backup Flags:
                                     The job is parallelized by number of nodes unless --parallel is set less than nodes number.
                                     This argument is mutually exclusive to partition-list/after-digest arguments.
                                     Default: backup all nodes in the cluster
+      --no-ttl-only                 Only include records that have no ttl set (persistent records).
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -183,8 +184,6 @@ Azure Flags:
                     10,000 (default) records at 99.9999%% confidence.
 
 --estimate-samples  The number of samples to take when running a backup estimate.
-
---no-ttl-only       Only include records that have no ttl set (persistent records).
 
 --prefer-racks      <rack id 1>[,<rack id 2>[,...]]
                     A list of Aerospike Server rack IDs to prefer when reading records for a backup.

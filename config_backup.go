@@ -94,6 +94,8 @@ type BackupConfig struct {
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	// Results in smaller backup files.
 	Compact bool
+	// Only include records that have no ttl set (persistent records).
+	NoTTLOnly bool
 }
 
 // PartitionRange specifies a range of Aerospike partitions.

@@ -95,6 +95,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
 			"This argument is mutually exclusive to partition-list/after-digest arguments.\n"+
 			"Default: backup all nodes in the cluster")
+	flagSet.BoolVar(&f.NoTTLOnly, "no-ttl-only",
+		false,
+		"Only include records that have no ttl set (persistent records).")
 
 	return flagSet
 }

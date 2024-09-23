@@ -178,7 +178,8 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 	nodes := bh.aerospikeClient.GetNodes()
 	// If bh.config.NodeList is not empty we filter nodes.
 	nodes = filterNodes(bh.config.NodeList, nodes)
-	// As we can have nodes < workers, we must spread nodes only to workers.
+	// As we can have nodes < workers, we can't distribute a small number of nodes to a large number of workers.
+	// So we set workers = nodes.
 	if len(nodes) < n {
 		n = len(nodes)
 	}
@@ -189,7 +190,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
-	// As nodesGroups can be < then workers number; we iterate over groups.
+
 	for i := 0; i < n; i++ {
 		// Skip empty groups.
 		if len(nodesGroups[i]) == 0 {

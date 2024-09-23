@@ -172,7 +172,7 @@ func (c *BackupConfig) validate() error {
 
 	if c.AfterDigest != "" {
 		if c.ParallelNodes || len(c.NodeList) != 0 {
-			return fmt.Errorf("parallel by nodes/node liost and after digest at the same time not allowed")
+			return fmt.Errorf("parallel by nodes/node list and after digest at the same time not allowed")
 		}
 
 		if _, err := base64.StdEncoding.DecodeString(c.AfterDigest); err != nil {

@@ -107,7 +107,7 @@ func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {
 	return result, nil
 }
 
-// filterNodes iterates on nodes and choose only nods that are in nodesList.
+// filterNodes iterates over the nodes and selects only those nodes that are in nodesList.
 // Return slice of filtered []*a.Node.
 func filterNodes(nodesList []string, nodes []*a.Node) []*a.Node {
 	if len(nodesList) == 0 {

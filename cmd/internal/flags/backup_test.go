@@ -41,6 +41,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 		"--compact",
 		"--node-list", "node1,node2",
 		"--no-ttl-only",
+		"--prefer-racks", "1,2,3,4",
 	}
 
 	err := flagSet.Parse(args)
@@ -62,6 +63,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 	assert.Equal(t, true, result.Compact, "The compact flag should be parsed correctly")
 	assert.Equal(t, "node1,node2", result.NodeList, "The node-list flag should be parsed correctly")
 	assert.Equal(t, true, result.NoTTLOnly, "The no-ttl-only flag should be parsed correctly")
+	assert.Equal(t, "1,2,3,4", result.PreferRacks, "The prefer-racks flag should be parsed correctly")
 }
 
 func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
@@ -89,4 +91,5 @@ func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, false, result.Compact, "The default value for compact should be false")
 	assert.Equal(t, "", result.NodeList, "The default value for node-list should be empty")
 	assert.Equal(t, false, result.NoTTLOnly, "The default value for no-ttl-only should be false")
+	assert.Equal(t, "", result.PreferRacks, "The default value for prefer-racks should be false")
 }

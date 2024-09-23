@@ -36,8 +36,8 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVarP(&f.Namespace, "namespace", "n",
 		"",
 		"The namespace to be backed up. Required.")
-	flagSet.StringArrayVarP(&f.SetList, "set", "s",
-		nil,
+	flagSet.StringVarP(&f.SetList, "set", "s",
+		"",
 		"The set(s) to be backed up.\n"+
 			"If multiple sets are being backed up, filter-exp cannot be used.\n"+
 			"if empty all sets.")
@@ -45,8 +45,8 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		0,
 		"Limit total returned records per second (rps).\n"+
 			"Do not apply rps limit if records-per-second is zero.")
-	flagSet.StringArrayVarP(&f.BinList, "bin-list", "B",
-		nil,
+	flagSet.StringVarP(&f.BinList, "bin-list", "B",
+		"",
 		"Only include the given bins in the backup.\n"+
 			"If empty include all bins.")
 	flagSet.IntVarP(&f.Parallel, "parallel", "w",

@@ -29,11 +29,9 @@ func TestCommon_NewFlagSet(t *testing.T) {
 	args := []string{
 		"--directory", "/path/to/backup",
 		"--namespace", "test-namespace",
-		"--set", "set1",
-		"--set", "set2",
+		"--set", "set1,set2",
 		"--records-per-second", "5000",
-		"--bin-list", "bin1",
-		"--bin-list", "bin2",
+		"--bin-list", "bin1,bin2",
 		"--parallel", "10",
 		"--no-records",
 		"--no-indexes",
@@ -50,9 +48,9 @@ func TestCommon_NewFlagSet(t *testing.T) {
 
 	assert.Equal(t, "/path/to/backup", result.Directory, "The directory flag should be parsed correctly")
 	assert.Equal(t, "test-namespace", result.Namespace, "The namespace flag should be parsed correctly")
-	assert.Equal(t, []string{"set1", "set2"}, result.SetList, "The set list flag should be parsed correctly")
+	assert.Equal(t, "set1,set2", result.SetList, "The set list flag should be parsed correctly")
 	assert.Equal(t, 5000, result.RecordsPerSecond, "The records-per-second flag should be parsed correctly")
-	assert.Equal(t, []string{"bin1", "bin2"}, result.BinList, "The bin-list flag should be parsed correctly")
+	assert.Equal(t, "bin1,bin2", result.BinList, "The bin-list flag should be parsed correctly")
 	assert.Equal(t, 10, result.Parallel, "The parallel flag should be parsed correctly")
 	assert.True(t, result.NoRecords, "The no-records flag should be parsed correctly")
 	assert.True(t, result.NoIndexes, "The no-indexes flag should be parsed correctly")
@@ -76,9 +74,9 @@ func TestCommon_NewFlagSet_DefaultValues(t *testing.T) {
 	// Verify default values
 	assert.Equal(t, "", result.Directory, "The default value for directory should be an empty string")
 	assert.Equal(t, "", result.Namespace, "The default value for namespace should be an empty string")
-	assert.Nil(t, result.SetList, "The default value for set-list should be nil")
+	assert.Equal(t, "", result.SetList, "The default value for set-list should be nil")
 	assert.Equal(t, 0, result.RecordsPerSecond, "The default value for records-per-second should be 0")
-	assert.Nil(t, result.BinList, "The default value for bin-list should be nil")
+	assert.Equal(t, "", result.BinList, "The default value for bin-list should be nil")
 	assert.Equal(t, 1, result.Parallel, "The default value for parallel should be 1")
 	assert.False(t, result.NoRecords, "The default value for no-records should be false")
 	assert.False(t, result.NoIndexes, "The default value for no-indexes should be false")

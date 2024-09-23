@@ -87,6 +87,14 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVarP(&f.Compact, "compact", "C",
 		false,
 		"Do not apply base-64 encoding to BLOBs; results in smaller backup files.")
+	flagSet.StringVarP(&f.NodeList, "node-list", "l",
+		"",
+		"<IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]\n"+
+			"<IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]\n"+
+			"Backup the given cluster nodes only.\n"+
+			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
+			"This argument is mutually exclusive to partition-list/after-digest arguments.\n"+
+			"Default: backup all nodes in the cluster")
 	flagSet.BoolVar(&f.NoTTLOnly, "no-ttl-only",
 		false,
 		"Only include records that have no ttl set (persistent records).")

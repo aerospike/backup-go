@@ -25,6 +25,8 @@ import (
 	bModels "github.com/aerospike/backup-go/models"
 )
 
+const sliceSeparator = ","
+
 func mapBackupConfig(
 	backupParams *models.Backup,
 	commonParams *models.Common,
@@ -38,8 +40,8 @@ func mapBackupConfig(
 
 	c := backup.NewDefaultBackupConfig()
 	c.Namespace = commonParams.Namespace
-	c.SetList = commonParams.SetList
-	c.BinList = commonParams.BinList
+	c.SetList = strings.Split(commonParams.SetList, sliceSeparator)
+	c.BinList = strings.Split(commonParams.BinList, sliceSeparator)
 	c.NoRecords = commonParams.NoRecords
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
@@ -54,6 +56,7 @@ func mapBackupConfig(
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
 	c.ParallelNodes = backupParams.ParallelNodes
 	c.Compact = backupParams.Compact
+	c.NodeList = strings.Split(backupParams.NodeList, sliceSeparator)
 	c.NoTTLOnly = backupParams.NoTTLOnly
 
 	sp, err := mapScanPolicy(backupParams, commonParams)
@@ -84,10 +87,6 @@ func mapBackupConfig(
 		c.ModAfter = &modAfterTime
 	}
 
-	if len(commonParams.SetList) > 0 {
-		c.SetList = commonParams.SetList
-	}
-
 	return c, nil
 }
 
@@ -104,8 +103,8 @@ func mapRestoreConfig(
 
 	c := backup.NewDefaultRestoreConfig()
 	c.Namespace = mapRestoreNamespace(commonParams.Namespace)
-	c.SetList = commonParams.SetList
-	c.BinList = commonParams.BinList
+	c.SetList = strings.Split(commonParams.SetList, sliceSeparator)
+	c.BinList = strings.Split(commonParams.BinList, sliceSeparator)
 	c.NoRecords = commonParams.NoRecords
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
@@ -120,10 +119,6 @@ func mapRestoreConfig(
 	c.EncryptionPolicy = mapEncryptionPolicy(encryption)
 	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
 	c.RetryPolicy = mapRetryPolicy(restoreParams)
-
-	if len(commonParams.SetList) > 0 {
-		c.SetList = commonParams.SetList
-	}
 
 	return c, nil
 }

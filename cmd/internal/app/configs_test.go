@@ -55,16 +55,20 @@ func TestMapBackupConfig_Success(t *testing.T) {
 		ModifiedBefore:   "2023-09-01_12:00:00",
 		ModifiedAfter:    "2023-09-02_12:00:00",
 		FilterExpression: "k1EDpHRlc3Q=",
+		ParallelNodes:    true,
+		Compact:          true,
+		NodeList:         "node1,node2",
 	}
 
 	commonModel := &models.Common{
 		Namespace:        "test-namespace",
-		SetList:          []string{"set1", "set2"},
-		BinList:          []string{"bin1", "bin2"},
+		SetList:          "set1,set2",
+		BinList:          "bin1,bin2",
 		NoRecords:        true,
 		NoIndexes:        false,
 		RecordsPerSecond: 1000,
-		Nice:             10, // 10 MiB
+		Nice:             10,
+		Parallel:         5,
 	}
 
 	compression := testCompression()
@@ -73,10 +77,12 @@ func TestMapBackupConfig_Success(t *testing.T) {
 
 	config, err := mapBackupConfig(backupModel, commonModel, compression, encryption, secretAgent)
 	assert.NoError(t, err)
+
 	assert.Equal(t, "test-namespace", config.Namespace)
 	assert.ElementsMatch(t, []string{"set1", "set2"}, config.SetList)
 	assert.ElementsMatch(t, []string{"bin1", "bin2"}, config.BinList)
 	assert.True(t, config.NoRecords)
+	assert.False(t, config.NoIndexes)
 	assert.Equal(t, 1000, config.RecordsPerSecond)
 	assert.Equal(t, int64(5000), config.FileLimit)
 	assert.Equal(t, "digest", config.AfterDigest)
@@ -86,7 +92,6 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	assert.Equal(t, &modBefore, config.ModBefore)
 	assert.Equal(t, &modAfter, config.ModAfter)
 
-	// Compression, Encryption, and Secret Agent
 	assert.NotNil(t, config.CompressionPolicy)
 	assert.Equal(t, "ZSTD", config.CompressionPolicy.Mode)
 	assert.Equal(t, 3, config.CompressionPolicy.Level)
@@ -99,6 +104,13 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	assert.Equal(t, "localhost", *config.SecretAgentConfig.Address)
 	assert.Equal(t, "tcp", *config.SecretAgentConfig.ConnectionType)
 	assert.Equal(t, 8080, *config.SecretAgentConfig.Port)
+
+	assert.Equal(t, 5, config.ParallelWrite, "The ParallelWrite should be set correctly")
+	assert.Equal(t, 5, config.ParallelRead, "The ParallelRead should be set correctly")
+	assert.Equal(t, 10*1024*1024, config.Bandwidth, "The Bandwidth should be set to 10 MiB in bytes")
+	assert.True(t, config.ParallelNodes, "The ParallelNodes flag should be set correctly")
+	assert.True(t, config.Compact, "The Compact flag should be set correctly")
+	assert.ElementsMatch(t, []string{"node1", "node2"}, config.NodeList, "The NodeList should be set correctly")
 }
 
 func TestMapBackupConfig_MissingNamespace(t *testing.T) {
@@ -158,8 +170,8 @@ func TestMapRestoreConfig_Success(t *testing.T) {
 	restoreModel := &models.Restore{}
 	commonModel := &models.Common{
 		Namespace:        "test-namespace",
-		SetList:          []string{"set1", "set2"},
-		BinList:          []string{"bin1", "bin2"},
+		SetList:          "set1,set2",
+		BinList:          "bin1,bin2",
 		NoRecords:        true,
 		NoIndexes:        false,
 		RecordsPerSecond: 1000,

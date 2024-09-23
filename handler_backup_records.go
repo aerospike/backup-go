@@ -99,7 +99,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	readerConfig := bh.recordReaderConfigForPartition(bh.config.Partitions, &scanPolicy, bh.afterDigest)
+	readerConfig := bh.recordReaderConfigForPartitions(bh.config.Partitions, &scanPolicy, bh.afterDigest)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 	defer recordReader.Close()
@@ -131,8 +131,8 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	scanPolicy.RawCDT = true
 
 	// If we are paralleling scans by nodes.
-	if bh.config.ParallelNodes {
-		return bh.makeAerospikeReadWorkersForNode(ctx, n, &scanPolicy)
+	if bh.config.ParallelNodes || len(bh.config.NodeList) > 0 {
+		return bh.makeAerospikeReadWorkersForNodes(ctx, n, &scanPolicy)
 	}
 
 	return bh.makeAerospikeReadWorkersForPartition(ctx, n, &scanPolicy)
@@ -152,11 +152,11 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
 
 	for i := 0; i < n; i++ {
-		recordReaderConfig := bh.recordReaderConfigForPartition(partitionRanges[i], scanPolicy, nil)
+		recordReaderConfig := bh.recordReaderConfigForPartitions(partitionRanges[i], scanPolicy, nil)
 
 		// For the first partition in the list, we start from digest if it is set.
 		if bh.afterDigest != nil && i == 0 {
-			recordReaderConfig = bh.recordReaderConfigForPartition(partitionRanges[i], scanPolicy, bh.afterDigest)
+			recordReaderConfig = bh.recordReaderConfigForPartitions(partitionRanges[i], scanPolicy, bh.afterDigest)
 		}
 
 		recordReader := aerospike.NewRecordReader(
@@ -172,20 +172,31 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 	return readWorkers, nil
 }
 
-func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNode(
+func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipeline.Worker[*models.Token], error) {
 	nodes := bh.aerospikeClient.GetNodes()
+	// If bh.config.NodeList is not empty we filter nodes.
+	nodes = filterNodes(bh.config.NodeList, nodes)
+	// As we can have nodes < workers, we must spread nodes only to workers.
+	if len(nodes) < n {
+		n = len(nodes)
+	}
 
-	nodesGpoups, err := splitNodes(nodes, n)
+	nodesGroups, err := splitNodes(nodes, n)
 	if err != nil {
 		return nil, err
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
-
+	// As nodesGroups can be < then workers number; we iterate over groups.
 	for i := 0; i < n; i++ {
-		recordReaderConfig := bh.recordReaderConfigForNode(nodesGpoups[i], scanPolicy)
+		// Skip empty groups.
+		if len(nodesGroups[i]) == 0 {
+			continue
+		}
+
+		recordReaderConfig := bh.recordReaderConfigForNode(nodesGroups[i], scanPolicy)
 
 		recordReader := aerospike.NewRecordReader(
 			ctx,
@@ -200,7 +211,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNode(
 	return readWorkers, nil
 }
 
-func (bh *backupRecordsHandler) recordReaderConfigForPartition(
+func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
 	partitionRange PartitionRange,
 	scanPolicy *a.ScanPolicy,
 	// We should pass digest as parameter here, for implementing adding digest to first partition logic.

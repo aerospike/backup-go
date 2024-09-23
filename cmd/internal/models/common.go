@@ -17,8 +17,8 @@ package models
 type Common struct {
 	Directory        string
 	Namespace        string
-	SetList          []string
-	BinList          []string
+	SetList          string
+	BinList          string
 	Parallel         int
 	NoRecords        bool
 	NoIndexes        bool

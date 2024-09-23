@@ -42,6 +42,13 @@ type BackupConfig struct {
 	SecretAgentConfig *SecretAgentConfig
 	// Namespace is the Aerospike namespace to back up.
 	Namespace string
+	// NodeList contains a list of nodes to back up.
+	// <IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]
+	// <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]
+	// Backup the given cluster nodes only.
+	// If it is set, ParallelNodes automatically set to true.
+	// This argument is mutually exclusive to partition-list/AfterDigest arguments.
+	NodeList []string
 	// SetList is the Aerospike set to back up (optional, given an empty list,
 	// all sets will be backed up).
 	SetList []string
@@ -153,17 +160,21 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if c.ParallelNodes && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
+	if (c.ParallelNodes || len(c.NodeList) != 0) && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
 		return fmt.Errorf("parallel by nodes and partitions and the same time not allowed")
 	}
 
-	if !c.ParallelNodes {
+	if !c.ParallelNodes && len(c.NodeList) == 0 {
 		if err := c.Partitions.validate(); err != nil {
 			return err
 		}
 	}
 
 	if c.AfterDigest != "" {
+		if c.ParallelNodes || len(c.NodeList) != 0 {
+			return fmt.Errorf("parallel by nodes/node liost and after digest at the same time not allowed")
+		}
+
 		if _, err := base64.StdEncoding.DecodeString(c.AfterDigest); err != nil {
 			return fmt.Errorf("after digest must be base64 encoded string: %w", err)
 		}

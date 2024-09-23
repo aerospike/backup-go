@@ -28,6 +28,7 @@ type Backup struct {
 	ParallelNodes       bool
 	RemoveArtifacts     bool
 	Compact             bool
+	NodeList            string
 }
 
 // ShouldClearTarget check if we should clean target directory.

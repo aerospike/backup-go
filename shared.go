@@ -106,3 +106,38 @@ func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {
 
 	return result, nil
 }
+
+// filterNodes iterates over the nodes and selects only those nodes that are in nodesList.
+// Return slice of filtered []*a.Node.
+func filterNodes(nodesList []string, nodes []*a.Node) []*a.Node {
+	if len(nodesList) == 0 {
+		return nodes
+	}
+
+	nodesMap := make(map[string]struct{}, len(nodesList))
+	for j := range nodesList {
+		nodesMap[nodesList[j]] = struct{}{}
+	}
+
+	filteredNodes := make([]*a.Node, 0, len(nodesList))
+
+	for i := range nodes {
+		nodeStr := nodeToString(nodes[i])
+
+		_, ok := nodesMap[nodeStr]
+		if ok {
+			filteredNodes = append(filteredNodes, nodes[i])
+		}
+	}
+
+	return filteredNodes
+}
+
+func nodeToString(node *a.Node) string {
+	nodeHost := node.GetHost()
+	if nodeHost.TLSName != "" {
+		return fmt.Sprintf("%s:%s:%d", nodeHost.Name, nodeHost.TLSName, nodeHost.Port)
+	}
+
+	return fmt.Sprintf("%s:%d", nodeHost.Name, nodeHost.Port)
+}

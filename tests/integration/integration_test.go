@@ -759,6 +759,24 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 	suite.Nil(err)
 }
 
+func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
+	bCfg := backup.NewDefaultBackupConfig()
+	bCfg.Partitions = backup.PartitionRange{}
+	bCfg.NodeList = []string{fmt.Sprintf("%s:%d", suite.aerospikeIP, suite.aerospikePort)}
+
+	ctx := context.Background()
+	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	bh, err := suite.backupClient.Backup(
+		ctx,
+		bCfg,
+		&dst,
+	)
+	suite.NotNil(bh)
+	suite.Nil(err)
+	err = bh.Wait(ctx)
+	suite.Nil(err)
+}
+
 func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 	userKeys := []any{1, "string", []byte("bytes")}
 	recs := make([]*a.Record, numRec)

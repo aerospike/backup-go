@@ -50,12 +50,12 @@ Aerospike Client Flags:
 Backup Flags:
   -d, --directory string         The Directory that holds the backup files. Required, unless -o or -e is used.
   -n, --namespace string         The namespace to be backed up. Required.
-  -s, --set stringArray          The set(s) to be backed up.
+  -s, --set string               The set(s) to be backed up.
                                  If multiple sets are being backed up, filter-exp cannot be used.
                                  if empty all sets.
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
-  -B, --bin-list stringArray     Only include the given bins in the backup.
+  -B, --bin-list string          Only include the given bins in the backup.
                                  If empty include all bins.
   -w, --parallel int             Maximum number of scan calls to run in parallel.
                                  If only one partition range is given, or the entire namespace is being backed up, the range
@@ -102,6 +102,12 @@ Backup Flags:
                                     otherwise workers run in parallel for partitions.
       --remove-artifacts            Remove existing backup file (-o) or files (-d) without performing a backup.
   -C, --compact                     Do not apply base-64 encoding to BLOBs; results in smaller backup files.
+  -l, --node-list string            <IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]
+                                    <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]
+                                    Backup the given cluster nodes only.
+                                    The job is parallelized by number of nodes unless --parallel is set less than nodes number.
+                                    This argument is mutually exclusive to partition-list/after-digest arguments.
+                                    Default: backup all nodes in the cluster
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -156,13 +162,6 @@ Azure Flags:
                     exact path is where the backup file will be placed. If a directory is given, the backup
                     state will be placed in the directory with name `<namespace>.asb.state`, or
                     `<prefix>.asb.state` if `--output-file-prefix` is given.
-                    
---node-list         <IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]
-                    <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]
-                    Backup the given cluster nodes only.
-                    The job is parallelized over 16 scans unless --parallel is set to another value.
-                    This argument is mutually exclusive to partition-list/after-digest arguments.
-                    Default: backup all nodes in the cluster
 
 --partition-list    <filter[,<filter>[...]]>
                     List of partitions to back up. Partition filters can be ranges, individual partitions, or 

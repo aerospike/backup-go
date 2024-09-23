@@ -39,6 +39,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 		"--parallel-nodes",
 		"--remove-artifacts",
 		"--compact",
+		"--node-list", "node1,node2",
 	}
 
 	err := flagSet.Parse(args)
@@ -58,6 +59,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 	assert.Equal(t, true, result.ParallelNodes, "The parallel-nodes flag should be parsed correctly")
 	assert.Equal(t, true, result.RemoveArtifacts, "The remove-artifacts flag should be parsed correctly")
 	assert.Equal(t, true, result.Compact, "The compact flag should be parsed correctly")
+	assert.Equal(t, "node1,node2", result.NodeList, "The node-list flag should be parsed correctly")
 }
 
 func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
@@ -83,4 +85,5 @@ func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, false, result.ParallelNodes, "The default value for parallel-nodes should be false")
 	assert.Equal(t, false, result.RemoveArtifacts, "The default value for remove-artifacts should be false")
 	assert.Equal(t, false, result.Compact, "The default value for compact should be false")
+	assert.Equal(t, "", result.NodeList, "The default value for node-list should be empty")
 }

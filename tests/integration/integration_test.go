@@ -324,12 +324,12 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "with parallel backup",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:    backup.PartitionRangeAll(),
-					SetList:       []string{suite.set},
-					Namespace:     suite.namespace,
-					ParallelRead:  1,
-					ParallelWrite: 100,
-					EncoderType:   backup.EncoderTypeASB,
+					PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
+					SetList:          []string{suite.set},
+					Namespace:        suite.namespace,
+					ParallelRead:     1,
+					ParallelWrite:    100,
+					EncoderType:      backup.EncoderTypeASB,
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
@@ -340,13 +340,13 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 			name: "parallel with file size limit",
 			args: args{
 				backupConfig: &backup.BackupConfig{
-					Partitions:    backup.PartitionRangeAll(),
-					SetList:       []string{suite.set},
-					Namespace:     suite.namespace,
-					ParallelRead:  1,
-					ParallelWrite: 2,
-					EncoderType:   backup.EncoderTypeASB,
-					FileLimit:     3 * 1024 * 1024, // 3mb, full backup ~9mb
+					PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
+					SetList:          []string{suite.set},
+					Namespace:        suite.namespace,
+					ParallelRead:     1,
+					ParallelWrite:    2,
+					EncoderType:      backup.EncoderTypeASB,
+					FileLimit:        3 * 1024 * 1024, // 3mb, full backup ~9mb
 				},
 				restoreConfig: nonBatchRestore,
 				bins:          testBins,
@@ -526,7 +526,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	// backup half the partitions
 	startPartition := 256
 	partitionCount := 2056
-	partitions := backup.NewPartitionRange(startPartition, partitionCount)
+	partitions := []*a.PartitionFilter{backup.NewPartitionFilterByRange(startPartition, partitionCount)}
 
 	// reset the expected record count
 	numRec = 0
@@ -542,7 +542,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	ctx := context.Background()
 
 	backupConfig := backup.NewDefaultBackupConfig()
-	backupConfig.Partitions = partitions
+	backupConfig.PartitionFilters = partitions
 
 	backupDir := suite.T().TempDir()
 	writers, err := local.NewWriter(
@@ -743,7 +743,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 
 func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 	bCfg := backup.NewDefaultBackupConfig()
-	bCfg.Partitions = backup.PartitionRange{}
+	bCfg.PartitionFilters = nil
 	bCfg.ParallelNodes = true
 
 	ctx := context.Background()
@@ -761,7 +761,7 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 
 func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
 	bCfg := backup.NewDefaultBackupConfig()
-	bCfg.Partitions = backup.PartitionRange{}
+	bCfg.PartitionFilters = nil
 	bCfg.NodeList = []string{fmt.Sprintf("%s:%d", suite.aerospikeIP, suite.aerospikePort)}
 
 	ctx := context.Background()
@@ -940,13 +940,13 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 	})
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:    backup.PartitionRangeAll(),
-		SetList:       []string{suite.set},
-		Namespace:     suite.namespace,
-		ParallelRead:  1,
-		ParallelWrite: 1,
-		EncoderType:   backup.EncoderTypeASB,
-		BinList:       []string{"BackupRestore", "OnlyBackup"},
+		PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
+		SetList:          []string{suite.set},
+		Namespace:        suite.namespace,
+		ParallelRead:     1,
+		ParallelWrite:    1,
+		EncoderType:      backup.EncoderTypeASB,
+		BinList:          []string{"BackupRestore", "OnlyBackup"},
 	}
 
 	var restoreConfig = backup.NewDefaultRestoreConfig()
@@ -984,14 +984,14 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 	var expectedRecords = tests.Subtract(batch2, batch3)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:    backup.PartitionRangeAll(),
-		SetList:       []string{suite.set},
-		Namespace:     suite.namespace,
-		ParallelRead:  1,
-		ParallelWrite: 1,
-		EncoderType:   backup.EncoderTypeASB,
-		ModAfter:      &lowerLimit,
-		ModBefore:     &upperLimit,
+		PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
+		SetList:          []string{suite.set},
+		Namespace:        suite.namespace,
+		ParallelRead:     1,
+		ParallelWrite:    1,
+		EncoderType:      backup.EncoderTypeASB,
+		ModAfter:         &lowerLimit,
+		ModBefore:        &upperLimit,
 	}
 
 	var restoreConfig = backup.NewDefaultRestoreConfig()
@@ -1011,12 +1011,12 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	suite.SetupTest(records)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:    backup.PartitionRangeAll(),
-		SetList:       []string{suite.set},
-		Namespace:     suite.namespace,
-		ParallelRead:  1,
-		ParallelWrite: 1,
-		EncoderType:   backup.EncoderTypeASB,
+		PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
+		SetList:          []string{suite.set},
+		Namespace:        suite.namespace,
+		ParallelRead:     1,
+		ParallelWrite:    1,
+		EncoderType:      backup.EncoderTypeASB,
 	}
 	backupConfig.ScanPolicy = suite.Aeroclient.DefaultScanPolicy
 	backupConfig.ScanPolicy.RecordsPerSecond = rps
@@ -1041,15 +1041,16 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 	suite.SetupTest(batch)
 
 	digest := base64.StdEncoding.EncodeToString(batch[0].Key.Digest())
+	afterDigestFilter, err := backup.NewPartitionFilterAfterDigest(suite.namespace, digest)
+	suite.Nil(err)
 
 	var backupConfig = &backup.BackupConfig{
-		Partitions:    backup.PartitionRangeAll(),
-		SetList:       []string{suite.set},
-		Namespace:     suite.namespace,
-		ParallelRead:  1,
-		ParallelWrite: 1,
-		EncoderType:   backup.EncoderTypeASB,
-		AfterDigest:   digest,
+		PartitionFilters: []*a.PartitionFilter{afterDigestFilter},
+		SetList:          []string{suite.set},
+		Namespace:        suite.namespace,
+		ParallelRead:     1,
+		ParallelWrite:    1,
+		EncoderType:      backup.EncoderTypeASB,
 	}
 
 	ctx := context.Background()

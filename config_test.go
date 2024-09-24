@@ -41,10 +41,6 @@ func TestBackupConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "modified before")
 	config = NewDefaultBackupConfig()
 
-	config.Partitions = NewPartitionRange(-1, -1)
-	assert.ErrorContains(t, config.validate(), "begin must be between")
-	config = NewDefaultBackupConfig()
-
 	config.RecordsPerSecond = -1
 	assert.ErrorContains(t, config.validate(), "rps")
 	config = NewDefaultBackupConfig()
@@ -59,16 +55,6 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.FileLimit = -1
 	assert.ErrorContains(t, config.validate(), "filelimit")
-	config = NewDefaultBackupConfig()
-
-	config.AfterDigest = "te/&st"
-	assert.ErrorContains(t, config.validate(), "after digest")
-	config = NewDefaultBackupConfig()
-
-	config.AfterDigest = "EjRWeJq83vEjRRI0VniavN7xI0U="
-	config.Partitions.Begin = 2
-	config.Partitions.Count = 10
-	assert.ErrorContains(t, config.validate(), "after digest")
 	config = NewDefaultBackupConfig()
 
 	config.CompressionPolicy = &CompressionPolicy{Level: -1}

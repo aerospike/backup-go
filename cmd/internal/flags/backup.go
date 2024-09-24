@@ -98,6 +98,20 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVar(&f.NoTTLOnly, "no-ttl-only",
 		false,
 		"Only include records that have no ttl set (persistent records).")
+	flagSet.StringVarP(&f.PartitionList, "partition-list", "X",
+		"",
+		"List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,\n"+
+			"individual partitions, or records after a specific digest within a single partition.\n"+
+			"This argument is mutually exclusive to after-digest.\n"+
+			"Note: each partition filter is an individual task which cannot be parallelized, so you can only\n"+
+			"achieve as much parallelism as there are partition filters. You may increase parallelism by dividing up\n"+
+			"partition ranges manually.\n"+
+			"Filter: <begin partition>[-<partition count>]|<digest>\n"+
+			"begin partition: 0-4095\n"+
+			"partition count: 1-4096 Default: 1\n"+
+			"digest: base64 encoded string\n"+
+			"Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=\n"+
+			"Default: 0-4096 (all partitions)\n")
 
 	return flagSet
 }

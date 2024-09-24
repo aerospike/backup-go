@@ -86,7 +86,6 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	assert.False(t, config.NoIndexes)
 	assert.Equal(t, 1000, config.RecordsPerSecond)
 	assert.Equal(t, int64(5000), config.FileLimit)
-	assert.Equal(t, "digest", config.AfterDigest)
 	assert.Equal(t, true, config.NoTTLOnly)
 
 	modBefore, _ := time.Parse("2006-01-02_15:04:05", "2023-09-01_12:00:00")

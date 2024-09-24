@@ -16,6 +16,8 @@ package app
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,7 +48,6 @@ func mapBackupConfig(
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
 	c.FileLimit = backupParams.FileLimit
-	c.AfterDigest = backupParams.AfterDigest
 	// The original backup tools have a single parallelism configuration property.
 	// We may consider splitting the configuration in the future.
 	c.ParallelWrite = commonParams.Parallel
@@ -58,6 +59,13 @@ func mapBackupConfig(
 	c.Compact = backupParams.Compact
 	c.NodeList = strings.Split(backupParams.NodeList, sliceSeparator)
 	c.NoTTLOnly = backupParams.NoTTLOnly
+
+	pf, err := mapPartitionFilter(backupParams, commonParams)
+	if err != nil {
+		return nil, err
+	}
+
+	c.PartitionFilters = pf
 
 	sp, err := mapScanPolicy(backupParams, commonParams)
 	if err != nil {
@@ -274,4 +282,89 @@ func mapRetryPolicy(r *models.Restore) *bModels.RetryPolicy {
 		Multiplier:  r.RetryMultiplier,
 		MaxRetries:  r.RetryMaxRetries,
 	}
+}
+
+func mapPartitionFilter(b *models.Backup, c *models.Common) ([]*aerospike.PartitionFilter, error) {
+	switch {
+	case b.AfterDigest != "":
+		afterDigestFilter, err := backup.NewPartitionFilterAfterDigest(c.Namespace, b.AfterDigest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse after digest filter: %w", err)
+		}
+
+		return []*aerospike.PartitionFilter{afterDigestFilter}, nil
+	case b.PartitionList != "":
+		filterSlice := strings.Split(b.PartitionList, sliceSeparator)
+		partitionFilters := make([]*aerospike.PartitionFilter, 0, len(filterSlice))
+
+		for i := range filterSlice {
+			partitionFilter, err := parsePartitionFilter(c.Namespace, filterSlice[i])
+			if err != nil {
+				return nil, err
+			}
+
+			partitionFilters = append(partitionFilters, partitionFilter)
+		}
+
+		return partitionFilters, nil
+	default:
+		return []*aerospike.PartitionFilter{backup.NewPartitionFilterAll()}, nil
+	}
+}
+
+// parsePartitionFilter check inputs from --partition-list with regexp.
+// Parse values and returns *aerospike.PartitionFilter or error
+func parsePartitionFilter(namespace, filter string) (*aerospike.PartitionFilter, error) {
+	// Range 0-4096
+	//nolint:lll // The regexp is long.
+	exp := regexp.MustCompile(`^([0-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-5])\-([1-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-6])$`)
+	if exp.MatchString(filter) {
+		return parsePartitionFilterByRange(filter)
+	}
+
+	// Id 1456
+	exp = regexp.MustCompile(`^\d+$`)
+	if exp.MatchString(filter) {
+		return parsePartitionFilterByID(filter)
+	}
+
+	// Digest (base64 string)
+	exp = regexp.MustCompile(`^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`)
+	if exp.MatchString(filter) {
+		return parsePartitionFilterByDigest(namespace, filter)
+	}
+
+	return nil, fmt.Errorf("failed to parse partition filter: %s", filter)
+}
+
+func parsePartitionFilterByRange(filter string) (*aerospike.PartitionFilter, error) {
+	bounds := strings.Split(filter, "-")
+	if len(bounds) != 2 {
+		return nil, fmt.Errorf("invalid partition filter: %s", filter)
+	}
+
+	begin, err := strconv.Atoi(bounds[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid partition filter %s begin value:%w", filter, err)
+	}
+
+	count, err := strconv.Atoi(bounds[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid partition filter %s count value:%w", filter, err)
+	}
+
+	return backup.NewPartitionFilterByRange(begin, count), nil
+}
+
+func parsePartitionFilterByID(filter string) (*aerospike.PartitionFilter, error) {
+	id, err := strconv.Atoi(filter)
+	if err != nil {
+		return nil, fmt.Errorf("invalid partition filter %s id value:%w", filter, err)
+	}
+
+	return backup.NewPartitionFilterByID(id), nil
+}
+
+func parsePartitionFilterByDigest(namespace, filter string) (*aerospike.PartitionFilter, error) {
+	return backup.NewPartitionFilterByDigest(namespace, filter)
 }

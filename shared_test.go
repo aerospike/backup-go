@@ -17,6 +17,8 @@ package backup
 import (
 	"reflect"
 	"testing"
+
+	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
 func Test_splitPartitions(t *testing.T) {
@@ -27,7 +29,7 @@ func Test_splitPartitions(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		want    []PartitionRange
+		want    []*a.PartitionFilter
 		args    args
 		wantErr bool
 	}{
@@ -38,7 +40,7 @@ func Test_splitPartitions(t *testing.T) {
 				numPartitions:  10,
 				numWorkers:     2,
 			},
-			want: []PartitionRange{
+			want: []*a.PartitionFilter{
 				{
 					Begin: 0,
 					Count: 5,
@@ -56,7 +58,7 @@ func Test_splitPartitions(t *testing.T) {
 				numPartitions:  10,
 				numWorkers:     2,
 			},
-			want: []PartitionRange{
+			want: []*a.PartitionFilter{
 				{
 					Begin: 5,
 					Count: 5,
@@ -74,7 +76,7 @@ func Test_splitPartitions(t *testing.T) {
 				numPartitions:  20,
 				numWorkers:     3,
 			},
-			want: []PartitionRange{
+			want: []*a.PartitionFilter{
 				{
 					Begin: 5,
 					Count: 6,
@@ -96,7 +98,7 @@ func Test_splitPartitions(t *testing.T) {
 				numPartitions:  4096,
 				numWorkers:     4,
 			},
-			want: []PartitionRange{
+			want: []*a.PartitionFilter{
 				{
 					Begin: 0,
 					Count: 1024,
@@ -122,7 +124,7 @@ func Test_splitPartitions(t *testing.T) {
 				numPartitions:  4096,
 				numWorkers:     1,
 			},
-			want: []PartitionRange{
+			want: []*a.PartitionFilter{
 				{
 					Begin: 0,
 					Count: 4096,
@@ -168,7 +170,8 @@ func Test_splitPartitions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := splitPartitions(tt.args.startPartition, tt.args.numPartitions, tt.args.numWorkers)
+			partitionFilters := []*a.PartitionFilter{NewPartitionFilterByRange(tt.args.startPartition, tt.args.numPartitions)}
+			got, err := splitPartitions(partitionFilters, tt.args.numWorkers)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("splitPartitions() error = %v, wantErr %v", err, tt.wantErr)
 				return

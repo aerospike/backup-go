@@ -38,8 +38,8 @@ func mapBackupConfig(
 
 	c := backup.NewDefaultBackupConfig()
 	c.Namespace = commonParams.Namespace
-	c.SetList = stringSplit(commonParams.SetList)
-	c.BinList = stringSplit(commonParams.BinList)
+	c.SetList = splitByComma(commonParams.SetList)
+	c.BinList = splitByComma(commonParams.BinList)
 	c.NoRecords = commonParams.NoRecords
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
@@ -59,7 +59,7 @@ func mapBackupConfig(
 	if backupParams.ParallelNodes || backupParams.NodeList != "" {
 		c.Partitions = backup.PartitionRange{}
 		c.ParallelNodes = backupParams.ParallelNodes
-		c.NodeList = stringSplit(backupParams.NodeList)
+		c.NodeList = splitByComma(backupParams.NodeList)
 	}
 
 	sp, err := mapScanPolicy(backupParams, commonParams)
@@ -106,8 +106,8 @@ func mapRestoreConfig(
 
 	c := backup.NewDefaultRestoreConfig()
 	c.Namespace = mapRestoreNamespace(commonParams.Namespace)
-	c.SetList = stringSplit(commonParams.SetList)
-	c.BinList = stringSplit(commonParams.BinList)
+	c.SetList = splitByComma(commonParams.SetList)
+	c.BinList = splitByComma(commonParams.BinList)
 	c.NoRecords = commonParams.NoRecords
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
@@ -127,7 +127,7 @@ func mapRestoreConfig(
 }
 
 func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
-	nsArr := stringSplit(n)
+	nsArr := splitByComma(n)
 
 	var source, destination string
 
@@ -283,7 +283,7 @@ func mapRetryPolicy(r *models.Restore) *bModels.RetryPolicy {
 	}
 }
 
-func stringSplit(s string) []string {
+func splitByComma(s string) []string {
 	if s == "" {
 		return nil
 	}

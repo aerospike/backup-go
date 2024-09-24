@@ -150,8 +150,8 @@ func toHosts(htpSlice client.HostTLSPortSlice) []*aerospike.Host {
 }
 
 func parseRacks(racks string) ([]int, error) {
-	racksStringSlice := stringSplit(racks)
-	racksIntSlice := make([]int, len(racksStringSlice))
+	racksStringSlice := splitByComma(racks)
+	racksIntSlice := make([]int, 0, len(racksStringSlice))
 
 	for i := range racksStringSlice {
 		rackID, err := strconv.Atoi(racksStringSlice[i])

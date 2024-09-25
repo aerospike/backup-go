@@ -48,7 +48,7 @@ func validateStorages(
 	return nil
 }
 
-func validateBackupConfig(cfg *models.Backup) error {
+func validateBackupParams(cfg *models.Backup) error {
 	if cfg.AfterDigest != "" && cfg.PartitionList != "" {
 		return fmt.Errorf("only one of after-digest or partition-list can be configured")
 	}

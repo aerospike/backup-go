@@ -51,7 +51,7 @@ func NewASBackup(
 		return nil, err
 	}
 
-	if err := validateBackupConfig(backupParams); err != nil {
+	if err := validateBackupParams(backupParams); err != nil {
 		return nil, err
 	}
 

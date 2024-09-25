@@ -145,9 +145,6 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 		n = len(bh.config.PartitionFilters)
 	}
 
-	fmt.Println("bh.config.PartitionFilters=", bh.config.PartitionFilters)
-	fmt.Println("n=", n)
-
 	partitionGroups, err := splitPartitions(bh.config.PartitionFilters, n)
 	if err != nil {
 		return nil, err

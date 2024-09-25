@@ -136,9 +136,13 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipeline.Worker[*models.Token], error) {
 	// If we have multiply partition filters, we shrink workers to number of filters.
-	if len(bh.config.PartitionFilters) > 1 {
+	// Or after digest filter.
+	if len(bh.config.PartitionFilters) > 1 || bh.config.isAfterDigest() {
 		n = len(bh.config.PartitionFilters)
 	}
+
+	fmt.Println("bh.config.PartitionFilters=", bh.config.PartitionFilters)
+	fmt.Println("n=", n)
 
 	partitionGroups, err := splitPartitions(bh.config.PartitionFilters, n)
 	if err != nil {

@@ -66,8 +66,6 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 		return nil, fmt.Errorf("numWorkers is less than 1, cannot split partitionFilters")
 	}
 
-	result := make([]*a.PartitionFilter, numWorkers)
-
 	// Validations.
 	for i := range partitionFilters {
 		if partitionFilters[i].Begin < 0 {
@@ -85,12 +83,14 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	}
 
 	// If we have one partition filter with range.
-	// TODO: check if byDigest works here.
-	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 {
+	result := make([]*a.PartitionFilter, numWorkers)
+
+	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 && partitionFilters[0].Digest == nil {
 		for j := 0; j < numWorkers; j++ {
-			result[j].Begin = (j * partitionFilters[j].Count) / numWorkers
-			result[j].Count = (((j + 1) * partitionFilters[j].Count) / numWorkers) - result[j].Begin
-			result[j].Begin += partitionFilters[j].Begin
+			result[j] = &a.PartitionFilter{}
+			result[j].Begin = (j * partitionFilters[0].Count) / numWorkers
+			result[j].Count = (((j + 1) * partitionFilters[0].Count) / numWorkers) - result[j].Begin
+			result[j].Begin += partitionFilters[0].Begin
 		}
 
 		return result, nil

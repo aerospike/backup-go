@@ -193,7 +193,7 @@ func (c *BackupConfig) validate() error {
 			return fmt.Errorf("parallel by nodes/node list and after digest at the same time not allowed")
 		}
 
-		if len(c.PartitionFilters) > 0 {
+		if len(c.PartitionFilters) > 1 {
 			return fmt.Errorf("after digest is set, begin partiotion can't be set")
 		}
 	}

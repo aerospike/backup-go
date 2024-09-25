@@ -98,6 +98,10 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVar(&f.NoTTLOnly, "no-ttl-only",
 		false,
 		"Only include records that have no ttl set (persistent records).")
+	flagSet.StringVar(&f.PreferRacks, "prefer-racks",
+		"",
+		"<rack id 1>[,<rack id 2>[,...]]\n"+
+			"A list of Aerospike Server rack IDs to prefer when reading records for a backup.")
 	flagSet.StringVarP(&f.PartitionList, "partition-list", "X",
 		"",
 		"List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,\n"+

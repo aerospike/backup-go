@@ -17,6 +17,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -29,7 +30,9 @@ import (
 	"google.golang.org/api/option"
 )
 
-func newAerospikeClient(cfg *client.AerospikeConfig) (*aerospike.Client, error) {
+const maxRack = 1000000
+
+func newAerospikeClient(cfg *client.AerospikeConfig, racks string) (*aerospike.Client, error) {
 	if len(cfg.Seeds) < 1 {
 		return nil, fmt.Errorf("at least one seed must be provided")
 	}
@@ -37,6 +40,16 @@ func newAerospikeClient(cfg *client.AerospikeConfig) (*aerospike.Client, error) 
 	p, err := cfg.NewClientPolicy()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aerospike client policy: %w", err)
+	}
+
+	if racks != "" {
+		racksIDs, err := parseRacks(racks)
+		if err != nil {
+			return nil, err
+		}
+
+		p.RackIds = racksIDs
+		p.RackAware = true
 	}
 
 	asClient, err := aerospike.NewClientWithPolicyAndHost(p, toHosts(cfg.Seeds)...)
@@ -134,4 +147,28 @@ func toHosts(htpSlice client.HostTLSPortSlice) []*aerospike.Host {
 	}
 
 	return hosts
+}
+
+func parseRacks(racks string) ([]int, error) {
+	racksStringSlice := splitByComma(racks)
+	racksIntSlice := make([]int, 0, len(racksStringSlice))
+
+	for i := range racksStringSlice {
+		rackID, err := strconv.Atoi(racksStringSlice[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse racks: %w", err)
+		}
+
+		if rackID < 0 {
+			return nil, fmt.Errorf("rack id %d invalid, should be positive number", rackID)
+		}
+
+		if rackID > maxRack {
+			return nil, fmt.Errorf("rack id %d invalid, should not exceed %d", rackID, maxRack)
+		}
+
+		racksIntSlice = append(racksIntSlice, rackID)
+	}
+
+	return racksIntSlice, nil
 }

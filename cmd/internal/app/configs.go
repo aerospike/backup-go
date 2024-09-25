@@ -25,8 +25,6 @@ import (
 	bModels "github.com/aerospike/backup-go/models"
 )
 
-const sliceSeparator = ","
-
 func mapBackupConfig(
 	backupParams *models.Backup,
 	commonParams *models.Common,
@@ -40,8 +38,8 @@ func mapBackupConfig(
 
 	c := backup.NewDefaultBackupConfig()
 	c.Namespace = commonParams.Namespace
-	c.SetList = strings.Split(commonParams.SetList, sliceSeparator)
-	c.BinList = strings.Split(commonParams.BinList, sliceSeparator)
+	c.SetList = splitByComma(commonParams.SetList)
+	c.BinList = splitByComma(commonParams.BinList)
 	c.NoRecords = commonParams.NoRecords
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
@@ -54,10 +52,15 @@ func mapBackupConfig(
 	// As we set --nice in MiB we must convert it to bytes
 	// TODO: make Bandwidth int64 to avoid overflow.
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
-	c.ParallelNodes = backupParams.ParallelNodes
 	c.Compact = backupParams.Compact
-	c.NodeList = strings.Split(backupParams.NodeList, sliceSeparator)
 	c.NoTTLOnly = backupParams.NoTTLOnly
+
+	// Overwrite partitions if we use nodes.
+	if backupParams.ParallelNodes || backupParams.NodeList != "" {
+		c.Partitions = backup.PartitionRange{}
+		c.ParallelNodes = backupParams.ParallelNodes
+		c.NodeList = splitByComma(backupParams.NodeList)
+	}
 
 	sp, err := mapScanPolicy(backupParams, commonParams)
 	if err != nil {
@@ -103,8 +106,8 @@ func mapRestoreConfig(
 
 	c := backup.NewDefaultRestoreConfig()
 	c.Namespace = mapRestoreNamespace(commonParams.Namespace)
-	c.SetList = strings.Split(commonParams.SetList, sliceSeparator)
-	c.BinList = strings.Split(commonParams.BinList, sliceSeparator)
+	c.SetList = splitByComma(commonParams.SetList)
+	c.BinList = splitByComma(commonParams.BinList)
 	c.NoRecords = commonParams.NoRecords
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
@@ -124,7 +127,7 @@ func mapRestoreConfig(
 }
 
 func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
-	nsArr := strings.Split(n, ",")
+	nsArr := splitByComma(n)
 
 	var source, destination string
 
@@ -216,6 +219,10 @@ func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, e
 	p.SleepBetweenRetries = time.Duration(b.SleepBetweenRetries) * time.Millisecond
 	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
 	p.SocketTimeout = time.Duration(c.SocketTimeout) * time.Millisecond
+	// If we selected racks we must set replica policy to aerospike.PREFER_RACK
+	if b.PreferRacks != "" {
+		p.ReplicaPolicy = aerospike.PREFER_RACK
+	}
 
 	if b.NoBins {
 		p.IncludeBinData = false
@@ -274,4 +281,12 @@ func mapRetryPolicy(r *models.Restore) *bModels.RetryPolicy {
 		Multiplier:  r.RetryMultiplier,
 		MaxRetries:  r.RetryMaxRetries,
 	}
+}
+
+func splitByComma(s string) []string {
+	if s == "" {
+		return nil
+	}
+
+	return strings.Split(s, ",")
 }

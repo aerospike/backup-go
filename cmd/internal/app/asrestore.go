@@ -56,7 +56,7 @@ func NewASRestore(
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
 
-	aerospikeClient, err := newAerospikeClient(clientConfig)
+	aerospikeClient, err := newAerospikeClient(clientConfig, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}

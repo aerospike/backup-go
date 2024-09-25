@@ -106,8 +106,7 @@ type BackupConfig struct {
 	NoTTLOnly bool
 }
 
-// NewPartitionFilterByRange returns a partition range with boundaries specified by the
-// provided values.
+// NewPartitionFilterByRange returns a partition range with boundaries specified by the provided values.
 func NewPartitionFilterByRange(begin, count int) *a.PartitionFilter {
 	return a.NewPartitionFilterByRange(begin, count)
 }

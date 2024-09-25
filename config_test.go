@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,6 +47,7 @@ func TestBackupConfig_validate(t *testing.T) {
 	config = NewDefaultBackupConfig()
 
 	config.ParallelNodes = true
+	config.PartitionFilters = []*a.PartitionFilter{NewPartitionFilterByID(1)}
 	assert.ErrorContains(t, config.validate(), "parallel by nodes and partitions")
 	config = NewDefaultBackupConfig()
 

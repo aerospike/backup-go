@@ -775,6 +775,34 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
 	suite.Nil(err)
 }
 
+func (suite *backupRestoreTestSuite) TestBackupPartitionList() {
+	batch := genRecords(suite.namespace, suite.set, 900, testBins)
+	suite.SetupTest(batch)
+
+	digest := base64.StdEncoding.EncodeToString(batch[0].Key.Digest())
+	digestFilter, err := backup.NewPartitionFilterByDigest(suite.namespace, digest)
+	suite.Nil(err)
+
+	bCfg := backup.NewDefaultBackupConfig()
+	bCfg.PartitionFilters = []*a.PartitionFilter{
+		backup.NewPartitionFilterByID(1),
+		backup.NewPartitionFilterByRange(2, 3),
+		digestFilter,
+	}
+
+	ctx := context.Background()
+	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
+	bh, err := suite.backupClient.Backup(
+		ctx,
+		bCfg,
+		&dst,
+	)
+	suite.NotNil(bh)
+	suite.Nil(err)
+	err = bh.Wait(ctx)
+	suite.Nil(err)
+}
+
 func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 	userKeys := []any{1, "string", []byte("bytes")}
 	recs := make([]*a.Record, numRec)

@@ -161,14 +161,17 @@ func NewDefaultBackupConfig() *BackupConfig {
 	}
 }
 
-// isAfterDigest checks if afterDigest filter is set.
-func (c *BackupConfig) isAfterDigest() bool {
-	return len(c.PartitionFilters) == 1 && c.PartitionFilters[0].Digest != nil && c.PartitionFilters[0].Count > 1
+// idDefaultPartitionFilter checks if default filter is set.
+func (c *BackupConfig) idDefaultPartitionFilter() bool {
+	return len(c.PartitionFilters) == 1 &&
+		c.PartitionFilters[0].Begin == 0 &&
+		c.PartitionFilters[0].Count == MaxPartitions &&
+		c.PartitionFilters[0].Digest == nil
 }
 
 func (c *BackupConfig) isFullBackup() bool {
 	// full backup doesn't have lower bound
-	return c.ModAfter == nil && !c.isAfterDigest()
+	return c.ModAfter == nil && c.idDefaultPartitionFilter()
 }
 
 func (c *BackupConfig) validate() error {
@@ -188,7 +191,7 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("parallel by nodes and partitions and the same time not allowed")
 	}
 
-	if c.isAfterDigest() {
+	if !c.idDefaultPartitionFilter() {
 		if c.ParallelNodes || len(c.NodeList) != 0 {
 			return fmt.Errorf("parallel by nodes/node list and after digest at the same time not allowed")
 		}

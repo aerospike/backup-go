@@ -83,9 +83,8 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	}
 
 	// If we have one partition filter with range.
-	result := make([]*a.PartitionFilter, numWorkers)
-
 	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 && partitionFilters[0].Digest == nil {
+		result := make([]*a.PartitionFilter, numWorkers)
 		for j := 0; j < numWorkers; j++ {
 			result[j] = &a.PartitionFilter{}
 			result[j].Begin = (j * partitionFilters[0].Count) / numWorkers

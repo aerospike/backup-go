@@ -94,7 +94,11 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 	var count uint64
 
 	for i := range bh.config.PartitionFilters {
-		readerConfig := bh.recordReaderConfigForPartitions(bh.config.PartitionFilters[i], &scanPolicy)
+		// We should copy *bh.config.PartitionFilters[i] value, to avoid getting zero results from other scans.
+		// As after filter is applied for any scan it set .Done = true, after that no records will be returned
+		// with this filter.
+		pf := *bh.config.PartitionFilters[i]
+		readerConfig := bh.recordReaderConfigForPartitions(&pf, &scanPolicy)
 		recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 		for {
@@ -137,7 +141,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 ) ([]pipeline.Worker[*models.Token], error) {
 	// If we have multiply partition filters, we shrink workers to number of filters.
 	// Or after digest filter.
-	if len(bh.config.PartitionFilters) > 1 || bh.config.isAfterDigest() {
+	if !bh.config.idDefaultPartitionFilter() {
 		n = len(bh.config.PartitionFilters)
 	}
 

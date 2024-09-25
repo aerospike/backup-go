@@ -118,7 +118,7 @@ func NewPartitionFilterByID(partitionID int) *a.PartitionFilter {
 
 // NewPartitionFilterByDigest returns a partition filter by digest with specified value.
 func NewPartitionFilterByDigest(namespace, digest string) (*a.PartitionFilter, error) {
-	key, err := getAsKeyByDigest(namespace, digest)
+	key, err := newKeyByDigest(namespace, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func NewPartitionFilterByDigest(namespace, digest string) (*a.PartitionFilter, e
 
 // NewPartitionFilterAfterDigest returns partition filter to scan call records after digest.
 func NewPartitionFilterAfterDigest(namespace, digest string) (*a.PartitionFilter, error) {
-	key, err := getAsKeyByDigest(namespace, digest)
+	key, err := newKeyByDigest(namespace, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +158,10 @@ func NewDefaultBackupConfig() *BackupConfig {
 		Namespace:        "test",
 		EncoderType:      EncoderTypeASB,
 	}
+}
+
+func (c *BackupConfig) isParalleledByNodes() bool {
+	return c.ParallelNodes || len(c.NodeList) > 0
 }
 
 // isDefaultPartitionFilter checks if default filter is set.
@@ -191,7 +195,7 @@ func (c *BackupConfig) validate() error {
 	}
 
 	if !c.isDefaultPartitionFilter() {
-		if c.ParallelNodes || len(c.NodeList) != 0 {
+		if c.isParalleledByNodes() {
 			return fmt.Errorf("parallel by nodes/node list and after digest/partition filter at the same time not allowed")
 		}
 	}

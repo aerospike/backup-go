@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -91,6 +92,15 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
+	if bh.config.isParalleledByNodes() {
+		return bh.countRecordsUsingScanByNodes(ctx, &scanPolicy)
+	}
+
+	return bh.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
+}
+
+func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Context, scanPolicy *a.ScanPolicy,
+) (uint64, error) {
 	var count uint64
 
 	for i := range bh.config.PartitionFilters {
@@ -98,12 +108,12 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 		// As after filter is applied for any scan it set .Done = true, after that no records will be returned
 		// with this filter.
 		pf := *bh.config.PartitionFilters[i]
-		readerConfig := bh.recordReaderConfigForPartitions(&pf, &scanPolicy)
+		readerConfig := bh.recordReaderConfigForPartitions(&pf, scanPolicy)
 		recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 		for {
 			if _, err := recordReader.Read(); err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 
@@ -119,6 +129,33 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 	return count, nil
 }
 
+func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context, scanPolicy *a.ScanPolicy,
+) (uint64, error) {
+	nodes := bh.aerospikeClient.GetNodes()
+	nodes = filterNodes(bh.config.NodeList, nodes)
+
+	var count uint64
+
+	readerConfig := bh.recordReaderConfigForNode(nodes, scanPolicy)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+
+	for {
+		if _, err := recordReader.Read(); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return 0, fmt.Errorf("error during records counting: %w", err)
+		}
+
+		count++
+	}
+
+	recordReader.Close()
+
+	return count, nil
+}
+
 func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	ctx context.Context, n int,
 ) ([]pipeline.Worker[*models.Token], error) {
@@ -129,7 +166,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	scanPolicy.RawCDT = true
 
 	// If we are paralleling scans by nodes.
-	if bh.config.ParallelNodes || len(bh.config.NodeList) > 0 {
+	if bh.config.isParalleledByNodes() {
 		return bh.makeAerospikeReadWorkersForNodes(ctx, n, &scanPolicy)
 	}
 

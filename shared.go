@@ -153,7 +153,7 @@ func nodeToString(node *a.Node) string {
 	return fmt.Sprintf("%s:%d", nodeHost.Name, nodeHost.Port)
 }
 
-func getAsKeyByDigest(namespace, digest string) (*a.Key, error) {
+func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 	digestBytes, err := base64.StdEncoding.DecodeString(digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode after-digest: %w", err)

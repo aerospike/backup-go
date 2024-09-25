@@ -138,6 +138,15 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 
 		return nil
 	}
+
+	if w.withNestedDir {
+		if err = os.RemoveAll(w.path); err != nil {
+			return fmt.Errorf("failed to remove path %s: %w", w.path, err)
+		}
+
+		return nil
+	}
+
 	// If it is a dir.
 	files, err := os.ReadDir(w.path)
 	if err != nil {
@@ -147,7 +156,7 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 	for _, file := range files {
 		filePath := filepath.Join(w.path, file.Name())
 		// Skip folders.
-		if file.IsDir() && !w.withNestedDir {
+		if file.IsDir() {
 			continue
 		}
 		// If validator is set, remove only valid files.

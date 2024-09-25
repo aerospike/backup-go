@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,7 +53,7 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
 		FileLimit:        5000,
-		AfterDigest:      "digest",
+		AfterDigest:      "AvDsV2KuSZHZugDBftnLxGpR+88=",
 		ModifiedBefore:   "2023-09-01_12:00:00",
 		ModifiedAfter:    "2023-09-02_12:00:00",
 		FilterExpression: "k1EDpHRlc3Q=",
@@ -331,4 +333,116 @@ func TestMapRestoreNamespace_InvalidNamespace(t *testing.T) {
 	ns := "source-ns,destination-ns,extra-ns"
 	result := mapRestoreNamespace(ns)
 	assert.Nil(t, result, "Result should be nil for invalid input")
+}
+
+func TestMapPartitionFilter_AfterDigest(t *testing.T) {
+	t.Parallel()
+	backupModel := &models.Backup{
+		AfterDigest: "AvDsV2KuSZHZugDBftnLxGpR+88=",
+	}
+
+	commonModel := &models.Common{
+		Namespace: "test-namespace",
+	}
+
+	filters, err := mapPartitionFilter(backupModel, commonModel)
+	assert.NoError(t, err)
+	assert.NotNil(t, filters)
+	assert.Equal(t, 1, len(filters))
+	assert.IsType(t, &aerospike.PartitionFilter{}, filters[0])
+}
+
+func TestMapPartitionFilter_PartitionList(t *testing.T) {
+	t.Parallel()
+	backupModel := &models.Backup{
+		PartitionList: "0-1024",
+	}
+
+	commonModel := &models.Common{
+		Namespace: "test-namespace",
+	}
+
+	filters, err := mapPartitionFilter(backupModel, commonModel)
+	assert.NoError(t, err)
+	assert.NotNil(t, filters)
+	assert.Equal(t, 1, len(filters))
+	assert.IsType(t, &aerospike.PartitionFilter{}, filters[0])
+}
+
+func TestMapPartitionFilter_NoFilters(t *testing.T) {
+	t.Parallel()
+	backupModel := &models.Backup{}
+
+	commonModel := &models.Common{
+		Namespace: "test-namespace",
+	}
+
+	filters, err := mapPartitionFilter(backupModel, commonModel)
+	assert.NoError(t, err)
+	assert.NotNil(t, filters)
+	assert.Equal(t, 1, len(filters))
+	assert.Equal(t, backup.NewPartitionFilterAll(), filters[0])
+}
+
+func TestParsePartitionFilterByRange_Valid(t *testing.T) {
+	t.Parallel()
+	filter := "100-200"
+	parsedFilter, err := parsePartitionFilterByRange(filter)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedFilter)
+}
+
+func TestParsePartitionFilterByRange_InvalidRange(t *testing.T) {
+	t.Parallel()
+	filter := "invalid-range"
+	parsedFilter, err := parsePartitionFilterByRange(filter)
+	assert.Error(t, err)
+	assert.Nil(t, parsedFilter)
+	assert.Contains(t, err.Error(), "invalid partition filter")
+}
+
+func TestParsePartitionFilterByID_Valid(t *testing.T) {
+	t.Parallel()
+	filter := "1234"
+	parsedFilter, err := parsePartitionFilterByID(filter)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedFilter)
+}
+
+func TestParsePartitionFilterByID_InvalidID(t *testing.T) {
+	t.Parallel()
+	filter := "invalid-id"
+	parsedFilter, err := parsePartitionFilterByID(filter)
+	assert.Error(t, err)
+	assert.Nil(t, parsedFilter)
+	assert.Contains(t, err.Error(), "invalid partition filter")
+}
+
+func TestParsePartitionFilterByDigest_Valid(t *testing.T) {
+	t.Parallel()
+	namespace := "test-namespace"
+	filter := "EjRWeJq83vEjRRI0VniavN7xI0U=" // Base64-encoded digest
+	parsedFilter, err := parsePartitionFilterByDigest(namespace, filter)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedFilter)
+}
+
+func TestParsePartitionFilterByDigest_InvalidDigest(t *testing.T) {
+	t.Parallel()
+	namespace := "test-namespace"
+	filter := "invalid-digest"
+	parsedFilter, err := parsePartitionFilterByDigest(namespace, filter)
+	assert.Error(t, err)
+	assert.Nil(t, parsedFilter)
+	assert.Contains(t, err.Error(), "failed to decode after-digest")
+}
+
+func TestParsePartitionFilter_InvalidFilter(t *testing.T) {
+	t.Parallel()
+	namespace := "test-namespace"
+	filter := "invalid-filter"
+	parsedFilter, err := parsePartitionFilter(namespace, filter)
+	assert.Error(t, err)
+	assert.Nil(t, parsedFilter)
+	assert.Contains(t, err.Error(), "failed to parse partition filter")
 }

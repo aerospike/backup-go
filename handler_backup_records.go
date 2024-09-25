@@ -141,7 +141,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 ) ([]pipeline.Worker[*models.Token], error) {
 	// If we have multiply partition filters, we shrink workers to number of filters.
 	// Or after digest filter.
-	if !bh.config.idDefaultPartitionFilter() {
+	if !bh.config.isDefaultPartitionFilter() {
 		n = len(bh.config.PartitionFilters)
 	}
 

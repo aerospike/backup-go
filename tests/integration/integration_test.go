@@ -743,7 +743,6 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 
 func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 	bCfg := backup.NewDefaultBackupConfig()
-	bCfg.PartitionFilters = nil
 	bCfg.ParallelNodes = true
 
 	ctx := context.Background()
@@ -761,7 +760,6 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 
 func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
 	bCfg := backup.NewDefaultBackupConfig()
-	bCfg.PartitionFilters = nil
 	bCfg.NodeList = []string{fmt.Sprintf("%s:%d", suite.aerospikeIP, suite.aerospikePort)}
 
 	ctx := context.Background()

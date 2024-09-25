@@ -161,8 +161,8 @@ func NewDefaultBackupConfig() *BackupConfig {
 	}
 }
 
-// idDefaultPartitionFilter checks if default filter is set.
-func (c *BackupConfig) idDefaultPartitionFilter() bool {
+// isDefaultPartitionFilter checks if default filter is set.
+func (c *BackupConfig) isDefaultPartitionFilter() bool {
 	return len(c.PartitionFilters) == 1 &&
 		c.PartitionFilters[0].Begin == 0 &&
 		c.PartitionFilters[0].Count == MaxPartitions &&
@@ -170,8 +170,8 @@ func (c *BackupConfig) idDefaultPartitionFilter() bool {
 }
 
 func (c *BackupConfig) isFullBackup() bool {
-	// full backup doesn't have lower bound
-	return c.ModAfter == nil && c.idDefaultPartitionFilter()
+	// full backup doesn't have a lower bound.
+	return c.ModAfter == nil && c.isDefaultPartitionFilter()
 }
 
 func (c *BackupConfig) validate() error {
@@ -187,17 +187,13 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if (c.ParallelNodes || len(c.NodeList) != 0) && len(c.PartitionFilters) > 0 {
+	if (c.ParallelNodes || len(c.NodeList) != 0) && !c.isDefaultPartitionFilter() {
 		return fmt.Errorf("parallel by nodes and partitions and the same time not allowed")
 	}
 
-	if !c.idDefaultPartitionFilter() {
+	if !c.isDefaultPartitionFilter() {
 		if c.ParallelNodes || len(c.NodeList) != 0 {
-			return fmt.Errorf("parallel by nodes/node list and after digest at the same time not allowed")
-		}
-
-		if len(c.PartitionFilters) > 1 {
-			return fmt.Errorf("after digest is set, begin partiotion can't be set")
+			return fmt.Errorf("parallel by nodes/node list and after digest/partition filter at the same time not allowed")
 		}
 	}
 

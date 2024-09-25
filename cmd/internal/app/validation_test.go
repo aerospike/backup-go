@@ -103,3 +103,36 @@ func TestValidateStorages(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateBackupConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := &models.Backup{
+		AfterDigest:   "some-digest",
+		PartitionList: "some-partition",
+	}
+	err := validateBackupConfig(cfg)
+	assert.Error(t, err)
+	assert.Equal(t, "only one of after-digest or partition-list can be configured", err.Error())
+
+	cfg = &models.Backup{
+		AfterDigest:   "some-digest",
+		PartitionList: "",
+	}
+	err = validateBackupConfig(cfg)
+	assert.NoError(t, err)
+
+	cfg = &models.Backup{
+		AfterDigest:   "",
+		PartitionList: "some-partition",
+	}
+	err = validateBackupConfig(cfg)
+	assert.NoError(t, err)
+
+	cfg = &models.Backup{
+		AfterDigest:   "",
+		PartitionList: "",
+	}
+	err = validateBackupConfig(cfg)
+	assert.NoError(t, err)
+}

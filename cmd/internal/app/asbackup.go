@@ -51,6 +51,10 @@ func NewASBackup(
 		return nil, err
 	}
 
+	if err := validateBackupConfig(backupParams); err != nil {
+		return nil, err
+	}
+
 	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup writer: %w", err)

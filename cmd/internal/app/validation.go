@@ -76,7 +76,7 @@ func validatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) err
 			beginMap[filter.Begin] = true
 		case filter.Count > 1:
 			begin := filter.Begin
-			end := filter.Begin + filter.Count - 1
+			end := filter.Begin + filter.Count
 			intervals = append(intervals, [2]int{begin, end})
 		default:
 			return fmt.Errorf("invalid partition filter count: %d", filter.Count)

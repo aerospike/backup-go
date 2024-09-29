@@ -1,3 +1,17 @@
+// Copyright 2024 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package backup
 
 import (
@@ -49,6 +63,7 @@ func NewPartitionFilterAll() *a.PartitionFilter {
 	return a.NewPartitionFilterByRange(0, MaxPartitions)
 }
 
+// splitPartitions splits partition to groups.
 func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
 	if numWorkers < 1 || numWorkers < len(partitionFilters) {
 		return nil, fmt.Errorf("numWorkers is less than partitionFilters, cannot split partitionFilters")
@@ -81,7 +96,7 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	}
 
 	// If we have more workers than filters.
-	totalWorkers := numWorkers
+	allWorkers := numWorkers
 
 	filtersWithSingle := make([]*a.PartitionFilter, 0)
 	filtersWithRange := make([]*a.PartitionFilter, 0)
@@ -102,7 +117,7 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 			return filtersWithSingle, nil
 		}
 
-		totalWorkers -= len(filtersWithSingle)
+		allWorkers -= len(filtersWithSingle)
 	}
 
 	// Now, distribute remaining workers to filters with Count > 1
@@ -113,16 +128,17 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 
 	// Split remaining workers between range filters proportionally
 	result := make([]*a.PartitionFilter, 0, numWorkers)
+	result = append(result, filtersWithSingle...)
 
-	remainingWorkers := numWorkers
+	remainingWorkers := allWorkers
 
 	for i, filter := range filtersWithRange {
-		numRangeWorkers := (filter.Count * totalWorkers) / totalRangeCount
+		numRangeWorkers := (filter.Count * allWorkers) / totalRangeCount
 		if numRangeWorkers == 0 {
 			numRangeWorkers = 1
 		}
 		// for the last range we give all remaining workers
-		if i == len(partitionFilters)-1 {
+		if i == len(filtersWithRange)-1 {
 			numRangeWorkers = remainingWorkers
 		}
 

@@ -95,6 +95,10 @@ func filterNodes(nodesList []string, nodes []*a.Node) []*a.Node {
 	filteredNodes := make([]*a.Node, 0, len(nodesList))
 
 	for i := range nodes {
+		if !nodes[i].IsActive() {
+			continue
+		}
+
 		nodeStr := nodeToString(nodes[i])
 
 		_, ok := nodesMap[nodeStr]

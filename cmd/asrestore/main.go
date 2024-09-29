@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -197,11 +196,12 @@ func main() {
 
 	go func() {
 		sig := <-sigChan
-		log.Printf("stopping asbackup: %v\n", sig)
+		fmt.Printf("stopping asbackup: %v\n", sig)
 		cancel()
 	}()
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

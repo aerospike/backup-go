@@ -107,9 +107,6 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,\n"+
 			"individual partitions, or records after a specific digest within a single partition.\n"+
 			"This argument is mutually exclusive to after-digest.\n"+
-			"Note: each partition filter is an individual task which cannot be parallelized, so you can only\n"+
-			"achieve as much parallelism as there are partition filters. You may increase parallelism by dividing up\n"+
-			"partition ranges manually.\n"+
 			"Filter: <begin partition>[-<partition count>]|<digest>\n"+
 			"begin partition: 0-4095\n"+
 			"partition count: 1-4096 Default: 1\n"+

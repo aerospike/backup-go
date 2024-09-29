@@ -113,9 +113,6 @@ Backup Flags:
   -X, --partition-list string       List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,
                                     individual partitions, or records after a specific digest within a single partition.
                                     This argument is mutually exclusive to after-digest.
-                                    Note: each partition filter is an individual task which cannot be parallelized, so you can only
-                                    achieve as much parallelism as there are partition filters. You may increase parallelism by dividing up
-                                    partition ranges manually.
                                     Filter: <begin partition>[-<partition count>]|<digest>
                                     begin partition: 0-4095
                                     partition count: 1-4096 Default: 1

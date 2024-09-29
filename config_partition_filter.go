@@ -1,6 +1,10 @@
 package backup
 
-import a "github.com/aerospike/aerospike-client-go/v7"
+import (
+	"fmt"
+
+	a "github.com/aerospike/aerospike-client-go/v7"
+)
 
 // NewPartitionFilterByRange returns a partition range with boundaries specified by the provided values.
 func NewPartitionFilterByRange(begin, count int) *a.PartitionFilter {
@@ -43,4 +47,102 @@ func NewPartitionFilterAfterDigest(namespace, digest string) (*a.PartitionFilter
 // NewPartitionFilterAll returns a partition range containing all partitions.
 func NewPartitionFilterAll() *a.PartitionFilter {
 	return a.NewPartitionFilterByRange(0, MaxPartitions)
+}
+
+func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
+	if numWorkers < 1 || numWorkers < len(partitionFilters) {
+		return nil, fmt.Errorf("numWorkers is less than partitionFilters, cannot split partitionFilters")
+	}
+
+	// Validations.
+	for i := range partitionFilters {
+		if partitionFilters[i].Begin < 0 {
+			return nil, fmt.Errorf("startPartition is less than 0, cannot split partitionFilters")
+		}
+
+		if partitionFilters[i].Count < 1 {
+			return nil, fmt.Errorf("numPartitions is less than 1, cannot split partitionFilters")
+		}
+
+		if partitionFilters[i].Begin+partitionFilters[i].Count > MaxPartitions {
+			return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitionFilters: %d",
+				MaxPartitions)
+		}
+	}
+
+	// If we have one partition filter with range.
+	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 && partitionFilters[0].Digest == nil {
+		return splitPartitionRange(partitionFilters[0], numWorkers), nil
+	}
+
+	// If the same amount of partition filters, we distribute them to workers 1=1.
+	if len(partitionFilters) == numWorkers {
+		return partitionFilters, nil
+	}
+
+	// If we have more workers than filters.
+	totalWorkers := numWorkers
+
+	filtersWithSingle := make([]*a.PartitionFilter, 0)
+	filtersWithRange := make([]*a.PartitionFilter, 0)
+	// Spread partitions by groups.
+	for _, filter := range partitionFilters {
+		switch filter.Count {
+		case 1:
+			filtersWithSingle = append(filtersWithSingle, filter)
+		default:
+			filtersWithRange = append(filtersWithRange, filter)
+		}
+	}
+
+	// If single filters == numWorkers, return result.
+	if len(filtersWithSingle) > 0 {
+		// If we don't have range filters, we return single filters.
+		if len(filtersWithRange) == 0 {
+			return filtersWithSingle, nil
+		}
+
+		totalWorkers -= len(filtersWithSingle)
+	}
+
+	// Now, distribute remaining workers to filters with Count > 1
+	var totalRangeCount int
+	for _, filter := range filtersWithRange {
+		totalRangeCount += filter.Count
+	}
+
+	// Split remaining workers between range filters proportionally
+	result := make([]*a.PartitionFilter, 0, numWorkers)
+
+	remainingWorkers := numWorkers
+
+	for i, filter := range filtersWithRange {
+		numRangeWorkers := (filter.Count * totalWorkers) / totalRangeCount
+		if numRangeWorkers == 0 {
+			numRangeWorkers = 1
+		}
+		// for the last range we give all remaining workers
+		if i == len(partitionFilters)-1 {
+			numRangeWorkers = remainingWorkers
+		}
+
+		result = append(result, splitPartitionRange(filter, numRangeWorkers)...)
+
+		remainingWorkers -= numRangeWorkers
+	}
+
+	return result, nil
+}
+
+// splitPartitionRange splits one range filter to numWorkers
+func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) []*a.PartitionFilter {
+	result := make([]*a.PartitionFilter, numWorkers)
+	for j := 0; j < numWorkers; j++ {
+		result[j] = &a.PartitionFilter{}
+		result[j].Begin = (j * partitionFilters.Count) / numWorkers
+		result[j].Count = (((j + 1) * partitionFilters.Count) / numWorkers) - result[j].Begin
+		result[j].Begin += partitionFilters.Begin
+	}
+
+	return result
 }

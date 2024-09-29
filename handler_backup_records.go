@@ -80,9 +80,9 @@ func (bh *backupRecordsHandler) run(
 }
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
-	// if bh.config.isFullBackup() {
-	// 	return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
-	// }
+	if bh.config.isFullBackup() {
+		return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
+	}
 
 	return bh.countRecordsUsingScan(ctx)
 }
@@ -94,10 +94,9 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 	scanPolicy.MaxRecords = 0
 
 	if bh.config.isParalleledByNodes() {
-		fmt.Println("count by niodes")
 		return bh.countRecordsUsingScanByNodes(ctx, &scanPolicy)
 	}
-	fmt.Println("count by part")
+
 	return bh.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
 }
 
@@ -205,14 +204,21 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 ) ([]pipeline.Worker[*models.Token], error) {
 	// If we have multiply partition filters, we shrink workers to number of filters.
 	// Or after digest filter.
-	if !bh.config.isDefaultPartitionFilter() {
-		n = len(bh.config.PartitionFilters)
-	}
+	// if !bh.config.isDefaultPartitionFilter() {
+	// 	n = len(bh.config.PartitionFilters)
+	// }
 
 	partitionGroups, err := splitPartitions(bh.config.PartitionFilters, n)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("partitionGroups=", partitionGroups)
+	for o := range partitionGroups {
+		fmt.Println("begin=", partitionGroups[o].Begin, " count=", partitionGroups[o].Count, " digest=", partitionGroups[o].Digest)
+	}
+
+	n = len(partitionGroups)
 
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
 

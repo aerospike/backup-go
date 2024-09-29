@@ -61,44 +61,6 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 	logger.Info("job done")
 }
 
-func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
-	if numWorkers < 1 {
-		return nil, fmt.Errorf("numWorkers is less than 1, cannot split partitionFilters")
-	}
-
-	// Validations.
-	for i := range partitionFilters {
-		if partitionFilters[i].Begin < 0 {
-			return nil, fmt.Errorf("startPartition is less than 0, cannot split partitionFilters")
-		}
-
-		if partitionFilters[i].Count < 1 {
-			return nil, fmt.Errorf("numPartitions is less than 1, cannot split partitionFilters")
-		}
-
-		if partitionFilters[i].Begin+partitionFilters[i].Count > MaxPartitions {
-			return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitionFilters: %d",
-				MaxPartitions)
-		}
-	}
-
-	// If we have one partition filter with range.
-	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 && partitionFilters[0].Digest == nil {
-		result := make([]*a.PartitionFilter, numWorkers)
-		for j := 0; j < numWorkers; j++ {
-			result[j] = &a.PartitionFilter{}
-			result[j].Begin = (j * partitionFilters[0].Count) / numWorkers
-			result[j].Count = (((j + 1) * partitionFilters[0].Count) / numWorkers) - result[j].Begin
-			result[j].Begin += partitionFilters[0].Begin
-		}
-
-		return result, nil
-	}
-
-	// If we have more than one filter, we distribute them to workers 1=1.
-	return partitionFilters, nil
-}
-
 func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {
 	if numWorkers < 1 {
 		return nil, fmt.Errorf("numWorkers is less than 1, cannot split nodes")

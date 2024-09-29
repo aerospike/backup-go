@@ -80,9 +80,9 @@ func (bh *backupRecordsHandler) run(
 }
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
-	// if bh.config.isFullBackup() {
-	// 	return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
-	// }
+	if bh.config.isFullBackup() {
+		return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
+	}
 
 	return bh.countRecordsUsingScan(ctx)
 }
@@ -112,10 +112,11 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Co
 	for i := range bh.config.PartitionFilters {
 		wg.Add(1)
 
+		j := i
+
 		go func() {
 			defer wg.Done()
 
-			j := i
 			// We should copy *bh.config.PartitionFilters[i] value, to avoid getting zero results from other scans.
 			// As after filter is applied for any scan it set .Done = true, after that no records will be returned
 			// with this filter.

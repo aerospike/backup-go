@@ -59,7 +59,7 @@ func validateBackupParams(cfg *models.Backup) error {
 }
 
 func validatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) error {
-	if len(partitionFilters) <= 1 {
+	if len(partitionFilters) < 1 {
 		return nil
 	}
 

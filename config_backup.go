@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -40,6 +39,25 @@ type BackupConfig struct {
 	CompressionPolicy *CompressionPolicy
 	// Secret agent config.
 	SecretAgentConfig *SecretAgentConfig
+	// PartitionFilters specifies the Aerospike partitions to back up.
+	// Partition filters can be ranges, individual partitions,
+	// or records after a specific digest within a single partition.
+	// Note:
+	// if not default partition filter NewPartitionFilterAll() is used,
+	// each partition filter is an individual task which cannot be parallelized,
+	// so you can only achieve as much parallelism as there are partition filters.
+	// You may increase parallelism by dividing up partition ranges manually.
+	// AfterDigest:
+	// afterDigest filter can be applied with
+	// NewPartitionFilterAfterDigest(namespace, digest string) (*a.PartitionFilter, error)
+	// Backup records after record digest in record's partition plus all succeeding partitions.
+	// Used to resume backup with last record received from previous incomplete backup.
+	// This parameter will overwrite PartitionFilters.Begin value.
+	// Can't be used in full backup mode.
+	// This parameter is mutually exclusive to partition-list (not implemented).
+	// Format: base64 encoded string.
+	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
+	PartitionFilters []*a.PartitionFilter
 	// Namespace is the Aerospike namespace to back up.
 	Namespace string
 	// NodeList contains a list of nodes to back up.
@@ -55,11 +73,9 @@ type BackupConfig struct {
 	// The list of backup bin names
 	// (optional, given an empty list, all bins will be backed up)
 	BinList []string
-	// Partitions specifies the Aerospike partitions to back up.
-	Partitions PartitionRange
 	// ParallelNodes specifies how to perform scan.
 	// If set to true, we launch parallel workers for nodes; otherwise workers run in parallel for partitions.
-	// Excludes Partitions param.
+	// Excludes PartitionFilters param.
 	ParallelNodes bool
 	// EncoderType describes an Encoder type that will be used on backing up.
 	// Default `EncoderTypeASB` = 0.
@@ -83,14 +99,6 @@ type BackupConfig struct {
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
 	FileLimit int64
-	// Backup records after record digest in record's partition plus all succeeding partitions.
-	// Used to resume backup with last record received from previous incomplete backup.
-	// This parameter will overwrite Partitions.Begin value.
-	// Can't be used in full backup mode.
-	// This parameter is mutually exclusive to partition-list (not implemented).
-	// Format: base64 encoded string.
-	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
-	AfterDigest string
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	// Results in smaller backup files.
 	Compact bool
@@ -98,57 +106,34 @@ type BackupConfig struct {
 	NoTTLOnly bool
 }
 
-// PartitionRange specifies a range of Aerospike partitions.
-type PartitionRange struct {
-	Begin int
-	Count int
-}
-
-// NewPartitionRange returns a partition range with boundaries specified by the
-// provided values.
-func NewPartitionRange(begin, count int) PartitionRange {
-	return PartitionRange{begin, count}
-}
-
-func (p PartitionRange) validate() error {
-	if p.Begin < 0 || p.Begin >= MaxPartitions {
-		return fmt.Errorf("begin must be between 0 and %d, got %d", MaxPartitions-1, p.Begin)
-	}
-
-	if p.Count < 1 || p.Count > MaxPartitions {
-		return fmt.Errorf("count must be between 1 and %d, got %d", MaxPartitions, p.Count)
-	}
-
-	if p.Begin+p.Count > MaxPartitions {
-		return fmt.Errorf("begin + count is greater than the max partitions count of %d",
-			MaxPartitions)
-	}
-
-	return nil
-}
-
-// PartitionRangeAll returns a partition range containing all partitions.
-func PartitionRangeAll() PartitionRange {
-	return NewPartitionRange(0, MaxPartitions)
-}
-
 // NewDefaultBackupConfig returns a new BackupConfig with default values.
 func NewDefaultBackupConfig() *BackupConfig {
 	return &BackupConfig{
-		Partitions:    PartitionRangeAll(),
-		ParallelRead:  1,
-		ParallelWrite: 1,
-		Namespace:     "test",
-		EncoderType:   EncoderTypeASB,
+		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
+		ParallelRead:     1,
+		ParallelWrite:    1,
+		Namespace:        "test",
+		EncoderType:      EncoderTypeASB,
 	}
 }
 
-func (c *BackupConfig) isFullBackup() bool {
-	// full backup doesn't have lower bound
-	return c.ModAfter == nil && c.AfterDigest == ""
+func (c *BackupConfig) isParalleledByNodes() bool {
+	return c.ParallelNodes || len(c.NodeList) > 0
 }
 
-//nolint:gocyclo // Long validation function with a lot of checks.
+// isDefaultPartitionFilter checks if default filter is set.
+func (c *BackupConfig) isDefaultPartitionFilter() bool {
+	return len(c.PartitionFilters) == 1 &&
+		c.PartitionFilters[0].Begin == 0 &&
+		c.PartitionFilters[0].Count == MaxPartitions &&
+		c.PartitionFilters[0].Digest == nil
+}
+
+func (c *BackupConfig) isFullBackup() bool {
+	// full backup doesn't have a lower bound.
+	return c.ModAfter == nil && c.isDefaultPartitionFilter()
+}
+
 func (c *BackupConfig) validate() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
@@ -162,27 +147,13 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if (c.ParallelNodes || len(c.NodeList) != 0) && (c.Partitions.Begin != 0 || c.Partitions.Count != 0) {
+	if (c.ParallelNodes || len(c.NodeList) != 0) && !c.isDefaultPartitionFilter() {
 		return fmt.Errorf("parallel by nodes and partitions and the same time not allowed")
 	}
 
-	if !c.ParallelNodes && len(c.NodeList) == 0 {
-		if err := c.Partitions.validate(); err != nil {
-			return err
-		}
-	}
-
-	if c.AfterDigest != "" {
-		if c.ParallelNodes || len(c.NodeList) != 0 {
-			return fmt.Errorf("parallel by nodes/node list and after digest at the same time not allowed")
-		}
-
-		if _, err := base64.StdEncoding.DecodeString(c.AfterDigest); err != nil {
-			return fmt.Errorf("after digest must be base64 encoded string: %w", err)
-		}
-
-		if c.Partitions.Begin != 0 {
-			return fmt.Errorf("after digest is set, begin partiotion can't be set")
+	if !c.isDefaultPartitionFilter() {
+		if c.isParalleledByNodes() {
+			return fmt.Errorf("parallel by nodes/node list and after digest/partition filter at the same time not allowed")
 		}
 	}
 

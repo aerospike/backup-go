@@ -17,6 +17,7 @@ package app
 import (
 	"testing"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -102,4 +103,134 @@ func TestValidateStorages(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateBackupConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := &models.Backup{
+		AfterDigest:   "some-digest",
+		PartitionList: "some-partition",
+	}
+	err := validateBackupParams(cfg)
+	assert.Error(t, err)
+	assert.Equal(t, "only one of after-digest or partition-list can be configured", err.Error())
+
+	cfg = &models.Backup{
+		AfterDigest:   "some-digest",
+		PartitionList: "",
+	}
+	err = validateBackupParams(cfg)
+	assert.NoError(t, err)
+
+	cfg = &models.Backup{
+		AfterDigest:   "",
+		PartitionList: "some-partition",
+	}
+	err = validateBackupParams(cfg)
+	assert.NoError(t, err)
+
+	cfg = &models.Backup{
+		AfterDigest:   "",
+		PartitionList: "",
+	}
+	err = validateBackupParams(cfg)
+	assert.NoError(t, err)
+}
+
+func TestValidatePartitionFilters_SuccessSingleFilter(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 1},
+	}
+
+	err := validatePartitionFilters(partitionFilters)
+
+	assert.NoError(t, err, "Single partition filter should be valid")
+}
+
+func TestValidatePartitionFilters_SuccessNonOverlappingIntervals(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 5},
+		{Begin: 10, Count: 5},
+		{Begin: 20, Count: 10},
+	}
+
+	err := validatePartitionFilters(partitionFilters)
+
+	assert.NoError(t, err, "Non-overlapping intervals should be valid")
+}
+
+func TestValidatePartitionFilters_ErrorDuplicateBeginValue(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 1},
+		{Begin: 0, Count: 1},
+	}
+
+	err := validatePartitionFilters(partitionFilters)
+
+	assert.Error(t, err, "Duplicate begin value should return an error")
+	assert.Equal(t, "duplicate begin value 0 for count = 1", err.Error())
+}
+
+func TestValidatePartitionFilters_ErrorOverlappingIntervals(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 10},
+		{Begin: 5, Count: 10},
+	}
+
+	err := validatePartitionFilters(partitionFilters)
+
+	assert.Error(t, err, "Overlapping intervals should return an error")
+	assert.Equal(t, "overlapping intervals: [0, 10] and [5, 15]", err.Error())
+}
+
+func TestValidatePartitionFilters_SuccessMixedFilters(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 1},
+		{Begin: 5, Count: 5},
+		{Begin: 20, Count: 1},
+		{Begin: 30, Count: 10},
+	}
+
+	err := validatePartitionFilters(partitionFilters)
+
+	assert.NoError(t, err, "Valid mixed filters should pass validation")
+}
+
+func TestValidatePartitionFilters_ErrorInvalidCount(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 0},
+	}
+
+	err := validatePartitionFilters(partitionFilters)
+
+	assert.Error(t, err, "Invalid count should return an error")
+	assert.Equal(t, "invalid partition filter count: 0", err.Error())
+}
+
+func TestValidatePartitionFilters_ErrorOverlappingComplexIntervals(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 5},
+		{Begin: 5, Count: 10},
+		{Begin: 8, Count: 3},
+	}
+
+	err := validatePartitionFilters(partitionFilters)
+
+	assert.Error(t, err, "Overlapping complex intervals should return an error")
+	assert.Equal(t, "overlapping intervals: [0, 5] and [5, 15]", err.Error())
 }

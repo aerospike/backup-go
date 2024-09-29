@@ -31,6 +31,7 @@ type Backup struct {
 	NodeList            string
 	NoTTLOnly           bool
 	PreferRacks         string
+	PartitionList       string
 }
 
 // ShouldClearTarget check if we should clean target directory.

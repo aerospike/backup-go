@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,15 +42,12 @@ func TestBackupConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "modified before")
 	config = NewDefaultBackupConfig()
 
-	config.Partitions = NewPartitionRange(-1, -1)
-	assert.ErrorContains(t, config.validate(), "begin must be between")
-	config = NewDefaultBackupConfig()
-
 	config.RecordsPerSecond = -1
 	assert.ErrorContains(t, config.validate(), "rps")
 	config = NewDefaultBackupConfig()
 
 	config.ParallelNodes = true
+	config.PartitionFilters = []*a.PartitionFilter{NewPartitionFilterByID(1)}
 	assert.ErrorContains(t, config.validate(), "parallel by nodes and partitions")
 	config = NewDefaultBackupConfig()
 
@@ -59,16 +57,6 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.FileLimit = -1
 	assert.ErrorContains(t, config.validate(), "filelimit")
-	config = NewDefaultBackupConfig()
-
-	config.AfterDigest = "te/&st"
-	assert.ErrorContains(t, config.validate(), "after digest")
-	config = NewDefaultBackupConfig()
-
-	config.AfterDigest = "EjRWeJq83vEjRRI0VniavN7xI0U="
-	config.Partitions.Begin = 2
-	config.Partitions.Count = 10
-	assert.ErrorContains(t, config.validate(), "after digest")
 	config = NewDefaultBackupConfig()
 
 	config.CompressionPolicy = &CompressionPolicy{Level: -1}

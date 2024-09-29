@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
@@ -60,34 +61,6 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 	logger.Info("job done")
 }
 
-func splitPartitions(startPartition, numPartitions, numWorkers int) ([]PartitionRange, error) {
-	if startPartition+numPartitions > MaxPartitions {
-		return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitions: %d",
-			MaxPartitions)
-	}
-
-	if numWorkers < 1 {
-		return nil, fmt.Errorf("numWorkers is less than 1, cannot split partitions")
-	}
-
-	if numPartitions < 1 {
-		return nil, fmt.Errorf("numPartitions is less than 1, cannot split partitions")
-	}
-
-	if startPartition < 0 {
-		return nil, fmt.Errorf("startPartition is less than 0, cannot split partitions")
-	}
-
-	pSpecs := make([]PartitionRange, numWorkers)
-	for i := 0; i < numWorkers; i++ {
-		pSpecs[i].Begin = (i * numPartitions) / numWorkers
-		pSpecs[i].Count = (((i + 1) * numPartitions) / numWorkers) - pSpecs[i].Begin
-		pSpecs[i].Begin += startPartition
-	}
-
-	return pSpecs, nil
-}
-
 func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {
 	if numWorkers < 1 {
 		return nil, fmt.Errorf("numWorkers is less than 1, cannot split nodes")
@@ -122,6 +95,10 @@ func filterNodes(nodesList []string, nodes []*a.Node) []*a.Node {
 	filteredNodes := make([]*a.Node, 0, len(nodesList))
 
 	for i := range nodes {
+		if !nodes[i].IsActive() {
+			continue
+		}
+
 		nodeStr := nodeToString(nodes[i])
 
 		_, ok := nodesMap[nodeStr]
@@ -140,4 +117,18 @@ func nodeToString(node *a.Node) string {
 	}
 
 	return fmt.Sprintf("%s:%d", nodeHost.Name, nodeHost.Port)
+}
+
+func newKeyByDigest(namespace, digest string) (*a.Key, error) {
+	digestBytes, err := base64.StdEncoding.DecodeString(digest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode after-digest: %w", err)
+	}
+
+	key, err := a.NewKeyWithDigest(namespace, "", "", digestBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init key from digest: %w", err)
+	}
+
+	return key, nil
 }

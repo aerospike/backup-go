@@ -110,6 +110,16 @@ Backup Flags:
                                     Default: backup all nodes in the cluster
       --no-ttl-only                 Only include records that have no ttl set (persistent records).
       --prefer-racks string         <rack id 1>[,<rack id 2>[,...]]\nA list of Aerospike Server rack IDs to prefer when reading records for a backup.
+  -X, --partition-list string       List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,
+                                    individual partitions, or records after a specific digest within a single partition.
+                                    This argument is mutually exclusive to after-digest.
+                                    Filter: <begin partition>[-<partition count>]|<digest>
+                                    begin partition: 0-4095
+                                    partition count: 1-4096 Default: 1
+                                    digest: base64 encoded string
+                                    Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=
+                                    Default: 0-4096 (all partitions)
+                                    
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -164,20 +174,6 @@ Azure Flags:
                     exact path is where the backup file will be placed. If a directory is given, the backup
                     state will be placed in the directory with name `<namespace>.asb.state`, or
                     `<prefix>.asb.state` if `--output-file-prefix` is given.
-
---partition-list    <filter[,<filter>[...]]>
-                    List of partitions to back up. Partition filters can be ranges, individual partitions, or 
-                    records after a specific digest within a single partition.
-                    This argument is mutually exclusive to after-digest.
-                    Note: each partition filter is an individual task which cannot be parallelized, so you can only
-                    achieve as much parallelism as there are partition filters. You may increase parallelism by dividing up
-                    partition ranges manually.
-                    Filter: <begin partition>[-<partition count>]|<digest>
-                    begin partition: 0-4095
-                    partition count: 1-4096 Default: 1
-                    digest: base64 encoded string
-                    Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=
-                    Default: 0-4096 (all partitions)
 
 --machine           Output machine-readable status updates to the given path, typically a FIFO.
 

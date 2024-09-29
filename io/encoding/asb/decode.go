@@ -39,7 +39,7 @@ func newDecoderError(offset uint64, err error) error {
 }
 
 func newSectionError(section string, err error) error {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return err
 	} else if err == nil {
 		return nil
@@ -49,7 +49,7 @@ func newSectionError(section string, err error) error {
 }
 
 func newLineError(lineType string, err error) error {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return err
 	} else if err == nil {
 		return nil

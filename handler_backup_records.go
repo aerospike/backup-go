@@ -16,10 +16,11 @@ package backup
 
 import (
 	"context"
-	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -45,7 +46,7 @@ func newBackupRecordsHandler(
 	ac AerospikeClient,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
-) (*backupRecordsHandler, error) {
+) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
 	h := &backupRecordsHandler{
@@ -55,14 +56,7 @@ func newBackupRecordsHandler(
 		scanLimiter:     scanLimiter,
 	}
 
-	// For resuming backup from config.AfterDigest, we have to get and check key info, then set additional params.
-	if config.AfterDigest != "" {
-		if err := h.setAfterDigest(); err != nil {
-			return nil, err
-		}
-	}
-
-	return h, nil
+	return h
 }
 
 func (bh *backupRecordsHandler) run(
@@ -99,16 +93,82 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	readerConfig := bh.recordReaderConfigForPartitions(bh.config.Partitions, &scanPolicy, bh.afterDigest)
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+	if bh.config.isParalleledByNodes() {
+		return bh.countRecordsUsingScanByNodes(ctx, &scanPolicy)
+	}
 
-	defer recordReader.Close()
+	return bh.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
+}
+
+func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Context, scanPolicy *a.ScanPolicy,
+) (uint64, error) {
+	var (
+		count atomic.Uint64
+		wg    sync.WaitGroup
+	)
+
+	errorsCh := make(chan error, len(bh.config.PartitionFilters))
+
+	for i := range bh.config.PartitionFilters {
+		wg.Add(1)
+
+		j := i
+
+		go func() {
+			defer wg.Done()
+
+			// We should copy *bh.config.PartitionFilters[i] value, to avoid getting zero results from other scans.
+			// As after filter is applied for any scan it set .Done = true, after that no records will be returned
+			// with this filter.
+			pf := *bh.config.PartitionFilters[j]
+			readerConfig := bh.recordReaderConfigForPartitions(&pf, scanPolicy)
+			recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+
+			for {
+				if _, err := recordReader.Read(); err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
+					errorsCh <- fmt.Errorf("error during records counting: %w", err)
+				}
+
+				count.Add(1)
+			}
+
+			recordReader.Close()
+		}()
+		errorsCh <- nil
+	}
+
+	// Wait for all count goroutines to finish.
+	go func() {
+		wg.Wait()
+		close(errorsCh)
+	}()
+
+	for err := range errorsCh {
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return count.Load(), nil
+}
+
+func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context, scanPolicy *a.ScanPolicy,
+) (uint64, error) {
+	nodes := bh.aerospikeClient.GetNodes()
+	nodes = filterNodes(bh.config.NodeList, nodes)
 
 	var count uint64
 
+	readerConfig := bh.recordReaderConfigForNode(nodes, scanPolicy)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+
 	for {
 		if _, err := recordReader.Read(); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 
@@ -117,6 +177,8 @@ func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint
 
 		count++
 	}
+
+	recordReader.Close()
 
 	return count, nil
 }
@@ -131,7 +193,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	scanPolicy.RawCDT = true
 
 	// If we are paralleling scans by nodes.
-	if bh.config.ParallelNodes || len(bh.config.NodeList) > 0 {
+	if bh.config.isParalleledByNodes() {
 		return bh.makeAerospikeReadWorkersForNodes(ctx, n, &scanPolicy)
 	}
 
@@ -141,22 +203,22 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipeline.Worker[*models.Token], error) {
-	partitionRanges, err := splitPartitions(
-		bh.config.Partitions.Begin,
-		bh.config.Partitions.Count,
-		n)
+	partitionGroups, err := splitPartitions(bh.config.PartitionFilters, n)
 	if err != nil {
 		return nil, err
 	}
 
+	// If we have multiply partition filters, we shrink workers to number of filters.
+	n = len(partitionGroups)
+
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
 
 	for i := 0; i < n; i++ {
-		recordReaderConfig := bh.recordReaderConfigForPartitions(partitionRanges[i], scanPolicy, nil)
+		recordReaderConfig := bh.recordReaderConfigForPartitions(partitionGroups[i], scanPolicy)
 
 		// For the first partition in the list, we start from digest if it is set.
 		if bh.afterDigest != nil && i == 0 {
-			recordReaderConfig = bh.recordReaderConfigForPartitions(partitionRanges[i], scanPolicy, bh.afterDigest)
+			recordReaderConfig = bh.recordReaderConfigForPartitions(partitionGroups[i], scanPolicy)
 		}
 
 		recordReader := aerospike.NewRecordReader(
@@ -213,16 +275,9 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 }
 
 func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
-	partitionRange PartitionRange,
+	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
-	// We should pass digest as parameter here, for implementing adding digest to first partition logic.
-	digest []byte,
 ) *aerospike.RecordReaderConfig {
-	partitionFilter := a.NewPartitionFilterByRange(partitionRange.Begin, partitionRange.Count)
-	if digest != nil {
-		partitionFilter.Digest = digest
-	}
-
 	return aerospike.NewRecordReaderConfig(
 		bh.config.Namespace,
 		bh.config.SetList,
@@ -257,22 +312,4 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
 	)
-}
-
-func (bh *backupRecordsHandler) setAfterDigest() error {
-	digestBytes, err := base64.StdEncoding.DecodeString(bh.config.AfterDigest)
-	if err != nil {
-		return fmt.Errorf("failed to decode after-digest: %w", err)
-	}
-
-	keyDigest, err := a.NewKeyWithDigest(bh.config.Namespace, "", "", digestBytes)
-	if err != nil {
-		return fmt.Errorf("failed to init key from digest: %w", err)
-	}
-
-	bh.config.Partitions.Begin = keyDigest.PartitionId()
-	bh.config.Partitions.Count -= bh.config.Partitions.Begin
-	bh.afterDigest = keyDigest.Digest()
-
-	return nil
 }

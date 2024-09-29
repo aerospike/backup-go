@@ -102,6 +102,17 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"",
 		"<rack id 1>[,<rack id 2>[,...]]\n"+
 			"A list of Aerospike Server rack IDs to prefer when reading records for a backup.")
+	flagSet.StringVarP(&f.PartitionList, "partition-list", "X",
+		"",
+		"List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,\n"+
+			"individual partitions, or records after a specific digest within a single partition.\n"+
+			"This argument is mutually exclusive to after-digest.\n"+
+			"Filter: <begin partition>[-<partition count>]|<digest>\n"+
+			"begin partition: 0-4095\n"+
+			"partition count: 1-4096 Default: 1\n"+
+			"digest: base64 encoded string\n"+
+			"Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=\n"+
+			"Default: 0-4096 (all partitions)\n")
 
 	return flagSet
 }

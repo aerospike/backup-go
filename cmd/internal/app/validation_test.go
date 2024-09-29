@@ -17,6 +17,7 @@ package app
 import (
 	"testing"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -135,4 +136,59 @@ func TestValidateBackupConfig(t *testing.T) {
 	}
 	err = validateBackupParams(cfg)
 	assert.NoError(t, err)
+}
+
+func TestValidatePartitionFilters_Success(t *testing.T) {
+	filters := []*aerospike.PartitionFilter{
+		{Begin: 1, Count: 1},
+		{Begin: 2, Count: 1},
+		{Begin: 5, Count: 3},
+		{Begin: 10, Count: 2},
+	}
+
+	err := validatePartitionFilters(filters)
+	assert.NoError(t, err, "Validation should pass for valid partition filters")
+}
+
+func TestValidatePartitionFilters_DuplicateBegin(t *testing.T) {
+	filters := []*aerospike.PartitionFilter{
+		{Begin: 1, Count: 1},
+		{Begin: 1, Count: 1},
+	}
+
+	err := validatePartitionFilters(filters)
+	assert.Error(t, err, "Validation should fail due to duplicate Begin")
+	assert.Contains(t, err.Error(), "duplicate Begin value", "Error should mention duplicate Begin value")
+}
+
+func TestValidatePartitionFilters_OverlappingIntervals(t *testing.T) {
+	filters := []*aerospike.PartitionFilter{
+		{Begin: 5, Count: 3},
+		{Begin: 6, Count: 2},
+	}
+
+	err := validatePartitionFilters(filters)
+	assert.Error(t, err, "Validation should fail due to overlapping intervals")
+	assert.Contains(t, err.Error(), "overlapping intervals", "Error should mention overlapping intervals")
+}
+
+func TestValidatePartitionFilters_AdjacentIntervals(t *testing.T) {
+	filters := []*aerospike.PartitionFilter{
+		{Begin: 5, Count: 3},
+		{Begin: 8, Count: 2},
+	}
+
+	err := validatePartitionFilters(filters)
+	assert.NoError(t, err, "Validation should pass for adjacent, non-overlapping intervals")
+}
+
+func TestValidatePartitionFilters_SingleCountNonOverlapping(t *testing.T) {
+	filters := []*aerospike.PartitionFilter{
+		{Begin: 1, Count: 1},
+		{Begin: 2, Count: 1},
+		{Begin: 3, Count: 1},
+	}
+
+	err := validatePartitionFilters(filters)
+	assert.NoError(t, err, "Validation should pass for multiple non-overlapping Count=1 filters")
 }

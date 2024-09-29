@@ -30,7 +30,7 @@ import (
 var (
 	//nolint:lll // The regexp is long.
 	expPartitionRange  = regexp.MustCompile(`^([0-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-5])\-([1-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-6])$`)
-	expPartitionID     = regexp.MustCompile(`^\d+$`)
+	expPartitionID     = regexp.MustCompile(`^(409[0-6]|40[0-8]\d|[123]?\d{1,3}|0)$`)
 	expPartitionDigest = regexp.MustCompile(`^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`)
 )
 
@@ -71,6 +71,10 @@ func mapBackupConfig(
 
 	pf, err := mapPartitionFilter(backupParams, commonParams)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := validatePartitionFilters(pf); err != nil {
 		return nil, err
 	}
 

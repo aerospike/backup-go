@@ -784,6 +784,7 @@ func (suite *backupRestoreTestSuite) TestBackupPartitionList() {
 	suite.Nil(err)
 
 	bCfg := backup.NewDefaultBackupConfig()
+	bCfg.ParallelRead = 4
 	bCfg.PartitionFilters = []*a.PartitionFilter{
 		backup.NewPartitionFilterByID(1),
 		backup.NewPartitionFilterByRange(2, 3),

@@ -113,7 +113,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 
 	switch {
 	case b.isEstimate:
-		estimates, err := b.backupClient.Estimate(ctx, b.backupConfig, b.writer, b.estimatesSamples)
+		estimates, err := b.backupClient.Estimate(ctx, b.backupConfig, b.estimatesSamples)
 		if err != nil {
 			return fmt.Errorf("failed to calculate backup estimate: %w", err)
 		}

@@ -109,7 +109,8 @@ Backup Flags:
                                     This argument is mutually exclusive to partition-list/after-digest arguments.
                                     Default: backup all nodes in the cluster
       --no-ttl-only                 Only include records that have no ttl set (persistent records).
-      --prefer-racks string         <rack id 1>[,<rack id 2>[,...]]\nA list of Aerospike Server rack IDs to prefer when reading records for a backup.
+      --prefer-racks string         <rack id 1>[,<rack id 2>[,...]]
+                                    A list of Aerospike Server rack IDs to prefer when reading records for a backup.
   -X, --partition-list string       List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,
                                     individual partitions, or records after a specific digest within a single partition.
                                     This argument is mutually exclusive to after-digest.
@@ -120,6 +121,12 @@ Backup Flags:
                                     Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=
                                     Default: 0-4096 (all partitions)
                                     
+  -e, --estimate                    Estimate the backed-up record size from a random sample of 
+                                    10,000 (default) records at 99.9999%% confidence.
+                                    It ignores any filter:  filter-exp, node-list, modified-after, modified-before, no-ttl-only,
+                                    after-digest, partition-list.
+                                    It calculates estimate size of full backup.
+      --estimate-samples int        The number of samples to take when running a backup estimate. (default 10000)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.

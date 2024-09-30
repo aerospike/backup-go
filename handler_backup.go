@@ -84,9 +84,11 @@ func newBackupHandler(
 ) *BackupHandler {
 	id := uuid.NewString()
 	// For estimates calculations, a writer will be nil.
+	storageType := ""
 	if writer != nil {
-		logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
+		storageType = writer.GetType()
 	}
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
@@ -137,6 +139,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 		return 0, fmt.Errorf("failed to estimate samples: %w", err)
 	}
 
+	// Calculate compress ratio. For uncompressed data it would be 1.
 	compressRatio, err := getCompressRatio(bh.config.CompressionPolicy, samplesData)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get compress ratio: %w", err)

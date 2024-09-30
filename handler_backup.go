@@ -88,6 +88,7 @@ func newBackupHandler(
 	if writer != nil {
 		storageType = writer.GetType()
 	}
+
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 
 	limiter := makeBandwidthLimiter(config.Bandwidth)

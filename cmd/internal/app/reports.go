@@ -43,5 +43,5 @@ func printRestoreReport(stats *bModels.RestoreStats) {
 func printEstimateReport(estimate uint64) {
 	fmt.Println("Estimate Report")
 	fmt.Println("--------------")
-	fmt.Println(estimate)
+	fmt.Printf("File size: %d bytes\n", estimate)
 }

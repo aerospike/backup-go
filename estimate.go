@@ -1,75 +1,89 @@
 package backup
 
-import "math"
+import (
+	"log/slog"
+	"math"
 
-// distrStats holds the total, mean, and variance of the sample record sizes.
-type distrStats struct {
-	total    uint64
-	mean     float64
-	variance float64
+	"github.com/aerospike/backup-go/internal/util"
+)
+
+const zScore = 2.576
+
+type estimateStats struct {
+	Mean     float64
+	Variance float64
 }
 
-// Function to calculate the estimate of total backup size
-func estimateTotalBackupSize(
-	headerSize, recordsSize uint64, recordsNumber, totalCount uint64, confidenceLevel float64, samples []uint64,
-) uint64 {
-	// Calculate record statistics (mean and variance)
-	recStats := calcRecordStats(samples, recordsNumber)
+func getEstimate(data []float64, total float64, logger *slog.Logger) float64 {
+	stats := calculateStats(data)
 
-	// Calculate z value (for upper-bound confidence interval)
-	z := confidenceZ(confidenceLevel, totalCount)
+	low, high := confidenceInterval(stats, len(data))
+	logger.Debug("predicted record size:",
+		slog.Float64("from", low),
+		slog.Float64("to", high))
 
-	// Calculate compression ratio
-	compressionRatio := float64(recordsSize) / float64(recStats.total+headerSize)
+	avg := (low + high) / 2
+	logger.Debug("average record size:", slog.Float64("average", avg))
 
-	// Estimate the total backup size
-	var estBackupSize uint64
-	if recordsNumber == 0 {
-		estBackupSize = headerSize
-	} else {
-		estBackupSize = headerSize +
-			uint64(math.Ceil(float64(totalCount)*(compressionRatio*recStats.mean+
-				(z*math.Sqrt(recStats.variance/float64(recordsNumber))))))
-	}
-
-	return estBackupSize
+	return total * avg
 }
 
-// Function to calculate the z-value for confidence interval
-func confidenceZ(confidenceLevel float64, totalCount uint64) float64 {
-	q := (1 - confidenceLevel) / float64(totalCount)
-	z := math.Sqrt(2) * -math.Erfinv(q*2-1)
+func calculateStats(data []float64) estimateStats {
+	n := len(data)
+	if n == 0 {
+		return estimateStats{}
+	}
 
-	return z
+	var sum float64
+	for _, value := range data {
+		sum += value
+	}
+
+	mean := sum / float64(n)
+
+	var varianceSum float64
+	for _, value := range data {
+		varianceSum += (value - mean) * (value - mean)
+	}
+
+	variance := varianceSum / float64(n-1)
+
+	return estimateStats{
+		Mean:     mean,
+		Variance: variance,
+	}
 }
 
-// Calculate statistics (mean and variance) from the record size samples
-func calcRecordStats(samples []uint64, nSamples uint64) distrStats {
-	if nSamples <= 1 {
-		return distrStats{0, 0, 0}
+func confidenceInterval(stats estimateStats, sampleSize int) (low, high float64) {
+	if sampleSize == 0 {
+		return 0, 0
 	}
 
-	// Calculate total and mean
-	var total uint64
-	for _, sample := range samples {
-		total += sample
+	standardError := math.Sqrt(stats.Variance / float64(sampleSize))
+	marginOfError := zScore * standardError
+
+	low = stats.Mean - marginOfError
+	high = stats.Mean + marginOfError
+
+	return low, high
+}
+
+func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, error) {
+	// We create io.WriteCloser from samplesData to calculate a compress ratio.
+	bytesWriter := util.NewBytesWriteCloser([]byte{})
+	// Create compression writer same way as on backup.
+	encodedWriter, err := newCompressionWriter(policy, bytesWriter)
+	if err != nil {
+		return 0, err
 	}
 
-	mean := float64(total) / float64(nSamples)
-
-	// Calculate variance
-	var variance float64
-
-	for _, sample := range samples {
-		diff := float64(sample) - mean
-		variance += diff * diff
+	if _, err := encodedWriter.Write(samplesData); err != nil {
+		return 0, err
 	}
 
-	variance /= float64(nSamples - 1)
-
-	return distrStats{
-		total:    total,
-		mean:     mean,
-		variance: variance,
+	if err := encodedWriter.Close(); err != nil {
+		return 0, err
 	}
+
+	return float64(len(samplesData)) / float64(bytesWriter.Buffer().Len()), nil
 }

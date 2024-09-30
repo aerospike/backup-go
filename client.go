@@ -273,7 +273,7 @@ func (c *Client) Estimate(
 
 	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
 
-	result, err := handler.GetEstimate(ctx, estimateSamples)
+	result, err := handler.getEstimate(ctx, estimateSamples)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get estimate: %w", err)
 	}

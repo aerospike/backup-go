@@ -50,9 +50,35 @@ func validateStorages(
 	return nil
 }
 
-func validateBackupParams(cfg *models.Backup) error {
-	if cfg.AfterDigest != "" && cfg.PartitionList != "" {
+func validateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
+	// Only one filter is allowed.
+	if backupParams.AfterDigest != "" && backupParams.PartitionList != "" {
 		return fmt.Errorf("only one of after-digest or partition-list can be configured")
+	}
+
+	if backupParams.Estimate {
+		// Estimate with filter not allowed.
+		if backupParams.PartitionList != "" ||
+			backupParams.NodeList != "" ||
+			backupParams.AfterDigest != "" ||
+			backupParams.FilterExpression != "" ||
+			backupParams.ModifiedAfter != "" ||
+			backupParams.ModifiedBefore != "" ||
+			backupParams.NoTTLOnly {
+			return fmt.Errorf("estimate with any filter is not allowed")
+		}
+		// For estimate directory or file must not be set.
+		if backupParams.OutputFile != "" || commonParams.Directory != "" {
+			return fmt.Errorf("estimate with output-file or directory is not allowed")
+		}
+		// Check estimate samples size.
+		if backupParams.EstimateSamples < 0 {
+			return fmt.Errorf("estimate with estimate-samples < 0 is not allowed")
+		}
+	}
+
+	if !backupParams.Estimate && backupParams.OutputFile == "" && commonParams.Directory == "" {
+		return fmt.Errorf("must specify either output-file or directory")
 	}
 
 	return nil

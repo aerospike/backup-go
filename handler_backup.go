@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -81,7 +82,11 @@ func newBackupHandler(
 	scanLimiter *semaphore.Weighted,
 ) *BackupHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
+	// For estimates calculations, a writer will be nil.
+	if writer != nil {
+		logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
+	}
+
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
 	// redefine context cancel.
@@ -112,6 +117,61 @@ func (bh *BackupHandler) run() {
 	go doWork(bh.errors, bh.logger, func() error {
 		return bh.backupSync(bh.ctx)
 	})
+}
+
+// GetEstimate calculates backup size estimate.
+func (bh *BackupHandler) GetEstimate(ctx context.Context, recordsNumber int64) (uint64, error) {
+	totalCount, err := bh.infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count records: %w", err)
+	}
+
+	scanPolicy := *bh.config.ScanPolicy
+	scanPolicy.MaxRecords = recordsNumber
+
+	nodes := bh.aerospikeClient.GetNodes()
+	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)
+	readerConfig := handler.recordReaderConfigForNode(nodes, &scanPolicy)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+
+	// Calculate records size.
+	var (
+		recordsSize uint64
+		samplesSize []uint64
+	)
+
+	for {
+		t, err := recordReader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return 0, fmt.Errorf("error during records reading: %w", err)
+		}
+
+		data, err := bh.encoder.EncodeToken(t)
+		if err != nil {
+			return 0, fmt.Errorf("error encoding token: %w", err)
+		}
+
+		samplesSize = append(samplesSize, uint64(len(data)))
+		recordsSize += uint64(len(data))
+	}
+
+	// Calculate hedares size.
+	header := bh.encoder.GetHeader()
+	headerSize := len(header) * bh.config.ParallelWrite
+
+	result := estimateTotalBackupSize(
+		uint64(headerSize),
+		recordsSize,
+		uint64(recordsNumber),
+		totalCount,
+		0.999,
+		samplesSize)
+
+	return result, nil
 }
 
 func (bh *BackupHandler) backupSync(ctx context.Context) error {

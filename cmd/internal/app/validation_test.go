@@ -112,7 +112,10 @@ func TestValidateBackupConfig(t *testing.T) {
 		AfterDigest:   "some-digest",
 		PartitionList: "some-partition",
 	}
-	err := validateBackupParams(cfg)
+
+	cmn := &models.Common{}
+
+	err := validateBackupParams(cfg, cmn)
 	assert.Error(t, err)
 	assert.Equal(t, "only one of after-digest or partition-list can be configured", err.Error())
 
@@ -120,21 +123,21 @@ func TestValidateBackupConfig(t *testing.T) {
 		AfterDigest:   "some-digest",
 		PartitionList: "",
 	}
-	err = validateBackupParams(cfg)
+	err = validateBackupParams(cfg, cmn)
 	assert.NoError(t, err)
 
 	cfg = &models.Backup{
 		AfterDigest:   "",
 		PartitionList: "some-partition",
 	}
-	err = validateBackupParams(cfg)
+	err = validateBackupParams(cfg, cmn)
 	assert.NoError(t, err)
 
 	cfg = &models.Backup{
 		AfterDigest:   "",
 		PartitionList: "",
 	}
-	err = validateBackupParams(cfg)
+	err = validateBackupParams(cfg, cmn)
 	assert.NoError(t, err)
 }
 

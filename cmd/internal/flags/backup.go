@@ -113,6 +113,16 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"digest: base64 encoded string\n"+
 			"Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=\n"+
 			"Default: 0-4096 (all partitions)\n")
+	flagSet.BoolVarP(&f.Estimate, "estimate", "e",
+		false,
+		"Estimate the backed-up record size from a random sample of \n"+
+			"10,000 (default) records at 99.9999%% confidence.\n"+
+			"It ignores any filter:  filter-exp, node-list, modified-after, modified-before, no-ttl-only,\n"+
+			"after-digest, partition-list.\n"+
+			"It calculates estimate size of full backup.")
+	flagSet.Int64Var(&f.EstimateSamples, "estimate-samples",
+		10000,
+		"The number of samples to take when running a backup estimate.")
 
 	return flagSet
 }

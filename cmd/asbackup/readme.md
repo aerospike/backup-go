@@ -177,11 +177,6 @@ Azure Flags:
 
 --machine           Output machine-readable status updates to the given path, typically a FIFO.
 
---estimate          Estimate the backed-up record size from a random sample of 
-                    10,000 (default) records at 99.9999%% confidence.
-
---estimate-samples  The number of samples to take when running a backup estimate.
-
 --no-config-file    Do not read any config file. Default: disabled
 
 --instance          Section with these instance is read. e.g in case instance `a` is specified

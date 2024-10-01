@@ -46,22 +46,6 @@ type Writer struct {
 	called atomic.Bool
 }
 
-// WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
-// Is used only for Writer.
-func WithRemoveFiles() Opt {
-	return func(r *options) {
-		r.isRemovingFiles = true
-	}
-}
-
-// WithUploadConcurrency define max number of concurrent uploads to be performed to upload the file.
-// Is used only for Writer.
-func WithUploadConcurrency(v int) Opt {
-	return func(r *options) {
-		r.uploadConcurrency = v
-	}
-}
-
 func NewWriter(
 	ctx context.Context,
 	client *azblob.Client,

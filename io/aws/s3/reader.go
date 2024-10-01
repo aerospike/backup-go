@@ -98,7 +98,14 @@ func (r *Reader) StreamFiles(
 ) {
 	// If it is a folder, open and return.
 	if r.isDir {
+		err := r.checkRestoreDirectory(ctx)
+		if err != nil {
+			errorsCh <- err
+			return
+		}
+
 		r.streamDirectory(ctx, readersCh, errorsCh)
+
 		return
 	}
 
@@ -183,4 +190,39 @@ func (r *Reader) streamFile(
 // GetType return `s3type` type of storage. Used in logging.
 func (r *Reader) GetType() string {
 	return s3type
+}
+
+// checkRestoreDirectory checks that the restore directory contains any file.
+func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
+	var continuationToken *string
+
+	for {
+		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            &r.bucketName,
+			Prefix:            &r.prefix,
+			ContinuationToken: continuationToken,
+			StartAfter:        &r.startAfter,
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to list objects: %w", err)
+		}
+
+		for _, p := range listResponse.Contents {
+			if p.Key == nil || isDirectory(r.prefix, *p.Key) && !r.withNestedDir {
+				continue
+			}
+			// If we found anything, then folder is not empty.
+			if p.Key != nil {
+				return nil
+			}
+		}
+
+		continuationToken = listResponse.NextContinuationToken
+		if continuationToken == nil {
+			break
+		}
+	}
+
+	return fmt.Errorf("%s is empty", r.prefix)
 }

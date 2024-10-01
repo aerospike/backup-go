@@ -18,11 +18,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -32,6 +30,9 @@ type ASBackup struct {
 	backupClient *backup.Client
 	backupConfig *backup.BackupConfig
 	writer       backup.Writer
+	// Additional params.
+	isEstimate       bool
+	estimatesSamples int64
 }
 
 func NewASBackup(
@@ -47,22 +48,31 @@ func NewASBackup(
 	azureBlob *models.AzureBlob,
 	logger *slog.Logger,
 ) (*ASBackup, error) {
+	// Validations.
 	if err := validateStorages(awsS3, gcpStorage, azureBlob); err != nil {
 		return nil, err
 	}
 
-	if err := validateBackupParams(backupParams); err != nil {
+	if err := validateBackupParams(backupParams, commonParams); err != nil {
 		return nil, err
 	}
 
-	writer, err := getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup writer: %w", err)
-	}
-
-	if backupParams.RemoveArtifacts {
-		// We clean the folder on initialization.
-		return nil, nil
+	// Initializations.
+	var (
+		writer backup.Writer
+		err    error
+	)
+	// We initialize a writer only if output is configured.
+	if backupParams.OutputFile != "" || commonParams.Directory != "" {
+		writer, err = getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create backup writer: %w", err)
+		}
+		// If asbackup was launched with --remove-artifacts, we don't need to initialize all clients.
+		// We clean the folder on writer initialization and exit.
+		if backupParams.RemoveArtifacts {
+			return nil, nil
+		}
 	}
 
 	aerospikeClient, err := newAerospikeClient(clientConfig, backupParams.PreferRacks)
@@ -87,27 +97,40 @@ func NewASBackup(
 	}
 
 	return &ASBackup{
-		backupClient: backupClient,
-		backupConfig: backupConfig,
-		writer:       writer,
+		backupClient:     backupClient,
+		backupConfig:     backupConfig,
+		writer:           writer,
+		isEstimate:       backupParams.Estimate,
+		estimatesSamples: backupParams.EstimateSamples,
 	}, nil
 }
 
 func (b *ASBackup) Run(ctx context.Context) error {
+	// If asbackup was called with --remove-artifacts, it would be nil.
 	if b == nil {
 		return nil
 	}
 
-	h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
-	if err != nil {
-		return fmt.Errorf("failed to start backup: %w", err)
-	}
+	switch {
+	case b.isEstimate:
+		estimates, err := b.backupClient.Estimate(ctx, b.backupConfig, b.estimatesSamples)
+		if err != nil {
+			return fmt.Errorf("failed to calculate backup estimate: %w", err)
+		}
 
-	if err := h.Wait(ctx); err != nil {
-		return fmt.Errorf("failed to backup: %w", err)
-	}
+		printEstimateReport(estimates)
+	default:
+		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
+		if err != nil {
+			return fmt.Errorf("failed to start backup: %w", err)
+		}
 
-	printBackupReport(h.GetStats())
+		if err := h.Wait(ctx); err != nil {
+			return fmt.Errorf("failed to backup: %w", err)
+		}
+
+		printBackupReport(h.GetStats())
+	}
 
 	return nil
 }
@@ -130,18 +153,4 @@ func getWriter(
 	default:
 		return newLocalWriter(ctx, backupParams, commonParams)
 	}
-}
-
-func printBackupReport(stats *bModels.BackupStats) {
-	fmt.Println("Backup Report")
-	fmt.Println("--------------")
-	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
-	fmt.Printf("Duration:             %s\n", stats.GetDuration())
-	fmt.Printf("Records Read:         %d\n", stats.GetReadRecords())
-	fmt.Printf("sIndex Read:          %d\n", stats.GetSIndexes())
-	fmt.Printf("UDFs Read:            %d\n", stats.GetUDFs())
-	fmt.Printf("Bytes Written:        %d bytes\n", stats.GetBytesWritten())
-
-	fmt.Printf("Total Records:        %d\n", stats.TotalRecords)
-	fmt.Printf("Files Written:        %d\n", stats.GetFileCount())
 }

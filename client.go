@@ -250,3 +250,33 @@ func (c *Client) Restore(
 func (c *Client) AerospikeClient() AerospikeClient {
 	return c.aerospikeClient
 }
+
+// Estimate calculates the backup size from random sample of estimateSamples records number.
+//   - ctx can be used to cancel the calculation operation.
+//   - config is the backup configuration for the calculation operation.
+//   - estimateSamples is number of records to be scanned for calculations.
+func (c *Client) Estimate(
+	ctx context.Context,
+	config *BackupConfig,
+	estimateSamples int64) (uint64, error) {
+	if config == nil {
+		return 0, fmt.Errorf("backup config required")
+	}
+
+	// copy the policies so we don't modify the original
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
+
+	if err := config.validate(); err != nil {
+		return 0, fmt.Errorf("failed to validate backup config: %w", err)
+	}
+
+	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, c.scanLimiter)
+
+	result, err := handler.getEstimate(ctx, estimateSamples)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get estimate: %w", err)
+	}
+
+	return result, nil
+}

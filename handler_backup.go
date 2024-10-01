@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
@@ -81,7 +83,14 @@ func newBackupHandler(
 	scanLimiter *semaphore.Weighted,
 ) *BackupHandler {
 	id := uuid.NewString()
-	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
+	// For estimates calculations, a writer will be nil.
+	storageType := ""
+	if writer != nil {
+		storageType = writer.GetType()
+	}
+
+	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
+
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
 	// redefine context cancel.
@@ -112,6 +121,84 @@ func (bh *BackupHandler) run() {
 	go doWork(bh.errors, bh.logger, func() error {
 		return bh.backupSync(bh.ctx)
 	})
+}
+
+// getEstimate calculates backup size estimate.
+func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (uint64, error) {
+	totalCount, err := bh.infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count records: %w", err)
+	}
+
+	// Calculate headers size.
+	header := bh.encoder.GetHeader()
+	headerSize := len(header) * bh.config.ParallelWrite
+
+	// Calculate records size.
+	samples, samplesData, err := bh.getEstimateSamples(ctx, recordsNumber)
+	if err != nil {
+		return 0, fmt.Errorf("failed to estimate samples: %w", err)
+	}
+
+	// Calculate compress ratio. For uncompressed data it would be 1.
+	compressRatio, err := getCompressRatio(bh.config.CompressionPolicy, samplesData)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get compress ratio: %w", err)
+	}
+
+	bh.logger.Debug("compression", slog.Float64("ratio", compressRatio))
+
+	result := getEstimate(samples, float64(totalCount), bh.logger)
+	// Add headers.
+	result += float64(headerSize)
+	// Apply compression ratio. (For uncompressed it will be 1)
+	result /= compressRatio
+
+	return uint64(result), nil
+}
+
+// getEstimateSamples returns slice of samples and its content for estimate calculations.
+func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber int64,
+) (samples []float64, samplesData []byte, err error) {
+	scanPolicy := *bh.config.ScanPolicy
+	scanPolicy.MaxRecords = recordsNumber
+	// we need to set the RawCDT flag
+	// in the scan policy so that maps and lists are returned as raw blob bins
+	scanPolicy.RawCDT = true
+
+	nodes := bh.aerospikeClient.GetNodes()
+	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)
+	readerConfig := handler.recordReaderConfigForNode(nodes, &scanPolicy)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+
+	// Timestamp processor.
+	tsProcessor := processors.NewVoidTimeSetter(bh.logger)
+
+	for {
+		t, err := recordReader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, nil, fmt.Errorf("failed to read records: %w", err)
+		}
+
+		t, err = tsProcessor.Process(t)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to process token: %w", err)
+		}
+
+		data, err := bh.encoder.EncodeToken(t)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to encode token: %w", err)
+		}
+
+		samples = append(samples, float64(len(data)))
+		samplesData = append(samplesData, data...)
+	}
+
+	return samples, samplesData, nil
 }
 
 func (bh *BackupHandler) backupSync(ctx context.Context) error {

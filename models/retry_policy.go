@@ -29,3 +29,12 @@ type RetryPolicy struct {
 	// If set to 0, no retries will be performed.
 	MaxRetries uint
 }
+
+// NewRetryPolicy returns new configuration for retry attempts in case of failures.
+func NewRetryPolicy(baseTimeout time.Duration, multiplier float64, maxRetries uint) *RetryPolicy {
+	return &RetryPolicy{
+		BaseTimeout: baseTimeout,
+		Multiplier:  multiplier,
+		MaxRetries:  maxRetries,
+	}
+}

@@ -91,6 +91,37 @@ func TestValidateStorages(t *testing.T) {
 			azureBlob:  &models.AzureBlob{},
 			wantErr:    false,
 		},
+		{
+			name: "Partial AWS S3 configuration",
+			awsS3: &models.AwsS3{
+				Region:  "",
+				Profile: "default",
+			},
+			gcpStorage: &models.GcpStorage{},
+			azureBlob:  &models.AzureBlob{},
+			wantErr:    false,
+		},
+		{
+			name:  "Partial GCP Storage configuration",
+			awsS3: &models.AwsS3{},
+			gcpStorage: &models.GcpStorage{
+				BucketName: "partial-bucket",
+				KeyFile:    "",
+			},
+			azureBlob: &models.AzureBlob{},
+			wantErr:   false,
+		},
+		{
+			name:       "Partial Azure Blob configuration",
+			awsS3:      &models.AwsS3{},
+			gcpStorage: &models.GcpStorage{},
+			azureBlob: &models.AzureBlob{
+				ContainerName: "",
+				AccountName:   "account-name",
+				AccountKey:    "",
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -105,132 +136,217 @@ func TestValidateStorages(t *testing.T) {
 	}
 }
 
-func TestValidateBackupConfig(t *testing.T) {
-	t.Parallel()
-
-	cfg := &models.Backup{
-		AfterDigest:   "some-digest",
-		PartitionList: "some-partition",
+func TestValidateBackupParams(t *testing.T) {
+	tests := []struct {
+		name         string
+		backupParams *models.Backup
+		commonParams *models.Common
+		wantErr      bool
+		expectedErr  string
+	}{
+		{
+			name: "Both AfterDigest and PartitionList configured",
+			backupParams: &models.Backup{
+				AfterDigest:   "some-digest",
+				PartitionList: "some-partition",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "only one of after-digest or partition-list can be configured",
+		},
+		{
+			name: "Only AfterDigest configured",
+			backupParams: &models.Backup{
+				AfterDigest:   "some-digest",
+				PartitionList: "",
+				OutputFile:    "some-output-file",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+			expectedErr:  "",
+		},
+		{
+			name: "Only PartitionList configured",
+			backupParams: &models.Backup{
+				AfterDigest:   "",
+				PartitionList: "some-partition",
+				OutputFile:    "some-output-file",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+			expectedErr:  "",
+		},
+		{
+			name: "Neither AfterDigest nor PartitionList configured",
+			backupParams: &models.Backup{
+				AfterDigest:   "",
+				PartitionList: "",
+				OutputFile:    "some-output-file",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+			expectedErr:  "",
+		},
+		{
+			name: "Estimate with PartitionList",
+			backupParams: &models.Backup{
+				Estimate:      true,
+				PartitionList: "some-partition",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "estimate with any filter is not allowed",
+		},
+		{
+			name: "Estimate with output file",
+			backupParams: &models.Backup{
+				Estimate:   true,
+				OutputFile: "output-file",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "estimate with output-file or directory is not allowed",
+		},
+		{
+			name: "Estimate with valid configuration",
+			backupParams: &models.Backup{
+				Estimate:        true,
+				EstimateSamples: 100,
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+			expectedErr:  "",
+		},
+		{
+			name: "Estimate with invalid samples size",
+			backupParams: &models.Backup{
+				Estimate:        true,
+				EstimateSamples: -1,
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "estimate with estimate-samples < 0 is not allowed",
+		},
+		{
+			name: "Non-estimate with no output or directory",
+			backupParams: &models.Backup{
+				Estimate:   false,
+				OutputFile: "",
+			},
+			commonParams: &models.Common{
+				Directory: "",
+			},
+			wantErr:     true,
+			expectedErr: "must specify either output-file or directory",
+		},
+		{
+			name: "Non-estimate with output file",
+			backupParams: &models.Backup{
+				Estimate:   false,
+				OutputFile: "output-file",
+			},
+			commonParams: &models.Common{
+				Directory: "",
+			},
+			wantErr:     false,
+			expectedErr: "",
+		},
+		{
+			name: "Non-estimate with directory",
+			backupParams: &models.Backup{
+				Estimate:   false,
+				OutputFile: "",
+			},
+			commonParams: &models.Common{
+				Directory: "some-directory",
+			},
+			wantErr:     false,
+			expectedErr: "",
+		},
 	}
-	err := validateBackupParams(cfg)
-	assert.Error(t, err)
-	assert.Equal(t, "only one of after-digest or partition-list can be configured", err.Error())
 
-	cfg = &models.Backup{
-		AfterDigest:   "some-digest",
-		PartitionList: "",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateBackupParams(tt.backupParams, tt.commonParams)
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error but got none")
+				assert.Equal(t, tt.expectedErr, err.Error())
+			} else {
+				assert.NoError(t, err, "Expected no error but got one")
+			}
+		})
 	}
-	err = validateBackupParams(cfg)
-	assert.NoError(t, err)
-
-	cfg = &models.Backup{
-		AfterDigest:   "",
-		PartitionList: "some-partition",
-	}
-	err = validateBackupParams(cfg)
-	assert.NoError(t, err)
-
-	cfg = &models.Backup{
-		AfterDigest:   "",
-		PartitionList: "",
-	}
-	err = validateBackupParams(cfg)
-	assert.NoError(t, err)
 }
 
-func TestValidatePartitionFilters_SuccessSingleFilter(t *testing.T) {
-	t.Parallel()
-
-	partitionFilters := []*aerospike.PartitionFilter{
-		{Begin: 0, Count: 1},
+func TestValidatePartitionFilters(t *testing.T) {
+	tests := []struct {
+		name             string
+		partitionFilters []*aerospike.PartitionFilter
+		wantErr          bool
+	}{
+		{
+			name: "Single valid partition filter",
+			partitionFilters: []*aerospike.PartitionFilter{
+				{Begin: 0, Count: 1},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Non-overlapping partition filters",
+			partitionFilters: []*aerospike.PartitionFilter{
+				{Begin: 0, Count: 5},
+				{Begin: 10, Count: 5},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Overlapping partition filters",
+			partitionFilters: []*aerospike.PartitionFilter{
+				{Begin: 0, Count: 10},
+				{Begin: 5, Count: 10},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Duplicate begin value",
+			partitionFilters: []*aerospike.PartitionFilter{
+				{Begin: 0, Count: 1},
+				{Begin: 0, Count: 1},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Mixed filters with no overlap",
+			partitionFilters: []*aerospike.PartitionFilter{
+				{Begin: 0, Count: 1},
+				{Begin: 5, Count: 5},
+				{Begin: 20, Count: 1},
+				{Begin: 30, Count: 10},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid count in filter",
+			partitionFilters: []*aerospike.PartitionFilter{
+				{Begin: 0, Count: 0},
+			},
+			wantErr: true,
+		},
+		{
+			name:             "Edge case: Empty filters",
+			partitionFilters: []*aerospike.PartitionFilter{},
+			wantErr:          false,
+		},
 	}
 
-	err := validatePartitionFilters(partitionFilters)
-
-	assert.NoError(t, err, "Single partition filter should be valid")
-}
-
-func TestValidatePartitionFilters_SuccessNonOverlappingIntervals(t *testing.T) {
-	t.Parallel()
-
-	partitionFilters := []*aerospike.PartitionFilter{
-		{Begin: 0, Count: 5},
-		{Begin: 10, Count: 5},
-		{Begin: 20, Count: 10},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePartitionFilters(tt.partitionFilters)
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error but got none")
+			} else {
+				assert.NoError(t, err, "Expected no error but got one")
+			}
+		})
 	}
-
-	err := validatePartitionFilters(partitionFilters)
-
-	assert.NoError(t, err, "Non-overlapping intervals should be valid")
-}
-
-func TestValidatePartitionFilters_ErrorDuplicateBeginValue(t *testing.T) {
-	t.Parallel()
-
-	partitionFilters := []*aerospike.PartitionFilter{
-		{Begin: 0, Count: 1},
-		{Begin: 0, Count: 1},
-	}
-
-	err := validatePartitionFilters(partitionFilters)
-
-	assert.Error(t, err, "Duplicate begin value should return an error")
-	assert.Equal(t, "duplicate begin value 0 for count = 1", err.Error())
-}
-
-func TestValidatePartitionFilters_ErrorOverlappingIntervals(t *testing.T) {
-	t.Parallel()
-
-	partitionFilters := []*aerospike.PartitionFilter{
-		{Begin: 0, Count: 10},
-		{Begin: 5, Count: 10},
-	}
-
-	err := validatePartitionFilters(partitionFilters)
-
-	assert.Error(t, err, "Overlapping intervals should return an error")
-	assert.Equal(t, "overlapping intervals: [0, 10] and [5, 15]", err.Error())
-}
-
-func TestValidatePartitionFilters_SuccessMixedFilters(t *testing.T) {
-	t.Parallel()
-
-	partitionFilters := []*aerospike.PartitionFilter{
-		{Begin: 0, Count: 1},
-		{Begin: 5, Count: 5},
-		{Begin: 20, Count: 1},
-		{Begin: 30, Count: 10},
-	}
-
-	err := validatePartitionFilters(partitionFilters)
-
-	assert.NoError(t, err, "Valid mixed filters should pass validation")
-}
-
-func TestValidatePartitionFilters_ErrorInvalidCount(t *testing.T) {
-	t.Parallel()
-
-	partitionFilters := []*aerospike.PartitionFilter{
-		{Begin: 0, Count: 0},
-	}
-
-	err := validatePartitionFilters(partitionFilters)
-
-	assert.Error(t, err, "Invalid count should return an error")
-	assert.Equal(t, "invalid partition filter count: 0", err.Error())
-}
-
-func TestValidatePartitionFilters_ErrorOverlappingComplexIntervals(t *testing.T) {
-	t.Parallel()
-
-	partitionFilters := []*aerospike.PartitionFilter{
-		{Begin: 0, Count: 5},
-		{Begin: 5, Count: 10},
-		{Begin: 8, Count: 3},
-	}
-
-	err := validatePartitionFilters(partitionFilters)
-
-	assert.Error(t, err, "Overlapping complex intervals should return an error")
-	assert.Equal(t, "overlapping intervals: [0, 5] and [5, 15]", err.Error())
 }

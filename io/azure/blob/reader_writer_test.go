@@ -513,3 +513,40 @@ func (s *AzureSuite) TestWriter_GetType() {
 	result := writer.GetType()
 	require.Equal(s.T(), azureBlobType, result)
 }
+
+func (s *AzureSuite) TestReader_WithMarker() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testReadFolderEmpty),
+		WithMarker(testReadFolderEmpty),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 0, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}

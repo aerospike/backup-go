@@ -30,9 +30,11 @@ type options struct {
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
 	// Default: false
 	withNestedDir bool
-	// marker is a string value that identifies the portion of the list of containers to be returned with the next listing operation. The
-	// operation returns the NextMarker value within the response body if the listing
-	// operation did not return all containers remaining to be listed with the current page. The NextMarker value can be used
+	// marker is a string value that identifies the portion of the list of containers to be
+	// returned with the next listing operation.
+	// The operation returns the NextMarker value within the response body if the listing
+	// operation did not return all containers remaining to be listed with the current page.
+	// The NextMarker value can be used
 	// as the value for the marker parameter in a subsequent call to request the next
 	// page of list items. The marker value is opaque to the client.
 	marker string

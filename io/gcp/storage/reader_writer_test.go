@@ -583,3 +583,42 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 	err = w.Close()
 	s.Require().NoError(err)
 }
+
+func (s *GCPSuite) TestReader_WithStartOffset() {
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		WithDir(testReadFolderEmpty),
+		WithStartOffset(testReadFolderEmpty),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 0, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}

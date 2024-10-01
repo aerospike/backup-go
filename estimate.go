@@ -55,6 +55,14 @@ func calculateStats(data []float64) estimateStats {
 
 	mean := sum / float64(n)
 
+	// For n = 1, variance = 0
+	if n == 1 {
+		return estimateStats{
+			mean,
+			0.0,
+		}
+	}
+
 	var varianceSum float64
 	for _, value := range data {
 		varianceSum += (value - mean) * (value - mean)
@@ -85,7 +93,7 @@ func confidenceInterval(stats estimateStats, sampleSize int) (low, high float64)
 func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, error) {
 	// We create io.WriteCloser from samplesData to calculate a compress ratio.
 	bytesWriter := util.NewBytesWriteCloser([]byte{})
-	// Create compression writer same way as on backup.
+	// Create compression writer the same way as on backup.
 	encodedWriter, err := newCompressionWriter(policy, bytesWriter)
 	if err != nil {
 		return 0, err

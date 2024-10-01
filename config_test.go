@@ -59,7 +59,7 @@ func TestBackupConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "filelimit")
 	config = NewDefaultBackupConfig()
 
-	config.CompressionPolicy = &CompressionPolicy{Level: -1}
+	config.CompressionPolicy = NewCompressionPolicy(CompressZSTD, -1)
 	assert.ErrorContains(t, config.validate(), "compression")
 	config = NewDefaultBackupConfig()
 
@@ -99,7 +99,7 @@ func TestRestoreConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "async batches")
 	config = NewDefaultRestoreConfig()
 
-	config.CompressionPolicy = &CompressionPolicy{Level: -1}
+	config.CompressionPolicy = NewCompressionPolicy(CompressZSTD, -1)
 	assert.ErrorContains(t, config.validate(), "compression")
 	config = NewDefaultRestoreConfig()
 

@@ -90,9 +90,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 	backupCfg.ParallelRead = 10
 
 	// set compression policy
-	backupCfg.CompressionPolicy = &backup.CompressionPolicy{
-		Mode: backup.CompressZSTD,
-	}
+	backupCfg.CompressionPolicy = backup.NewCompressionPolicy(backup.CompressZSTD, 20)
 
 	backupHandler, err := c.Backup(ctx, backupCfg, writers)
 	if err != nil {
@@ -138,9 +136,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 	}
 
 	// set compression policy
-	restoreCfg.CompressionPolicy = &backup.CompressionPolicy{
-		Mode: backup.CompressZSTD,
-	}
+	restoreCfg.CompressionPolicy = backup.NewCompressionPolicy(backup.CompressZSTD, 20)
 
 	restoreHandler, err := c.Restore(ctx, restoreCfg, readers)
 	if err != nil {

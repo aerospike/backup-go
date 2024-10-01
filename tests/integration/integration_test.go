@@ -709,14 +709,9 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 	}
 
 	bCfg := backup.NewDefaultBackupConfig()
-	bCfg.CompressionPolicy = &backup.CompressionPolicy{
-		Mode:  backup.CompressZSTD,
-		Level: 20,
-	}
+	bCfg.CompressionPolicy = backup.NewCompressionPolicy(backup.CompressZSTD, 20)
 	rCfg := backup.NewDefaultRestoreConfig()
-	rCfg.CompressionPolicy = &backup.CompressionPolicy{
-		Mode: backup.CompressZSTD,
-	}
+	rCfg.CompressionPolicy = backup.NewCompressionPolicy(backup.CompressZSTD, 20)
 
 	var testsCases = []struct {
 		args args
@@ -1086,6 +1081,22 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 		ctx,
 		backupConfig,
 		&dst,
+	)
+	suite.Nil(err)
+	suite.NotNil(bh)
+	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) TestBackupEstimateOk() {
+	batch := genRecords(suite.namespace, suite.set, 900, testBins)
+	suite.SetupTest(batch)
+
+	backupConfig := backup.NewDefaultBackupConfig()
+	ctx := context.Background()
+	bh, err := suite.backupClient.Estimate(
+		ctx,
+		backupConfig,
+		100,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)

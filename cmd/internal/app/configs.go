@@ -169,10 +169,7 @@ func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
 		return nil
 	}
 
-	return &backup.CompressionPolicy{
-		Mode:  strings.ToUpper(c.Mode),
-		Level: c.Level,
-	}
+	return backup.NewCompressionPolicy(strings.ToUpper(c.Mode), c.Level)
 }
 
 func mapEncryptionPolicy(e *models.Encryption) *backup.EncryptionPolicy {
@@ -293,12 +290,11 @@ func mapInfoPolicy(timeOut int64) *aerospike.InfoPolicy {
 }
 
 func mapRetryPolicy(r *models.Restore) *bModels.RetryPolicy {
-	// TODO: make constructor for bModels.RetryPolicy
-	return &bModels.RetryPolicy{
-		BaseTimeout: time.Duration(r.RetryBaseTimeout) * time.Millisecond,
-		Multiplier:  r.RetryMultiplier,
-		MaxRetries:  r.RetryMaxRetries,
-	}
+	return bModels.NewRetryPolicy(
+		time.Duration(r.RetryBaseTimeout)*time.Millisecond,
+		r.RetryMultiplier,
+		r.RetryMaxRetries,
+	)
 }
 
 func splitByComma(s string) []string {

@@ -21,6 +21,10 @@ import (
 	"github.com/aerospike/backup-go/internal/util"
 )
 
+// zScore represents the number of standard deviations a given value is from the mean of a distribution.
+// For a 99% confidence interval, the zScore is approximately 2.576.
+// This means that there is a 99% probability that the true population parameter
+// lies within the calculated confidence interval.
 const zScore = 2.576
 
 type estimateStats struct {

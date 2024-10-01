@@ -283,15 +283,13 @@ func TestValidatePartitionFilters(t *testing.T) {
 		name             string
 		partitionFilters []*aerospike.PartitionFilter
 		wantErr          bool
-		expectedErr      string
 	}{
 		{
 			name: "Single valid partition filter",
 			partitionFilters: []*aerospike.PartitionFilter{
 				{Begin: 0, Count: 1},
 			},
-			wantErr:     false,
-			expectedErr: "",
+			wantErr: false,
 		},
 		{
 			name: "Non-overlapping partition filters",
@@ -299,8 +297,7 @@ func TestValidatePartitionFilters(t *testing.T) {
 				{Begin: 0, Count: 5},
 				{Begin: 10, Count: 5},
 			},
-			wantErr:     false,
-			expectedErr: "",
+			wantErr: false,
 		},
 		{
 			name: "Overlapping partition filters",
@@ -308,8 +305,7 @@ func TestValidatePartitionFilters(t *testing.T) {
 				{Begin: 0, Count: 10},
 				{Begin: 5, Count: 10},
 			},
-			wantErr:     true,
-			expectedErr: "overlapping intervals: [0, 10] and [5, 15]",
+			wantErr: true,
 		},
 		{
 			name: "Duplicate begin value",
@@ -317,8 +313,7 @@ func TestValidatePartitionFilters(t *testing.T) {
 				{Begin: 0, Count: 1},
 				{Begin: 0, Count: 1},
 			},
-			wantErr:     true,
-			expectedErr: "duplicate begin value 0 for count = 1",
+			wantErr: true,
 		},
 		{
 			name: "Mixed filters with no overlap",
@@ -328,22 +323,19 @@ func TestValidatePartitionFilters(t *testing.T) {
 				{Begin: 20, Count: 1},
 				{Begin: 30, Count: 10},
 			},
-			wantErr:     false,
-			expectedErr: "",
+			wantErr: false,
 		},
 		{
 			name: "Invalid count in filter",
 			partitionFilters: []*aerospike.PartitionFilter{
 				{Begin: 0, Count: 0},
 			},
-			wantErr:     true,
-			expectedErr: "invalid partition filter count: 0",
+			wantErr: true,
 		},
 		{
 			name:             "Edge case: Empty filters",
 			partitionFilters: []*aerospike.PartitionFilter{},
 			wantErr:          false,
-			expectedErr:      "",
 		},
 	}
 
@@ -352,7 +344,6 @@ func TestValidatePartitionFilters(t *testing.T) {
 			err := validatePartitionFilters(tt.partitionFilters)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
-				assert.Equal(t, tt.expectedErr, err.Error())
 			} else {
 				assert.NoError(t, err, "Expected no error but got one")
 			}

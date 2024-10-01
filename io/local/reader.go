@@ -143,7 +143,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		if file.IsDir() {
-			// Itterate over nested dirs recursively.
+			// Iterate over nested dirs recursively.
 			if r.withNestedDir {
 				nestedDir := filepath.Join(r.path, file.Name())
 

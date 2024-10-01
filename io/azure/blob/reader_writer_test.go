@@ -37,6 +37,7 @@ const (
 	testReadFolderWithData       = "folder_read_with_data/"
 	testReadFolderMixedData      = "folder_read_mixed_data/"
 	testReadFolderOneFile        = "folder_read_one_file/"
+	testReadFolderWithMarker     = "folder_read_with_marker/"
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
 	testWriteFolderWithDataError = "folder_write_with_data_error/"
@@ -113,7 +114,7 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 			return err
 		}
 
-		fileName = fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
+		fileName = fmt.Sprintf("%s%s", testReadFolderWithMarker, fmt.Sprintf(testFileNameTemplate, i))
 		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
 		}
@@ -521,12 +522,14 @@ func (s *AzureSuite) TestReader_WithMarker() {
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
+	marker := fmt.Sprintf("%s%s", testReadFolderWithMarker, fmt.Sprintf(testFileNameTemplate, 2))
+
 	reader, err := NewReader(
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testReadFolderEmpty),
-		WithMarker(testReadFolderEmpty),
+		WithDir(testReadFolderWithMarker),
+		WithMarker(marker),
 	)
 	s.Require().NoError(err)
 
@@ -543,7 +546,7 @@ func (s *AzureSuite) TestReader_WithMarker() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 0, filesCounter)
+				require.Equal(s.T(), 2, filesCounter)
 				return
 			}
 			filesCounter++

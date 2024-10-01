@@ -45,14 +45,6 @@ type Writer struct {
 	called atomic.Bool
 }
 
-// WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
-// Is used only for Writer.
-func WithRemoveFiles() Opt {
-	return func(r *options) {
-		r.isRemovingFiles = true
-	}
-}
-
 // NewWriter creates a new writer for S3 storage directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.

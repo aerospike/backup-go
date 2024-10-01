@@ -30,24 +30,25 @@ import (
 )
 
 const (
-	testServiceAddress           = "http://127.0.0.1:4443/storage/v1/b"
-	testProjectID                = "test-project"
-	testBucketName               = "test-bucket"
-	testReadFolderEmpty          = "folder_read_empty/"
-	testReadFolderWithData       = "folder_read_with_data/"
-	testReadFolderMixedData      = "folder_read_mixed_data/"
-	testReadFolderOneFile        = "folder_read_one_file/"
-	testWriteFolderEmpty         = "folder_write_empty/"
-	testWriteFolderWithData      = "folder_write_with_data/"
-	testWriteFolderWithDataError = "folder_write_with_data_error/"
-	testWriteFolderMixedData     = "folder_write_mixed_data/"
-	testWriteFolderOneFile       = "folder_write_one_file/"
-	testFileNameTemplate         = "backup_%d.asb"
-	testFileNameTemplateWrong    = "file_%d.zip"
-	testFileNameOneFile          = "one_file.any"
-	testFileContent              = "content"
-	testFileContentLength        = 7
-	testFilesNumber              = 5
+	testServiceAddress            = "http://127.0.0.1:4443/storage/v1/b"
+	testProjectID                 = "test-project"
+	testBucketName                = "test-bucket"
+	testReadFolderEmpty           = "folder_read_empty/"
+	testReadFolderWithData        = "folder_read_with_data/"
+	testReadFolderMixedData       = "folder_read_mixed_data/"
+	testReadFolderOneFile         = "folder_read_one_file/"
+	testReadFolderWithStartOffset = "folder_read_with_start_offset/"
+	testWriteFolderEmpty          = "folder_write_empty/"
+	testWriteFolderWithData       = "folder_write_with_data/"
+	testWriteFolderWithDataError  = "folder_write_with_data_error/"
+	testWriteFolderMixedData      = "folder_write_mixed_data/"
+	testWriteFolderOneFile        = "folder_write_one_file/"
+	testFileNameTemplate          = "backup_%d.asb"
+	testFileNameTemplateWrong     = "file_%d.zip"
+	testFileNameOneFile           = "one_file.any"
+	testFileContent               = "content"
+	testFileContentLength         = 7
+	testFilesNumber               = 5
 )
 
 type GCPSuite struct {
@@ -114,6 +115,13 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 	for i := 0; i < testFilesNumber; i++ {
 		// for reading tests.
 		fileName := fmt.Sprintf("%s%s", testReadFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
+		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+		sw.ContentType = fileType
+		if err := writeContent(sw, testFileContent); err != nil {
+			return err
+		}
+
+		fileName = fmt.Sprintf("%s%s", testReadFolderWithStartOffset, fmt.Sprintf(testFileNameTemplate, i))
 		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
 		sw.ContentType = fileType
 		if err := writeContent(sw, testFileContent); err != nil {
@@ -582,4 +590,45 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 	s.Equal(testFileContentLength, n)
 	err = w.Close()
 	s.Require().NoError(err)
+}
+
+func (s *GCPSuite) TestReader_WithStartOffset() {
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	startOffset := fmt.Sprintf("%s%s", testReadFolderWithStartOffset, fmt.Sprintf(testFileNameTemplate, 2))
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		WithDir(testReadFolderWithStartOffset),
+		WithStartOffset(startOffset),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
 }

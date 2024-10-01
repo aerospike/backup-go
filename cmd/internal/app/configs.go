@@ -53,6 +53,7 @@ func mapBackupConfig(
 	c.NoIndexes = commonParams.NoIndexes
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
 	c.FileLimit = backupParams.FileLimit
+	c.NoUDFs = commonParams.NoUDFs
 	// The original backup tools have a single parallelism configuration property.
 	// We may consider splitting the configuration in the future.
 	c.ParallelWrite = commonParams.Parallel
@@ -128,6 +129,7 @@ func mapRestoreConfig(
 	c.BinList = splitByComma(commonParams.BinList)
 	c.NoRecords = commonParams.NoRecords
 	c.NoIndexes = commonParams.NoIndexes
+	c.NoUDFs = commonParams.NoUDFs
 	c.RecordsPerSecond = commonParams.RecordsPerSecond
 	c.Parallel = commonParams.Parallel
 	c.WritePolicy = mapWritePolicy(restoreParams, commonParams)

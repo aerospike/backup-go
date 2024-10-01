@@ -162,6 +162,9 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 ) (samples []float64, samplesData []byte, err error) {
 	scanPolicy := *bh.config.ScanPolicy
 	scanPolicy.MaxRecords = recordsNumber
+	// we need to set the RawCDT flag
+	// in the scan policy so that maps and lists are returned as raw blob bins
+	scanPolicy.RawCDT = true
 
 	nodes := bh.aerospikeClient.GetNodes()
 	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)

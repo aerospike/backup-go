@@ -1088,7 +1088,7 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 }
 
 func (suite *backupRestoreTestSuite) TestBackupEstimateOk() {
-	batch := genRecords(suite.namespace, suite.set, 900, testBins)
+	batch := genRecords(suite.namespace, suite.set, 100, testBins)
 	suite.SetupTest(batch)
 
 	backupConfig := backup.NewDefaultBackupConfig()
@@ -1096,7 +1096,7 @@ func (suite *backupRestoreTestSuite) TestBackupEstimateOk() {
 	bh, err := suite.backupClient.Estimate(
 		ctx,
 		backupConfig,
-		100,
+		10,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)

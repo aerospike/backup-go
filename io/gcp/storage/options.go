@@ -74,6 +74,8 @@ func WithRemoveFiles() Opt {
 }
 
 // WithStartOffset adds start offset parameter to list request.
+// The Value of start offset will be included in a result.
+// You will receive objects including start offset.
 // Is used only for Reader.
 func WithStartOffset(v string) Opt {
 	return func(r *options) {

@@ -90,6 +90,8 @@ func WithUploadConcurrency(v int) Opt {
 }
 
 // WithMarker adds marker parameter to list request.
+// The Value of marker will be not included in a result.
+// You will receive objects after marker.
 // Is used only for Reader.
 func WithMarker(v string) Opt {
 	return func(r *options) {

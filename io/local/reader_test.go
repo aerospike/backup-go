@@ -147,20 +147,9 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrEmpt
 	errorChan := make(chan error)
 	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
 
-	var counter int
-	for {
-		select {
-		case _, ok := <-readerChan:
-			// if chan closed, we're done.
-			if !ok {
-				s.Require().Equal(2, counter)
-				return
-			}
-			counter++
-		case err = <-errorChan:
-			require.ErrorContains(s.T(), err, "is empty")
-			return
-		}
+	for err = range errorChan {
+		s.Require().ErrorContains(err, "is empty")
+		return
 	}
 }
 

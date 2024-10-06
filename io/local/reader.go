@@ -224,7 +224,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 			if file.IsDir() {
 				// Iterate over nested dirs recursively.
 				if r.withNestedDir {
-					nestedDir := filepath.Join(r.path, file.Name())
+					nestedDir := filepath.Join(dir, file.Name())
 					// If the nested folder is ok, then return nil.
 					if err = r.checkRestoreDirectory(nestedDir); err == nil {
 						return nil

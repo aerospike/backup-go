@@ -268,6 +268,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 		testBucketName,
 		WithDir(testReadFolderEmpty),
 		WithValidator(validatorMock{}),
+		WithNestedDir(),
 	)
 	s.Require().NoError(err)
 

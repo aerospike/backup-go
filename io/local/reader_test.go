@@ -43,8 +43,9 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_Empt
 		return fmt.Errorf("invalid file extension")
 	})
 
-	reader, _ := NewReader(WithValidator(mockValidator), WithDir(dir))
-	err := reader.checkRestoreDirectory()
+	reader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
+	s.NoError(err)
+	err = reader.checkRestoreDirectory(dir)
 	s.Error(err)
 }
 

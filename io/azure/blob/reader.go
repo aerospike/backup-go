@@ -183,9 +183,18 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 			if isDirectory(r.prefix, *blob.Name) && !r.withNestedDir {
 				continue
 			}
-			// If we found anything, then folder is not empty.
-			if blob.Name != nil {
-				return nil
+
+			switch {
+			case r.validator != nil:
+				// If we found a valid file, return.
+				if err = r.validator.Run(*blob.Name); err == nil {
+					return nil
+				}
+			default:
+				// If we found anything, then folder is not empty.
+				if blob.Name != nil {
+					return nil
+				}
 			}
 		}
 	}

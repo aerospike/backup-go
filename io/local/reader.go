@@ -112,7 +112,7 @@ func (r *Reader) StreamFiles(
 	defer close(readersCh)
 	// If it is a folder, open and return.
 	if r.isDir {
-		err := r.checkRestoreDirectory()
+		err := r.checkRestoreDirectory(r.path)
 		if err != nil {
 			errorsCh <- err
 			return
@@ -201,9 +201,7 @@ func (r *Reader) streamFile(
 
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format.
-func (r *Reader) checkRestoreDirectory() error {
-	dir := r.path
-
+func (r *Reader) checkRestoreDirectory(dir string) error {
 	dirInfo, err := os.Stat(dir)
 	if err != nil {
 		// Handle the error
@@ -220,9 +218,33 @@ func (r *Reader) checkRestoreDirectory() error {
 		return fmt.Errorf("failed to read path %s: %w", dir, err)
 	}
 
-	// Check if the directory is empty
-	if len(fileInfo) == 0 {
-		return fmt.Errorf("%s is empty", dir)
+	switch {
+	case r.validator != nil:
+		for _, file := range fileInfo {
+			if file.IsDir() {
+				// Iterate over nested dirs recursively.
+				if r.withNestedDir {
+					nestedDir := filepath.Join(r.path, file.Name())
+					// If the nested folder is ok, then return nil.
+					err = r.checkRestoreDirectory(nestedDir)
+					if err != nil {
+						return err
+					}
+				}
+
+				continue
+			}
+
+			// If we found a valid file, return.
+			if err = r.validator.Run(file.Name()); err == nil {
+				return nil
+			}
+		}
+	default:
+		// Check if the directory is empty
+		if len(fileInfo) == 0 {
+			return fmt.Errorf("%s is empty", dir)
+		}
 	}
 
 	return nil

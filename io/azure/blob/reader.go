@@ -87,7 +87,14 @@ func (r *Reader) StreamFiles(
 ) {
 	// If it is a folder, open and return.
 	if r.isDir {
+		err := r.checkRestoreDirectory(ctx)
+		if err != nil {
+			errorsCh <- err
+			return
+		}
+
 		r.streamDirectory(ctx, readersCh, errorsCh)
+
 		return
 	}
 
@@ -156,6 +163,43 @@ func (r *Reader) streamFile(
 // GetType return `gcpStorageType` type of storage. Used in logging.
 func (r *Reader) GetType() string {
 	return azureBlobType
+}
+
+// checkRestoreDirectory checks that the restore directory contains any file.
+func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
+	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
+		Prefix: &r.prefix,
+		Marker: &r.marker,
+	})
+
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		for _, blob := range page.Segment.BlobItems {
+			// Skip files in folders.
+			if isDirectory(r.prefix, *blob.Name) && !r.withNestedDir {
+				continue
+			}
+
+			switch {
+			case r.validator != nil:
+				// If we found a valid file, return.
+				if err = r.validator.Run(*blob.Name); err == nil {
+					return nil
+				}
+			default:
+				// If we found anything, then folder is not empty.
+				if blob.Name != nil {
+					return nil
+				}
+			}
+		}
+	}
+
+	return fmt.Errorf("%s is empty", r.prefix)
 }
 
 func isDirectory(prefix, fileName string) bool {

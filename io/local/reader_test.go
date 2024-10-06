@@ -34,6 +34,8 @@ type checkRestoreDirectoryTestSuite struct {
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
+	err := createTmpFile(dir, "file3.txt")
+	require.NoError(s.T(), err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -43,8 +45,9 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_Empt
 		return fmt.Errorf("invalid file extension")
 	})
 
-	reader, _ := NewReader(WithValidator(mockValidator), WithDir(dir))
-	err := reader.checkRestoreDirectory()
+	reader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
+	s.NoError(err)
+	err = reader.checkRestoreDirectory(dir)
 	s.Error(err)
 }
 
@@ -147,20 +150,9 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrEmpt
 	errorChan := make(chan error)
 	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
 
-	var counter int
-	for {
-		select {
-		case _, ok := <-readerChan:
-			// if chan closed, we're done.
-			if !ok {
-				s.Require().Equal(2, counter)
-				return
-			}
-			counter++
-		case err = <-errorChan:
-			require.ErrorContains(s.T(), err, "is empty")
-			return
-		}
+	for err = range errorChan {
+		s.Require().ErrorContains(err, "is empty")
+		return
 	}
 }
 

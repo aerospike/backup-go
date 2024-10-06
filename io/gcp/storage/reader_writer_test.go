@@ -268,6 +268,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 		testBucketName,
 		WithDir(testReadFolderEmpty),
 		WithValidator(validatorMock{}),
+		WithNestedDir(),
 	)
 	s.Require().NoError(err)
 
@@ -276,19 +277,9 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 
 	go reader.StreamFiles(ctx, rCH, eCH)
 
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case _, ok := <-rCH:
-			if !ok {
-				require.Equal(s.T(), 0, filesCounter)
-				return
-			}
-			filesCounter++
-		}
+	for err = range eCH {
+		s.Require().ErrorContains(err, "is empty")
+		return
 	}
 }
 

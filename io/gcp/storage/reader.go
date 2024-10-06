@@ -91,7 +91,14 @@ func (r *Reader) StreamFiles(
 ) {
 	// If it is a folder, open and return.
 	if r.isDir {
+		err := r.checkRestoreDirectory(ctx)
+		if err != nil {
+			errorsCh <- err
+			return
+		}
+
 		r.streamDirectory(ctx, readersCh, errorsCh)
+
 		return
 	}
 
@@ -170,6 +177,49 @@ func (r *Reader) streamFile(
 // GetType return `gcpStorageType` type of storage. Used in logging.
 func (r *Reader) GetType() string {
 	return gcpStorageType
+}
+
+// checkRestoreDirectory checks that the restore directory contains any file.
+func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
+	it := r.bucketHandle.Objects(ctx, &storage.Query{
+		Prefix:      r.prefix,
+		StartOffset: r.startOffset,
+	})
+
+	for {
+		// Iterate over bucket until we're done.
+		objAttrs, err := it.Next()
+		if err != nil {
+			if !errors.Is(err, iterator.Done) {
+				return fmt.Errorf("failed to read object attr from bucket %s: %w",
+					r.bucketName, err)
+			}
+			// If the previous call to Next returned an error other than iterator.Done, all
+			// subsequent calls will return the same error. To continue iteration, a new
+			// `ObjectIterator` must be created.
+			break
+		}
+
+		// Skip files in folders.
+		if isDirectory(r.prefix, objAttrs.Name) && !r.withNestedDir {
+			continue
+		}
+
+		switch {
+		case r.validator != nil:
+			// If we found a valid file, return.
+			if err = r.validator.Run(objAttrs.Name); err == nil {
+				return nil
+			}
+		default:
+			// If we found anything, then folder is not empty.
+			if objAttrs.Name != "" {
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("%s is empty", r.prefix)
 }
 
 func isDirectory(prefix, fileName string) bool {

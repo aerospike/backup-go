@@ -34,6 +34,8 @@ type checkRestoreDirectoryTestSuite struct {
 
 func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
+	err := createTmpFile(dir, "file3.txt")
+	require.NoError(s.T(), err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {

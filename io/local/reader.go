@@ -226,9 +226,8 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 				if r.withNestedDir {
 					nestedDir := filepath.Join(r.path, file.Name())
 					// If the nested folder is ok, then return nil.
-					err = r.checkRestoreDirectory(nestedDir)
-					if err != nil {
-						return err
+					if err = r.checkRestoreDirectory(nestedDir); err == nil {
+						return nil
 					}
 				}
 
@@ -240,6 +239,8 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 				return nil
 			}
 		}
+
+		return fmt.Errorf("%s is empty", dir)
 	default:
 		// Check if the directory is empty
 		if len(fileInfo) == 0 {

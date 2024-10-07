@@ -137,6 +137,11 @@ func mapRestoreConfig(
 	// As we set --nice in MiB we must convert it to bytes
 	// TODO: make Bandwidth int64 to avoid overflow.
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
+	c.ExtraTTL = restoreParams.ExtraTTL
+	c.IgnoreRecordError = restoreParams.IgnoreRecordError
+	c.DisableBatchWrites = restoreParams.DisableBatchWrites
+	c.BatchSize = restoreParams.BatchSize
+	c.MaxAsyncBatches = restoreParams.MaxAsyncBatches
 
 	c.CompressionPolicy = mapCompressionPolicy(compression)
 	c.EncryptionPolicy = mapEncryptionPolicy(encryption)

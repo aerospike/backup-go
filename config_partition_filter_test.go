@@ -129,7 +129,7 @@ func TestSplitPartitions_NumWorkersLessThanFilters(t *testing.T) {
 	_, err := splitPartitions(partitionFilters, numWorkers)
 
 	assert.Error(t, err)
-	assert.Equal(t, "numWorkers is less than PartitionFilters, cannot split PartitionFilters", err.Error())
+	assert.Equal(t, "numWorkers is less than partitionFilters, cannot split partitionFilters", err.Error())
 }
 
 func TestSplitPartitionRange(t *testing.T) {

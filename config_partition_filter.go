@@ -66,21 +66,21 @@ func NewPartitionFilterAll() *a.PartitionFilter {
 // splitPartitions splits partition to groups.
 func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
 	if numWorkers < 1 || numWorkers < len(partitionFilters) {
-		return nil, fmt.Errorf("numWorkers is less than PartitionFilters, cannot split PartitionFilters")
+		return nil, fmt.Errorf("numWorkers is less than partitionFilters, cannot split partitionFilters")
 	}
 
 	// Validations.
 	for i := range partitionFilters {
 		if partitionFilters[i].Begin < 0 {
-			return nil, fmt.Errorf("startPartition is less than 0, cannot split PartitionFilters")
+			return nil, fmt.Errorf("startPartition is less than 0, cannot split partitionFilters")
 		}
 
 		if partitionFilters[i].Count < 1 {
-			return nil, fmt.Errorf("numPartitions is less than 1, cannot split PartitionFilters")
+			return nil, fmt.Errorf("numPartitions is less than 1, cannot split partitionFilters")
 		}
 
 		if partitionFilters[i].Begin+partitionFilters[i].Count > MaxPartitions {
-			return nil, fmt.Errorf("startPartition + numPartitions is greater than the max PartitionFilters: %d",
+			return nil, fmt.Errorf("startPartition + numPartitions is greater than the max partitionFilters: %d",
 				MaxPartitions)
 		}
 	}

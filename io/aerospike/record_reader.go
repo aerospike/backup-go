@@ -141,7 +141,8 @@ func (r *RecordReader) Read() (*models.Token, error) {
 	rec := models.Record{
 		Record: res.Record,
 	}
-	recToken := models.NewRecordToken(&rec, 0)
+	// TODO: check how accurate is value of filter at this moment.
+	recToken := models.NewRecordToken(&rec, 0, *r.config.partitionFilter)
 
 	return recToken, nil
 }

@@ -85,21 +85,23 @@ func (tw *tokenStatsWriter) Close() error {
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
 type tokenWriter struct {
-	encoder Encoder
-	output  io.Writer
-	logger  *slog.Logger
+	encoder   Encoder
+	output    io.Writer
+	logger    *slog.Logger
+	stateChan chan<- recordState
 }
 
 // newTokenWriter creates a new tokenWriter.
-func newTokenWriter(encoder Encoder, output io.Writer, logger *slog.Logger) *tokenWriter {
+func newTokenWriter(encoder Encoder, output io.Writer, logger *slog.Logger, stateChan chan<- recordState) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
 	logger.Debug("created new token writer")
 
 	return &tokenWriter{
-		encoder: encoder,
-		output:  output,
-		logger:  logger,
+		encoder:   encoder,
+		output:    output,
+		logger:    logger,
+		stateChan: stateChan,
 	}
 }
 
@@ -109,6 +111,8 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("error encoding token: %w", err)
 	}
+
+	w.stateChan <- newRecordState(v.Filter)
 
 	return w.output.Write(data)
 }

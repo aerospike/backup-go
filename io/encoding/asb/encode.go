@@ -48,8 +48,8 @@ func NewEncoder(namespace string, compact bool) *Encoder {
 }
 
 // GenerateFilename generates a file name for the given namespace.
-func (e *Encoder) GenerateFilename() string {
-	return fmt.Sprintf("%s_%d.asb", e.namespace, e.id.Add(1))
+func (e *Encoder) GenerateFilename(prefix string) string {
+	return fmt.Sprintf("%s%s_%d.asb", prefix, e.namespace, e.id.Add(1))
 }
 
 // EncodeToken encodes a token to the ASB format.

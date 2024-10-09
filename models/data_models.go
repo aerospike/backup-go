@@ -101,14 +101,18 @@ type Token struct {
 	Record *Record
 	Type   TokenType
 	Size   uint64
+	// Current filter state. Must copy this value.
+	Filter   a.PartitionFilter
+	FileName string
 }
 
 // NewRecordToken creates a new token with the given record.
-func NewRecordToken(r *Record, size uint64) *Token {
+func NewRecordToken(r *Record, size uint64, filter a.PartitionFilter) *Token {
 	return &Token{
 		Record: r,
 		Type:   TokenTypeRecord,
 		Size:   size,
+		Filter: filter,
 	}
 }
 

@@ -37,6 +37,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
+const filePrefixContinue = "continue_"
+
 // Writer provides access to backup storage.
 // Exported for integration tests.
 type Writer interface {
@@ -71,6 +73,8 @@ type BackupHandler struct {
 	id                     string
 
 	stats models.BackupStats
+	// Backup state for continuation.
+	state *State
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -81,7 +85,7 @@ func newBackupHandler(
 	logger *slog.Logger,
 	writer Writer,
 	scanLimiter *semaphore.Weighted,
-) *BackupHandler {
+) (*BackupHandler, error) {
 	id := uuid.NewString()
 	// For estimates calculations, a writer will be nil.
 	storageType := ""
@@ -96,6 +100,12 @@ func newBackupHandler(
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
+	// Keep in mind, that on continue operation, we update partitions list in config by pointer.
+	state, err := NewState(ctx, config, logger)
+	if err != nil {
+		return nil, err
+	}
+
 	return &BackupHandler{
 		ctx:                    ctx,
 		cancel:                 cancel,
@@ -109,7 +119,8 @@ func newBackupHandler(
 		limiter:                limiter,
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
 		scanLimiter:            scanLimiter,
-	}
+		state:                  state,
+	}, nil
 }
 
 // run runs the backup job.
@@ -233,6 +244,11 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Have to reload filter
+	bh.config.PartitionFilters, err = bh.state.loadPartitionFilters()
+	if err != nil {
+		return err
+	}
 
 	return handler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
 }
@@ -243,7 +259,7 @@ func (bh *BackupHandler) makeWriteWorkers(
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(backupWriters))
 
 	for i, w := range backupWriters {
-		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger)
+		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger, bh.state.RecordsChan)
 		dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
 		writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, bh.limiter)
 	}
@@ -287,7 +303,11 @@ func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) 
 }
 
 func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
-	filename := bh.encoder.GenerateFilename()
+	prefix := ""
+	if bh.config.isStateContinue() {
+		prefix = filePrefixContinue
+	}
+	filename := bh.encoder.GenerateFilename(prefix)
 
 	storageWriter, err := bh.writer.NewWriter(ctx, filename)
 	if err != nil {
@@ -411,7 +431,7 @@ func (bh *BackupHandler) backupSIndexes(
 	reader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
 	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
-	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger))
+	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
 	sindexWriter = newWriterWithTokenStats(sindexWriter, &bh.stats, bh.logger)
 	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
 
@@ -430,7 +450,7 @@ func (bh *BackupHandler) backupUDFs(
 	reader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
 	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
-	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger))
+	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
 	udfWriter = newWriterWithTokenStats(udfWriter, &bh.stats, bh.logger)
 	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
 

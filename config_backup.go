@@ -104,6 +104,18 @@ type BackupConfig struct {
 	Compact bool
 	// Only include records that have no ttl set (persistent records).
 	NoTTLOnly bool
+	// Either a path with a file name or a directory in which the backup state file will be
+	// placed if the backup is interrupted/fails. If a path with a file name is used, that
+	// exact path is where the backup file will be placed. If a directory is given, the backup
+	// state will be placed in the directory with name `<namespace>.asb.state`
+	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
+	StateFile string
+	// How often we will dump a state file to disk.
+	StateFileDumpDuration time.Duration
+	// Resumes an interrupted/failed backup from where it was left off, given the .state file
+	// that was generated from the interrupted/failed run.
+	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
+	Continue bool
 }
 
 // NewDefaultBackupConfig returns a new BackupConfig with default values.
@@ -117,6 +129,7 @@ func NewDefaultBackupConfig() *BackupConfig {
 	}
 }
 
+// isParalleledByNodes checks if backup is parallel by nodes.
 func (c *BackupConfig) isParalleledByNodes() bool {
 	return c.ParallelNodes || len(c.NodeList) > 0
 }
@@ -127,6 +140,16 @@ func (c *BackupConfig) isDefaultPartitionFilter() bool {
 		c.PartitionFilters[0].Begin == 0 &&
 		c.PartitionFilters[0].Count == MaxPartitions &&
 		c.PartitionFilters[0].Digest == nil
+}
+
+// isStateFirstRun checks if it is first run of backup with a state file.
+func (c *BackupConfig) isStateFirstRun() bool {
+	return c.StateFile != "" && c.Continue == false
+}
+
+// isStateContinueRun checks if we continue backup from a state file.
+func (c *BackupConfig) isStateContinue() bool {
+	return c.StateFile != "" && c.Continue == true
 }
 
 func (c *BackupConfig) isFullBackup() bool {

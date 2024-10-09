@@ -32,6 +32,8 @@ type Writer struct {
 	options
 	// Sync for running backup to one file.
 	called atomic.Bool
+
+	fileName string
 }
 
 // WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
@@ -194,6 +196,7 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
+
 	// protection for single file backup.
 	if !w.isDir {
 		if !w.called.CompareAndSwap(false, true) {

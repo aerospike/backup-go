@@ -212,7 +212,10 @@ func (c *Client) Backup(
 		return nil, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
+	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup handler: %w", err)
+	}
 	handler.run()
 
 	return handler, nil
@@ -271,7 +274,10 @@ func (c *Client) Estimate(
 		return 0, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, c.scanLimiter)
+	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, c.scanLimiter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create backup handler: %w", err)
+	}
 
 	result, err := handler.getEstimate(ctx, estimateSamples)
 	if err != nil {

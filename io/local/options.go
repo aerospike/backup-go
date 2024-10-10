@@ -29,6 +29,8 @@ type options struct {
 	withNestedDir bool
 	// unbuffered means that writings toi disk will be unbuffered.
 	unbuffered bool
+	// skipDirCheck if true, backup directory won't be checked.
+	skipDirCheck bool
 }
 
 type Opt func(*options)
@@ -77,5 +79,13 @@ func WithRemoveFiles() Opt {
 func WithUnbufferedWrite() Opt {
 	return func(r *options) {
 		r.unbuffered = true
+	}
+}
+
+// WithSkipDirCheck adds skip dir check flags.
+// Which means that backup directory won't be checked for emptiness.
+func WithSkipDirCheck() Opt {
+	return func(r *options) {
+		r.skipDirCheck = true
 	}
 }

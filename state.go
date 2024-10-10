@@ -19,12 +19,12 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"sync"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/models"
 )
 
 // State contains current backups status data.
@@ -36,9 +36,9 @@ type State struct {
 	// Is used to create prefix for backup files.
 	Counter int
 	// RecordsChan communication channel to save current filter state.
-	RecordsChan chan recordState
+	RecordsChan chan *models.PartitionFilterSerialized
 	// RecordStates store states of all filters.
-	RecordStates map[string]recordState
+	RecordStates map[string]*models.PartitionFilterSerialized
 	// Mutex for RecordStates operations.
 	// Ordinary mutex is used, because we must not allow any writings when we read state.
 	mu sync.Mutex
@@ -51,50 +51,6 @@ type State struct {
 	writer Writer
 	// logger for logging errors.
 	logger *slog.Logger
-}
-
-type recordState struct {
-	Filter filter
-}
-
-// filter contains custom filter struct to save filter to GOB.
-type filter struct {
-	Begin  int
-	Count  int
-	Digest []byte
-	Cursor []byte
-}
-
-func mapToFilter(pf a.PartitionFilter) (filter, error) {
-	c, err := pf.EncodeCursor()
-	if err != nil {
-		return filter{}, fmt.Errorf("failed to encode cursor: %w", err)
-	}
-	return filter{
-		Begin:  pf.Begin,
-		Count:  pf.Count,
-		Digest: pf.Digest,
-		Cursor: c,
-	}, nil
-}
-
-func mapFromFilter(f filter) (*a.PartitionFilter, error) {
-	pf := &a.PartitionFilter{Begin: f.Begin, Count: f.Count, Digest: f.Digest}
-	if err := pf.DecodeCursor(f.Cursor); err != nil {
-		return nil, fmt.Errorf("failed to decode cursor: %w", err)
-	}
-
-	return pf, nil
-}
-
-func newRecordState(filter a.PartitionFilter) recordState {
-	f, err := mapToFilter(filter)
-	if err != nil {
-		log.Fatalf("failed to map partition filter: %w", err)
-	}
-	return recordState{
-		Filter: f,
-	}
 }
 
 // NewState returns new state instance depending on config.
@@ -116,11 +72,11 @@ func NewState(
 			return nil, err
 		}
 		// change filters in config.
-		// TODO: may be move it handler, so everyone wil see it.
 		config.PartitionFilters, err = s.loadPartitionFilters()
 		if err != nil {
 			return nil, err
 		}
+
 		return s, nil
 	}
 
@@ -134,12 +90,11 @@ func newState(
 	writer Writer,
 	logger *slog.Logger,
 ) *State {
-
 	s := &State{
 		ctx: ctx,
 		// RecordsChan must not be buffered, so we can stop all operations.
-		RecordsChan:  make(chan recordState),
-		RecordStates: make(map[string]recordState),
+		RecordsChan:  make(chan *models.PartitionFilterSerialized),
+		RecordStates: make(map[string]*models.PartitionFilterSerialized),
 		FileName:     config.StateFile,
 		DumpDuration: config.StateFileDumpDuration,
 		writer:       writer,
@@ -175,7 +130,7 @@ func newStateFromFile(
 	s.ctx = ctx
 	s.writer = writer
 	s.logger = logger
-	s.RecordsChan = make(chan recordState)
+	s.RecordsChan = make(chan *models.PartitionFilterSerialized)
 	s.Counter++
 
 	logger.Debug("loaded state file successfully")
@@ -228,6 +183,7 @@ func (s *State) dump() error {
 	}
 
 	enc := gob.NewEncoder(file)
+
 	s.mu.Lock()
 	if err = enc.Encode(s); err != nil {
 		return fmt.Errorf("failed to encode state data: %w", err)
@@ -244,8 +200,9 @@ func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
 	s.mu.Lock()
 
 	result := make([]*a.PartitionFilter, 0, len(s.RecordStates))
+
 	for _, state := range s.RecordStates {
-		f, err := mapFromFilter(state.Filter)
+		f, err := state.Decode()
 		if err != nil {
 			return nil, err
 		}
@@ -259,26 +216,23 @@ func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
 }
 
 func (s *State) serveRecords() {
-
 	var counter int
+
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
 		case state := <-s.RecordsChan:
+			if state == nil {
+				continue
+			}
+
 			counter++
+
 			s.mu.Lock()
-			key := fmt.Sprintf("%d%d%s", state.Filter.Begin, state.Filter.Count, state.Filter.Digest)
+			key := fmt.Sprintf("%d%d%s", state.Begin, state.Count, state.Digest)
 			s.RecordStates[key] = state
 			s.mu.Unlock()
-
-			// For tests:
-			// ----------
-			// if counter == 1000 {
-			// 	s.dump()
-			// 	fmt.Println("done 4000000")
-			// 	os.Exit(1)
-			// }
 		}
 	}
 }
@@ -294,7 +248,9 @@ func (s *State) getFileSuffix() string {
 func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.ReadCloser, error) {
 	readCh := make(chan io.ReadCloser)
 	errCh := make(chan error)
+
 	go reader.StreamFile(ctx, fileName, readCh, errCh)
+
 	for {
 		select {
 		case <-ctx.Done():

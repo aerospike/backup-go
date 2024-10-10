@@ -144,12 +144,12 @@ func (c *BackupConfig) isDefaultPartitionFilter() bool {
 
 // isStateFirstRun checks if it is first run of backup with a state file.
 func (c *BackupConfig) isStateFirstRun() bool {
-	return c.StateFile != "" && c.Continue == false
+	return c.StateFile != "" && !c.Continue
 }
 
 // isStateContinueRun checks if we continue backup from a state file.
 func (c *BackupConfig) isStateContinue() bool {
-	return c.StateFile != "" && c.Continue == true
+	return c.StateFile != "" && !c.Continue
 }
 
 func (c *BackupConfig) isFullBackup() bool {

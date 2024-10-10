@@ -53,17 +53,17 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
-	// if w.isDir {
-	// 	// Check if backup dir is empty.
-	// 	isEmpty, err := isEmptyDirectory(w.path)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
-	// 	}
-	//
-	// 	if !isEmpty && !w.isRemovingFiles {
-	// 		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
-	// 	}
-	// }
+	if w.isDir && !w.skipDirCheck {
+		// Check if backup dir is empty.
+		isEmpty, err := isEmptyDirectory(w.path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+		}
+
+		if !isEmpty && !w.isRemovingFiles {
+			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+		}
+	}
 
 	// If we want to remove files from backup path.
 	if w.isRemovingFiles {

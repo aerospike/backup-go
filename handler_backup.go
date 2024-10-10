@@ -99,10 +99,18 @@ func newBackupHandler(
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
-	// Keep in mind, that on continue operation, we update partitions list in config by pointer.
-	state, err := NewState(ctx, config, reader, writer, logger)
-	if err != nil {
-		return nil, err
+	var (
+		state *State
+		err   error
+	)
+
+	if config.StateFile != "" {
+		// Keep in mind, that on continue operation, we update partitions list in config by pointer.
+		state, err = NewState(ctx, config, reader, writer, logger)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
 	}
 
 	return &BackupHandler{
@@ -243,6 +251,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	if bh.config.isStateContinue() {
 		// Have to reload filter, as on count records cursor is moving and future scans returns nothing.
 		bh.config.PartitionFilters, err = bh.state.loadPartitionFilters()

@@ -218,6 +218,7 @@ func (c *Client) Backup(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup handler: %w", err)
 	}
+
 	handler.run()
 
 	return handler, nil

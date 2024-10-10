@@ -88,11 +88,16 @@ type tokenWriter struct {
 	encoder   Encoder
 	output    io.Writer
 	logger    *slog.Logger
-	stateChan chan<- recordState
+	stateChan chan<- *models.PartitionFilterSerialized
 }
 
 // newTokenWriter creates a new tokenWriter.
-func newTokenWriter(encoder Encoder, output io.Writer, logger *slog.Logger, stateChan chan<- recordState) *tokenWriter {
+func newTokenWriter(
+	encoder Encoder,
+	output io.Writer,
+	logger *slog.Logger,
+	stateChan chan<- *models.PartitionFilterSerialized,
+) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
 	logger.Debug("created new token writer")
@@ -112,7 +117,7 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 		return 0, fmt.Errorf("error encoding token: %w", err)
 	}
 
-	w.stateChan <- newRecordState(v.Filter)
+	w.stateChan <- v.Filter
 
 	return w.output.Write(data)
 }

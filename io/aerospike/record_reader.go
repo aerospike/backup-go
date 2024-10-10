@@ -141,8 +141,13 @@ func (r *RecordReader) Read() (*models.Token, error) {
 	rec := models.Record{
 		Record: res.Record,
 	}
-	// TODO: check how accurate is value of filter at this moment.
-	recToken := models.NewRecordToken(&rec, 0, *r.config.partitionFilter)
+
+	pfs, err := models.NewPartitionFilterSerialized(r.config.partitionFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize partition filter: %w", err)
+	}
+
+	recToken := models.NewRecordToken(&rec, 0, pfs)
 
 	return recToken, nil
 }

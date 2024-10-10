@@ -37,8 +37,6 @@ type backupRecordsHandler struct {
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
-	// is used when AfterDigest is set.
-	afterDigest []byte
 }
 
 func newBackupRecordsHandler(
@@ -204,7 +202,9 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipeline.Worker[*models.Token], error) {
 	var err error
+
 	partitionGroups := bh.config.PartitionFilters
+
 	if !bh.config.isStateContinue() {
 		partitionGroups, err = splitPartitions(bh.config.PartitionFilters, n)
 		if err != nil {
@@ -276,6 +276,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
 	scanPolicy *a.ScanPolicy,
 ) *aerospike.RecordReaderConfig {
 	pfCopy := *partitionFilter
+
 	return aerospike.NewRecordReaderConfig(
 		bh.config.Namespace,
 		bh.config.SetList,

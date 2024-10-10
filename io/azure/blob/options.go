@@ -38,6 +38,8 @@ type options struct {
 	// as the value for the marker parameter in a subsequent call to request the next
 	// page of list items. The marker value is opaque to the client.
 	marker string
+	// skipDirCheck if true, backup directory won't be checked.
+	skipDirCheck bool
 }
 
 type Opt func(*options)
@@ -96,5 +98,13 @@ func WithUploadConcurrency(v int) Opt {
 func WithMarker(v string) Opt {
 	return func(r *options) {
 		r.marker = v
+	}
+}
+
+// WithSkipDirCheck adds skip dir check flags.
+// Which means that backup directory won't be checked for emptiness.
+func WithSkipDirCheck() Opt {
+	return func(r *options) {
+		r.skipDirCheck = true
 	}
 }

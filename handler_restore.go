@@ -39,6 +39,11 @@ type StreamingReader interface {
 	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
 	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
 
+	// StreamFile creates a single file reader and sends io.Readers to the `readersCh`
+	// In case of an error, it is sent to the `errorsCh` channel.
+	// Must be run in a goroutine `go rh.reader.StreamFile()`.
+	StreamFile(ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error)
+
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
 }

@@ -238,6 +238,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 		ctx,
 		backupConfig,
 		&dst,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -384,6 +385,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		ctx,
 		backupConfig,
 		writers,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -463,7 +465,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 			VoidTime: 1,
 		}
 
-		token := models.NewRecordToken(modelRec, 0)
+		token := models.NewRecordToken(modelRec, 0, nil)
 		v, err := encoder.EncodeToken(token)
 		if err != nil {
 			suite.FailNow(err.Error())
@@ -556,6 +558,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 		ctx,
 		backupConfig,
 		writers,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -595,6 +598,7 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 		ctx,
 		backup.NewDefaultBackupConfig(),
 		&writer,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -746,6 +750,7 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 		ctx,
 		bCfg,
 		&dst,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -763,6 +768,7 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
 		ctx,
 		bCfg,
 		&dst,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -792,6 +798,7 @@ func (suite *backupRestoreTestSuite) TestBackupPartitionList() {
 		ctx,
 		bCfg,
 		&dst,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -1081,6 +1088,7 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 		ctx,
 		backupConfig,
 		&dst,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -1108,6 +1116,12 @@ type byteReadWriterFactory struct {
 }
 
 func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
+	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
+	readersCh <- reader
+	close(readersCh)
+}
+
+func (b *byteReadWriterFactory) StreamFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	readersCh <- reader
 	close(readersCh)

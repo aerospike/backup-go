@@ -141,7 +141,18 @@ func (r *RecordReader) Read() (*models.Token, error) {
 	rec := models.Record{
 		Record: res.Record,
 	}
-	recToken := models.NewRecordToken(&rec, 0)
+
+	recToken := models.NewRecordToken(&rec, 0, nil)
+
+	// For indexes and udf, partition filter will be nil.
+	if r.config.partitionFilter != nil {
+		pfs, err := models.NewPartitionFilterSerialized(r.config.partitionFilter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize partition filter: %w", err)
+		}
+
+		recToken = models.NewRecordToken(&rec, 0, pfs)
+	}
 
 	return recToken, nil
 }

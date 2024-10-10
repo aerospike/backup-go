@@ -182,6 +182,8 @@ Azure Flags:
                     state will be placed in the directory with name `<namespace>.asb.state`, or
                     `<prefix>.asb.state` if `--output-file-prefix` is given.
 
+-q, --output-file-prefix <prefix> When using directory parameter, prepend a prefix to the names of the generated files.
+ 
 --machine           Output machine-readable status updates to the given path, typically a FIFO.
 
 --no-config-file    Do not read any config file. Default: disabled

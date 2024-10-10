@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package s3
+package local
 
 type options struct {
 	// path contains path to file or directory.
@@ -27,9 +27,8 @@ type options struct {
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
 	// Default: false
 	withNestedDir bool
-	// startAfter is where you want Amazon S3 to start listing from. Amazon S3 starts
-	// listing after this specified key. StartAfter can be any key in the bucket.
-	startAfter string
+	// unbuffered means that writings toi disk will be unbuffered.
+	unbuffered bool
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
 }
@@ -75,11 +74,11 @@ func WithRemoveFiles() Opt {
 	}
 }
 
-// WithStartAfter adds start after parameter to list request.
-// Is used only for Reader.
-func WithStartAfter(v string) Opt {
+// WithUnbufferedWrite adds an unbuffered flag to the writer.
+// Which means that writings to disk will be unbuffered.
+func WithUnbufferedWrite() Opt {
 	return func(r *options) {
-		r.startAfter = v
+		r.unbuffered = true
 	}
 }
 

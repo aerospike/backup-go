@@ -101,14 +101,17 @@ type Token struct {
 	Record *Record
 	Type   TokenType
 	Size   uint64
+	// Current filter state.
+	Filter *PartitionFilterSerialized
 }
 
 // NewRecordToken creates a new token with the given record.
-func NewRecordToken(r *Record, size uint64) *Token {
+func NewRecordToken(r *Record, size uint64, filter *PartitionFilterSerialized) *Token {
 	return &Token{
 		Record: r,
 		Type:   TokenTypeRecord,
 		Size:   size,
+		Filter: filter,
 	}
 }
 

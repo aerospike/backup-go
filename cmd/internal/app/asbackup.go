@@ -30,6 +30,8 @@ type ASBackup struct {
 	backupClient *backup.Client
 	backupConfig *backup.BackupConfig
 	writer       backup.Writer
+	// reader is used to read state file.
+	reader backup.StreamingReader
 	// Additional params.
 	isEstimate       bool
 	estimatesSamples int64
@@ -60,6 +62,7 @@ func NewASBackup(
 	// Initializations.
 	var (
 		writer backup.Writer
+		reader backup.StreamingReader
 		err    error
 	)
 	// We initialize a writer only if output is configured.
@@ -72,6 +75,15 @@ func NewASBackup(
 		// We clean the folder on writer initialization and exit.
 		if backupParams.RemoveArtifacts {
 			return nil, nil
+		}
+	}
+
+	if backupParams.StateFileDst != "" || backupParams.Continue != "" {
+		r := &models.Restore{InputFile: backupParams.OutputFile}
+
+		reader, err = getReader(ctx, r, commonParams, awsS3, gcpStorage, azureBlob)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create reader: %w", err)
 		}
 	}
 
@@ -100,6 +112,7 @@ func NewASBackup(
 		backupClient:     backupClient,
 		backupConfig:     backupConfig,
 		writer:           writer,
+		reader:           reader,
 		isEstimate:       backupParams.Estimate,
 		estimatesSamples: backupParams.EstimateSamples,
 	}, nil
@@ -120,7 +133,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 
 		printEstimateReport(estimates)
 	default:
-		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
+		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
 		if err != nil {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}

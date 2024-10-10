@@ -85,7 +85,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	expectedRecToken := models.NewRecordToken(mockRec, 0)
+	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }
@@ -273,7 +273,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 
 	v, err := reader.Read()
 	suite.Nil(err)
-	expectedRecToken := models.NewRecordToken(mockRec, 0)
+	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }

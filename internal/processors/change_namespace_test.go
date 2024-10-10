@@ -45,7 +45,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 				Record: &aerospike.Record{
 					Key: key,
 				},
-			}, 0),
+			}, 0, nil),
 			wantErr: false,
 		},
 		{
@@ -56,7 +56,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 				Record: &aerospike.Record{
 					Key: key,
 				},
-			}, 0),
+			}, 0, nil),
 			wantErr: false,
 		},
 		{
@@ -74,7 +74,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 				Record: &aerospike.Record{
 					Key: invalidKey,
 				},
-			}, 0),
+			}, 0, nil),
 			wantErr: true,
 		},
 		{
@@ -85,7 +85,7 @@ func TestChangeNamespaceProcessor(t *testing.T) {
 				Record: &aerospike.Record{
 					Key: key,
 				},
-			}, 0),
+			}, 0, nil),
 			wantErr: false,
 		},
 	}

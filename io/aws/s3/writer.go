@@ -90,7 +90,7 @@ func NewWriter(
 		return nil, fmt.Errorf("bucket does not exist or you don't have access: %w", err)
 	}
 
-	if w.isDir {
+	if w.isDir && !w.skipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, client, bucketName, w.prefix)
 		if err != nil {

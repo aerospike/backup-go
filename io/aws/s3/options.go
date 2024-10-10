@@ -30,6 +30,8 @@ type options struct {
 	// startAfter is where you want Amazon S3 to start listing from. Amazon S3 starts
 	// listing after this specified key. StartAfter can be any key in the bucket.
 	startAfter string
+	// skipDirCheck if true, backup directory won't be checked.
+	skipDirCheck bool
 }
 
 type Opt func(*options)
@@ -78,5 +80,13 @@ func WithRemoveFiles() Opt {
 func WithStartAfter(v string) Opt {
 	return func(r *options) {
 		r.startAfter = v
+	}
+}
+
+// WithSkipDirCheck adds skip dir check flags.
+// Which means that backup directory won't be checked for emptiness.
+func WithSkipDirCheck() Opt {
+	return func(r *options) {
+		r.skipDirCheck = true
 	}
 }

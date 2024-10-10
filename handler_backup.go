@@ -269,7 +269,11 @@ func (bh *BackupHandler) makeWriteWorkers(
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(backupWriters))
 
 	for i, w := range backupWriters {
-		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger, bh.state.RecordsChan)
+		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger, nil)
+		if bh.state != nil {
+			dataWriter = newTokenWriter(bh.encoder, w, bh.logger, bh.state.RecordsChan)
+		}
+
 		dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
 		writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, bh.limiter)
 	}
@@ -313,7 +317,11 @@ func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) 
 }
 
 func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
-	filename := bh.encoder.GenerateFilename(bh.state.getFileSuffix())
+	suffix := ""
+	if bh.state != nil {
+		suffix = bh.state.getFileSuffix()
+	}
+	filename := bh.encoder.GenerateFilename(suffix)
 
 	storageWriter, err := bh.writer.NewWriter(ctx, filename)
 	if err != nil {
@@ -437,7 +445,11 @@ func (bh *BackupHandler) backupSIndexes(
 	reader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
 	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
-	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
+	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
+	if bh.state != nil {
+		sindexWriter = pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
+	}
+
 	sindexWriter = newWriterWithTokenStats(sindexWriter, &bh.stats, bh.logger)
 	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
 
@@ -456,7 +468,12 @@ func (bh *BackupHandler) backupUDFs(
 	reader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
 	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
-	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
+	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
+
+	if bh.state != nil {
+		udfWriter = pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
+	}
+
 	udfWriter = newWriterWithTokenStats(udfWriter, &bh.stats, bh.logger)
 	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
 

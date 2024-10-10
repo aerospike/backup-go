@@ -117,7 +117,9 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 		return 0, fmt.Errorf("error encoding token: %w", err)
 	}
 
-	w.stateChan <- v.Filter
+	if w.stateChan != nil {
+		w.stateChan <- v.Filter
+	}
 
 	return w.output.Write(data)
 }

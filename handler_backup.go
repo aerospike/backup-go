@@ -37,8 +37,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const filePrefixContinue = "continue_"
-
 // Writer provides access to backup storage.
 // Exported for integration tests.
 type Writer interface {
@@ -84,6 +82,7 @@ func newBackupHandler(
 	ac AerospikeClient,
 	logger *slog.Logger,
 	writer Writer,
+	reader StreamingReader,
 	scanLimiter *semaphore.Weighted,
 ) (*BackupHandler, error) {
 	id := uuid.NewString()
@@ -101,7 +100,7 @@ func newBackupHandler(
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Keep in mind, that on continue operation, we update partitions list in config by pointer.
-	state, err := NewState(ctx, config, logger)
+	state, err := NewState(ctx, config, reader, writer, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -244,10 +243,12 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Have to reload filter
-	bh.config.PartitionFilters, err = bh.state.loadPartitionFilters()
-	if err != nil {
-		return err
+	if bh.config.isStateContinue() {
+		// Have to reload filter, as on count records cursor is moving and future scans returns nothing.
+		bh.config.PartitionFilters, err = bh.state.loadPartitionFilters()
+		if err != nil {
+			return err
+		}
 	}
 
 	return handler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
@@ -303,11 +304,7 @@ func (bh *BackupHandler) newWriter(ctx context.Context) (io.WriteCloser, error) 
 }
 
 func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
-	prefix := ""
-	if bh.config.isStateContinue() {
-		prefix = filePrefixContinue
-	}
-	filename := bh.encoder.GenerateFilename(prefix)
+	filename := bh.encoder.GenerateFilename(bh.state.getFileSuffix())
 
 	storageWriter, err := bh.writer.NewWriter(ctx, filename)
 	if err != nil {

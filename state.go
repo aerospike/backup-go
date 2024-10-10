@@ -18,38 +18,39 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
-	"os"
 	"sync"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-// Must be the same as pipeline channelSize
-const channelSize = 256
-
 // State contains current backups status data.
 type State struct {
 	// Global backup context.
 	ctx context.Context
 
-	// File to save to.
+	// Counter to count how many times State instance was initialized.
+	// Is used to create prefix for backup files.
+	Counter int
+	// RecordsChan communication channel to save current filter state.
+	RecordsChan chan recordState
+	// RecordStates store states of all filters.
+	RecordStates map[string]recordState
+	// Mutex for RecordStates operations.
+	// Ordinary mutex is used, because we must not allow any writings when we read state.
+	mu sync.Mutex
+	// File to save state to.
 	FileName string
-
 	// How often file will be saved to disk.
 	DumpDuration time.Duration
 
-	// Config *BackupConfig
-
+	// writer is used to create a state file.
+	writer Writer
 	// logger for logging errors.
 	logger *slog.Logger
-
-	// ------ experiments -----
-	RecordsChan  chan recordState
-	RecordStates map[string]recordState
-	mu           sync.RWMutex
 }
 
 type recordState struct {
@@ -96,19 +97,26 @@ func newRecordState(filter a.PartitionFilter) recordState {
 	}
 }
 
-func NewState(ctx context.Context,
+// NewState returns new state instance depending on config.
+// If we continue back up, the state will be loaded from a state file,
+// if it is the first operation, new state instance will be returned.
+func NewState(
+	ctx context.Context,
 	config *BackupConfig,
+	reader StreamingReader,
+	writer Writer,
 	logger *slog.Logger,
 ) (*State, error) {
 	switch {
 	case config.isStateFirstRun():
-		return newState(ctx, config, logger), nil
+		return newState(ctx, config, writer, logger), nil
 	case config.isStateContinue():
-		s, err := newStateFromFile(ctx, config, logger)
+		s, err := newStateFromFile(ctx, config, reader, writer, logger)
 		if err != nil {
 			return nil, err
 		}
 		// change filters in config.
+		// TODO: may be move it handler, so everyone wil see it.
 		config.PartitionFilters, err = s.loadPartitionFilters()
 		if err != nil {
 			return nil, err
@@ -119,21 +127,23 @@ func NewState(ctx context.Context,
 	return nil, nil
 }
 
-// NewState creates status service from parameters, for backup operations.
+// newState creates status service from parameters, for backup operations.
 func newState(
 	ctx context.Context,
 	config *BackupConfig,
+	writer Writer,
 	logger *slog.Logger,
 ) *State {
 
 	s := &State{
-		ctx:          ctx,
+		ctx: ctx,
+		// RecordsChan must not be buffered, so we can stop all operations.
+		RecordsChan:  make(chan recordState),
+		RecordStates: make(map[string]recordState),
 		FileName:     config.StateFile,
 		DumpDuration: config.StateFileDumpDuration,
-		//		Config:       config,
+		writer:       writer,
 		logger:       logger,
-		RecordsChan:  make(chan recordState, channelSize),
-		RecordStates: make(map[string]recordState),
 	}
 	// Run watcher on initialization.
 	go s.serve()
@@ -142,19 +152,20 @@ func newState(
 	return s
 }
 
-// NewStateFromFile creates a status service from the file, to continue operations.
+// newStateFromFile creates a status service from the file, to continue operations.
 func newStateFromFile(
 	ctx context.Context,
 	config *BackupConfig,
+	reader StreamingReader,
+	writer Writer,
 	logger *slog.Logger,
 ) (*State, error) {
-	// TODO: replace with io reader/writer.
-	reader, err := os.Open(config.StateFile)
+	f, err := openFile(ctx, reader, config.StateFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open state file: %w", err)
 	}
 
-	dec := gob.NewDecoder(reader)
+	dec := gob.NewDecoder(f)
 
 	var s State
 	if err = dec.Decode(&s); err != nil {
@@ -162,8 +173,10 @@ func newStateFromFile(
 	}
 
 	s.ctx = ctx
+	s.writer = writer
 	s.logger = logger
-	s.RecordsChan = make(chan recordState, channelSize)
+	s.RecordsChan = make(chan recordState)
+	s.Counter++
 
 	logger.Debug("loaded state file successfully")
 
@@ -199,8 +212,6 @@ func (s *State) serve() {
 
 			return
 		case <-ticker.C:
-			// save state and sleep.
-			time.Sleep(time.Second)
 			// save intermediate state.
 			if err := s.dump(); err != nil {
 				s.logger.Error("failed to dump state", slog.Any("error", err))
@@ -211,18 +222,18 @@ func (s *State) serve() {
 }
 
 func (s *State) dump() error {
-	// TODO: replace with io reader/writer.
-	file, err := os.OpenFile(s.FileName, os.O_CREATE|os.O_WRONLY, 0o666)
+	file, err := s.writer.NewWriter(s.ctx, s.FileName)
 	if err != nil {
 		return fmt.Errorf("failed to create state file %s: %w", s.FileName, err)
 	}
 
 	enc := gob.NewEncoder(file)
-	s.mu.RLock()
+	s.mu.Lock()
 	if err = enc.Encode(s); err != nil {
 		return fmt.Errorf("failed to encode state data: %w", err)
 	}
-	s.mu.RUnlock()
+	// file.Close()
+	s.mu.Unlock()
 
 	s.logger.Debug("state file dumped", slog.Time("saved at", time.Now()))
 
@@ -230,7 +241,7 @@ func (s *State) dump() error {
 }
 
 func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
-	s.mu.RLock()
+	s.mu.Lock()
 
 	result := make([]*a.PartitionFilter, 0, len(s.RecordStates))
 	for _, state := range s.RecordStates {
@@ -242,7 +253,7 @@ func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
 		result = append(result, f)
 	}
 
-	s.mu.RUnlock()
+	s.mu.Unlock()
 
 	return result, nil
 }
@@ -261,11 +272,37 @@ func (s *State) serveRecords() {
 			s.RecordStates[key] = state
 			s.mu.Unlock()
 
-			// if counter == 400000 {
+			// For tests:
+			// ----------
+			// if counter == 1000 {
 			// 	s.dump()
 			// 	fmt.Println("done 4000000")
 			// 	os.Exit(1)
 			// }
+		}
+	}
+}
+
+func (s *State) getFileSuffix() string {
+	if s.Counter > 0 {
+		return fmt.Sprintf("(%d)", s.Counter)
+	}
+
+	return ""
+}
+
+func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.ReadCloser, error) {
+	readCh := make(chan io.ReadCloser)
+	errCh := make(chan error)
+	go reader.StreamFile(ctx, fileName, readCh, errCh)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case err := <-errCh:
+			return nil, err
+		case file := <-readCh:
+			return file, nil
 		}
 	}
 }

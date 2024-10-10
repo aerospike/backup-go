@@ -195,10 +195,12 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 //   - ctx can be used to cancel the backup operation.
 //   - config is the configuration for the backup operation.
 //   - writer creates new writers for the backup operation.
+//   - reader is used only for reading a state file for continuation operations.
 func (c *Client) Backup(
 	ctx context.Context,
 	config *BackupConfig,
 	writer Writer,
+	reader StreamingReader,
 ) (*BackupHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("backup config required")
@@ -212,7 +214,7 @@ func (c *Client) Backup(
 		return nil, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, c.scanLimiter)
+	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, reader, c.scanLimiter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup handler: %w", err)
 	}
@@ -274,7 +276,7 @@ func (c *Client) Estimate(
 		return 0, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, c.scanLimiter)
+	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, nil, c.scanLimiter)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create backup handler: %w", err)
 	}

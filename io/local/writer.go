@@ -32,16 +32,6 @@ type Writer struct {
 	options
 	// Sync for running backup to one file.
 	called atomic.Bool
-
-	fileName string
-}
-
-// WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
-// Is used only for Writer.
-func WithRemoveFiles() Opt {
-	return func(r *options) {
-		r.isRemovingFiles = true
-	}
 }
 
 // NewWriter creates a new writer for local directory/file writes.
@@ -63,17 +53,17 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
-	if w.isDir {
-		// Check if backup dir is empty.
-		isEmpty, err := isEmptyDirectory(w.path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
-		}
-
-		if !isEmpty && !w.isRemovingFiles {
-			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
-		}
-	}
+	// if w.isDir {
+	// 	// Check if backup dir is empty.
+	// 	isEmpty, err := isEmptyDirectory(w.path)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+	// 	}
+	//
+	// 	if !isEmpty && !w.isRemovingFiles {
+	// 		return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+	// 	}
+	// }
 
 	// If we want to remove files from backup path.
 	if w.isRemovingFiles {
@@ -212,6 +202,11 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+
+	// If unbuffered write is set, we return file directly.
+	if w.unbuffered {
+		return file, nil
 	}
 
 	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil

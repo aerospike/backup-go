@@ -99,7 +99,7 @@ func (r *Reader) StreamFiles(
 	}
 
 	// If not a folder, only file.
-	r.streamFile(ctx, r.path, readersCh, errorsCh)
+	r.StreamFile(ctx, r.path, readersCh, errorsCh)
 }
 
 func (r *Reader) streamDirectory(
@@ -146,9 +146,9 @@ func (r *Reader) streamDirectory(
 	}
 }
 
-// streamFile opens a single file from GCP cloud storage and sends io.Readers to the `readersCh`
+// StreamFile opens a single file from GCP cloud storage and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
-func (r *Reader) streamFile(
+func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
 

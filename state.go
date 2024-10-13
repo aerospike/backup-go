@@ -36,9 +36,9 @@ type State struct {
 	// Is used to create prefix for backup files.
 	Counter int
 	// RecordsChan communication channel to save current filter state.
-	RecordsChan chan *models.PartitionFilterSerialized
+	RecordsChan chan models.PartitionFilterSerialized
 	// RecordStates store states of all filters.
-	RecordStates map[string]*models.PartitionFilterSerialized
+	RecordStates map[string]models.PartitionFilterSerialized
 	// Mutex for RecordStates operations.
 	// Ordinary mutex is used, because we must not allow any writings when we read state.
 	mu sync.Mutex
@@ -93,8 +93,8 @@ func newState(
 	s := &State{
 		ctx: ctx,
 		// RecordsChan must not be buffered, so we can stop all operations.
-		RecordsChan:  make(chan *models.PartitionFilterSerialized),
-		RecordStates: make(map[string]*models.PartitionFilterSerialized),
+		RecordsChan:  make(chan models.PartitionFilterSerialized),
+		RecordStates: make(map[string]models.PartitionFilterSerialized),
 		FileName:     config.StateFile,
 		DumpDuration: config.StateFileDumpDuration,
 		writer:       writer,
@@ -130,7 +130,7 @@ func newStateFromFile(
 	s.ctx = ctx
 	s.writer = writer
 	s.logger = logger
-	s.RecordsChan = make(chan *models.PartitionFilterSerialized)
+	s.RecordsChan = make(chan models.PartitionFilterSerialized)
 	s.Counter++
 
 	logger.Debug("loaded state file successfully")
@@ -223,7 +223,7 @@ func (s *State) serveRecords() {
 		case <-s.ctx.Done():
 			return
 		case state := <-s.RecordsChan:
-			if state == nil {
+			if state.Begin == 0 && state.Count == 0 && state.Digest == nil {
 				continue
 			}
 

@@ -229,9 +229,9 @@ func (rh *RestoreHandler) runRestorePipeline(ctx context.Context, readers []pipe
 		processors.NewChangeNamespace(nsSource, nsDest),
 		processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
 		processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond),
-	))
+	), rh.config.Parallel)
 
-	return pipeline.NewPipeline(readers, composeProcessor, writeWorkers).Run(ctx)
+	return pipeline.NewPipeline(true, readers, composeProcessor, writeWorkers).Run(ctx)
 }
 
 func (rh *RestoreHandler) useBatchWrites() (bool, error) {
@@ -244,7 +244,15 @@ func (rh *RestoreHandler) useBatchWrites() (bool, error) {
 	return infoClient.SupportsBatchWrite()
 }
 
-func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*models.Token] {
+func newTokenWorker(processor processors.TokenProcessor, parallel int) []pipeline.Worker[*models.Token] {
+	if parallel > 0 {
+		workers := make([]pipeline.Worker[*models.Token], 0, parallel)
+		for i := 0; i < parallel; i++ {
+			workers = append(workers, pipeline.NewProcessorWorker(processor))
+		}
+		return workers
+	}
+
 	return []pipeline.Worker[*models.Token]{
 		pipeline.NewProcessorWorker(processor),
 	}

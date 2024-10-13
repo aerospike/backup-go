@@ -16,16 +16,27 @@ package aerospike
 
 import (
 	"log/slog"
+	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/models"
 )
 
 // recordSets contains multiple Aerospike Recordset objects.
 type recordSets struct {
-	resultsChannel <-chan *a.Result
+	resultsChannel <-chan *customRecord
 	logger         *slog.Logger
 	data           []*a.Recordset
+}
+
+type customRecord struct {
+	result *a.Result
+	filter models.PartitionFilterSerialized
+}
+
+func newCustomRecord(result *a.Result, filter *a.) *customRecord {
+
 }
 
 func newRecordSets(data []*a.Recordset, logger *slog.Logger) *recordSets {
@@ -52,6 +63,39 @@ func (r *recordSets) Close() {
 }
 
 // Results returns the results channel of the recordSets.
-func (r *recordSets) Results() <-chan *a.Result {
+func (r *recordSets) Results() <-chan *customRecord {
 	return r.resultsChannel
+}
+
+func MergeResultSets(channels []<-chan *a.Result) <-chan *a.PartitionFilter {
+	out := make(chan *a.PartitionFilter)
+
+	if len(channels) == 0 {
+		close(out)
+		return out
+	}
+
+	var wg sync.WaitGroup
+	// Run an output goroutine for each input channel.
+	output := func(c <-chan *a.Result) {
+		for n := range c {
+			out <- n
+		}
+
+		wg.Done()
+	}
+
+	wg.Add(len(channels))
+
+	for _, c := range channels {
+		go output(c)
+	}
+
+	// Run a goroutine to close out once all the output goroutines are done.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
 }

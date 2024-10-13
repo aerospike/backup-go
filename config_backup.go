@@ -149,7 +149,7 @@ func (c *BackupConfig) isStateFirstRun() bool {
 
 // isStateContinueRun checks if we continue backup from a state file.
 func (c *BackupConfig) isStateContinue() bool {
-	return c.StateFile != "" && !c.Continue
+	return c.StateFile != "" && c.Continue
 }
 
 func (c *BackupConfig) isFullBackup() bool {

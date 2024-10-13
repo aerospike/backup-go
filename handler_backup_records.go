@@ -37,6 +37,7 @@ type backupRecordsHandler struct {
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
+	state           *State
 }
 
 func newBackupRecordsHandler(
@@ -44,6 +45,7 @@ func newBackupRecordsHandler(
 	ac AerospikeClient,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
+	state *State,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
@@ -52,6 +54,7 @@ func newBackupRecordsHandler(
 		aerospikeClient: ac,
 		logger:          logger,
 		scanLimiter:     scanLimiter,
+		state:           state,
 	}
 
 	return h
@@ -72,9 +75,9 @@ func (bh *backupRecordsHandler) run(
 		processors.NewVoidTimeSetter(bh.logger),
 		processors.NewTPSLimiter[*models.Token](
 			ctx, bh.config.RecordsPerSecond),
-	))
+	), bh.config.ParallelRead)
 
-	return pipeline.NewPipeline(readWorkers, composeProcessor, writers).Run(ctx)
+	return pipeline.NewPipeline(true, readWorkers, composeProcessor, writers).Run(ctx)
 }
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
@@ -120,7 +123,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Co
 			// with this filter.
 			pf := *bh.config.PartitionFilters[j]
 			readerConfig := bh.recordReaderConfigForPartitions(&pf, scanPolicy)
-			recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+			recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger, nil)
 
 			for {
 				if _, err := recordReader.Read(); err != nil {
@@ -162,7 +165,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 	var count uint64
 
 	readerConfig := bh.recordReaderConfigForNode(nodes, scanPolicy)
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger, nil)
 
 	for {
 		if _, err := recordReader.Read(); err != nil {
@@ -223,6 +226,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 			bh.aerospikeClient,
 			recordReaderConfig,
 			bh.logger,
+			bh.state.RecordsChan,
 		)
 
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](recordReader)
@@ -263,6 +267,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 			bh.aerospikeClient,
 			recordReaderConfig,
 			bh.logger,
+			bh.state.RecordsChan,
 		)
 
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](recordReader)

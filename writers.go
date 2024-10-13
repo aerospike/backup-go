@@ -88,7 +88,7 @@ type tokenWriter struct {
 	encoder   Encoder
 	output    io.Writer
 	logger    *slog.Logger
-	stateChan chan<- *models.PartitionFilterSerialized
+	stateChan chan<- models.PartitionFilterSerialized
 }
 
 // newTokenWriter creates a new tokenWriter.
@@ -96,7 +96,7 @@ func newTokenWriter(
 	encoder Encoder,
 	output io.Writer,
 	logger *slog.Logger,
-	stateChan chan<- *models.PartitionFilterSerialized,
+	stateChan chan<- models.PartitionFilterSerialized,
 ) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)

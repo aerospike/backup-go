@@ -185,9 +185,9 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	scanPolicy.RawCDT = true
 
 	nodes := bh.aerospikeClient.GetNodes()
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)
+	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
 	readerConfig := handler.recordReaderConfigForNode(nodes, &scanPolicy)
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger, bh.state.RecordsChan)
 
 	// Timestamp processor.
 	tsProcessor := processors.NewVoidTimeSetter(bh.logger)
@@ -245,7 +245,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
 
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter)
+	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
 
 	bh.stats.TotalRecords, err = handler.countRecords(ctx, bh.infoClient)
 	if err != nil {
@@ -321,6 +321,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 	if bh.state != nil {
 		suffix = bh.state.getFileSuffix()
 	}
+
 	filename := bh.encoder.GenerateFilename(suffix)
 
 	storageWriter, err := bh.writer.NewWriter(ctx, filename)
@@ -454,6 +455,7 @@ func (bh *BackupHandler) backupSIndexes(
 	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
 
 	sindexPipeline := pipeline.NewPipeline[*models.Token](
+		true,
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
 		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
 	)
@@ -478,6 +480,7 @@ func (bh *BackupHandler) backupUDFs(
 	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
 
 	udfPipeline := pipeline.NewPipeline[*models.Token](
+		true,
 		[]pipeline.Worker[*models.Token]{udfReadWorker},
 		[]pipeline.Worker[*models.Token]{udfWriteWorker},
 	)

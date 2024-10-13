@@ -95,6 +95,7 @@ type RecordReader struct {
 	logger     *slog.Logger
 	config     *RecordReaderConfig
 	scanResult *recordSets // initialized on first Read() call
+	stateChan  chan<- models.PartitionFilterSerialized
 }
 
 // NewRecordReader creates a new RecordReader.
@@ -103,16 +104,18 @@ func NewRecordReader(
 	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
+	stateChan chan<- models.PartitionFilterSerialized,
 ) *RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	logger.Debug("created new aerospike record reader")
 
 	return &RecordReader{
-		ctx:    ctx,
-		config: cfg,
-		client: client,
-		logger: logger,
+		ctx:       ctx,
+		config:    cfg,
+		client:    client,
+		logger:    logger,
+		stateChan: stateChan,
 	}
 }
 
@@ -125,6 +128,19 @@ func (r *RecordReader) Read() (*models.Token, error) {
 		}
 
 		r.scanResult = scan
+	}
+
+	var (
+		pfs models.PartitionFilterSerialized
+		err error
+	)
+	// For indexes and udf, partition filter will be nil.
+	if r.config.partitionFilter != nil && r.stateChan != nil {
+		pfs, err = models.NewPartitionFilterSerialized(r.config.partitionFilter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize partition filter: %w", err)
+		}
+		//	r.stateChan <- pfs
 	}
 
 	res, active := <-r.scanResult.Results()
@@ -142,17 +158,7 @@ func (r *RecordReader) Read() (*models.Token, error) {
 		Record: res.Record,
 	}
 
-	recToken := models.NewRecordToken(&rec, 0, nil)
-
-	// For indexes and udf, partition filter will be nil.
-	if r.config.partitionFilter != nil {
-		pfs, err := models.NewPartitionFilterSerialized(r.config.partitionFilter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize partition filter: %w", err)
-		}
-
-		recToken = models.NewRecordToken(&rec, 0, pfs)
-	}
+	recToken := models.NewRecordToken(&rec, 0, pfs)
 
 	return recToken, nil
 }

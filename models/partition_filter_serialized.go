@@ -30,13 +30,17 @@ type PartitionFilterSerialized struct {
 }
 
 // NewPartitionFilterSerialized serialize *a.PartitionFilter and returns new PartitionFilterSerialized instance.
-func NewPartitionFilterSerialized(pf *a.PartitionFilter) (*PartitionFilterSerialized, error) {
-	c, err := pf.EncodeCursor()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode cursor: %w", err)
+func NewPartitionFilterSerialized(pf *a.PartitionFilter) (PartitionFilterSerialized, error) {
+	if pf == nil || pf.IsDone() {
+		return PartitionFilterSerialized{}, nil
 	}
 
-	return &PartitionFilterSerialized{
+	c, err := pf.EncodeCursor()
+	if err != nil {
+		return PartitionFilterSerialized{}, fmt.Errorf("failed to encode cursor: %w", err)
+	}
+
+	return PartitionFilterSerialized{
 		Begin:  pf.Begin,
 		Count:  pf.Count,
 		Digest: pf.Digest,

@@ -77,6 +77,10 @@ func (r *SindexReader) Read() (*models.Token, error) {
 	return nil, io.EOF
 }
 
+func (r *SindexReader) CustomRead() (*models.Token, error) {
+	return r.Read()
+}
+
 // Close satisfies the DataReader interface
 // but is a no-op for the SIndexReader.
 func (r *SindexReader) Close() {}

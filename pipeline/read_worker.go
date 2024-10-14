@@ -25,6 +25,7 @@ import (
 //go:generate mockery --name dataReader
 type dataReader[T any] interface {
 	Read() (T, error)
+	CustomRead() (T, error)
 	Close()
 }
 
@@ -58,7 +59,7 @@ func (w *readWorker[T]) Run(ctx context.Context) error {
 	defer w.reader.Close()
 
 	for {
-		data, err := w.reader.Read()
+		data, err := w.reader.CustomRead()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return nil

@@ -123,7 +123,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Co
 			// with this filter.
 			pf := *bh.config.PartitionFilters[j]
 			readerConfig := bh.recordReaderConfigForPartitions(&pf, scanPolicy)
-			recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger, nil)
+			recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 			for {
 				if _, err := recordReader.Read(); err != nil {
@@ -165,7 +165,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 	var count uint64
 
 	readerConfig := bh.recordReaderConfigForNode(nodes, scanPolicy)
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger, nil)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 	for {
 		if _, err := recordReader.Read(); err != nil {
@@ -226,7 +226,6 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 			bh.aerospikeClient,
 			recordReaderConfig,
 			bh.logger,
-			bh.state.RecordsChan,
 		)
 
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](recordReader)
@@ -267,7 +266,6 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 			bh.aerospikeClient,
 			recordReaderConfig,
 			bh.logger,
-			bh.state.RecordsChan,
 		)
 
 		readWorkers[i] = pipeline.NewReadWorker[*models.Token](recordReader)
@@ -295,6 +293,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
 		},
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
+		1000,
 	)
 }
 
@@ -315,5 +314,6 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		},
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
+		1000,
 	)
 }

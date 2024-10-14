@@ -161,7 +161,7 @@ func (r *Decoder) NextToken() (*models.Token, error) {
 	case *models.UDF:
 		return models.NewUDFToken(v, size), nil
 	case *models.Record:
-		return models.NewRecordToken(v, size, models.PartitionFilterSerialized{}), nil
+		return models.NewRecordToken(v, size, nil), nil
 	default:
 		return nil, fmt.Errorf("unsupported token type %T", v)
 	}

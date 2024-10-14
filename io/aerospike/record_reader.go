@@ -39,6 +39,7 @@ type RecordReaderConfig struct {
 	setList     []string
 	binList     []string
 	noTTLOnly   bool
+	pageSize    int64
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -51,6 +52,7 @@ func NewRecordReaderConfig(namespace string,
 	timeBounds models.TimeBounds,
 	scanLimiter *semaphore.Weighted,
 	noTTLOnly bool,
+	pageSize int64,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		namespace:       namespace,
@@ -62,6 +64,7 @@ func NewRecordReaderConfig(namespace string,
 		timeBounds:      timeBounds,
 		scanLimiter:     scanLimiter,
 		noTTLOnly:       noTTLOnly,
+		pageSize:        pageSize,
 	}
 }
 
@@ -90,12 +93,12 @@ type scanner interface {
 // It reads records from an Aerospike database and returns them as
 // *models.Record.
 type RecordReader struct {
-	ctx        context.Context
-	client     scanner
-	logger     *slog.Logger
-	config     *RecordReaderConfig
-	scanResult *recordSets // initialized on first Read() call
-	stateChan  chan<- models.PartitionFilterSerialized
+	ctx               context.Context
+	client            scanner
+	logger            *slog.Logger
+	config            *RecordReaderConfig
+	scanResult        *recordSets // initialized on first Read() call
+	customScanResults *customRecordSets
 }
 
 // NewRecordReader creates a new RecordReader.
@@ -104,18 +107,17 @@ func NewRecordReader(
 	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
-	stateChan chan<- models.PartitionFilterSerialized,
+
 ) *RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	logger.Debug("created new aerospike record reader")
 
 	return &RecordReader{
-		ctx:       ctx,
-		config:    cfg,
-		client:    client,
-		logger:    logger,
-		stateChan: stateChan,
+		ctx:    ctx,
+		config: cfg,
+		client: client,
+		logger: logger,
 	}
 }
 
@@ -128,19 +130,6 @@ func (r *RecordReader) Read() (*models.Token, error) {
 		}
 
 		r.scanResult = scan
-	}
-
-	var (
-		pfs models.PartitionFilterSerialized
-		err error
-	)
-	// For indexes and udf, partition filter will be nil.
-	if r.config.partitionFilter != nil && r.stateChan != nil {
-		pfs, err = models.NewPartitionFilterSerialized(r.config.partitionFilter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize partition filter: %w", err)
-		}
-		//	r.stateChan <- pfs
 	}
 
 	res, active := <-r.scanResult.Results()
@@ -158,7 +147,7 @@ func (r *RecordReader) Read() (*models.Token, error) {
 		Record: res.Record,
 	}
 
-	recToken := models.NewRecordToken(&rec, 0, pfs)
+	recToken := models.NewRecordToken(&rec, 0, nil)
 
 	return recToken, nil
 }
@@ -262,6 +251,10 @@ func (r *RecordReader) scanNodes(scanPolicy *a.ScanPolicy,
 
 func (r *RecordReader) isScanStarted() bool {
 	return r.scanResult != nil
+}
+
+func (r *RecordReader) isCustomScanStarted() bool {
+	return r.customScanResults != nil
 }
 
 func getScanExpression(bounds models.TimeBounds, noTTLOnly bool) *a.Expression {

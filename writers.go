@@ -118,7 +118,7 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 	}
 
 	if w.stateChan != nil {
-		w.stateChan <- v.Filter
+		w.stateChan <- *v.Filter
 	}
 
 	return w.output.Write(data)

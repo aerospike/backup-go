@@ -36,6 +36,8 @@ type Record struct {
 	// VoidTime is the time in seconds since the citrusleaf epoch when the
 	// record will expire.
 	VoidTime int64
+
+	// TODO: put filter here
 }
 
 type SIPathBinType byte
@@ -102,11 +104,11 @@ type Token struct {
 	Type   TokenType
 	Size   uint64
 	// Current filter state.
-	Filter PartitionFilterSerialized
+	Filter *PartitionFilterSerialized
 }
 
 // NewRecordToken creates a new token with the given record.
-func NewRecordToken(r *Record, size uint64, filter PartitionFilterSerialized) *Token {
+func NewRecordToken(r *Record, size uint64, filter *PartitionFilterSerialized) *Token {
 	return &Token{
 		Record: r,
 		Type:   TokenTypeRecord,

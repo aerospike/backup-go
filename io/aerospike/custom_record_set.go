@@ -1,7 +1,6 @@
 package aerospike
 
 import (
-	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
@@ -49,11 +48,12 @@ func streamData(data []*scanResult, out chan *customResult) {
 	}
 
 	for _, d := range data {
+	
 		for _, n := range d.records {
-			fmt.Println(n)
+
 			out <- newCustomResult(n, &d.Filter)
 		}
 	}
-	fmt.Println("closing")
+
 	close(out)
 }

@@ -15,7 +15,7 @@ type scanResult struct {
 
 func newScanResult(bufferSize int64) *scanResult {
 	return &scanResult{
-		records: make([]*a.Result, bufferSize),
+		records: make([]*a.Result, 0, bufferSize),
 	}
 }
 
@@ -54,8 +54,6 @@ func (r *RecordReader) CustomRead() (*models.Token, error) {
 
 // startCustomScan starts the scan for the RecordReader only for state save!
 func (r *RecordReader) startCustomScan() (*customRecordSets, error) {
-	fmt.Println("START CUSTOM SCAN")
-
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(r.config.timeBounds, r.config.noTTLOnly)
 
@@ -100,17 +98,16 @@ func (r *RecordReader) scanPartitions(scanPolicy *a.ScanPolicy,
 ) ([]*scanResult, error) {
 	results := make([]*scanResult, 0)
 	scanPolicy.MaxRecords = r.config.pageSize
-	pf := *partitionFilter
 
 	for {
-		curFilter, err := models.NewPartitionFilterSerialized(&pf)
+		curFilter, err := models.NewPartitionFilterSerialized(partitionFilter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize partition filter: %w", err)
 		}
 
 		recSet, aErr := r.client.ScanPartitions(
 			scanPolicy,
-			&pf,
+			partitionFilter,
 			r.config.namespace,
 			set,
 			r.config.binList...,
@@ -126,7 +123,6 @@ func (r *RecordReader) scanPartitions(scanPolicy *a.ScanPolicy,
 		for res := range recSet.Results() {
 			counter++
 			if res.Err != nil {
-				fmt.Println("ERROR:", res.Err)
 				continue
 			} else {
 				result.records = append(result.records, res)
@@ -144,6 +140,6 @@ func (r *RecordReader) scanPartitions(scanPolicy *a.ScanPolicy,
 			break
 		}
 	}
-	fmt.Println("end scan")
+
 	return results, nil
 }

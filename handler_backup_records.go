@@ -314,6 +314,6 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		},
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
-		1000,
+		100,
 	)
 }

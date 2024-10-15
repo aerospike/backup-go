@@ -50,7 +50,7 @@ type Pipeline[T any] struct {
 
 var _ Worker[any] = (*Pipeline[any])(nil)
 
-// const channelSize = 1
+const channelSize = 256
 
 // NewPipeline creates a new DataPipeline.
 func NewPipeline[T any](isSynced bool, workGroups ...[]Worker[T]) (*Pipeline[T], error) {
@@ -71,7 +71,7 @@ func NewPipeline[T any](isSynced bool, workGroups ...[]Worker[T]) (*Pipeline[T],
 	}
 
 	for i, workers := range workGroups {
-		stages[i] = newStage(workers...)
+		stages[i] = newStage(isSynced, workers...)
 	}
 
 	return &Pipeline[T]{
@@ -125,6 +125,7 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 
 		if dp.isSynced {
 			for i := 0; i < len(s.workers); i++ {
+				// For synced mode, we don't add buffer to channels, not to lose any data.
 				send := make(chan T)
 				sendChans = append(sendChans, send)
 				receiveChans = append(receiveChans, send)
@@ -134,9 +135,13 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 				emptyReceiveChans = append(emptyReceiveChans, empty)
 			}
 		} else {
-			send := make(chan T)
+			send := make(chan T, channelSize)
 			sendChans = append(sendChans, send)
 			receiveChans = append(receiveChans, send)
+
+			empty := make(chan T)
+			emptySendChans = append(emptySendChans, empty)
+			emptyReceiveChans = append(emptyReceiveChans, empty)
 		}
 
 		s.SetSendChan(sendChans)
@@ -181,6 +186,8 @@ type stage[T any] struct {
 	receive []<-chan T
 	send    []chan<- T
 	workers []Worker[T]
+	// if synced, we distribute communication channels through workers.
+	isSynced bool
 }
 
 func (s *stage[T]) SetReceiveChan(c []<-chan T) {
@@ -191,9 +198,10 @@ func (s *stage[T]) SetSendChan(c []chan<- T) {
 	s.send = c
 }
 
-func newStage[T any](workers ...Worker[T]) *stage[T] {
+func newStage[T any](isSynced bool, workers ...Worker[T]) *stage[T] {
 	s := stage[T]{
-		workers: workers,
+		workers:  workers,
+		isSynced: isSynced,
 	}
 
 	return &s
@@ -205,8 +213,16 @@ func (s *stage[T]) Run(ctx context.Context) error {
 	}
 
 	for i, w := range s.workers {
-		w.SetReceiveChan(s.receive[i])
-		w.SetSendChan(s.send[i])
+		if s.isSynced {
+			// If it is not sync mode, there will be 1 channel in each slice.
+			w.SetReceiveChan(s.receive[i])
+			w.SetSendChan(s.send[i])
+
+			continue
+		}
+		// Else we distribute all channels to workers.
+		w.SetReceiveChan(s.receive[0])
+		w.SetSendChan(s.send[0])
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

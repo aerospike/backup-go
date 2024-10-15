@@ -101,5 +101,5 @@ func TestState(t *testing.T) {
 	require.NoError(t, err)
 	newPf, err := newState.loadPartitionFilters()
 	require.NoError(t, err)
-	require.Equal(t, newPf, result)
+	require.EqualValues(t, newPf, result)
 }

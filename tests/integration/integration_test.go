@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -1109,6 +1110,130 @@ func (suite *backupRestoreTestSuite) TestBackupEstimateOk() {
 	suite.Nil(err)
 	suite.NotNil(bh)
 	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) TestBackupContinuation() {
+	const totalRecords = 900
+	batch := genRecords(suite.namespace, suite.set, totalRecords, testBins)
+	suite.SetupTest(batch)
+
+	testFolder := suite.T().TempDir()
+	testFile := "test_state_file"
+
+	for i := 0; i < 5; i++ {
+		randomNumber := rand.Intn(7-3+1) + 3
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(time.Duration(randomNumber) * time.Second)
+			cancel()
+		}()
+
+		first := suite.runFirstBackup(ctx, testFolder, testFile, i)
+
+		ctx = context.Background()
+		second := suite.runContinueBackup(ctx, testFolder, testFile, i)
+
+		suite.T().Log("first:", first, "second:", second)
+		result := (first + second) >= totalRecords
+		suite.T().Log(first + second)
+		suite.Equal(true, result)
+	}
+
+	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFolder, testStateFile string, i int,
+) uint64 {
+	bFolder := fmt.Sprintf("%s_%d", testFolder, i)
+
+	writers, err := local.NewWriter(
+		ctx,
+		local.WithValidator(asb.NewValidator()),
+		local.WithSkipDirCheck(),
+		local.WithDir(bFolder),
+		local.WithUnbufferedWrite(),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	readers, err := local.NewReader(
+		local.WithDir(bFolder),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	backupCfg := backup.NewDefaultBackupConfig()
+	backupCfg.Namespace = suite.namespace
+	backupCfg.ParallelRead = 10
+	backupCfg.ParallelWrite = 10
+
+	backupCfg.StateFile = testStateFile
+	backupCfg.StateFileDumpDuration = 10 * time.Millisecond
+	backupCfg.Bandwidth = 1000000
+	backupCfg.PageSize = 100
+	backupCfg.SyncPipelines = true
+
+	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
+	if err != nil {
+		panic(err)
+	}
+
+	// use backupHandler.Wait() to wait for the job to finish or fail
+	err = backupHandler.Wait(ctx)
+	if err != nil {
+		suite.T().Logf("Backup failed: %v", err)
+	}
+
+	return backupHandler.GetStats().GetReadRecords()
+}
+
+func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, testFolder, testStateFile string, i int,
+) uint64 {
+	bFolder := fmt.Sprintf("%s_%d", testFolder, i)
+
+	writers, err := local.NewWriter(
+		ctx,
+		local.WithValidator(asb.NewValidator()),
+		local.WithSkipDirCheck(),
+		local.WithDir(bFolder),
+		local.WithUnbufferedWrite(),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	readers, err := local.NewReader(
+		local.WithDir(bFolder),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	backupCfg := backup.NewDefaultBackupConfig()
+	backupCfg.Namespace = suite.namespace
+	backupCfg.ParallelRead = 10
+	backupCfg.ParallelWrite = 10
+
+	backupCfg.StateFile = testStateFile
+	backupCfg.Continue = true
+	backupCfg.StateFileDumpDuration = 10 * time.Millisecond
+	backupCfg.PageSize = 100
+	backupCfg.SyncPipelines = true
+
+	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
+	if err != nil {
+		panic(err)
+	}
+
+	// use backupHandler.Wait() to wait for the job to finish or fail
+	err = backupHandler.Wait(ctx)
+	if err != nil {
+		suite.T().Logf("Backup failed: %v", err)
+	}
+
+	return backupHandler.GetStats().GetReadRecords()
 }
 
 type byteReadWriterFactory struct {

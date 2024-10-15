@@ -271,7 +271,7 @@ func (bh *BackupHandler) makeWriteWorkers(
 	for i, w := range backupWriters {
 		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger, nil)
 		if bh.state != nil {
-			dataWriter = newTokenWriter(bh.encoder, w, bh.logger, bh.state.RecordsChan)
+			dataWriter = newTokenWriter(bh.encoder, w, bh.logger, bh.state.RecordsStateChan)
 		}
 
 		dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
@@ -448,7 +448,14 @@ func (bh *BackupHandler) backupSIndexes(
 
 	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
 	if bh.state != nil {
-		sindexWriter = pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
+		sindexWriter = pipeline.DataWriter[*models.Token](
+			newTokenWriter(
+				bh.encoder,
+				writer,
+				bh.logger,
+				bh.state.RecordsStateChan,
+			),
+		)
 	}
 
 	sindexWriter = newWriterWithTokenStats(sindexWriter, &bh.stats, bh.logger)
@@ -476,7 +483,14 @@ func (bh *BackupHandler) backupUDFs(
 	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
 
 	if bh.state != nil {
-		udfWriter = pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, bh.state.RecordsChan))
+		udfWriter = pipeline.DataWriter[*models.Token](
+			newTokenWriter(
+				bh.encoder,
+				writer,
+				bh.logger,
+				bh.state.RecordsStateChan,
+			),
+		)
 	}
 
 	udfWriter = newWriterWithTokenStats(udfWriter, &bh.stats, bh.logger)

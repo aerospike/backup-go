@@ -35,8 +35,8 @@ type State struct {
 	// Counter to count how many times State instance was initialized.
 	// Is used to create suffix for backup files.
 	Counter int
-	// RecordsChan communication channel to save current filter state.
-	RecordsChan chan models.PartitionFilterSerialized
+	// RecordsStateChan communication channel to save current filter state.
+	RecordsStateChan chan models.PartitionFilterSerialized
 	// RecordStates store states of all filters.
 	RecordStates map[string]models.PartitionFilterSerialized
 	// Mutex for RecordStates operations.
@@ -92,13 +92,13 @@ func newState(
 ) *State {
 	s := &State{
 		ctx: ctx,
-		// RecordsChan must not be buffered, so we can stop all operations.
-		RecordsChan:  make(chan models.PartitionFilterSerialized),
-		RecordStates: make(map[string]models.PartitionFilterSerialized),
-		FileName:     config.StateFile,
-		DumpDuration: config.StateFileDumpDuration,
-		writer:       writer,
-		logger:       logger,
+		// RecordsStateChan must not be buffered, so we can stop all operations.
+		RecordsStateChan: make(chan models.PartitionFilterSerialized),
+		RecordStates:     make(map[string]models.PartitionFilterSerialized),
+		FileName:         config.StateFile,
+		DumpDuration:     config.StateFileDumpDuration,
+		writer:           writer,
+		logger:           logger,
 	}
 	// Run watcher on initialization.
 	go s.serve()
@@ -130,7 +130,7 @@ func newStateFromFile(
 	s.ctx = ctx
 	s.writer = writer
 	s.logger = logger
-	s.RecordsChan = make(chan models.PartitionFilterSerialized)
+	s.RecordsStateChan = make(chan models.PartitionFilterSerialized)
 	s.Counter++
 
 	logger.Debug("loaded state file successfully")
@@ -222,7 +222,7 @@ func (s *State) serveRecords() {
 		select {
 		case <-s.ctx.Done():
 			return
-		case state := <-s.RecordsChan:
+		case state := <-s.RecordsStateChan:
 			if state.Begin == 0 && state.Count == 0 && state.Digest == nil {
 				continue
 			}

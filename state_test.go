@@ -13,3 +13,93 @@
 // limitations under the License.
 
 package backup
+
+import (
+	"context"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/local"
+	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/require"
+)
+
+const (
+	testDuration  = 1 * time.Second
+	testStateFile = "test_state_file"
+)
+
+func TestState(t *testing.T) {
+	t.Parallel()
+
+	testDir := t.TempDir()
+	tempFile := filepath.Join(testDir, testStateFile)
+
+	testFilters := []*a.PartitionFilter{
+		NewPartitionFilterByID(1),
+		NewPartitionFilterByID(2),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	cfg := NewDefaultBackupConfig()
+	cfg.StateFile = testStateFile
+	cfg.StateFileDumpDuration = testDuration
+	cfg.PageSize = 100000
+	cfg.SyncPipelines = true
+	cfg.PartitionFilters = testFilters
+
+	reader, err := local.NewReader(
+		local.WithDir(testDir),
+	)
+	require.NoError(t, err)
+
+	writer, err := local.NewWriter(
+		ctx,
+		local.WithValidator(asb.NewValidator()),
+		local.WithSkipDirCheck(),
+		local.WithDir(testDir),
+		local.WithUnbufferedWrite(),
+	)
+	require.NoError(t, err)
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	// Check init.
+	state, err := NewState(ctx, cfg, reader, writer, logger)
+	require.NotNil(t, state)
+	require.NoError(t, err)
+
+	for i := range testFilters {
+		pfs, err := models.NewPartitionFilterSerialized(testFilters[i])
+		require.NoError(t, err)
+		state.RecordsStateChan <- pfs
+	}
+
+	time.Sleep(testDuration * 3)
+	cancel()
+
+	// Check that file exists.
+	_, err = os.Stat(tempFile)
+	require.NoError(t, err)
+
+	// Nullify the link.
+	result := []*a.PartitionFilter{
+		NewPartitionFilterByID(1),
+		NewPartitionFilterByID(2),
+	}
+
+	// Check restore.
+	newCtx := context.Background()
+	cfg.Continue = true
+	newState, err := NewState(newCtx, cfg, reader, writer, logger)
+	require.NoError(t, err)
+	newPf, err := newState.loadPartitionFilters()
+	require.NoError(t, err)
+	require.Equal(t, newPf, result)
+}

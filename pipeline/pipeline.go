@@ -16,6 +16,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
@@ -52,8 +53,22 @@ var _ Worker[any] = (*Pipeline[any])(nil)
 // const channelSize = 1
 
 // NewPipeline creates a new DataPipeline.
-func NewPipeline[T any](isSynced bool, workGroups ...[]Worker[T]) *Pipeline[T] {
+func NewPipeline[T any](isSynced bool, workGroups ...[]Worker[T]) (*Pipeline[T], error) {
+	if len(workGroups) == 0 {
+		return nil, fmt.Errorf("workGroups is empty")
+	}
+
 	stages := make([]*stage[T], len(workGroups))
+
+	// Check that all working groups have same number of workers.
+	if isSynced {
+		firstLen := len(workGroups[0])
+		for i := range workGroups {
+			if len(workGroups[i]) != firstLen {
+				return nil, fmt.Errorf("all workers groups must be same length in sync mode")
+			}
+		}
+	}
 
 	for i, workers := range workGroups {
 		stages[i] = newStage(workers...)
@@ -62,7 +77,7 @@ func NewPipeline[T any](isSynced bool, workGroups ...[]Worker[T]) *Pipeline[T] {
 	return &Pipeline[T]{
 		stages:   stages,
 		isSynced: isSynced,
-	}
+	}, nil
 }
 
 // SetReceiveChan sets the receive channel for the pipeline.
@@ -95,7 +110,8 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	errors := make(chan error, len(dp.stages))
 
 	var (
-		lastSend          []<-chan T
+		lastSend []<-chan T
+		// To initialize pipeline workers correctly, we need to create empty channels for first and last stages.
 		emptySendChans    []chan<- T
 		emptyReceiveChans []<-chan T
 	)
@@ -220,7 +236,6 @@ func (s *stage[T]) Run(ctx context.Context) error {
 		if s.send[i] != nil {
 			close(s.send[i])
 		}
-
 	}
 
 	close(errors)

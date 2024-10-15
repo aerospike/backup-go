@@ -231,7 +231,12 @@ func (rh *RestoreHandler) runRestorePipeline(ctx context.Context, readers []pipe
 		processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond),
 	), rh.config.Parallel)
 
-	return pipeline.NewPipeline(true, readers, composeProcessor, writeWorkers).Run(ctx)
+	pl, err := pipeline.NewPipeline(false, readers, composeProcessor, writeWorkers)
+	if err != nil {
+		return err
+	}
+
+	return pl.Run(ctx)
 }
 
 func (rh *RestoreHandler) useBatchWrites() (bool, error) {
@@ -250,6 +255,7 @@ func newTokenWorker(processor processors.TokenProcessor, parallel int) []pipelin
 		for i := 0; i < parallel; i++ {
 			workers = append(workers, pipeline.NewProcessorWorker(processor))
 		}
+
 		return workers
 	}
 

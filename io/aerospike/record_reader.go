@@ -132,7 +132,8 @@ func (r *RecordReader) Read() (*models.Token, error) {
 	if r.config.pageSize > 0 {
 		return r.readPage()
 	}
-	return r.Read()
+
+	return r.read()
 }
 
 func (r *RecordReader) read() (*models.Token, error) {

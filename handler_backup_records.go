@@ -77,7 +77,12 @@ func (bh *backupRecordsHandler) run(
 			ctx, bh.config.RecordsPerSecond),
 	), bh.config.ParallelRead)
 
-	return pipeline.NewPipeline(true, readWorkers, composeProcessor, writers).Run(ctx)
+	pl, err := pipeline.NewPipeline(bh.config.SyncPipelines, readWorkers, composeProcessor, writers)
+	if err != nil {
+		return err
+	}
+
+	return pl.Run(ctx)
 }
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
@@ -293,7 +298,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
 		},
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
-		1000,
+		bh.config.PageSize,
 	)
 }
 
@@ -314,6 +319,6 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		},
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
-		100,
+		bh.config.PageSize,
 	)
 }

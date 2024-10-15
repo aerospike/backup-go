@@ -454,11 +454,14 @@ func (bh *BackupHandler) backupSIndexes(
 	sindexWriter = newWriterWithTokenStats(sindexWriter, &bh.stats, bh.logger)
 	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
 
-	sindexPipeline := pipeline.NewPipeline[*models.Token](
-		true,
+	sindexPipeline, err := pipeline.NewPipeline[*models.Token](
+		bh.config.SyncPipelines,
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
 		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
 	)
+	if err != nil {
+		return err
+	}
 
 	return sindexPipeline.Run(ctx)
 }
@@ -479,11 +482,14 @@ func (bh *BackupHandler) backupUDFs(
 	udfWriter = newWriterWithTokenStats(udfWriter, &bh.stats, bh.logger)
 	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
 
-	udfPipeline := pipeline.NewPipeline[*models.Token](
-		true,
+	udfPipeline, err := pipeline.NewPipeline[*models.Token](
+		bh.config.SyncPipelines,
 		[]pipeline.Worker[*models.Token]{udfReadWorker},
 		[]pipeline.Worker[*models.Token]{udfWriteWorker},
 	)
+	if err != nil {
+		return err
+	}
 
 	return udfPipeline.Run(ctx)
 }

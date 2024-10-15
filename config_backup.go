@@ -116,6 +116,14 @@ type BackupConfig struct {
 	// that was generated from the interrupted/failed run.
 	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
 	Continue bool
+	// PageSize how many records will be read on one iteration for continuation backup.
+	// Affects size if overlap on resuming backup after an error.
+	// By default, it must be zero. If any value is set, reading from Aerospike will be paginated.
+	// Which affects the performance and RAM usage.
+	PageSize int64
+	// SyncPipelines if set to true, the same number of workers will be created for each stage of the pipeline.
+	// Each worker will be connected to the next stage worker with a separate channel.
+	SyncPipelines bool
 }
 
 // NewDefaultBackupConfig returns a new BackupConfig with default values.
@@ -157,6 +165,7 @@ func (c *BackupConfig) isFullBackup() bool {
 	return c.ModAfter == nil && c.isDefaultPartitionFilter()
 }
 
+//nolint:gocyclo // validate func is long func with a lot of checks.
 func (c *BackupConfig) validate() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
@@ -190,6 +199,18 @@ func (c *BackupConfig) validate() error {
 
 	if c.FileLimit < 0 {
 		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
+	}
+
+	if c.StateFile != "" && c.PageSize == 0 {
+		return fmt.Errorf("page size must be set if saving state to state file is enabled")
+	}
+
+	if c.Continue && c.StateFile == "" {
+		return fmt.Errorf("state file must be set if continue is enabled")
+	}
+
+	if c.StateFile != "" && !c.SyncPipelines {
+		return fmt.Errorf("sync pipelines must be enabled if stage file is set")
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

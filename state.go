@@ -33,7 +33,7 @@ type State struct {
 	ctx context.Context
 
 	// Counter to count how many times State instance was initialized.
-	// Is used to create prefix for backup files.
+	// Is used to create suffix for backup files.
 	Counter int
 	// RecordsChan communication channel to save current filter state.
 	RecordsChan chan models.PartitionFilterSerialized

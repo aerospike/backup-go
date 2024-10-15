@@ -24,6 +24,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *RecordReader) readPage() (*models.Token, error) {
 	errChan := make(chan error)
+
 	if r.pageRecordsChan == nil {
 		r.pageRecordsChan = make(chan *pageRecord)
 		go r.startScanPaginated(errChan)
@@ -101,13 +102,13 @@ func (r *RecordReader) startScanPaginated(localErrChan chan error) {
 					// After we finish all the readings, we close pageRecord chan.
 					close(r.pageRecordsChan)
 					close(localErrChan)
+
 					return
 				}
 
 				for i := range result {
 					r.pageRecordsChan <- result[i]
 				}
-
 			}
 		}
 	}
@@ -153,10 +154,9 @@ func (r *RecordReader) streamPartitionPages(
 
 				if res.Err != nil {
 					continue
-				} else {
-					// Save to pageRecord filter that returns current pageRecord.
-					result = append(result, newPageRecord(res, &curFilter))
 				}
+				// Save to pageRecord filter that returns current pageRecord.
+				result = append(result, newPageRecord(res, &curFilter))
 			}
 
 			if aErr = recSet.Close(); aErr != nil {

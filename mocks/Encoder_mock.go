@@ -78,17 +78,17 @@ func (_c *MockEncoder_EncodeToken_Call) RunAndReturn(run func(*models.Token) ([]
 	return _c
 }
 
-// GenerateFilename provides a mock function with given fields: prefix
-func (_m *MockEncoder) GenerateFilename(prefix string) string {
-	ret := _m.Called(prefix)
+// GenerateFilename provides a mock function with given fields: prefix, suffix
+func (_m *MockEncoder) GenerateFilename(prefix string, suffix string) string {
+	ret := _m.Called(prefix, suffix)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GenerateFilename")
 	}
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(string) string); ok {
-		r0 = rf(prefix)
+	if rf, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = rf(prefix, suffix)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
@@ -103,13 +103,14 @@ type MockEncoder_GenerateFilename_Call struct {
 
 // GenerateFilename is a helper method to define mock.On call
 //   - prefix string
-func (_e *MockEncoder_Expecter) GenerateFilename(prefix interface{}) *MockEncoder_GenerateFilename_Call {
-	return &MockEncoder_GenerateFilename_Call{Call: _e.mock.On("GenerateFilename", prefix)}
+//   - suffix string
+func (_e *MockEncoder_Expecter) GenerateFilename(prefix interface{}, suffix interface{}) *MockEncoder_GenerateFilename_Call {
+	return &MockEncoder_GenerateFilename_Call{Call: _e.mock.On("GenerateFilename", prefix, suffix)}
 }
 
-func (_c *MockEncoder_GenerateFilename_Call) Run(run func(prefix string)) *MockEncoder_GenerateFilename_Call {
+func (_c *MockEncoder_GenerateFilename_Call) Run(run func(prefix string, suffix string)) *MockEncoder_GenerateFilename_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
@@ -119,7 +120,7 @@ func (_c *MockEncoder_GenerateFilename_Call) Return(_a0 string) *MockEncoder_Gen
 	return _c
 }
 
-func (_c *MockEncoder_GenerateFilename_Call) RunAndReturn(run func(string) string) *MockEncoder_GenerateFilename_Call {
+func (_c *MockEncoder_GenerateFilename_Call) RunAndReturn(run func(string, string) string) *MockEncoder_GenerateFilename_Call {
 	_c.Call.Return(run)
 	return _c
 }

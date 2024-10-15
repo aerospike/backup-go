@@ -36,7 +36,7 @@ const (
 type Encoder interface {
 	EncodeToken(*models.Token) ([]byte, error)
 	GetHeader() []byte
-	GenerateFilename(prefix string) string
+	GenerateFilename(prefix, suffix string) string
 }
 
 // NewEncoder returns a new Encoder according to `EncoderType`.

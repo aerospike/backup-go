@@ -322,7 +322,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 		suffix = bh.state.getFileSuffix()
 	}
 
-	filename := bh.encoder.GenerateFilename(suffix)
+	filename := bh.encoder.GenerateFilename(bh.config.OutputFilePrefix, suffix)
 
 	storageWriter, err := bh.writer.NewWriter(ctx, filename)
 	if err != nil {

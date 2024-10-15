@@ -116,14 +116,16 @@ type BackupConfig struct {
 	// that was generated from the interrupted/failed run.
 	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
 	Continue bool
-	// PageSize how many records will be read on one iteration for continuation backup.
+	// How many records will be read on one iteration for continuation backup.
 	// Affects size if overlap on resuming backup after an error.
 	// By default, it must be zero. If any value is set, reading from Aerospike will be paginated.
 	// Which affects the performance and RAM usage.
 	PageSize int64
-	// SyncPipelines if set to true, the same number of workers will be created for each stage of the pipeline.
+	// If set to true, the same number of workers will be created for each stage of the pipeline.
 	// Each worker will be connected to the next stage worker with a separate unbuffered channel.
 	SyncPipelines bool
+	// When using directory parameter, prepend a prefix to the names of the generated files.
+	OutputFilePrefix string
 }
 
 // NewDefaultBackupConfig returns a new BackupConfig with default values.

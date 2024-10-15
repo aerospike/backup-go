@@ -79,10 +79,6 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 	}
 }
 
-func (tr *tokenReader) CustomRead() (*models.Token, error) {
-	return tr.Read()
-}
-
 // Close satisfies the DataReader interface
 // but is a no-op for the tokenReader.
 func (tr *tokenReader) Close() {

@@ -76,10 +76,6 @@ func (r *UdfReader) Read() (*models.Token, error) {
 	return nil, io.EOF
 }
 
-func (r *UdfReader) CustomRead() (*models.Token, error) {
-	return r.Read()
-}
-
 // Close satisfies the DataReader interface
 // but is a no-op for the UDFReader.
 func (r *UdfReader) Close() {}

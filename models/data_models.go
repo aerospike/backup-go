@@ -36,8 +36,6 @@ type Record struct {
 	// VoidTime is the time in seconds since the citrusleaf epoch when the
 	// record will expire.
 	VoidTime int64
-
-	// TODO: put filter here
 }
 
 type SIPathBinType byte
@@ -103,7 +101,8 @@ type Token struct {
 	Record *Record
 	Type   TokenType
 	Size   uint64
-	// Current filter state.
+	// Filter represents serialized partition filter for page, that record belongs to.
+	// Is used only on pagination read, to save reading states.
 	Filter *PartitionFilterSerialized
 }
 

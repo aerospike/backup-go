@@ -39,7 +39,10 @@ type RecordReaderConfig struct {
 	setList     []string
 	binList     []string
 	noTTLOnly   bool
-	pageSize    int64
+
+	// pageSize used for paginated scan for saving reading state.
+	// If pageSize = 0, we think that we use normal scan.
+	pageSize int64
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -93,12 +96,13 @@ type scanner interface {
 // It reads records from an Aerospike database and returns them as
 // *models.Record.
 type RecordReader struct {
-	ctx               context.Context
-	client            scanner
-	logger            *slog.Logger
-	config            *RecordReaderConfig
-	scanResult        *recordSets // initialized on first Read() call
-	customScanResults *customRecordSets
+	ctx        context.Context
+	client     scanner
+	logger     *slog.Logger
+	config     *RecordReaderConfig
+	scanResult *recordSets // initialized on first Read() call
+	// pageRecordsChan chan is initialized only if pageSize > 0.
+	pageRecordsChan chan *pageRecord
 }
 
 // NewRecordReader creates a new RecordReader.
@@ -107,22 +111,31 @@ func NewRecordReader(
 	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
-
 ) *RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	logger.Debug("created new aerospike record reader")
 
-	return &RecordReader{
+	r := &RecordReader{
 		ctx:    ctx,
 		config: cfg,
 		client: client,
 		logger: logger,
 	}
+
+	return r
 }
 
 // Read reads the next record from the Aerospike database.
 func (r *RecordReader) Read() (*models.Token, error) {
+	// If pageSize is set, we use paginated read.
+	if r.config.pageSize > 0 {
+		return r.readPage()
+	}
+	return r.Read()
+}
+
+func (r *RecordReader) read() (*models.Token, error) {
 	if !r.isScanStarted() {
 		scan, err := r.startScan()
 		if err != nil {
@@ -251,10 +264,6 @@ func (r *RecordReader) scanNodes(scanPolicy *a.ScanPolicy,
 
 func (r *RecordReader) isScanStarted() bool {
 	return r.scanResult != nil
-}
-
-func (r *RecordReader) isCustomScanStarted() bool {
-	return r.customScanResults != nil
 }
 
 func getScanExpression(bounds models.TimeBounds, noTTLOnly bool) *a.Expression {

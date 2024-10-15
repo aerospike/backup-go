@@ -139,9 +139,8 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 			sendChans = append(sendChans, send)
 			receiveChans = append(receiveChans, send)
 
-			empty := make(chan T)
-			emptySendChans = append(emptySendChans, empty)
-			emptyReceiveChans = append(emptyReceiveChans, empty)
+			emptySendChans = append(emptySendChans, dp.send)
+			emptyReceiveChans = append(emptyReceiveChans, dp.receive)
 		}
 
 		s.SetSendChan(sendChans)

@@ -122,7 +122,7 @@ type BackupConfig struct {
 	// Which affects the performance and RAM usage.
 	PageSize int64
 	// SyncPipelines if set to true, the same number of workers will be created for each stage of the pipeline.
-	// Each worker will be connected to the next stage worker with a separate channel.
+	// Each worker will be connected to the next stage worker with a separate unbuffered channel.
 	SyncPipelines bool
 }
 

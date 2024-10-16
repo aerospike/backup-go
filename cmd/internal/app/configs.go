@@ -63,11 +63,19 @@ func mapBackupConfig(
 	c.Compact = backupParams.Compact
 	c.NoTTLOnly = backupParams.NoTTLOnly
 	c.StateFileDumpDuration = time.Duration(backupParams.StateFileDumpDuration) * time.Millisecond
-	c.StateFile = backupParams.StateFileDst
+	c.OutputFilePrefix = backupParams.OutputFilePrefix
 
 	if backupParams.Continue != "" {
 		c.StateFile = backupParams.Continue
 		c.Continue = true
+		c.SyncPipelines = true
+		c.PageSize = backupParams.ScanPageSize
+	}
+
+	if backupParams.StateFileDst != "" {
+		c.StateFile = backupParams.StateFileDst
+		c.SyncPipelines = true
+		c.PageSize = backupParams.ScanPageSize
 	}
 
 	// Overwrite partitions if we use nodes.

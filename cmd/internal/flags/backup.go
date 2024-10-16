@@ -33,6 +33,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVarP(&f.OutputFile, "output-file", "o",
 		"",
 		"Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.")
+	flagSet.StringVarP(&f.OutputFilePrefix, "output-file-prefix", "q",
+		"",
+		"When using directory parameter, prepend a prefix to the names of the generated files.")
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
 		false,
 		"Remove existing backup file (-o) or files (-d).")
@@ -137,6 +140,11 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.Int64Var(&f.StateFileDumpDuration, "state-file-dump-duration",
 		10000,
 		"Intervals in milliseconds, how often dump state file to disk.")
+	flagSet.Int64Var(&f.ScanPageSize, "scan-page-size",
+		10000,
+		"How many records will be read on one iteration for continuation backup.\n"+
+			"Affects size if overlap on resuming backup after an error.\n"+
+			"Is used only with --state-file-dst or --continue.")
 
 	return flagSet
 }

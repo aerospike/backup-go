@@ -37,6 +37,8 @@ type Backup struct {
 	StateFileDst          string
 	StateFileDumpDuration int64
 	Continue              string
+	ScanPageSize          int64
+	OutputFilePrefix      string
 }
 
 // ShouldClearTarget check if we should clean target directory.

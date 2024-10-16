@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package blob
+package local
 
 type options struct {
 	// path contains path to file or directory.
@@ -23,25 +23,14 @@ type options struct {
 	isRemovingFiles bool
 	// validator contains files validator that is applied to files if isDir = true.
 	validator validator
-	// Concurrency defines the max number of concurrent uploads to be performed to upload the file.
-	// Each concurrent upload will create a buffer of size BlockSize.
-	uploadConcurrency int
 	// withNestedDir describes if we should check for if an object is a directory for read/write operations.
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
 	// Default: false
 	withNestedDir bool
-	// marker is a string value that identifies the portion of the list of containers to be
-	// returned with the next listing operation.
-	// The operation returns the NextMarker value within the response body if the listing
-	// operation did not return all containers remaining to be listed with the current page.
-	// The NextMarker value can be used
-	// as the value for the marker parameter in a subsequent call to request the next
-	// page of list items. The marker value is opaque to the client.
-	marker string
+	// unbuffered means that writings to the disk will be unbuffered.
+	unbuffered bool
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
-	// unbuffered means that writings to the cloud will be unbuffered.
-	unbuffered bool
 }
 
 type Opt func(*options)
@@ -85,21 +74,11 @@ func WithRemoveFiles() Opt {
 	}
 }
 
-// WithUploadConcurrency define max number of concurrent uploads to be performed to upload the file.
-// Is used only for Writer.
-func WithUploadConcurrency(v int) Opt {
+// WithUnbufferedWrite adds an unbuffered flag to the writer.
+// Which means that writings to the disk will be unbuffered.
+func WithUnbufferedWrite() Opt {
 	return func(r *options) {
-		r.uploadConcurrency = v
-	}
-}
-
-// WithMarker adds marker parameter to list request.
-// The Value of marker will be not included in a result.
-// You will receive objects after marker.
-// Is used only for Reader.
-func WithMarker(v string) Opt {
-	return func(r *options) {
-		r.marker = v
+		r.unbuffered = true
 	}
 }
 
@@ -108,13 +87,5 @@ func WithMarker(v string) Opt {
 func WithSkipDirCheck() Opt {
 	return func(r *options) {
 		r.skipDirCheck = true
-	}
-}
-
-// WithUnbufferedWrite adds an unbuffered flag to the writer.
-// Which means that writings to the cloud will be unbuffered.
-func WithUnbufferedWrite() Opt {
-	return func(r *options) {
-		r.unbuffered = true
 	}
 }

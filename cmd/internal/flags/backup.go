@@ -33,6 +33,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVarP(&f.OutputFile, "output-file", "o",
 		"",
 		"Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.")
+	flagSet.StringVarP(&f.OutputFilePrefix, "output-file-prefix", "q",
+		"",
+		"When using directory parameter, prepend a prefix to the names of the generated files.")
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
 		false,
 		"Remove existing backup file (-o) or files (-d).")
@@ -123,6 +126,25 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.Int64Var(&f.EstimateSamples, "estimate-samples",
 		10000,
 		"The number of samples to take when running a backup estimate.")
+	flagSet.StringVarP(&f.Continue, "continue", "c",
+		"",
+		"Resumes an interrupted/failed backup from where it was left off, given the .state file\n"+
+			"that was generated from the interrupted/failed run.")
+	flagSet.StringVar(&f.StateFileDst, "state-file-dst",
+		"",
+		"Either a path with a file name or a directory in which the backup state file will be\n"+
+			"placed if the backup is interrupted/fails. If a path with a file name is used, that\n"+
+			"exact path is where the backup file will be placed. If a directory is given, the backup\n"+
+			"state will be placed in the directory with name `<namespace>.asb.state`, or\n"+
+			"`<prefix>.asb.state` if `--output-file-prefix` is given.")
+	flagSet.Int64Var(&f.StateFileDumpDuration, "state-file-dump-duration",
+		10000,
+		"Intervals in milliseconds, how often dump state file to disk.")
+	flagSet.Int64Var(&f.ScanPageSize, "scan-page-size",
+		10000,
+		"How many records will be read on one iteration for continuation backup.\n"+
+			"Affects size if overlap on resuming backup after an error.\n"+
+			"Is used only with --state-file-dst or --continue.")
 
 	return flagSet
 }

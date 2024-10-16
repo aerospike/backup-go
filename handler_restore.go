@@ -39,6 +39,11 @@ type StreamingReader interface {
 	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
 	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
 
+	// StreamFile creates a single file reader and sends io.Readers to the `readersCh`
+	// In case of an error, it is sent to the `errorsCh` channel.
+	// Must be run in a goroutine `go rh.reader.StreamFile()`.
+	StreamFile(ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error)
+
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
 }
@@ -224,9 +229,14 @@ func (rh *RestoreHandler) runRestorePipeline(ctx context.Context, readers []pipe
 		processors.NewChangeNamespace(nsSource, nsDest),
 		processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
 		processors.NewTPSLimiter[*models.Token](ctx, rh.config.RecordsPerSecond),
-	))
+	), rh.config.Parallel)
 
-	return pipeline.NewPipeline(readers, composeProcessor, writeWorkers).Run(ctx)
+	pl, err := pipeline.NewPipeline(false, readers, composeProcessor, writeWorkers)
+	if err != nil {
+		return err
+	}
+
+	return pl.Run(ctx)
 }
 
 func (rh *RestoreHandler) useBatchWrites() (bool, error) {
@@ -239,7 +249,16 @@ func (rh *RestoreHandler) useBatchWrites() (bool, error) {
 	return infoClient.SupportsBatchWrite()
 }
 
-func newTokenWorker(processor processors.TokenProcessor) []pipeline.Worker[*models.Token] {
+func newTokenWorker(processor processors.TokenProcessor, parallel int) []pipeline.Worker[*models.Token] {
+	if parallel > 0 {
+		workers := make([]pipeline.Worker[*models.Token], 0, parallel)
+		for i := 0; i < parallel; i++ {
+			workers = append(workers, pipeline.NewProcessorWorker(processor))
+		}
+
+		return workers
+	}
+
 	return []pipeline.Worker[*models.Token]{
 		pipeline.NewProcessorWorker(processor),
 	}

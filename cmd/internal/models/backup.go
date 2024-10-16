@@ -15,28 +15,37 @@
 package models
 
 type Backup struct {
-	OutputFile          string
-	RemoveFiles         bool
-	ModifiedBefore      string
-	ModifiedAfter       string
-	FileLimit           int64
-	AfterDigest         string
-	MaxRecords          int64
-	NoBins              bool
-	SleepBetweenRetries int
-	FilterExpression    string
-	ParallelNodes       bool
-	RemoveArtifacts     bool
-	Compact             bool
-	NodeList            string
-	NoTTLOnly           bool
-	PreferRacks         string
-	PartitionList       string
-	Estimate            bool
-	EstimateSamples     int64
+	OutputFile            string
+	RemoveFiles           bool
+	ModifiedBefore        string
+	ModifiedAfter         string
+	FileLimit             int64
+	AfterDigest           string
+	MaxRecords            int64
+	NoBins                bool
+	SleepBetweenRetries   int
+	FilterExpression      string
+	ParallelNodes         bool
+	RemoveArtifacts       bool
+	Compact               bool
+	NodeList              string
+	NoTTLOnly             bool
+	PreferRacks           string
+	PartitionList         string
+	Estimate              bool
+	EstimateSamples       int64
+	StateFileDst          string
+	StateFileDumpDuration int64
+	Continue              string
+	ScanPageSize          int64
+	OutputFilePrefix      string
 }
 
 // ShouldClearTarget check if we should clean target directory.
 func (b *Backup) ShouldClearTarget() bool {
-	return b.RemoveFiles || b.RemoveArtifacts
+	return (b.RemoveFiles || b.RemoveArtifacts) && b.Continue == ""
+}
+
+func (b *Backup) ShouldSaveState() bool {
+	return b.StateFileDst != "" || b.Continue != ""
 }

@@ -59,10 +59,24 @@ func mapBackupConfig(
 	c.ParallelWrite = commonParams.Parallel
 	c.ParallelRead = commonParams.Parallel
 	// As we set --nice in MiB we must convert it to bytes
-	// TODO: make Bandwidth int64 to avoid overflow.
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
 	c.Compact = backupParams.Compact
 	c.NoTTLOnly = backupParams.NoTTLOnly
+	c.StateFileDumpDuration = time.Duration(backupParams.StateFileDumpDuration) * time.Millisecond
+	c.OutputFilePrefix = backupParams.OutputFilePrefix
+
+	if backupParams.Continue != "" {
+		c.StateFile = backupParams.Continue
+		c.Continue = true
+		c.SyncPipelines = true
+		c.PageSize = backupParams.ScanPageSize
+	}
+
+	if backupParams.StateFileDst != "" {
+		c.StateFile = backupParams.StateFileDst
+		c.SyncPipelines = true
+		c.PageSize = backupParams.ScanPageSize
+	}
 
 	// Overwrite partitions if we use nodes.
 	if backupParams.ParallelNodes || backupParams.NodeList != "" {
@@ -135,7 +149,6 @@ func mapRestoreConfig(
 	c.WritePolicy = mapWritePolicy(restoreParams, commonParams)
 	c.InfoPolicy = mapInfoPolicy(restoreParams.TimeOut)
 	// As we set --nice in MiB we must convert it to bytes
-	// TODO: make Bandwidth int64 to avoid overflow.
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
 	c.ExtraTTL = restoreParams.ExtraTTL
 	c.IgnoreRecordError = restoreParams.IgnoreRecordError
@@ -288,7 +301,6 @@ func recordExistsAction(replace, unique bool) aerospike.RecordExistsAction {
 	}
 }
 
-// TODO: why no info policy timeout is set for backup in C tool?
 func mapInfoPolicy(timeOut int64) *aerospike.InfoPolicy {
 	p := aerospike.NewInfoPolicy()
 	p.Timeout = time.Duration(timeOut) * time.Millisecond

@@ -26,11 +26,16 @@ import (
 	"github.com/aerospike/backup-go/io/local"
 )
 
-func newLocalReader(r *models.Restore, c *models.Common) (backup.StreamingReader, error) {
+func newLocalReader(r *models.Restore, c *models.Common, b *models.Backup) (backup.StreamingReader, error) {
 	var opts []local.Opt
 
 	if c.Directory != "" && r.InputFile == "" {
-		opts = append(opts, local.WithDir(c.Directory), local.WithValidator(asb.NewValidator()))
+		opts = append(opts, local.WithDir(c.Directory))
+		// Append Validator only if backup params are not set.
+		// That means we don't need to check that we are saving a state file.
+		if b == nil {
+			opts = append(opts, local.WithValidator(asb.NewValidator()))
+		}
 	}
 
 	if r.InputFile != "" && c.Directory == "" {
@@ -45,6 +50,7 @@ func newS3Reader(
 	a *models.AwsS3,
 	r *models.Restore,
 	c *models.Common,
+	b *models.Backup,
 ) (backup.StreamingReader, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
@@ -57,7 +63,12 @@ func newS3Reader(
 
 	if c.Directory != "" && r.InputFile == "" {
 		bucketName, path = getBucketFromPath(c.Directory)
-		opts = append(opts, s3.WithDir(path), s3.WithValidator(asb.NewValidator()))
+		opts = append(opts, s3.WithDir(path))
+		// Append Validator only if backup params are not set.
+		// That means we don't need to check that we are saving a state file.
+		if b == nil {
+			opts = append(opts, s3.WithValidator(asb.NewValidator()))
+		}
 	}
 
 	if r.InputFile != "" && c.Directory == "" {
@@ -73,6 +84,7 @@ func newGcpReader(
 	g *models.GcpStorage,
 	r *models.Restore,
 	c *models.Common,
+	b *models.Backup,
 ) (backup.StreamingReader, error) {
 	client, err := newGcpClient(ctx, g)
 	if err != nil {
@@ -82,7 +94,12 @@ func newGcpReader(
 	opts := make([]storage.Opt, 0)
 
 	if c.Directory != "" && r.InputFile == "" {
-		opts = append(opts, storage.WithDir(c.Directory), storage.WithValidator(asb.NewValidator()))
+		opts = append(opts, storage.WithDir(c.Directory))
+		// Append Validator only if backup params are not set.
+		// That means we don't need to check that we are saving a state file.
+		if b == nil {
+			opts = append(opts, storage.WithValidator(asb.NewValidator()))
+		}
 	}
 
 	if r.InputFile != "" && c.Directory == "" {
@@ -97,6 +114,7 @@ func newAzureReader(
 	a *models.AzureBlob,
 	r *models.Restore,
 	c *models.Common,
+	b *models.Backup,
 ) (backup.StreamingReader, error) {
 	client, err := newAzureClient(a)
 	if err != nil {
@@ -106,7 +124,12 @@ func newAzureReader(
 	opts := make([]blob.Opt, 0)
 
 	if c.Directory != "" && r.InputFile == "" {
-		opts = append(opts, blob.WithDir(c.Directory), blob.WithValidator(asb.NewValidator()))
+		opts = append(opts, blob.WithDir(c.Directory))
+		// Append Validator only if backup params are not set.
+		// That means we don't need to check that we are saving a state file.
+		if b == nil {
+			opts = append(opts, blob.WithValidator(asb.NewValidator()))
+		}
 	}
 
 	if r.InputFile != "" && c.Directory == "" {

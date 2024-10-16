@@ -148,6 +148,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		buffer:     new(bytes.Buffer),
 		partNumber: 1,
 		chunkSize:  s3DefaultChunkSize,
+		unbuffered: w.unbuffered,
 	}, nil
 }
 
@@ -169,6 +170,7 @@ type s3Writer struct {
 	chunkSize      int
 	partNumber     int32
 	closed         bool
+	unbuffered     bool
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
@@ -176,6 +178,13 @@ var _ io.WriteCloser = (*s3Writer)(nil)
 func (w *s3Writer) Write(p []byte) (int, error) {
 	if w.closed {
 		return 0, os.ErrClosed
+	}
+
+	if w.unbuffered {
+		if err := w.uploadDirect(p); err != nil {
+			return 0, fmt.Errorf("failed to upload direct: %w", err)
+		}
+		return len(p), nil
 	}
 
 	if w.buffer.Len() >= w.chunkSize {
@@ -213,19 +222,56 @@ func (w *s3Writer) uploadPart() error {
 	return nil
 }
 
+// uploadDirect is used for unbuffered upload.
+func (w *s3Writer) uploadDirect(p []byte) error {
+	response, err := w.client.UploadPart(context.Background(), &s3.UploadPartInput{
+		Body:       bytes.NewReader(p),
+		Bucket:     &w.bucket,
+		Key:        &w.key,
+		PartNumber: &w.partNumber,
+		UploadId:   w.uploadID,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to upload part: %w", err)
+	}
+
+	pn := w.partNumber
+	w.completedParts = append(w.completedParts, types.CompletedPart{
+		PartNumber: &pn,
+		ETag:       response.ETag,
+	})
+
+	w.partNumber++
+
+	if w.ctx.Err() != nil {
+		if err = w.Close(); err != nil {
+			return fmt.Errorf("failed to close writer: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (w *s3Writer) Close() error {
 	if w.closed {
 		return os.ErrClosed
 	}
 
-	if w.buffer.Len() > 0 {
+	ctx := w.ctx
+	if w.unbuffered {
+		ctx = context.Background()
+	}
+
+	// Upload from buffer only if unbuffered = false.
+	if !w.unbuffered && w.buffer.Len() > 0 {
 		err := w.uploadPart()
 		if err != nil {
 			return fmt.Errorf("failed to upload part: %w", err)
 		}
 	}
 
-	_, err := w.client.CompleteMultipartUpload(w.ctx,
+	_, err := w.client.CompleteMultipartUpload(ctx,
 		&s3.CompleteMultipartUploadInput{
 			Bucket:   &w.bucket,
 			UploadId: w.uploadID,

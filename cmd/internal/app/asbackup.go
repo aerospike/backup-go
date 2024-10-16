@@ -67,7 +67,14 @@ func NewASBackup(
 	)
 	// We initialize a writer only if output is configured.
 	if backupParams.OutputFile != "" || commonParams.Directory != "" {
-		writer, err = getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
+		writer, err = getWriter(
+			ctx,
+			backupParams,
+			commonParams,
+			awsS3,
+			gcpStorage,
+			azureBlob,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create backup writer: %w", err)
 		}
@@ -78,10 +85,9 @@ func NewASBackup(
 		}
 	}
 
-	if backupParams.StateFileDst != "" || backupParams.Continue != "" {
+	if backupParams.ShouldSaveState() {
 		r := &models.Restore{InputFile: backupParams.OutputFile}
-
-		reader, err = getReader(ctx, r, commonParams, awsS3, gcpStorage, azureBlob)
+		reader, err = getReader(ctx, r, commonParams, awsS3, gcpStorage, azureBlob, backupParams)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create reader: %w", err)
 		}

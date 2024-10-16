@@ -32,6 +32,8 @@ type options struct {
 	startAfter string
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
+	// unbuffered means that writings to the cloud will be unbuffered.
+	unbuffered bool
 }
 
 type Opt func(*options)
@@ -88,5 +90,13 @@ func WithStartAfter(v string) Opt {
 func WithSkipDirCheck() Opt {
 	return func(r *options) {
 		r.skipDirCheck = true
+	}
+}
+
+// WithUnbufferedWrite adds an unbuffered flag to the writer.
+// Which means that writings to the cloud will be unbuffered.
+func WithUnbufferedWrite() Opt {
+	return func(r *options) {
+		r.unbuffered = true
 	}
 }

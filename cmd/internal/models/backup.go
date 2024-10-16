@@ -43,5 +43,9 @@ type Backup struct {
 
 // ShouldClearTarget check if we should clean target directory.
 func (b *Backup) ShouldClearTarget() bool {
-	return b.RemoveFiles || b.RemoveArtifacts
+	return (b.RemoveFiles || b.RemoveArtifacts) && b.Continue == ""
+}
+
+func (b *Backup) ShouldSaveState() bool {
+	return b.StateFileDst != "" || b.Continue != ""
 }

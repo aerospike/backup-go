@@ -27,7 +27,7 @@ type options struct {
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
 	// Default: false
 	withNestedDir bool
-	// unbuffered means that writings toi disk will be unbuffered.
+	// unbuffered means that writings to the disk will be unbuffered.
 	unbuffered bool
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
@@ -75,7 +75,7 @@ func WithRemoveFiles() Opt {
 }
 
 // WithUnbufferedWrite adds an unbuffered flag to the writer.
-// Which means that writings to disk will be unbuffered.
+// Which means that writings to the disk will be unbuffered.
 func WithUnbufferedWrite() Opt {
 	return func(r *options) {
 		r.unbuffered = true

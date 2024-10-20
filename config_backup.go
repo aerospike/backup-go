@@ -104,11 +104,11 @@ type BackupConfig struct {
 	Compact bool
 	// Only include records that have no ttl set (persistent records).
 	NoTTLOnly bool
-	// Either a path with a file name or a directory in which the backup state file will be
-	// placed if the backup is interrupted/fails. If a path with a file name is used, that
-	// exact path is where the backup file will be placed. If a directory is given, the backup
-	// state will be placed in the directory with name `<namespace>.asb.state`
-	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
+	// Name of a state file that will be saved in backup directory.
+	// Works only with FileLimit parameter.
+	// As we reach FileLimit and close file, the current state will be saved.
+	// Works only for default and/or partition backup.
+	// Not work with ParallelNodes or NodeList.
 	StateFile string
 	// Resumes an interrupted/failed backup from where it was left off, given the .state file
 	// that was generated from the interrupted/failed run.

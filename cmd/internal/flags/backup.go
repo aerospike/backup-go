@@ -132,9 +132,10 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"that was generated from the interrupted/failed run.")
 	flagSet.StringVar(&f.StateFileDst, "state-file-dst",
 		"",
-		"Name or path relatively to --directory where state file will be saved.\n"+
-			"Works only with --file-limit parameter. As we reach file-limit and save file to storage\n"+
-			"current state will be saved.")
+		"Name of a state file that will be saved in backup --directory.\n"+
+			"Works only with --file-limit parameter. As we reach --file-limit and close file,\n"+
+			"current state will be saved. Works only for default and/or partition backup. \n"+
+			"Not work with --parallel-nodes or --node--list.")
 	flagSet.Int64Var(&f.ScanPageSize, "scan-page-size",
 		10000,
 		"How many records will be read on one iteration for continuation backup.\n"+

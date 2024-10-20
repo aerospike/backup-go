@@ -310,7 +310,12 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 // configuration.
 func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, error) {
 	if bh.config.FileLimit > 0 {
-		return sized.NewWriter(ctx, n, bh.state.SaveCommandChan, bh.config.FileLimit, bh.newConfiguredWriter)
+		// For saving state operation, we init writer with a communication channel.
+		if bh.config.isStateFirstRun() || bh.config.isStateContinue() {
+			return sized.NewWriter(ctx, n, bh.state.SaveCommandChan, bh.config.FileLimit, bh.newConfiguredWriter)
+		}
+
+		return sized.NewWriter(ctx, n, nil, bh.config.FileLimit, bh.newConfiguredWriter)
 	}
 
 	return bh.newConfiguredWriter(ctx)

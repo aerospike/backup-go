@@ -87,6 +87,7 @@ func NewASBackup(
 
 	if backupParams.ShouldSaveState() {
 		r := &models.Restore{InputFile: backupParams.OutputFile}
+
 		reader, err = getReader(ctx, r, commonParams, awsS3, gcpStorage, azureBlob, backupParams)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create reader: %w", err)

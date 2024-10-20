@@ -219,7 +219,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 			return nil, err
 		}
 		// Init state.
-		if err = bh.state.InitState(partitionGroups); err != nil {
+		if err := bh.state.InitState(partitionGroups); err != nil {
 			return nil, err
 		}
 	}

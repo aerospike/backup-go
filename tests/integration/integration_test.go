@@ -1151,7 +1151,6 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 		local.WithValidator(asb.NewValidator()),
 		local.WithSkipDirCheck(),
 		local.WithDir(bFolder),
-		local.WithUnbufferedWrite(),
 	)
 	if err != nil {
 		panic(err)
@@ -1170,7 +1169,7 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 	backupCfg.ParallelWrite = 10
 
 	backupCfg.StateFile = testStateFile
-	backupCfg.StateFileDumpDuration = 10 * time.Millisecond
+	backupCfg.FileLimit = 100000
 	backupCfg.Bandwidth = 1000000
 	backupCfg.PageSize = 100
 	backupCfg.SyncPipelines = true
@@ -1198,7 +1197,6 @@ func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, test
 		local.WithValidator(asb.NewValidator()),
 		local.WithSkipDirCheck(),
 		local.WithDir(bFolder),
-		local.WithUnbufferedWrite(),
 	)
 	if err != nil {
 		panic(err)
@@ -1218,7 +1216,7 @@ func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, test
 
 	backupCfg.StateFile = testStateFile
 	backupCfg.Continue = true
-	backupCfg.StateFileDumpDuration = 10 * time.Millisecond
+	backupCfg.FileLimit = 100000
 	backupCfg.PageSize = 100
 	backupCfg.SyncPipelines = true
 

@@ -137,7 +137,7 @@ func newStateFromFile(
 	s.SaveCommandChan = make(chan int)
 	s.Counter++
 
-	logger.Debug("loaded state file successfully, filters loaded:", len(s.RecordStatesSaved))
+	logger.Debug("loaded state file successfully", slog.Int("filters loaded", len(s.RecordStatesSaved)))
 
 	// Run watcher on initialization.
 	go s.serve()
@@ -190,10 +190,12 @@ func (s *State) InitState(pf []*a.PartitionFilter) error {
 		if err != nil {
 			return err
 		}
+
 		s.RecordStates[i] = pfs
 		s.RecordStatesSaved[i] = pfs
 	}
 	s.mu.Unlock()
+
 	return s.dump(-1)
 }
 
@@ -231,7 +233,6 @@ func (s *State) serveRecords() {
 			counter++
 
 			s.mu.Lock()
-			//	key := fmt.Sprintf("%d%d%s", state.Begin, state.Count, state.Digest)
 			s.RecordStates[state.N] = state
 			s.mu.Unlock()
 		}

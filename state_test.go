@@ -49,7 +49,6 @@ func TestState(t *testing.T) {
 
 	cfg := NewDefaultBackupConfig()
 	cfg.StateFile = testStateFile
-	cfg.StateFileDumpDuration = testDuration
 	cfg.PageSize = 100000
 	cfg.SyncPipelines = true
 	cfg.PartitionFilters = testFilters
@@ -64,7 +63,6 @@ func TestState(t *testing.T) {
 		local.WithValidator(asb.NewValidator()),
 		local.WithSkipDirCheck(),
 		local.WithDir(testDir),
-		local.WithUnbufferedWrite(),
 	)
 	require.NoError(t, err)
 

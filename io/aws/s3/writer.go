@@ -169,7 +169,6 @@ type s3Writer struct {
 	chunkSize      int
 	partNumber     int32
 	closed         bool
-	unbuffered     bool
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)

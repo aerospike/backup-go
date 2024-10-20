@@ -53,7 +53,6 @@ func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit int64
 
 func (f *Writer) Write(p []byte) (n int, err error) {
 	if f.size >= f.limit {
-
 		err = f.writer.Close()
 		if err != nil {
 			return 0, fmt.Errorf("failed to close writer: %w", err)

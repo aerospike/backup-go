@@ -20,7 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/io/encoding/asb"
@@ -30,7 +29,6 @@ import (
 )
 
 const (
-	testDuration  = 1 * time.Second
 	testStateFile = "test_state_file"
 )
 
@@ -45,7 +43,7 @@ func TestState(t *testing.T) {
 		NewPartitionFilterByID(2),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := context.Background()
 
 	cfg := NewDefaultBackupConfig()
 	cfg.StateFile = testStateFile
@@ -73,20 +71,19 @@ func TestState(t *testing.T) {
 	require.NotNil(t, state)
 	require.NoError(t, err)
 
+	err = state.InitState(testFilters)
+	require.NoError(t, err)
+
 	for i := range testFilters {
 		pfs, err := models.NewPartitionFilterSerialized(testFilters[i])
 		require.NoError(t, err)
 		state.RecordsStateChan <- pfs
 	}
 
-	time.Sleep(testDuration * 3)
-	cancel()
-
 	// Check that file exists.
 	_, err = os.Stat(tempFile)
 	require.NoError(t, err)
 
-	// Nullify the link.
 	result := []*a.PartitionFilter{
 		NewPartitionFilterByID(1),
 		NewPartitionFilterByID(2),

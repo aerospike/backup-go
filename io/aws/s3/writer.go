@@ -148,7 +148,6 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		buffer:     new(bytes.Buffer),
 		partNumber: 1,
 		chunkSize:  s3DefaultChunkSize,
-		unbuffered: w.unbuffered,
 	}, nil
 }
 
@@ -215,37 +214,11 @@ func (w *s3Writer) uploadPart() error {
 	return nil
 }
 
-// uploadDirect is used for unbuffered upload.
-func (w *s3Writer) uploadDirect(p []byte) error {
-	response, err := w.client.UploadPart(context.Background(), &s3.UploadPartInput{
-		Body:       bytes.NewReader(p),
-		Bucket:     &w.bucket,
-		Key:        &w.key,
-		PartNumber: &w.partNumber,
-		UploadId:   w.uploadID,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to upload part %d: %w", w.partNumber, err)
-	}
-
-	pn := w.partNumber
-	w.completedParts = append(w.completedParts, types.CompletedPart{
-		PartNumber: &pn,
-		ETag:       response.ETag,
-	})
-
-	w.partNumber++
-
-	return nil
-}
-
 func (w *s3Writer) Close() error {
 	if w.closed {
 		return os.ErrClosed
 	}
 
-	// Upload from buffer only if unbuffered = false.
 	if w.buffer.Len() > 0 {
 		err := w.uploadPart()
 		if err != nil {

@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -174,6 +175,10 @@ func (r *Reader) streamDirectory(
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
+
+	if r.isDir {
+		filename = filepath.Join(r.path, filename)
+	}
 
 	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &r.bucketName,

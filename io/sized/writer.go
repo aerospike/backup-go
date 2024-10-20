@@ -29,28 +29,38 @@ type Writer struct {
 	open   func(context.Context) (io.WriteCloser, error)
 	size   int64
 	limit  int64
+	// Number of writer, for saving state.
+	n               int
+	saveCommandChan chan int
 }
 
 // NewWriter creates a new Writer writer with a size limit.
 // limit must be greater than 0.
-func NewWriter(ctx context.Context, limit int64,
+func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit int64,
 	open func(context.Context) (io.WriteCloser, error)) (*Writer, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be greater than 0, got %d", limit)
 	}
 
 	return &Writer{
-		ctx:   ctx,
-		limit: limit,
-		open:  open,
+		ctx:             ctx,
+		limit:           limit,
+		open:            open,
+		n:               n,
+		saveCommandChan: saveCommandChan,
 	}, nil
 }
 
 func (f *Writer) Write(p []byte) (n int, err error) {
 	if f.size >= f.limit {
+
 		err = f.writer.Close()
 		if err != nil {
 			return 0, fmt.Errorf("failed to close writer: %w", err)
+		}
+
+		if f.saveCommandChan != nil {
+			f.saveCommandChan <- f.n
 		}
 
 		f.size = 0

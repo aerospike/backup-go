@@ -132,14 +132,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"that was generated from the interrupted/failed run.")
 	flagSet.StringVar(&f.StateFileDst, "state-file-dst",
 		"",
-		"Either a path with a file name or a directory in which the backup state file will be\n"+
-			"placed if the backup is interrupted/fails. If a path with a file name is used, that\n"+
-			"exact path is where the backup file will be placed. If a directory is given, the backup\n"+
-			"state will be placed in the directory with name `<namespace>.asb.state`, or\n"+
-			"`<prefix>.asb.state` if `--output-file-prefix` is given.")
-	flagSet.Int64Var(&f.StateFileDumpDuration, "state-file-dump-duration",
-		10000,
-		"Intervals in milliseconds, how often dump state file to disk.")
+		"Name or path relatively to --directory where state file will be saved.\n"+
+			"Works only with --file-limit parameter. As we reach file-limit and save file to storage\n"+
+			"current state will be saved.")
 	flagSet.Int64Var(&f.ScanPageSize, "scan-page-size",
 		10000,
 		"How many records will be read on one iteration for continuation backup.\n"+

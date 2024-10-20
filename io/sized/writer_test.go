@@ -61,7 +61,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 		return writer2, nil
 	}
 
-	wcs, err := NewWriter(context.Background(), 10, open)
+	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
 	suite.NotNil(wcs)
 	suite.Nil(err)
 
@@ -111,6 +111,6 @@ func (suite *sizedTestSuite) Test_writeCloserSized_ErrLimit() {
 		return writer2, nil
 	}
 
-	_, err := NewWriter(context.Background(), -1, open)
+	_, err := NewWriter(context.Background(), 1, nil, -1, open)
 	require.ErrorContains(suite.T(), err, "limit must be greater than 0")
 }

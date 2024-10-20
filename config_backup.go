@@ -110,8 +110,6 @@ type BackupConfig struct {
 	// state will be placed in the directory with name `<namespace>.asb.state`
 	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
 	StateFile string
-	// How often we will dump a state file to disk.
-	StateFileDumpDuration time.Duration
 	// Resumes an interrupted/failed backup from where it was left off, given the .state file
 	// that was generated from the interrupted/failed run.
 	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
@@ -205,6 +203,10 @@ func (c *BackupConfig) validate() error {
 
 	if c.StateFile != "" && c.PageSize == 0 {
 		return fmt.Errorf("page size must be set if saving state to state file is enabled")
+	}
+
+	if c.StateFile != "" && c.FileLimit == 0 {
+		return fmt.Errorf("file limit must be set if saving state to state file is enabled")
 	}
 
 	if c.Continue && c.StateFile == "" {

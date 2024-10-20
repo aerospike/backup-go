@@ -89,6 +89,8 @@ type tokenWriter struct {
 	output           io.Writer
 	logger           *slog.Logger
 	recordsStateChan chan<- models.PartitionFilterSerialized
+	// Number of writer.
+	n int
 }
 
 // newTokenWriter creates a new tokenWriter.
@@ -97,6 +99,7 @@ func newTokenWriter(
 	output io.Writer,
 	logger *slog.Logger,
 	recordsStateChan chan<- models.PartitionFilterSerialized,
+	n int,
 ) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
@@ -107,6 +110,7 @@ func newTokenWriter(
 		output:           output,
 		logger:           logger,
 		recordsStateChan: recordsStateChan,
+		n:                n,
 	}
 }
 
@@ -118,6 +122,8 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 	}
 
 	if w.recordsStateChan != nil && v.Filter != nil {
+		// Set worker number.
+		v.Filter.N = w.n
 		w.recordsStateChan <- *v.Filter
 	}
 

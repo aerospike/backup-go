@@ -70,7 +70,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
 	dst := bytes.Buffer{}
-	writer := newTokenWriter(mockEncoder, &dst, slog.Default(), nil)
+	writer := newTokenWriter(mockEncoder, &dst, slog.Default(), nil, -1)
 	suite.NotNil(writer)
 
 	_, err := writer.Write(recToken)

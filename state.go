@@ -38,14 +38,16 @@ type State struct {
 	// RecordsStateChan communication channel to save current filter state.
 	RecordsStateChan chan models.PartitionFilterSerialized
 	// RecordStates store states of all filters.
-	RecordStates map[string]models.PartitionFilterSerialized
+	RecordStates map[int]models.PartitionFilterSerialized
+
+	RecordStatesSaved map[int]models.PartitionFilterSerialized
+	// SaveCommandChan command to save current state for worker.
+	SaveCommandChan chan int
 	// Mutex for RecordStates operations.
 	// Ordinary mutex is used, because we must not allow any writings when we read state.
 	mu sync.Mutex
 	// File to save state to.
 	FileName string
-	// How often file will be saved to disk.
-	DumpDuration time.Duration
 
 	// writer is used to create a state file.
 	writer Writer
@@ -93,12 +95,13 @@ func newState(
 	s := &State{
 		ctx: ctx,
 		// RecordsStateChan must not be buffered, so we can stop all operations.
-		RecordsStateChan: make(chan models.PartitionFilterSerialized),
-		RecordStates:     make(map[string]models.PartitionFilterSerialized),
-		FileName:         config.StateFile,
-		DumpDuration:     config.StateFileDumpDuration,
-		writer:           writer,
-		logger:           logger,
+		RecordsStateChan:  make(chan models.PartitionFilterSerialized),
+		RecordStates:      make(map[int]models.PartitionFilterSerialized),
+		RecordStatesSaved: make(map[int]models.PartitionFilterSerialized),
+		SaveCommandChan:   make(chan int),
+		FileName:          config.StateFile,
+		writer:            writer,
+		logger:            logger,
 	}
 	// Run watcher on initialization.
 	go s.serve()
@@ -131,9 +134,10 @@ func newStateFromFile(
 	s.writer = writer
 	s.logger = logger
 	s.RecordsStateChan = make(chan models.PartitionFilterSerialized)
+	s.SaveCommandChan = make(chan int)
 	s.Counter++
 
-	logger.Debug("loaded state file successfully")
+	logger.Debug("loaded state file successfully, filters loaded:", len(s.RecordStatesSaved))
 
 	// Run watcher on initialization.
 	go s.serve()
@@ -144,39 +148,15 @@ func newStateFromFile(
 
 // serve dumps files to disk.
 func (s *State) serve() {
-	ticker := time.NewTicker(s.DumpDuration)
-	defer ticker.Stop()
-
-	// Dump a file at the very beginning.
-	if err := s.dump(); err != nil {
-		s.logger.Error("failed to dump state", slog.Any("error", err))
-		return
-	}
-
-	// Server ticker.
-	for {
-		select {
-		case <-s.ctx.Done():
-			// saves state and exit
-			if err := s.dump(); err != nil {
-				s.logger.Error("failed to dump state", slog.Any("error", err))
-				return
-			}
-
-			s.logger.Debug("state context done")
-
+	for msg := range s.SaveCommandChan {
+		if err := s.dump(msg); err != nil {
+			s.logger.Error("failed to dump state", slog.Any("error", err))
 			return
-		case <-ticker.C:
-			// save intermediate state.
-			if err := s.dump(); err != nil {
-				s.logger.Error("failed to dump state", slog.Any("error", err))
-				return
-			}
 		}
 	}
 }
 
-func (s *State) dump() error {
+func (s *State) dump(n int) error {
 	file, err := s.writer.NewWriter(s.ctx, s.FileName)
 	if err != nil {
 		return fmt.Errorf("failed to create state file %s: %w", s.FileName, err)
@@ -185,10 +165,17 @@ func (s *State) dump() error {
 	enc := gob.NewEncoder(file)
 
 	s.mu.Lock()
+
+	if n > -1 {
+		s.RecordStatesSaved[n] = s.RecordStates[n]
+	}
+
 	if err = enc.Encode(s); err != nil {
 		return fmt.Errorf("failed to encode state data: %w", err)
 	}
+
 	file.Close()
+
 	s.mu.Unlock()
 
 	s.logger.Debug("state file dumped", slog.Time("saved at", time.Now()))
@@ -196,12 +183,26 @@ func (s *State) dump() error {
 	return nil
 }
 
+func (s *State) InitState(pf []*a.PartitionFilter) error {
+	s.mu.Lock()
+	for i := range pf {
+		pfs, err := models.NewPartitionFilterSerialized(pf[i])
+		if err != nil {
+			return err
+		}
+		s.RecordStates[i] = pfs
+		s.RecordStatesSaved[i] = pfs
+	}
+	s.mu.Unlock()
+	return s.dump(-1)
+}
+
 func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
 	s.mu.Lock()
 
-	result := make([]*a.PartitionFilter, 0, len(s.RecordStates))
+	result := make([]*a.PartitionFilter, 0, len(s.RecordStatesSaved))
 
-	for _, state := range s.RecordStates {
+	for _, state := range s.RecordStatesSaved {
 		f, err := state.Decode()
 		if err != nil {
 			return nil, err
@@ -230,8 +231,8 @@ func (s *State) serveRecords() {
 			counter++
 
 			s.mu.Lock()
-			key := fmt.Sprintf("%d%d%s", state.Begin, state.Count, state.Digest)
-			s.RecordStates[key] = state
+			//	key := fmt.Sprintf("%d%d%s", state.Begin, state.Count, state.Digest)
+			s.RecordStates[state.N] = state
 			s.mu.Unlock()
 		}
 	}

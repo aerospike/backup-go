@@ -62,7 +62,6 @@ func mapBackupConfig(
 	c.Bandwidth = commonParams.Nice * 1024 * 1024
 	c.Compact = backupParams.Compact
 	c.NoTTLOnly = backupParams.NoTTLOnly
-	c.StateFileDumpDuration = time.Duration(backupParams.StateFileDumpDuration) * time.Millisecond
 	c.OutputFilePrefix = backupParams.OutputFilePrefix
 
 	if backupParams.Continue != "" {

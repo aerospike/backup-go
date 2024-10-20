@@ -204,11 +204,6 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 
-	// If unbuffered write is set, we return file directly.
-	if w.unbuffered {
-		return file, nil
-	}
-
 	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil
 }
 

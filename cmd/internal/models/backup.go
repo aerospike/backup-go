@@ -15,30 +15,29 @@
 package models
 
 type Backup struct {
-	OutputFile            string
-	RemoveFiles           bool
-	ModifiedBefore        string
-	ModifiedAfter         string
-	FileLimit             int64
-	AfterDigest           string
-	MaxRecords            int64
-	NoBins                bool
-	SleepBetweenRetries   int
-	FilterExpression      string
-	ParallelNodes         bool
-	RemoveArtifacts       bool
-	Compact               bool
-	NodeList              string
-	NoTTLOnly             bool
-	PreferRacks           string
-	PartitionList         string
-	Estimate              bool
-	EstimateSamples       int64
-	StateFileDst          string
-	StateFileDumpDuration int64
-	Continue              string
-	ScanPageSize          int64
-	OutputFilePrefix      string
+	OutputFile          string
+	RemoveFiles         bool
+	ModifiedBefore      string
+	ModifiedAfter       string
+	FileLimit           int64
+	AfterDigest         string
+	MaxRecords          int64
+	NoBins              bool
+	SleepBetweenRetries int
+	FilterExpression    string
+	ParallelNodes       bool
+	RemoveArtifacts     bool
+	Compact             bool
+	NodeList            string
+	NoTTLOnly           bool
+	PreferRacks         string
+	PartitionList       string
+	Estimate            bool
+	EstimateSamples     int64
+	StateFileDst        string
+	Continue            string
+	ScanPageSize        int64
+	OutputFilePrefix    string
 }
 
 // ShouldClearTarget check if we should clean target directory.

@@ -218,6 +218,10 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 		if err != nil {
 			return nil, err
 		}
+		// Init state.
+		if err = bh.state.InitState(partitionGroups); err != nil {
+			return nil, err
+		}
 	}
 
 	// If we have multiply partition filters, we shrink workers to number of filters.

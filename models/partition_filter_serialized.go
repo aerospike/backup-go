@@ -27,6 +27,8 @@ type PartitionFilterSerialized struct {
 	Count  int
 	Digest []byte
 	Cursor []byte
+	// Worker number.
+	N int
 }
 
 // NewPartitionFilterSerialized serialize *a.PartitionFilter and returns new PartitionFilterSerialized instance.

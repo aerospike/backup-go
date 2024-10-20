@@ -137,6 +137,11 @@ func newStateFromFile(
 	s.SaveCommandChan = make(chan int)
 	s.Counter++
 
+	// Init current state.
+	for k, v := range s.RecordStatesSaved {
+		s.RecordStates[k] = v
+	}
+
 	logger.Debug("loaded state file successfully", slog.Int("filters loaded", len(s.RecordStatesSaved)))
 
 	// Run watcher on initialization.

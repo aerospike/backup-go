@@ -49,7 +49,7 @@ func NewASRestore(
 		return nil, err
 	}
 
-	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob, false)
+	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}

@@ -188,7 +188,7 @@ func (s *State) dump() error {
 	if err = enc.Encode(s); err != nil {
 		return fmt.Errorf("failed to encode state data: %w", err)
 	}
-	// file.Close()
+	file.Close()
 	s.mu.Unlock()
 
 	s.logger.Debug("state file dumped", slog.Time("saved at", time.Now()))

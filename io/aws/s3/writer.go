@@ -87,7 +87,7 @@ func NewWriter(
 		Bucket: aws.String(bucketName),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("bucket does not exist or you don't have access: %w", err)
+		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)
 	}
 
 	if w.isDir && !w.skipDirCheck {
@@ -180,13 +180,6 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, os.ErrClosed
 	}
 
-	if w.unbuffered {
-		if err := w.uploadDirect(p); err != nil {
-			return 0, fmt.Errorf("failed to upload direct: %w", err)
-		}
-		return len(p), nil
-	}
-
 	if w.buffer.Len() >= w.chunkSize {
 		err := w.uploadPart()
 		if err != nil {
@@ -233,7 +226,7 @@ func (w *s3Writer) uploadDirect(p []byte) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to upload part: %w", err)
+		return fmt.Errorf("failed to upload part %d: %w", w.partNumber, err)
 	}
 
 	pn := w.partNumber
@@ -244,12 +237,6 @@ func (w *s3Writer) uploadDirect(p []byte) error {
 
 	w.partNumber++
 
-	if w.ctx.Err() != nil {
-		if err = w.Close(); err != nil {
-			return fmt.Errorf("failed to close writer: %w", err)
-		}
-	}
-
 	return nil
 }
 
@@ -258,20 +245,15 @@ func (w *s3Writer) Close() error {
 		return os.ErrClosed
 	}
 
-	ctx := w.ctx
-	if w.unbuffered {
-		ctx = context.Background()
-	}
-
 	// Upload from buffer only if unbuffered = false.
-	if !w.unbuffered && w.buffer.Len() > 0 {
+	if w.buffer.Len() > 0 {
 		err := w.uploadPart()
 		if err != nil {
 			return fmt.Errorf("failed to upload part: %w", err)
 		}
 	}
 
-	_, err := w.client.CompleteMultipartUpload(ctx,
+	_, err := w.client.CompleteMultipartUpload(w.ctx,
 		&s3.CompleteMultipartUploadInput{
 			Bucket:   &w.bucket,
 			UploadId: w.uploadID,

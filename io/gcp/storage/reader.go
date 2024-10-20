@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -164,6 +165,10 @@ func (r *Reader) streamDirectory(
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
+
+	if r.isDir {
+		filename = filepath.Join(r.path, filename)
+	}
 
 	reader, err := r.bucketHandle.Object(filename).NewReader(ctx)
 	if err != nil {

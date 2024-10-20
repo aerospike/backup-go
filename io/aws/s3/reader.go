@@ -76,7 +76,7 @@ func NewReader(
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	}); err != nil {
-		return nil, fmt.Errorf("bucket does not exist or you don't have access: %w", err)
+		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)
 	}
 
 	// S3 storage can read/write to "/" prefix, so we should replace it with "".

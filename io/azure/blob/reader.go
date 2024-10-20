@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -151,6 +152,10 @@ func (r *Reader) streamDirectory(
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
+
+	if r.isDir {
+		filename = filepath.Join(r.path, filename)
+	}
 
 	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
 	if err != nil {

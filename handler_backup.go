@@ -276,9 +276,11 @@ func (bh *BackupHandler) makeWriteWorkers(
 	writeWorkers := make([]pipeline.Worker[*models.Token], len(backupWriters))
 
 	for i, w := range backupWriters {
-		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger, nil, i)
+		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger, nil)
+
 		if bh.state != nil {
-			dataWriter = newTokenWriter(bh.encoder, w, bh.logger, bh.state.RecordsStateChan, i)
+			stInfo := newStateInfo(bh.state.RecordsStateChan, i)
+			dataWriter = newTokenWriter(bh.encoder, w, bh.logger, stInfo)
 		}
 
 		dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
@@ -458,15 +460,16 @@ func (bh *BackupHandler) backupSIndexes(
 	reader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
 	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
-	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil, -1))
+	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
+
 	if bh.state != nil {
+		stInfo := newStateInfo(bh.state.RecordsStateChan, -1)
 		sindexWriter = pipeline.DataWriter[*models.Token](
 			newTokenWriter(
 				bh.encoder,
 				writer,
 				bh.logger,
-				bh.state.RecordsStateChan,
-				-1,
+				stInfo,
 			),
 		)
 	}
@@ -493,16 +496,16 @@ func (bh *BackupHandler) backupUDFs(
 	reader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
 	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
 
-	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil, -1))
+	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
 
 	if bh.state != nil {
+		stInfo := newStateInfo(bh.state.RecordsStateChan, -1)
 		udfWriter = pipeline.DataWriter[*models.Token](
 			newTokenWriter(
 				bh.encoder,
 				writer,
 				bh.logger,
-				bh.state.RecordsStateChan,
-				-1,
+				stInfo,
 			),
 		)
 	}

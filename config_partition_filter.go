@@ -37,7 +37,11 @@ func NewPartitionFilterByDigest(namespace, digest string) (*a.PartitionFilter, e
 		return nil, err
 	}
 
-	return a.NewPartitionFilterByKey(key), nil
+	pf := a.NewPartitionFilterByKey(key)
+	// We must nullify digest, to start partition from the beginning.
+	pf.Digest = nil
+
+	return pf, nil
 }
 
 // NewPartitionFilterAfterDigest returns partition filter to scan call records after digest.
@@ -86,7 +90,7 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	}
 
 	// If we have one partition filter with range.
-	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 && partitionFilters[0].Digest == nil {
+	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 {
 		return splitPartitionRange(partitionFilters[0], numWorkers), nil
 	}
 
@@ -158,6 +162,10 @@ func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) []
 		result[j].Begin = (j * partitionFilters.Count) / numWorkers
 		result[j].Count = (((j + 1) * partitionFilters.Count) / numWorkers) - result[j].Begin
 		result[j].Begin += partitionFilters.Begin
+		// Set digest property for the first group.
+		if partitionFilters.Digest != nil && j == 0 {
+			result[j].Digest = partitionFilters.Digest
+		}
 	}
 
 	return result

@@ -67,6 +67,42 @@ func (_c *MockStreamingReader_GetType_Call) RunAndReturn(run func() string) *Moc
 	return _c
 }
 
+// StreamFile provides a mock function with given fields: ctx, filename, readersCh, errorsCh
+func (_m *MockStreamingReader) StreamFile(ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	_m.Called(ctx, filename, readersCh, errorsCh)
+}
+
+// MockStreamingReader_StreamFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StreamFile'
+type MockStreamingReader_StreamFile_Call struct {
+	*mock.Call
+}
+
+// StreamFile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filename string
+//   - readersCh chan<- io.ReadCloser
+//   - errorsCh chan<- error
+func (_e *MockStreamingReader_Expecter) StreamFile(ctx interface{}, filename interface{}, readersCh interface{}, errorsCh interface{}) *MockStreamingReader_StreamFile_Call {
+	return &MockStreamingReader_StreamFile_Call{Call: _e.mock.On("StreamFile", ctx, filename, readersCh, errorsCh)}
+}
+
+func (_c *MockStreamingReader_StreamFile_Call) Run(run func(ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error)) *MockStreamingReader_StreamFile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(chan<- io.ReadCloser), args[3].(chan<- error))
+	})
+	return _c
+}
+
+func (_c *MockStreamingReader_StreamFile_Call) Return() *MockStreamingReader_StreamFile_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockStreamingReader_StreamFile_Call) RunAndReturn(run func(context.Context, string, chan<- io.ReadCloser, chan<- error)) *MockStreamingReader_StreamFile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StreamFiles provides a mock function with given fields: _a0, _a1, _a2
 func (_m *MockStreamingReader) StreamFiles(_a0 context.Context, _a1 chan<- io.ReadCloser, _a2 chan<- error) {
 	_m.Called(_a0, _a1, _a2)

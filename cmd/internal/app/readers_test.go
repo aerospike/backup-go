@@ -28,8 +28,9 @@ func TestNewLocalReader(t *testing.T) {
 	c := &models.Common{
 		Directory: t.TempDir(),
 	}
+	b := &models.Backup{}
 
-	reader, err := newLocalReader(r, c)
+	reader, err := newLocalReader(r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
@@ -39,13 +40,13 @@ func TestNewLocalReader(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	reader, err = newLocalReader(r, c)
+	reader, err = newLocalReader(r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
 	r = &models.Restore{}
-	reader, err = newLocalReader(r, c)
+	reader, err = newLocalReader(r, c, b)
 	assert.Error(t, err)
 	assert.Nil(t, reader)
 }
@@ -59,6 +60,7 @@ func TestNewS3Reader(t *testing.T) {
 	c := &models.Common{
 		Directory: "asbackup/" + t.TempDir(),
 	}
+	b := &models.Backup{}
 
 	s3cfg := &models.AwsS3{
 		Region:   testS3Region,
@@ -68,7 +70,7 @@ func TestNewS3Reader(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newS3Reader(ctx, s3cfg, r, c)
+	writer, err := newS3Reader(ctx, s3cfg, r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
@@ -78,7 +80,7 @@ func TestNewS3Reader(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	writer, err = newS3Reader(ctx, s3cfg, r, c)
+	writer, err = newS3Reader(ctx, s3cfg, r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
@@ -93,6 +95,7 @@ func TestNewGcpReader(t *testing.T) {
 	c := &models.Common{
 		Directory: t.TempDir(),
 	}
+	b := &models.Backup{}
 
 	cfg := &models.GcpStorage{
 		BucketName: testBucket,
@@ -101,7 +104,7 @@ func TestNewGcpReader(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newGcpReader(ctx, cfg, r, c)
+	writer, err := newGcpReader(ctx, cfg, r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
@@ -111,7 +114,7 @@ func TestNewGcpReader(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	writer, err = newGcpReader(ctx, cfg, r, c)
+	writer, err = newGcpReader(ctx, cfg, r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
@@ -126,6 +129,7 @@ func TestNewAzureReader(t *testing.T) {
 	c := &models.Common{
 		Directory: t.TempDir(),
 	}
+	b := &models.Backup{}
 
 	cfg := &models.AzureBlob{
 		AccountName:   testAzureAccountName,
@@ -136,7 +140,7 @@ func TestNewAzureReader(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newAzureReader(ctx, cfg, r, c)
+	writer, err := newAzureReader(ctx, cfg, r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())
@@ -146,7 +150,7 @@ func TestNewAzureReader(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	writer, err = newAzureReader(ctx, cfg, r, c)
+	writer, err = newAzureReader(ctx, cfg, r, c, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())

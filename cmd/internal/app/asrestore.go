@@ -49,7 +49,7 @@ func NewASRestore(
 		return nil, err
 	}
 
-	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob)
+	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
@@ -108,15 +108,16 @@ func getReader(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
+	backupParams *models.Backup,
 ) (backup.StreamingReader, error) {
 	switch {
 	case awsS3.Region != "":
-		return newS3Reader(ctx, awsS3, restoreParams, commonParams)
+		return newS3Reader(ctx, awsS3, restoreParams, commonParams, backupParams)
 	case gcpStorage.BucketName != "":
-		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams)
+		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams, backupParams)
 	case azureBlob.ContainerName != "":
-		return newAzureReader(ctx, azureBlob, restoreParams, commonParams)
+		return newAzureReader(ctx, azureBlob, restoreParams, commonParams, backupParams)
 	default:
-		return newLocalReader(restoreParams, commonParams)
+		return newLocalReader(restoreParams, commonParams, backupParams)
 	}
 }

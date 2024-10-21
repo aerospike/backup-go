@@ -16,6 +16,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
@@ -42,6 +43,9 @@ type Pipeline[T any] struct {
 	receive <-chan T
 	send    chan<- T
 	stages  []*stage[T]
+	// For synced pipeline we must create same number of workers for each stage.
+	// Then we will initialize communication channels strait from worker to worker through stages.
+	isSynced bool
 }
 
 var _ Worker[any] = (*Pipeline[any])(nil)
@@ -49,16 +53,31 @@ var _ Worker[any] = (*Pipeline[any])(nil)
 const channelSize = 256
 
 // NewPipeline creates a new DataPipeline.
-func NewPipeline[T any](workGroups ...[]Worker[T]) *Pipeline[T] {
+func NewPipeline[T any](isSynced bool, workGroups ...[]Worker[T]) (*Pipeline[T], error) {
+	if len(workGroups) == 0 {
+		return nil, fmt.Errorf("workGroups is empty")
+	}
+
 	stages := make([]*stage[T], len(workGroups))
 
+	// Check that all working groups have same number of workers.
+	if isSynced {
+		firstLen := len(workGroups[0])
+		for i := range workGroups {
+			if len(workGroups[i]) != firstLen {
+				return nil, fmt.Errorf("all workers groups must be same length in sync mode")
+			}
+		}
+	}
+
 	for i, workers := range workGroups {
-		stages[i] = newStage(workers...)
+		stages[i] = newStage(isSynced, workers...)
 	}
 
 	return &Pipeline[T]{
-		stages: stages,
-	}
+		stages:   stages,
+		isSynced: isSynced,
+	}, nil
 }
 
 // SetReceiveChan sets the receive channel for the pipeline.
@@ -90,21 +109,51 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 
 	errors := make(chan error, len(dp.stages))
 
-	var lastSend chan T
+	var (
+		lastSend []<-chan T
+		// To initialize pipeline workers correctly, we need to create empty channels for first and last stages.
+		emptySendChans    []chan<- T
+		emptyReceiveChans []<-chan T
+	)
 
 	for _, s := range dp.stages {
-		send := make(chan T, channelSize)
-		s.SetSendChan(send)
+		sendChans := make([]chan<- T, 0, len(s.workers))
+		receiveChans := make([]<-chan T, 0, len(s.workers))
+
+		emptySendChans = make([]chan<- T, 0, len(s.workers))
+		emptyReceiveChans = make([]<-chan T, 0, len(s.workers))
+
+		if dp.isSynced {
+			for i := 0; i < len(s.workers); i++ {
+				// For synced mode, we don't add buffer to channels, not to lose any data.
+				send := make(chan T)
+				sendChans = append(sendChans, send)
+				receiveChans = append(receiveChans, send)
+
+				empty := make(chan T)
+				emptySendChans = append(emptySendChans, empty)
+				emptyReceiveChans = append(emptyReceiveChans, empty)
+			}
+		} else {
+			send := make(chan T, channelSize)
+			sendChans = append(sendChans, send)
+			receiveChans = append(receiveChans, send)
+
+			emptySendChans = append(emptySendChans, dp.send)
+			emptyReceiveChans = append(emptyReceiveChans, dp.receive)
+		}
+
+		s.SetSendChan(sendChans)
 
 		s.SetReceiveChan(lastSend)
 
-		lastSend = send
+		lastSend = receiveChans
 	}
 
 	// set the receive and send channels for first
 	// and last stages to the pipeline's receive and send channels
-	dp.stages[0].SetReceiveChan(dp.receive)
-	dp.stages[len(dp.stages)-1].SetSendChan(dp.send)
+	dp.stages[0].SetReceiveChan(emptyReceiveChans)
+	dp.stages[len(dp.stages)-1].SetSendChan(emptySendChans)
 
 	wg := &sync.WaitGroup{}
 	for _, s := range dp.stages {
@@ -133,22 +182,25 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 }
 
 type stage[T any] struct {
-	receive <-chan T
-	send    chan<- T
+	receive []<-chan T
+	send    []chan<- T
 	workers []Worker[T]
+	// if synced, we distribute communication channels through workers.
+	isSynced bool
 }
 
-func (s *stage[T]) SetReceiveChan(c <-chan T) {
+func (s *stage[T]) SetReceiveChan(c []<-chan T) {
 	s.receive = c
 }
 
-func (s *stage[T]) SetSendChan(c chan<- T) {
+func (s *stage[T]) SetSendChan(c []chan<- T) {
 	s.send = c
 }
 
-func newStage[T any](workers ...Worker[T]) *stage[T] {
+func newStage[T any](isSynced bool, workers ...Worker[T]) *stage[T] {
 	s := stage[T]{
-		workers: workers,
+		workers:  workers,
+		isSynced: isSynced,
 	}
 
 	return &s
@@ -159,9 +211,17 @@ func (s *stage[T]) Run(ctx context.Context) error {
 		return nil
 	}
 
-	for _, w := range s.workers {
-		w.SetReceiveChan(s.receive)
-		w.SetSendChan(s.send)
+	for i, w := range s.workers {
+		if s.isSynced {
+			// If it is not sync mode, there will be 1 channel in each slice.
+			w.SetReceiveChan(s.receive[i])
+			w.SetSendChan(s.send[i])
+
+			continue
+		}
+		// Else we distribute all channels to workers.
+		w.SetReceiveChan(s.receive[0])
+		w.SetSendChan(s.send[0])
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -187,8 +247,10 @@ func (s *stage[T]) Run(ctx context.Context) error {
 
 	wg.Wait()
 
-	if s.send != nil {
-		close(s.send)
+	for i := range s.send {
+		if s.send[i] != nil {
+			close(s.send[i])
+		}
 	}
 
 	close(errors)

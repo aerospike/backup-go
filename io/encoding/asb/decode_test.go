@@ -3718,7 +3718,7 @@ func TestASBReader_NextToken(t *testing.T) {
 					Generation: 10,
 				},
 				VoidTime: 10,
-			}, 106),
+			}, 106, nil),
 		},
 		{
 			name: "negative EOF",

@@ -51,7 +51,7 @@ func main() {
 	backupCfg.Namespace = "test"
 	backupCfg.ParallelRead = 5
 
-	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers)
+	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
 	if err != nil {
 		panic(err)
 	}

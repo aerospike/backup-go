@@ -101,7 +101,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 	// set compression policy
 	backupCfg.CompressionPolicy = backup.NewCompressionPolicy(backup.CompressZSTD, 20)
 
-	backupHandler, err := c.Backup(ctx, backupCfg, writers)
+	backupHandler, err := c.Backup(ctx, backupCfg, writers, nil)
 	if err != nil {
 		panic(err)
 	}

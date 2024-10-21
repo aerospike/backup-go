@@ -101,14 +101,18 @@ type Token struct {
 	Record *Record
 	Type   TokenType
 	Size   uint64
+	// Filter represents serialized partition filter for page, that record belongs to.
+	// Is used only on pagination read, to save reading states.
+	Filter *PartitionFilterSerialized
 }
 
 // NewRecordToken creates a new token with the given record.
-func NewRecordToken(r *Record, size uint64) *Token {
+func NewRecordToken(r *Record, size uint64, filter *PartitionFilterSerialized) *Token {
 	return &Token{
 		Record: r,
 		Type:   TokenTypeRecord,
 		Size:   size,
+		Filter: filter,
 	}
 }
 

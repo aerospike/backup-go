@@ -104,6 +104,26 @@ type BackupConfig struct {
 	Compact bool
 	// Only include records that have no ttl set (persistent records).
 	NoTTLOnly bool
+	// Name of a state file that will be saved in backup directory.
+	// Works only with FileLimit parameter.
+	// As we reach FileLimit and close file, the current state will be saved.
+	// Works only for default and/or partition backup.
+	// Not work with ParallelNodes or NodeList.
+	StateFile string
+	// Resumes an interrupted/failed backup from where it was left off, given the .state file
+	// that was generated from the interrupted/failed run.
+	// Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
+	Continue bool
+	// How many records will be read on one iteration for continuation backup.
+	// Affects size if overlap on resuming backup after an error.
+	// By default, it must be zero. If any value is set, reading from Aerospike will be paginated.
+	// Which affects the performance and RAM usage.
+	PageSize int64
+	// If set to true, the same number of workers will be created for each stage of the pipeline.
+	// Each worker will be connected to the next stage worker with a separate unbuffered channel.
+	SyncPipelines bool
+	// When using directory parameter, prepend a prefix to the names of the generated files.
+	OutputFilePrefix string
 }
 
 // NewDefaultBackupConfig returns a new BackupConfig with default values.
@@ -117,6 +137,7 @@ func NewDefaultBackupConfig() *BackupConfig {
 	}
 }
 
+// isParalleledByNodes checks if backup is parallel by nodes.
 func (c *BackupConfig) isParalleledByNodes() bool {
 	return c.ParallelNodes || len(c.NodeList) > 0
 }
@@ -129,11 +150,22 @@ func (c *BackupConfig) isDefaultPartitionFilter() bool {
 		c.PartitionFilters[0].Digest == nil
 }
 
+// isStateFirstRun checks if it is first run of backup with a state file.
+func (c *BackupConfig) isStateFirstRun() bool {
+	return c.StateFile != "" && !c.Continue
+}
+
+// isStateContinueRun checks if we continue backup from a state file.
+func (c *BackupConfig) isStateContinue() bool {
+	return c.StateFile != "" && c.Continue
+}
+
 func (c *BackupConfig) isFullBackup() bool {
 	// full backup doesn't have a lower bound.
 	return c.ModAfter == nil && c.isDefaultPartitionFilter()
 }
 
+//nolint:gocyclo // validate func is long func with a lot of checks.
 func (c *BackupConfig) validate() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
@@ -167,6 +199,22 @@ func (c *BackupConfig) validate() error {
 
 	if c.FileLimit < 0 {
 		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
+	}
+
+	if c.StateFile != "" && c.PageSize == 0 {
+		return fmt.Errorf("page size must be set if saving state to state file is enabled")
+	}
+
+	if c.StateFile != "" && c.FileLimit == 0 {
+		return fmt.Errorf("file limit must be set if saving state to state file is enabled")
+	}
+
+	if c.Continue && c.StateFile == "" {
+		return fmt.Errorf("state file must be set if continue is enabled")
+	}
+
+	if c.StateFile != "" && !c.SyncPipelines {
+		return fmt.Errorf("sync pipelines must be enabled if stage file is set")
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

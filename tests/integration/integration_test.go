@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -238,6 +239,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 		ctx,
 		backupConfig,
 		&dst,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -246,9 +248,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	suite.Nil(err)
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -384,6 +384,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 		ctx,
 		backupConfig,
 		writers,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -463,7 +464,7 @@ func (suite *backupRestoreTestSuite) TestRestoreExpiredRecords() {
 			VoidTime: 1,
 		}
 
-		token := models.NewRecordToken(modelRec, 0)
+		token := models.NewRecordToken(modelRec, 0, nil)
 		v, err := encoder.EncodeToken(token)
 		if err != nil {
 			suite.FailNow(err.Error())
@@ -507,9 +508,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	recsByPartition := make(map[int][]*a.Record)
 
@@ -556,6 +555,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 		ctx,
 		backupConfig,
 		writers,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -564,9 +564,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	suite.Nil(err)
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	restoreConfig := backup.NewDefaultRestoreConfig()
 	readers, err := local.NewReader(local.WithDir(backupDir))
@@ -595,6 +593,7 @@ func (suite *backupRestoreTestSuite) TestBackupContext() {
 		ctx,
 		backup.NewDefaultBackupConfig(),
 		&writer,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -746,6 +745,7 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 		ctx,
 		bCfg,
 		&dst,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -763,6 +763,7 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
 		ctx,
 		bCfg,
 		&dst,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -792,6 +793,7 @@ func (suite *backupRestoreTestSuite) TestBackupPartitionList() {
 		ctx,
 		bCfg,
 		&dst,
+		nil,
 	)
 	suite.NotNil(bh)
 	suite.Nil(err)
@@ -1081,6 +1083,7 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 		ctx,
 		backupConfig,
 		&dst,
+		nil,
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
@@ -1103,11 +1106,127 @@ func (suite *backupRestoreTestSuite) TestBackupEstimateOk() {
 	suite.TearDownTest()
 }
 
+func (suite *backupRestoreTestSuite) TestBackupContinuation() {
+	const totalRecords = 900
+	batch := genRecords(suite.namespace, suite.set, totalRecords, testBins)
+	suite.SetupTest(batch)
+
+	testFolder := suite.T().TempDir()
+	testFile := "test_state_file"
+
+	for i := 0; i < 5; i++ {
+		randomNumber := rand.Intn(7-3+1) + 3
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(time.Duration(randomNumber) * time.Second)
+			cancel()
+		}()
+
+		first := suite.runFirstBackup(ctx, testFolder, testFile, i)
+
+		ctx = context.Background()
+		second := suite.runContinueBackup(ctx, testFolder, testFile, i)
+
+		suite.T().Log("first:", first, "second:", second)
+		result := (first + second) >= totalRecords
+		suite.T().Log(first + second)
+		suite.Equal(true, result)
+	}
+
+	suite.TearDownTest()
+}
+
+func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFolder, testStateFile string, i int,
+) uint64 {
+	bFolder := fmt.Sprintf("%s_%d", testFolder, i)
+
+	writers, err := local.NewWriter(
+		ctx,
+		local.WithValidator(asb.NewValidator()),
+		local.WithSkipDirCheck(),
+		local.WithDir(bFolder),
+	)
+	suite.Nil(err)
+
+	readers, err := local.NewReader(
+		local.WithDir(bFolder),
+	)
+	suite.Nil(err)
+
+	backupCfg := backup.NewDefaultBackupConfig()
+	backupCfg.Namespace = suite.namespace
+	backupCfg.ParallelRead = 10
+	backupCfg.ParallelWrite = 10
+
+	backupCfg.StateFile = testStateFile
+	backupCfg.FileLimit = 100000
+	backupCfg.Bandwidth = 1000000
+	backupCfg.PageSize = 100
+	backupCfg.SyncPipelines = true
+
+	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
+	suite.Nil(err)
+
+	// use backupHandler.Wait() to wait for the job to finish or fail
+	err = backupHandler.Wait(ctx)
+	if err != nil {
+		suite.T().Logf("Backup failed: %v", err)
+	}
+
+	return backupHandler.GetStats().GetReadRecords()
+}
+
+func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, testFolder, testStateFile string, i int,
+) uint64 {
+	bFolder := fmt.Sprintf("%s_%d", testFolder, i)
+
+	writers, err := local.NewWriter(
+		ctx,
+		local.WithValidator(asb.NewValidator()),
+		local.WithSkipDirCheck(),
+		local.WithDir(bFolder),
+	)
+	suite.Nil(err)
+
+	readers, err := local.NewReader(
+		local.WithDir(bFolder),
+	)
+	suite.Nil(err)
+
+	backupCfg := backup.NewDefaultBackupConfig()
+	backupCfg.Namespace = suite.namespace
+	backupCfg.ParallelRead = 10
+	backupCfg.ParallelWrite = 10
+
+	backupCfg.StateFile = testStateFile
+	backupCfg.Continue = true
+	backupCfg.FileLimit = 100000
+	backupCfg.PageSize = 100
+	backupCfg.SyncPipelines = true
+
+	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
+	suite.Nil(err)
+
+	// use backupHandler.Wait() to wait for the job to finish or fail
+	err = backupHandler.Wait(ctx)
+	if err != nil {
+		suite.T().Logf("Backup failed: %v", err)
+	}
+
+	return backupHandler.GetStats().GetReadRecords()
+}
+
 type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
 func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
+	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
+	readersCh <- reader
+	close(readersCh)
+}
+
+func (b *byteReadWriterFactory) StreamFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	readersCh <- reader
 	close(readersCh)

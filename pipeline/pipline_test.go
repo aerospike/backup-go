@@ -35,7 +35,8 @@ func (suite *pipelineTestSuite) TestNewDataPipeline() {
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}}
 
-	pipeline := NewPipeline(workers...)
+	pipeline, err := NewPipeline(false, workers...)
+	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 }
 
@@ -57,11 +58,12 @@ func (suite *pipelineTestSuite) TestDataPipelineRun() {
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}}
 
-	pipeline := NewPipeline(workers...)
+	pipeline, err := NewPipeline(false, workers...)
+	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 
 	ctx := context.Background()
-	err := pipeline.Run(ctx)
+	err = pipeline.Run(ctx)
 	suite.Nil(err)
 }
 
@@ -126,7 +128,8 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 	w4.EXPECT().Run(ctx)
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}, {w4}}
-	pipeline := NewPipeline(workers...)
+	pipeline, err := NewPipeline(false, workers...)
+	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 
 	receive := make(chan string, 2)
@@ -139,7 +142,7 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 	receive <- "1"
 	close(receive)
 
-	err := pipeline.Run(ctx)
+	err = pipeline.Run(ctx)
 	suite.Nil(err)
 
 	suite.Equal(2, len(send))
@@ -174,11 +177,12 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWorkerFails() {
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}, {w4}}
 
-	pipeline := NewPipeline(workers...)
+	pipeline, err := NewPipeline(false, workers...)
+	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 
 	ctx := context.Background()
-	err := pipeline.Run(ctx)
+	err = pipeline.Run(ctx)
 	suite.NotNil(err)
 }
 

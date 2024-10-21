@@ -24,9 +24,6 @@ More info here https://goreleaser.com/quick-start/
 
 ## Supported flags
 ```
-Welcome to the Aerospike backup CLI tool!
------------------------------------------
-
 Usage:
   asbackup [flags]
 

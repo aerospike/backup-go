@@ -67,19 +67,11 @@ func NewState(
 ) (*State, error) {
 	switch {
 	case config.isStateFirstRun():
+		logger.Debug("initializing new state")
 		return newState(ctx, config, writer, logger), nil
 	case config.isStateContinue():
-		s, err := newStateFromFile(ctx, config, reader, writer, logger)
-		if err != nil {
-			return nil, err
-		}
-		// change filters in config.
-		config.PartitionFilters, err = s.loadPartitionFilters()
-		if err != nil {
-			return nil, err
-		}
-
-		return s, nil
+		logger.Debug("initializing state from file", slog.String("file", config.StateFile))
+		return newStateFromFile(ctx, config, reader, writer, logger)
 	}
 
 	return nil, nil
@@ -153,10 +145,15 @@ func newStateFromFile(
 
 // serve dumps files to disk.
 func (s *State) serve() {
-	for msg := range s.SaveCommandChan {
-		if err := s.dump(msg); err != nil {
-			s.logger.Error("failed to dump state", slog.Any("error", err))
+	for {
+		select {
+		case <-s.ctx.Done():
 			return
+		case msg := <-s.SaveCommandChan:
+			if err := s.dump(msg); err != nil {
+				s.logger.Error("failed to dump state", slog.Any("error", err))
+				return
+			}
 		}
 	}
 }
@@ -170,6 +167,7 @@ func (s *State) dump(n int) error {
 	enc := gob.NewEncoder(file)
 
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if n > -1 {
 		s.RecordStatesSaved[n] = s.RecordStates[n]
@@ -179,17 +177,18 @@ func (s *State) dump(n int) error {
 		return fmt.Errorf("failed to encode state data: %w", err)
 	}
 
-	file.Close()
-
-	s.mu.Unlock()
+	if err = file.Close(); err != nil {
+		return fmt.Errorf("failed to close state file: %w", err)
+	}
 
 	s.logger.Debug("state file dumped", slog.Time("saved at", time.Now()))
 
 	return nil
 }
 
-func (s *State) InitState(pf []*a.PartitionFilter) error {
+func (s *State) initState(pf []*a.PartitionFilter) error {
 	s.mu.Lock()
+
 	for i := range pf {
 		pfs, err := models.NewPartitionFilterSerialized(pf[i])
 		if err != nil {
@@ -199,6 +198,7 @@ func (s *State) InitState(pf []*a.PartitionFilter) error {
 		s.RecordStates[i] = pfs
 		s.RecordStatesSaved[i] = pfs
 	}
+	// Do not move this Unlock() to defer!
 	s.mu.Unlock()
 
 	return s.dump(-1)
@@ -206,6 +206,7 @@ func (s *State) InitState(pf []*a.PartitionFilter) error {
 
 func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	result := make([]*a.PartitionFilter, 0, len(s.RecordStatesSaved))
 
@@ -218,24 +219,18 @@ func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
 		result = append(result, f)
 	}
 
-	s.mu.Unlock()
-
 	return result, nil
 }
 
 func (s *State) serveRecords() {
-	var counter int
-
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
 		case state := <-s.RecordsStateChan:
-			if state.Begin == 0 && state.Count == 0 && state.Digest == nil {
+			if state.IsEmpty() {
 				continue
 			}
-
-			counter++
 
 			s.mu.Lock()
 			s.RecordStates[state.N] = state
@@ -258,14 +253,12 @@ func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.
 
 	go reader.StreamFile(ctx, fileName, readCh, errCh)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case err := <-errCh:
-			return nil, err
-		case file := <-readCh:
-			return file, nil
-		}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case err := <-errCh:
+		return nil, err
+	case file := <-readCh:
+		return file, nil
 	}
 }

@@ -99,17 +99,24 @@ func newBackupHandler(
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
-	var (
-		state *State
-		err   error
-	)
+	var state *State
 
 	if config.StateFile != "" {
-		// Keep in mind, that on continue operation, we update partitions list in config by pointer.
+		var err error
+
 		state, err = NewState(ctx, config, reader, writer, logger)
 		if err != nil {
 			cancel()
-			return nil, err
+			return nil, fmt.Errorf("failed to initialize state: %w", err)
+		}
+		// If it is a continuation operation, we load partition filters from state.
+		if config.isStateContinue() {
+			// change filters in config.
+			config.PartitionFilters, err = state.loadPartitionFilters()
+			if err != nil {
+				cancel()
+				return nil, fmt.Errorf("failed to load partition filters for : %w", err)
+			}
 		}
 	}
 

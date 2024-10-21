@@ -248,9 +248,7 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 	suite.Nil(err)
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -510,9 +508,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	expectedRecs := genRecords(suite.namespace, suite.set, numRec, bins)
 
 	err := suite.testClient.WriteRecords(expectedRecs)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	recsByPartition := make(map[int][]*a.Record)
 
@@ -568,9 +564,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	suite.Nil(err)
 
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	restoreConfig := backup.NewDefaultRestoreConfig()
 	readers, err := local.NewReader(local.WithDir(backupDir))
@@ -1152,16 +1146,12 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 		local.WithSkipDirCheck(),
 		local.WithDir(bFolder),
 	)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	readers, err := local.NewReader(
 		local.WithDir(bFolder),
 	)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = suite.namespace
@@ -1175,9 +1165,7 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 	backupCfg.SyncPipelines = true
 
 	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	// use backupHandler.Wait() to wait for the job to finish or fail
 	err = backupHandler.Wait(ctx)
@@ -1198,16 +1186,12 @@ func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, test
 		local.WithSkipDirCheck(),
 		local.WithDir(bFolder),
 	)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	readers, err := local.NewReader(
 		local.WithDir(bFolder),
 	)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = suite.namespace
@@ -1221,9 +1205,7 @@ func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, test
 	backupCfg.SyncPipelines = true
 
 	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
-	if err != nil {
-		panic(err)
-	}
+	suite.Nil(err)
 
 	// use backupHandler.Wait() to wait for the job to finish or fail
 	err = backupHandler.Wait(ctx)

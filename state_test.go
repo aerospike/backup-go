@@ -71,7 +71,7 @@ func TestState(t *testing.T) {
 	require.NotNil(t, state)
 	require.NoError(t, err)
 
-	err = state.InitState(testFilters)
+	err = state.initState(testFilters)
 	require.NoError(t, err)
 
 	for i := range testFilters {

@@ -59,3 +59,7 @@ func (p *PartitionFilterSerialized) Decode() (*a.PartitionFilter, error) {
 
 	return pf, nil
 }
+
+func (p *PartitionFilterSerialized) IsEmpty() bool {
+	return p.Begin == 0 && p.Count == 0 && p.Digest == nil
+}

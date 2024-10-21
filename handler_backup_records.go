@@ -79,7 +79,7 @@ func (bh *backupRecordsHandler) run(
 
 	pl, err := pipeline.NewPipeline(bh.config.SyncPipelines, readWorkers, composeProcessor, writers)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create new pipeline: %w", err)
 	}
 
 	return pl.Run(ctx)
@@ -221,7 +221,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 
 		if bh.config.isStateFirstRun() {
 			// Init state.
-			if err := bh.state.InitState(partitionGroups); err != nil {
+			if err := bh.state.initState(partitionGroups); err != nil {
 				return nil, err
 			}
 		}

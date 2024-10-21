@@ -116,14 +116,12 @@ func NewRecordReader(
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	logger.Debug("created new aerospike record reader")
 
-	r := &RecordReader{
+	return &RecordReader{
 		ctx:    ctx,
 		config: cfg,
 		client: client,
 		logger: logger,
 	}
-
-	return r
 }
 
 // Read reads the next record from the Aerospike database.

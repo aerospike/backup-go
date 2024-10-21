@@ -17,8 +17,10 @@ package aerospike
 import (
 	"fmt"
 	"io"
+	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -60,8 +62,7 @@ func (r *RecordReader) readPage() (*models.Token, error) {
 		}
 
 		if res.result.Err != nil {
-			r.logger.Error("error reading record", "error", res.result.Err)
-			return nil, res.result.Err
+			return nil, fmt.Errorf("error reading record: %w", res.result.Err)
 		}
 
 		rec := models.Record{
@@ -167,6 +168,11 @@ func (r *RecordReader) streamPartitionPages(
 				counter++
 
 				if res.Err != nil {
+					// Ignore last page errors.
+					if !res.Err.Matches(types.INVALID_NODE_ERROR) {
+						r.logger.Error("error reading paginated record", slog.Any("error", res.Err))
+					}
+
 					continue
 				}
 				// Save to pageRecord filter that returns current pageRecord.

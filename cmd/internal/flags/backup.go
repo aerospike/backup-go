@@ -70,7 +70,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
 		false,
 		"Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.\n"+
-			"On restore all records, that don't contain bins data will be skipped.")
+			"On restore all records, that don't contain bin data will be skipped.")
 	flagSet.IntVar(&f.SleepBetweenRetries, "sleep-between-retries",
 		5,
 		"The amount of milliseconds to sleep between retries.")

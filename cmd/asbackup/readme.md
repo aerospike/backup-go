@@ -94,7 +94,7 @@ Backup Flags:
                                     date and time. May combined with --modified-after to specify a range.
   -M, --max-records int             The number of records approximately to back up. 0 - all records
   -x, --no-bins                     Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.
-                                    On restore all records, that don't contain bins data will be skipped.
+                                    On restore all records, that don't contain bin data will be skipped.
       --sleep-between-retries int   The amount of milliseconds to sleep between retries. (default 5)
   -f, --filter-exp string           Base64 encoded expression. Use the encoded filter expression in each scan call,
                                     which can be used to do a partial backup. The expression to be used can be base64 
@@ -179,7 +179,7 @@ Azure Flags:
       --azure-client-id string        Azure client ID for Azure Active Directory authorization.
       --azure-client-secret string    Azure client secret for Azure Active Directory authorization.
       --azure-endpoint string         Azure endpoint.
-      --azure-container-name string   Azure container Name
+      --azure-container-name string   Azure container Name.
 ```
 
 ## Unsupported flags

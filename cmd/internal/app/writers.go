@@ -42,6 +42,10 @@ func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (ba
 		opts = append(opts, local.WithRemoveFiles())
 	}
 
+	if b.Continue != "" {
+		opts = append(opts, local.WithSkipDirCheck())
+	}
+
 	opts = append(opts, local.WithValidator(asb.NewValidator()))
 
 	return local.NewWriter(ctx, opts...)
@@ -76,6 +80,10 @@ func newS3Writer(
 		opts = append(opts, s3.WithRemoveFiles())
 	}
 
+	if b.Continue != "" {
+		opts = append(opts, s3.WithSkipDirCheck())
+	}
+
 	opts = append(opts, s3.WithValidator(asb.NewValidator()))
 
 	return s3.NewWriter(ctx, client, bucketName, opts...)
@@ -106,6 +114,10 @@ func newGcpWriter(
 		opts = append(opts, storage.WithRemoveFiles())
 	}
 
+	if b.Continue != "" {
+		opts = append(opts, storage.WithSkipDirCheck())
+	}
+
 	opts = append(opts, storage.WithValidator(asb.NewValidator()))
 
 	return storage.NewWriter(ctx, client, g.BucketName, opts...)
@@ -134,6 +146,10 @@ func newAzureWriter(
 
 	if b.ShouldClearTarget() {
 		opts = append(opts, blob.WithRemoveFiles())
+	}
+
+	if b.Continue != "" {
+		opts = append(opts, blob.WithSkipDirCheck())
 	}
 
 	opts = append(opts, blob.WithValidator(asb.NewValidator()))

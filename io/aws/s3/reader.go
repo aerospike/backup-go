@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -76,7 +77,7 @@ func NewReader(
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	}); err != nil {
-		return nil, fmt.Errorf("bucket does not exist or you don't have access: %w", err)
+		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)
 	}
 
 	// S3 storage can read/write to "/" prefix, so we should replace it with "".
@@ -110,7 +111,7 @@ func (r *Reader) StreamFiles(
 	}
 
 	// If not a folder, only file.
-	r.streamFile(ctx, r.path, readersCh, errorsCh)
+	r.StreamFile(ctx, r.path, readersCh, errorsCh)
 }
 
 func (r *Reader) streamDirectory(
@@ -169,11 +170,15 @@ func (r *Reader) streamDirectory(
 	}
 }
 
-// streamFile opens single file from s3 and sends io.Readers to the `readersCh`
+// StreamFile opens single file from s3 and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
-func (r *Reader) streamFile(
+func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
 	defer close(readersCh)
+
+	if r.isDir {
+		filename = filepath.Join(r.path, filename)
+	}
 
 	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &r.bucketName,

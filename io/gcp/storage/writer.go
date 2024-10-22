@@ -80,7 +80,7 @@ func NewWriter(
 		return nil, fmt.Errorf("failed to get bucketHandler %s attr: %w", bucketName, err)
 	}
 
-	if w.isDir {
+	if w.isDir && !w.skipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, bucketHandler, prefix)
 		if err != nil {

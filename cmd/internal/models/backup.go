@@ -34,9 +34,17 @@ type Backup struct {
 	PartitionList       string
 	Estimate            bool
 	EstimateSamples     int64
+	StateFileDst        string
+	Continue            string
+	ScanPageSize        int64
+	OutputFilePrefix    string
 }
 
 // ShouldClearTarget check if we should clean target directory.
 func (b *Backup) ShouldClearTarget() bool {
-	return b.RemoveFiles || b.RemoveArtifacts
+	return (b.RemoveFiles || b.RemoveArtifacts) && b.Continue == ""
+}
+
+func (b *Backup) ShouldSaveState() bool {
+	return b.StateFileDst != "" || b.Continue != ""
 }

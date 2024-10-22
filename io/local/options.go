@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package s3
+package local
 
 type options struct {
 	// path contains path to file or directory.
@@ -27,9 +27,6 @@ type options struct {
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
 	// Default: false
 	withNestedDir bool
-	// startAfter is where you want Amazon S3 to start listing from. Amazon S3 starts
-	// listing after this specified key. StartAfter can be any key in the bucket.
-	startAfter string
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
 }
@@ -72,14 +69,6 @@ func WithNestedDir() Opt {
 func WithRemoveFiles() Opt {
 	return func(r *options) {
 		r.isRemovingFiles = true
-	}
-}
-
-// WithStartAfter adds start after parameter to list request.
-// Is used only for Reader.
-func WithStartAfter(v string) Opt {
-	return func(r *options) {
-		r.startAfter = v
 	}
 }
 

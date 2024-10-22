@@ -37,8 +37,7 @@ type backupRecordsHandler struct {
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
-	// is used when AfterDigest is set.
-	afterDigest []byte
+	state           *State
 }
 
 func newBackupRecordsHandler(
@@ -46,6 +45,7 @@ func newBackupRecordsHandler(
 	ac AerospikeClient,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
+	state *State,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
@@ -54,6 +54,7 @@ func newBackupRecordsHandler(
 		aerospikeClient: ac,
 		logger:          logger,
 		scanLimiter:     scanLimiter,
+		state:           state,
 	}
 
 	return h
@@ -74,9 +75,14 @@ func (bh *backupRecordsHandler) run(
 		processors.NewVoidTimeSetter(bh.logger),
 		processors.NewTPSLimiter[*models.Token](
 			ctx, bh.config.RecordsPerSecond),
-	))
+	), bh.config.ParallelRead)
 
-	return pipeline.NewPipeline(readWorkers, composeProcessor, writers).Run(ctx)
+	pl, err := pipeline.NewPipeline(bh.config.SyncPipelines, readWorkers, composeProcessor, writers)
+	if err != nil {
+		return fmt.Errorf("failed to create new pipeline: %w", err)
+	}
+
+	return pl.Run(ctx)
 }
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
@@ -203,23 +209,29 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipeline.Worker[*models.Token], error) {
-	partitionGroups, err := splitPartitions(bh.config.PartitionFilters, n)
-	if err != nil {
-		return nil, err
+	var err error
+
+	partitionGroups := bh.config.PartitionFilters
+
+	if !bh.config.isStateContinue() {
+		partitionGroups, err = splitPartitions(bh.config.PartitionFilters, n)
+		if err != nil {
+			return nil, err
+		}
+
+		if bh.config.isStateFirstRun() {
+			// Init state.
+			if err := bh.state.initState(partitionGroups); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// If we have multiply partition filters, we shrink workers to number of filters.
-	n = len(partitionGroups)
+	readWorkers := make([]pipeline.Worker[*models.Token], len(partitionGroups))
 
-	readWorkers := make([]pipeline.Worker[*models.Token], n)
-
-	for i := 0; i < n; i++ {
+	for i := range partitionGroups {
 		recordReaderConfig := bh.recordReaderConfigForPartitions(partitionGroups[i], scanPolicy)
-
-		// For the first partition in the list, we start from digest if it is set.
-		if bh.afterDigest != nil && i == 0 {
-			recordReaderConfig = bh.recordReaderConfigForPartitions(partitionGroups[i], scanPolicy)
-		}
 
 		recordReader := aerospike.NewRecordReader(
 			ctx,
@@ -278,10 +290,12 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 ) *aerospike.RecordReaderConfig {
+	pfCopy := *partitionFilter
+
 	return aerospike.NewRecordReaderConfig(
 		bh.config.Namespace,
 		bh.config.SetList,
-		partitionFilter,
+		&pfCopy,
 		nil,
 		scanPolicy,
 		bh.config.BinList,
@@ -291,6 +305,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
 		},
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
+		bh.config.PageSize,
 	)
 }
 
@@ -311,5 +326,6 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		},
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
+		bh.config.PageSize,
 	)
 }

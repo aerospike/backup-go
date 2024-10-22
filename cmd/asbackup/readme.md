@@ -71,6 +71,7 @@ Backup Flags:
                                  there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -o, --output-file string          Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
+  -q, --output-file-prefix string   When using directory parameter, prepend a prefix to the names of the generated files.
   -r, --remove-files                Remove existing backup file (-o) or files (-d).
   -F, --file-limit int              Rotate backup files, when their size crosses the given
                                     value (in bytes) Only used when backing up to a Directory.
@@ -127,6 +128,15 @@ Backup Flags:
                                     after-digest, partition-list.
                                     It calculates estimate size of full backup.
       --estimate-samples int        The number of samples to take when running a backup estimate. (default 10000)
+  -c, --continue string             Resumes an interrupted/failed backup from where it was left off, given the .state file
+                                    that was generated from the interrupted/failed run.
+      --state-file-dst string       Name of a state file that will be saved in backup --directory.
+                                    Works only with --file-limit parameter. As we reach --file-limit and close file,
+                                    current state will be saved. Works only for default and/or partition backup. 
+                                    Not work with --parallel-nodes or --node--list.
+      --scan-page-size int          How many records will be read on one iteration for continuation backup.
+                                    Affects size if overlap on resuming backup after an error.
+                                    Is used only with --state-file-dst or --continue. (default 10000)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -173,15 +183,6 @@ Azure Flags:
 
 ## Unsupported flags
 ```
---continue          Resumes an interrupted/failed backup from where it was left off, given the .state file
-                    that was generated from the interrupted/failed run.
-
---state-file-dst    Either a path with a file name or a directory in which the backup state file will be
-                    placed if the backup is interrupted/fails. If a path with a file name is used, that
-                    exact path is where the backup file will be placed. If a directory is given, the backup
-                    state will be placed in the directory with name `<namespace>.asb.state`, or
-                    `<prefix>.asb.state` if `--output-file-prefix` is given.
-
 --machine           Output machine-readable status updates to the given path, typically a FIFO.
 
 --no-config-file    Do not read any config file. Default: disabled

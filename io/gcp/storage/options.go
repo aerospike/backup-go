@@ -30,6 +30,8 @@ type options struct {
 	// startOffset is used to filter results to objects whose names are
 	// lexicographically equal to or after startOffset.
 	startOffset string
+	// skipDirCheck if true, backup directory won't be checked.
+	skipDirCheck bool
 }
 
 type Opt func(*options)
@@ -80,5 +82,13 @@ func WithRemoveFiles() Opt {
 func WithStartOffset(v string) Opt {
 	return func(r *options) {
 		r.startOffset = v
+	}
+}
+
+// WithSkipDirCheck adds skip dir check flags.
+// Which means that backup directory won't be checked for emptiness.
+func WithSkipDirCheck() Opt {
+	return func(r *options) {
+		r.skipDirCheck = true
 	}
 }

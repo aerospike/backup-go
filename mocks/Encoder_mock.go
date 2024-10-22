@@ -78,17 +78,17 @@ func (_c *MockEncoder_EncodeToken_Call) RunAndReturn(run func(*models.Token) ([]
 	return _c
 }
 
-// GenerateFilename provides a mock function with given fields:
-func (_m *MockEncoder) GenerateFilename() string {
-	ret := _m.Called()
+// GenerateFilename provides a mock function with given fields: prefix, suffix
+func (_m *MockEncoder) GenerateFilename(prefix string, suffix string) string {
+	ret := _m.Called(prefix, suffix)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GenerateFilename")
 	}
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = rf(prefix, suffix)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
@@ -102,13 +102,15 @@ type MockEncoder_GenerateFilename_Call struct {
 }
 
 // GenerateFilename is a helper method to define mock.On call
-func (_e *MockEncoder_Expecter) GenerateFilename() *MockEncoder_GenerateFilename_Call {
-	return &MockEncoder_GenerateFilename_Call{Call: _e.mock.On("GenerateFilename")}
+//   - prefix string
+//   - suffix string
+func (_e *MockEncoder_Expecter) GenerateFilename(prefix interface{}, suffix interface{}) *MockEncoder_GenerateFilename_Call {
+	return &MockEncoder_GenerateFilename_Call{Call: _e.mock.On("GenerateFilename", prefix, suffix)}
 }
 
-func (_c *MockEncoder_GenerateFilename_Call) Run(run func()) *MockEncoder_GenerateFilename_Call {
+func (_c *MockEncoder_GenerateFilename_Call) Run(run func(prefix string, suffix string)) *MockEncoder_GenerateFilename_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
@@ -118,7 +120,7 @@ func (_c *MockEncoder_GenerateFilename_Call) Return(_a0 string) *MockEncoder_Gen
 	return _c
 }
 
-func (_c *MockEncoder_GenerateFilename_Call) RunAndReturn(run func() string) *MockEncoder_GenerateFilename_Call {
+func (_c *MockEncoder_GenerateFilename_Call) RunAndReturn(run func(string, string) string) *MockEncoder_GenerateFilename_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -90,7 +90,7 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	}
 
 	// If we have one partition filter with range.
-	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 {
+	if len(partitionFilters) == 1 && partitionFilters[0].Count != 1 && partitionFilters[0].Digest == nil {
 		return splitPartitionRange(partitionFilters[0], numWorkers), nil
 	}
 
@@ -163,9 +163,9 @@ func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) []
 		result[j].Count = (((j + 1) * partitionFilters.Count) / numWorkers) - result[j].Begin
 		result[j].Begin += partitionFilters.Begin
 		// Set digest property for the first group.
-		if partitionFilters.Digest != nil && j == 0 {
-			result[j].Digest = partitionFilters.Digest
-		}
+		// if partitionFilters.Digest != nil && j == 0 {
+		// 	result[j].Digest = partitionFilters.Digest
+		// }
 	}
 
 	return result

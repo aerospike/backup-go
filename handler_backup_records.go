@@ -16,6 +16,7 @@ package backup
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -200,12 +201,27 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	return bh.makeAerospikeReadWorkersForPartition(ctx, n, &scanPolicy)
 }
 
+func base64Encode(v []byte) []byte {
+	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(v)))
+	base64.StdEncoding.Encode(encoded, v)
+
+	return encoded
+}
+
 func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipeline.Worker[*models.Token], error) {
 	partitionGroups, err := splitPartitions(bh.config.PartitionFilters, n)
 	if err != nil {
 		return nil, err
+	}
+
+	fmt.Println("========part groups=======")
+	for k := range partitionGroups {
+		fmt.Println("filter:")
+		fmt.Println("begin:", partitionGroups[k].Begin)
+		fmt.Println("count:", partitionGroups[k].Count)
+		fmt.Println("digest:", string(base64Encode(partitionGroups[k].Digest)))
 	}
 
 	// If we have multiply partition filters, we shrink workers to number of filters.

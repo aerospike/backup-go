@@ -51,7 +51,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"This argument is mutually exclusive to partition-list.\n"+
 			"Format: base64 encoded string\n"+
 			"Example: EjRWeJq83vEjRRI0VniavN7xI0U=\n")
-	flagSet.StringVarP(&f.ModifiedBefore, "modified-before", "a",
+	flagSet.StringVarP(&f.ModifiedAfter, "modified-after", "a",
 		"",
 		"<YYYY-MM-DD_HH:MM:SS>\n"+
 			"Perform an incremental backup; only include records \n"+
@@ -59,7 +59,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"local timezone applies. If only HH:MM:SS is specified, then\n"+
 			"today's date is assumed as the date. If only YYYY-MM-DD is \n"+
 			"specified, then 00:00:00 (midnight) is assumed as the time.\n")
-	flagSet.StringVarP(&f.ModifiedAfter, "modified-after", "b",
+	flagSet.StringVarP(&f.ModifiedBefore, "modified-before", "b",
 		"",
 		"<YYYY-MM-DD_HH:MM:SS>\n"+
 			"Only include records that last changed before the given\n"+

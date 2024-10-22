@@ -32,6 +32,10 @@ var (
 	expPartitionRange  = regexp.MustCompile(`^([0-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-5])\-([1-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-6])$`)
 	expPartitionID     = regexp.MustCompile(`^(409[0-6]|40[0-8]\d|[123]?\d{1,3}|0)$`)
 	expPartitionDigest = regexp.MustCompile(`^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`)
+	// Time parsing expressions.
+	expTimeOnly = regexp.MustCompile(`^\d{2}:\d{2}:\d{2}$`)
+	expDateOnly = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	expDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2}$`)
 )
 
 func mapBackupConfig(
@@ -105,7 +109,7 @@ func mapBackupConfig(
 	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
 
 	if backupParams.ModifiedBefore != "" {
-		modBeforeTime, err := time.Parse("2006-01-02_15:04:05", backupParams.ModifiedBefore)
+		modBeforeTime, err := parseLocalTimeToUTC(backupParams.ModifiedBefore)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified before date: %w", err)
 		}
@@ -114,7 +118,7 @@ func mapBackupConfig(
 	}
 
 	if backupParams.ModifiedAfter != "" {
-		modAfterTime, err := time.Parse("2006-01-02_15:04:05", backupParams.ModifiedAfter)
+		modAfterTime, err := parseLocalTimeToUTC(backupParams.ModifiedAfter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified after date: %w", err)
 		}
@@ -402,4 +406,34 @@ func parsePartitionFilterByID(filter string) (*aerospike.PartitionFilter, error)
 
 func parsePartitionFilterByDigest(namespace, filter string) (*aerospike.PartitionFilter, error) {
 	return backup.NewPartitionFilterByDigest(namespace, filter)
+}
+
+func parseLocalTimeToUTC(timeString string) (time.Time, error) {
+	location, err := time.LoadLocation("Local")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to load timezone location: %w", err)
+	}
+
+	var validTime string
+
+	switch {
+	case expDateTime.MatchString(timeString):
+		validTime = timeString
+	case expTimeOnly.MatchString(timeString):
+		currentTime := time.Now().In(location)
+		validTime = currentTime.Format("2006-01-02") + "_" + timeString
+	case expDateOnly.MatchString(timeString):
+		validTime = timeString + "_00:00:00"
+	default:
+		return time.Time{}, fmt.Errorf("unknown time format: %s", timeString)
+	}
+
+	localTime, err := time.ParseInLocation("2006-01-02_15:04:05", validTime, location)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse time %s: %w", timeString, err)
+	}
+
+	utcTime := localTime.UTC()
+
+	return utcTime, nil
 }

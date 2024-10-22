@@ -82,14 +82,14 @@ Backup Flags:
                                     Format: base64 encoded string
                                     Example: EjRWeJq83vEjRRI0VniavN7xI0U=
                                     
-  -a, --modified-before string      <YYYY-MM-DD_HH:MM:SS>
+  -a, --modified-after string       <YYYY-MM-DD_HH:MM:SS>
                                     Perform an incremental backup; only include records 
                                     that changed after the given date and time. The system's 
                                     local timezone applies. If only HH:MM:SS is specified, then
                                     today's date is assumed as the date. If only YYYY-MM-DD is 
                                     specified, then 00:00:00 (midnight) is assumed as the time.
                                     
-  -b, --modified-after string       <YYYY-MM-DD_HH:MM:SS>
+  -b, --modified-before string      <YYYY-MM-DD_HH:MM:SS>
                                     Only include records that last changed before the given
                                     date and time. May combined with --modified-after to specify a range.
   -M, --max-records int             The number of records approximately to back up. 0 - all records

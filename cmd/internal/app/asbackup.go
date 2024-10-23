@@ -60,11 +60,22 @@ func NewASBackup(
 	}
 
 	// Initializations.
+	backupConfig, err := mapBackupConfig(
+		backupParams,
+		commonParams,
+		compression,
+		encryption,
+		secretAgent,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup config: %w", err)
+	}
+
 	var (
 		writer backup.Writer
 		reader backup.StreamingReader
-		err    error
 	)
+
 	// We initialize a writer only if output is configured.
 	if backupParams.OutputFile != "" || commonParams.Directory != "" {
 		writer, err = getWriter(
@@ -74,6 +85,7 @@ func NewASBackup(
 			awsS3,
 			gcpStorage,
 			azureBlob,
+			backupConfig.SecretAgentConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create backup writer: %w", err)
@@ -86,9 +98,18 @@ func NewASBackup(
 	}
 
 	if backupParams.ShouldSaveState() {
-		r := &models.Restore{InputFile: backupParams.OutputFile}
+		restore := &models.Restore{InputFile: backupParams.OutputFile}
 
-		reader, err = getReader(ctx, r, commonParams, awsS3, gcpStorage, azureBlob, backupParams)
+		reader, err = getReader(
+			ctx,
+			restore,
+			commonParams,
+			awsS3,
+			gcpStorage,
+			azureBlob,
+			backupParams,
+			backupConfig.SecretAgentConfig,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create reader: %w", err)
 		}
@@ -97,17 +118,6 @@ func NewASBackup(
 	aerospikeClient, err := newAerospikeClient(clientConfig, backupParams.PreferRacks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
-	}
-
-	backupConfig, err := mapBackupConfig(
-		backupParams,
-		commonParams,
-		compression,
-		encryption,
-		secretAgent,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup config: %w", err)
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
@@ -153,24 +163,4 @@ func (b *ASBackup) Run(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func getWriter(
-	ctx context.Context,
-	backupParams *models.Backup,
-	commonParams *models.Common,
-	awsS3 *models.AwsS3,
-	gcpStorage *models.GcpStorage,
-	azureBlob *models.AzureBlob,
-) (backup.Writer, error) {
-	switch {
-	case awsS3.Region != "":
-		return newS3Writer(ctx, awsS3, backupParams, commonParams)
-	case gcpStorage.BucketName != "":
-		return newGcpWriter(ctx, gcpStorage, backupParams, commonParams)
-	case azureBlob.ContainerName != "":
-		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
-	default:
-		return newLocalWriter(ctx, backupParams, commonParams)
-	}
 }

@@ -113,7 +113,11 @@ func init() {
 		encryptionFlagSet.PrintDefaults()
 
 		// Print section: Secret Agent Flags
-		fmt.Println("\nSecret Agent Flags:")
+		fmt.Println("\nSecret Agent Flags:\n" +
+			"Options pertaining to the Aerospike secret agent https://docs.aerospike.com/tools/secret-agent.\n" +
+			"Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike secret agent.\n" +
+			"To use a secret as an option, use this format 'secrets:<resource_name>:<secret_name>' \n" +
+			"Example: asbackup --azure-account-name secret:resource1:azaccount")
 		secretAgentFlagSet.PrintDefaults()
 
 		// Print section: AWS Flags

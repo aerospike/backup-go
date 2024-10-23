@@ -155,6 +155,10 @@ Encryption Flags:
       --encryption-key-secret string   Grabs the encryption key from secret-agent.
 
 Secret Agent Flags:
+Options pertaining to the Aerospike secret agent https://docs.aerospike.com/tools/secret-agent.
+Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike secret agent.
+To use a secret as an option, use this format 'secrets:<resource_name>:<secret_name>' 
+Example: asbackup --azure-account-name secret:resource1:azaccount
       --sa-connection-type string   Secret agent connection type, supported types: tcp, unix. (default "tcp")
       --sa-address string           Secret agent host for TCP connection or socket file path for UDS connection.
       --sa-port int                 Secret agent port (only for TCP connection).

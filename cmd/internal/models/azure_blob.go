@@ -14,6 +14,12 @@
 
 package models
 
+import (
+	"fmt"
+
+	"github.com/aerospike/backup-go"
+)
+
 type AzureBlob struct {
 	// Account name + key auth
 	AccountName string
@@ -25,4 +31,46 @@ type AzureBlob struct {
 
 	Endpoint      string
 	ContainerName string
+}
+
+// LoadSecrets tries to load field values from secret agent.
+func (a *AzureBlob) LoadSecrets(cfg *backup.SecretAgentConfig) error {
+	var err error
+
+	a.AccountName, err = backup.ParseSecret(cfg, a.AccountName)
+	if err != nil {
+		return fmt.Errorf("failed to load account name from secret agent: %w", err)
+	}
+
+	a.AccountKey, err = backup.ParseSecret(cfg, a.AccountKey)
+	if err != nil {
+		return fmt.Errorf("failed to load account key from secret agent: %w", err)
+	}
+
+	a.TenantID, err = backup.ParseSecret(cfg, a.TenantID)
+	if err != nil {
+		return fmt.Errorf("failed to load tenant id from secret agent: %w", err)
+	}
+
+	a.ClientID, err = backup.ParseSecret(cfg, a.ClientID)
+	if err != nil {
+		return fmt.Errorf("failed to load client id from secret agent: %w", err)
+	}
+
+	a.ClientSecret, err = backup.ParseSecret(cfg, a.ClientSecret)
+	if err != nil {
+		return fmt.Errorf("failed to load client secret from secret agent: %w", err)
+	}
+
+	a.Endpoint, err = backup.ParseSecret(cfg, a.Endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to load endpoint from secret agent: %w", err)
+	}
+
+	a.ContainerName, err = backup.ParseSecret(cfg, a.ContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to load container name from secret agent: %w", err)
+	}
+
+	return nil
 }

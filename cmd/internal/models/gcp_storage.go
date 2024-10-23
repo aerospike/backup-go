@@ -14,6 +14,12 @@
 
 package models
 
+import (
+	"fmt"
+
+	"github.com/aerospike/backup-go"
+)
+
 type GcpStorage struct {
 	// Path to file containing Service Account JSON Key.
 	KeyFile string
@@ -23,4 +29,26 @@ type GcpStorage struct {
 	// Alternative url.
 	// It is not recommended to use an alternate URL in a production environment.
 	Endpoint string
+}
+
+// LoadSecrets tries to load field values from secret agent.
+func (g *GcpStorage) LoadSecrets(cfg *backup.SecretAgentConfig) error {
+	var err error
+
+	g.KeyFile, err = backup.ParseSecret(cfg, g.KeyFile)
+	if err != nil {
+		return fmt.Errorf("failed to load key file from secret agent: %w", err)
+	}
+
+	g.BucketName, err = backup.ParseSecret(cfg, g.BucketName)
+	if err != nil {
+		return fmt.Errorf("failed to load bucket name from secret agent: %w", err)
+	}
+
+	g.Endpoint, err = backup.ParseSecret(cfg, g.Endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to load endpoint from secret agent: %w", err)
+	}
+
+	return nil
 }

@@ -14,8 +14,36 @@
 
 package models
 
+import (
+	"fmt"
+
+	"github.com/aerospike/backup-go"
+)
+
 type AwsS3 struct {
 	Region   string
 	Profile  string
 	Endpoint string
+}
+
+// LoadSecrets tries to load field values from secret agent.
+func (a *AwsS3) LoadSecrets(cfg *backup.SecretAgentConfig) error {
+	var err error
+
+	a.Region, err = backup.ParseSecret(cfg, a.Region)
+	if err != nil {
+		return fmt.Errorf("failed to load region from secret agent: %w", err)
+	}
+
+	a.Profile, err = backup.ParseSecret(cfg, a.Profile)
+	if err != nil {
+		return fmt.Errorf("failed to load profile from secret agent: %w", err)
+	}
+
+	a.Endpoint, err = backup.ParseSecret(cfg, a.Endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to load endpoint from secret agent: %w", err)
+	}
+
+	return nil
 }

@@ -50,12 +50,12 @@ Aerospike Client Flags:
 Restore Flags:
   -d, --directory string         The Directory that holds the backup files. Required, unless -o or -e is used.
   -n, --namespace string         The namespace to be backed up. Required.
-  -s, --set stringArray          The set(s) to be backed up.
+  -s, --set string               The set(s) to be backed up.
                                  If multiple sets are being backed up, filter-exp cannot be used.
                                  if empty all sets.
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
-  -B, --bin-list stringArray     Only include the given bins in the backup.
+  -B, --bin-list string          Only include the given bins in the backup.
                                  If empty include all bins.
   -w, --parallel int             Maximum number of scan calls to run in parallel.
                                  If only one partition range is given, or the entire namespace is being backed up, the range
@@ -120,6 +120,10 @@ Encryption Flags:
       --encryption-key-secret string   Grabs the encryption key from secret-agent.
 
 Secret Agent Flags:
+Options pertaining to the Aerospike secret agent https://docs.aerospike.com/tools/secret-agent.
+Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike secret agent.
+To use a secret as an option, use this format 'secrets:<resource_name>:<secret_name>' 
+Example: asrestore --azure-account-name secret:resource1:azaccount
       --sa-connection-type string   Secret agent connection type, supported types: tcp, unix. (default "tcp")
       --sa-address string           Secret agent host for TCP connection or socket file path for UDS connection.
       --sa-port int                 Secret agent port (only for TCP connection).
@@ -129,19 +133,19 @@ Secret Agent Flags:
 
 AWS Flags:
       --s3-region string              The S3 region that the bucket(s) exist in.
-      --s3-profile string             The S3 profile to use for credentials. (default "default")
+      --s3-profile string             The S3 profile to use for credentials.
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
 
 GCP Flags:
-      --gcp-key-path string            Path to file containing Service Account JSON Key.
-      --gcp-bucket-name string         Name of the Google Cloud Storage bucket.
+      --gcp-key-path string            Path to file containing service account JSON key.
+      --gcp-bucket-name string         Name of the Google cloud storage bucket.
       --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
 
 Azure Flags:
       --azure-account-name string     Azure account name for account name, key authorization.
       --azure-account-key string      Azure account key for account name, key authorization.
       --azure-tenant-id string        Azure tenant ID for Azure Active Directory authorization.
-      --azure-client-id string        Azure Client ID for Azure Active Directory authorization.
+      --azure-client-id string        Azure client ID for Azure Active Directory authorization.
       --azure-client-secret string    Azure client secret for Azure Active Directory authorization.
       --azure-endpoint string         Azure endpoint.
       --azure-container-name string   Azure container Name.

@@ -16,6 +16,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aerospike/backup-go"
@@ -26,6 +27,39 @@ import (
 	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
+
+func getWriter(
+	ctx context.Context,
+	backupParams *models.Backup,
+	commonParams *models.Common,
+	awsS3 *models.AwsS3,
+	gcpStorage *models.GcpStorage,
+	azureBlob *models.AzureBlob,
+	secretAgent *backup.SecretAgentConfig,
+) (backup.Writer, error) {
+	switch {
+	case awsS3.Region != "":
+		if err := awsS3.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
+		}
+
+		return newS3Writer(ctx, awsS3, backupParams, commonParams)
+	case gcpStorage.BucketName != "":
+		if err := gcpStorage.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
+		}
+
+		return newGcpWriter(ctx, gcpStorage, backupParams, commonParams)
+	case azureBlob.ContainerName != "":
+		if err := azureBlob.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
+		}
+
+		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
+	default:
+		return newLocalWriter(ctx, backupParams, commonParams)
+	}
+}
 
 func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (backup.Writer, error) {
 	var opts []local.Opt

@@ -71,7 +71,9 @@ archives:
       - "asrestore"
 
 release:
+  prerelease: auto
   draft: true
+  make_latest: false
   replace_existing_artifacts: true
   mode: prepend
   header: |

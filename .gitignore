@@ -22,3 +22,5 @@ go.work
 
 main
 backup
+
+dist/

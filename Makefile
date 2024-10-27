@@ -1,3 +1,7 @@
+VERSION := dev
+COMMIT := $(shell git rev-parse --short HEAD)
+LDFLAGS := -ldflags "-X 'main.appVersion=$(VERSION)' -X 'main.commitHash=$(COMMIT)'"
+
 .PHONY: test
 test:
 	go test -v ./...
@@ -12,8 +16,9 @@ coverage:
 .PHONY: clean
 clean: mocks-clean
 	rm -f coverage.cov
+	rm -Rf dist
 
-# Install mockery for generating test mocks
+# Install mockery for generating test mocks.
 .PHONY: mockery-install
 mockery-install:
 	go install github.com/vektra/mockery/v2@v2.45.0
@@ -30,3 +35,19 @@ mocks-generate: mockery-install
 mocks-clean:
 	@echo "Cleaning up all 'mocks' directories..."
 	@find . -type d -name 'mocks' -exec rm -rf {} +
+
+# Build release locally.
+.PHONY: release-test
+release-test:
+	@echo "Testing release with version $(VERSION)..."
+	goreleaser build --snapshot
+
+
+# Build CLI tools.
+.PHONY: build
+build:
+	mkdir dist
+	@echo "Building asbackup with version $(VERSION)..."
+	go build -o dist/asbackup cmd/asbackup/main.go
+	@echo "Building asrestore with version $(VERSION)..."
+	go build -o dist/asrestore cmd/asbackup/main.go

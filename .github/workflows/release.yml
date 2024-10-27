@@ -2,7 +2,7 @@ name: goreleaser
 
 on:
   release:
-    types: unpublished
+    types: prereleased
 
 permissions:
   contents: write

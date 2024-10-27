@@ -81,8 +81,6 @@ archives:
       - "asrestore"
 
 release:
-  # for tests remove when ready
-  make_latest: false
   header: |
     ## Release {{ .Version }} ({{ .Date }})
     - asbackup (CLI tool)

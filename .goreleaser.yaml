@@ -18,8 +18,6 @@ builds:
       - amd64
       - arm64
     ignore:
-      - goos: darwin
-        goarch: amd64
       - goos: linux
         goarch: arm64
       - goos: windows
@@ -39,8 +37,6 @@ builds:
       - amd64
       - arm64
     ignore:
-      - goos: darwin
-        goarch: amd64
       - goos: linux
         goarch: arm64
       - goos: windows
@@ -81,10 +77,6 @@ archives:
         format: zip
     builds:
       - "asrestore"
-
-source:
-  enabled: true
-  name_template: "{{ .ProjectName }}"
 
 release:
   header: |

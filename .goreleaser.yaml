@@ -17,6 +17,13 @@ builds:
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: darwin
+        goarch: amd64
+      - goos: linux
+        goarch: arm64
+      - goos: windows
+        goarch: arm64
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -31,6 +38,13 @@ builds:
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: darwin
+        goarch: amd64
+      - goos: linux
+        goarch: arm64
+      - goos: windows
+        goarch: arm64
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -42,8 +56,7 @@ archives:
   - id: "asbackup"
     format: tar.gz
     name_template: >-
-      {{ .Binary }}_
-      {{ .Version }}_
+      {{ .Binary }}_{{ .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
@@ -52,11 +65,12 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    builds:
+      - "asbackup"
   - id: "asrestore"
     format: tar.gz
     name_template: >-
-      {{ .Binary }}_
-      {{ .Version }}_
+      {{ .Binary }}_{{ .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
@@ -65,16 +79,12 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-  - id: "backup-go"
-    format: tar.gz
-    name_template: >-
-      {{ .ProjectName }}_
-      {{ .Version }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    builds:
+      - "asrestore"
+
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}"
 
 release:
   header: |

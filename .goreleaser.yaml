@@ -45,8 +45,6 @@ builds:
       - CGO_ENABLED=0
     ldflags:
       - -s -w -X 'main.appVersion={{.Version}}' -X 'main.commitHash={{.Commit}}'
-  - id: "backup-go"
-    skip: true
 
 archives:
   - id: "asbackup"
@@ -61,6 +59,8 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - LICENSE
     builds:
       - "asbackup"
   - id: "asrestore"
@@ -75,6 +75,8 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - LICENSE
     builds:
       - "asrestore"
 

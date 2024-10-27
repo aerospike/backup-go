@@ -16,6 +16,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -25,6 +26,40 @@ import (
 	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
+
+func getReader(
+	ctx context.Context,
+	restoreParams *models.Restore,
+	commonParams *models.Common,
+	awsS3 *models.AwsS3,
+	gcpStorage *models.GcpStorage,
+	azureBlob *models.AzureBlob,
+	backupParams *models.Backup,
+	secretAgent *backup.SecretAgentConfig,
+) (backup.StreamingReader, error) {
+	switch {
+	case awsS3.Region != "":
+		if err := awsS3.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
+		}
+
+		return newS3Reader(ctx, awsS3, restoreParams, commonParams, backupParams)
+	case gcpStorage.BucketName != "":
+		if err := gcpStorage.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
+		}
+
+		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams, backupParams)
+	case azureBlob.ContainerName != "":
+		if err := azureBlob.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
+		}
+
+		return newAzureReader(ctx, azureBlob, restoreParams, commonParams, backupParams)
+	default:
+		return newLocalReader(restoreParams, commonParams, backupParams)
+	}
+}
 
 func newLocalReader(r *models.Restore, c *models.Common, b *models.Backup) (backup.StreamingReader, error) {
 	var opts []local.Opt

@@ -76,10 +76,6 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
 
 release:
-  # for tests, remove this line when everything is ready.
-  draft: true
-  skip_upload: true
-
   header: |
     ## Release {{ .Version }} ({{ .Date }})
     - asbackup (CLI tool)

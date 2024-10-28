@@ -59,6 +59,10 @@ func NewASBackup(
 		return nil, err
 	}
 
+	if err := validateCommonParams(commonParams); err != nil {
+		return nil, err
+	}
+
 	// Initializations.
 	backupConfig, err := mapBackupConfig(
 		backupParams,

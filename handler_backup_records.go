@@ -16,7 +16,6 @@ package backup
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -205,13 +204,6 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkers(
 	}
 
 	return bh.makeAerospikeReadWorkersForPartition(ctx, n, &scanPolicy)
-}
-
-func base64Encode(v []byte) []byte {
-	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(v)))
-	base64.StdEncoding.Encode(encoded, v)
-
-	return encoded
 }
 
 func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(

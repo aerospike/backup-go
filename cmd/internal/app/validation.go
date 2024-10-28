@@ -84,6 +84,18 @@ func validateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 	return nil
 }
 
+func validateCommonParams(commonParams *models.Common) error {
+	if commonParams.TotalTimeout < 0 {
+		return fmt.Errorf("total-timeout must be non-negative")
+	}
+
+	if commonParams.SocketTimeout < 0 {
+		return fmt.Errorf("socket-timeout must be non-negative")
+	}
+
+	return nil
+}
+
 func validatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) error {
 	if len(partitionFilters) < 1 {
 		return nil

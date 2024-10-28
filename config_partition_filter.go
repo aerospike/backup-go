@@ -162,7 +162,6 @@ func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) []
 		result[j].Begin = (j * partitionFilters.Count) / numWorkers
 		result[j].Count = (((j + 1) * partitionFilters.Count) / numWorkers) - result[j].Begin
 		result[j].Begin += partitionFilters.Begin
-		// result[j].Digest = partitionFilters.Digest
 		// Set digest property for the first group.
 		if partitionFilters.Digest != nil && j == 0 {
 			result[j].Digest = partitionFilters.Digest

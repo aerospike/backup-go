@@ -26,7 +26,10 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-var aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
+var (
+	aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
+	secretAgentValRegex   = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
+)
 
 type AerospikeVersion struct {
 	Major int
@@ -584,7 +587,16 @@ func parseInfoObject(obj, pairSep, kvSep string) (infoMap, error) {
 	}
 
 	data := map[string]string{}
-	kvpairs := strings.Split(obj, pairSep)
+
+	var kvpairs []string
+
+	switch secretAgentValRegex.MatchString(obj) {
+	case true:
+		// If parameter is configured with secret agent, we don't split it.
+		kvpairs = append(kvpairs, obj)
+	case false:
+		kvpairs = strings.Split(obj, pairSep)
+	}
 
 	for _, pair := range kvpairs {
 		key, val, err := parseInfoKVPair(pair, kvSep)

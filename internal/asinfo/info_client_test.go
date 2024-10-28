@@ -23,6 +23,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/asinfo/mocks"
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_parseAerospikeVersion(t *testing.T) {
@@ -1666,5 +1667,35 @@ func TestGetRecordCount(t *testing.T) {
 				t.Errorf("GetRecordCount() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_parseInfoObject(t *testing.T) {
+	tests := []struct {
+		obj    string
+		result infoMap
+		err    error
+	}{
+		{
+			"storage-engine.stripe[0]=stripe-0.0xad001000",
+			map[string]string{"storage-engine.stripe[0]": "stripe-0.0xad001000"},
+			nil,
+		},
+		{
+			"encryption-key-file=secrets:one:two",
+			map[string]string{"encryption-key-file": "secrets:one:two"},
+			nil,
+		},
+		{
+			"storage-engine1=1:storage-engine2=2",
+			map[string]string{"storage-engine1": "1", "storage-engine2": "2"},
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		result, err := parseInfoObject(tt.obj, ":", "=")
+		require.Equal(t, tt.result, result)
+		require.Equal(t, tt.err, err)
 	}
 }

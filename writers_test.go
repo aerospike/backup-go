@@ -49,7 +49,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 			},
 		},
 	}
-	recToken := models.NewRecordToken(expRecord, 0)
+	recToken := models.NewRecordToken(expRecord, 0, nil)
 
 	expUDF := &models.UDF{
 		Name: "udf",
@@ -70,7 +70,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
 	dst := bytes.Buffer{}
-	writer := newTokenWriter(mockEncoder, &dst, slog.Default())
+	writer := newTokenWriter(mockEncoder, &dst, slog.Default(), nil)
 	suite.NotNil(writer)
 
 	_, err := writer.Write(recToken)
@@ -92,7 +92,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	failRec := &models.Record{
 		Record: &a.Record{},
 	}
-	failRecToken := models.NewRecordToken(failRec, 0)
+	failRecToken := models.NewRecordToken(failRec, 0, nil)
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	_, err = writer.Write(failRecToken)
 	suite.NotNil(err)
@@ -103,7 +103,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter := pipemocks.NewMockDataWriter[*models.Token](suite.T())
-	mockWriter.EXPECT().Write(models.NewRecordToken(&models.Record{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
 	mockWriter.EXPECT().Write(&models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
@@ -116,7 +116,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
-	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0))
+	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0, nil))
 	suite.Nil(err)
 
 	_, err = writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))

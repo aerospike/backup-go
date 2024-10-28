@@ -43,6 +43,7 @@ func main() {
 
 	// For backup to single file use local.WithFile(fileName)
 	writers, err := local.NewWriter(
+		context.Background(),
 		local.WithRemoveFiles(),
 		local.WithDir("backups_folder"),
 	)
@@ -52,10 +53,11 @@ func main() {
 
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = "test"
-	backupCfg.Parallel = 5
+	backupCfg.ParallelRead = 10
+	backupCfg.ParallelWrite = 10
 	ctx := context.Background()
 
-	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers)
+	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
 	if err != nil {
 		panic(err)
 	}

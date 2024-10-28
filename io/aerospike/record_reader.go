@@ -39,6 +39,10 @@ type RecordReaderConfig struct {
 	setList     []string
 	binList     []string
 	noTTLOnly   bool
+
+	// pageSize used for paginated scan for saving reading state.
+	// If pageSize = 0, we think that we use normal scan.
+	pageSize int64
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -51,6 +55,7 @@ func NewRecordReaderConfig(namespace string,
 	timeBounds models.TimeBounds,
 	scanLimiter *semaphore.Weighted,
 	noTTLOnly bool,
+	pageSize int64,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		namespace:       namespace,
@@ -62,6 +67,7 @@ func NewRecordReaderConfig(namespace string,
 		timeBounds:      timeBounds,
 		scanLimiter:     scanLimiter,
 		noTTLOnly:       noTTLOnly,
+		pageSize:        pageSize,
 	}
 }
 
@@ -95,6 +101,8 @@ type RecordReader struct {
 	logger     *slog.Logger
 	config     *RecordReaderConfig
 	scanResult *recordSets // initialized on first Read() call
+	// pageRecordsChan chan is initialized only if pageSize > 0.
+	pageRecordsChan chan *pageRecord
 }
 
 // NewRecordReader creates a new RecordReader.
@@ -118,6 +126,15 @@ func NewRecordReader(
 
 // Read reads the next record from the Aerospike database.
 func (r *RecordReader) Read() (*models.Token, error) {
+	// If pageSize is set, we use paginated read.
+	if r.config.pageSize > 0 {
+		return r.readPage()
+	}
+
+	return r.read()
+}
+
+func (r *RecordReader) read() (*models.Token, error) {
 	if !r.isScanStarted() {
 		scan, err := r.startScan()
 		if err != nil {
@@ -141,7 +158,8 @@ func (r *RecordReader) Read() (*models.Token, error) {
 	rec := models.Record{
 		Record: res.Record,
 	}
-	recToken := models.NewRecordToken(&rec, 0)
+
+	recToken := models.NewRecordToken(&rec, 0, nil)
 
 	return recToken, nil
 }

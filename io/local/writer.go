@@ -34,14 +34,6 @@ type Writer struct {
 	called atomic.Bool
 }
 
-// WithRemoveFiles adds remove files flag, so all files will be removed from backup folder before backup.
-// Is used only for Writer.
-func WithRemoveFiles() Opt {
-	return func(r *options) {
-		r.isRemovingFiles = true
-	}
-}
-
 // NewWriter creates a new writer for local directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
@@ -61,7 +53,7 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
-	if w.isDir {
+	if w.isDir && !w.skipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(w.path)
 		if err != nil {
@@ -194,6 +186,7 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
+
 	// protection for single file backup.
 	if !w.isDir {
 		if !w.called.CompareAndSwap(false, true) {

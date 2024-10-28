@@ -33,6 +33,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVarP(&f.OutputFile, "output-file", "o",
 		"",
 		"Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.")
+	flagSet.StringVarP(&f.OutputFilePrefix, "output-file-prefix", "q",
+		"",
+		"When using directory parameter, prepend a prefix to the names of the generated files.")
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
 		false,
 		"Remove existing backup file (-o) or files (-d).")
@@ -48,7 +51,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"This argument is mutually exclusive to partition-list.\n"+
 			"Format: base64 encoded string\n"+
 			"Example: EjRWeJq83vEjRRI0VniavN7xI0U=\n")
-	flagSet.StringVarP(&f.ModifiedBefore, "modified-before", "a",
+	flagSet.StringVarP(&f.ModifiedAfter, "modified-after", "a",
 		"",
 		"<YYYY-MM-DD_HH:MM:SS>\n"+
 			"Perform an incremental backup; only include records \n"+
@@ -56,7 +59,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"local timezone applies. If only HH:MM:SS is specified, then\n"+
 			"today's date is assumed as the date. If only YYYY-MM-DD is \n"+
 			"specified, then 00:00:00 (midnight) is assumed as the time.\n")
-	flagSet.StringVarP(&f.ModifiedAfter, "modified-after", "b",
+	flagSet.StringVarP(&f.ModifiedBefore, "modified-before", "b",
 		"",
 		"<YYYY-MM-DD_HH:MM:SS>\n"+
 			"Only include records that last changed before the given\n"+
@@ -66,7 +69,8 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"The number of records approximately to back up. 0 - all records")
 	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
 		false,
-		"Do not include bin data in the backup.")
+		"Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.\n"+
+			"On restore all records, that don't contain bin data will be skipped.")
 	flagSet.IntVar(&f.SleepBetweenRetries, "sleep-between-retries",
 		5,
 		"The amount of milliseconds to sleep between retries.")
@@ -123,6 +127,21 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.Int64Var(&f.EstimateSamples, "estimate-samples",
 		10000,
 		"The number of samples to take when running a backup estimate.")
+	flagSet.StringVarP(&f.Continue, "continue", "c",
+		"",
+		"Resumes an interrupted/failed backup from where it was left off, given the .state file\n"+
+			"that was generated from the interrupted/failed run.")
+	flagSet.StringVar(&f.StateFileDst, "state-file-dst",
+		"",
+		"Name of a state file that will be saved in backup --directory.\n"+
+			"Works only with --file-limit parameter. As we reach --file-limit and close file,\n"+
+			"current state will be saved. Works only for default and/or partition backup. \n"+
+			"Not work with --parallel-nodes or --node--list.")
+	flagSet.Int64Var(&f.ScanPageSize, "scan-page-size",
+		10000,
+		"How many records will be read on one iteration for continuation backup.\n"+
+			"Affects size if overlap on resuming backup after an error.\n"+
+			"Is used only with --state-file-dst or --continue.")
 
 	return flagSet
 }

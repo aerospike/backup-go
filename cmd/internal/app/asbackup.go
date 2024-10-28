@@ -30,6 +30,8 @@ type ASBackup struct {
 	backupClient *backup.Client
 	backupConfig *backup.BackupConfig
 	writer       backup.Writer
+	// reader is used to read state file.
+	reader backup.StreamingReader
 	// Additional params.
 	isEstimate       bool
 	estimatesSamples int64
@@ -58,28 +60,6 @@ func NewASBackup(
 	}
 
 	// Initializations.
-	var (
-		writer backup.Writer
-		err    error
-	)
-	// We initialize a writer only if output is configured.
-	if backupParams.OutputFile != "" || commonParams.Directory != "" {
-		writer, err = getWriter(ctx, backupParams, commonParams, awsS3, gcpStorage, azureBlob)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create backup writer: %w", err)
-		}
-		// If asbackup was launched with --remove-artifacts, we don't need to initialize all clients.
-		// We clean the folder on writer initialization and exit.
-		if backupParams.RemoveArtifacts {
-			return nil, nil
-		}
-	}
-
-	aerospikeClient, err := newAerospikeClient(clientConfig, backupParams.PreferRacks)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
-	}
-
 	backupConfig, err := mapBackupConfig(
 		backupParams,
 		commonParams,
@@ -91,6 +71,55 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create backup config: %w", err)
 	}
 
+	var (
+		writer backup.Writer
+		reader backup.StreamingReader
+	)
+
+	// We initialize a writer only if output is configured.
+	if backupParams.OutputFile != "" || commonParams.Directory != "" {
+		writer, err = getWriter(
+			ctx,
+			backupParams,
+			commonParams,
+			awsS3,
+			gcpStorage,
+			azureBlob,
+			backupConfig.SecretAgentConfig,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create backup writer: %w", err)
+		}
+		// If asbackup was launched with --remove-artifacts, we don't need to initialize all clients.
+		// We clean the folder on writer initialization and exit.
+		if backupParams.RemoveArtifacts {
+			return nil, nil
+		}
+	}
+
+	if backupParams.ShouldSaveState() {
+		restore := &models.Restore{InputFile: backupParams.OutputFile}
+
+		reader, err = getReader(
+			ctx,
+			restore,
+			commonParams,
+			awsS3,
+			gcpStorage,
+			azureBlob,
+			backupParams,
+			backupConfig.SecretAgentConfig,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create reader: %w", err)
+		}
+	}
+
+	aerospikeClient, err := newAerospikeClient(clientConfig, backupParams.PreferRacks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
+	}
+
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %w", err)
@@ -100,6 +129,7 @@ func NewASBackup(
 		backupClient:     backupClient,
 		backupConfig:     backupConfig,
 		writer:           writer,
+		reader:           reader,
 		isEstimate:       backupParams.Estimate,
 		estimatesSamples: backupParams.EstimateSamples,
 	}, nil
@@ -120,7 +150,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 
 		printEstimateReport(estimates)
 	default:
-		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer)
+		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
 		if err != nil {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}
@@ -133,24 +163,4 @@ func (b *ASBackup) Run(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func getWriter(
-	ctx context.Context,
-	backupParams *models.Backup,
-	commonParams *models.Common,
-	awsS3 *models.AwsS3,
-	gcpStorage *models.GcpStorage,
-	azureBlob *models.AzureBlob,
-) (backup.Writer, error) {
-	switch {
-	case awsS3.Region != "":
-		return newS3Writer(ctx, awsS3, backupParams, commonParams)
-	case gcpStorage.BucketName != "":
-		return newGcpWriter(ctx, gcpStorage, backupParams, commonParams)
-	case azureBlob.ContainerName != "":
-		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
-	default:
-		return newLocalWriter(ctx, backupParams, commonParams)
-	}
 }

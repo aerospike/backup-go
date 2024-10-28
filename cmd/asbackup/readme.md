@@ -71,6 +71,7 @@ Backup Flags:
                                  there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -o, --output-file string          Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
+  -q, --output-file-prefix string   When using directory parameter, prepend a prefix to the names of the generated files.
   -r, --remove-files                Remove existing backup file (-o) or files (-d).
   -F, --file-limit int              Rotate backup files, when their size crosses the given
                                     value (in bytes) Only used when backing up to a Directory.
@@ -81,18 +82,19 @@ Backup Flags:
                                     Format: base64 encoded string
                                     Example: EjRWeJq83vEjRRI0VniavN7xI0U=
                                     
-  -a, --modified-before string      <YYYY-MM-DD_HH:MM:SS>
+  -a, --modified-after string       <YYYY-MM-DD_HH:MM:SS>
                                     Perform an incremental backup; only include records 
                                     that changed after the given date and time. The system's 
                                     local timezone applies. If only HH:MM:SS is specified, then
                                     today's date is assumed as the date. If only YYYY-MM-DD is 
                                     specified, then 00:00:00 (midnight) is assumed as the time.
                                     
-  -b, --modified-after string       <YYYY-MM-DD_HH:MM:SS>
+  -b, --modified-before string      <YYYY-MM-DD_HH:MM:SS>
                                     Only include records that last changed before the given
                                     date and time. May combined with --modified-after to specify a range.
   -M, --max-records int             The number of records approximately to back up. 0 - all records
-  -x, --no-bins                     Do not include bin data in the backup.
+  -x, --no-bins                     Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.
+                                    On restore all records, that don't contain bin data will be skipped.
       --sleep-between-retries int   The amount of milliseconds to sleep between retries. (default 5)
   -f, --filter-exp string           Base64 encoded expression. Use the encoded filter expression in each scan call,
                                     which can be used to do a partial backup. The expression to be used can be base64 
@@ -127,6 +129,15 @@ Backup Flags:
                                     after-digest, partition-list.
                                     It calculates estimate size of full backup.
       --estimate-samples int        The number of samples to take when running a backup estimate. (default 10000)
+  -c, --continue string             Resumes an interrupted/failed backup from where it was left off, given the .state file
+                                    that was generated from the interrupted/failed run.
+      --state-file-dst string       Name of a state file that will be saved in backup --directory.
+                                    Works only with --file-limit parameter. As we reach --file-limit and close file,
+                                    current state will be saved. Works only for default and/or partition backup. 
+                                    Not work with --parallel-nodes or --node--list.
+      --scan-page-size int          How many records will be read on one iteration for continuation backup.
+                                    Affects size if overlap on resuming backup after an error.
+                                    Is used only with --state-file-dst or --continue. (default 10000)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -144,6 +155,10 @@ Encryption Flags:
       --encryption-key-secret string   Grabs the encryption key from secret-agent.
 
 Secret Agent Flags:
+Options pertaining to the Aerospike secret agent https://docs.aerospike.com/tools/secret-agent.
+Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike secret agent.
+To use a secret as an option, use this format 'secrets:<resource_name>:<secret_name>' 
+Example: asbackup --azure-account-name secret:resource1:azaccount
       --sa-connection-type string   Secret agent connection type, supported types: tcp, unix. (default "tcp")
       --sa-address string           Secret agent host for TCP connection or socket file path for UDS connection.
       --sa-port int                 Secret agent port (only for TCP connection).
@@ -173,15 +188,6 @@ Azure Flags:
 
 ## Unsupported flags
 ```
---continue          Resumes an interrupted/failed backup from where it was left off, given the .state file
-                    that was generated from the interrupted/failed run.
-
---state-file-dst    Either a path with a file name or a directory in which the backup state file will be
-                    placed if the backup is interrupted/fails. If a path with a file name is used, that
-                    exact path is where the backup file will be placed. If a directory is given, the backup
-                    state will be placed in the directory with name `<namespace>.asb.state`, or
-                    `<prefix>.asb.state` if `--output-file-prefix` is given.
-
 --machine           Output machine-readable status updates to the given path, typically a FIFO.
 
 --no-config-file    Do not read any config file. Default: disabled

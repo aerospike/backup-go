@@ -1,0 +1,88 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go install github.com/vektra/mockery/v2@v2.45.0
+    - mockery --config=.mockery.yaml
+
+builds:
+  - id: "asbackup"
+    main: cmd/asbackup/main.go
+    binary: "asbackup"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X 'main.appVersion={{.Version}}' -X 'main.commitHash={{.Commit}}'
+  - id: "asrestore"
+    main: cmd/asrestore/main.go
+    binary: "asrestore"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X 'main.appVersion={{.Version}}' -X 'main.commitHash={{.Commit}}'
+
+archives:
+  - id: "asbackup"
+    format: tar.gz
+    name_template: >-
+      {{ .Binary }}_{{ .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+    builds:
+      - "asbackup"
+  - id: "asrestore"
+    format: tar.gz
+    name_template: >-
+      {{ .Binary }}_{{ .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+    builds:
+      - "asrestore"
+
+release:
+  prerelease: true
+  make_latest: false
+  replace_existing_artifacts: true
+  mode: prepend
+  header: |
+    ## Release {{ .Version }} ({{ .Date }})
+    - asbackup (CLI tool)
+    - asrestore (CLI tool)
+    - backup-go (library)
+
+changelog:
+  disable: true
+
+checksum:
+  name_template: "checksums.txt"

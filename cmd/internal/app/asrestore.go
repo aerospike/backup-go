@@ -49,16 +49,6 @@ func NewASRestore(
 		return nil, err
 	}
 
-	reader, err := getReader(ctx, restoreParams, commonParams, awsS3, gcpStorage, azureBlob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup reader: %w", err)
-	}
-
-	aerospikeClient, err := newAerospikeClient(clientConfig, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
-	}
-
 	restoreConfig, err := mapRestoreConfig(
 		restoreParams,
 		commonParams,
@@ -68,6 +58,25 @@ func NewASRestore(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create restore config: %w", err)
+	}
+
+	reader, err := getReader(
+		ctx,
+		restoreParams,
+		commonParams,
+		awsS3,
+		gcpStorage,
+		azureBlob,
+		nil,
+		restoreConfig.SecretAgentConfig,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup reader: %w", err)
+	}
+
+	aerospikeClient, err := newAerospikeClient(clientConfig, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idRestore))
@@ -99,24 +108,4 @@ func (r *ASRestore) Run(ctx context.Context) error {
 	printRestoreReport(h.GetStats())
 
 	return nil
-}
-
-func getReader(
-	ctx context.Context,
-	restoreParams *models.Restore,
-	commonParams *models.Common,
-	awsS3 *models.AwsS3,
-	gcpStorage *models.GcpStorage,
-	azureBlob *models.AzureBlob,
-) (backup.StreamingReader, error) {
-	switch {
-	case awsS3.Region != "":
-		return newS3Reader(ctx, awsS3, restoreParams, commonParams)
-	case gcpStorage.BucketName != "":
-		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams)
-	case azureBlob.ContainerName != "":
-		return newAzureReader(ctx, azureBlob, restoreParams, commonParams)
-	default:
-		return newLocalReader(restoreParams, commonParams)
-	}
 }

@@ -16,6 +16,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aerospike/backup-go"
@@ -26,6 +27,39 @@ import (
 	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
+
+func getWriter(
+	ctx context.Context,
+	backupParams *models.Backup,
+	commonParams *models.Common,
+	awsS3 *models.AwsS3,
+	gcpStorage *models.GcpStorage,
+	azureBlob *models.AzureBlob,
+	secretAgent *backup.SecretAgentConfig,
+) (backup.Writer, error) {
+	switch {
+	case awsS3.Region != "":
+		if err := awsS3.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
+		}
+
+		return newS3Writer(ctx, awsS3, backupParams, commonParams)
+	case gcpStorage.BucketName != "":
+		if err := gcpStorage.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
+		}
+
+		return newGcpWriter(ctx, gcpStorage, backupParams, commonParams)
+	case azureBlob.ContainerName != "":
+		if err := azureBlob.LoadSecrets(secretAgent); err != nil {
+			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
+		}
+
+		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
+	default:
+		return newLocalWriter(ctx, backupParams, commonParams)
+	}
+}
 
 func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (backup.Writer, error) {
 	var opts []local.Opt
@@ -40,6 +74,10 @@ func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (ba
 
 	if b.ShouldClearTarget() {
 		opts = append(opts, local.WithRemoveFiles())
+	}
+
+	if b.Continue != "" {
+		opts = append(opts, local.WithSkipDirCheck())
 	}
 
 	opts = append(opts, local.WithValidator(asb.NewValidator()))
@@ -76,6 +114,10 @@ func newS3Writer(
 		opts = append(opts, s3.WithRemoveFiles())
 	}
 
+	if b.Continue != "" {
+		opts = append(opts, s3.WithSkipDirCheck())
+	}
+
 	opts = append(opts, s3.WithValidator(asb.NewValidator()))
 
 	return s3.NewWriter(ctx, client, bucketName, opts...)
@@ -106,6 +148,10 @@ func newGcpWriter(
 		opts = append(opts, storage.WithRemoveFiles())
 	}
 
+	if b.Continue != "" {
+		opts = append(opts, storage.WithSkipDirCheck())
+	}
+
 	opts = append(opts, storage.WithValidator(asb.NewValidator()))
 
 	return storage.NewWriter(ctx, client, g.BucketName, opts...)
@@ -134,6 +180,10 @@ func newAzureWriter(
 
 	if b.ShouldClearTarget() {
 		opts = append(opts, blob.WithRemoveFiles())
+	}
+
+	if b.Continue != "" {
+		opts = append(opts, blob.WithSkipDirCheck())
 	}
 
 	opts = append(opts, blob.WithValidator(asb.NewValidator()))

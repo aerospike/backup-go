@@ -216,14 +216,6 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 		return nil, err
 	}
 
-	fmt.Println("========part groups=======")
-	for k := range partitionGroups {
-		fmt.Println("filter:")
-		fmt.Println("begin:", partitionGroups[k].Begin)
-		fmt.Println("count:", partitionGroups[k].Count)
-		fmt.Println("digest:", string(base64Encode(partitionGroups[k].Digest)))
-	}
-
 	// If we have multiply partition filters, we shrink workers to number of filters.
 	n = len(partitionGroups)
 

@@ -27,7 +27,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
 	"github.com/aerospike/backup-go/models"
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestASBReader_readHeader(t *testing.T) {
@@ -1949,17 +1949,6 @@ func TestASBReader_readRecord(t *testing.T) {
 		},
 	}
 
-	// allow comp.Diff to compare aerospike keys
-	keyCmp := cmp.Comparer(func(x, y *a.Key) bool {
-		if x == nil || y == nil {
-			return x == y
-		}
-		if !x.Equals(y) {
-			return false
-		}
-		return x.String() == y.String()
-	})
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &Decoder{
@@ -1972,10 +1961,7 @@ func TestASBReader_readRecord(t *testing.T) {
 				t.Errorf("ASBReader.readRecord() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// TODO don't use cmp.Diff here, use testify instead
-			if diff := cmp.Diff(got, tt.want, keyCmp); diff != "" {
-				t.Errorf("ASBReader.readRecord() mismatch:\n%s", diff)
-			}
+			assert.EqualValues(t, got, tt.want)
 		})
 	}
 }

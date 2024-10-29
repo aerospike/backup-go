@@ -28,6 +28,8 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+const supportedVersion = "3.1"
+
 func newDecoderError(offset uint64, err error) error {
 	if errors.Is(err, io.EOF) {
 		return err
@@ -112,8 +114,11 @@ func NewDecoder(src io.Reader) (*Decoder, error) {
 		return nil, fmt.Errorf("error while reading header: %w", err)
 	}
 
+	if header.Version != supportedVersion {
+		return nil, fmt.Errorf("unsupported backup file version: %s", header.Version)
+	}
+
 	asb.header = header
-	// TODO make sure file version is 3.1
 
 	meta, err := asb.readMetadata()
 	if err != nil {
@@ -966,8 +971,6 @@ func (r *Decoder) readBinCount() (uint16, error) {
 // readExpiration reads an expiration line from the asb file
 // it expects that r has been advanced past the expiration line marker '+ t '
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
-// TODO expiration needs to be updated based on how much time has passed since the backup.
-// I think that should be done in a processor though, not here
 func (r *Decoder) readExpiration() (int64, error) {
 	exp, err := _readInteger(r, '\n')
 	if err != nil {

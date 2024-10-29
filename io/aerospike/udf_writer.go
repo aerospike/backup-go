@@ -29,8 +29,6 @@ type udfWriter struct {
 }
 
 // writeUDF writes a UDF to Aerospike.
-// TODO check that this does not overwrite existing UDFs
-// TODO support write policy
 func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	var UDFLang a.Language
 

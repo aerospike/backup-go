@@ -628,7 +628,7 @@ func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
 }
 
 // parseSindexListResponse parses a sindex-list info response
-// TODO example response
+// example resp: ns=source-ns1:indexname=idx_timestamp:set=metrics:bin=timestamp:type=numeric:indextype=default
 func parseSindexListResponse(resp string) ([]infoMap, error) {
 	return parseInfoResponse(resp, ";", ":", "=")
 }

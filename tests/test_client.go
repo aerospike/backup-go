@@ -119,7 +119,7 @@ func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 			}
 		}
 
-		task, err := tc.asc.CreateComplexIndex( // TODO create complex indexes
+		task, err := tc.asc.CreateComplexIndex(
 			nil,
 			sindex.Namespace,
 			sindex.Set,
@@ -240,7 +240,6 @@ func (tc *TestClient) ReadAllRecords(namespace, set string) (RecordMap, error) {
 // It does this by reading all records in the database namespace and set, then comparing
 // their digests and bins to the expected records' digests and bins.
 // Currently, it does not compare the records' metadata, only their digests and bins.
-// TODO compare metadata and user keys, maybe in another method
 func (tc *TestClient) ValidateRecords(
 	t assert.TestingT, expectedRecs []*a.Record, namespace, set string) {
 	actualRecs, err := tc.ReadAllRecords(namespace, set)

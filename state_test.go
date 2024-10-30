@@ -74,6 +74,12 @@ func TestState(t *testing.T) {
 	err = state.initState(testFilters)
 	require.NoError(t, err)
 
+	state.Counter = 1
+	suf := state.getFileSuffix()
+	require.Equal(t, "(1)", suf)
+
+	// Check empty condition.
+	state.RecordsStateChan <- models.PartitionFilterSerialized{}
 	for i := range testFilters {
 		pfs, err := models.NewPartitionFilterSerialized(testFilters[i])
 		require.NoError(t, err)

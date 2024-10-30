@@ -119,7 +119,7 @@ func (tc *TestClient) WriteSIndexes(sindexes []*models.SIndex) error {
 			}
 		}
 
-		task, err := tc.asc.CreateComplexIndex( // TODO create complex indexes
+		task, err := tc.asc.CreateComplexIndex(
 			nil,
 			sindex.Namespace,
 			sindex.Set,

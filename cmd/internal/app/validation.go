@@ -40,7 +40,6 @@ func validateStorages(
 	if azureBlob.ContainerName != "" || azureBlob.AccountName != "" || azureBlob.AccountKey != "" ||
 		azureBlob.Endpoint != "" || azureBlob.TenantID != "" || azureBlob.ClientID != "" ||
 		azureBlob.ClientSecret != "" {
-
 		count++
 	}
 

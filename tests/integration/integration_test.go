@@ -431,6 +431,10 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
 	suite.Require().Less(statsRestore.GetTotalBytesRead(), dirSize) // restore size doesn't include asb control characters
+	suite.Require().Equal(uint64(0), statsRestore.GetRecordsSkipped())
+	suite.Require().Equal(uint64(0), statsRestore.GetRecordsFresher())
+	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExisted())
+	suite.Require().Equal(uint64(0), statsRestore.GetRecordsIgnored())
 
 	suite.testClient.ValidateSIndexes(suite.T(), suite.expectedSIndexes, suite.namespace)
 	suite.testClient.ValidateRecords(suite.T(), expectedRecs, suite.namespace, suite.set)
@@ -1087,6 +1091,8 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
+	suite.Equal(uint64(0), bh.GetStats().GetFileCount())
+	suite.True(bh.GetStats().IsEmpty())
 	suite.TearDownTest()
 }
 

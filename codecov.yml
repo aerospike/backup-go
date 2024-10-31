@@ -1,0 +1,2 @@
+ignore:
+  - "cmd/internal/models"

@@ -600,6 +600,8 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 		testBucketName,
 		WithDir(testReadFolderWithStartOffset),
 		WithStartOffset(startOffset),
+		WithSkipDirCheck(),
+		WithNestedDir(),
 	)
 	s.Require().NoError(err)
 

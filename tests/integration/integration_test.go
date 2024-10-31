@@ -1091,7 +1091,7 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 	)
 	suite.Nil(err)
 	suite.NotNil(bh)
-	suite.Equal(uint64(1), bh.GetStats().GetFileCount())
+	suite.Equal(uint64(0), bh.GetStats().GetFileCount())
 	suite.True(bh.GetStats().IsEmpty())
 	suite.TearDownTest()
 }

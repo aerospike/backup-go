@@ -26,7 +26,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testNamespace = "test"
+const (
+	testNamespace = "test"
+	testStateFile = "state"
+)
 
 // Test_BackupRestore one test for both so we can restore from just backed up files.
 func Test_BackupRestore(t *testing.T) {
@@ -84,4 +87,55 @@ func Test_BackupRestore(t *testing.T) {
 
 	err = asr.Run(ctx)
 	require.NoError(t, err)
+}
+
+func Test_BackupWithState(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	hostPort := client.NewDefaultHostTLSPort()
+	clientCfg := &client.AerospikeConfig{
+		Seeds: client.HostTLSPortSlice{
+			hostPort,
+		},
+		User:     testASLoginPassword,
+		Password: testASLoginPassword,
+	}
+
+	bParams := &models.Backup{
+		StateFileDst: testStateFile,
+		ScanPageSize: 10,
+		FileLimit:    100000,
+	}
+
+	cParams := &models.Common{
+		Directory: dir,
+		Namespace: testNamespace,
+		Parallel:  1,
+	}
+
+	comp := &models.Compression{
+		Mode: backup.CompressNone,
+	}
+
+	enc := &models.Encryption{}
+
+	sa := &models.SecretAgent{}
+
+	aws := &models.AwsS3{}
+
+	gcp := &models.GcpStorage{}
+
+	azure := &models.AzureBlob{}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	asb, err := NewASBackup(ctx, clientCfg, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	require.NoError(t, err)
+
+	err = asb.Run(ctx)
+	require.NoError(t, err)
+
 }

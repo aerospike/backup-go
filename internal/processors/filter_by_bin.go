@@ -42,21 +42,18 @@ func (p filterByBin) Process(token *models.Token) (*models.Token, error) {
 		return token, nil
 	}
 
-	// If the record contains no bins, we skip it.
+	// If the filter bin list is not empty, perform filtering.
+	if len(p.binsToRemove) > 0 {
+		for key := range token.Record.Bins {
+			if !p.binsToRemove[key] {
+				delete(token.Record.Bins, key)
+			}
+		}
+	}
+
 	if len(token.Record.Bins) == 0 {
 		p.skipped.Add(1)
 		return nil, pipeline.ErrFilteredOut
-	}
-
-	// if filter bin list is empty, don't filter anything.
-	if len(p.binsToRemove) == 0 {
-		return token, nil
-	}
-
-	for key := range token.Record.Bins {
-		if !p.binsToRemove[key] {
-			delete(token.Record.Bins, key)
-		}
 	}
 
 	return token, nil

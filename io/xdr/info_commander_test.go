@@ -41,8 +41,6 @@ func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
 }
 
 func TestInfoCommander_parseResultResponse(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		cmd      string

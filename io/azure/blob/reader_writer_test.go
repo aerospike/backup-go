@@ -520,6 +520,9 @@ func (s *AzureSuite) TestReader_WithMarker() {
 		testContainerName,
 		WithDir(testReadFolderWithMarker),
 		WithMarker(marker),
+		WithUploadConcurrency(5),
+		WithSkipDirCheck(),
+		WithNestedDir(),
 	)
 	s.Require().NoError(err)
 

@@ -350,3 +350,70 @@ func TestValidatePartitionFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCommonParams(t *testing.T) {
+	tests := []struct {
+		name         string
+		commonParams *models.Common
+		wantErr      bool
+		expectedErr  string
+	}{
+		{
+			name: "Valid total and socket timeout",
+			commonParams: &models.Common{
+				TotalTimeout:  1000,
+				SocketTimeout: 500,
+			},
+			wantErr:     false,
+			expectedErr: "",
+		},
+		{
+			name: "Invalid negative total timeout",
+			commonParams: &models.Common{
+				TotalTimeout:  -1,
+				SocketTimeout: 500,
+			},
+			wantErr:     true,
+			expectedErr: "total-timeout must be non-negative",
+		},
+		{
+			name: "Invalid negative socket timeout",
+			commonParams: &models.Common{
+				TotalTimeout:  1000,
+				SocketTimeout: -1,
+			},
+			wantErr:     true,
+			expectedErr: "socket-timeout must be non-negative",
+		},
+		{
+			name: "Both total and socket timeout negative",
+			commonParams: &models.Common{
+				TotalTimeout:  -1000,
+				SocketTimeout: -500,
+			},
+			wantErr:     true,
+			expectedErr: "total-timeout must be non-negative",
+		},
+		{
+			name: "Edge case: zero total and socket timeout",
+			commonParams: &models.Common{
+				TotalTimeout:  0,
+				SocketTimeout: 0,
+			},
+			wantErr:     false,
+			expectedErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateCommonParams(tt.commonParams)
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error but got none")
+				assert.Equal(t, tt.expectedErr, err.Error())
+			} else {
+				assert.NoError(t, err, "Expected no error but got one")
+			}
+		})
+	}
+}

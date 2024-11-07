@@ -90,10 +90,12 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	assert.Equal(t, int64(5000), config.FileLimit)
 	assert.Equal(t, true, config.NoTTLOnly)
 
-	modBefore, _ := time.Parse("2006-01-02_15:04:05", "2023-09-01_12:00:00")
-	modAfter, _ := time.Parse("2006-01-02_15:04:05", "2023-09-02_12:00:00")
-	assert.Equal(t, &modBefore, config.ModBefore)
-	assert.Equal(t, &modAfter, config.ModAfter)
+	modBefore, err := parseLocalTimeToUTC("2023-09-01_12:00:00")
+	assert.NoError(t, err)
+	modAfter, err := parseLocalTimeToUTC("2023-09-02_12:00:00")
+	assert.NoError(t, err)
+	assert.Equal(t, modBefore, *config.ModBefore)
+	assert.Equal(t, modAfter, *config.ModAfter)
 
 	assert.NotNil(t, config.CompressionPolicy)
 	assert.Equal(t, "ZSTD", config.CompressionPolicy.Mode)
@@ -445,4 +447,172 @@ func TestParsePartitionFilter_InvalidFilter(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, parsedFilter)
 	assert.Contains(t, err.Error(), "failed to parse partition filter")
+}
+
+func TestMapRestoreConfig_MissingNamespace(t *testing.T) {
+	t.Parallel()
+	restoreModel := &models.Restore{}
+	commonModel := &models.Common{}
+	config, err := mapRestoreConfig(restoreModel, commonModel, nil, nil, nil)
+	assert.Error(t, err)
+	assert.Nil(t, config)
+	assert.Equal(t, "namespace is required", err.Error())
+}
+
+func TestMapRestoreConfig_PartialConfig(t *testing.T) {
+	t.Parallel()
+	restoreModel := &models.Restore{
+		ExtraTTL:           3600,
+		IgnoreRecordError:  true,
+		DisableBatchWrites: true,
+		BatchSize:          1000,
+		MaxAsyncBatches:    5,
+	}
+
+	commonModel := &models.Common{
+		Namespace: "test-namespace",
+	}
+
+	config, err := mapRestoreConfig(restoreModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(3600), config.ExtraTTL)
+	assert.True(t, config.IgnoreRecordError)
+	assert.True(t, config.DisableBatchWrites)
+	assert.Equal(t, 1000, config.BatchSize)
+	assert.Equal(t, 5, config.MaxAsyncBatches)
+}
+
+func TestMapScanPolicy_Success(t *testing.T) {
+	t.Parallel()
+	backupModel := &models.Backup{
+		MaxRecords:          500,
+		SleepBetweenRetries: 50,
+		FilterExpression:    "k1EDpHRlc3Q=",
+		PreferRacks:         "rack1",
+		NoBins:              true,
+	}
+
+	commonModel := &models.Common{
+		MaxRetries:    3,
+		TotalTimeout:  10000,
+		SocketTimeout: 3000,
+	}
+
+	scanPolicy, err := mapScanPolicy(backupModel, commonModel)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(500), scanPolicy.MaxRecords)
+	assert.Equal(t, 3, scanPolicy.MaxRetries)
+	assert.Equal(t, 50*time.Millisecond, scanPolicy.SleepBetweenRetries)
+	assert.Equal(t, 10000*time.Millisecond, scanPolicy.TotalTimeout)
+	assert.Equal(t, 3000*time.Millisecond, scanPolicy.SocketTimeout)
+	assert.Equal(t, aerospike.PREFER_RACK, scanPolicy.ReplicaPolicy)
+	assert.False(t, scanPolicy.IncludeBinData)
+}
+
+func TestMapWritePolicy_Success(t *testing.T) {
+	t.Parallel()
+	restoreModel := &models.Restore{
+		Replace: true,
+		Uniq:    false,
+	}
+
+	commonModel := &models.Common{
+		MaxRetries:    3,
+		TotalTimeout:  5000,
+		SocketTimeout: 1500,
+	}
+
+	writePolicy := mapWritePolicy(restoreModel, commonModel)
+	assert.Equal(t, aerospike.REPLACE, writePolicy.RecordExistsAction)
+	assert.Equal(t, 3, writePolicy.MaxRetries)
+	assert.Equal(t, 5000*time.Millisecond, writePolicy.TotalTimeout)
+	assert.Equal(t, 1500*time.Millisecond, writePolicy.SocketTimeout)
+}
+
+func TestSplitByComma_EmptyString(t *testing.T) {
+	t.Parallel()
+	result := splitByComma("")
+	assert.Nil(t, result)
+}
+
+func TestSplitByComma_NonEmptyString(t *testing.T) {
+	t.Parallel()
+	result := splitByComma("item1,item2,item3")
+	assert.Equal(t, []string{"item1", "item2", "item3"}, result)
+}
+
+func TestRecordExistsAction(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, aerospike.REPLACE, recordExistsAction(true, false))
+	assert.Equal(t, aerospike.CREATE_ONLY, recordExistsAction(false, true))
+	assert.Equal(t, aerospike.UPDATE, recordExistsAction(false, false))
+}
+
+func TestParseLocalTimeToUTC(t *testing.T) {
+	tests := []struct {
+		name        string
+		timeString  string
+		expectedUTC string
+		expectError bool
+		errorText   string
+	}{
+		{
+			name:        "Valid DateTime",
+			timeString:  "2023-09-01_12:34:56",
+			expectedUTC: "2023-09-01_12:34:56",
+			expectError: false,
+		},
+		{
+			name:        "Valid Date Only",
+			timeString:  "2023-09-01",
+			expectedUTC: "2023-09-01_00:00:00",
+			expectError: false,
+		},
+		{
+			name:        "Valid Time Only",
+			timeString:  "12:34:56",
+			expectedUTC: time.Now().Format("2006-01-02") + "_12:34:56",
+			expectError: false,
+		},
+		{
+			name:        "Invalid Format",
+			timeString:  "invalid-format",
+			expectedUTC: "",
+			expectError: true,
+			errorText:   "unknown time format",
+		},
+		{
+			name:        "Invalid Date",
+			timeString:  "2023-13-01_12:00:00",
+			expectedUTC: "",
+			expectError: true,
+			errorText:   "failed to parse time",
+		},
+		{
+			name:        "Invalid Time",
+			timeString:  "2023-09-01_25:00:00",
+			expectedUTC: "",
+			expectError: true,
+			errorText:   "failed to parse time",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseLocalTimeToUTC(tt.timeString)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, time.Time{}, result)
+				assert.Contains(t, err.Error(), tt.errorText)
+			} else {
+				assert.NoError(t, err)
+				location, err := time.LoadLocation("Local")
+				assert.NoError(t, err)
+				localTime, err := time.ParseInLocation("2006-01-02_15:04:05", tt.expectedUTC, location)
+				assert.NoError(t, err)
+				assert.Equal(t, localTime.UTC(), result)
+			}
+		})
+	}
 }

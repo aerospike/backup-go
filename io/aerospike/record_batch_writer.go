@@ -135,7 +135,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 	rw.logger.Error("Max retries reached",
 		slog.Any("attempts", attempt),
 		slog.Int("failedOperations", len(rw.operationBuffer)),
-		slog.Any("operation error", opErr),
+		slog.Any("operationError", opErr),
 		slog.Any("lastError", err),
 	)
 

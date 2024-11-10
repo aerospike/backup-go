@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -94,6 +95,8 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("retryPolicy", rw.retryPolicy),
 	)
 
+	var opErr error
+
 	for {
 		rw.logger.Debug("Attempting batch operation",
 			slog.Any("attempt", attempt),
@@ -105,7 +108,8 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		switch {
 		case isNilOrAcceptableError(err),
 			rw.ignoreRecordError && shouldIgnore(err):
-			rw.operationBuffer = rw.processAndFilterOperations()
+			rw.operationBuffer, opErr = rw.processAndFilterOperations()
+
 			if len(rw.operationBuffer) == 0 {
 				rw.logger.Debug("All operations succeeded")
 				return nil
@@ -131,21 +135,26 @@ func (rw *batchRecordWriter) flushBuffer() error {
 	rw.logger.Error("Max retries reached",
 		slog.Any("attempts", attempt),
 		slog.Int("failedOperations", len(rw.operationBuffer)),
+		slog.Any("operation error", opErr),
 		slog.Any("lastError", err),
 	)
 
 	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), err)
 }
-func (rw *batchRecordWriter) processAndFilterOperations() []a.BatchRecordIfc {
+func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {
 	failedOps := make([]a.BatchRecordIfc, 0)
+
+	errMap := make(map[string]struct{})
 
 	for _, op := range rw.operationBuffer {
 		if rw.processOperationResult(op) {
+			errMap[op.BatchRec().Err.Error()] = struct{}{}
+
 			failedOps = append(failedOps, op)
 		}
 	}
 
-	return failedOps
+	return failedOps, errMapToErr(errMap)
 }
 
 // processOperationResult increases statistics counters.
@@ -174,4 +183,18 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	default:
 		return true
 	}
+}
+
+func errMapToErr(errMap map[string]struct{}) error {
+	if len(errMap) == 0 {
+		return nil
+	}
+
+	var result error
+
+	for k := range errMap {
+		result = errors.Join(result, errors.New(k))
+	}
+
+	return result
 }

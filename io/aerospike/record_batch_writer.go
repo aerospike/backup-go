@@ -141,14 +141,15 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), err)
 }
+
 func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {
 	failedOps := make([]a.BatchRecordIfc, 0)
 
-	errMap := make(map[string]struct{})
+	errMap := make(map[atypes.ResultCode]error)
 
 	for _, op := range rw.operationBuffer {
 		if rw.processOperationResult(op) {
-			errMap[op.BatchRec().Err.Error()] = struct{}{}
+			errMap[op.BatchRec().ResultCode] = op.BatchRec().Err
 
 			failedOps = append(failedOps, op)
 		}
@@ -185,15 +186,15 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	}
 }
 
-func errMapToErr(errMap map[string]struct{}) error {
+func errMapToErr(errMap map[atypes.ResultCode]error) error {
 	if len(errMap) == 0 {
 		return nil
 	}
 
 	var result error
 
-	for k := range errMap {
-		result = errors.Join(result, errors.New(k))
+	for _, v := range errMap {
+		result = errors.Join(result, v)
 	}
 
 	return result

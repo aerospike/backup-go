@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	cmdDisableXDR       = "set-config:context=xdr;dc=%s;namespace=%s;action=remove"
-	cmdEnableXDR        = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
-	cmdBlockMRTWrites   = "%s%s"
-	cmdUnBlockMRTWrites = "%s%s"
+	cmdDisableXDR = "set-config:context=xdr;dc=%s;namespace=%s;node-address-port=%s;connector=true;action=remove"
+	//nolint:lll // Long info commands will be here.
+	cmdEnableXDR        = "set-config:context=xdr;dc=%s;namespace=%s;node-address-port=%s;connector=true;action=add;rewind=%s"
+	cmdBlockMRTWrites   = "health-stats"
+	cmdUnBlockMRTWrites = "health-stats"
 )
 
 type InfoCommander struct {
@@ -30,8 +31,8 @@ func NewInfoCommander(host string, port int, user, password string) *InfoCommand
 	return &InfoCommander{client: client}
 }
 
-func (c *InfoCommander) DisableXDR(dc, namespace string) error {
-	cmd := fmt.Sprintf(cmdDisableXDR, dc, namespace)
+func (c *InfoCommander) DisableXDR(dc, hostPort, namespace string) error {
+	cmd := fmt.Sprintf(cmdDisableXDR, dc, hostPort, namespace)
 
 	resp, err := c.client.RequestInfo(cmd)
 	if err != nil {
@@ -41,8 +42,8 @@ func (c *InfoCommander) DisableXDR(dc, namespace string) error {
 	return parseResultResponse(cmd, resp)
 }
 
-func (c *InfoCommander) EnableXDR(dc, namespace, rewind string) error {
-	cmd := fmt.Sprintf(cmdEnableXDR, dc, namespace, rewind)
+func (c *InfoCommander) EnableXDR(dc, hostPort, namespace, rewind string) error {
+	cmd := fmt.Sprintf(cmdEnableXDR, dc, hostPort, namespace, rewind)
 
 	resp, err := c.client.RequestInfo(cmd)
 	if err != nil {
@@ -52,8 +53,8 @@ func (c *InfoCommander) EnableXDR(dc, namespace, rewind string) error {
 	return parseResultResponse(cmd, resp)
 }
 
-func (c *InfoCommander) BlockMRTWrites(dc, namespace string) error {
-	cmd := fmt.Sprintf(cmdBlockMRTWrites, dc, namespace)
+func (c *InfoCommander) BlockMRTWrites(_, _ string) error {
+	cmd := cmdBlockMRTWrites
 
 	resp, err := c.client.RequestInfo(cmd)
 	if err != nil {
@@ -63,8 +64,8 @@ func (c *InfoCommander) BlockMRTWrites(dc, namespace string) error {
 	return parseResultResponse(cmd, resp)
 }
 
-func (c *InfoCommander) UnBlockMRTWrites(dc, namespace string) error {
-	cmd := fmt.Sprintf(cmdUnBlockMRTWrites, dc, namespace)
+func (c *InfoCommander) UnBlockMRTWrites(_, _ string) error {
+	cmd := cmdUnBlockMRTWrites
 
 	resp, err := c.client.RequestInfo(cmd)
 	if err != nil {

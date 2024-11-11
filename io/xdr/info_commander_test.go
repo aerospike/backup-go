@@ -14,6 +14,7 @@ const (
 	testASHost          = "127.0.0.1"
 	testASPort          = 3000
 	testASRewind        = "all"
+	testXRdHostPort     = "127.0.0.1:3003"
 )
 
 func TestInfoCommander_EnableDisableXDR(t *testing.T) {
@@ -21,10 +22,10 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 
 	c := NewInfoCommander(testASHost, testASPort, testASLoginPassword, testASLoginPassword)
 
-	err := c.EnableXDR(testASDC, testASNamespace, testASRewind)
+	err := c.EnableXDR(testASDC, testXRdHostPort, testASNamespace, testASRewind)
 	require.NoError(t, err)
 
-	err = c.DisableXDR(testASDC, testASNamespace)
+	err = c.DisableXDR(testASDC, testXRdHostPort, testASNamespace)
 	require.NoError(t, err)
 }
 

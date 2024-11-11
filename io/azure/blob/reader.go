@@ -110,7 +110,6 @@ func (r *Reader) streamDirectory(
 
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &r.prefix,
-		Marker: &r.marker,
 	})
 
 	for pager.More() {
@@ -121,7 +120,8 @@ func (r *Reader) streamDirectory(
 
 		for _, blob := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if isDirectory(r.prefix, *blob.Name) && !r.withNestedDir {
+			if (isDirectory(r.prefix, *blob.Name) && !r.withNestedDir) ||
+				isSkippedByStartAfter(r.startAfter, *blob.Name) {
 				continue
 			}
 
@@ -174,7 +174,6 @@ func (r *Reader) GetType() string {
 func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &r.prefix,
-		Marker: &r.marker,
 	})
 
 	for pager.More() {
@@ -185,7 +184,8 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 
 		for _, blob := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if isDirectory(r.prefix, *blob.Name) && !r.withNestedDir {
+			if (isDirectory(r.prefix, *blob.Name) && !r.withNestedDir) ||
+				isSkippedByStartAfter(r.startAfter, *blob.Name) {
 				continue
 			}
 
@@ -220,4 +220,16 @@ func isDirectory(prefix, fileName string) bool {
 	}
 	// All other variants.
 	return strings.Contains(fileName, "/")
+}
+
+func isSkippedByStartAfter(startAfter, fileName string) bool {
+	if startAfter == "" {
+		return false
+	}
+
+	if fileName <= startAfter {
+		return true
+	}
+
+	return false
 }

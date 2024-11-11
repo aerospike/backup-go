@@ -121,15 +121,28 @@ func init() {
 		secretAgentFlagSet.PrintDefaults()
 
 		// Print section: AWS Flags
-		fmt.Println("\nAWS Flags:")
+		fmt.Println("\nAWS Flags:\n" +
+			"For AWS storage bucket name is set in --directory path <bucket_name>/<backup_folder>.\n" +
+			"--s3-endpoint-override is used in case you want to use minio, instead of AWS.\n" +
+			"Any AWS parameter can be retrieved from secret agent.")
 		awsFlagSet.PrintDefaults()
 
 		// Print section: GCP Flags
-		fmt.Println("\nGCP Flags:")
+		fmt.Println("\nGCP Flags:\n" +
+			"For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.\n" +
+			"So --directory path will only contain folder name.\n" +
+			"Flag --gcp-endpoint-override is mandatory, as each storage account has different service address.\n" +
+			"Any GCP parameter can be retrieved from secret agent.")
 		gcpFlagSet.PrintDefaults()
 
 		// Print section: Azure Flags
-		fmt.Println("\nAzure Flags:")
+		fmt.Println("\nAzure Flags:\n" +
+			"For Azure storage container name is mandatory, and is set with --azure-storage-container-name flag.\n" +
+			"So --directory path will only contain folder name.\n" +
+			"Flag --azure-endpoint is optional, and is used for tests with Azurit or any other Azure emulator.\n" +
+			"For authentication you can use --azure-account-name and --azure-account-key, or \n" +
+			"--azure-tenant-id, --azure-client-id and azure-client-secret.\n" +
+			"Any Azure parameter can be retrieved from secret agent.")
 		azureFlagSet.PrintDefaults()
 	}
 

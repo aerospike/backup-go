@@ -75,10 +75,10 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		10000,
 		"Set the timeout (ms) for commands.")
 	flagSet.Int64Var(&f.RetryBaseTimeout, "retry-base-timeout",
-		10000,
+		1000,
 		"Set the initial delay between retry attempts in milliseconds")
 	flagSet.Float64Var(&f.RetryMultiplier, "retry-multiplier",
-		0,
+		1,
 		"retry-multiplier is used to increase the delay between subsequent retry attempts.\n"+
 			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.RetryMaxRetries, "retry-max-retries",

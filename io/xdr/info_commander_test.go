@@ -1,7 +1,6 @@
 package xdr
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,7 +9,7 @@ import (
 const (
 	testASLoginPassword = "admin"
 	testASNamespace     = "test"
-	testASDC            = "dc1"
+	testASDC            = "DC1"
 	testASHost          = "127.0.0.1"
 	testASPort          = 3000
 	testASRewind        = "all"
@@ -22,10 +21,10 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 
 	c := NewInfoCommander(testASHost, testASPort, testASLoginPassword, testASLoginPassword)
 
-	err := c.EnableXDR(testASDC, testXRdHostPort, testASNamespace, testASRewind)
+	err := c.StartXDR(testASDC, testXRdHostPort, testASNamespace, testASRewind)
 	require.NoError(t, err)
 
-	err = c.DisableXDR(testASDC, testXRdHostPort, testASNamespace)
+	err = c.StopXDR(testASDC, testXRdHostPort, testASNamespace)
 	require.NoError(t, err)
 }
 
@@ -46,41 +45,51 @@ func TestInfoCommander_parseResultResponse(t *testing.T) {
 		name     string
 		cmd      string
 		input    map[string]string
-		expected error
+		expected string
+		errMsg   string
 	}{
 		{
-			name:     "Command exists with OK response",
+			name:     "Command exists with successful response",
 			cmd:      "testCommand",
-			input:    map[string]string{"testCommand": "ok"},
-			expected: nil,
+			input:    map[string]string{"testCommand": "success"},
+			expected: "success",
+			errMsg:   "",
 		},
 		{
 			name:     "Command exists with failure response",
 			cmd:      "testCommand",
-			input:    map[string]string{"testCommand": "error"},
-			expected: fmt.Errorf("command testCommand failed: error"),
+			input:    map[string]string{"testCommand": "ERROR: command failed"},
+			expected: "",
+			errMsg:   "command testCommand failed: ERROR: command failed",
 		},
 		{
-			name:     "Command not found in response map",
+			name:     "Command not found in map",
 			cmd:      "missingCommand",
-			input:    map[string]string{"testCommand": "ok"},
-			expected: fmt.Errorf("no response for command missingCommand"),
+			input:    map[string]string{"testCommand": "success"},
+			expected: "",
+			errMsg:   "no response for command missingCommand",
 		},
 		{
 			name:     "Empty response map",
 			cmd:      "testCommand",
 			input:    map[string]string{},
-			expected: fmt.Errorf("no response for command testCommand"),
+			expected: "",
+			errMsg:   "no response for command testCommand",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := parseResultResponse(tt.cmd, tt.input)
-			if (err == nil && tt.expected != nil) || (err != nil && tt.expected == nil) {
-				t.Errorf("expected %v, got %v", tt.expected, err)
-			} else if err != nil && tt.expected != nil && err.Error() != tt.expected.Error() {
-				t.Errorf("expected error message %v, got %v", tt.expected, err)
+			result, err := parseResultResponse(tt.cmd, tt.input)
+			if result != tt.expected {
+				t.Errorf("expected result %v, got %v", tt.expected, result)
+			}
+			if err != nil {
+				if err.Error() != tt.errMsg {
+					t.Errorf("expected error message %v, got %v", tt.errMsg, err)
+				}
+			} else if tt.errMsg != "" {
+				t.Errorf("expected error message %v, got nil", tt.errMsg)
 			}
 		})
 	}

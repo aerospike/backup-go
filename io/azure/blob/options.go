@@ -31,8 +31,9 @@ type options struct {
 	// Default: false
 	withNestedDir bool
 	// startAfter is an artificial parameter. Used to skip objects in the storage.
-	// If it is set, then we compare the names received from the storage and if the name is less
-	// than the specified parameter, we skip this object.
+	// The Result will not include an object specified in startAfter.
+	// If it is set, then we compare the names received from the storage lexicographically,
+	// and if the name is less than the specified parameter, we skip this object.
 	startAfter string
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool

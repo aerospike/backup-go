@@ -167,16 +167,29 @@ Example: asbackup --azure-account-name secret:resource1:azaccount
       --sa-is-base64                Flag that shows if secret agent responses are encrypted with base64.
 
 AWS Flags:
+For AWS storage bucket name is set in --directory path <bucket_name>/<backup_folder>.
+--s3-endpoint-override is used in case you want to use minio, instead of AWS.
+Any AWS parameter can be retrieved from secret agent.
       --s3-region string              The S3 region that the bucket(s) exist in.
       --s3-profile string             The S3 profile to use for credentials.
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
 
 GCP Flags:
+For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
+So --directory path will only contain folder name.
+Flag --gcp-endpoint-override is mandatory, as each storage account has different service address.
+Any GCP parameter can be retrieved from secret agent.
       --gcp-key-path string            Path to file containing service account JSON key.
       --gcp-bucket-name string         Name of the Google cloud storage bucket.
       --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
 
 Azure Flags:
+For Azure storage container name is mandatory, and is set with --azure-storage-container-name flag.
+So --directory path will only contain folder name.
+Flag --azure-endpoint is optional, and is used for tests with Azurit or any other Azure emulator.
+For authentication you can use --azure-account-name and --azure-account-key, or 
+--azure-tenant-id, --azure-client-id and azure-client-secret.
+Any Azure parameter can be retrieved from secret agent.
       --azure-account-name string     Azure account name for account name, key authorization.
       --azure-account-key string      Azure account key for account name, key authorization.
       --azure-tenant-id string        Azure tenant ID for Azure Active Directory authorization.

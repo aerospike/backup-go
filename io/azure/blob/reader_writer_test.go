@@ -519,7 +519,7 @@ func (s *AzureSuite) TestReader_WithMarker() {
 		client,
 		testContainerName,
 		WithDir(testReadFolderWithMarker),
-		WithMarker(marker),
+		WithStartAfter(marker),
 		WithUploadConcurrency(5),
 		WithSkipDirCheck(),
 		WithNestedDir(),
@@ -544,5 +544,48 @@ func (s *AzureSuite) TestReader_WithMarker() {
 			}
 			filesCounter++
 		}
+	}
+}
+
+func (s *AzureSuite) TestIsSkippedByStartAfter() {
+	tests := []struct {
+		name       string
+		startAfter string
+		fileName   string
+		expected   bool
+	}{
+		{
+			name:       "Empty startAfter - do not skip",
+			startAfter: "",
+			fileName:   "file1",
+			expected:   false,
+		},
+		{
+			name:       "File name is before startAfter - skip",
+			startAfter: "file2",
+			fileName:   "file1",
+			expected:   true,
+		},
+		{
+			name:       "File name equals startAfter - skip",
+			startAfter: "file1",
+			fileName:   "file1",
+			expected:   true,
+		},
+		{
+			name:       "File name is after startAfter - do not skip",
+			startAfter: "file1",
+			fileName:   "file2",
+			expected:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		s.T().Run(tt.name, func(t *testing.T) {
+			result := isSkippedByStartAfter(tt.startAfter, tt.fileName)
+			if result != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
 	}
 }

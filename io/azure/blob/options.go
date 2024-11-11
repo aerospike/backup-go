@@ -30,14 +30,11 @@ type options struct {
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
 	// Default: false
 	withNestedDir bool
-	// marker is a string value that identifies the portion of the list of containers to be
-	// returned with the next listing operation.
-	// The operation returns the NextMarker value within the response body if the listing
-	// operation did not return all containers remaining to be listed with the current page.
-	// The NextMarker value can be used
-	// as the value for the marker parameter in a subsequent call to request the next
-	// page of list items. The marker value is opaque to the client.
-	marker string
+	// startAfter is an artificial parameter. Used to skip objects in the storage.
+	// The Result will not include an object specified in startAfter.
+	// If it is set, then we compare the names received from the storage lexicographically,
+	// and if the name is less than the specified parameter, we skip this object.
+	startAfter string
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
 }
@@ -91,13 +88,13 @@ func WithUploadConcurrency(v int) Opt {
 	}
 }
 
-// WithMarker adds marker parameter to list request.
-// The Value of marker will be not included in a result.
-// You will receive objects after marker.
+// WithStartAfter adds start after parameter to list request.
+// The Value of start after will be not included in a result.
+// You will receive objects after this parameter.
 // Is used only for Reader.
-func WithMarker(v string) Opt {
+func WithStartAfter(v string) Opt {
 	return func(r *options) {
-		r.marker = v
+		r.startAfter = v
 	}
 }
 

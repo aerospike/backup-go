@@ -1,8 +1,9 @@
-package xdr
+package aerospike
 
 import (
 	"testing"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +20,12 @@ const (
 func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 	t.Parallel()
 
-	c := NewInfoCommander(testASHost, testASPort, testASLoginPassword, testASLoginPassword)
+	asHost := aerospike.NewHost(testASHost, testASPort)
+	asPolicy := aerospike.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+
+	c := NewInfoCommander(asHost, asPolicy)
 
 	err := c.StartXDR(testASDC, testXRdHostPort, testASNamespace, testASRewind)
 	require.NoError(t, err)
@@ -31,8 +37,12 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
 	t.Parallel()
 
-	c := NewInfoCommander(testASHost, testASPort, testASLoginPassword, testASLoginPassword)
+	asHost := aerospike.NewHost(testASHost, testASPort)
+	asPolicy := aerospike.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
 
+	c := NewInfoCommander(asHost, asPolicy)
 	err := c.BlockMRTWrites(testASDC, testASNamespace)
 	require.NoError(t, err)
 

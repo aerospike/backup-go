@@ -1,4 +1,4 @@
-package xdr
+package aerospike
 
 import (
 	"fmt"
@@ -28,12 +28,8 @@ type InfoCommander struct {
 	client *info.AsInfo
 }
 
-func NewInfoCommander(host string, port int, user, password string) *InfoCommander {
-	asPolicy := aerospike.NewClientPolicy()
-	asPolicy.User = user
-	asPolicy.Password = password
+func NewInfoCommander(asHost *aerospike.Host, asPolicy *aerospike.ClientPolicy) *InfoCommander {
 	logger := logr.New(nil)
-	asHost := aerospike.NewHost(host, port)
 	client := info.NewAsInfo(logger, asHost, asPolicy)
 
 	return &InfoCommander{client: client}
@@ -82,7 +78,7 @@ func (c *InfoCommander) createXDRDC(dc string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to create xdr dc: %w", err)
+		return fmt.Errorf("failed to parse create xdr dc response: %w", err)
 	}
 
 	return nil
@@ -97,7 +93,7 @@ func (c *InfoCommander) createXDRNode(dc, hostPort string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to create xdr node: %w", err)
+		return fmt.Errorf("failed to parse create xdr node response: %w", err)
 	}
 
 	return nil
@@ -112,7 +108,7 @@ func (c *InfoCommander) createXDRNamespace(dc, namespace, rewind string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to create xdr namesapce: %w", err)
+		return fmt.Errorf("failed to parse create xdr namesapce response: %w", err)
 	}
 
 	return nil
@@ -127,7 +123,7 @@ func (c *InfoCommander) removeXDRNamespace(dc, namespace string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to remove xdr namespace: %w", err)
+		return fmt.Errorf("failed to parse remove xdr namespace response: %w", err)
 	}
 
 	return nil
@@ -142,7 +138,7 @@ func (c *InfoCommander) removeXDRNode(dc, hostPort string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to remove xdr node: %w", err)
+		return fmt.Errorf("failed to parse remove xdr node response: %w", err)
 	}
 
 	return nil
@@ -157,7 +153,7 @@ func (c *InfoCommander) removeXDRDC(dc string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to remove xdr dc: %w", err)
+		return fmt.Errorf("failed to parse remove xdr dc response: %w", err)
 	}
 
 	return nil
@@ -173,7 +169,7 @@ func (c *InfoCommander) BlockMRTWrites(_, _ string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to block mrt writes: %w", err)
+		return fmt.Errorf("failed to parse block mrt writes response: %w", err)
 	}
 
 	return nil
@@ -189,7 +185,7 @@ func (c *InfoCommander) UnBlockMRTWrites(_, _ string) error {
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to unblock mrt writes: %w", err)
+		return fmt.Errorf("failed to parse unblock mrt writes response: %w", err)
 	}
 
 	return nil

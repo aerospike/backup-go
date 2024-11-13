@@ -125,6 +125,8 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
 
+	fmt.Println("====================SCAN=LIMITER================:", backupParams.MaxParallelScans)
+
 	backupClient, err := backup.NewClient(
 		aerospikeClient,
 		backup.WithLogger(logger),

@@ -22,6 +22,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
+	"golang.org/x/sync/semaphore"
 )
 
 const idBackup = "asbackup-cli"
@@ -124,7 +125,13 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
 
-	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
+	backupClient, err := backup.NewClient(
+		aerospikeClient,
+		backup.WithLogger(logger),
+		backup.WithID(idBackup),
+		backup.WithScanLimiter(
+			semaphore.NewWeighted(backupParams.MaxParallelScans),
+		))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %w", err)
 	}

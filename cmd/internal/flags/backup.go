@@ -142,6 +142,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"How many records will be read on one iteration for continuation backup.\n"+
 			"Affects size if overlap on resuming backup after an error.\n"+
 			"Is used only with --state-file-dst or --continue.")
+	flagSet.Int64Var(&f.MaxParallelScans, "max-parallel-scans",
+		100,
+		"Specifies the maximum number of parallel scans per the cluster.")
 
 	return flagSet
 }

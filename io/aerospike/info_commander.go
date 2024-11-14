@@ -202,9 +202,11 @@ func (c *InfoCommander) Statistics() error {
 	}
 
 	fmt.Println("============STATISTICS================")
-	fmt.Println("client_connections=", resp["client_connections"])
-	fmt.Println("client_connections_opened=", resp["client_connections_opened"])
-	fmt.Println("client_connections_closed=", resp["client_connections_closed"])
+
+	stats := strings.Split(resp[cmdStatistics], ";")
+	for i := range stats {
+		fmt.Println(stats[i])
+	}
 
 	return nil
 }

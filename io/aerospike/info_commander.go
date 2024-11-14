@@ -18,6 +18,8 @@ const (
 	cmdRemoveXDRNode      = "set-config:context=xdr;dc=%s;node-address-port=%s;action=remove"
 	cmdRemoveXDRDC        = "set-config:context=xdr;dc=%s;action=remove"
 
+	cmdStatistics = "statistics"
+
 	cmdBlockMRTWrites   = "namespaces"
 	cmdUnBlockMRTWrites = "namespaces"
 
@@ -187,6 +189,22 @@ func (c *InfoCommander) UnBlockMRTWrites(_, _ string) error {
 	if _, err = parseResultResponse(cmd, resp); err != nil {
 		return fmt.Errorf("failed to parse unblock mrt writes response: %w", err)
 	}
+
+	return nil
+}
+
+func (c *InfoCommander) Statistics() error {
+	cmd := cmdStatistics
+
+	resp, err := c.client.RequestInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to get statistics: %w", err)
+	}
+
+	fmt.Println("============STATISTICS================")
+	fmt.Println("client_connections=", resp["client_connections"])
+	fmt.Println("client_connections_opened=", resp["client_connections_opened"])
+	fmt.Println("client_connections_closed=", resp["client_connections_closed"])
 
 	return nil
 }

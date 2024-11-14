@@ -22,6 +22,7 @@ import (
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	ioas "github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -37,6 +38,7 @@ type ASBackup struct {
 	// Additional params.
 	isEstimate       bool
 	estimatesSamples int64
+	infoCommander    *ioas.InfoCommander
 }
 
 func NewASBackup(
@@ -135,6 +137,17 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create backup client: %w", err)
 	}
 
+	clientConfig.NewHosts()
+
+	// -----------------------
+	ashst := toHosts(clientConfig.Seeds)
+	asP, err := clientConfig.NewClientPolicy()
+	if err != nil {
+		fmt.Println("ERROR ASP:", err)
+	}
+	ic := ioas.NewInfoCommander(ashst[0], asP)
+	ic.Statistics()
+
 	return &ASBackup{
 		asClient:         aerospikeClient,
 		backupClient:     backupClient,
@@ -143,6 +156,7 @@ func NewASBackup(
 		reader:           reader,
 		isEstimate:       backupParams.Estimate,
 		estimatesSamples: backupParams.EstimateSamples,
+		infoCommander:    ic,
 	}, nil
 }
 
@@ -166,7 +180,11 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}
 
+		b.infoCommander.Statistics()
+
 		if err := h.Wait(ctx); err != nil {
+			b.infoCommander.Statistics()
+
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 

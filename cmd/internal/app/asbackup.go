@@ -120,7 +120,7 @@ func NewASBackup(
 		}
 	}
 
-	aerospikeClient, err := newAerospikeClient(clientConfig, backupParams.PreferRacks)
+	aerospikeClient, err := newAerospikeClient(clientConfig, backupParams.PreferRacks, backupParams.MaxParallelScans)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
@@ -130,7 +130,7 @@ func NewASBackup(
 		backup.WithLogger(logger),
 		backup.WithID(idBackup),
 		backup.WithScanLimiter(
-			semaphore.NewWeighted(backupParams.MaxParallelScans),
+			semaphore.NewWeighted(int64(backupParams.MaxParallelScans)),
 		))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %w", err)

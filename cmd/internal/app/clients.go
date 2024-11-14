@@ -32,7 +32,7 @@ import (
 
 const maxRack = 1000000
 
-func newAerospikeClient(cfg *client.AerospikeConfig, racks string) (*aerospike.Client, error) {
+func newAerospikeClient(cfg *client.AerospikeConfig, racks string, maxParallelScans int) (*aerospike.Client, error) {
 	if len(cfg.Seeds) < 1 {
 		return nil, fmt.Errorf("at least one seed must be provided")
 	}
@@ -40,6 +40,10 @@ func newAerospikeClient(cfg *client.AerospikeConfig, racks string) (*aerospike.C
 	p, err := cfg.NewClientPolicy()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aerospike client policy: %w", err)
+	}
+
+	if maxParallelScans > 0 {
+		p.ConnectionQueueSize = max(256, maxParallelScans*2)
 	}
 
 	if racks != "" {

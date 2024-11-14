@@ -138,7 +138,11 @@ Backup Flags:
       --scan-page-size int          How many records will be read on one iteration for continuation backup.
                                     Affects size if overlap on resuming backup after an error.
                                     Is used only with --state-file-dst or --continue. (default 10000)
-      --max-parallel-scans int      Specifies the maximum number of parallel scans per the cluster. (default 20)
+      --max-parallel-scans int      Specifies the maximum number of parallel scans per the cluster.
+                                    To avoid no available connections error, you must calculate this parameter wisely.
+                                    This parameter is multiplied by --parallel. This parameter affects backup performance.
+                                    Example: if you know you have 20 connections, that can be used for backup.
+                                    You want to run backup with --parallel 5. So --max-parallel-scans = 20 / --parallel, result is 4. (default 6)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.

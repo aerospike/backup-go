@@ -143,8 +143,12 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"Affects size if overlap on resuming backup after an error.\n"+
 			"Is used only with --state-file-dst or --continue.")
 	flagSet.Int64Var(&f.MaxParallelScans, "max-parallel-scans",
-		1,
-		"Specifies the maximum number of parallel scans per the cluster.")
+		6,
+		"Specifies the maximum number of parallel scans per the cluster.\n"+
+			"To avoid no available connections error, you must calculate this parameter wisely.\n"+
+			"This parameter is multiplied by --parallel. This parameter affects backup performance.\n"+
+			"Example: if you know you have 20 connections, that can be used for backup.\n"+
+			"You want to run backup with --parallel 5. So --max-parallel-scans = 20 / --parallel, result is 4.")
 
 	return flagSet
 }

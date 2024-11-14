@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
@@ -27,6 +28,7 @@ import (
 const idRestore = "asrestore-cli"
 
 type ASRestore struct {
+	asClient      *aerospike.Client
 	backupClient  *backup.Client
 	restoreConfig *backup.RestoreConfig
 	reader        backup.StreamingReader
@@ -89,6 +91,7 @@ func NewASRestore(
 	}
 
 	return &ASRestore{
+		asClient:      aerospikeClient,
 		backupClient:  backupClient,
 		restoreConfig: restoreConfig,
 		reader:        reader,
@@ -110,6 +113,8 @@ func (r *ASRestore) Run(ctx context.Context) error {
 	}
 
 	printRestoreReport(h.GetStats())
+
+	r.asClient.Close()
 
 	return nil
 }

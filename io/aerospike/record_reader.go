@@ -188,7 +188,7 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 	if len(setsToScan) == 0 {
 		setsToScan = []string{""}
 	}
-
+	fmt.Println("-----START SCANN---")
 	if r.config.scanLimiter != nil {
 		err := r.config.scanLimiter.Acquire(r.ctx, int64(len(setsToScan)))
 		if err != nil {

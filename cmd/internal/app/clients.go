@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -32,7 +33,7 @@ import (
 
 const maxRack = 1000000
 
-func newAerospikeClient(cfg *client.AerospikeConfig, racks string, maxParallelScans int) (*aerospike.Client, error) {
+func newAerospikeClient(cfg *client.AerospikeConfig, racks string, parallelism int) (*aerospike.Client, error) {
 	if len(cfg.Seeds) < 1 {
 		return nil, fmt.Errorf("at least one seed must be provided")
 	}
@@ -42,9 +43,8 @@ func newAerospikeClient(cfg *client.AerospikeConfig, racks string, maxParallelSc
 		return nil, fmt.Errorf("failed to create Aerospike client policy: %w", err)
 	}
 
-	if maxParallelScans > 0 {
-		p.ConnectionQueueSize = max(256, maxParallelScans*2)
-	}
+	p.ConnectionQueueSize = parallelism * 2
+	p.Timeout = 10 * time.Second
 
 	if racks != "" {
 		racksIDs, err := parseRacks(racks)

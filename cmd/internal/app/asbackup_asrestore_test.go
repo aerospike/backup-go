@@ -47,9 +47,7 @@ func Test_BackupRestore(t *testing.T) {
 		Password: testASLoginPassword,
 	}
 
-	bParams := &models.Backup{
-		MaxParallelScans: 20,
-	}
+	bParams := &models.Backup{}
 
 	cParams := &models.Common{
 		Directory: dir,
@@ -107,10 +105,9 @@ func Test_BackupWithState(t *testing.T) {
 	}
 
 	bParams := &models.Backup{
-		StateFileDst:     testStateFile,
-		ScanPageSize:     10,
-		FileLimit:        100000,
-		MaxParallelScans: 20,
+		StateFileDst: testStateFile,
+		ScanPageSize: 10,
+		FileLimit:    100000,
 	}
 
 	cParams := &models.Common{

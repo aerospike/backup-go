@@ -38,7 +38,6 @@ type Backup struct {
 	Continue            string
 	ScanPageSize        int64
 	OutputFilePrefix    string
-	MaxParallelScans    int
 }
 
 // ShouldClearTarget check if we should clean target directory.

@@ -43,8 +43,9 @@ func newAerospikeClient(cfg *client.AerospikeConfig, racks string, parallelism i
 		return nil, fmt.Errorf("failed to create Aerospike client policy: %w", err)
 	}
 
-	p.ConnectionQueueSize = parallelism * 2
-	p.Timeout = 10 * time.Second
+	p.ConnectionQueueSize = parallelism * 10
+	p.LimitConnectionsToQueueSize = false
+	p.Timeout = 10 * time.Minute
 
 	if racks != "" {
 		racksIDs, err := parseRacks(racks)

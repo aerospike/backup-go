@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
@@ -27,6 +28,7 @@ import (
 const idBackup = "asbackup-cli"
 
 type ASBackup struct {
+	asClient     *aerospike.Client
 	backupClient *backup.Client
 	backupConfig *backup.BackupConfig
 	writer       backup.Writer
@@ -134,6 +136,7 @@ func NewASBackup(
 	}
 
 	return &ASBackup{
+		asClient:         aerospikeClient,
 		backupClient:     backupClient,
 		backupConfig:     backupConfig,
 		writer:           writer,
@@ -169,6 +172,9 @@ func (b *ASBackup) Run(ctx context.Context) error {
 
 		printBackupReport(h.GetStats())
 	}
+
+	b.asClient.Close()
+	fmt.Println("=====CL0SED=====")
 
 	return nil
 }

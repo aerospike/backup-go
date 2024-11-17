@@ -175,7 +175,9 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	readersCh <- resp.Body
+	if resp.Body != nil {
+		readersCh <- resp.Body
+	}
 }
 
 // shouldSkip performs check, is we should skip files.

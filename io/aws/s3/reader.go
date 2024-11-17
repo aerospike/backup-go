@@ -206,7 +206,9 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	readersCh <- object.Body
+	if object != nil {
+		readersCh <- object.Body
+	}
 }
 
 // GetType return `s3type` type of storage. Used in logging.

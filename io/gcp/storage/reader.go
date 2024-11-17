@@ -182,7 +182,9 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	readersCh <- reader
+	if reader != nil {
+		readersCh <- reader
+	}
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.

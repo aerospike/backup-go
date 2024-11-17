@@ -147,7 +147,7 @@ func (r *Reader) streamDirectory(
 					continue
 				}
 
-				errorsCh <- fmt.Errorf("failed to create reader from directory file %s: %w", *blob.Name, err)
+				errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *blob.Name, err)
 
 				return
 			}
@@ -169,7 +169,7 @@ func (r *Reader) StreamFile(
 
 	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", filename, err)
+		errorsCh <- fmt.Errorf("failed to open file %s: %w", filename, err)
 		return
 	}
 

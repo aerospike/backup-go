@@ -164,15 +164,13 @@ func (r *Reader) streamDirectory(
 				var opErr *smithy.OperationError
 				if errors.As(err, &opErr) {
 					var httpErr *awsHttp.ResponseError
-					if errors.As(opErr.Err, &httpErr) {
-						if httpErr.HTTPStatusCode() == http.StatusNotFound {
-							continue
-						}
+					if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound {
+						continue
 					}
 				}
 
 				// We check *p.Key == nil in the beginning.
-				errorsCh <- fmt.Errorf("failed to create reader from directory file %s: %w", *p.Key, err)
+				errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *p.Key, err)
 
 				return
 			}
@@ -204,7 +202,7 @@ func (r *Reader) StreamFile(
 		Key:    &filename,
 	})
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", filename, err)
+		errorsCh <- fmt.Errorf("failed to open file %s: %w", filename, err)
 		return
 	}
 

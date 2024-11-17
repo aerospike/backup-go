@@ -152,7 +152,9 @@ func (r *Reader) streamDirectory(
 				return
 			}
 
-			readersCh <- resp.Body
+			if resp.Body != nil {
+				readersCh <- resp.Body
+			}
 		}
 	}
 }

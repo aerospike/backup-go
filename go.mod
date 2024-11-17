@@ -4,15 +4,15 @@ go 1.21
 
 require (
 	cloud.google.com/go/storage v1.43.0
+	github.com/Azure/azure-sdk-for-go-extensions v0.1.8
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.7.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.0
 	github.com/aerospike/aerospike-client-go/v7 v7.6.1
 	github.com/aerospike/tools-common-go v0.0.0-20240701164814-36eec593d9c6
-	github.com/aws/aws-sdk-go-v2 v1.30.4
+	github.com/aws/aws-sdk-go-v2 v1.32.4
 	github.com/aws/aws-sdk-go-v2/config v1.27.28
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.59.0
-	github.com/aws/smithy-go v1.20.4
-	github.com/google/go-cmp v0.6.0
+	github.com/aws/smithy-go v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.17.9
 	github.com/spf13/cobra v1.8.1

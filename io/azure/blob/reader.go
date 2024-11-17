@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	azErr "github.com/Azure/azure-sdk-for-go-extensions/pkg/errors"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
@@ -138,7 +139,14 @@ func (r *Reader) streamDirectory(
 
 			resp, err = r.client.DownloadStream(ctx, r.containerName, *blob.Name, nil)
 			if err != nil {
+				// Skip 404 not found error.
+				if azErr.IsNotFoundErr(err) {
+					continue
+				}
+
 				errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", *blob.Name, err)
+
+				return
 			}
 
 			readersCh <- resp.Body
@@ -159,6 +167,7 @@ func (r *Reader) StreamFile(
 	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", filename, err)
+		return
 	}
 
 	readersCh <- resp.Body

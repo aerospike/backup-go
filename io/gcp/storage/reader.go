@@ -151,7 +151,13 @@ func (r *Reader) streamDirectory(
 
 		reader, err = r.bucketHandle.Object(objAttrs.Name).NewReader(ctx)
 		if err != nil {
+			// Skip 404 not found error.
+			if errors.Is(err, storage.ErrObjectNotExist) {
+				continue
+			}
 			errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", objAttrs.Name, err)
+
+			return
 		}
 
 		if reader != nil {

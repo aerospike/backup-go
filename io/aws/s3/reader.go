@@ -16,13 +16,17 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 )
 
 const s3type = "s3"
@@ -156,12 +160,26 @@ func (r *Reader) streamDirectory(
 				Key:    p.Key,
 			})
 			if err != nil {
+				// Skip 404 not found error.
+				var opErr *smithy.OperationError
+				if errors.As(err, &opErr) {
+					var httpErr *awsHttp.ResponseError
+					if errors.As(opErr.Err, &httpErr) {
+						if httpErr.HTTPStatusCode() == http.StatusNotFound {
+							continue
+						}
+					}
+				}
+
 				// We check *p.Key == nil in the beginning.
 				errorsCh <- fmt.Errorf("failed to create reader from directory %s: %w", *p.Key, err)
+
 				return
 			}
 
-			readersCh <- object.Body
+			if object != nil {
+				readersCh <- object.Body
+			}
 		}
 
 		continuationToken = listResponse.NextContinuationToken

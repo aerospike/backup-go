@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -142,11 +143,11 @@ func (r *Reader) streamDirectory(
 			if err != nil {
 				// Skip 404 not found error.
 				var respErr *azcore.ResponseError
-				if errors.As(err, &respErr) && respErr.StatusCode == 404 {
+				if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
 					continue
 				}
 
-				errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", *blob.Name, err)
+				errorsCh <- fmt.Errorf("failed to create reader from directory file %s: %w", *blob.Name, err)
 
 				return
 			}

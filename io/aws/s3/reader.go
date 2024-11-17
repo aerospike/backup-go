@@ -172,7 +172,7 @@ func (r *Reader) streamDirectory(
 				}
 
 				// We check *p.Key == nil in the beginning.
-				errorsCh <- fmt.Errorf("failed to create reader from directory %s: %w", *p.Key, err)
+				errorsCh <- fmt.Errorf("failed to create reader from directory file %s: %w", *p.Key, err)
 
 				return
 			}

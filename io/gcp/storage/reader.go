@@ -155,7 +155,7 @@ func (r *Reader) streamDirectory(
 			if errors.Is(err, storage.ErrObjectNotExist) {
 				continue
 			}
-			errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", objAttrs.Name, err)
+			errorsCh <- fmt.Errorf("failed to create reader from directory file %s: %w", objAttrs.Name, err)
 
 			return
 		}
@@ -178,7 +178,7 @@ func (r *Reader) StreamFile(
 
 	reader, err := r.bucketHandle.Object(filename).NewReader(ctx)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)
+		errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", filename, err)
 		return
 	}
 

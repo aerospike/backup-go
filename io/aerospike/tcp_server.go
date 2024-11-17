@@ -148,20 +148,3 @@ func readBytes(conn net.Conn, length int) ([]byte, error) {
 
 	return buffer, nil
 }
-
-// writeBytes writes `buffer` to `conn`.
-func writeBytes(conn net.Conn, buffer []byte) error {
-	length := len(buffer)
-	total := 0
-
-	for total < length {
-		n, err := conn.Write(buffer[total:])
-		if err != nil {
-			return err
-		}
-
-		total += n
-	}
-
-	return nil
-}

@@ -3,7 +3,6 @@ package aerospike
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"log/slog"
 	"net"
 	"os"
@@ -15,7 +14,7 @@ import (
 )
 
 const (
-	testAddress = "localhost:1000"
+	testAddress = "localhost:1025"
 	testTimeout = 1 * time.Second
 	testPayload = "payload"
 )
@@ -55,6 +54,5 @@ func Test_TCPServer(t *testing.T) {
 	require.NoError(t, err)
 
 	result := <-resultChan
-	fmt.Println("result:", result)
-	require.NotNil(t, result)
+	require.Equal(t, result.Payload, []byte(testPayload))
 }

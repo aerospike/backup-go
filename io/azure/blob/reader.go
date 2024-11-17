@@ -16,12 +16,13 @@ package blob
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
 
-	azErr "github.com/Azure/azure-sdk-for-go-extensions/pkg/errors"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
@@ -140,7 +141,8 @@ func (r *Reader) streamDirectory(
 			resp, err = r.client.DownloadStream(ctx, r.containerName, *blob.Name, nil)
 			if err != nil {
 				// Skip 404 not found error.
-				if azErr.IsNotFoundErr(err) {
+				var respErr *azcore.ResponseError
+				if errors.As(err, &respErr) && respErr.StatusCode == 404 {
 					continue
 				}
 

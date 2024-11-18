@@ -16,11 +16,14 @@ package blob
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
@@ -138,10 +141,20 @@ func (r *Reader) streamDirectory(
 
 			resp, err = r.client.DownloadStream(ctx, r.containerName, *blob.Name, nil)
 			if err != nil {
-				errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", *blob.Name, err)
+				// Skip 404 not found error.
+				var respErr *azcore.ResponseError
+				if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
+					continue
+				}
+
+				errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *blob.Name, err)
+
+				return
 			}
 
-			readersCh <- resp.Body
+			if resp.Body != nil {
+				readersCh <- resp.Body
+			}
 		}
 	}
 }
@@ -158,10 +171,13 @@ func (r *Reader) StreamFile(
 
 	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", filename, err)
+		errorsCh <- fmt.Errorf("failed to open file %s: %w", filename, err)
+		return
 	}
 
-	readersCh <- resp.Body
+	if resp.Body != nil {
+		readersCh <- resp.Body
+	}
 }
 
 // shouldSkip performs check, is we should skip files.

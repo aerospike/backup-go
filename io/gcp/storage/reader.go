@@ -151,7 +151,13 @@ func (r *Reader) streamDirectory(
 
 		reader, err = r.bucketHandle.Object(objAttrs.Name).NewReader(ctx)
 		if err != nil {
-			errorsCh <- fmt.Errorf("failed to create reader from file %s: %w", objAttrs.Name, err)
+			// Skip 404 not found error.
+			if errors.Is(err, storage.ErrObjectNotExist) {
+				continue
+			}
+			errorsCh <- fmt.Errorf("failed to open directory file %s: %w", objAttrs.Name, err)
+
+			return
 		}
 
 		if reader != nil {
@@ -172,11 +178,13 @@ func (r *Reader) StreamFile(
 
 	reader, err := r.bucketHandle.Object(filename).NewReader(ctx)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)
+		errorsCh <- fmt.Errorf("failed to open file %s: %w", filename, err)
 		return
 	}
 
-	readersCh <- reader
+	if reader != nil {
+		readersCh <- reader
+	}
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.

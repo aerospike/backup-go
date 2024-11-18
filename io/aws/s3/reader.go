@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -165,6 +166,11 @@ func (r *Reader) streamDirectory(
 				if errors.As(err, &opErr) {
 					var httpErr *awsHttp.ResponseError
 					if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound {
+						slog.Warn("File not found",
+							slog.String("key", *p.Key),
+							slog.String("bucket", r.bucketName),
+							slog.Any("err", err),
+						)
 						continue
 					}
 				}

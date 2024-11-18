@@ -187,6 +187,8 @@ type stage[T any] struct {
 	workers []Worker[T]
 	// if synced, we distribute communication channels through workers.
 	isSynced bool
+	// Route rule
+	routeRule routeRule
 }
 
 func (s *stage[T]) SetReceiveChan(c []<-chan T) {
@@ -213,13 +215,13 @@ func (s *stage[T]) Run(ctx context.Context) error {
 
 	for i, w := range s.workers {
 		if s.isSynced {
-			// If it is not sync mode, there will be 1 channel in each slice.
+			// We distribute all channels to workers.
 			w.SetReceiveChan(s.receive[i])
 			w.SetSendChan(s.send[i])
 
 			continue
 		}
-		// Else we distribute all channels to workers.
+		// If it is not sync mode, there will be 1 channel in each slice.
 		w.SetReceiveChan(s.receive[0])
 		w.SetSendChan(s.send[0])
 	}

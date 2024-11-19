@@ -1,4 +1,4 @@
-# ASBackup
+# ASRestore
 Aerospike Restore CLI tool.
 
 ## Build

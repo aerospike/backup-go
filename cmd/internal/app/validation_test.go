@@ -263,6 +263,17 @@ func TestValidateBackupParams(t *testing.T) {
 			wantErr:     false,
 			expectedErr: "",
 		},
+		{
+			name: "Continue and nodes",
+			backupParams: &models.Backup{
+				StateFileDst:  "some-file",
+				ParallelNodes: true,
+				OutputFile:    "some-output-file",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "saving states and calculating estimates is not possible in parallel node mode",
+		},
 	}
 
 	for _, tt := range tests {

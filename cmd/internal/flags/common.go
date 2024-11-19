@@ -19,52 +19,105 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// OperationBackup is used to generate proper documentation for backup.
+	OperationBackup = iota
+	// OperationRestore is used to generate proper documentation for restore.
+	OperationRestore
+
+	descNamespaceBackup  = "The namespace to be backed up. Required."
+	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns"
+
+	descSetListBackup = "The set(s) to be backed up.\n" +
+		"If multiple sets are being backed up, filter-exp cannot be used.\n" +
+		"if empty all sets."
+	descSetListRestore = "Only restore the given sets from the backup.\n" +
+		"Default: restore all sets."
+
+	descBinListBackup = "Only include the given bins in the backup.\n" +
+		"If empty include all bins."
+	descBinListRestore = "Only restore the given bins in the backup.\n" +
+		"Default: restore all bins.\n"
+
+	descNoRecordsBackup  = "Don't backup any records."
+	descNoRecordsRestore = "Don't restore any records."
+
+	descNoIndexesBackup  = "Don't backup any indexes."
+	descNoIndexesRestore = "Don't restore any secondary indexes."
+
+	descNoUDFsBackup  = "Don't backup any UDFs."
+	descNoUDFsRestore = "Don't restore any UDFs."
+
+	descParallelBackup = "Maximum number of scan calls to run in parallel.\n" +
+		"If only one partition range is given, or the entire namespace is being backed up, the range\n" +
+		"of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each\n" +
+		"filter cannot be parallelized individually, so you may only achieve as much parallelism as there are\n" +
+		"partition filters."
+	descParallelRestore = "The number of restore threads."
+)
+
 type Common struct {
+	// operation: backup or restore, to form correct documentation.
+	operation int
 	models.Common
 }
 
-func NewCommon() *Common {
-	return &Common{}
+func NewCommon(operation int) *Common {
+	return &Common{operation: operation}
 }
 
 func (f *Common) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
+
+	var descNamespace, descSetList, descBinList, descNoRecords, descNoIndexes, descNoUDFs, descParallel string
+
+	switch f.operation {
+	case OperationBackup:
+		descNamespace = descNamespaceBackup
+		descSetList = descSetListBackup
+		descBinList = descBinListBackup
+		descNoRecords = descNoRecordsBackup
+		descNoIndexes = descNoIndexesBackup
+		descNoUDFs = descNoUDFsBackup
+		descParallel = descParallelBackup
+	case OperationRestore:
+		descNamespace = descNamespaceRestore
+		descSetList = descSetListRestore
+		descBinList = descBinListRestore
+		descNoRecords = descNoRecordsRestore
+		descNoIndexes = descNoIndexesRestore
+		descNoUDFs = descNoUDFsRestore
+		descParallel = descParallelRestore
+	}
 
 	flagSet.StringVarP(&f.Directory, "directory", "d",
 		"",
 		"The Directory that holds the backup files. Required, unless -o or -e is used.")
 	flagSet.StringVarP(&f.Namespace, "namespace", "n",
 		"",
-		"The namespace to be backed up. Required.")
+		descNamespace)
 	flagSet.StringVarP(&f.SetList, "set", "s",
 		"",
-		"The set(s) to be backed up.\n"+
-			"If multiple sets are being backed up, filter-exp cannot be used.\n"+
-			"if empty all sets.")
+		descSetList)
+	flagSet.StringVarP(&f.BinList, "bin-list", "B",
+		"",
+		descBinList)
+	flagSet.BoolVarP(&f.NoRecords, "no-records", "R",
+		false,
+		descNoRecords)
+	flagSet.BoolVarP(&f.NoIndexes, "no-indexes", "I",
+		false,
+		descNoIndexes)
+	flagSet.BoolVar(&f.NoUDFs, "no-udfs",
+		false,
+		descNoUDFs)
+	flagSet.IntVarP(&f.Parallel, "parallel", "w",
+		1,
+		descParallel)
 	flagSet.IntVarP(&f.RecordsPerSecond, "records-per-second", "L",
 		0,
 		"Limit total returned records per second (rps).\n"+
 			"Do not apply rps limit if records-per-second is zero.")
-	flagSet.StringVarP(&f.BinList, "bin-list", "B",
-		"",
-		"Only include the given bins in the backup.\n"+
-			"If empty include all bins.")
-	flagSet.IntVarP(&f.Parallel, "parallel", "w",
-		1,
-		"Maximum number of scan calls to run in parallel.\n"+
-			"If only one partition range is given, or the entire namespace is being backed up, the range\n"+
-			"of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each\n"+
-			"filter cannot be parallelized individually, so you may only achieve as much parallelism as there are\n"+
-			"partition filters.")
-	flagSet.BoolVarP(&f.NoRecords, "no-records", "R",
-		false,
-		"Don't backup any records.")
-	flagSet.BoolVarP(&f.NoIndexes, "no-indexes", "I",
-		false,
-		"Don't backup any indexes.")
-	flagSet.BoolVar(&f.NoUDFs, "no-udfs",
-		false,
-		"Don't backup any UDFs.")
 	flagSet.IntVar(&f.MaxRetries, "max-retries",
 		5,
 		"Maximum number of retries before aborting the current transaction.")

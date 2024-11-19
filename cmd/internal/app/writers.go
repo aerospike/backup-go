@@ -17,7 +17,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -96,18 +95,14 @@ func newS3Writer(
 		return nil, err
 	}
 
-	var bucketName, path string
-
 	opts := make([]s3.Opt, 0)
 
 	if c.Directory != "" && b.OutputFile == "" {
-		bucketName, path = getBucketFromPath(c.Directory)
-		opts = append(opts, s3.WithDir(path))
+		opts = append(opts, s3.WithDir(c.Directory))
 	}
 
 	if b.OutputFile != "" && c.Directory == "" {
-		bucketName, path = getBucketFromPath(b.OutputFile)
-		opts = append(opts, s3.WithFile(path))
+		opts = append(opts, s3.WithFile(b.OutputFile))
 	}
 
 	if b.ShouldClearTarget() {
@@ -120,7 +115,7 @@ func newS3Writer(
 
 	opts = append(opts, s3.WithValidator(asb.NewValidator()))
 
-	return s3.NewWriter(ctx, client, bucketName, opts...)
+	return s3.NewWriter(ctx, client, a.BucketName, opts...)
 }
 
 func newGcpWriter(
@@ -189,20 +184,4 @@ func newAzureWriter(
 	opts = append(opts, blob.WithValidator(asb.NewValidator()))
 
 	return blob.NewWriter(ctx, client, a.ContainerName, opts...)
-}
-
-// getBucketFromPath returns the first part of path as bucket name.
-// E.g.: some/folder/path - returns `some` as bucket name and `folder/path` as cleanPath
-func getBucketFromPath(path string) (bucket, cleanPath string) {
-	parts := strings.Split(path, "/")
-	if len(parts) < 2 {
-		return path, "/"
-	}
-
-	cleanPath = strings.Join(parts[1:], "/")
-	if cleanPath == "" {
-		cleanPath = "/"
-	}
-
-	return parts[0], cleanPath
 }

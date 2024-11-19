@@ -22,7 +22,7 @@ import (
 
 func TestCommon_NewFlagSet(t *testing.T) {
 	t.Parallel()
-	common := NewCommon()
+	common := NewCommon(OperationBackup)
 
 	flagSet := common.NewFlagSet()
 
@@ -62,7 +62,7 @@ func TestCommon_NewFlagSet(t *testing.T) {
 
 func TestCommon_NewFlagSet_DefaultValues(t *testing.T) {
 	t.Parallel()
-	common := NewCommon()
+	common := NewCommon(OperationRestore)
 
 	flagSet := common.NewFlagSet()
 

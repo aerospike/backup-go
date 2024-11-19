@@ -3,3 +3,4 @@ ignore:
   - "examples"
   - "cmd/asbackup"
   - "cmd/asrestore"
+  - "models"

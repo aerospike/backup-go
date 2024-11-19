@@ -7,7 +7,7 @@ Aerospike Backup CLI tool.
 make build
 ```
 ### Release
-Releases will be compiled automatically in GitHub actions.
+Version artifacts are automatically built and uploaded under releases in GitHub.
 
 ## Supported flags
 ```

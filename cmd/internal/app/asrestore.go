@@ -35,6 +35,7 @@ type ASRestore struct {
 func NewASRestore(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
+	clientPolicy *models.ClientPolicy,
 	restoreParams *models.Restore,
 	commonParams *models.Common,
 	compression *models.Compression,
@@ -78,7 +79,7 @@ func NewASRestore(
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
 
-	aerospikeClient, err := newAerospikeClient(clientConfig, "")
+	aerospikeClient, err := newAerospikeClient(clientConfig, clientPolicy, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}

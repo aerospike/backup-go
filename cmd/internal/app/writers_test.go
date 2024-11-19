@@ -46,54 +46,6 @@ const (
 	testAzureType        = "azure-blob"
 )
 
-func TestGetBucketFromPath(t *testing.T) {
-	tests := []struct {
-		name          string
-		path          string
-		wantBucket    string
-		wantCleanPath string
-	}{
-		{
-			name:          "Single part path",
-			path:          "bucketname",
-			wantBucket:    "bucketname",
-			wantCleanPath: "/",
-		},
-		{
-			name:          "Path with bucket and folder",
-			path:          "bucketname/folder",
-			wantBucket:    "bucketname",
-			wantCleanPath: "folder",
-		},
-		{
-			name:          "Path with multiple folders",
-			path:          "bucketname/folder/subfolder",
-			wantBucket:    "bucketname",
-			wantCleanPath: "folder/subfolder",
-		},
-		{
-			name:          "Path with trailing slash",
-			path:          "bucketname/",
-			wantBucket:    "bucketname",
-			wantCleanPath: "/",
-		},
-		{
-			name:          "Empty path",
-			path:          "",
-			wantBucket:    "",
-			wantCleanPath: "/",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			bucket, cleanPath := getBucketFromPath(tt.path)
-			assert.Equal(t, tt.wantBucket, bucket)
-			assert.Equal(t, tt.wantCleanPath, cleanPath)
-		})
-	}
-}
-
 func TestNewLocalWriter(t *testing.T) {
 	t.Parallel()
 	b := &models.Backup{

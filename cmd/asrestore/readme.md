@@ -7,20 +7,7 @@ Aerospike Restore CLI tool.
 make build
 ```
 ### Release
-```bash
-# for local build
-make release-test
-# for release
-make release
-```
-
-### Release requirements
-For creating releases, you must have `goreleaser` installed on your device.
-```bash
-brew install goreleaser/tap/goreleaser
-```
-Configure `GITHUB_TOKEN`, `GITLAB_TOKEN` and `GITEA_TOKEN`.
-More info here https://goreleaser.com/quick-start/
+Releases will be compiled automatically in GitHub actions.
 
 ## Supported flags
 ```
@@ -46,6 +33,20 @@ Aerospike Client Flags:
       --tls-keyfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                      The key file used for mutual TLS authentication with Aerospike.
       --tls-keyfile-password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"       The password used to decrypt the key-file if encrypted.
       --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
+      --client-timeout int         Initial host connection timeout duration. The timeout when opening a connection
+                                   to the server host for the first time. (default 30000)
+      --client-idle-timeout int    Idle timeout. Every time a connection is used, its idle
+                                   deadline will be extended by this duration. When this deadline is reached,
+                                   the connection will be closed and discarded from the connection pool.
+                                   The value is limited to 24 hours (86400s).
+                                   It's important to set this value to a few seconds less than the server's proto-fd-idle-ms
+                                   (default 60000 milliseconds or 1 minute), so the client does not attempt to use a socket
+                                   that has already been reaped by the server.
+                                   Connection pools are now implemented by a LIFO stack. Connections at the tail of the
+                                   stack will always be the least used. These connections are checked for IdleTimeout
+                                   on every tend (usually 1 second).
+                                   
+      --client-login-timeout int   specifies the timeout for login operation for external authentication such as LDAP. (default 10000)
 
 Restore Flags:
   -d, --directory string         The Directory that holds the backup files. Required, unless -o or -e is used.
@@ -53,18 +54,18 @@ Restore Flags:
   -s, --set string               The set(s) to be backed up.
                                  If multiple sets are being backed up, filter-exp cannot be used.
                                  if empty all sets.
-  -L, --records-per-second int   Limit total returned records per second (rps).
-                                 Do not apply rps limit if records-per-second is zero.
   -B, --bin-list string          Only include the given bins in the backup.
                                  If empty include all bins.
+  -R, --no-records               Don't backup any records.
+  -I, --no-indexes               Don't backup any indexes.
+      --no-udfs                  Don't backup any UDFs.
   -w, --parallel int             Maximum number of scan calls to run in parallel.
                                  If only one partition range is given, or the entire namespace is being backed up, the range
                                  of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
                                  filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
                                  partition filters. (default 1)
-  -R, --no-records               Don't backup any records.
-  -I, --no-indexes               Don't backup any indexes.
-      --no-udfs                  Don't backup any UDFs.
+  -L, --records-per-second int   Limit total returned records per second (rps).
+                                 Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
       --total-timeout int        Total socket timeout in milliseconds. 0 - no timeout.
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
@@ -73,6 +74,13 @@ Restore Flags:
   -i, --input-file string        Restore from a single backup file. Use - for stdin.
                                  Required, unless --directory or --directory-list is used.
                                  
+  -u, --unique                   Skip records that already exist in the namespace;
+                                 Don't touch them.
+                                 
+  -r, --replace                  Fully replace records that already exist in the namespace;
+                                 Don't update them.
+                                 
+  -g, --no-generation            Don't check the generation of records that already exist in the namespace.
       --ignore-record-error      Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
                                  By default such errors are not ignored and asrestore terminates.
                                  Optional: Use verbose mode to see errors in detail.
@@ -91,13 +99,6 @@ Restore Flags:
                                  Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
       --extra-ttl int            For records with expirable void-times, add N seconds of extra-ttl to the
                                  recorded void-time.
-  -u, --unique                   Skip records that already exist in the namespace;
-                                 Don't touch them.
-                                 
-  -r, --replace                  Fully replace records that already exist in the namespace;
-                                 Don't update them.
-                                 
-  -g, --no-generation            Don't check the generation of records that already exist in the namespace.
   -T, --timeout int              Set the timeout (ms) for commands. (default 10000)
       --retry-base-timeout int   Set the initial delay between retry attempts in milliseconds (default 1000)
       --retry-multiplier float   retry-multiplier is used to increase the delay between subsequent retry attempts.
@@ -132,9 +133,11 @@ Example: asrestore --azure-account-name secret:resource1:azaccount
       --sa-is-base64                Flag that shows if secret agent responses are encrypted with base64.
 
 AWS Flags:
-For AWS storage bucket name is set in --directory path <bucket_name>/<backup_folder>.
+For S3 storage bucket name is mandatory, and is set with --s3-bucket-name flag.
+So --directory path will only contain folder name.
 --s3-endpoint-override is used in case you want to use minio, instead of AWS.
 Any AWS parameter can be retrieved from secret agent.
+      --s3-bucket-name string         Existing S3 bucket name
       --s3-region string              The S3 region that the bucket(s) exist in.
       --s3-profile string             The S3 profile to use for credentials.
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.

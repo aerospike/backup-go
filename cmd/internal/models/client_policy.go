@@ -14,22 +14,8 @@
 
 package models
 
-// Common parameters are used by both backup and restore operations.
-type Common struct {
-	Directory        string
-	Namespace        string
-	SetList          string
-	BinList          string
-	Parallel         int
-	NoRecords        bool
-	NoIndexes        bool
-	NoUDFs           bool
-	RecordsPerSecond int
-	MaxRetries       int
-	TotalTimeout     int64
-	SocketTimeout    int64
-
-	// Nice is mapped to config.Bandwidth
-	// Is set in MiB then converted to bytes.
-	Nice int
+type ClientPolicy struct {
+	Timeout      int64
+	IdleTimeout  int64
+	LoginTimeout int64
 }

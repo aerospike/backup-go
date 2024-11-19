@@ -30,19 +30,30 @@ func NewBackup() *Backup {
 func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
+	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
+		false,
+		"Remove existing backup file (-o) or files (-d).")
+	flagSet.BoolVar(&f.RemoveArtifacts, "remove-artifacts",
+		false,
+		"Remove existing backup file (-o) or files (-d) without performing a backup.")
 	flagSet.StringVarP(&f.OutputFile, "output-file", "o",
 		"",
 		"Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.")
 	flagSet.StringVarP(&f.OutputFilePrefix, "output-file-prefix", "q",
 		"",
 		"When using directory parameter, prepend a prefix to the names of the generated files.")
-	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
-		false,
-		"Remove existing backup file (-o) or files (-d).")
+
 	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
 		0,
 		"Rotate backup files, when their size crosses the given\n"+
 			"value (in bytes) Only used when backing up to a Directory.")
+	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
+		false,
+		"Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.\n"+
+			"On restore all records, that don't contain bin data will be skipped.")
+	flagSet.BoolVar(&f.NoTTLOnly, "no-ttl-only",
+		false,
+		"Only include records that have no ttl set (persistent records).")
 	flagSet.StringVarP(&f.AfterDigest, "after-digest", "D",
 		"",
 		"Backup records after record digest in record's partition plus all succeeding\n"+
@@ -64,16 +75,6 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"<YYYY-MM-DD_HH:MM:SS>\n"+
 			"Only include records that last changed before the given\n"+
 			"date and time. May combined with --modified-after to specify a range.")
-	flagSet.Int64VarP(&f.MaxRecords, "max-records", "M",
-		0,
-		"The number of records approximately to back up. 0 - all records")
-	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
-		false,
-		"Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.\n"+
-			"On restore all records, that don't contain bin data will be skipped.")
-	flagSet.IntVar(&f.SleepBetweenRetries, "sleep-between-retries",
-		5,
-		"The amount of milliseconds to sleep between retries.")
 	flagSet.StringVarP(&f.FilterExpression, "filter-exp", "f",
 		"",
 		"Base64 encoded expression. Use the encoded filter expression in each scan call,\n"+
@@ -82,15 +83,8 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVar(&f.ParallelNodes, "parallel-nodes",
 		false,
 		"Specifies how to perform scan. If set to true, we launch parallel workers for nodes;\n"+
-			"otherwise workers run in parallel for partitions.")
-	// After implementing --continue and --estimate add this line here:
-	// "This option is mutually exclusive to --continue and --estimate."
-	flagSet.BoolVar(&f.RemoveArtifacts, "remove-artifacts",
-		false,
-		"Remove existing backup file (-o) or files (-d) without performing a backup.")
-	flagSet.BoolVarP(&f.Compact, "compact", "C",
-		false,
-		"Do not apply base-64 encoding to BLOBs; results in smaller backup files.")
+			"otherwise workers run in parallel for partitions. \n"+
+			"This option is mutually exclusive to --continue and --estimate.")
 	flagSet.StringVarP(&f.NodeList, "node-list", "l",
 		"",
 		"<IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]\n"+
@@ -99,13 +93,6 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
 			"This argument is mutually exclusive to partition-list/after-digest arguments.\n"+
 			"Default: backup all nodes in the cluster")
-	flagSet.BoolVar(&f.NoTTLOnly, "no-ttl-only",
-		false,
-		"Only include records that have no ttl set (persistent records).")
-	flagSet.StringVar(&f.PreferRacks, "prefer-racks",
-		"",
-		"<rack id 1>[,<rack id 2>[,...]]\n"+
-			"A list of Aerospike Server rack IDs to prefer when reading records for a backup.")
 	flagSet.StringVarP(&f.PartitionList, "partition-list", "X",
 		"",
 		"List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,\n"+
@@ -117,6 +104,19 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"digest: base64 encoded string\n"+
 			"Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=\n"+
 			"Default: 0-4096 (all partitions)\n")
+	flagSet.StringVar(&f.PreferRacks, "prefer-racks",
+		"",
+		"<rack id 1>[,<rack id 2>[,...]]\n"+
+			"A list of Aerospike Server rack IDs to prefer when reading records for a backup.")
+	flagSet.Int64VarP(&f.MaxRecords, "max-records", "M",
+		0,
+		"The number of records approximately to back up. 0 - all records")
+	flagSet.IntVar(&f.SleepBetweenRetries, "sleep-between-retries",
+		5,
+		"The amount of milliseconds to sleep between retries.")
+	flagSet.BoolVarP(&f.Compact, "compact", "C",
+		false,
+		"Do not apply base-64 encoding to BLOBs; results in smaller backup files.")
 	flagSet.BoolVarP(&f.Estimate, "estimate", "e",
 		false,
 		"Estimate the backed-up record size from a random sample of \n"+

@@ -85,13 +85,14 @@ func TestNewS3Writer(t *testing.T) {
 		RemoveFiles: true,
 	}
 	c := &models.Common{
-		Directory: "asbackup/" + t.TempDir(),
+		Directory: t.TempDir(),
 	}
 
 	s3cfg := &models.AwsS3{
-		Region:   testS3Region,
-		Profile:  testS3Profile,
-		Endpoint: testS3Endpoint,
+		BucketName: testS3Bucket,
+		Region:     testS3Region,
+		Profile:    testS3Profile,
+		Endpoint:   testS3Endpoint,
 	}
 
 	ctx := context.Background()
@@ -102,7 +103,7 @@ func TestNewS3Writer(t *testing.T) {
 	assert.Equal(t, testS3Type, writer.GetType())
 
 	b = &models.Backup{
-		OutputFile:  "asbackup/" + t.TempDir() + testFileName,
+		OutputFile:  t.TempDir() + testFileName,
 		RemoveFiles: true,
 	}
 	c = &models.Common{}

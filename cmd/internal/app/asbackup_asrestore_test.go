@@ -47,7 +47,11 @@ func Test_BackupRestore(t *testing.T) {
 		Password: testASLoginPassword,
 	}
 
-	clientPolicy := &models.ClientPolicy{}
+	clientPolicy := &models.ClientPolicy{
+		Timeout:      1000,
+		IdleTimeout:  1000,
+		LoginTimeout: 1000,
+	}
 
 	bParams := &models.Backup{}
 
@@ -106,7 +110,11 @@ func Test_BackupWithState(t *testing.T) {
 		Password: testASLoginPassword,
 	}
 
-	clientPolicy := &models.ClientPolicy{}
+	clientPolicy := &models.ClientPolicy{
+		Timeout:      1000,
+		IdleTimeout:  1000,
+		LoginTimeout: 1000,
+	}
 
 	bParams := &models.Backup{
 		StateFileDst: testStateFile,

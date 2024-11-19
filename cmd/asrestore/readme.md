@@ -50,20 +50,16 @@ Aerospike Client Flags:
 
 Restore Flags:
   -d, --directory string         The Directory that holds the backup files. Required, unless -o or -e is used.
-  -n, --namespace string         The namespace to be backed up. Required.
-  -s, --set string               The set(s) to be backed up.
-                                 If multiple sets are being backed up, filter-exp cannot be used.
-                                 if empty all sets.
-  -B, --bin-list string          Only include the given bins in the backup.
-                                 If empty include all bins.
-  -R, --no-records               Don't backup any records.
-  -I, --no-indexes               Don't backup any indexes.
-      --no-udfs                  Don't backup any UDFs.
-  -w, --parallel int             Maximum number of scan calls to run in parallel.
-                                 If only one partition range is given, or the entire namespace is being backed up, the range
-                                 of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
-                                 filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
-                                 partition filters. (default 1)
+  -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
+  -s, --set string               Only restore the given sets from the backup.
+                                 Default: restore all sets.
+  -B, --bin-list string          Only restore the given bins in the backup.
+                                 Default: restore all bins.
+                                 
+  -R, --no-records               Don't restore any records.
+  -I, --no-indexes               Don't restore any secondary indexes.
+      --no-udfs                  Don't restore any UDFs.
+  -w, --parallel int             The number of restore threads. (default 1)
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
@@ -106,13 +102,15 @@ Restore Flags:
       --retry-max-retries uint   Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.
 
 Compression Flags:
-  -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
+  -z, --compress string         Enables decompressing of backup files using the specified compression algorithm.
+                                This must match the compression mode used when backing up the data.
                                 Supported compression algorithms are: zstd, none
                                 Set the zstd compression level via the --compression-level option. Default level is 3. (default "NONE")
       --compression-level int   zstd compression level. (default 3)
 
 Encryption Flags:
-      --encrypt string                 Enables encryption of backup files using the specified encryption algorithm.
+      --encrypt string                 Enables decryption of backup files using the specified encryption algorithm.
+                                       This must match the encryption mode used when backing up the data.
                                        Supported encryption algorithms are: none, aes128, aes256.
                                        A private key must be given, either via the --encryption-key-file option or
                                        the --encryption-key-env option or the --encryption-key-secret.

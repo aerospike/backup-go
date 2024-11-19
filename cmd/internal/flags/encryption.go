@@ -19,20 +19,37 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	descEncryptBackup  = "Enables encryption of backup files using the specified encryption algorithm.\n"
+	descEncryptRestore = "Enables decryption of backup files using the specified encryption algorithm.\n" +
+		"This must match the encryption mode used when backing up the data.\n"
+)
+
 type Encryption struct {
+	// operation: backup or restore, to form correct documentation.
+	operation int
 	models.Encryption
 }
 
-func NewEncryption() *Encryption {
-	return &Encryption{}
+func NewEncryption(operation int) *Encryption {
+	return &Encryption{operation: operation}
 }
 
 func (f *Encryption) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
+	var descEncrypt string
+
+	switch f.operation {
+	case 0:
+		descEncrypt = descEncryptBackup
+	case 1:
+		descEncrypt = descEncryptRestore
+	}
+
 	flagSet.StringVar(&f.Mode, "encrypt",
 		"",
-		"Enables encryption of backup files using the specified encryption algorithm.\n"+
+		descEncrypt+
 			"Supported encryption algorithms are: none, aes128, aes256.\n"+
 			"A private key must be given, either via the --encryption-key-file option or\n"+
 			"the --encryption-key-env option or the --encryption-key-secret.")

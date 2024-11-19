@@ -47,10 +47,10 @@ var (
 	flagsApp          = flags.NewApp()
 	flagsAerospike    = asFlags.NewDefaultAerospikeFlags()
 	flagsClientPolicy = flags.NewClientPolicy()
-	flagsCommon       = flags.NewCommon()
+	flagsCommon       = flags.NewCommon(flags.OperationRestore)
 	flagsRestore      = flags.NewRestore()
-	flagsCompression  = flags.NewCompression()
-	flagsEncryption   = flags.NewEncryption()
+	flagsCompression  = flags.NewCompression(flags.OperationRestore)
+	flagsEncryption   = flags.NewEncryption(flags.OperationRestore)
 	flagsSecretAgent  = flags.NewSecretAgent()
 	flagsAws          = flags.NewAwsS3()
 	flagsGcp          = flags.NewGcpStorage()
@@ -103,7 +103,7 @@ func init() {
 		aerospikeFlagSet.PrintDefaults()
 		clientPolicyFlagSet.PrintDefaults()
 
-		// Print section: Backup Flags
+		// Print section: Restore Flags
 		fmt.Println("\nRestore Flags:")
 		commonFlagSet.PrintDefaults()
 		restoreFlagSet.PrintDefaults()
@@ -220,7 +220,7 @@ func main() {
 
 	go func() {
 		sig := <-sigChan
-		log.Printf("stopping asbackup: %v\n", sig)
+		log.Printf("stopping asrestore: %v\n", sig)
 		cancel()
 	}()
 

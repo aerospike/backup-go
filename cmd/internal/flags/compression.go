@@ -19,19 +19,37 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	descCompressBackup  = "Enables compressing of backup files using the specified compression algorithm.\n"
+	descCompressRestore = "Enables decompressing of backup files using the specified compression algorithm.\n" +
+		"This must match the compression mode used when backing up the data.\n"
+)
+
 type Compression struct {
+	// operation: backup or restore, to form correct documentation.
+	operation int
 	models.Compression
 }
 
-func NewCompression() *Compression {
-	return &Compression{}
+func NewCompression(operation int) *Compression {
+	return &Compression{operation: operation}
 }
 
 func (f *Compression) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
+
+	var descCompress string
+
+	switch f.operation {
+	case 0:
+		descCompress = descCompressBackup
+	case 1:
+		descCompress = descCompressRestore
+	}
+
 	flagSet.StringVarP(&f.Mode, "compress", "z",
 		"NONE",
-		"Enables compressing of backup files using the specified compression algorithm.\n"+
+		descCompress+
 			"Supported compression algorithms are: zstd, none\n"+
 			"Set the zstd compression level via the --compression-level option. Default level is 3.")
 	flagSet.IntVar(&f.Level, "compression-level",

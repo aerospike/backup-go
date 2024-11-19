@@ -41,9 +41,9 @@ func (f *Encryption) NewFlagSet() *pflag.FlagSet {
 	var descEncrypt string
 
 	switch f.operation {
-	case 0:
+	case OperationBackup:
 		descEncrypt = descEncryptBackup
-	case 1:
+	case OperationRestore:
 		descEncrypt = descEncryptRestore
 	}
 

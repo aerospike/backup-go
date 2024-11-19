@@ -41,9 +41,9 @@ func (f *Compression) NewFlagSet() *pflag.FlagSet {
 	var descCompress string
 
 	switch f.operation {
-	case 0:
+	case OperationBackup:
 		descCompress = descCompressBackup
-	case 1:
+	case OperationRestore:
 		descCompress = descCompressRestore
 	}
 

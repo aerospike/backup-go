@@ -72,7 +72,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 	var descNamespace, descSetList, descBinList, descNoRecords, descNoIndexes, descNoUDFs, descParallel string
 
 	switch f.operation {
-	case 0:
+	case OperationBackup:
 		descNamespace = descNamespaceBackup
 		descSetList = descSetListBackup
 		descBinList = descBinListBackup
@@ -80,7 +80,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		descNoIndexes = descNoIndexesBackup
 		descNoUDFs = descNoUDFsBackup
 		descParallel = descParallelBackup
-	case 1:
+	case OperationRestore:
 		descNamespace = descNamespaceRestore
 		descSetList = descSetListRestore
 		descBinList = descBinListRestore

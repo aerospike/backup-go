@@ -46,7 +46,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
 		262144000,
 		"Rotate backup files, when their size crosses the given\n"+
-			"value (in bytes) Only used when backing up to a Directory.")
+			"value (in bytes) Only used when backing up to a Directory. 0 - no limit.")
 	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
 		false,
 		"Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.\n"+

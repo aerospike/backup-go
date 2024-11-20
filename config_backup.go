@@ -134,7 +134,6 @@ func NewDefaultBackupConfig() *BackupConfig {
 		ParallelWrite:    1,
 		Namespace:        "test",
 		EncoderType:      EncoderTypeASB,
-		ScanPolicy:       a.NewScanPolicy(),
 	}
 }
 

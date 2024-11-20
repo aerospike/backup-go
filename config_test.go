@@ -24,7 +24,6 @@ import (
 
 func TestBackupConfig_validate(t *testing.T) {
 	config := NewDefaultBackupConfig()
-	config.ScanPolicy = a.NewScanPolicy()
 	assert.NoError(t, config.validate())
 	assert.Equal(t, true, config.isFullBackup())
 

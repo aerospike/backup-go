@@ -619,7 +619,7 @@ func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
 		return "", "", fmt.Errorf("invalid key-value pair: %s", pair)
 	}
 
-	// make keys case insensitive
+	// make keys case-insensitive
 	// to help with different version compatibility
 	key = strings.ToLower(kv[0])
 	val = kv[1]

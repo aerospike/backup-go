@@ -59,12 +59,12 @@ Restore Flags:
   -R, --no-records               Don't restore any records.
   -I, --no-indexes               Don't restore any secondary indexes.
       --no-udfs                  Don't restore any UDFs.
-  -w, --parallel int             The number of restore threads. (default 1)
+  -w, --parallel int             The number of restore threads. (default - the number of available CPUs)
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
-      --total-timeout int        Total socket timeout in milliseconds. 0 - no timeout.
-      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
+      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
+      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to total-timeout. If both are 0,
                                  there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -i, --input-file string        Restore from a single backup file. Use - for stdin.
@@ -95,7 +95,7 @@ Restore Flags:
                                  Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
       --extra-ttl int            For records with expirable void-times, add N seconds of extra-ttl to the
                                  recorded void-time.
-  -T, --timeout int              Set the timeout (ms) for commands. (default 10000)
+  -T, --timeout int              Set the timeout (ms) for info commands. (default 10000)
       --retry-base-timeout int   Set the initial delay between retry attempts in milliseconds (default 1000)
       --retry-multiplier float   retry-multiplier is used to increase the delay between subsequent retry attempts.
                                  The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)

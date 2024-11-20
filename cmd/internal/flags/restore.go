@@ -74,7 +74,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.Int64VarP(&f.TimeOut, "timeout", "T",
 		10000,
-		"Set the timeout (ms) for commands.")
+		"Set the timeout (ms) for info commands.")
 	flagSet.Int64Var(&f.RetryBaseTimeout, "retry-base-timeout",
 		1000,
 		"Set the initial delay between retry attempts in milliseconds")

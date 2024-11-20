@@ -82,7 +82,9 @@ func NewRestoreWriter(
 	}
 }
 
-func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
+func newRecordWriter(
+	asc dbWriter,
+	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
 	logger *slog.Logger,
 	useBatchWrites bool,
@@ -91,24 +93,24 @@ func newRecordWriter(asc dbWriter, writePolicy *a.WritePolicy,
 	ignoreRecordError bool,
 ) recordWriter {
 	if useBatchWrites {
-		return &batchRecordWriter{
-			asc:               asc,
-			writePolicy:       writePolicy,
-			stats:             stats,
-			logger:            logger,
-			batchSize:         batchSize,
-			retryPolicy:       retryPolicy,
-			ignoreRecordError: ignoreRecordError,
-		}
+		return newBatchRecordWriter(
+			asc,
+			writePolicy,
+			stats,
+			retryPolicy,
+			batchSize,
+			ignoreRecordError,
+			logger,
+		)
 	}
 
-	return &singleRecordWriter{
-		asc:               asc,
-		writePolicy:       writePolicy,
-		stats:             stats,
-		retryPolicy:       retryPolicy,
-		ignoreRecordError: ignoreRecordError,
-	}
+	return newSingleRecordWriter(
+		asc,
+		writePolicy,
+		stats,
+		retryPolicy,
+		ignoreRecordError,
+	)
 }
 
 // Write writes the types from the models package to an Aerospike DB.

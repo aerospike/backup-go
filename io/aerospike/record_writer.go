@@ -30,6 +30,22 @@ type singleRecordWriter struct {
 	ignoreRecordError bool
 }
 
+func newSingleRecordWriter(
+	asc dbWriter,
+	writePolicy *a.WritePolicy,
+	stats *models.RestoreStats,
+	retryPolicy *models.RetryPolicy,
+	ignoreRecordError bool,
+) *singleRecordWriter {
+	return &singleRecordWriter{
+		asc:               asc,
+		writePolicy:       writePolicy,
+		stats:             stats,
+		retryPolicy:       retryPolicy,
+		ignoreRecordError: ignoreRecordError,
+	}
+}
+
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 	writePolicy := rw.writePolicy
 	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {

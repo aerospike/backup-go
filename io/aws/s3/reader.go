@@ -140,7 +140,13 @@ func (r *Reader) streamDirectory(
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || isDirectory(r.prefix, *p.Key) && !r.withNestedDir {
+			if p.Key == nil {
+				slog.Debug("p.Key is nil")
+				continue
+			}
+
+			if isDirectory(r.prefix, *p.Key) && !r.withNestedDir {
+				slog.Debug("skip directory", slog.String("p.key", *p.Key))
 				continue
 			}
 
@@ -150,6 +156,7 @@ func (r *Reader) streamDirectory(
 					// Since we are passing invalid files, we don't need to handle this
 					// error and write a test for it. Maybe we should log this information
 					// for the user, so they know what is going on.
+					slog.Debug("skip invalid", slog.String("p.key", *p.Key))
 					continue
 				}
 			}
@@ -161,16 +168,17 @@ func (r *Reader) streamDirectory(
 				Key:    p.Key,
 			})
 			if err != nil {
+				slog.Warn("Got error",
+					slog.String("p.key", *p.Key),
+					slog.String("bucket", r.bucketName),
+					slog.Any("err", err),
+				)
+
 				// Skip 404 not found error.
 				var opErr *smithy.OperationError
 				if errors.As(err, &opErr) {
 					var httpErr *awsHttp.ResponseError
 					if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound {
-						slog.Warn("File not found",
-							slog.String("key", *p.Key),
-							slog.String("bucket", r.bucketName),
-							slog.Any("err", err),
-						)
 						continue
 					}
 				}
@@ -183,6 +191,8 @@ func (r *Reader) streamDirectory(
 
 			if object != nil {
 				readersCh <- object.Body
+			} else {
+				slog.Warn("empty body", slog.String("p.key", *p.Key))
 			}
 		}
 

@@ -162,7 +162,7 @@ func (c *BackupConfig) isStateContinue() bool {
 
 func (c *BackupConfig) isFullBackup() bool {
 	// full backup doesn't have a lower bound.
-	return c.ModAfter == nil && c.isDefaultPartitionFilter()
+	return c.ModAfter == nil && c.isDefaultPartitionFilter() && c.PartitionFilters == nil
 }
 
 //nolint:gocyclo // validate func is long func with a lot of checks.

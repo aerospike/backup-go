@@ -30,7 +30,7 @@ type ASBackup struct {
 	backupClient *backup.Client
 	backupConfig *backup.BackupConfig
 	writer       backup.Writer
-	// reader is used to read state file.
+	// reader is used to read a state file.
 	reader backup.StreamingReader
 	// Additional params.
 	isEstimate       bool

@@ -15,6 +15,8 @@
 package flags
 
 import (
+	"runtime"
+
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
@@ -54,6 +56,9 @@ const (
 		"filter cannot be parallelized individually, so you may only achieve as much parallelism as there are\n" +
 		"partition filters."
 	descParallelRestore = "The number of restore threads."
+
+	defaultTotalTimeoutBackup  = 0
+	defaultTotalTimeoutRestore = 10000
 )
 
 type Common struct {
@@ -69,7 +74,11 @@ func NewCommon(operation int) *Common {
 func (f *Common) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
-	var descNamespace, descSetList, descBinList, descNoRecords, descNoIndexes, descNoUDFs, descParallel string
+	var (
+		descNamespace, descSetList, descBinList, descNoRecords, descNoIndexes, descNoUDFs, descParallel string
+		defaultTotalTimeout                                                                             int64
+		defaultParallel                                                                                 int
+	)
 
 	switch f.operation {
 	case OperationBackup:
@@ -80,6 +89,8 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		descNoIndexes = descNoIndexesBackup
 		descNoUDFs = descNoUDFsBackup
 		descParallel = descParallelBackup
+		defaultTotalTimeout = defaultTotalTimeoutBackup
+		defaultParallel = 1
 	case OperationRestore:
 		descNamespace = descNamespaceRestore
 		descSetList = descSetListRestore
@@ -88,6 +99,8 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		descNoIndexes = descNoIndexesRestore
 		descNoUDFs = descNoUDFsRestore
 		descParallel = descParallelRestore
+		defaultTotalTimeout = defaultTotalTimeoutRestore
+		defaultParallel = runtime.NumCPU()
 	}
 
 	flagSet.StringVarP(&f.Directory, "directory", "d",
@@ -112,7 +125,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		false,
 		descNoUDFs)
 	flagSet.IntVarP(&f.Parallel, "parallel", "w",
-		1,
+		defaultParallel,
 		descParallel)
 	flagSet.IntVarP(&f.RecordsPerSecond, "records-per-second", "L",
 		0,
@@ -122,8 +135,8 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		5,
 		"Maximum number of retries before aborting the current transaction.")
 	flagSet.Int64Var(&f.TotalTimeout, "total-timeout",
-		0,
-		"Total socket timeout in milliseconds. 0 - no timeout.")
+		defaultTotalTimeout,
+		"Total transaction timeout in milliseconds. 0 - no timeout.")
 	flagSet.Int64Var(&f.SocketTimeout, "socket-timeout",
 		10000,
 		"Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,\n"+

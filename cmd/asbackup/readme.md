@@ -67,7 +67,7 @@ Backup Flags:
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
-      --total-timeout int        Total socket timeout in milliseconds. 0 - no timeout.
+      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout.
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,
                                  there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
@@ -76,7 +76,7 @@ Backup Flags:
   -o, --output-file string          Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
   -q, --output-file-prefix string   When using directory parameter, prepend a prefix to the names of the generated files.
   -F, --file-limit int              Rotate backup files, when their size crosses the given
-                                    value (in bytes) Only used when backing up to a Directory.
+                                    value (in bytes) Only used when backing up to a Directory. (default 262144000)
   -x, --no-bins                     Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.
                                     On restore all records, that don't contain bin data will be skipped.
       --no-ttl-only                 Only include records that have no ttl set (persistent records).

@@ -34,6 +34,17 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		"",
 		"Restore from a single backup file. Use - for stdin.\n"+
 			"Required, unless --directory or --directory-list is used.\n")
+	flagSet.BoolVarP(&f.Uniq, "unique", "u",
+		false,
+		"Skip records that already exist in the namespace;\n"+
+			"Don't touch them.\n")
+	flagSet.BoolVarP(&f.Replace, "replace", "r",
+		false,
+		"Fully replace records that already exist in the namespace;\n"+
+			"Don't update them.\n")
+	flagSet.BoolVarP(&f.NoGeneration, "no-generation", "g",
+		false,
+		"Don't check the generation of records that already exist in the namespace.")
 	flagSet.BoolVar(&f.IgnoreRecordError, "ignore-record-error",
 		false,
 		"Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.\n"+
@@ -60,20 +71,10 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		0,
 		"For records with expirable void-times, add N seconds of extra-ttl to the\n"+
 			"recorded void-time.")
-	flagSet.BoolVarP(&f.Uniq, "unique", "u",
-		false,
-		"Skip records that already exist in the namespace;\n"+
-			"Don't touch them.\n")
-	flagSet.BoolVarP(&f.Replace, "replace", "r",
-		false,
-		"Fully replace records that already exist in the namespace;\n"+
-			"Don't update them.\n")
-	flagSet.BoolVarP(&f.NoGeneration, "no-generation", "g",
-		false,
-		"Don't check the generation of records that already exist in the namespace.")
+
 	flagSet.Int64VarP(&f.TimeOut, "timeout", "T",
 		10000,
-		"Set the timeout (ms) for commands.")
+		"Set the timeout (ms) for info commands.")
 	flagSet.Int64Var(&f.RetryBaseTimeout, "retry-base-timeout",
 		1000,
 		"Set the initial delay between retry attempts in milliseconds")

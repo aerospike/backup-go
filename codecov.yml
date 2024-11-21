@@ -1,2 +1,6 @@
 ignore:
   - "cmd/internal/models"
+  - "examples"
+  - "cmd/asbackup"
+  - "cmd/asrestore"
+  - "models"

@@ -47,6 +47,12 @@ func Test_BackupRestore(t *testing.T) {
 		Password: testASLoginPassword,
 	}
 
+	clientPolicy := &models.ClientPolicy{
+		Timeout:      1000,
+		IdleTimeout:  1000,
+		LoginTimeout: 1000,
+	}
+
 	bParams := &models.Backup{}
 
 	cParams := &models.Common{
@@ -71,7 +77,7 @@ func Test_BackupRestore(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	asb, err := NewASBackup(ctx, clientCfg, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asb, err := NewASBackup(ctx, clientCfg, clientPolicy, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
 	require.NoError(t, err)
 
 	err = asb.Run(ctx)
@@ -82,7 +88,7 @@ func Test_BackupRestore(t *testing.T) {
 		MaxAsyncBatches: 1,
 	}
 
-	asr, err := NewASRestore(ctx, clientCfg, rParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asr, err := NewASRestore(ctx, clientCfg, clientPolicy, rParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
 	require.NoError(t, err)
 
 	err = asr.Run(ctx)
@@ -102,6 +108,12 @@ func Test_BackupWithState(t *testing.T) {
 		},
 		User:     testASLoginPassword,
 		Password: testASLoginPassword,
+	}
+
+	clientPolicy := &models.ClientPolicy{
+		Timeout:      1000,
+		IdleTimeout:  1000,
+		LoginTimeout: 1000,
 	}
 
 	bParams := &models.Backup{
@@ -132,7 +144,7 @@ func Test_BackupWithState(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	asb, err := NewASBackup(ctx, clientCfg, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asb, err := NewASBackup(ctx, clientCfg, clientPolicy, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
 	require.NoError(t, err)
 
 	err = asb.Run(ctx)

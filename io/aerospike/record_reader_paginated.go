@@ -80,7 +80,7 @@ func (r *RecordReader) readPage() (*models.Token, error) {
 // startScanPaginated starts the scan for the RecordReader only for state save!
 func (r *RecordReader) startScanPaginated(localErrChan chan error) {
 	scanPolicy := *r.config.scanPolicy
-	scanPolicy.FilterExpression = getScanExpression(r.config.timeBounds, r.config.noTTLOnly)
+	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {

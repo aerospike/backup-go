@@ -134,6 +134,7 @@ func NewDefaultBackupConfig() *BackupConfig {
 		ParallelWrite:    1,
 		Namespace:        "test",
 		EncoderType:      EncoderTypeASB,
+		ScanPolicy:       a.NewScanPolicy(),
 	}
 }
 
@@ -162,7 +163,7 @@ func (c *BackupConfig) isStateContinue() bool {
 
 func (c *BackupConfig) isFullBackup() bool {
 	// full backup doesn't have a lower bound.
-	return c.ModAfter == nil && c.isDefaultPartitionFilter()
+	return c.ModAfter == nil && c.isDefaultPartitionFilter() && c.ScanPolicy.FilterExpression == nil
 }
 
 //nolint:gocyclo // validate func is long func with a lot of checks.

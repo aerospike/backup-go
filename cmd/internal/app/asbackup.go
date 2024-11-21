@@ -30,7 +30,7 @@ type ASBackup struct {
 	backupClient *backup.Client
 	backupConfig *backup.BackupConfig
 	writer       backup.Writer
-	// reader is used to read state file.
+	// reader is used to read a state file.
 	reader backup.StreamingReader
 	// Additional params.
 	isEstimate       bool
@@ -40,6 +40,7 @@ type ASBackup struct {
 func NewASBackup(
 	ctx context.Context,
 	clientConfig *client.AerospikeConfig,
+	clientPolicy *models.ClientPolicy,
 	backupParams *models.Backup,
 	commonParams *models.Common,
 	compression *models.Compression,
@@ -119,7 +120,7 @@ func NewASBackup(
 		}
 	}
 
-	aerospikeClient, err := newAerospikeClient(clientConfig, backupParams.PreferRacks)
+	aerospikeClient, err := newAerospikeClient(clientConfig, clientPolicy, backupParams.PreferRacks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}

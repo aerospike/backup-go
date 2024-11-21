@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testS3Bucket = "asbackup"
+
 func TestNewLocalReader(t *testing.T) {
 	t.Parallel()
 	r := &models.Restore{}
@@ -58,14 +60,15 @@ func TestNewS3Reader(t *testing.T) {
 
 	r := &models.Restore{}
 	c := &models.Common{
-		Directory: "asbackup/" + t.TempDir(),
+		Directory: t.TempDir(),
 	}
 	b := &models.Backup{}
 
 	s3cfg := &models.AwsS3{
-		Region:   testS3Region,
-		Profile:  testS3Profile,
-		Endpoint: testS3Endpoint,
+		BucketName: testS3Bucket,
+		Region:     testS3Region,
+		Profile:    testS3Profile,
+		Endpoint:   testS3Endpoint,
 	}
 
 	ctx := context.Background()
@@ -76,7 +79,7 @@ func TestNewS3Reader(t *testing.T) {
 	assert.Equal(t, testS3Type, writer.GetType())
 
 	r = &models.Restore{
-		InputFile: "asbackup/" + t.TempDir() + testFileName,
+		InputFile: t.TempDir() + testFileName,
 	}
 	c = &models.Common{}
 

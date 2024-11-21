@@ -22,7 +22,7 @@ import (
 
 func TestCompression_NewFlagSet(t *testing.T) {
 	t.Parallel()
-	compression := NewCompression()
+	compression := NewCompression(OperationBackup)
 
 	flagSet := compression.NewFlagSet()
 
@@ -42,7 +42,7 @@ func TestCompression_NewFlagSet(t *testing.T) {
 
 func TestCompression_NewFlagSet_DefaultValues(t *testing.T) {
 	t.Parallel()
-	compression := NewCompression()
+	compression := NewCompression(OperationRestore)
 
 	flagSet := compression.NewFlagSet()
 

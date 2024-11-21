@@ -8,11 +8,13 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0
 	github.com/aerospike/aerospike-client-go/v7 v7.7.2
+	github.com/aerospike/aerospike-management-lib v1.5.0
 	github.com/aerospike/tools-common-go v0.0.0-20241008160846-fe05e01c0f83
 	github.com/aws/aws-sdk-go-v2 v1.32.5
 	github.com/aws/aws-sdk-go-v2/config v1.28.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.67.1
 	github.com/aws/smithy-go v1.22.1
+	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.17.11
 	github.com/spf13/cobra v1.8.1
@@ -66,7 +68,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
@@ -119,6 +120,8 @@ require (
 	google.golang.org/grpc v1.67.1 // indirect
 	google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b2c93a // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/apimachinery v0.29.0 // indirect
 )

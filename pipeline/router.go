@@ -14,33 +14,19 @@
 
 package pipeline
 
-import "fmt"
+import "github.com/aerospike/backup-go/internal/util"
 
 const (
-	// ModeOneToOne means that each worker sends messages directly to another stage worker.
-	// All stages must have the same number of workers.
-	ModeOneToOne = iota
-	// ModeManyToOne means that all workers send messages to one channel.
-	// And the next stage took messages to process from this one channel.
-	// There can be different workers number on each stage.
-	ModeManyToOne
-	// ModeOneToMany means that one worker sends messages to different workers on next stage.
-	ModeOneToMany
+	// modeParallel each worker get it own channel.
+	modeParallel = iota
+	// modeSingle all workers get one channel.
+	modeSingle
 )
 
-type routeRule struct {
-	Mode      int
-	Processor func()
-}
-
-type route[T any] struct {
-	send []chan T
-}
-
-func newRoute[T any](send []chan T) *route[T] {
-	return &route[T]{
-		send: send,
-	}
+type routeRule[T any] struct {
+	Mode       int
+	BufferSize int
+	splitFunc  splitFunc[T]
 }
 
 // Router is used to route communication channels between stage workers.
@@ -49,82 +35,116 @@ type Router[T any] struct {
 	// Modes ordered slice of communication modes between stages.
 	// For e.g.: for three stages, we must set two modes.
 	// For communication between 1 and 2, 2 and 3 stages.
-	Modes []int
-
-	// Func for route?
-	Rule string
+	Rules []routeRule[T]
 }
 
 // NewRouter returns new Router instance.
-func NewRouter[T any](modes []int) *Router[T] {
+func NewRouter[T any](rules []routeRule[T]) *Router[T] {
 	return &Router[T]{
-		Modes: modes,
+		Rules: rules,
 	}
 }
 
 func (r *Router[T]) Set(stages []*stage[T]) error {
+	// Define channels for a previous step.
+	var (
+		prevOutput  []chan T
+		prevOutMode int
+	)
 	// For first and last step we need to create empty chan.
-	sendChans := make([]chan T, 0, len(stages[0].workers))
-	nextRoute := nil
-	for i := range stages {
-		rt, err := r.applyRoute(stages[i], nextRoute)
-		if err != nil {
-			return err
+	for i, s := range stages {
+		// For the first stage, we initialize empty channels.
+		if i == 0 {
+			prevOutput = r.create(s.inputRoute.Mode, len(s.workers), s.outputRoute.BufferSize)
+			prevOutMode = s.outputRoute.Mode
 		}
 
-		nextRoute = rt
+		output := make([]chan T, 0)
+
+		switch {
+		case prevOutMode == s.inputRoute.Mode:
+
+			// If previous and next modes are the same, we connect workers directly.
+			output = r.create(s.inputRoute.Mode, len(s.workers), s.outputRoute.BufferSize)
+
+		case prevOutMode == modeParallel && s.inputRoute.Mode == modeSingle:
+			// Merge channels.
+			op := util.MergeChannels(prevOutput)
+			output = append(output, op)
+		case prevOutMode == modeSingle && s.inputRoute.Mode == modeParallel:
+			// Split channels.
+			output = splitChannels(prevOutput[0], len(s.workers), s.outputRoute.splitFunc[T])
+		}
+
+		r.connect(s.workers, prevOutput, output)
+
+		prevOutput = output
+		prevOutMode = s.outputRoute.Mode
 	}
 
 	return nil
 }
 
-// ApplyRoute returns route for next stage
-func (r *Router[T]) applyRoute(st *stage[T], previousRoute *route[T]) (*route[T], error) {
-	// TODO check if previousRoute nil
-	switch st.routeRule.Mode {
-	case ModeOneToOne:
-		if len(st.workers) != len(previousRoute.send) {
-			return nil, fmt.Errorf("can't apply route with %d channels to %d workers",
-				len(previousRoute.send), len(st.workers))
+func (r *Router[T]) create(mode, workersNumber, bufferSize int) []chan T {
+	result := make([]chan T, workersNumber)
+	switch mode {
+	case modeParallel:
+		for i := 0; i < workersNumber; i++ {
+			comChan := make(chan T, bufferSize)
+			result = append(result, comChan)
 		}
-
-		sendChans := make([]chan T, 0, len(st.workers))
-
-		for i := range st.workers {
-			// Set input.
-			st.workers[i].SetReceiveChan(previousRoute.send[i])
-			// Set output.
-			send := make(chan T)
-			st.workers[i].SetSendChan(send)
-			sendChans = append(sendChans, send)
-		}
-
-		return newRoute(sendChans), nil
-	case ModeManyToOne:
-		// Set output.
-		send := make(chan T)
-		for i := range st.workers {
-			// Set input.
-			st.workers[i].SetReceiveChan(previousRoute.send[i])
-
-			st.workers[i].SetSendChan(send)
-		}
-
-		return newRoute([]chan T{send}), nil
-	case ModeOneToMany:
-		sendChans := make([]chan T, 0, len(st.workers))
-
-		for i := range st.workers {
-			// Set input.
-			st.workers[i].SetReceiveChan(previousRoute.send[0])
-			// Set output.
-			send := make(chan T)
-			st.workers[i].SetSendChan(send)
-			sendChans = append(sendChans, send)
-		}
-
-		return newRoute(sendChans), nil
-	default:
-		return nil, fmt.Errorf("mode %d not supported", st.routeRule.Mode)
+	case modeSingle:
+		comChan := make(chan T, bufferSize)
+		result = append(result, comChan)
 	}
+
+	return result
+}
+
+func (r *Router[T]) connect(workers []Worker[T], input, output []chan T) {
+	// Set input and output channels.
+	for j, w := range workers {
+		switch {
+		case len(input) == 1 && len(output) == 1:
+			// Single.
+			w.SetReceiveChan(input[0])
+			w.SetSendChan(output[0])
+		case len(input) == len(output):
+			// Parallel.
+			w.SetReceiveChan(input[j])
+			w.SetSendChan(output[j])
+		case len(input) > len(output) && len(output) == 1:
+			// Many to one.
+			w.SetReceiveChan(input[j])
+			w.SetSendChan(output[0])
+		case len(input) < len(output) && len(input) == 1:
+			// One to many
+			w.SetReceiveChan(input[0])
+			w.SetSendChan(output[j])
+		}
+	}
+}
+
+type splitFunc[T any] func(T) int
+
+func splitChannels[T any](commChan chan T, number int, splitFunc splitFunc[T]) []chan T {
+	if splitFunc == nil {
+		return nil
+	}
+
+	out := make([]chan T, 0, number)
+
+	for i := 0; i < number; i++ {
+		resChan := make(chan T)
+		out = append(out, resChan)
+	}
+
+	go func() {
+		for msg := range commChan {
+			chanNumber := splitFunc(msg)
+			out[chanNumber] <- msg
+		}
+	}()
+
+	return out
 }

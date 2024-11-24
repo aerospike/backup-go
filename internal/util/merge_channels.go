@@ -16,7 +16,7 @@ package util
 
 import "sync"
 
-func MergeChannels[T any](channels []chan T) chan T {
+func MergeChannels[T any](channels []<-chan T) <-chan T {
 	out := make(chan T)
 
 	if len(channels) == 0 {

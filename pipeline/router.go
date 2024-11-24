@@ -14,7 +14,9 @@
 
 package pipeline
 
-import "github.com/aerospike/backup-go/internal/util"
+import (
+	"sync"
+)
 
 const (
 	// modeParallel each worker get it own channel.
@@ -65,13 +67,11 @@ func (r *Router[T]) Set(stages []*stage[T]) error {
 
 		switch {
 		case prevOutMode == s.inputRoute.Mode:
-
 			// If previous and next modes are the same, we connect workers directly.
 			output = r.create(s.inputRoute.Mode, len(s.workers), s.outputRoute.BufferSize)
-
 		case prevOutMode == modeParallel && s.inputRoute.Mode == modeSingle:
 			// Merge channels.
-			op := util.MergeChannels(prevOutput)
+			op := r.mergeChannels(prevOutput)
 			output = append(output, op)
 		case prevOutMode == modeSingle && s.inputRoute.Mode == modeParallel:
 			// Split channels.
@@ -89,6 +89,7 @@ func (r *Router[T]) Set(stages []*stage[T]) error {
 
 func (r *Router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 	result := make([]chan T, workersNumber)
+
 	switch mode {
 	case modeParallel:
 		for i := 0; i < workersNumber; i++ {
@@ -144,6 +145,39 @@ func (r *Router[T]) splitChannels(commChan chan T, number int, splitFunc splitFu
 			chanNumber := splitFunc(msg)
 			out[chanNumber] <- msg
 		}
+	}()
+
+	return out
+}
+
+func (r *Router[T]) mergeChannels(channels []chan T) chan T {
+	out := make(chan T)
+
+	if len(channels) == 0 {
+		close(out)
+		return out
+	}
+
+	var wg sync.WaitGroup
+	// Run an output goroutine for each input channel.
+	output := func(c <-chan T) {
+		for n := range c {
+			out <- n
+		}
+
+		wg.Done()
+	}
+
+	wg.Add(len(channels))
+
+	for _, c := range channels {
+		go output(c)
+	}
+
+	// Run a goroutine to close out once all the output goroutines are done.
+	go func() {
+		wg.Wait()
+		close(out)
 	}()
 
 	return out

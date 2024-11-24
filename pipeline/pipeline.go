@@ -188,8 +188,8 @@ type stage[T any] struct {
 	// if synced, we distribute communication channels through workers.
 	isSynced bool
 	// Communication routes.
-	inputRoute  routeRule
-	outputRoute routeRule
+	inputRoute  routeRule[T]
+	outputRoute routeRule[T]
 }
 
 func (s *stage[T]) SetReceiveChan(c []<-chan T) {

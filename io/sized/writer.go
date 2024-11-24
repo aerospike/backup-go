@@ -34,7 +34,7 @@ type Writer struct {
 	saveCommandChan chan int
 }
 
-// NewWriter creates a new Writer writer with a size limit.
+// NewWriter creates a new Writer with a size limit.
 // limit must be greater than 0.
 func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit int64,
 	open func(context.Context) (io.WriteCloser, error)) (*Writer, error) {

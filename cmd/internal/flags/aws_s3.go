@@ -30,6 +30,9 @@ func NewAwsS3() *AwsS3 {
 func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
+	flagSet.StringVar(&f.BucketName, "s3-bucket-name",
+		"",
+		"Existing S3 bucket name")
 	flagSet.StringVar(&f.Region, "s3-region",
 		"",
 		"The S3 region that the bucket(s) exist in.")

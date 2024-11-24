@@ -182,7 +182,8 @@ func (r *RecordReader) Close() {
 // startScan starts the scan for the RecordReader.
 func (r *RecordReader) startScan() (*recordSets, error) {
 	scanPolicy := *r.config.scanPolicy
-	scanPolicy.FilterExpression = getScanExpression(r.config.timeBounds, r.config.noTTLOnly)
+
+	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {
@@ -265,8 +266,12 @@ func (r *RecordReader) isScanStarted() bool {
 	return r.scanResult != nil
 }
 
-func getScanExpression(bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
+func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
 	expressions := make([]*a.Expression, 0)
+
+	if currentExpression != nil {
+		expressions = append(expressions, currentExpression)
+	}
 
 	exp := timeBoundExpression(bounds)
 	if exp != nil {

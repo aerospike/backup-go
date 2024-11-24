@@ -80,7 +80,7 @@ func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
 	result := backup.GetBackup()
 
 	assert.Equal(t, "", result.OutputFile, "The default value for output-file should be an empty string")
-	assert.Equal(t, int64(0), result.FileLimit, "The default value for file-limit should be 0")
+	assert.Equal(t, int64(262144000), result.FileLimit, "The default value for file-limit should be 0")
 	assert.Equal(t, "", result.AfterDigest, "The default value for after-digest should be an empty string")
 	assert.Equal(t, "", result.ModifiedBefore, "The default value for modified-before should be an empty string")
 	assert.Equal(t, "", result.ModifiedAfter, "The default value for modified-after should be an empty string")

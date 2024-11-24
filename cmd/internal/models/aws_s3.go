@@ -21,14 +21,20 @@ import (
 )
 
 type AwsS3 struct {
-	Region   string
-	Profile  string
-	Endpoint string
+	BucketName string
+	Region     string
+	Profile    string
+	Endpoint   string
 }
 
 // LoadSecrets tries to load field values from secret agent.
 func (a *AwsS3) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	var err error
+
+	a.BucketName, err = backup.ParseSecret(cfg, a.BucketName)
+	if err != nil {
+		return fmt.Errorf("failed to load bucket name from secret agent: %w", err)
+	}
 
 	a.Region, err = backup.ParseSecret(cfg, a.Region)
 	if err != nil {

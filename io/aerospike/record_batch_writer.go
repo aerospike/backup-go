@@ -27,12 +27,34 @@ import (
 type batchRecordWriter struct {
 	asc               dbWriter
 	writePolicy       *a.WritePolicy
+	batchPolicy       *a.BatchPolicy
 	stats             *models.RestoreStats
 	logger            *slog.Logger
 	retryPolicy       *models.RetryPolicy
 	operationBuffer   []a.BatchRecordIfc
 	batchSize         int
 	ignoreRecordError bool
+}
+
+func newBatchRecordWriter(
+	asc dbWriter,
+	writePolicy *a.WritePolicy,
+	stats *models.RestoreStats,
+	retryPolicy *models.RetryPolicy,
+	batchSize int,
+	ignoreRecordError bool,
+	logger *slog.Logger,
+) *batchRecordWriter {
+	return &batchRecordWriter{
+		asc:               asc,
+		writePolicy:       writePolicy,
+		batchPolicy:       mapWriteToBatchPolicy(writePolicy),
+		stats:             stats,
+		logger:            logger,
+		retryPolicy:       retryPolicy,
+		batchSize:         batchSize,
+		ignoreRecordError: ignoreRecordError,
+	}
 }
 
 func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
@@ -103,7 +125,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			slog.Int("bufferSize", len(rw.operationBuffer)),
 		)
 
-		err = rw.asc.BatchOperate(nil, rw.operationBuffer)
+		err = rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
 
 		switch {
 		case isNilOrAcceptableError(err),
@@ -198,4 +220,12 @@ func errMapToErr(errMap map[atypes.ResultCode]error) error {
 	}
 
 	return result
+}
+
+func mapWriteToBatchPolicy(w *a.WritePolicy) *a.BatchPolicy {
+	bp := a.NewBatchPolicy()
+	bp.SocketTimeout = w.SocketTimeout
+	bp.TotalTimeout = w.TotalTimeout
+
+	return bp
 }

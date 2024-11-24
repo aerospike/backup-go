@@ -44,16 +44,17 @@ var rootCmd = &cobra.Command{
 }
 
 var (
-	flagsApp         = flags.NewApp()
-	flagsAerospike   = asFlags.NewDefaultAerospikeFlags()
-	flagsCommon      = flags.NewCommon()
-	flagsBackup      = flags.NewBackup()
-	flagsCompression = flags.NewCompression()
-	flagsEncryption  = flags.NewEncryption()
-	flagsSecretAgent = flags.NewSecretAgent()
-	flagsAws         = flags.NewAwsS3()
-	flagsGcp         = flags.NewGcpStorage()
-	flagsAzure       = flags.NewAzureBlob()
+	flagsApp          = flags.NewApp()
+	flagsAerospike    = asFlags.NewDefaultAerospikeFlags()
+	flagsClientPolicy = flags.NewClientPolicy()
+	flagsCommon       = flags.NewCommon(flags.OperationBackup)
+	flagsBackup       = flags.NewBackup()
+	flagsCompression  = flags.NewCompression(flags.OperationBackup)
+	flagsEncryption   = flags.NewEncryption(flags.OperationBackup)
+	flagsSecretAgent  = flags.NewSecretAgent()
+	flagsAws          = flags.NewAwsS3()
+	flagsGcp          = flags.NewGcpStorage()
+	flagsAzure        = flags.NewAzureBlob()
 )
 
 func init() {
@@ -63,6 +64,7 @@ func init() {
 
 	appFlagSet := flagsApp.NewFlagSet()
 	aerospikeFlagSet := flagsAerospike.NewFlagSet(func(str string) string { return str })
+	clientPolicyFlagSet := flagsClientPolicy.NewFlagSet()
 	commonFlagSet := flagsCommon.NewFlagSet()
 	backupFlagSet := flagsBackup.NewFlagSet()
 	compressionFlagSet := flagsCompression.NewFlagSet()
@@ -75,6 +77,7 @@ func init() {
 	// App flags.
 	rootCmd.PersistentFlags().AddFlagSet(appFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(aerospikeFlagSet)
+	rootCmd.PersistentFlags().AddFlagSet(clientPolicyFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(commonFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(backupFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(compressionFlagSet)
@@ -98,6 +101,7 @@ func init() {
 		// Print section: Common Flags
 		fmt.Println("\nAerospike Client Flags:")
 		aerospikeFlagSet.PrintDefaults()
+		clientPolicyFlagSet.PrintDefaults()
 
 		// Print section: Backup Flags
 		fmt.Println("\nBackup Flags:")
@@ -122,7 +126,8 @@ func init() {
 
 		// Print section: AWS Flags
 		fmt.Println("\nAWS Flags:\n" +
-			"For AWS storage bucket name is set in --directory path <bucket_name>/<backup_folder>.\n" +
+			"For S3 storage bucket name is mandatory, and is set with --s3-bucket-name flag.\n" +
+			"So --directory path will only contain folder name.\n" +
 			"--s3-endpoint-override is used in case you want to use minio, instead of AWS.\n" +
 			"Any AWS parameter can be retrieved from secret agent.")
 		awsFlagSet.PrintDefaults()
@@ -181,6 +186,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	asb, err := app.NewASBackup(
 		cmd.Context(),
 		flagsAerospike.NewAerospikeConfig(),
+		flagsClientPolicy.GetClientPolicy(),
 		flagsBackup.GetBackup(),
 		flagsCommon.GetCommon(),
 		flagsCompression.GetCompression(),

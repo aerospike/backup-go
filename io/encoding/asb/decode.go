@@ -319,7 +319,7 @@ func (r *Decoder) readGlobals() (any, error) {
 }
 
 // readSindex is used to read secondary index lines in the global section of the asb file.
-// readSindex expects that r has been advanced past the secondary index global line markter '* i'
+// readSindex expects that r has been advanced past the secondary index global line marker '* i'
 func (r *Decoder) readSIndex() (*models.SIndex, error) {
 	var res models.SIndex
 

@@ -48,7 +48,7 @@ func printRestoreReport(stats *bModels.RestoreStats) {
 	fmt.Printf("Expired Records:      %d\n", stats.GetRecordsExpired())
 	fmt.Printf("Skipped Records:      %d\n", stats.GetRecordsSkipped())
 	fmt.Printf("Ignored Records:      %d\n", stats.GetRecordsIgnored())
-	fmt.Printf("Freasher Records:     %d\n", stats.GetRecordsFresher())
+	fmt.Printf("Fresher Records:     %d\n", stats.GetRecordsFresher())
 	fmt.Printf("Existed Records:      %d\n", stats.GetRecordsExisted())
 	fmt.Printf("Inserted Records:     %d\n", stats.GetRecordsInserted())
 	fmt.Printf("Total Bytes Read:     %d\n", stats.GetTotalBytesRead())

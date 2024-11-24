@@ -92,13 +92,10 @@ func newS3Reader(
 		return nil, err
 	}
 
-	var bucketName, path string
-
 	opts := make([]s3.Opt, 0)
 
 	if c.Directory != "" && r.InputFile == "" {
-		bucketName, path = getBucketFromPath(c.Directory)
-		opts = append(opts, s3.WithDir(path))
+		opts = append(opts, s3.WithDir(c.Directory))
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
@@ -107,11 +104,10 @@ func newS3Reader(
 	}
 
 	if r.InputFile != "" && c.Directory == "" {
-		bucketName, path = getBucketFromPath(r.InputFile)
-		opts = append(opts, s3.WithFile(path))
+		opts = append(opts, s3.WithFile(r.InputFile))
 	}
 
-	return s3.NewReader(ctx, client, bucketName, opts...)
+	return s3.NewReader(ctx, client, a.BucketName, opts...)
 }
 
 func newGcpReader(

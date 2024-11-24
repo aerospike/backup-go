@@ -50,10 +50,16 @@ func validateStorages(
 	return nil
 }
 
+//nolint:gocyclo // It is a long validation function.
 func validateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
 	// Only one filter is allowed.
 	if backupParams.AfterDigest != "" && backupParams.PartitionList != "" {
 		return fmt.Errorf("only one of after-digest or partition-list can be configured")
+	}
+
+	if (backupParams.Continue != "" || backupParams.Estimate || backupParams.StateFileDst != "") &&
+		(backupParams.ParallelNodes || backupParams.NodeList != "") {
+		return fmt.Errorf("saving states and calculating estimates is not possible in parallel node mode")
 	}
 
 	if backupParams.Estimate {

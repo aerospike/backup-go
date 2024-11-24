@@ -23,10 +23,12 @@ const (
 	modeSingle
 )
 
+type splitFunc func(T any) int
+
 type routeRule[T any] struct {
 	Mode       int
 	BufferSize int
-	splitFunc  splitFunc[T]
+	splitFunc  splitFunc
 }
 
 // Router is used to route communication channels between stage workers.
@@ -73,7 +75,7 @@ func (r *Router[T]) Set(stages []*stage[T]) error {
 			output = append(output, op)
 		case prevOutMode == modeSingle && s.inputRoute.Mode == modeParallel:
 			// Split channels.
-			output = splitChannels(prevOutput[0], len(s.workers), s.outputRoute.splitFunc[T])
+			output = r.splitChannels(prevOutput[0], len(s.workers), s.outputRoute.splitFunc)
 		}
 
 		r.connect(s.workers, prevOutput, output)
@@ -125,9 +127,7 @@ func (r *Router[T]) connect(workers []Worker[T], input, output []chan T) {
 	}
 }
 
-type splitFunc[T any] func(T) int
-
-func splitChannels[T any](commChan chan T, number int, splitFunc splitFunc[T]) []chan T {
+func (r *Router[T]) splitChannels(commChan chan T, number int, splitFunc splitFunc) []chan T {
 	if splitFunc == nil {
 		return nil
 	}

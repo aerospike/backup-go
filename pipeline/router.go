@@ -25,31 +25,45 @@ const (
 	modeSingle
 )
 
-type splitFunc func(T any) int
+type splitFunc[T any] func(T) int
 
-type routeRule[T any] struct {
+type Route[T any] struct {
+	input  *RouteRule[T]
+	output *RouteRule[T]
+}
+
+type RouteRule[T any] struct {
 	Mode       int
 	BufferSize int
-	splitFunc  splitFunc
+	sf         splitFunc[T]
 }
 
-// Router is used to route communication channels between stage workers.
-// Router is placed between stages.
-type Router[T any] struct {
-	// Modes ordered slice of communication modes between stages.
-	// For e.g.: for three stages, we must set two modes.
-	// For communication between 1 and 2, 2 and 3 stages.
-	Rules []routeRule[T]
-}
-
-// NewRouter returns new Router instance.
-func NewRouter[T any](rules []routeRule[T]) *Router[T] {
-	return &Router[T]{
-		Rules: rules,
+func NewRouteRuleSingle[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] {
+	return &RouteRule[T]{
+		Mode:       modeSingle,
+		BufferSize: bufferSize,
+		sf:         sf,
 	}
 }
 
-func (r *Router[T]) Set(stages []*stage[T]) error {
+func NewRouteRuleParallel[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] {
+	return &RouteRule[T]{
+		Mode:       modeParallel,
+		BufferSize: bufferSize,
+		sf:         sf,
+	}
+}
+
+// router is used to route communication channels between stage workers.
+// the router is placed between stages.
+type router[T any] struct{}
+
+// NewRouter returns new router instance.
+func NewRouter[T any]() *router[T] {
+	return &router[T]{}
+}
+
+func (r *router[T]) Set(stages []*stage[T]) error {
 	// Define channels for a previous step.
 	var (
 		prevOutput  []chan T
@@ -59,35 +73,35 @@ func (r *Router[T]) Set(stages []*stage[T]) error {
 	for i, s := range stages {
 		// For the first stage, we initialize empty channels.
 		if i == 0 {
-			prevOutput = r.create(s.inputRoute.Mode, len(s.workers), s.outputRoute.BufferSize)
-			prevOutMode = s.outputRoute.Mode
+			prevOutput = r.create(s.route.input.Mode, len(s.workers), s.route.output.BufferSize)
+			prevOutMode = s.route.output.Mode
 		}
 
 		output := make([]chan T, 0)
 
 		switch {
-		case prevOutMode == s.inputRoute.Mode:
+		case prevOutMode == s.route.input.Mode:
 			// If previous and next modes are the same, we connect workers directly.
-			output = r.create(s.inputRoute.Mode, len(s.workers), s.outputRoute.BufferSize)
-		case prevOutMode == modeParallel && s.inputRoute.Mode == modeSingle:
+			output = r.create(s.route.input.Mode, len(s.workers), s.route.output.BufferSize)
+		case prevOutMode == modeParallel && s.route.input.Mode == modeSingle:
 			// Merge channels.
 			op := r.mergeChannels(prevOutput)
 			output = append(output, op)
-		case prevOutMode == modeSingle && s.inputRoute.Mode == modeParallel:
+		case prevOutMode == modeSingle && s.route.input.Mode == modeParallel:
 			// Split channels.
-			output = r.splitChannels(prevOutput[0], len(s.workers), s.outputRoute.splitFunc)
+			output = r.splitChannels(prevOutput[0], len(s.workers), s.route.output.sf)
 		}
 
 		r.connect(s.workers, prevOutput, output)
 
 		prevOutput = output
-		prevOutMode = s.outputRoute.Mode
+		prevOutMode = s.route.output.Mode
 	}
 
 	return nil
 }
 
-func (r *Router[T]) create(mode, workersNumber, bufferSize int) []chan T {
+func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 	result := make([]chan T, workersNumber)
 
 	switch mode {
@@ -104,7 +118,7 @@ func (r *Router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 	return result
 }
 
-func (r *Router[T]) connect(workers []Worker[T], input, output []chan T) {
+func (r *router[T]) connect(workers []Worker[T], input, output []chan T) {
 	// Set input and output channels.
 	for j, w := range workers {
 		switch {
@@ -128,8 +142,8 @@ func (r *Router[T]) connect(workers []Worker[T], input, output []chan T) {
 	}
 }
 
-func (r *Router[T]) splitChannels(commChan chan T, number int, splitFunc splitFunc) []chan T {
-	if splitFunc == nil {
+func (r *router[T]) splitChannels(commChan chan T, number int, sf splitFunc[T]) []chan T {
+	if sf == nil {
 		return nil
 	}
 
@@ -142,7 +156,7 @@ func (r *Router[T]) splitChannels(commChan chan T, number int, splitFunc splitFu
 
 	go func() {
 		for msg := range commChan {
-			chanNumber := splitFunc(msg)
+			chanNumber := sf(msg)
 			out[chanNumber] <- msg
 		}
 	}()
@@ -150,7 +164,7 @@ func (r *Router[T]) splitChannels(commChan chan T, number int, splitFunc splitFu
 	return out
 }
 
-func (r *Router[T]) mergeChannels(channels []chan T) chan T {
+func (r *router[T]) mergeChannels(channels []chan T) chan T {
 	out := make(chan T)
 
 	if len(channels) == 0 {
@@ -159,7 +173,7 @@ func (r *Router[T]) mergeChannels(channels []chan T) chan T {
 	}
 
 	var wg sync.WaitGroup
-	// Run an output goroutine for each input channel.
+
 	output := func(c <-chan T) {
 		for n := range c {
 			out <- n

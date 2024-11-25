@@ -15,6 +15,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -122,7 +123,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 		switch {
 		case prevOutMode == s.route.input.mode:
 			// If previous and next modes are the same, we connect workers directly.
-			output = r.create(s.route.input.mode, len(s.workers), s.route.input.bufferSize)
+			output = r.create(s.route.output.mode, len(s.workers), s.route.output.bufferSize)
 		case prevOutMode == modeParallel && s.route.input.mode == modeSingle:
 			// Merge channels.
 			op := r.mergeChannels(prevOutput)
@@ -132,7 +133,9 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 			output = r.splitChannels(prevOutput[0], len(s.workers), s.route.output.sf)
 		}
 
-		r.connect(s.workers, prevOutput, output)
+		if err := r.connect(s.workers, prevOutput, output); err != nil {
+			return err
+		}
 
 		prevOutput = output
 		prevOutMode = s.route.output.mode
@@ -160,7 +163,7 @@ func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 }
 
 // connect set communication channels to workers.
-func (r *router[T]) connect(workers []Worker[T], input, output []chan T) {
+func (r *router[T]) connect(workers []Worker[T], input, output []chan T) error {
 	// Set input and output channels.
 	for j, w := range workers {
 		switch {
@@ -180,8 +183,13 @@ func (r *router[T]) connect(workers []Worker[T], input, output []chan T) {
 			// One to many.
 			w.SetReceiveChan(input[0])
 			w.SetSendChan(output[j])
+		default:
+			return fmt.Errorf("failed to connect %d workers, with %d input and %d output",
+				len(workers), len(output), len(output))
 		}
 	}
+
+	return nil
 }
 
 func (r *router[T]) splitChannels(commChan chan T, number int, sf splitFunc[T]) []chan T {

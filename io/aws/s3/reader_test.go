@@ -52,6 +52,7 @@ func testClient(ctx context.Context) (*s3.Client, error) {
 func (s *AwsSuite) SetupSuite() {
 	ctx := context.Background()
 	client, err := testClient(ctx)
+	s.Require().NoError(err)
 	err = fillTestData(ctx, client)
 	s.Require().NoError(err)
 	s.client = client
@@ -85,10 +86,16 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 }
 
 func removeTestData(ctx context.Context, client *s3.Client) error {
-	client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(testBucket),
-		Key:    aws.String(testFolderStartAfter),
-	})
+	for i := range testFoldersTimestamps {
+		fileName := fmt.Sprintf("%s/%s/%s", testFolderStartAfter, testFoldersTimestamps[i], testFileNameMetadata)
+		_, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+		})
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

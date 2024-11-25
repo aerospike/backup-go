@@ -93,7 +93,7 @@ func removeTestData(ctx context.Context, client *s3.Client) error {
 	return nil
 }
 
-func (s *AwsSuite) TestReader_WithMarker() {
+func (s *AwsSuite) TestReader_WithStartAfter() {
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)

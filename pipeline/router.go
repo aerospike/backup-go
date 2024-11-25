@@ -111,10 +111,10 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 	)
 	// For first and last step we need to create empty chan.
 	for i, s := range stages {
-		// For the first stage, we initialize empty channels.
+		// For the first stage, we initialize empty input channels.
 		if i == 0 {
-			prevOutput = r.create(s.route.input.mode, len(s.workers), s.route.output.bufferSize)
-			prevOutMode = s.route.output.mode
+			prevOutput = r.create(s.route.input.mode, len(s.workers), 0)
+			prevOutMode = s.route.input.mode
 		}
 
 		output := make([]chan T, 0)
@@ -122,7 +122,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 		switch {
 		case prevOutMode == s.route.input.mode:
 			// If previous and next modes are the same, we connect workers directly.
-			output = r.create(s.route.input.mode, len(s.workers), s.route.output.bufferSize)
+			output = r.create(s.route.input.mode, len(s.workers), s.route.input.bufferSize)
 		case prevOutMode == modeParallel && s.route.input.mode == modeSingle:
 			// Merge channels.
 			op := r.mergeChannels(prevOutput)

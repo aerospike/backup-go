@@ -43,8 +43,6 @@ type Pipeline[T any] struct {
 	receive <-chan T
 	send    chan<- T
 	stages  []*stage[T]
-
-	routes []Route[T]
 }
 
 var _ Worker[any] = (*Pipeline[any])(nil)
@@ -74,7 +72,6 @@ func NewPipeline[T any](routes []Route[T], workGroups ...[]Worker[T]) (*Pipeline
 
 	return &Pipeline[T]{
 		stages: stages,
-		routes: routes,
 	}, nil
 }
 

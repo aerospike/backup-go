@@ -29,6 +29,7 @@ import (
 	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
 	"github.com/aerospike/backup-go/io/encryption"
+	"github.com/aerospike/backup-go/io/lazy"
 	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -327,7 +328,7 @@ func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, 
 		return sized.NewWriter(ctx, n, nil, bh.config.FileLimit, bh.newConfiguredWriter)
 	}
 
-	return bh.newConfiguredWriter(ctx)
+	return lazy.NewWriter(ctx, bh.newConfiguredWriter)
 }
 
 func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {

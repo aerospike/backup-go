@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,39 +21,39 @@ func TestRouter_CreateChannels(t *testing.T) {
 	assert.NotNil(t, singleChannels[0])
 }
 
-// func TestRouter_SplitChannels(t *testing.T) {
-// 	r := NewRouter[int]()
-// 	input := make(chan int, 10)
-//
-// 	go func() {
-// 		for i := 0; i < 10; i++ {
-// 			input <- i
-// 		}
-// 		close(input)
-// 	}()
-//
-// 	outputs := r.splitChannels(input, 2, testSplit[int])
-// 	assert.Equal(t, 2, len(outputs))
-//
-// 	wg := sync.WaitGroup{}
-// 	wg.Add(2)
-//
-// 	go func() {
-// 		defer wg.Done()
-// 		for msg := range outputs[0] {
-// 			assert.Equal(t, 0, msg%2)
-// 		}
-// 	}()
-//
-// 	go func() {
-// 		defer wg.Done()
-// 		for msg := range outputs[1] {
-// 			assert.Equal(t, 1, msg%2)
-// 		}
-// 	}()
-//
-// 	wg.Wait()
-// }
+func TestRouter_SplitChannels(t *testing.T) {
+	r := NewRouter[int]()
+	input := make(chan int, 10)
+
+	go func() {
+		for i := 0; i < 10; i++ {
+			input <- i
+		}
+		close(input)
+	}()
+
+	outputs := r.splitChannels(input, 2, testSplit[int])
+	assert.Equal(t, 2, len(outputs))
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for msg := range outputs[0] {
+			assert.Equal(t, 0, msg%2)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for msg := range outputs[1] {
+			assert.Equal(t, 1, msg%2)
+		}
+	}()
+
+	wg.Wait()
+}
 
 func testSplit[T int](v T) int {
 	if v%2 == 0 {

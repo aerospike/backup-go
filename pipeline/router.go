@@ -159,6 +159,9 @@ func (r *router[T]) splitChannels(commChan chan T, number int, sf splitFunc[T]) 
 			chanNumber := sf(msg)
 			out[chanNumber] <- msg
 		}
+		for i := 0; i < number; i++ {
+			close(out[i])
+		}
 	}()
 
 	return out

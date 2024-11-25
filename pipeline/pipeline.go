@@ -67,8 +67,8 @@ func NewPipeline[T any](routes []Route[T], workGroups ...[]Worker[T]) (*Pipeline
 		stages[i] = newStage(routes[i], workers...)
 	}
 
-	r := NewRouter[T]()
-	if err := r.Set(stages); err != nil {
+	r := newRouter[T]()
+	if err := r.apply(stages); err != nil {
 		return nil, err
 	}
 

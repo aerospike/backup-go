@@ -8,7 +8,7 @@ import (
 )
 
 func TestRouter_CreateChannels(t *testing.T) {
-	r := NewRouter[int]()
+	r := newRouter[int]()
 
 	parallelChannels := r.create(modeParallel, 3, 5)
 	assert.Equal(t, 3, len(parallelChannels))
@@ -22,7 +22,7 @@ func TestRouter_CreateChannels(t *testing.T) {
 }
 
 func TestRouter_SplitChannels(t *testing.T) {
-	r := NewRouter[int]()
+	r := newRouter[int]()
 	input := make(chan int, 10)
 
 	go func() {
@@ -63,7 +63,7 @@ func testSplit[T int](v T) int {
 }
 
 func TestRouter_MergeChannels(t *testing.T) {
-	r := NewRouter[int]()
+	r := newRouter[int]()
 	ch1 := make(chan int, 5)
 	ch2 := make(chan int, 5)
 

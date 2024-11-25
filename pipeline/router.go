@@ -25,31 +25,71 @@ const (
 	modeSingle
 )
 
+// splitFunc function that processes T and returns the number of a channel to send a message to.
 type splitFunc[T any] func(T) int
 
+// Route describes how workers will communicate through stages.
+// Each stage must have the corresponding route.
+// The Route consists of input and output rule.
 type Route[T any] struct {
 	input  *RouteRule[T]
 	output *RouteRule[T]
 }
 
-type RouteRule[T any] struct {
-	Mode       int
-	BufferSize int
-	sf         splitFunc[T]
+// NewSingleRoutes helper function, to initialize simple single mode routes.
+func NewSingleRoutes[T any](stagesNum int) []Route[T] {
+	result := make([]Route[T], 0, stagesNum)
+
+	for i := 0; i < stagesNum; i++ {
+		r := Route[T]{
+			input:  NewRouteRuleSingle[T](channelSize, nil),
+			output: NewRouteRuleSingle[T](channelSize, nil),
+		}
+		result = append(result, r)
+	}
+
+	return result
 }
 
+// NewParallelRoutes helper function, to initialize parallel (sync) mode routes.
+func NewParallelRoutes[T any](stagesNum int) []Route[T] {
+	result := make([]Route[T], 0, stagesNum)
+
+	for i := 0; i < stagesNum; i++ {
+		r := Route[T]{
+			input:  NewRouteRuleParallel[T](channelSize, nil),
+			output: NewRouteRuleParallel[T](channelSize, nil),
+		}
+		result = append(result, r)
+	}
+
+	return result
+}
+
+// RouteRule describes how exactly stages will communicate with each other.
+type RouteRule[T any] struct {
+	// mode can be single or parallel. Depending on that, one or more communication channels will be created.
+	mode int
+	// bufferSize is applied communication to channels.
+	bufferSize int
+	// sf split function is used when previous and next step routes have different mode.
+	sf splitFunc[T]
+}
+
+// NewRouteRuleSingle returns new route rule for single mode communication.
 func NewRouteRuleSingle[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] {
 	return &RouteRule[T]{
-		Mode:       modeSingle,
-		BufferSize: bufferSize,
+		mode:       modeSingle,
+		bufferSize: bufferSize,
 		sf:         sf,
 	}
 }
 
+// NewRouteRuleParallel returns new route rule for parallel mode communication.
 func NewRouteRuleParallel[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] {
 	return &RouteRule[T]{
-		Mode:       modeParallel,
-		BufferSize: bufferSize,
+		mode:       modeParallel,
+		bufferSize: bufferSize,
 		sf:         sf,
 	}
 }
@@ -58,12 +98,12 @@ func NewRouteRuleParallel[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] 
 // the router is placed between stages.
 type router[T any] struct{}
 
-// NewRouter returns new router instance.
-func NewRouter[T any]() *router[T] {
+// newRouter returns new router instance.
+func newRouter[T any]() *router[T] {
 	return &router[T]{}
 }
 
-func (r *router[T]) Set(stages []*stage[T]) error {
+func (r *router[T]) apply(stages []*stage[T]) error {
 	// Define channels for a previous step.
 	var (
 		prevOutput  []chan T
@@ -73,21 +113,21 @@ func (r *router[T]) Set(stages []*stage[T]) error {
 	for i, s := range stages {
 		// For the first stage, we initialize empty channels.
 		if i == 0 {
-			prevOutput = r.create(s.route.input.Mode, len(s.workers), s.route.output.BufferSize)
-			prevOutMode = s.route.output.Mode
+			prevOutput = r.create(s.route.input.mode, len(s.workers), s.route.output.bufferSize)
+			prevOutMode = s.route.output.mode
 		}
 
 		output := make([]chan T, 0)
 
 		switch {
-		case prevOutMode == s.route.input.Mode:
+		case prevOutMode == s.route.input.mode:
 			// If previous and next modes are the same, we connect workers directly.
-			output = r.create(s.route.input.Mode, len(s.workers), s.route.output.BufferSize)
-		case prevOutMode == modeParallel && s.route.input.Mode == modeSingle:
+			output = r.create(s.route.input.mode, len(s.workers), s.route.output.bufferSize)
+		case prevOutMode == modeParallel && s.route.input.mode == modeSingle:
 			// Merge channels.
 			op := r.mergeChannels(prevOutput)
 			output = append(output, op)
-		case prevOutMode == modeSingle && s.route.input.Mode == modeParallel:
+		case prevOutMode == modeSingle && s.route.input.mode == modeParallel:
 			// Split channels.
 			output = r.splitChannels(prevOutput[0], len(s.workers), s.route.output.sf)
 		}
@@ -95,12 +135,13 @@ func (r *router[T]) Set(stages []*stage[T]) error {
 		r.connect(s.workers, prevOutput, output)
 
 		prevOutput = output
-		prevOutMode = s.route.output.Mode
+		prevOutMode = s.route.output.mode
 	}
 
 	return nil
 }
 
+// create creates communication channels.
 func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 	result := make([]chan T, workersNumber)
 
@@ -118,6 +159,7 @@ func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 	return result
 }
 
+// connect set communication channels to workers.
 func (r *router[T]) connect(workers []Worker[T], input, output []chan T) {
 	// Set input and output channels.
 	for j, w := range workers {
@@ -135,7 +177,7 @@ func (r *router[T]) connect(workers []Worker[T], input, output []chan T) {
 			w.SetReceiveChan(input[j])
 			w.SetSendChan(output[0])
 		case len(input) < len(output) && len(input) == 1:
-			// One to many
+			// One to many.
 			w.SetReceiveChan(input[0])
 			w.SetSendChan(output[j])
 		}
@@ -159,6 +201,7 @@ func (r *router[T]) splitChannels(commChan chan T, number int, sf splitFunc[T]) 
 			chanNumber := sf(msg)
 			out[chanNumber] <- msg
 		}
+
 		for i := 0; i < number; i++ {
 			close(out[i])
 		}
@@ -191,7 +234,6 @@ func (r *router[T]) mergeChannels(channels []chan T) chan T {
 		go output(c)
 	}
 
-	// Run a goroutine to close out once all the output goroutines are done.
 	go func() {
 		wg.Wait()
 		close(out)

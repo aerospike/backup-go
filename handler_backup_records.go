@@ -77,7 +77,11 @@ func (bh *backupRecordsHandler) run(
 			ctx, bh.config.RecordsPerSecond),
 	), bh.config.ParallelRead)
 
-	pl, err := pipeline.NewPipeline(bh.config.SyncPipelines, readWorkers, composeProcessor, writers)
+	pl, err := pipeline.NewPipeline(
+		newRoutes[*models.Token](bh.config.SyncPipelines, 3),
+		readWorkers,
+		composeProcessor,
+		writers)
 	if err != nil {
 		return fmt.Errorf("failed to create new pipeline: %w", err)
 	}

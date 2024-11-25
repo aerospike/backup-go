@@ -21,6 +21,7 @@ import (
 	"runtime/debug"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 func handlePanic(errors chan<- error, logger *slog.Logger) {
@@ -131,4 +132,12 @@ func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 	}
 
 	return key, nil
+}
+
+func newRoutes[T any](isSynced bool, stagesNum int) []pipeline.Route[T] {
+	if isSynced {
+		return pipeline.NewParallelRoutes[T](stagesNum)
+	}
+
+	return pipeline.NewSingleRoutes[T](stagesNum)
 }

@@ -133,7 +133,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 			output = r.splitChannels(prevOutput[0], len(s.workers), s.route.output.sf)
 		}
 
-		if err := r.connect(s.workers, prevOutput, output); err != nil {
+		if err := r.connect(s, prevOutput, output); err != nil {
 			return err
 		}
 
@@ -146,7 +146,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 
 // create creates communication channels.
 func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
-	result := make([]chan T, workersNumber)
+	result := make([]chan T, 0, workersNumber)
 
 	switch mode {
 	case modeParallel:
@@ -163,9 +163,9 @@ func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 }
 
 // connect set communication channels to workers.
-func (r *router[T]) connect(workers []Worker[T], input, output []chan T) error {
+func (r *router[T]) connect(st *stage[T], input, output []chan T) error {
 	// Set input and output channels.
-	for j, w := range workers {
+	for j, w := range st.workers {
 		switch {
 		case len(input) == 1 && len(output) == 1:
 			// Single.
@@ -185,7 +185,7 @@ func (r *router[T]) connect(workers []Worker[T], input, output []chan T) error {
 			w.SetSendChan(output[j])
 		default:
 			return fmt.Errorf("failed to connect %d workers, with %d input and %d output",
-				len(workers), len(output), len(output))
+				len(st.workers), len(output), len(output))
 		}
 	}
 

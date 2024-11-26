@@ -252,6 +252,7 @@ func mapSecretAgentConfig(s *models.SecretAgent) *backup.SecretAgentConfig {
 
 func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, error) {
 	p := aerospike.NewScanPolicy()
+	p.SendKey = true
 	p.MaxRecords = b.MaxRecords
 	p.MaxRetries = c.MaxRetries
 	p.SleepBetweenRetries = time.Duration(b.SleepBetweenRetries) * time.Millisecond
@@ -280,6 +281,7 @@ func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, e
 
 func mapWritePolicy(r *models.Restore, c *models.Common) *aerospike.WritePolicy {
 	p := aerospike.NewWritePolicy(0, 0)
+	p.SendKey = true
 	p.MaxRetries = c.MaxRetries
 	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
 	p.SocketTimeout = time.Duration(c.SocketTimeout) * time.Millisecond

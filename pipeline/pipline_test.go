@@ -31,8 +31,14 @@ type pipelineTestSuite struct {
 
 func (suite *pipelineTestSuite) TestNewDataPipeline() {
 	w1 := mocks.NewMockWorker[string](suite.T())
+	w1.EXPECT().SetReceiveChan(mock.Anything)
+	w1.EXPECT().SetSendChan(mock.Anything)
 	w2 := mocks.NewMockWorker[string](suite.T())
+	w2.EXPECT().SetReceiveChan(mock.Anything)
+	w2.EXPECT().SetSendChan(mock.Anything)
 	w3 := mocks.NewMockWorker[string](suite.T())
+	w3.EXPECT().SetReceiveChan(mock.Anything)
+	w3.EXPECT().SetSendChan(mock.Anything)
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}}
 	routes := newRoutesForWorkers(len(workers))

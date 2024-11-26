@@ -252,7 +252,6 @@ func mapSecretAgentConfig(s *models.SecretAgent) *backup.SecretAgentConfig {
 
 func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, error) {
 	p := aerospike.NewScanPolicy()
-	p.SendKey = true
 	p.MaxRecords = b.MaxRecords
 	p.MaxRetries = c.MaxRetries
 	p.SleepBetweenRetries = time.Duration(b.SleepBetweenRetries) * time.Millisecond

@@ -202,6 +202,8 @@ func (tc *TestClient) ValidateSIndexes(t assert.TestingT, expected []*models.SIn
 
 // WriteRecords writes the given records to the database.
 func (tc *TestClient) WriteRecords(recs []*a.Record) error {
+	wp := tc.asc.GetDefaultWritePolicy()
+	wp.SendKey = true
 	for _, rec := range recs {
 		err := tc.asc.Put(nil, rec.Key, rec.Bins)
 		if err != nil {
@@ -249,12 +251,14 @@ func (tc *TestClient) ValidateRecords(
 
 	if len(actualRecs) != len(expectedRecs) {
 		t.Errorf("Expected %d records, got %d", len(expectedRecs), len(actualRecs))
+		return
 	}
 
 	for _, expRec := range expectedRecs {
 		actual, ok := actualRecs[string(expRec.Key.Digest())]
 		if !ok {
 			t.Errorf("Expected record not found: %v", expRec.Key)
+			return
 		}
 
 		assert.Equal(t, expRec.Bins, actual.Bins)

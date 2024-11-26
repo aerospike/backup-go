@@ -16,10 +16,13 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
@@ -28,6 +31,7 @@ import (
 
 const (
 	testNamespace = "test"
+	testSet       = "test"
 	testStateFile = "state"
 )
 
@@ -74,6 +78,9 @@ func Test_BackupRestore(t *testing.T) {
 	gcp := &models.GcpStorage{}
 
 	azure := &models.AzureBlob{}
+
+	err := createRecords(clientCfg, clientPolicy, testNamespace, testSet)
+	require.NoError(t, err)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -142,6 +149,9 @@ func Test_BackupWithState(t *testing.T) {
 
 	azure := &models.AzureBlob{}
 
+	err := createRecords(clientCfg, clientPolicy, testNamespace, testSet)
+	require.NoError(t, err)
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	asb, err := NewASBackup(ctx, clientCfg, clientPolicy, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
@@ -149,4 +159,28 @@ func Test_BackupWithState(t *testing.T) {
 
 	err = asb.Run(ctx)
 	require.NoError(t, err)
+}
+
+func createRecords(cfg *client.AerospikeConfig, cp *models.ClientPolicy, namespace, set string) error {
+	client, err := newAerospikeClient(cfg, cp, "")
+	if err != nil {
+		return fmt.Errorf("failed to create aerospike client: %w", err)
+	}
+
+	wp := aerospike.NewWritePolicy(0, 0)
+
+	for i := 0; i < 10; i++ {
+		key, err := aerospike.NewKey(namespace, set, fmt.Sprintf("map-key-%d", i))
+		if err != nil {
+			return fmt.Errorf("failed to create aerospike key: %w", err)
+		}
+
+		bin := aerospike.NewBin("time", time.Now().Unix())
+
+		if err = client.PutBins(wp, key, bin); err != nil {
+			return fmt.Errorf("failed to create aerospike key: %w", err)
+		}
+	}
+
+	return nil
 }

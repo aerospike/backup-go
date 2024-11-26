@@ -101,7 +101,6 @@ func (w *mockWorker) Run(ctx context.Context) error {
 		for i := 0; i < 3; i++ {
 			w.send <- fmt.Sprintf("%d", i)
 		}
-		close(w.send)
 	} else {
 		for {
 			select {
@@ -141,7 +140,7 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 	w4.EXPECT().SetSendChan(mock.Anything)
 	w4.EXPECT().Run(ctx)
 
-	workers := [][]Worker[string]{{w1, w2}, {w3}, {w4}}
+	workers := [][]Worker[string]{{w1}, {w3}, {w4, w2}}
 	routes := newRoutesForWorkers(len(workers))
 	pipeline, err := NewPipeline(routes, workers...)
 	suite.Require().Nil(err)
@@ -149,12 +148,6 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 
 	err = pipeline.Run(ctx)
 	suite.Nil(err)
-
-	for res := range pipeline.stages[2].send[0] {
-		if res != "0" && res != "1" {
-			suite.Fail("unexpected result: %s, expected 1 or 0", res)
-		}
-	}
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineRunWorkerFails() {

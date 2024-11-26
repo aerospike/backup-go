@@ -40,12 +40,8 @@ type Worker[T any] interface {
 // workers should not close the send channel, the pipeline stages handle that.
 // Pipelines can be chained together by using them as workers.
 type Pipeline[T any] struct {
-	receive <-chan T
-	send    chan<- T
-	stages  []*stage[T]
+	stages []*stage[T]
 }
-
-var _ Worker[any] = (*Pipeline[any])(nil)
 
 const channelSize = 256
 
@@ -73,22 +69,6 @@ func NewPipeline[T any](routes []Route[T], workGroups ...[]Worker[T]) (*Pipeline
 	return &Pipeline[T]{
 		stages: stages,
 	}, nil
-}
-
-// SetReceiveChan sets the receive channel for the pipeline.
-// The receive channel is used as the input to the first stage.
-// This satisfies the Worker interface so that pipelines can be chained together.
-// Usually users will not need to call this method.
-func (dp *Pipeline[T]) SetReceiveChan(c <-chan T) {
-	dp.receive = c
-}
-
-// SetSendChan sets the send channel for the pipeline.
-// The send channel is used as the output from the last stage.
-// This satisfies the Worker interface so that pipelines can be chained together.
-// Usually users will not need to call this method.
-func (dp *Pipeline[T]) SetSendChan(c chan<- T) {
-	dp.send = c
 }
 
 // Run starts the pipeline.
@@ -131,18 +111,14 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 }
 
 type stage[T any] struct {
-	receive []<-chan T
-	send    []chan<- T
+	// Is used to stop workers.
+	send    []chan T
 	workers []Worker[T]
 	// Communication routes.
 	route Route[T]
 }
 
-func (s *stage[T]) SetReceiveChan(c []<-chan T) {
-	s.receive = c
-}
-
-func (s *stage[T]) SetSendChan(c []chan<- T) {
+func (s *stage[T]) SetSendChan(c []chan T) {
 	s.send = c
 }
 

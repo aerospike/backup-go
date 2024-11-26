@@ -164,6 +164,7 @@ func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
 
 // connect set communication channels to workers.
 func (r *router[T]) connect(st *stage[T], input, output []chan T) error {
+	st.SetSendChan(output)
 	// Set input and output channels.
 	for j, w := range st.workers {
 		switch {

@@ -17,6 +17,7 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aerospike/backup-go/pipeline/mocks"
@@ -73,14 +74,17 @@ type mockWorker struct {
 	receive <-chan string
 	send    chan<- string
 	mocks.MockWorker[string]
+	// Means that it is the first worker who actively sends smth.
+	active bool
 }
 
 var _ Worker[string] = (*mockWorker)(nil)
 
-func newMockWorker(t *testing.T) *mockWorker {
+func newMockWorker(t *testing.T, active bool) *mockWorker {
 	t.Helper()
 	return &mockWorker{
 		MockWorker: *mocks.NewMockWorker[string](t),
+		active:     active,
 	}
 }
 
@@ -93,38 +97,46 @@ func (w *mockWorker) SetSendChan(c chan<- string) {
 }
 
 func (w *mockWorker) Run(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case msg, active := <-w.receive:
-			if !active {
+	if w.active {
+		for i := 0; i < 3; i++ {
+			w.send <- fmt.Sprintf("%d", i)
+		}
+		close(w.send)
+	} else {
+		for {
+			select {
+			case <-ctx.Done():
 				return nil
+			case msg, active := <-w.receive:
+				if !active {
+					return nil
+				}
+				w.send <- msg
 			}
-			w.send <- msg
 		}
 	}
+	return nil
 }
 
 func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 	ctx := context.Background()
 
-	w1 := newMockWorker(suite.T())
+	w1 := newMockWorker(suite.T(), true)
 	w1.EXPECT().SetReceiveChan(mock.Anything)
 	w1.EXPECT().SetSendChan(mock.Anything)
 	w1.EXPECT().Run(ctx)
 
-	w2 := newMockWorker(suite.T())
+	w2 := newMockWorker(suite.T(), false)
 	w2.EXPECT().SetReceiveChan(mock.Anything)
 	w2.EXPECT().SetSendChan(mock.Anything)
 	w2.EXPECT().Run(ctx)
 
-	w3 := newMockWorker(suite.T())
+	w3 := newMockWorker(suite.T(), false)
 	w3.EXPECT().SetReceiveChan(mock.Anything)
 	w3.EXPECT().SetSendChan(mock.Anything)
 	w3.EXPECT().Run(ctx)
 
-	w4 := newMockWorker(suite.T())
+	w4 := newMockWorker(suite.T(), false)
 	w4.EXPECT().SetReceiveChan(mock.Anything)
 	w4.EXPECT().SetSendChan(mock.Anything)
 	w4.EXPECT().Run(ctx)
@@ -135,22 +147,10 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 
-	receive := make(chan string, 2)
-	pipeline.SetReceiveChan(receive)
-
-	send := make(chan string, 2)
-	pipeline.SetSendChan(send)
-
-	receive <- "0"
-	receive <- "1"
-	close(receive)
-
 	err = pipeline.Run(ctx)
 	suite.Nil(err)
 
-	suite.Equal(2, len(send))
-
-	for res := range send {
+	for res := range pipeline.stages[2].send[0] {
 		if res != "0" && res != "1" {
 			suite.Fail("unexpected result: %s, expected 1 or 0", res)
 		}

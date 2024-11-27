@@ -48,9 +48,13 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	err := prepareBackupDirectory(w.path, w.isDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
+	// If directory not exists, we don't need to check it for emptiness.
+	path := w.path
+	if !w.isDir {
+		path = filepath.Dir(w.path)
+	}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return w, nil
 	}
 
 	if w.isDir && !w.skipDirCheck {
@@ -76,9 +80,9 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 	return w, nil
 }
 
-// prepareBackupDirectory creates the backup directory if it does not exist.
+// createDirIfNotExist creates the backup directory if it does not exist.
 // It returns an error is the path already exits and it is not empty.
-func prepareBackupDirectory(path string, isDir bool) error {
+func createDirIfNotExist(path string, isDir bool) error {
 	if !isDir {
 		path = filepath.Dir(path)
 	}
@@ -185,6 +189,12 @@ func (bf *bufferedFile) Close() error {
 func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
+	}
+
+	// Create directory only if we have something to backup to this directory.
+	err := createDirIfNotExist(w.path, w.isDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
 	// protection for single file backup.

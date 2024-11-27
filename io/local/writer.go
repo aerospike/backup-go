@@ -53,6 +53,7 @@ func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
 	if !w.isDir {
 		path = filepath.Dir(w.path)
 	}
+
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return w, nil
 	}

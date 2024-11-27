@@ -88,10 +88,17 @@ func createDirIfNotExist(path string, isDir bool) error {
 		path = filepath.Dir(path)
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	_, err := os.Stat(path)
+
+	switch {
+	case err == nil:
+		// ok.
+	case os.IsNotExist(err):
 		if err = os.MkdirAll(path, os.ModePerm); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
+	default:
+		return fmt.Errorf("failed to get stats for directory %s: %w", path, err)
 	}
 
 	return nil

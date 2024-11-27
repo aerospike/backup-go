@@ -19,9 +19,11 @@ import (
 	"sync"
 )
 
+type routeMode int
+
 const (
 	// modeParallel each worker get it own channel.
-	modeParallel = iota
+	modeParallel routeMode = iota
 	// modeSingle all workers get one channel.
 	modeSingle
 )
@@ -70,7 +72,7 @@ func NewParallelRoutes[T any](stagesNum int) []Route[T] {
 // RouteRule describes how exactly stages will communicate with each other.
 type RouteRule[T any] struct {
 	// mode can be single or parallel. Depending on that, one or more communication channels will be created.
-	mode int
+	mode routeMode
 	// bufferSize is applied communication to channels.
 	bufferSize int
 	// sf split function is used when previous and next step routes have different mode.
@@ -108,7 +110,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 	// Define channels for a previous step.
 	var (
 		prevOutput  []chan T
-		prevOutMode int
+		prevOutMode routeMode
 	)
 	// For first and last step we need to create empty chan.
 	for i, s := range stages {
@@ -145,16 +147,15 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 }
 
 // create creates communication channels.
-func (r *router[T]) create(mode, workersNumber, bufferSize int) []chan T {
-	result := make([]chan T, 0, workersNumber)
+func (r *router[T]) create(mode routeMode, workersNumber, bufferSize int) []chan T {
+	size := workersNumber
+	if mode == modeSingle {
+		size = 1
+	}
 
-	switch mode {
-	case modeParallel:
-		for i := 0; i < workersNumber; i++ {
-			comChan := make(chan T, bufferSize)
-			result = append(result, comChan)
-		}
-	case modeSingle:
+	result := make([]chan T, 0, size)
+
+	for i := 0; i < size; i++ {
 		comChan := make(chan T, bufferSize)
 		result = append(result, comChan)
 	}
@@ -186,7 +187,7 @@ func (r *router[T]) connect(st *stage[T], input, output []chan T) error {
 			w.SetSendChan(output[j])
 		default:
 			return fmt.Errorf("failed to connect %d workers, with %d input and %d output",
-				len(st.workers), len(output), len(output))
+				len(st.workers), len(input), len(output))
 		}
 	}
 

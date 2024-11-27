@@ -192,7 +192,7 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 		return nil, ctx.Err()
 	}
 
-	// Create directory only if we have something to backup to this directory.
+	// Create directory only if we have something to back up to this directory.
 	err := createDirIfNotExist(w.path, w.isDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)

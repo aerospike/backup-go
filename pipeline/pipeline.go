@@ -110,6 +110,9 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	return nil
 }
 
+// stage contains pipeline stages, that contains workers.
+// router manages communication between stages.
+// After stage finishes, we close send channel, to send stop signal for workers.
 type stage[T any] struct {
 	// Is used to stop workers.
 	send    []chan T

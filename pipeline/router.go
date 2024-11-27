@@ -19,11 +19,11 @@ import (
 	"sync"
 )
 
-type routeMode int
+type routeRuleMode int
 
 const (
 	// modeParallel each worker get it own channel.
-	modeParallel routeMode = iota
+	modeParallel routeRuleMode = iota
 	// modeSingle all workers get one channel.
 	modeSingle
 )
@@ -72,7 +72,7 @@ func NewParallelRoutes[T any](stagesNum int) []Route[T] {
 // RouteRule describes how exactly stages will communicate with each other.
 type RouteRule[T any] struct {
 	// mode can be single or parallel. Depending on that, one or more communication channels will be created.
-	mode routeMode
+	mode routeRuleMode
 	// bufferSize is applied communication to channels.
 	bufferSize int
 	// sf split function is used when previous and next step routes have different mode.
@@ -110,7 +110,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 	// Define channels for a previous step.
 	var (
 		prevOutput  []chan T
-		prevOutMode routeMode
+		prevOutMode routeRuleMode
 	)
 	// For first and last step we need to create empty chan.
 	for i, s := range stages {
@@ -132,6 +132,10 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 			output = append(output, op)
 		case prevOutMode == modeSingle && s.route.input.mode == modeParallel:
 			// Split channels.
+			if s.route.output.sf == nil {
+				return fmt.Errorf("split function not set for stage %d", i)
+			}
+
 			output = r.splitChannels(prevOutput[0], len(s.workers), s.route.output.sf)
 		}
 
@@ -147,7 +151,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 }
 
 // create creates communication channels.
-func (r *router[T]) create(mode routeMode, workersNumber, bufferSize int) []chan T {
+func (r *router[T]) create(mode routeRuleMode, workersNumber, bufferSize int) []chan T {
 	size := workersNumber
 	if mode == modeSingle {
 		size = 1

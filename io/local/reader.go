@@ -48,7 +48,7 @@ func NewReader(opts ...Opt) (*Reader, error) {
 		opt(&r.options)
 	}
 
-	if r.path == "" {
+	if len(r.pathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
@@ -62,29 +62,31 @@ func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	defer close(readersCh)
-	// If it is a folder, open and return.
-	if r.isDir {
-		err := r.checkRestoreDirectory(r.path)
-		if err != nil {
-			errorsCh <- err
-			return
+
+	for _, path := range r.pathList {
+		// If it is a folder, open and return.
+		switch r.isDir {
+		case true:
+			err := r.checkRestoreDirectory(path)
+			if err != nil {
+				errorsCh <- err
+				return
+			}
+
+			r.streamDirectory(ctx, path, readersCh, errorsCh)
+		case false:
+			// If not a folder, only file.
+			r.StreamFile(ctx, path, readersCh, errorsCh)
 		}
-
-		r.streamDirectory(ctx, readersCh, errorsCh)
-
-		return
 	}
-
-	// If not a folder, only file.
-	r.StreamFile(ctx, r.path, readersCh, errorsCh)
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	fileInfo, err := os.ReadDir(r.path)
+	fileInfo, err := os.ReadDir(path)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to read path %s: %w", r.path, err)
+		errorsCh <- fmt.Errorf("failed to read path %s: %w", path, err)
 		return
 	}
 
@@ -97,20 +99,14 @@ func (r *Reader) streamDirectory(
 		if file.IsDir() {
 			// Iterate over nested dirs recursively.
 			if r.withNestedDir {
-				nestedDir := filepath.Join(r.path, file.Name())
-
-				subReader, err := NewReader(WithDir(nestedDir), WithValidator(r.validator), WithNestedDir())
-				if err != nil {
-					errorsCh <- fmt.Errorf("failed to read nested dir %s: %w", nestedDir, err)
-				}
-
-				subReader.streamDirectory(ctx, readersCh, errorsCh)
+				nestedDir := filepath.Join(path, file.Name())
+				r.streamDirectory(ctx, nestedDir, readersCh, errorsCh)
 			}
 
 			continue
 		}
 
-		filePath := filepath.Join(r.path, file.Name())
+		filePath := filepath.Join(path, file.Name())
 
 		if r.validator != nil {
 			if err = r.validator.Run(filePath); err != nil {
@@ -140,10 +136,6 @@ func (r *Reader) StreamFile(
 	if ctx.Err() != nil {
 		errorsCh <- ctx.Err()
 		return
-	}
-
-	if r.isDir {
-		filename = filepath.Join(r.path, filename)
 	}
 
 	reader, err := os.Open(filename)

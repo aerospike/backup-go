@@ -15,8 +15,8 @@
 package local
 
 type options struct {
-	// path contains path to file or directory.
-	path string
+	// pathList contains path list read to file or directory.
+	pathList []string
 	// isDir flag describes what we have in path, file or directory.
 	isDir bool
 	// isRemovingFiles flag describes should we remove everything from backup folder or not.
@@ -36,7 +36,15 @@ type Opt func(*options)
 // WithDir adds directory to reading/writing files from/to.
 func WithDir(path string) Opt {
 	return func(r *options) {
-		r.path = path
+		r.pathList = append(r.pathList, path)
+		r.isDir = true
+	}
+}
+
+// WithDirList adds a directory list to reading/writing files from/to.
+func WithDirList(pathList []string) Opt {
+	return func(r *options) {
+		r.pathList = pathList
 		r.isDir = true
 	}
 }
@@ -44,7 +52,15 @@ func WithDir(path string) Opt {
 // WithFile adds a file path to reading/writing from/to.
 func WithFile(path string) Opt {
 	return func(r *options) {
-		r.path = path
+		r.pathList = append(r.pathList, path)
+		r.isDir = false
+	}
+}
+
+// WithFileList adds a file list path to reading/writing from/to.
+func WithFileList(pathList []string) Opt {
+	return func(r *options) {
+		r.pathList = pathList
 		r.isDir = false
 	}
 }

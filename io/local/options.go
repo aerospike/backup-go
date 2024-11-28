@@ -41,7 +41,8 @@ func WithDir(path string) Opt {
 	}
 }
 
-// WithDirList adds a directory list to reading/writing files from/to.
+// WithDirList adds a directory list to read files from.
+// Is used only for Reader.
 func WithDirList(pathList []string) Opt {
 	return func(r *options) {
 		r.pathList = pathList
@@ -57,7 +58,8 @@ func WithFile(path string) Opt {
 	}
 }
 
-// WithFileList adds a file list path to reading/writing from/to.
+// WithFileList adds a file list to read from.
+// Is used only for Reader.
 func WithFileList(pathList []string) Opt {
 	return func(r *options) {
 		r.pathList = pathList

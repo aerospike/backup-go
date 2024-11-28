@@ -15,7 +15,7 @@
 package local
 
 type options struct {
-	// pathList contains path list read to file or directory.
+	// pathList contains list of files or directories.
 	pathList []string
 	// isDir flag describes what we have in path, file or directory.
 	isDir bool

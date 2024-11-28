@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"sync/atomic"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -62,17 +61,14 @@ func NewWriter(
 		opt(&w.options)
 	}
 
-	if w.path == "" {
-		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	if len(w.pathList) != 1 {
+		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
 	var prefix string
+
 	if w.isDir {
-		prefix = w.path
-		// Protection from incorrect input.
-		if !strings.HasSuffix(w.path, "/") && w.path != "/" && w.path != "" {
-			prefix = fmt.Sprintf("%s/", w.path)
-		}
+		w.prefix = cleanPath(w.pathList[0])
 	}
 
 	// Check if container exists.
@@ -113,7 +109,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 		// If we use backup to single file, we overwrite the file name.
-		filename = w.path
+		filename = w.pathList[0]
 	}
 
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
@@ -210,9 +206,9 @@ func isEmptyDirectory(ctx context.Context, client *azblob.Client, containerName,
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	// Remove file.
 	if !w.isDir {
-		_, err := w.client.DeleteBlob(ctx, w.containerName, w.path, nil)
+		_, err := w.client.DeleteBlob(ctx, w.containerName, w.pathList[0], nil)
 		if err != nil {
-			return fmt.Errorf("failed to delete blob %s: %w", w.path, err)
+			return fmt.Errorf("failed to delete blob %s: %w", w.pathList[0], err)
 		}
 
 		return nil

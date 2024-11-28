@@ -41,8 +41,6 @@ type Reader struct {
 	client *azblob.Client
 	// containerName contains name of the container to read from.
 	containerName string
-	// prefix contains folder name if we have folders inside the bucket.
-	prefix string
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -62,16 +60,8 @@ func NewReader(
 		opt(&r.options)
 	}
 
-	if r.path == "" {
+	if len(r.pathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
-	}
-
-	if r.isDir {
-		r.prefix = r.path
-		// Protection from incorrect input.
-		if !strings.HasSuffix(r.path, "/") && r.path != "/" && r.path != "" {
-			r.prefix = fmt.Sprintf("%s/", r.path)
-		}
 	}
 
 	// Check if container exists.
@@ -89,30 +79,33 @@ func NewReader(
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	// If it is a folder, open and return.
-	if r.isDir {
-		err := r.checkRestoreDirectory(ctx)
-		if err != nil {
-			errorsCh <- err
-			return
+	defer close(readersCh)
+
+	for _, path := range r.pathList {
+		// If it is a folder, open and return.
+		switch r.isDir {
+		case true:
+			path = cleanPath(path)
+
+			err := r.checkRestoreDirectory(ctx, path)
+			if err != nil {
+				errorsCh <- err
+				return
+			}
+
+			r.streamDirectory(ctx, path, readersCh, errorsCh)
+		case false:
+			// If not a folder, only file.
+			r.StreamFile(ctx, path, readersCh, errorsCh)
 		}
-
-		r.streamDirectory(ctx, readersCh, errorsCh)
-
-		return
 	}
-
-	// If not a folder, only file.
-	r.StreamFile(ctx, r.path, readersCh, errorsCh)
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	defer close(readersCh)
-
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
-		Prefix: &r.prefix,
+		Prefix: &path,
 	})
 
 	for pager.More() {
@@ -123,7 +116,7 @@ func (r *Reader) streamDirectory(
 
 		for _, blob := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if r.shouldSkip(*blob.Name) {
+			if r.shouldSkip(path, *blob.Name) {
 				continue
 			}
 
@@ -163,10 +156,16 @@ func (r *Reader) streamDirectory(
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
-	defer close(readersCh)
-
+	// This condition will be true, only if we initialized reader for directory and then want to read
+	// a specific file. It is used for state file and by asb service. So it must be initialized with only
+	// one path.
 	if r.isDir {
-		filename = filepath.Join(r.path, filename)
+		if len(r.pathList) != 1 {
+			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
+			return
+		}
+
+		filename = filepath.Join(r.pathList[0], filename)
 	}
 
 	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
@@ -181,8 +180,8 @@ func (r *Reader) StreamFile(
 }
 
 // shouldSkip performs check, is we should skip files.
-func (r *Reader) shouldSkip(fileName string) bool {
-	return (isDirectory(r.prefix, fileName) && !r.withNestedDir) ||
+func (r *Reader) shouldSkip(path, fileName string) bool {
+	return (isDirectory(path, fileName) && !r.withNestedDir) ||
 		isSkippedByStartAfter(r.startAfter, fileName)
 }
 
@@ -192,9 +191,9 @@ func (r *Reader) GetType() string {
 }
 
 // checkRestoreDirectory checks that the restore directory contains any file.
-func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
+func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
-		Prefix: &r.prefix,
+		Prefix: &path,
 	})
 
 	for pager.More() {
@@ -205,7 +204,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 
 		for _, blob := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if r.shouldSkip(*blob.Name) {
+			if r.shouldSkip(path, *blob.Name) {
 				continue
 			}
 
@@ -224,7 +223,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 		}
 	}
 
-	return fmt.Errorf("%s is empty", r.prefix)
+	return fmt.Errorf("%s is empty", path)
 }
 
 func isDirectory(prefix, fileName string) bool {
@@ -252,4 +251,14 @@ func isSkippedByStartAfter(startAfter, fileName string) bool {
 	}
 
 	return false
+}
+
+// cleanPath is protection from incorrect input.
+func cleanPath(path string) string {
+	var result string
+	if !strings.HasSuffix(path, "/") && path != "/" && path != "" {
+		result = fmt.Sprintf("%s/", path)
+	}
+
+	return result
 }

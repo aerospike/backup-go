@@ -478,7 +478,7 @@ func (bh *BackupHandler) backupSIndexes(
 	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
 
 	sindexPipeline, err := pipeline.NewPipeline[*models.Token](
-		newRoutes[*models.Token](bh.config.SyncPipelines, 2),
+		bh.config.PipelinesMode, nil,
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
 		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
 	)
@@ -514,7 +514,7 @@ func (bh *BackupHandler) backupUDFs(
 	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
 
 	udfPipeline, err := pipeline.NewPipeline[*models.Token](
-		newRoutes[*models.Token](bh.config.SyncPipelines, 2),
+		bh.config.PipelinesMode, nil,
 		[]pipeline.Worker[*models.Token]{udfReadWorker},
 		[]pipeline.Worker[*models.Token]{udfWriteWorker},
 	)

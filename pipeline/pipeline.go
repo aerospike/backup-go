@@ -45,16 +45,43 @@ type Pipeline[T any] struct {
 
 const channelSize = 256
 
+type Mode int
+
+const (
+	// ModeSingle default pipeline mode,
+	// when all workers from each stage linked to the other stage workers with one channel.
+	ModeSingle Mode = iota
+	// ModeParallel advanced pipeline mode,
+	// when each worker in one stage linked to each worker f another stage with one channel.
+	ModeParallel
+	// ModeSingleParallel advanced pipeline mode,
+	// When first stage with second stage is linked in single mode, and second and last stages linked in parallel.
+	// SplitFunction must be set, for using this mode.
+	ModeSingleParallel
+)
+
 // NewPipeline creates a new DataPipeline.
-func NewPipeline[T any](routes []Route[T], workGroups ...[]Worker[T]) (*Pipeline[T], error) {
+func NewPipeline[T any](mode Mode, sf splitFunc[T], workGroups ...[]Worker[T]) (*Pipeline[T], error) {
 	if len(workGroups) == 0 {
 		return nil, fmt.Errorf("workGroups is empty")
 	}
 
 	stages := make([]*stage[T], len(workGroups))
 
-	if len(routes) != len(workGroups) {
-		return nil, fmt.Errorf("routes and workGroups have different length")
+	var routes []Route[T]
+
+	switch mode {
+	case ModeSingle:
+		routes = NewSingleRoutes[T](len(workGroups))
+	case ModeParallel:
+		routes = NewParallelRoutes[T](len(workGroups))
+	case ModeSingleParallel:
+		// This will create only 3 routes, for 3 stages!
+		// For MRT backup, so we should check if user knows what he is doing.
+		routes = NewSingleParallelRoutes[T](sf)
+		if len(routes) != len(workGroups) {
+			return nil, fmt.Errorf("this pipeline mode supports only 3 working groups, got %d", len(workGroups))
+		}
 	}
 
 	for i, workers := range workGroups {

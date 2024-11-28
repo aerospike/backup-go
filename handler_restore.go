@@ -232,7 +232,7 @@ func (rh *RestoreHandler) runRestorePipeline(ctx context.Context, readers []pipe
 	), rh.config.Parallel)
 
 	pl, err := pipeline.NewPipeline(
-		newRoutes[*models.Token](false, 3),
+		pipeline.ModeSingle, nil,
 		readers,
 		composeProcessor,
 		writeWorkers,

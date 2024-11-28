@@ -41,9 +41,8 @@ func (suite *pipelineTestSuite) TestNewDataPipeline() {
 	w3.EXPECT().SetSendChan(mock.Anything)
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}}
-	routes := newRoutesForWorkers(len(workers))
 
-	pipeline, err := NewPipeline(routes, workers...)
+	pipeline, err := NewPipeline(ModeSingle, nil, workers...)
 	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 }
@@ -66,8 +65,7 @@ func (suite *pipelineTestSuite) TestDataPipelineRun() {
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}}
 
-	routes := newRoutesForWorkers(len(workers))
-	pipeline, err := NewPipeline(routes, workers...)
+	pipeline, err := NewPipeline(ModeSingle, nil, workers...)
 	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 
@@ -147,8 +145,7 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWithChannels() {
 	w4.EXPECT().Run(ctx)
 
 	workers := [][]Worker[string]{{w1}, {w3}, {w4, w2}}
-	routes := newRoutesForWorkers(len(workers))
-	pipeline, err := NewPipeline(routes, workers...)
+	pipeline, err := NewPipeline(ModeSingle, nil, workers...)
 	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 
@@ -178,8 +175,7 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWorkerFails() {
 	w4.EXPECT().Run(mock.Anything).Return(nil)
 
 	workers := [][]Worker[string]{{w1, w2}, {w3}, {w4}}
-	routes := newRoutesForWorkers(len(workers))
-	pipeline, err := NewPipeline(routes, workers...)
+	pipeline, err := NewPipeline(ModeSingle, nil, workers...)
 	suite.Require().Nil(err)
 	suite.NotNil(pipeline)
 
@@ -190,17 +186,4 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWorkerFails() {
 
 func TestPipelineTestSuite(t *testing.T) {
 	suite.Run(t, new(pipelineTestSuite))
-}
-
-func newRoutesForWorkers(n int) []Route[string] {
-	result := make([]Route[string], 0, n)
-	for i := 0; i < n; i++ {
-		var r Route[string]
-		r.output = NewRouteRuleSingle[string](channelSize, nil)
-		r.input = NewRouteRuleSingle[string](channelSize, nil)
-
-		result = append(result, r)
-	}
-
-	return result
 }

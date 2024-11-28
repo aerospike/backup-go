@@ -31,6 +31,7 @@ import (
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 	"github.com/aerospike/backup-go/tests"
 	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
@@ -1168,7 +1169,7 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 	backupCfg.FileLimit = 100000
 	backupCfg.Bandwidth = 1000000
 	backupCfg.PageSize = 100
-	backupCfg.SyncPipelines = true
+	backupCfg.PipelinesMode = pipeline.ModeParallel
 
 	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
 	suite.Nil(err)
@@ -1208,7 +1209,7 @@ func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, test
 	backupCfg.Continue = true
 	backupCfg.FileLimit = 100000
 	backupCfg.PageSize = 100
-	backupCfg.SyncPipelines = true
+	backupCfg.PipelinesMode = pipeline.ModeParallel
 
 	backupHandler, err := suite.backupClient.Backup(ctx, backupCfg, writers, readers)
 	suite.Nil(err)

@@ -78,7 +78,7 @@ func (bh *backupRecordsHandler) run(
 	), bh.config.ParallelRead)
 
 	pl, err := pipeline.NewPipeline(
-		newRoutes[*models.Token](bh.config.SyncPipelines, 3),
+		bh.config.PipelinesMode, nil,
 		readWorkers,
 		composeProcessor,
 		writers)

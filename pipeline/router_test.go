@@ -24,13 +24,13 @@ import (
 func TestRouter_CreateChannels(t *testing.T) {
 	r := newRouter[int]()
 
-	parallelChannels := r.create(modeParallel, 3, 5)
+	parallelChannels := r.create(routeRuleModeParallel, 3, 5)
 	assert.Equal(t, 3, len(parallelChannels))
 	for _, ch := range parallelChannels {
 		assert.NotNil(t, ch)
 	}
 
-	singleChannels := r.create(modeSingle, 3, 5)
+	singleChannels := r.create(routeRuleModeSingle, 3, 5)
 	assert.Equal(t, 1, len(singleChannels))
 	assert.NotNil(t, singleChannels[0])
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/local"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,7 +49,7 @@ func TestState(t *testing.T) {
 	cfg := NewDefaultBackupConfig()
 	cfg.StateFile = testStateFile
 	cfg.PageSize = 100000
-	cfg.SyncPipelines = true
+	cfg.PipelinesMode = pipeline.ModeParallel
 	cfg.PartitionFilters = testFilters
 
 	reader, err := local.NewReader(

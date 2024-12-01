@@ -39,14 +39,6 @@ type Route[T any] struct {
 	output *RouteRule[T]
 }
 
-func NewRoutes[T any](isSynced bool, stagesNum int) []Route[T] {
-	if isSynced {
-		return NewParallelRoutes[T](stagesNum)
-	}
-
-	return NewSingleRoutes[T](stagesNum)
-}
-
 // NewSingleRoutes helper function, to initialize simple single mode routes.
 func NewSingleRoutes[T any](stagesNum int) []Route[T] {
 	result := make([]Route[T], 0, stagesNum)

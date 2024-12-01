@@ -25,6 +25,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	bModels "github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 var (
@@ -71,13 +72,13 @@ func mapBackupConfig(
 	if backupParams.Continue != "" {
 		c.StateFile = backupParams.Continue
 		c.Continue = true
-		c.SyncPipelines = true
+		c.PipelinesMode = pipeline.ModeParallel
 		c.PageSize = backupParams.ScanPageSize
 	}
 
 	if backupParams.StateFileDst != "" {
 		c.StateFile = backupParams.StateFileDst
-		c.SyncPipelines = true
+		c.PipelinesMode = pipeline.ModeParallel
 		c.PageSize = backupParams.ScanPageSize
 	}
 

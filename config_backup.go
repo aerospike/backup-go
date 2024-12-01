@@ -19,6 +19,7 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // BackupConfig contains configuration for the backup operation.
@@ -121,7 +122,7 @@ type BackupConfig struct {
 	PageSize int64
 	// If set to true, the same number of workers will be created for each stage of the pipeline.
 	// Each worker will be connected to the next stage worker with a separate unbuffered channel.
-	SyncPipelines bool
+	PipelinesMode pipeline.Mode
 	// When using directory parameter, prepend a prefix to the names of the generated files.
 	OutputFilePrefix string
 }
@@ -214,8 +215,8 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("state file must be set if continue is enabled")
 	}
 
-	if c.StateFile != "" && !c.SyncPipelines {
-		return fmt.Errorf("sync pipelines must be enabled if stage file is set")
+	if c.StateFile != "" && c.PipelinesMode != pipeline.ModeParallel {
+		return fmt.Errorf("parallel pipelines must be enabled if stage file is set")
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

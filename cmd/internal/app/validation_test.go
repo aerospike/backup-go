@@ -428,3 +428,96 @@ func TestValidateCommonParams(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateRestoreParams(t *testing.T) {
+	tests := []struct {
+		name          string
+		restoreParams *models.Restore
+		commonParams  *models.Common
+		expectedError string
+	}{
+		{
+			name: "Valid input - only Directory set",
+			restoreParams: &models.Restore{
+				InputFile:       "",
+				DirectoryList:   "",
+				ParentDirectory: "",
+			},
+			commonParams: &models.Common{
+				Directory: "some/directory",
+			},
+			expectedError: "",
+		},
+		{
+			name: "Error - both Directory and InputFile set",
+			restoreParams: &models.Restore{
+				InputFile:       "somefile",
+				DirectoryList:   "",
+				ParentDirectory: "",
+			},
+			commonParams: &models.Common{
+				Directory: "some/directory",
+			},
+			expectedError: "only one of directory and input-file may be configured at the same time",
+		},
+		{
+			name: "Error - DirectoryList with Directory",
+			restoreParams: &models.Restore{
+				InputFile:       "",
+				DirectoryList:   "dirlist",
+				ParentDirectory: "",
+			},
+			commonParams: &models.Common{
+				Directory: "some/directory",
+			},
+			expectedError: "only one of directory, input-file and directory-list may be configured at the same time",
+		},
+		{
+			name: "Error - DirectoryList with InputFile",
+			restoreParams: &models.Restore{
+				InputFile:       "somefile",
+				DirectoryList:   "dirlist",
+				ParentDirectory: "",
+			},
+			commonParams: &models.Common{
+				Directory: "",
+			},
+			expectedError: "only one of directory, input-file and directory-list may be configured at the same time",
+		},
+		{
+			name: "Error - ParentDirectory without DirectoryList",
+			restoreParams: &models.Restore{
+				InputFile:       "",
+				DirectoryList:   "",
+				ParentDirectory: "parent/dir",
+			},
+			commonParams: &models.Common{
+				Directory: "",
+			},
+			expectedError: "must specify directory-list list",
+		},
+		{
+			name: "Valid input - DirectoryList with ParentDirectory",
+			restoreParams: &models.Restore{
+				InputFile:       "",
+				DirectoryList:   "dirlist",
+				ParentDirectory: "parent/dir",
+			},
+			commonParams: &models.Common{
+				Directory: "",
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRestoreParams(tt.restoreParams, tt.commonParams)
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.expectedError)
+			}
+		})
+	}
+}

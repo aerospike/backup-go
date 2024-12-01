@@ -16,6 +16,8 @@ package models
 
 type Restore struct {
 	InputFile          string
+	DirectoryList      string
+	ParentDirectory    string
 	DisableBatchWrites bool
 	BatchSize          int
 	MaxAsyncBatches    int

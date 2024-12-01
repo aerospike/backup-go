@@ -139,7 +139,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		"Total transaction timeout in milliseconds. 0 - no timeout.")
 	flagSet.Int64Var(&f.SocketTimeout, "socket-timeout",
 		10000,
-		"Socket timeout in milliseconds. If this value is 0, its set to total-timeout. If both are 0,\n"+
+		"Socket timeout in milliseconds. If this value is 0, it's set to total-timeout. If both are 0,\n"+
 			"there is no socket idle time limit")
 	flagSet.IntVarP(&f.Nice, "nice", "N",
 		0,

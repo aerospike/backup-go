@@ -77,6 +77,7 @@ func (rw *batchRecordWriter) batchWrite(record *models.Record) *a.BatchWrite {
 
 func batchWritePolicy(writePolicy *a.WritePolicy, r *models.Record) *a.BatchWritePolicy {
 	policy := a.NewBatchWritePolicy()
+	policy.SendKey = writePolicy.SendKey
 	policy.RecordExistsAction = writePolicy.RecordExistsAction
 	policy.Expiration = r.Expiration
 

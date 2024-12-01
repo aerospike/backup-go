@@ -51,14 +51,14 @@ func (suite *writerTestSuite) Test_openBackupFile() {
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive() {
 	dir := suite.T().TempDir()
-	err := prepareBackupDirectory(dir, true)
+	err := createDirIfNotExist(dir, true)
 	suite.NoError(err)
 }
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 	dir := suite.T().TempDir()
 	dir += "/test"
-	err := prepareBackupDirectory(dir, true)
+	err := createDirIfNotExist(dir, true)
 	suite.NoError(err)
 	suite.DirExists(dir)
 }

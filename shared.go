@@ -48,7 +48,7 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 	defer close(errors)
 	defer handlePanic(errors, logger)
 
-	logger.Info("job starting")
+	logger.Debug("job starting")
 
 	err := work()
 	if err != nil {
@@ -58,7 +58,7 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 		return
 	}
 
-	logger.Info("job done")
+	logger.Debug("job done")
 }
 
 func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {

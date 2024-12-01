@@ -73,7 +73,7 @@ func NewWriter(
 		w.prefix = w.path
 		// Protection from incorrect input.
 		if !strings.HasSuffix(w.path, "/") && w.path != "/" && w.path != "" {
-			prefix = fmt.Sprintf("%s/", w.path)
+			w.prefix = fmt.Sprintf("%s/", w.path)
 		}
 	}
 

@@ -203,7 +203,6 @@ func (tc *TestClient) ValidateSIndexes(t assert.TestingT, expected []*models.SIn
 // WriteRecords writes the given records to the database.
 func (tc *TestClient) WriteRecords(recs []*a.Record) error {
 	wp := tc.asc.GetDefaultWritePolicy()
-	wp.SendKey = true
 
 	for _, rec := range recs {
 		err := tc.asc.Put(nil, rec.Key, rec.Bins)

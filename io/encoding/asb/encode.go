@@ -449,6 +449,8 @@ func userKeyToASB(userKey a.Value, w io.Writer) (int, error) {
 		return writeUserKeyString(v, w)
 	case []byte:
 		return writeUserKeyBytes(v, w)
+	case nil:
+		return 0, nil
 	default:
 		return 0, fmt.Errorf("invalid user key type: %T", v)
 	}

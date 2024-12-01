@@ -65,8 +65,6 @@ func NewWriter(
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	var prefix string
-
 	if w.isDir {
 		w.prefix = cleanPath(w.pathList[0])
 	}
@@ -78,7 +76,7 @@ func NewWriter(
 
 	if w.isDir && !w.skipDirCheck {
 		// Check if backup dir is empty.
-		isEmpty, err := isEmptyDirectory(ctx, client, containerName, prefix)
+		isEmpty, err := isEmptyDirectory(ctx, client, containerName, w.prefix)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
@@ -89,7 +87,6 @@ func NewWriter(
 	}
 
 	w.containerName = containerName
-	w.prefix = prefix
 
 	if w.isRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.

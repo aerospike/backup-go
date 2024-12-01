@@ -41,8 +41,6 @@ type Reader struct {
 	bucketHandle *storage.BucketHandle
 	// bucketName contains name of the bucket to read from.
 	bucketName string
-	// prefix contains folder name if we have folders inside the bucket.
-	prefix string
 }
 
 // NewReader returns new GCP storage directory/file reader.
@@ -60,16 +58,8 @@ func NewReader(
 		opt(&r.options)
 	}
 
-	if r.path == "" {
+	if len(r.pathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
-	}
-
-	if r.isDir {
-		r.prefix = r.path
-		// Protection from incorrect input.
-		if !strings.HasSuffix(r.path, "/") && r.path != "/" && r.path != "" {
-			r.prefix = fmt.Sprintf("%s/", r.path)
-		}
 	}
 
 	bucket := client.Bucket(bucketName)
@@ -90,30 +80,33 @@ func NewReader(
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	// If it is a folder, open and return.
-	if r.isDir {
-		err := r.checkRestoreDirectory(ctx)
-		if err != nil {
-			errorsCh <- err
-			return
+	defer close(readersCh)
+
+	for _, path := range r.pathList {
+		// If it is a folder, open and return.
+		switch r.isDir {
+		case true:
+			path = cleanPath(path)
+
+			err := r.checkRestoreDirectory(ctx, path)
+			if err != nil {
+				errorsCh <- err
+				return
+			}
+
+			r.streamDirectory(ctx, path, readersCh, errorsCh)
+		case false:
+			// If not a folder, only file.
+			r.StreamFile(ctx, path, readersCh, errorsCh)
 		}
-
-		r.streamDirectory(ctx, readersCh, errorsCh)
-
-		return
 	}
-
-	// If not a folder, only file.
-	r.StreamFile(ctx, r.path, readersCh, errorsCh)
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	defer close(readersCh)
-
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
-		Prefix:      r.prefix,
+		Prefix:      path,
 		StartOffset: r.startOffset,
 	})
 
@@ -132,7 +125,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		// Skip files in folders.
-		if isDirectory(r.prefix, objAttrs.Name) && !r.withNestedDir {
+		if isDirectory(path, objAttrs.Name) && !r.withNestedDir {
 			continue
 		}
 
@@ -170,10 +163,16 @@ func (r *Reader) streamDirectory(
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
-	defer close(readersCh)
-
+	// This condition will be true, only if we initialized reader for directory and then want to read
+	// a specific file. It is used for state file and by asb service. So it must be initialized with only
+	// one path.
 	if r.isDir {
-		filename = filepath.Join(r.path, filename)
+		if len(r.pathList) != 1 {
+			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
+			return
+		}
+
+		filename = filepath.Join(r.pathList[0], filename)
 	}
 
 	reader, err := r.bucketHandle.Object(filename).NewReader(ctx)
@@ -193,9 +192,9 @@ func (r *Reader) GetType() string {
 }
 
 // checkRestoreDirectory checks that the restore directory contains any file.
-func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
+func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
-		Prefix:      r.prefix,
+		Prefix:      path,
 		StartOffset: r.startOffset,
 	})
 
@@ -214,7 +213,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 		}
 
 		// Skip files in folders.
-		if isDirectory(r.prefix, objAttrs.Name) && !r.withNestedDir {
+		if isDirectory(path, objAttrs.Name) && !r.withNestedDir {
 			continue
 		}
 
@@ -232,7 +231,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 		}
 	}
 
-	return fmt.Errorf("%s is empty", r.prefix)
+	return fmt.Errorf("%s is empty", path)
 }
 
 func isDirectory(prefix, fileName string) bool {
@@ -254,4 +253,15 @@ func isDirectory(prefix, fileName string) bool {
 	}
 	// All other variants.
 	return strings.Contains(fileName, "/")
+}
+
+// cleanPath is protection from incorrect input.
+func cleanPath(path string) string {
+	result := path
+	// Protection from incorrect input.
+	if !strings.HasSuffix(path, "/") && path != "/" && path != "" {
+		result = fmt.Sprintf("%s/", path)
+	}
+
+	return result
 }

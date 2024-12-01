@@ -255,7 +255,7 @@ func isSkippedByStartAfter(startAfter, fileName string) bool {
 
 // cleanPath is protection from incorrect input.
 func cleanPath(path string) string {
-	var result string
+	result := path
 	if !strings.HasSuffix(path, "/") && path != "/" && path != "" {
 		result = fmt.Sprintf("%s/", path)
 	}

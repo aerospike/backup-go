@@ -261,7 +261,7 @@ func cleanPath(path string) string {
 		return ""
 	}
 
-	var result string
+	result := path
 	if !strings.HasSuffix(path, "/") && path != "/" && path != "" {
 		result = fmt.Sprintf("%s/", path)
 	}

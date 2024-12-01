@@ -33,6 +33,8 @@ func TestRestore_NewFlagSet(t *testing.T) {
 		"--max-async-batches", "64",
 		"--batch-size", "256",
 		"--extra-ttl", "3600",
+		"--directory-list", "dir1,dir2",
+		"--parent-directory", "parent-dir",
 	}
 
 	err := flagSet.Parse(args)
@@ -46,6 +48,8 @@ func TestRestore_NewFlagSet(t *testing.T) {
 	assert.Equal(t, 64, result.MaxAsyncBatches, "The max-async-batches flag should be parsed correctly")
 	assert.Equal(t, 256, result.BatchSize, "The batch-size flag should be parsed correctly")
 	assert.Equal(t, int64(3600), result.ExtraTTL, "The extra-ttl flag should be parsed correctly")
+	assert.Equal(t, "dir1,dir2", result.DirectoryList, "The directory-list flag should be parsed correctly")
+	assert.Equal(t, "parent-dir", result.ParentDirectory, "The parent-directory flag should be parsed correctly")
 }
 
 func TestRestore_NewFlagSet_DefaultValues(t *testing.T) {
@@ -66,4 +70,6 @@ func TestRestore_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, 32, result.MaxAsyncBatches, "The default value for max-async-batches should be 32")
 	assert.Equal(t, 128, result.BatchSize, "The default value for batch-size should be 128")
 	assert.Equal(t, int64(0), result.ExtraTTL, "The default value for extra-ttl should be 0")
+	assert.Equal(t, "", result.DirectoryList, "The directory-list flag should be an empty string")
+	assert.Equal(t, "", result.ParentDirectory, "The parent-directory flag should be an empty string")
 }

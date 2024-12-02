@@ -17,6 +17,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -62,24 +63,28 @@ func getReader(
 }
 
 func newLocalReader(r *models.Restore, c *models.Common, b *models.Backup) (backup.StreamingReader, error) {
-	var opts []local.Opt
+	opts := make([]local.Opt, 0)
 
-	if c.Directory != "" && r.InputFile == "" {
+	// As we validate this fields in validation function, we can switch here.
+	switch {
+	case c.Directory != "":
 		opts = append(opts, local.WithDir(c.Directory))
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
 			opts = append(opts, local.WithValidator(asb.NewValidator()))
 		}
-	}
-
-	if r.InputFile != "" && c.Directory == "" {
+	case r.InputFile != "":
 		opts = append(opts, local.WithFile(r.InputFile))
+	case r.DirectoryList != "":
+		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+		opts = append(opts, local.WithDirList(dirList))
 	}
 
 	return local.NewReader(opts...)
 }
 
+//nolint:dupl // This code is not duplicated, it is a different initialization.
 func newS3Reader(
 	ctx context.Context,
 	a *models.AwsS3,
@@ -94,22 +99,26 @@ func newS3Reader(
 
 	opts := make([]s3.Opt, 0)
 
-	if c.Directory != "" && r.InputFile == "" {
+	// As we validate this fields in validation function, we can switch here.
+	switch {
+	case c.Directory != "":
 		opts = append(opts, s3.WithDir(c.Directory))
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
 			opts = append(opts, s3.WithValidator(asb.NewValidator()))
 		}
-	}
-
-	if r.InputFile != "" && c.Directory == "" {
+	case r.InputFile != "":
 		opts = append(opts, s3.WithFile(r.InputFile))
+	case r.DirectoryList != "":
+		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+		opts = append(opts, s3.WithDirList(dirList))
 	}
 
 	return s3.NewReader(ctx, client, a.BucketName, opts...)
 }
 
+//nolint:dupl // This code is not duplicated, it is a different initialization.
 func newGcpReader(
 	ctx context.Context,
 	g *models.GcpStorage,
@@ -124,17 +133,20 @@ func newGcpReader(
 
 	opts := make([]storage.Opt, 0)
 
-	if c.Directory != "" && r.InputFile == "" {
+	// As we validate this fields in validation function, we can switch here.
+	switch {
+	case c.Directory != "":
 		opts = append(opts, storage.WithDir(c.Directory))
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
 			opts = append(opts, storage.WithValidator(asb.NewValidator()))
 		}
-	}
-
-	if r.InputFile != "" && c.Directory == "" {
+	case r.InputFile != "":
 		opts = append(opts, storage.WithFile(r.InputFile))
+	case r.DirectoryList != "":
+		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+		opts = append(opts, storage.WithDirList(dirList))
 	}
 
 	return storage.NewReader(ctx, client, g.BucketName, opts...)
@@ -154,18 +166,33 @@ func newAzureReader(
 
 	opts := make([]blob.Opt, 0)
 
-	if c.Directory != "" && r.InputFile == "" {
+	// As we validate this fields in validation function, we can switch here.
+	switch {
+	case c.Directory != "":
 		opts = append(opts, blob.WithDir(c.Directory))
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
 			opts = append(opts, blob.WithValidator(asb.NewValidator()))
 		}
-	}
-
-	if r.InputFile != "" && c.Directory == "" {
+	case r.InputFile != "":
 		opts = append(opts, blob.WithFile(r.InputFile))
+	case r.DirectoryList != "":
+		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+		opts = append(opts, blob.WithDirList(dirList))
 	}
 
 	return blob.NewReader(ctx, client, a.ContainerName, opts...)
+}
+
+// prepareDirectoryList parses command line parameters and return slice of strings.
+func prepareDirectoryList(parentDir, dirList string) []string {
+	result := splitByComma(dirList)
+	if parentDir != "" {
+		for i := range result {
+			result[i] = path.Join(parentDir, result[i])
+		}
+	}
+
+	return result
 }

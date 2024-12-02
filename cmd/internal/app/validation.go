@@ -52,6 +52,10 @@ func validateStorages(
 
 //nolint:gocyclo // It is a long validation function.
 func validateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
+	if commonParams.Directory != "" && backupParams.OutputFile != "" {
+		return fmt.Errorf("only one of output-file and directory may be configured at the same time")
+	}
+
 	// Only one filter is allowed.
 	if backupParams.AfterDigest != "" && backupParams.PartitionList != "" {
 		return fmt.Errorf("only one of after-digest or partition-list can be configured")
@@ -139,6 +143,22 @@ func validatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) err
 			return fmt.Errorf("overlapping intervals: [%d, %d] and [%d, %d]",
 				intervals[i-1][0], prevEnd, currBegin, intervals[i][1])
 		}
+	}
+
+	return nil
+}
+
+func validateRestoreParams(restoreParams *models.Restore, commonParams *models.Common) error {
+	if commonParams.Directory != "" && restoreParams.InputFile != "" {
+		return fmt.Errorf("only one of directory and input-file may be configured at the same time")
+	}
+
+	if restoreParams.DirectoryList != "" && (commonParams.Directory != "" || restoreParams.InputFile != "") {
+		return fmt.Errorf("only one of directory, input-file and directory-list may be configured at the same time")
+	}
+
+	if restoreParams.ParentDirectory != "" && restoreParams.DirectoryList == "" {
+		return fmt.Errorf("must specify directory-list list")
 	}
 
 	return nil

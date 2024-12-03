@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -33,19 +34,24 @@ const (
 	testServiceAddress = "http://127.0.0.1:5000/devstoreaccount1"
 	testContainerName  = "test-container"
 
-	testReadFolderEmpty          = "folder_read_empty/"
-	testReadFolderWithData       = "folder_read_with_data/"
-	testReadFolderMixedData      = "folder_read_mixed_data/"
-	testReadFolderOneFile        = "folder_read_one_file/"
-	testReadFolderWithMarker     = "folder_read_with_marker/"
+	testReadFolderEmpty      = "folder_read_empty/"
+	testReadFolderWithData   = "folder_read_with_data/"
+	testReadFolderMixedData  = "folder_read_mixed_data/"
+	testReadFolderOneFile    = "folder_read_one_file/"
+	testReadFolderWithMarker = "folder_read_with_marker/"
+	testReadFolderPathList   = "folder_path_list/"
+	testReadFolderFileList   = "folder_file_list/"
+
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
 	testWriteFolderWithDataError = "folder_write_with_data_error/"
 	testWriteFolderMixedData     = "folder_write_mixed_data/"
 	testWriteFolderOneFile       = "folder_write_one_file/"
-	testFileNameTemplate         = "backup_%d.asb"
-	testFileNameTemplateWrong    = "file_%d.zip"
-	testFileNameOneFile          = "one_file.any"
+
+	testFolderNameTemplate    = "folder_%d/"
+	testFileNameTemplate      = "backup_%d.asb"
+	testFileNameTemplateWrong = "file_%d.zip"
+	testFileNameOneFile       = "one_file.any"
 
 	testFileContent       = "content"
 	testFileContentLength = 7
@@ -136,6 +142,21 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 		if i%2 == 0 {
 			fileName = fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplateWrong, i))
 		}
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
+			return err
+		}
+
+		// Path list.
+		fileName = fmt.Sprintf("%s%s%s",
+			testReadFolderPathList,
+			fmt.Sprintf(testFolderNameTemplate, i),
+			fmt.Sprintf(testFileNameTemplate, i))
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
+			return err
+		}
+
+		// File list
+		fileName = fmt.Sprintf("%s%s", testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, i))
 		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
 		}
@@ -523,6 +544,90 @@ func (s *AzureSuite) TestReader_WithMarker() {
 		WithUploadConcurrency(5),
 		WithSkipDirCheck(),
 		WithNestedDir(),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 2, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *AzureSuite) TestReader_StreamPathList() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	pathList := []string{
+		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 0)),
+		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 2)),
+	}
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testContainerName,
+		WithDirList(pathList),
+		WithValidator(validatorMock{}),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 2, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *AzureSuite) TestReader_StreamFilesList() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	pathList := []string{
+		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 0)),
+		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 2)),
+	}
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testContainerName,
+		WithFileList(pathList),
+		WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 

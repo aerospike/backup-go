@@ -63,23 +63,12 @@ func NewWriter(
 		opt(&w.options)
 	}
 
-	if w.path == "" {
-		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	if len(w.pathList) != 1 {
+		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
-
-	var prefix string
 
 	if w.isDir {
-		w.prefix = w.path
-		// Protection from incorrect input.
-		if !strings.HasSuffix(w.path, "/") && w.path != "/" && w.path != "" {
-			w.prefix = fmt.Sprintf("%s/", w.path)
-		}
-	}
-
-	// For s3 we should use empty prefix for root.
-	if w.prefix == "/" {
-		w.prefix = ""
+		w.prefix = cleanPath(w.pathList[0])
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -108,7 +97,7 @@ func NewWriter(
 	if w.isRemovingFiles {
 		err = w.RemoveFiles(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to delete files under prefix %s: %w", prefix, err)
+			return nil, fmt.Errorf("failed to delete files under prefix %s: %w", w.prefix, err)
 		}
 	}
 
@@ -122,11 +111,8 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		if !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
-	}
-
-	// If we use backup to single file, we overwrite the file name.
-	if !w.isDir {
-		filename = w.path
+		// If we use backup to single file, we overwrite the file name.
+		filename = w.pathList[0]
 	}
 
 	fullPath := path.Join(w.prefix, filename)
@@ -267,9 +253,9 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 	if !w.isDir {
 		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 			Bucket: aws.String(w.bucketName),
-			Key:    aws.String(w.path),
+			Key:    aws.String(w.pathList[0]),
 		}); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", w.path, err)
+			return fmt.Errorf("failed to delete object %s: %w", w.pathList[0], err)
 		}
 
 		return nil

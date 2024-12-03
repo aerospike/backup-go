@@ -19,11 +19,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"testing"
 
+	"github.com/aerospike/backup-go/io/local/mocks"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -34,9 +37,14 @@ const (
 	testS3Region   = "eu"
 	testS3Profile  = "minio"
 
-	testFolderStartAfter = "folder_start_after"
-	testFileNameMetadata = "metadata.yaml"
-	testFileContent      = "content"
+	testFolderStartAfter    = "folder_start_after"
+	testFolderPathList      = "folder_path_list"
+	testFolderFileList      = "folder_file_list"
+	testFileNameMetadata    = "metadata.yaml"
+	testFileNameAsbTemplate = "backup_%d.asb"
+	testFileContent         = "content"
+
+	testFoldersNumber = 5
 )
 
 var testFoldersTimestamps = []string{"1732519290025", "1732519390025", "1732519490025", "1732519590025", "1732519790025"}
@@ -94,6 +102,27 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		}); err != nil {
 			return err
 		}
+
+		fileName = fmt.Sprintf("%s/%s/%s", testFolderPathList, testFoldersTimestamps[i],
+			fmt.Sprintf(testFileNameAsbTemplate, i))
+		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+			Body:   bytes.NewReader([]byte(testFileContent)),
+		}); err != nil {
+			return err
+		}
+	}
+
+	for i := range testFoldersNumber {
+		fileName := fmt.Sprintf("%s/%s", testFolderFileList, fmt.Sprintf(testFileNameAsbTemplate, i))
+		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+			Body:   bytes.NewReader([]byte(testFileContent)),
+		}); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -129,6 +158,102 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 		WithStartAfter(startAfter),
 		WithSkipDirCheck(),
 		WithNestedDir(),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 2, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *AwsSuite) TestReader_StreamPathList() {
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	pathList := []string{
+		filepath.Join(testFolderPathList, "1732519390025"),
+		filepath.Join(testFolderPathList, "1732519590025"),
+	}
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		WithDirList(pathList),
+		WithValidator(mockValidator),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 2, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *AwsSuite) TestReader_StreamFilesList() {
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	pathList := []string{
+		filepath.Join(testFolderFileList, "backup_1.asb"),
+		filepath.Join(testFolderFileList, "backup_2.asb"),
+	}
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		WithFileList(pathList),
+		WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 

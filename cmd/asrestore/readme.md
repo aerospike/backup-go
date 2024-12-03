@@ -67,39 +67,45 @@ Restore Flags:
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to total-timeout. If both are 0,
                                  there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
-  -i, --input-file string        Restore from a single backup file. Use - for stdin.
-                                 Required, unless --directory or --directory-list is used.
-                                 
-  -u, --unique                   Skip records that already exist in the namespace;
-                                 Don't touch them.
-                                 
-  -r, --replace                  Fully replace records that already exist in the namespace;
-                                 Don't update them.
-                                 
-  -g, --no-generation            Don't check the generation of records that already exist in the namespace.
-      --ignore-record-error      Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
-                                 By default such errors are not ignored and asrestore terminates.
-                                 Optional: Use verbose mode to see errors in detail.
-      --disable-batch-writes     Disables the use of batch writes when restoring records to the Aerospike cluster.
-                                 By default, the cluster is checked for batch write support, so only set this flag if you explicitly
-                                 don't want
-                                 batch writes to be used or asrestore is failing to recognize that batch writes are disabled
-                                 and is failing to work because of it.
-      --max-async-batches int    The max number of outstanding async record batch write calls at a time.
-                                 For pre-6.0 servers, 'batches' are only a logical grouping of
-                                 records, and each record is uploaded individually. The true max
-                                 number of async aerospike calls would then be
-                                 <max-async-batches> * <batch-size>. (default 32)
-      --batch-size int           The max allowed number of records to simultaneously upload
-                                 in an async batch write calls to make to aerospike at a time.
-                                 Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
-      --extra-ttl int            For records with expirable void-times, add N seconds of extra-ttl to the
-                                 recorded void-time.
-  -T, --timeout int              Set the timeout (ms) for info commands. (default 10000)
-      --retry-base-timeout int   Set the initial delay between retry attempts in milliseconds (default 1000)
-      --retry-multiplier float   retry-multiplier is used to increase the delay between subsequent retry attempts.
-                                 The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
-      --retry-max-retries uint   Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.
+  -i, --input-file string         Restore from a single backup file. Use - for stdin.
+                                  Required, unless --directory or --directory-list is used.
+                                  
+      --directory-list string     A comma separated list of paths to directories that hold the backup files. Required,
+                                  unless -i or -d is used. The paths may not contain commas
+                                  Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2
+      --parent-directory string   A common root path for all paths used in --directory-list.
+                                  This path is prepended to all entries in --directory-list.
+                                  Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2
+  -u, --unique                    Skip records that already exist in the namespace;
+                                  Don't touch them.
+                                  
+  -r, --replace                   Fully replace records that already exist in the namespace;
+                                  Don't update them.
+                                  
+  -g, --no-generation             Don't check the generation of records that already exist in the namespace.
+      --ignore-record-error       Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
+                                  By default such errors are not ignored and asrestore terminates.
+                                  Optional: Use verbose mode to see errors in detail.
+      --disable-batch-writes      Disables the use of batch writes when restoring records to the Aerospike cluster.
+                                  By default, the cluster is checked for batch write support, so only set this flag if you explicitly
+                                  don't want
+                                  batch writes to be used or asrestore is failing to recognize that batch writes are disabled
+                                  and is failing to work because of it.
+      --max-async-batches int     The max number of outstanding async record batch write calls at a time.
+                                  For pre-6.0 servers, 'batches' are only a logical grouping of
+                                  records, and each record is uploaded individually. The true max
+                                  number of async aerospike calls would then be
+                                  <max-async-batches> * <batch-size>. (default 32)
+      --batch-size int            The max allowed number of records to simultaneously upload
+                                  in an async batch write calls to make to aerospike at a time.
+                                  Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
+      --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
+                                  recorded void-time.
+  -T, --timeout int               Set the timeout (ms) for info commands. (default 10000)
+      --retry-base-timeout int    Set the initial delay between retry attempts in milliseconds (default 1000)
+      --retry-multiplier float    retry-multiplier is used to increase the delay between subsequent retry attempts.
+                                  The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
+      --retry-max-retries uint    Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.
 
 Compression Flags:
   -z, --compress string         Enables decompressing of backup files using the specified compression algorithm.
@@ -167,13 +173,6 @@ Any Azure parameter can be retrieved from secret agent.
 
 ## Unsupported flags
 ```
---directory-list        A comma seperated list of paths to directories that hold the backup files. Required,
-                        unless -i or -d is used. The paths may not contain commas
-                        Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2
-                        
---parent-directory      A common root path for all paths used in --directory-list.
-                        This path is prepended to all entries in --directory-list.
-                        Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2
 
 -m, --machine <path>    Output machine-readable status updates to the given path, 
                         typically a FIFO.

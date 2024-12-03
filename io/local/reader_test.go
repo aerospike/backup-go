@@ -339,3 +339,109 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_Nested_
 		}
 	}
 }
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFilesList() {
+	dir := s.T().TempDir()
+
+	err := createTempNestedDir(dir, "nested1")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "nested1/file1.asb")
+	require.NoError(s.T(), err)
+	err = createTempNestedDir(dir, "nested2")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "nested2/file2.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file3.txt")
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	pathList := []string{
+		filepath.Join(dir, "nested1", "file1.asb"),
+		filepath.Join(dir, "nested2", "file2.asb"),
+	}
+
+	r, err := NewReader(
+		WithValidator(mockValidator),
+		WithFileList(pathList),
+	)
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(2, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
+}
+
+func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamPathList() {
+	dir := s.T().TempDir()
+
+	err := createTempNestedDir(dir, "nested1")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "nested1/file1.asb")
+	require.NoError(s.T(), err)
+	err = createTempNestedDir(dir, "nested2")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "nested2/file2.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "nested1/file3.asb")
+	require.NoError(s.T(), err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	pathList := []string{
+		filepath.Join(dir, "nested1"),
+		filepath.Join(dir, "nested2"),
+	}
+
+	r, err := NewReader(
+		WithValidator(mockValidator),
+		WithDirList(pathList),
+	)
+	s.Require().NoError(err)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(3, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
+}

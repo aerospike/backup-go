@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
@@ -60,17 +59,12 @@ func NewWriter(
 		opt(&w.options)
 	}
 
-	if w.path == "" {
-		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	if len(w.pathList) != 1 {
+		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	var prefix string
 	if w.isDir {
-		prefix = w.path
-		// Protection from incorrect input.
-		if !strings.HasSuffix(w.path, "/") && w.path != "/" && w.path != "" {
-			prefix = fmt.Sprintf("%s/", w.path)
-		}
+		w.prefix = cleanPath(w.pathList[0])
 	}
 
 	bucketHandler := client.Bucket(bucketName)
@@ -82,7 +76,7 @@ func NewWriter(
 
 	if w.isDir && !w.skipDirCheck {
 		// Check if backup dir is empty.
-		isEmpty, err := isEmptyDirectory(ctx, bucketHandler, prefix)
+		isEmpty, err := isEmptyDirectory(ctx, bucketHandler, w.prefix)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
@@ -93,7 +87,6 @@ func NewWriter(
 	}
 
 	w.bucketHandle = bucketHandler
-	w.prefix = prefix
 
 	if w.isRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucketHandler.
@@ -113,7 +106,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 		// If we use backup to single file, we overwrite the file name.
-		filename = w.path
+		filename = w.pathList[0]
 	}
 
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
@@ -130,15 +123,15 @@ func (w *Writer) RemoveFiles(
 ) error {
 	// Remove file.
 	if !w.isDir {
-		if err := w.bucketHandle.Object(w.path).Delete(ctx); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", w.path, err)
+		if err := w.bucketHandle.Object(w.pathList[0]).Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", w.pathList[0], err)
 		}
 
 		return nil
 	}
 	// Remove files from dir.
 	it := w.bucketHandle.Objects(ctx, &storage.Query{
-		Prefix: w.path,
+		Prefix: w.pathList[0],
 	})
 
 	for {
@@ -153,7 +146,7 @@ func (w *Writer) RemoveFiles(
 		}
 
 		// Skip files in folders.
-		if isDirectory(w.path, objAttrs.Name) && !w.withNestedDir {
+		if isDirectory(w.pathList[0], objAttrs.Name) && !w.withNestedDir {
 			continue
 		}
 

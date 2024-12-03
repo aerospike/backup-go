@@ -16,6 +16,7 @@ package app
 
 import (
 	"context"
+	"path"
 	"testing"
 
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -157,4 +158,99 @@ func TestNewAzureReader(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())
+}
+
+func TestPrepareDirectoryList(t *testing.T) {
+	tests := []struct {
+		name      string
+		parentDir string
+		dirList   string
+		expected  []string
+	}{
+		{
+			name:      "Empty input",
+			parentDir: "",
+			dirList:   "",
+			expected:  nil,
+		},
+		{
+			name:      "Single directory without parentDir",
+			parentDir: "",
+			dirList:   "dir1",
+			expected:  []string{"dir1"},
+		},
+		{
+			name:      "Multiple directories without parentDir",
+			parentDir: "",
+			dirList:   "dir1,dir2,dir3",
+			expected:  []string{"dir1", "dir2", "dir3"},
+		},
+		{
+			name:      "Single directory with parentDir",
+			parentDir: "parent",
+			dirList:   "dir1",
+			expected:  []string{path.Join("parent", "dir1")},
+		},
+		{
+			name:      "Multiple directories with parentDir",
+			parentDir: "parent",
+			dirList:   "dir1,dir2,dir3",
+			expected: []string{
+				path.Join("parent", "dir1"),
+				path.Join("parent", "dir2"),
+				path.Join("parent", "dir3"),
+			},
+		},
+		{
+			name:      "Trailing commas in dirList",
+			parentDir: "parent",
+			dirList:   "dir1,dir2,",
+			expected: []string{
+				path.Join("parent", "dir1"),
+				path.Join("parent", "dir2"),
+				path.Join("parent", ""),
+			},
+		},
+		{
+			name:      "Whitespace in dirList",
+			parentDir: "parent",
+			dirList:   " dir1 , dir2 ,dir3 ",
+			expected: []string{
+				path.Join("parent", " dir1 "),
+				path.Join("parent", " dir2 "),
+				path.Join("parent", "dir3 "),
+			},
+		},
+		{
+			name:      "ParentDir is empty but dirList has valid directories",
+			parentDir: "",
+			dirList:   "dir1,dir2",
+			expected:  []string{"dir1", "dir2"},
+		},
+		{
+			name:      "ParentDir has trailing slash",
+			parentDir: "parent/",
+			dirList:   "dir1,dir2",
+			expected: []string{
+				path.Join("parent/", "dir1"),
+				path.Join("parent/", "dir2"),
+			},
+		},
+		{
+			name:      "ParentDir with absolute path",
+			parentDir: "/absolute/path",
+			dirList:   "dir1,dir2",
+			expected: []string{
+				path.Join("/absolute/path", "dir1"),
+				path.Join("/absolute/path", "dir2"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := prepareDirectoryList(tt.parentDir, tt.dirList)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
 }

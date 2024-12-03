@@ -54,6 +54,10 @@ func NewASRestore(
 		return nil, err
 	}
 
+	if err := validateRestoreParams(restoreParams, commonParams); err != nil {
+		return nil, err
+	}
+
 	restoreConfig, err := mapRestoreConfig(
 		restoreParams,
 		commonParams,

@@ -43,8 +43,6 @@ type Reader struct {
 	client *s3.Client
 	// bucketName contains name of the bucket to read from.
 	bucketName string
-	// prefix contains folder name if we have folders inside the bucket.
-	prefix string
 }
 
 // NewReader returns new S3 storage reader.
@@ -65,16 +63,8 @@ func NewReader(
 		opt(&r.options)
 	}
 
-	if r.path == "" {
+	if len(r.pathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
-	}
-
-	if r.isDir {
-		r.prefix = r.path
-		// Protection from incorrect input.
-		if !strings.HasSuffix(r.path, "/") && r.path != "/" && r.path != "" {
-			r.prefix = fmt.Sprintf("%s/", r.path)
-		}
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -82,11 +72,6 @@ func NewReader(
 		Bucket: aws.String(bucketName),
 	}); err != nil {
 		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)
-	}
-
-	// S3 storage can read/write to "/" prefix, so we should replace it with "".
-	if r.prefix == "/" {
-		r.prefix = ""
 	}
 
 	r.client = client
@@ -101,34 +86,37 @@ func NewReader(
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	// If it is a folder, open and return.
-	if r.isDir {
-		err := r.checkRestoreDirectory(ctx)
-		if err != nil {
-			errorsCh <- err
-			return
+	defer close(readersCh)
+
+	for _, path := range r.pathList {
+		// If it is a folder, open and return.
+		switch r.isDir {
+		case true:
+			path = cleanPath(path)
+
+			err := r.checkRestoreDirectory(ctx, path)
+			if err != nil {
+				errorsCh <- err
+				return
+			}
+
+			r.streamDirectory(ctx, path, readersCh, errorsCh)
+		case false:
+			// If not a folder, only file.
+			r.StreamFile(ctx, path, readersCh, errorsCh)
 		}
-
-		r.streamDirectory(ctx, readersCh, errorsCh)
-
-		return
 	}
-
-	// If not a folder, only file.
-	r.StreamFile(ctx, r.path, readersCh, errorsCh)
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	defer close(readersCh)
-
 	var continuationToken *string
 
 	for {
 		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 			Bucket:            &r.bucketName,
-			Prefix:            &r.prefix,
+			Prefix:            &path,
 			ContinuationToken: continuationToken,
 			StartAfter:        &r.startAfter,
 		})
@@ -139,7 +127,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || isDirectory(r.prefix, *p.Key) && !r.withNestedDir {
+			if p.Key == nil || isDirectory(path, *p.Key) && !r.withNestedDir {
 				continue
 			}
 
@@ -191,10 +179,16 @@ func (r *Reader) streamDirectory(
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
-	defer close(readersCh)
-
+	// This condition will be true, only if we initialized reader for directory and then want to read
+	// a specific file. It is used for state file and by asb service. So it must be initialized with only
+	// one path.
 	if r.isDir {
-		filename = filepath.Join(r.path, filename)
+		if len(r.pathList) != 1 {
+			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
+			return
+		}
+
+		filename = filepath.Join(r.pathList[0], filename)
 	}
 
 	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
@@ -217,13 +211,13 @@ func (r *Reader) GetType() string {
 }
 
 // checkRestoreDirectory checks that the restore directory contains any file.
-func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
+func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	var continuationToken *string
 
 	for {
 		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 			Bucket:            &r.bucketName,
-			Prefix:            &r.prefix,
+			Prefix:            &path,
 			ContinuationToken: continuationToken,
 			StartAfter:        &r.startAfter,
 		})
@@ -233,7 +227,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || isDirectory(r.prefix, *p.Key) && !r.withNestedDir {
+			if p.Key == nil || isDirectory(path, *p.Key) && !r.withNestedDir {
 				continue
 			}
 
@@ -257,5 +251,20 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context) error {
 		}
 	}
 
-	return fmt.Errorf("%s is empty", r.prefix)
+	return fmt.Errorf("%s is empty", path)
+}
+
+// cleanPath is protection from incorrect input.
+func cleanPath(path string) string {
+	// S3 storage can read/write to "/" prefix, so we should replace it with "".
+	if path == "/" {
+		return ""
+	}
+
+	result := path
+	if !strings.HasSuffix(path, "/") && path != "/" && path != "" {
+		result = fmt.Sprintf("%s/", path)
+	}
+
+	return result
 }

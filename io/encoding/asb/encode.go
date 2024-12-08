@@ -253,7 +253,7 @@ func writeBinInt[T binTypesInt](name string, v T, w io.Writer) (int, error) {
 }
 
 func writeBinFloat(name string, v float64, w io.Writer) (int, error) {
-	return writeBytes(w, binFloatTypePrefix, escapeASB(name), []byte(fmt.Sprintf(" %f", v)))
+	return writeBytes(w, binFloatTypePrefix, escapeASB(name), space, []byte(strconv.FormatFloat(v, 'g', -1, 64)))
 }
 
 func writeBinString(name, v string, w io.Writer) (int, error) {

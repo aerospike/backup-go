@@ -362,7 +362,39 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: 123.456,
 			},
-			want: []byte("- D binName 123.456000\n"),
+			want: []byte("- D binName 123.456\n"),
+		},
+		{
+			name: "positive float scientific notation long bin",
+			args: args{
+				k: "binName",
+				v: 8.699637788021931e-151,
+			},
+			want: []byte("- D binName 8.699637788021931e-151\n"),
+		},
+		{
+			name: "positive float scientific notation short bin",
+			args: args{
+				k: "binName",
+				v: 2.000511e-212,
+			},
+			want: []byte("- D binName 2.000511e-212\n"),
+		},
+		{
+			name: "negative float scientific notation long bin",
+			args: args{
+				k: "binName",
+				v: -9.799243036278548e-17,
+			},
+			want: []byte("- D binName -9.799243036278548e-17\n"),
+		},
+		{
+			name: "negative float scientific notation short bin",
+			args: args{
+				k: "binName",
+				v: -2.490355e+26,
+			},
+			want: []byte("- D binName -2.490355e+26\n"),
 		},
 		{
 			name: "positive negative float bin",
@@ -370,7 +402,7 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: -123.456,
 			},
-			want: []byte("- D binName -123.456000\n"),
+			want: []byte("- D binName -123.456\n"),
 		},
 		{
 			name: "positive string bin",

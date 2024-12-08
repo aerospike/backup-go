@@ -996,8 +996,8 @@ func Test_writeBinFloat(t *testing.T) {
 				name: "binName",
 				v:    1234.5678,
 			},
-			want:  len("- D binName 1234.567800\n"),
-			wantW: "- D binName 1234.567800\n",
+			want:  len("- D binName 1234.5678\n"),
+			wantW: "- D binName 1234.5678\n",
 		},
 		{
 			name: "positive escaped",
@@ -1005,8 +1005,8 @@ func Test_writeBinFloat(t *testing.T) {
 				name: "b\nin\\Nam e",
 				v:    1234.5678,
 			},
-			want:  len("- D b\\\nin\\\\Nam\\ e 1234.567800\n"),
-			wantW: "- D b\\\nin\\\\Nam\\ e 1234.567800\n",
+			want:  len("- D b\\\nin\\\\Nam\\ e 1234.5678\n"),
+			wantW: "- D b\\\nin\\\\Nam\\ e 1234.5678\n",
 		},
 	}
 	for _, tt := range tests {

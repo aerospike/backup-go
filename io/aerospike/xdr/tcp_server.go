@@ -392,6 +392,7 @@ func (h *ConnectionHandler) handleAcknowledgments(ctx context.Context) {
 				h.logger.Error("failed to send ack", slog.Any("error", err))
 				// Close connection!
 				h.cancel()
+
 				return
 			}
 		}

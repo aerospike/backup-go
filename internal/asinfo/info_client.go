@@ -26,6 +26,22 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+const (
+	cmdCreateXDRDC        = "set-config:context=xdr;dc=%s;action=create"
+	cmdCreateConnector    = "set-config:context=xdr;dc=%s;connector=true"
+	cmdCreateXDRNode      = "set-config:context=xdr;dc=%s;node-address-port=%s;action=add"
+	cmdCreateXDRNamespace = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
+
+	cmdRemoveXDRNamespace = "set-config:context=xdr;dc=%s;namespace=%s;action=remove"
+	cmdRemoveXDRNode      = "set-config:context=xdr;dc=%s;node-address-port=%s;action=remove"
+	cmdRemoveXDRDC        = "set-config:context=xdr;dc=%s;action=remove"
+
+	cmdBlockMRTWrites   = "namespaces"
+	cmdUnBlockMRTWrites = "namespaces"
+
+	cmdRespErrPrefix = "ERROR"
+)
+
 var (
 	aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
 	secretAgentValRegex   = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
@@ -169,7 +185,195 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 	return recordsNumber / uint64(effectiveReplicationFactor), nil
 }
 
+// StartXDR creates xdr config and starts replication.
+func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string) error {
+	if err := ic.createXDRDC(dc); err != nil {
+		return err
+	}
+	// The Order of this operation is important. Don't move it if you don't know what you are doing!
+	if err := ic.createXDRConnector(dc); err != nil {
+		return err
+	}
+
+	if err := ic.createXDRNode(dc, hostPort); err != nil {
+		return err
+	}
+
+	if err := ic.createXDRNamespace(dc, namespace, rewind); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// StopXDR disable replication and remove xdr config.
+func (ic *InfoClient) StopXDR(dc, hostPort, namespace string) error {
+	if err := ic.removeXDRNamespace(dc, namespace); err != nil {
+		return err
+	}
+
+	if err := ic.removeXDRNode(dc, hostPort); err != nil {
+		return err
+	}
+
+	if err := ic.removeXDRDC(dc); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) createXDRDC(dc string) error {
+	cmd := fmt.Sprintf(cmdCreateXDRDC, dc)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create xdr dc: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr dc response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) createXDRConnector(dc string) error {
+	cmd := fmt.Sprintf(cmdCreateConnector, dc)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create xdr connector: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr connector response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) createXDRNode(dc, hostPort string) error {
+	cmd := fmt.Sprintf(cmdCreateXDRNode, dc, hostPort)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create xdr node: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr node response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) createXDRNamespace(dc, namespace, rewind string) error {
+	cmd := fmt.Sprintf(cmdCreateXDRNamespace, dc, namespace, rewind)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create xdr namesapce: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr namesapce response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) removeXDRNamespace(dc, namespace string) error {
+	cmd := fmt.Sprintf(cmdRemoveXDRNamespace, dc, namespace)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to remove xdr namespace: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse remove xdr namespace response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) removeXDRNode(dc, hostPort string) error {
+	cmd := fmt.Sprintf(cmdRemoveXDRNode, dc, hostPort)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to remove xdr node: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse remove xdr node response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) removeXDRDC(dc string) error {
+	cmd := fmt.Sprintf(cmdRemoveXDRDC, dc)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to remove xdr dc: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse remove xdr dc response: %w", err)
+	}
+
+	return nil
+}
+
+// BlockMRTWrites blocks MRT writes on cluster.
+func (ic *InfoClient) BlockMRTWrites(_, _ string) error {
+	cmd := cmdBlockMRTWrites
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to block mrt writes: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse block mrt writes response: %w", err)
+	}
+
+	return nil
+}
+
+// UnBlockMRTWrites unblocks MRT writes on cluster.
+func (ic *InfoClient) UnBlockMRTWrites(_, _ string) error {
+	cmd := cmdUnBlockMRTWrites
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to unblock mrt writes: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse unblock mrt writes response: %w", err)
+	}
+
+	return nil
+}
+
 // ***** Utility functions *****
+
+func parseResultResponse(cmd string, result map[string]string) (string, error) {
+	v, ok := result[cmd]
+	if !ok {
+		return "", fmt.Errorf("no response for command %s", cmd)
+	}
+
+	if strings.Contains(v, cmdRespErrPrefix) {
+		return "", fmt.Errorf("command %s failed: %s", cmd, v)
+	}
+
+	return v, nil
+}
 
 func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext

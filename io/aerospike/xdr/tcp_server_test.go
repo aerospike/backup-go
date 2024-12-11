@@ -16,57 +16,100 @@ package xdr
 
 import (
 	"context"
-	"encoding/binary"
+	"encoding/base64"
+	"fmt"
+	"log"
 	"log/slog"
 	"net"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	testAddress = "localhost:1025"
-	testTimeout = 1 * time.Second
-	testPayload = "payload"
+	testMessageB64      = "FhABEAAAAAAAAgAnjQAAAAAAAAUAAQAAAAsAc291cmNlLW5zMQAAABUE/+Ptyjj06wW9zx0AnxOmq45xJzsAAAAFAXNldDEAAAAKAgEAAAAAAAADCQAAAAkOAAAAbcndaZgAAAAUAgMAAWF6enp6enp6enp6enp6eno="
+	testErrorMessageB64 = "ZXJyb3IgbWVzc2FnZQ=="
+	testHost            = ":8080"
+	testTimeOut         = 1 * time.Second
+	testKeyString       = "source-ns1:set1:777:ff e3 ed ca 38 f4 eb 05 bd cf 1d 00 9f 13 a6 ab 8e 71 27 3b"
 )
 
-func Test_TCPServer(t *testing.T) {
+func TestTCPServer(t *testing.T) {
 	t.Parallel()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
 
-	resultChan := make(chan *models.XDRToken)
-	errChan := make(chan error, 1)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	tcpSrv := NewTCPServer(testAddress, testTimeout, nil, resultChan, logger)
+	srv := NewTCPServer(
+		testHost,
+		testTimeOut,
+		testTimeOut,
+		nil,
+		logger,
+	)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
+
+	results, err := srv.Start(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Wait for server to start.
+	time.Sleep(testTimeOut)
+
+	cleint, err := newTCPClient()
+	require.NoError(t, err)
 
 	go func() {
-		if err := tcpSrv.Start(ctx); err != nil {
-			errChan <- err
+		// Send 3 valid messages.
+		for i := 0; i < 3; i++ {
+			msg, err := newMessage(testMessageB64)
+			require.NoError(t, err)
+			err = sendMessage(cleint, msg)
+			require.NoError(t, err)
 		}
+		// Send one invalid message.
+		msg, err := newMessage(testErrorMessageB64)
+		require.NoError(t, err)
+		err = sendMessage(cleint, msg)
+		require.NoError(t, err)
 	}()
 
-	// Wait for the server to start.
-	time.Sleep(1 * time.Second)
+	go func() {
+		time.Sleep(5 + time.Second)
+		srv.Stop()
+	}()
 
-	conn, err := net.Dial("tcp", testAddress)
-	require.NoError(t, err)
-	defer conn.Close()
+	for result := range results {
+		require.Equal(t, testKeyString, result.Key.String())
+	}
+}
 
-	data := []byte(testPayload)
-	length := len(data)
-	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, uint32(length))
-	_, err = conn.Write(append(header, data...))
-	require.NoError(t, err)
+func newTCPClient() (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: testTimeOut}
+	return dialer.Dial("tcp", testHost)
+}
 
-	result := <-resultChan
-	require.Equal(t, result.Payload, []byte(testPayload))
+func sendMessage(conn net.Conn, message []byte) error {
+	deadline := time.Now().Add(testTimeOut)
+	if err := conn.SetWriteDeadline(deadline); err != nil {
+		return fmt.Errorf("failed to set write deadline: %w", err)
+	}
+
+	if _, err := conn.Write(message); err != nil {
+		return fmt.Errorf("failed to send message: %v", err)
+	}
+
+	return nil
+}
+
+func newMessage(message string) ([]byte, error) {
+	body, err := base64.StdEncoding.DecodeString(message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode message: %w", err)
+	}
+
+	return NewPayload(body), nil
 }

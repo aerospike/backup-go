@@ -90,11 +90,11 @@ func (p *Parser) Read() ([]byte, error) {
 // It will always be 8 bytes.
 type ProtoHeader struct {
 	// Version 1 byte.
-	Version uint64
+	Version int64
 	// Type 1 byte.
-	Type uint64
+	Type int64
 	// Size 6 bytes.
-	Size uint64
+	Size int64
 }
 
 // AerospikeMessage represents aerospike message type 3
@@ -102,24 +102,24 @@ type AerospikeMessage struct {
 	// Original message.
 	Raw []byte
 	// Must be always 22 for proto version 2.
-	HeaderSize     uint64
-	Info1          uint64
-	Info2          uint64
-	Info3          uint64
-	ResultCode     uint64
-	Generation     uint64
-	RecordTTL      uint64
-	TransactionTTL uint64
-	NumFields      uint64
-	NumOps         uint64
+	HeaderSize     int64
+	Info1          int64
+	Info2          int64
+	Info3          int64
+	ResultCode     int64
+	Generation     int64
+	RecordTTL      int64
+	TransactionTTL int64
+	NumFields      int64
+	NumOps         int64
 	Fields         []*Field
 	// There will be operations. But we don't need to parse them.
 }
 
 // Field represents field of AerospikeMessage
 type Field struct {
-	Size uint64
-	Type uint64
+	Size int64
+	Type int64
 	Data []byte // or interface
 }
 
@@ -152,13 +152,13 @@ func ParseAerospikeMessage(message []byte) (*AerospikeMessage, error) {
 
 // ParseFields receives data part of a message, that is placed after MessageHeader - 22 bytes.
 // And the number of fields that are encoded in this part of the message.
-func ParseFields(message []byte, numFields uint64) []*Field {
+func ParseFields(message []byte, numFields int64) []*Field {
 	if len(message) == 0 || numFields == 0 {
 		return nil
 	}
 
 	result := make([]*Field, numFields)
-	start := uint64(0)
+	start := int64(0)
 
 	for i := range result {
 		field, cursor := ParseField(message[start:])
@@ -172,7 +172,7 @@ func ParseFields(message []byte, numFields uint64) []*Field {
 }
 
 // ParseField parses one field, and returns *Field and cursor position.
-func ParseField(message []byte) (field *Field, end uint64) {
+func ParseField(message []byte) (field *Field, end int64) {
 	if len(message) < 5 {
 		// Minimum required bytes
 		return nil, 0
@@ -206,7 +206,7 @@ func NewPayload(body []byte) []byte {
 	// type 1 byte
 	msg = append(msg, intToField(ProtoTypeMessage, 1)...)
 	// Len 6 byte
-	msg = append(msg, intToField(uint64(bLen), 6)...)
+	msg = append(msg, intToField(int64(bLen), 6)...)
 	// Success message
 	msg = append(msg, body...)
 
@@ -221,7 +221,7 @@ func ResetXDRBit(message []byte) []byte {
 }
 
 // NewAckMessage returns new acknowledge message.
-func NewAckMessage(code uint64) []byte {
+func NewAckMessage(code int64) []byte {
 	msg := make([]byte, 0, LenProtoHeader+LenMessageHeader)
 	// version 1 byte
 	msg = append(msg, intToField(ProtoVersion, 1)...)
@@ -251,16 +251,16 @@ func readBytes(conn net.Conn, length int) ([]byte, error) {
 	return buffer, nil
 }
 
-func fieldToInt(header []byte) uint64 {
-	var num uint64
+func fieldToInt(header []byte) int64 {
+	var num int64
 	for i := 0; i < len(header); i++ {
-		num = (num << 8) | uint64(header[i])
+		num = (num << 8) | int64(header[i])
 	}
 
 	return num
 }
 
-func intToField(num uint64, size int) []byte {
+func intToField(num int64, size int) []byte {
 	field := make([]byte, size)
 	for i := size - 1; i >= 0; i-- {
 		field[i] = byte(num & 0xFF)

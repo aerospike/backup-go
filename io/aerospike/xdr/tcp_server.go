@@ -22,6 +22,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -227,6 +228,7 @@ func (h *ConnectionHandler) Start(ctx context.Context) {
 
 func (h *ConnectionHandler) cleanup() {
 	close(h.ackQueue)
+
 	if err := h.conn.Close(); err != nil {
 		h.logger.Warn("failed to close connection", slog.Any("error", err))
 	}
@@ -248,11 +250,18 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 			}
 
 			message, err := parser.Read()
-			if err != nil {
-				if err != io.EOF {
-					h.logger.Error("failed to read message", slog.Any("error", err))
-				}
 
+			switch {
+			case err == nil:
+			// ok.
+			case errors.Is(err, io.EOF):
+				// do nothing, wait for the next message.
+				continue
+			case os.IsTimeout(errors.Unwrap(err)):
+				// If timeout reached and the connection is closed, do nothing.
+				return
+			default:
+				h.logger.Error("failed to read message", slog.Any("error", err))
 				return
 			}
 

@@ -81,6 +81,8 @@ func TestTCPServer(t *testing.T) {
 		srv.Stop()
 	}()
 
+	require.Equal(t, int32(1), srv.GetActiveConnections())
+
 	var counter int
 	for result := range results {
 		require.Equal(t, testKeyString, result.Key.String())

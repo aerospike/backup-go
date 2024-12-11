@@ -65,10 +65,10 @@ type TCPServer struct {
 	config *TCPConfig
 
 	// Fields for internal connection serving.
-	listener    net.Listener
-	connections chan net.Conn
-	wg          sync.WaitGroup
-	cancel      context.CancelFunc
+	listener          net.Listener
+	activeConnections atomic.Int32
+	wg                sync.WaitGroup
+	cancel            context.CancelFunc
 
 	// Results will be sent here.
 	resultChan chan *models.XDRToken
@@ -82,10 +82,9 @@ func NewTCPServer(
 	logger *slog.Logger,
 ) *TCPServer {
 	return &TCPServer{
-		config:      config,
-		connections: make(chan net.Conn, config.MaxConnections),
-		resultChan:  make(chan *models.XDRToken, config.ResultQueueSize),
-		logger:      logger,
+		config:     config,
+		resultChan: make(chan *models.XDRToken, config.ResultQueueSize),
+		logger:     logger,
 	}
 }
 
@@ -113,12 +112,6 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.XDRToken, error) {
 	// Start connection acceptor
 	go s.acceptConnections(ctx)
 
-	// Start worker pool
-	for i := 0; i < s.config.MaxConnections; i++ {
-		s.wg.Add(1)
-		go s.handleConnections(ctx)
-	}
-
 	s.logger.Info("server started",
 		slog.String("address", s.config.Address),
 		slog.Bool("tls", s.config.TLSConfig != nil))
@@ -138,10 +131,14 @@ func (s *TCPServer) Stop() {
 
 	s.wg.Wait()
 
-	close(s.connections)
 	close(s.resultChan)
 
 	s.logger.Info("server shutdown complete")
+}
+
+// GetActiveConnections method for monitoring current state.
+func (s *TCPServer) GetActiveConnections() int32 {
+	return s.activeConnections.Load()
 }
 
 // acceptConnections serves connections, not more than maxConnections.
@@ -160,11 +157,31 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 
 				continue
 			}
-			select {
-			case s.connections <- conn:
+			// Check if we have an opportunity to start new connections.
+			if s.activeConnections.Load() < int32(s.config.MaxConnections) {
+				// Increment connections counter.
+				s.activeConnections.Add(1)
+
+				go func() {
+					// Create and run handler.
+					handler := NewConnectionHandler(
+						conn,
+						s.resultChan,
+						s.config.AckQueueSize,
+						s.config.ReadTimoutMilliseconds,
+						s.config.WriteTimeoutMilliseconds,
+						s.logger,
+					)
+					// Handlers wait when all goroutines are finished.
+					handler.Start(ctx)
+					s.logger.Debug("connection finished",
+						slog.String("address", conn.RemoteAddr().String()))
+					s.activeConnections.Add(-1)
+				}()
+
 				s.logger.Debug("accepted new connection",
 					slog.String("address", conn.RemoteAddr().String()))
-			default:
+			} else {
 				s.logger.Info("connection pool is full, rejecting TCP connection",
 					slog.String("address", conn.RemoteAddr().String()))
 
@@ -173,28 +190,6 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 						slog.String("address", conn.RemoteAddr().String()))
 				}
 			}
-		}
-	}
-}
-
-// handleConnections creates connection handlers to serve each connection.
-func (s *TCPServer) handleConnections(ctx context.Context) {
-	defer s.wg.Done()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case conn := <-s.connections:
-			handler := NewConnectionHandler(
-				conn,
-				s.resultChan,
-				s.config.AckQueueSize,
-				s.config.ReadTimoutMilliseconds,
-				s.config.WriteTimeoutMilliseconds,
-				s.logger,
-			)
-			handler.Start(ctx)
 		}
 	}
 }
@@ -283,11 +278,9 @@ func (h *ConnectionHandler) Start(ctx context.Context) {
 		h.handleAcknowledgments(ctx)
 	}()
 
-	// Clean up when all routines exit.
-	go func() {
-		h.wg.Wait()
-		h.cleanup()
-	}()
+	// Wait and clean up when all routines exit.
+	h.wg.Wait()
+	h.cleanup()
 }
 
 // cleanup closes communication channels for current handler and closes connection itself.

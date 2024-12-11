@@ -36,10 +36,13 @@ const (
 	AckRetry = 11
 )
 
+// Parser xdr protocol parser.
+// Read connection and process messages.
 type Parser struct {
 	conn net.Conn
 }
 
+// NewParser returns new XDR protocol parser.
 func NewParser(conn net.Conn) *Parser {
 	return &Parser{
 		conn: conn,
@@ -55,7 +58,7 @@ func (p *Parser) Read() ([]byte, error) {
 		return nil, fmt.Errorf("failed to read proto version: %w", err)
 	}
 
-	version := fieldToInt(versionBytes)
+	version := fieldToInt32(versionBytes)
 	if version != ProtoVersion {
 		return nil, fmt.Errorf("unsupported protocol version: %d", version)
 	}
@@ -65,7 +68,7 @@ func (p *Parser) Read() ([]byte, error) {
 		return nil, fmt.Errorf("failed to read proto type: %w", err)
 	}
 
-	protoType := fieldToInt(typeBytes)
+	protoType := fieldToInt32(typeBytes)
 	if protoType != ProtoTypeMessage {
 		return nil, fmt.Errorf("invalid proto type: %d", protoType)
 	}
@@ -75,7 +78,7 @@ func (p *Parser) Read() ([]byte, error) {
 		return nil, fmt.Errorf("failed to read proto size bytes: %w", err)
 	}
 
-	size := fieldToInt(sizeBytes)
+	size := fieldToInt64(sizeBytes)
 	if size > MaxProtoBody {
 		return nil, fmt.Errorf("invalid proto size bytes: %d", size)
 	}
@@ -95,7 +98,7 @@ func (p *Parser) Read() ([]byte, error) {
 // - Type 1 byte
 // - Size 6 bytes
 type ProtoHeader struct {
-	Size    int
+	Size    int64
 	Version int8
 	Type    int8
 }
@@ -118,9 +121,9 @@ type AerospikeMessage struct {
 	// Raw original message.
 	Raw            []byte
 	Fields         []*Field
-	Generation     int
-	RecordTTL      int
-	TransactionTTL int
+	Generation     int32
+	RecordTTL      int32
+	TransactionTTL int32
 	NumFields      int16
 	NumOps         int16
 	// HeaderSize must always be 22 for proto version 2.
@@ -138,7 +141,7 @@ type AerospikeMessage struct {
 // - Data (Size - 1) bytes
 type Field struct {
 	Data []byte
-	Size int
+	Size int32
 	Type int8
 }
 
@@ -155,11 +158,11 @@ func ParseAerospikeMessage(message []byte) (*AerospikeMessage, error) {
 		Info1:      fieldToInt8(message[1:2]),
 		Info2:      fieldToInt8(message[2:3]),
 		Info3:      fieldToInt8(message[3:4]),
-		// We skip bytes 4:5 as they are unused according to documentation.
+		// We skip bytes 4:5 as they are unused, according to documentation.
 		ResultCode:     fieldToInt8(message[5:6]),
-		Generation:     fieldToInt(message[6:10]),
-		RecordTTL:      fieldToInt(message[10:14]),
-		TransactionTTL: fieldToInt(message[14:18]),
+		Generation:     fieldToInt32(message[6:10]),
+		RecordTTL:      fieldToInt32(message[10:14]),
+		TransactionTTL: fieldToInt32(message[14:18]),
 		NumFields:      fieldToInt16(message[18:20]),
 		NumOps:         fieldToInt16(message[20:22]),
 	}
@@ -177,7 +180,7 @@ func ParseFields(message []byte, numFields int16) []*Field {
 	}
 
 	result := make([]*Field, numFields)
-	start := 0
+	start := int32(0)
 
 	for i := range result {
 		field, cursor := ParseField(message[start:])
@@ -191,7 +194,7 @@ func ParseFields(message []byte, numFields int16) []*Field {
 }
 
 // ParseField parses one field, and returns *Field and cursor position.
-func ParseField(message []byte) (field *Field, end int) {
+func ParseField(message []byte) (field *Field, end int32) {
 	if len(message) < 5 {
 		// Minimum required bytes
 		return nil, 0
@@ -201,7 +204,7 @@ func ParseField(message []byte) (field *Field, end int) {
 	const offset = 4
 
 	// Size 4 bytes.
-	size := fieldToInt(message[:4])
+	size := fieldToInt32(message[:4])
 	// End of data block.
 	end = offset + size
 
@@ -255,9 +258,9 @@ func NewAckMessage(code int) []byte {
 }
 
 // readBytes reads length number of bytes from conn.
-func readBytes(conn net.Conn, length int) ([]byte, error) {
+func readBytes(conn net.Conn, length int64) ([]byte, error) {
 	buffer := make([]byte, length)
-	total := 0
+	total := int64(0)
 
 	for total < length {
 		n, err := conn.Read(buffer[total:])
@@ -265,16 +268,25 @@ func readBytes(conn net.Conn, length int) ([]byte, error) {
 			return nil, err
 		}
 
-		total += n
+		total += int64(n)
 	}
 
 	return buffer, nil
 }
 
-func fieldToInt(header []byte) int {
-	var num int
+func fieldToInt64(header []byte) int64 {
+	var num int64
 	for i := 0; i < len(header); i++ {
-		num = (num << 8) | int(header[i])
+		num = (num << 8) | int64(header[i])
+	}
+
+	return num
+}
+
+func fieldToInt32(header []byte) int32 {
+	var num int32
+	for i := 0; i < len(header); i++ {
+		num = (num << 8) | int32(header[i])
 	}
 
 	return num
@@ -337,10 +349,10 @@ func NewAerospikeKey(fields []*Field) (*aerospike.Key, error) {
 		case FieldTypeSet:
 			set = string(fields[i].Data)
 		case FieldTypeUserKey:
-			typeByte := fieldToInt(fields[i].Data[:1])
+			typeByte := fieldToInt32(fields[i].Data[:1])
 			switch typeByte {
 			case UserKeyTypeInt:
-				key = fieldToInt(fields[i].Data[1:])
+				key = fieldToInt32(fields[i].Data[1:])
 			case UserKeyTypeString:
 				key = string(fields[i].Data[1:])
 			case UserKeyTypeBlob:

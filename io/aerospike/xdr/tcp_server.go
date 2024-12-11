@@ -202,8 +202,9 @@ type ConnectionHandler struct {
 	// Timeouts in nanoseconds.
 	readTimoutNano   int64
 	writeTimeoutNano int64
-
-	wg sync.WaitGroup
+	// To stop all goroutines from inside.
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 	// Queue to process received messages.
 	bodyQueue chan []byte
 	// Queue to process ack messages.
@@ -243,6 +244,9 @@ func NewConnectionHandler(
 
 // Start launch goroutines to serve current connection.
 func (h *ConnectionHandler) Start(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	h.cancel = cancel
+
 	h.wg.Add(4)
 
 	// This function serve h.timeNow field, to save each 100 milliseconds, current time.
@@ -386,7 +390,9 @@ func (h *ConnectionHandler) handleAcknowledgments(ctx context.Context) {
 			// Process each received ack message.
 			if err := h.sendAck(ack); err != nil {
 				h.logger.Error("failed to send ack", slog.Any("error", err))
-				continue
+				// Close connection!
+				h.cancel()
+				return
 			}
 		}
 	}

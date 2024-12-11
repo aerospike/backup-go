@@ -41,11 +41,10 @@ func TestTCPServer(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
+	cfg := NewDefaultTCPConfig()
+
 	srv := NewTCPServer(
-		testHost,
-		testTimeOut,
-		testTimeOut,
-		nil,
+		cfg,
 		logger,
 	)
 
@@ -57,9 +56,9 @@ func TestTCPServer(t *testing.T) {
 	}
 
 	// Wait for server to start.
-	time.Sleep(testTimeOut)
+	time.Sleep(3 * time.Second)
 
-	cleint, err := newTCPClient()
+	client, err := newTCPClient()
 	require.NoError(t, err)
 
 	go func() {
@@ -67,13 +66,13 @@ func TestTCPServer(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			msg, err := newMessage(testMessageB64)
 			require.NoError(t, err)
-			err = sendMessage(cleint, msg)
+			err = sendMessage(client, msg)
 			require.NoError(t, err)
 		}
 		// Send one invalid message.
 		msg, err := newMessage(testErrorMessageB64)
 		require.NoError(t, err)
-		err = sendMessage(cleint, msg)
+		err = sendMessage(client, msg)
 		require.NoError(t, err)
 	}()
 
@@ -82,9 +81,12 @@ func TestTCPServer(t *testing.T) {
 		srv.Stop()
 	}()
 
+	var counter int
 	for result := range results {
 		require.Equal(t, testKeyString, result.Key.String())
+		counter++
 	}
+	require.Equal(t, 3, counter)
 }
 
 func newTCPClient() (net.Conn, error) {

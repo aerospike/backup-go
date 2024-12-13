@@ -306,8 +306,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			timeNow := atomic.LoadInt64(&h.timeNow)
-			deadline := timeNow + h.readTimoutNano
+			deadline := h.getDeadline(h.readTimoutNano)
 
 			if err := h.conn.SetReadDeadline(time.Unix(deadline, 0)); err != nil {
 				h.logger.Error("failed to set read deadline", slog.Any("error", err))
@@ -401,9 +400,7 @@ func (h *ConnectionHandler) handleAcknowledgments(ctx context.Context) {
 
 // sendAck updates connection deadline and writes an ack message to connection.
 func (h *ConnectionHandler) sendAck(ack []byte) error {
-	timeNow := atomic.LoadInt64(&h.timeNow)
-	deadline := timeNow + h.writeTimeoutNano
-
+	deadline := h.getDeadline(h.writeTimeoutNano)
 	if err := h.conn.SetWriteDeadline(time.Unix(0, deadline)); err != nil {
 		return fmt.Errorf("failed to set ack write deadline: %w", err)
 	}
@@ -414,4 +411,10 @@ func (h *ConnectionHandler) sendAck(ack []byte) error {
 	}
 
 	return nil
+}
+
+// getDeadline loads current time from h.timeNow and add timeout value.
+func (h *ConnectionHandler) getDeadline(timeout int64) int64 {
+	timeNow := atomic.LoadInt64(&h.timeNow)
+	return timeNow + timeout
 }

@@ -94,7 +94,7 @@ type scanner interface {
 
 // RecordReader satisfies the pipeline DataReader interface.
 // It reads records from an Aerospike database and returns them as
-// *models.Record.
+// *models.Token.
 type RecordReader struct {
 	ctx        context.Context
 	client     scanner

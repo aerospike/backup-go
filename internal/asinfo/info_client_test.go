@@ -1725,6 +1725,9 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 	err := ic.StartXDR(testASDC, testXRdHostPort, testASNamespace, testASRewind)
 	require.NoError(t, err)
 
+	_, err = ic.GetStats(testASDC, testASNamespace)
+	require.NoError(t, err)
+
 	err = ic.StopXDR(testASDC, testXRdHostPort, testASNamespace)
 	require.NoError(t, err)
 }

@@ -36,6 +36,8 @@ const (
 	cmdRemoveXDRNode      = "set-config:context=xdr;dc=%s;node-address-port=%s;action=remove"
 	cmdRemoveXDRDC        = "set-config:context=xdr;dc=%s;action=remove"
 
+	cmdGetStats = "get-stats:context=xdr;dc=%s;namespace=%s"
+
 	cmdBlockMRTWrites   = "namespaces"
 	cmdUnBlockMRTWrites = "namespaces"
 
@@ -358,6 +360,62 @@ func (ic *InfoClient) UnBlockMRTWrites(_, _ string) error {
 	}
 
 	return nil
+}
+
+// Stats represent a result of get stats command.
+// In the future, other fields can be added.
+type Stats struct {
+	Lag               int64
+	Recoveries        int64
+	RecoveriesPending int64
+}
+
+// GetStats requests node statistics like recoveries, lag, etc.
+// returns Stats struct.
+func (ic *InfoClient) GetStats(dc, namespace string) (Stats, error) {
+	cmd := fmt.Sprintf(cmdGetStats, dc, namespace)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return Stats{}, fmt.Errorf("failed to get stats: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return Stats{}, fmt.Errorf("failed to parse get stats response: %w", err)
+	}
+
+	resultMap, err := parseInfoResponse(result, ";", ":", "=")
+	if err != nil {
+		return Stats{}, fmt.Errorf("failed to parse to map get stats response: %w", err)
+	}
+
+	var stats Stats
+
+	for i := range resultMap {
+		if val, ok := resultMap[i]["lag"]; ok {
+			stats.Lag, err = strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return Stats{}, fmt.Errorf("failed to parse lag: %w", err)
+			}
+		}
+
+		if val, ok := resultMap[i]["recoveries"]; ok {
+			stats.Recoveries, err = strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return Stats{}, fmt.Errorf("failed to parse recoveries: %w", err)
+			}
+		}
+
+		if val, ok := resultMap[i]["recoveries_pending"]; ok {
+			stats.RecoveriesPending, err = strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return Stats{}, fmt.Errorf("failed to parse recoveries_pending: %w", err)
+			}
+		}
+	}
+
+	return stats, nil
 }
 
 // ***** Utility functions *****

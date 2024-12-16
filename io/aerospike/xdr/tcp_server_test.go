@@ -58,7 +58,7 @@ func TestTCPServer(t *testing.T) {
 	// Wait for server to start.
 	time.Sleep(3 * time.Second)
 
-	client, err := newTCPClient()
+	client, err := newTCPClient(testHost)
 	require.NoError(t, err)
 
 	go func() {
@@ -89,9 +89,9 @@ func TestTCPServer(t *testing.T) {
 	require.Equal(t, 3, counter)
 }
 
-func newTCPClient() (net.Conn, error) {
+func newTCPClient(host string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: testTimeOut}
-	return dialer.Dial("tcp", testHost)
+	return dialer.Dial("tcp", host)
 }
 
 func sendMessage(conn net.Conn, message []byte) error {

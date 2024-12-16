@@ -52,13 +52,15 @@ func NewRecordReaderConfig(
 	rewind string,
 	currentHostPort string,
 	tcpConfig *TCPConfig,
+	infoPolingPeriod time.Duration,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
-		dc:              dc,
-		namespace:       namespace,
-		rewind:          rewind,
-		currentHostPort: currentHostPort,
-		tcpConfig:       tcpConfig,
+		dc:               dc,
+		namespace:        namespace,
+		rewind:           rewind,
+		currentHostPort:  currentHostPort,
+		tcpConfig:        tcpConfig,
+		infoPolingPeriod: infoPolingPeriod,
 	}
 }
 
@@ -69,13 +71,20 @@ var (
 	mu       sync.Mutex
 )
 
+// infoCommander interface for an info client.
+type infoCommander interface {
+	StartXDR(dc, hostPort, namespace, rewind string) error
+	StopXDR(dc, hostPort, namespace string) error
+	GetStats(dc, namespace string) (asinfo.Stats, error)
+}
+
 // RecordReader satisfies the pipeline DataReader interface.
 // It reads receives records from an Aerospike database through XDR protocol
 // and returns them as *models.XDRToken.
 type RecordReader struct {
 	ctx context.Context
 	// Info client to start and stop XDR, also to get current state.
-	infoClient *asinfo.InfoClient
+	infoClient infoCommander
 	// Records reader config.
 	config *RecordReaderConfig
 	// TCP server to serve XDR backup.
@@ -95,7 +104,7 @@ type RecordReader struct {
 // NewRecordReader creates a new RecordReader for XDR.
 func NewRecordReader(
 	ctx context.Context,
-	infoClient *asinfo.InfoClient,
+	infoClient infoCommander,
 	config *RecordReaderConfig,
 	logger *slog.Logger,
 ) (*RecordReader, error) {
@@ -149,6 +158,7 @@ func (r *RecordReader) Read() (*models.XDRToken, error) {
 
 // Close cancels the Aerospike scan used to read records.
 func (r *RecordReader) Close() {
+	r.logger.Debug("closing aerospike xdr record reader")
 	// If not running, do nothing.
 	if !r.isRunning.Load() {
 		return
@@ -216,6 +226,8 @@ func (r *RecordReader) serve() {
 				r.logger.Error("failed to get xdr stats", slog.Any("error", err))
 				continue // Or brake?
 			}
+
+			r.logger.Debug("got stats", slog.Any("stats", stats))
 
 			if stats.Recoveries != 0 || stats.RecoveriesPending != 0 {
 				// Recovery in progress.

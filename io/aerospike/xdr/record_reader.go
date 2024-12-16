@@ -84,11 +84,9 @@ type RecordReader struct {
 	tcpServer *TCPServer
 	// Received results will be placed here.
 	results chan *models.XDRToken
-
 	// Time when recovery finished.
 	checkpoint int64
-
-	// To server singleton.
+	// To check if the reader is running.
 	isRunning atomic.Bool
 
 	logger *slog.Logger
@@ -111,15 +109,13 @@ func NewRecordReader(
 		logger:     logger,
 	}
 
-	rr.isRunning.Store(true)
-
 	return rr, nil
 }
 
 // Read reads the next record from the Aerospike database.
 func (r *RecordReader) Read() (*models.XDRToken, error) {
 	// Check if the server already started.
-	if r.results == nil {
+	if !r.isRunning.Load() {
 		// If not started.
 		if err := r.start(); err != nil {
 			return nil, fmt.Errorf("failed to start xdr scan: %v", err)
@@ -161,6 +157,8 @@ func (r *RecordReader) Close() {
 }
 
 func (r *RecordReader) start() error {
+	// Set isRunning = true.
+	r.isRunning.Store(true)
 	// Create XDR config.
 	if err := r.infoClient.StartXDR(
 		r.config.dc,

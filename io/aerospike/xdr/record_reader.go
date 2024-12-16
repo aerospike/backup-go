@@ -19,11 +19,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
+	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -64,13 +64,6 @@ func NewRecordReaderConfig(
 	}
 }
 
-// instance represents singleton for RecordReader,
-// as we must limit simultaneous operations with backup over XDR protocol.
-var (
-	instance *RecordReader
-	mu       sync.Mutex
-)
-
 // infoCommander interface for an info client.
 type infoCommander interface {
 	StartXDR(dc, hostPort, namespace, rewind string) error
@@ -108,17 +101,6 @@ func NewRecordReader(
 	config *RecordReaderConfig,
 	logger *slog.Logger,
 ) (*RecordReader, error) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if instance != nil {
-		if instance.isRunning.Load() {
-			return nil, fmt.Errorf("xdr record reader is already running")
-		}
-		// Previous instance exists but not running, clean it up
-		instance = nil
-	}
-
 	tcpSrv := NewTCPServer(config.tcpConfig, logger)
 
 	rr := &RecordReader{
@@ -129,10 +111,9 @@ func NewRecordReader(
 		logger:     logger,
 	}
 
-	instance = rr
-	instance.isRunning.Store(true)
+	rr.isRunning.Store(true)
 
-	return instance, nil
+	return rr, nil
 }
 
 // Read reads the next record from the Aerospike database.
@@ -205,7 +186,7 @@ func (r *RecordReader) start() error {
 
 	r.results = results
 
-	r.logger.Debug("started xdr tcp server ")
+	r.logger.Debug("started xdr tcp server")
 
 	go r.serve()
 
@@ -235,10 +216,14 @@ func (r *RecordReader) serve() {
 			}
 			// set once
 			if r.checkpoint == 0 {
-				r.checkpoint = time.Now().UnixNano()
+				r.checkpoint = time.Now().Unix()
 			}
 
-			if r.checkpoint-stats.Lag > 0 {
+			// Convert lag from citrus leaf epoch.
+			clLag := cltime.NewCLTime(stats.Lag)
+			unixLag := clLag.Unix()
+
+			if r.checkpoint-unixLag > 0 {
 				// Stop.
 				r.Close()
 				return

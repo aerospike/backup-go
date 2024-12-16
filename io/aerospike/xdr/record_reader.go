@@ -118,7 +118,7 @@ func (r *RecordReader) Read() (*models.XDRToken, error) {
 	if !r.isRunning.Load() {
 		// If not started.
 		if err := r.start(); err != nil {
-			return nil, fmt.Errorf("failed to start xdr scan: %v", err)
+			return nil, fmt.Errorf("failed to start xdr scan: %w", err)
 		}
 	}
 

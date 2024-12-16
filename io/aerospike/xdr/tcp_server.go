@@ -48,16 +48,38 @@ type TCPConfig struct {
 	MaxConnections int
 }
 
+// NewTCPConfig returns new TCP config.
+func NewTCPConfig(
+	address string,
+	tlsConfig *tls.Config,
+	readTimoutMilliseconds int64,
+	writeTimeoutMilliseconds int64,
+	resultQueueSize int,
+	ackQueueSize int,
+	maxConnections int,
+) *TCPConfig {
+	return &TCPConfig{
+		Address:                  address,
+		TLSConfig:                tlsConfig,
+		ReadTimoutMilliseconds:   readTimoutMilliseconds,
+		WriteTimeoutMilliseconds: writeTimeoutMilliseconds,
+		ResultQueueSize:          resultQueueSize,
+		AckQueueSize:             ackQueueSize,
+		MaxConnections:           maxConnections,
+	}
+}
+
 // NewDefaultTCPConfig returns default TCP Server config.
 func NewDefaultTCPConfig() *TCPConfig {
-	return &TCPConfig{
-		Address:                  ":8080",
-		ReadTimoutMilliseconds:   1000,
-		WriteTimeoutMilliseconds: 1000,
-		ResultQueueSize:          256,
-		AckQueueSize:             256,
-		MaxConnections:           100,
-	}
+	return NewTCPConfig(
+		":8080",
+		nil,
+		1000,
+		1000,
+		256,
+		256,
+		100,
+	)
 }
 
 // TCPServer server for serving XDR connections.

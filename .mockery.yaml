@@ -36,3 +36,7 @@ packages:
       outpkg: mocks
       exclude:
         - Opt
+  github.com/aerospike/backup-go/io/aerospike/xdr:
+    config:
+      dir: ./io/aerospike/xdr/mocks
+      outpkg: mocks

@@ -83,9 +83,8 @@ func TestRecordReader(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start to read messages.
+	var counter int
 	go func() {
-		var counter int
-		defer require.Equal(t, 3, counter)
 		for {
 			token, err := r.Read()
 			switch {
@@ -121,4 +120,6 @@ func TestRecordReader(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	r.Close()
+
+	require.Equal(t, 3, counter)
 }

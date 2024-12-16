@@ -85,6 +85,7 @@ func TestRecordReader(t *testing.T) {
 	// Start to read messages.
 	go func() {
 		var counter int
+		defer require.Equal(t, 3, counter)
 		for {
 			token, err := r.Read()
 			switch {
@@ -98,7 +99,6 @@ func TestRecordReader(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}
-		require.Equal(t, 3, counter)
 	}()
 
 	// Wait for the TCP server to start.

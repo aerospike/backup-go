@@ -157,8 +157,6 @@ func (r *RecordReader) Close() {
 }
 
 func (r *RecordReader) start() error {
-	// Set isRunning = true.
-	r.isRunning.Store(true)
 	// Create XDR config.
 	if err := r.infoClient.StartXDR(
 		r.config.dc,
@@ -187,6 +185,8 @@ func (r *RecordReader) start() error {
 	r.logger.Debug("started xdr tcp server")
 
 	go r.serve()
+
+	r.isRunning.Store(true)
 
 	return nil
 }

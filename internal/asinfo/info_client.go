@@ -390,28 +390,30 @@ func (ic *InfoClient) GetStats(dc, namespace string) (Stats, error) {
 		return Stats{}, fmt.Errorf("failed to parse to map get stats response: %w", err)
 	}
 
+	if len(resultMap) != 1 {
+		return Stats{}, fmt.Errorf("stats response has unexpected number of results: %d", len(resultMap))
+	}
+
 	var stats Stats
 
-	for i := range resultMap {
-		if val, ok := resultMap[i]["lag"]; ok {
-			stats.Lag, err = strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return Stats{}, fmt.Errorf("failed to parse lag: %w", err)
-			}
+	if val, ok := resultMap[0]["lag"]; ok {
+		stats.Lag, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return Stats{}, fmt.Errorf("failed to parse lag: %w", err)
 		}
+	}
 
-		if val, ok := resultMap[i]["recoveries"]; ok {
-			stats.Recoveries, err = strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return Stats{}, fmt.Errorf("failed to parse recoveries: %w", err)
-			}
+	if val, ok := resultMap[0]["recoveries"]; ok {
+		stats.Recoveries, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return Stats{}, fmt.Errorf("failed to parse recoveries: %w", err)
 		}
+	}
 
-		if val, ok := resultMap[i]["recoveries_pending"]; ok {
-			stats.RecoveriesPending, err = strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return Stats{}, fmt.Errorf("failed to parse recoveries_pending: %w", err)
-			}
+	if val, ok := resultMap[0]["recoveries_pending"]; ok {
+		stats.RecoveriesPending, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return Stats{}, fmt.Errorf("failed to parse recoveries_pending: %w", err)
 		}
 	}
 

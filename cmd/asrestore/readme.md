@@ -79,9 +79,8 @@ Restore Flags:
   -u, --unique                    Skip records that already exist in the namespace;
                                   Don't touch them.
                                   
-  -r, --replace                   Fully replace records that already exist in the namespace;
-                                  Don't update them.
-                                  
+  -r, --replace                   Fully replace records that already exist in the namespace.
+                                  Generation check is conducted during replace.
   -g, --no-generation             Don't check the generation of records that already exist in the namespace.
       --ignore-record-error       Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
                                   By default such errors are not ignored and asrestore terminates.

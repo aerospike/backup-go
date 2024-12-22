@@ -81,6 +81,9 @@ Restore Flags:
                                   
   -r, --replace                   Fully replace records that already exist in the namespace.
                                   Generation check is conducted during replace.
+                                  This option still does a generation check by default and would need to be combined with the -g option 
+                                  if no generation check is desired. 
+                                  Note: this option is mutually exclusive to --unique.
   -g, --no-generation             Don't check the generation of records that already exist in the namespace.
       --ignore-record-error       Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
                                   By default such errors are not ignored and asrestore terminates.

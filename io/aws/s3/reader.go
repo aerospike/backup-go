@@ -29,7 +29,10 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-const s3type = "s3"
+const (
+	s3type     = "s3"
+	bufferSize = 256
+)
 
 type validator interface {
 	Run(fileName string) error
@@ -43,6 +46,8 @@ type Reader struct {
 	client *s3.Client
 	// bucketName contains name of the bucket to read from.
 	bucketName string
+	// Used to open writers asynchronously.
+	objectKeysChan chan *string
 }
 
 // NewReader returns new S3 storage reader.
@@ -76,18 +81,16 @@ func NewReader(
 
 	r.client = client
 	r.bucketName = bucketName
+	r.objectKeysChan = make(chan *string, bufferSize)
 
 	return r, nil
 }
 
-// StreamFiles read files form s3 and send io.Readers to `readersCh` communication
-// chan for lazy loading.
+// StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	defer close(readersCh)
-
 	for _, path := range r.pathList {
 		// If it is a folder, open and return.
 		switch r.isDir {
@@ -108,6 +111,8 @@ func (r *Reader) StreamFiles(
 	}
 }
 
+// streamDirectory reads directory form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// In case of error we send error to `errorsCh` channel.
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
@@ -175,10 +180,48 @@ func (r *Reader) streamDirectory(
 	}
 }
 
+func (r *Reader) serverObjects(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	defer close(readersCh)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case key, active := <-r.objectKeysChan:
+			if !active {
+				return
+			}
+			object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
+				Bucket: &r.bucketName,
+				Key:    key,
+			})
+			if err != nil {
+				// Skip 404 not found error.
+				var opErr *smithy.OperationError
+				if errors.As(err, &opErr) {
+					var httpErr *awsHttp.ResponseError
+					if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound {
+						continue
+					}
+				}
+
+				// We check *p.Key == nil in the beginning.
+				errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *p.Key, err)
+
+				return
+			}
+
+			if object != nil {
+				readersCh <- object.Body
+			}
+		}
+	}
+}
+
 // StreamFile opens single file from s3 and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	defer close(readersCh)
 	// This condition will be true, only if we initialized reader for directory and then want to read
 	// a specific file. It is used for state file and by asb service. So it must be initialized with only
 	// one path.

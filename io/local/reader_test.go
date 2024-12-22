@@ -28,11 +28,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type checkRestoreDirectoryTestSuite struct {
+type readerTestSuite struct {
 	suite.Suite
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
+func (s *readerTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 	dir := s.T().TempDir()
 	err := createTmpFile(dir, "file3.txt")
 	require.NoError(s.T(), err)
@@ -52,10 +52,10 @@ func (s *checkRestoreDirectoryTestSuite) TestCheckRestoreDirectory_Negative_Empt
 }
 
 func TestCheckRestoreDirectory(t *testing.T) {
-	suite.Run(t, new(checkRestoreDirectoryTestSuite))
+	suite.Run(t, new(readerTestSuite))
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
+func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 	dir := s.T().TempDir()
 
 	err := createTmpFile(dir, "file1.asb")
@@ -96,7 +96,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OK() {
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
+func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 	dir := s.T().TempDir()
 	err := createTmpFile(dir, "file1.asb")
 	require.NoError(s.T(), err)
@@ -132,7 +132,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_OneFile
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
+func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 	dir := s.T().TempDir()
 
 	mockValidator := new(mocks.Mockvalidator)
@@ -156,7 +156,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrEmpt
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
+func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 	dir := s.T().TempDir()
 	err := createTmpFile(dir, "file1.asb")
 	require.NoError(s.T(), err)
@@ -193,7 +193,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_ErrNoSu
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_GetType() {
+func (s *readerTestSuite) TestDirectoryReader_GetType() {
 	dir := s.T().TempDir()
 
 	mockValidator := new(mocks.Mockvalidator)
@@ -231,7 +231,7 @@ func createTempNestedDir(rootPath, nestedDir string) error {
 	return nil
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFile() {
+func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
 	const fileName = "oneFile.asb"
 
 	dir := s.T().TempDir()
@@ -264,7 +264,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFile() {
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFileErr() {
+func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
 	dir := s.T().TempDir()
 	err := createTmpFile(dir, "oneFile.asb")
 	require.NoError(s.T(), err)
@@ -295,7 +295,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_OpenFileErr() {
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
+func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 	dir := s.T().TempDir()
 
 	err := createTempNestedDir(dir, "nested1")
@@ -340,7 +340,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFiles_Nested_
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFilesList() {
+func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 	dir := s.T().TempDir()
 
 	err := createTempNestedDir(dir, "nested1")
@@ -393,7 +393,7 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamFilesList() {
 	}
 }
 
-func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamPathList() {
+func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 	dir := s.T().TempDir()
 
 	err := createTempNestedDir(dir, "nested1")
@@ -444,4 +444,62 @@ func (s *checkRestoreDirectoryTestSuite) TestDirectoryReader_StreamPathList() {
 			require.NoError(s.T(), err)
 		}
 	}
+}
+
+func (s *readerTestSuite) TestReader_getFilesListASC() {
+	dir := s.T().TempDir()
+
+	expResult := []string{"file1.asb", "file2.asb", "file3.asb"}
+
+	err := createTmpFile(dir, "file3.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file1.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file2.asb")
+	require.NoError(s.T(), err)
+
+	r, err := NewReader(
+		WithDir(dir),
+		WithSorted(SortASC),
+	)
+	s.Require().NoError(err)
+
+	list, err := r.getFilesList(dir)
+	s.Require().NoError(err)
+
+	result := make([]string, 0, len(list))
+	for i := range list {
+		result = append(result, list[i].Name())
+	}
+
+	s.Equal(expResult, result)
+}
+
+func (s *readerTestSuite) TestReader_getFilesListDesc() {
+	dir := s.T().TempDir()
+
+	expResult := []string{"file3.asb", "file2.asb", "file1.asb"}
+
+	err := createTmpFile(dir, "file3.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file1.asb")
+	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file2.asb")
+	require.NoError(s.T(), err)
+
+	r, err := NewReader(
+		WithDir(dir),
+		WithSorted(SortDESC),
+	)
+	s.Require().NoError(err)
+
+	list, err := r.getFilesList(dir)
+	s.Require().NoError(err)
+
+	result := make([]string, 0, len(list))
+	for i := range list {
+		result = append(result, list[i].Name())
+	}
+
+	s.Equal(expResult, result)
 }

@@ -20,13 +20,18 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 )
 
-const gcpStorageType = "gcp-storage"
+const (
+	gcpStorageType = "gcp-storage"
+	bufferSize     = 256
+)
 
 type validator interface {
 	Run(fileName string) error
@@ -105,6 +110,30 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
+	// start serving goroutines.
+	var wg sync.WaitGroup
+
+	objectsToOpen := make(chan *string, bufferSize)
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		r.openObjects(ctx, objectsToOpen, readersCh, errorsCh)
+	}()
+
+	var objectsToSort chan *string
+	if r.sort != "" {
+		objectsToSort = make(chan *string, bufferSize)
+
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			r.sortObjects(ctx, objectsToSort, objectsToOpen)
+		}()
+	}
+
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix:      path,
 		StartOffset: r.startOffset,
@@ -139,16 +168,75 @@ func (r *Reader) streamDirectory(
 			}
 		}
 
-		// Create readers for files.
-		var reader *storage.Reader
+		switch {
+		case r.sort != "":
+			objectsToSort <- &objAttrs.Name
+		default:
+			objectsToOpen <- &objAttrs.Name
+		}
+	}
 
-		reader, err = r.bucketHandle.Object(objAttrs.Name).NewReader(ctx)
+	if r.sort != "" {
+		// Don't defer this line. We must close this channel, to stop goroutine and release a wait group.
+		close(objectsToSort)
+	}
+
+	// Close only if we are not sorting. If we sort, this channel will be closed in another goroutine.
+	if r.sort == "" {
+		// Don't defer this line. We must close this channel, to stop goroutine and release a wait group.
+		close(objectsToOpen)
+	}
+
+	wg.Wait()
+}
+
+// sortObjects receives keys, sort them, and then send to open chan.
+func (r *Reader) sortObjects(ctx context.Context, objectsToSort <-chan *string, objectsToOpen chan<- *string) {
+	defer close(objectsToOpen)
+
+	keys := make([]string, 0)
+
+	for key := range objectsToSort {
+		if ctx.Err() != nil {
+			return
+		}
+
+		keys = append(keys, *key)
+	}
+
+	switch r.sort {
+	case SortASC:
+		sort.Strings(keys)
+	case SortDESC:
+		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	default:
+		return
+	}
+
+	for _, k := range keys {
+		objectsToOpen <- &k
+	}
+}
+
+// openObjects creates object readers and sends them readersCh.
+func (r *Reader) openObjects(
+	ctx context.Context,
+	objectsToOpen <-chan *string,
+	readersCh chan<- io.ReadCloser,
+	errorsCh chan<- error,
+) {
+	for name := range objectsToOpen {
+		if ctx.Err() != nil {
+			return
+		}
+
+		reader, err := r.bucketHandle.Object(*name).NewReader(ctx)
 		if err != nil {
 			// Skip 404 not found error.
 			if errors.Is(err, storage.ErrObjectNotExist) {
 				continue
 			}
-			errorsCh <- fmt.Errorf("failed to open directory file %s: %w", objAttrs.Name, err)
+			errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *name, err)
 
 			return
 		}

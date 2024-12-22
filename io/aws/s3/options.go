@@ -14,6 +14,13 @@
 
 package s3
 
+type SortOrder string
+
+const (
+	SortASC  SortOrder = "asc"
+	SortDESC SortOrder = "desc"
+)
+
 type options struct {
 	// pathList contains list of files or directories.
 	pathList []string
@@ -32,6 +39,9 @@ type options struct {
 	startAfter string
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
+	// Sort can be "", asc, desc (Use SortASC, SortDesc constants).
+	// If sort is set, files will be sorted before read.
+	sort SortOrder
 }
 
 type Opt func(*options)
@@ -106,5 +116,14 @@ func WithStartAfter(v string) Opt {
 func WithSkipDirCheck() Opt {
 	return func(r *options) {
 		r.skipDirCheck = true
+	}
+}
+
+// WithSorted adds a sorting flag.
+// Which means that files will be read from directory in the sorted order.
+// Is used only for Reader.
+func WithSorted(sort SortOrder) Opt {
+	return func(r *options) {
+		r.sort = sort
 	}
 }

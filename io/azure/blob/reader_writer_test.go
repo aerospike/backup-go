@@ -41,6 +41,7 @@ const (
 	testReadFolderWithMarker = "folder_read_with_marker/"
 	testReadFolderPathList   = "folder_path_list/"
 	testReadFolderFileList   = "folder_file_list/"
+	testReadFolderSorted     = "folder_sorted/"
 
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
@@ -55,6 +56,10 @@ const (
 
 	testFileContent       = "content"
 	testFileContentLength = 7
+
+	testFileContentSorted1 = "sorted1"
+	testFileContentSorted2 = "sorted2"
+	testFileContentSorted3 = "sorted3"
 
 	testFilesNumber = 5
 )
@@ -162,6 +167,20 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 		}
 	}
 
+	// unsorted files.
+	fileName := fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 3))
+	if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContentSorted3), nil); err != nil {
+		return err
+	}
+	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 1))
+	if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContentSorted1), nil); err != nil {
+		return err
+	}
+	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 2))
+	if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContentSorted2), nil); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -215,6 +234,96 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 				return
 			}
 			filesCounter++
+		}
+	}
+}
+
+func (s *AzureSuite) TestReader_StreamSortedASC() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testReadFolderSorted),
+		WithValidator(validatorMock{}),
+		WithSorted(SortASC),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
+
+			s.Require().NoError(err)
+			s.Require().Equal(expecting, result)
+		}
+	}
+}
+
+func (s *AzureSuite) TestReader_StreamSortedDESC() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testReadFolderSorted),
+		WithValidator(validatorMock{}),
+		WithSorted(SortDESC),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+	expectedPostfix := 3
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
+			expectedPostfix--
+
+			s.Require().NoError(err)
+			s.Require().Equal(expecting, result)
 		}
 	}
 }
@@ -693,4 +802,14 @@ func (s *AzureSuite) TestIsSkippedByStartAfter() {
 			}
 		})
 	}
+}
+
+func readAll(r io.ReadCloser) (string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("failed to read data: %w", err)
+	}
+	defer r.Close()
+
+	return string(data), nil
 }

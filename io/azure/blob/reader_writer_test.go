@@ -251,7 +251,7 @@ func (s *AzureSuite) TestReader_StreamSortedASC() {
 		testContainerName,
 		WithDir(testReadFolderSorted),
 		WithValidator(validatorMock{}),
-		WithSorted(SortASC),
+		WithSorted(SortAsc),
 	)
 	s.Require().NoError(err)
 
@@ -295,7 +295,7 @@ func (s *AzureSuite) TestReader_StreamSortedDESC() {
 		testContainerName,
 		WithDir(testReadFolderSorted),
 		WithValidator(validatorMock{}),
-		WithSorted(SortDESC),
+		WithSorted(SortDesc),
 	)
 	s.Require().NoError(err)
 

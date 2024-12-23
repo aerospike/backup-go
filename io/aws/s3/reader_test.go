@@ -330,7 +330,7 @@ func (s *AwsSuite) TestReader_StreamFilesASC() {
 		testBucket,
 		WithDir(testFolderSorted),
 		WithValidator(mockValidator),
-		WithSorted(SortASC),
+		WithSorted(SortAsc),
 	)
 	s.Require().NoError(err)
 
@@ -380,7 +380,7 @@ func (s *AwsSuite) TestReader_StreamFilesDESC() {
 		testBucket,
 		WithDir(testFolderSorted),
 		WithValidator(mockValidator),
-		WithSorted(SortDESC),
+		WithSorted(SortDesc),
 	)
 	s.Require().NoError(err)
 

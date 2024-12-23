@@ -67,6 +67,10 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
+	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
+		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
+	}
+
 	bucket := client.Bucket(bucketName)
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
@@ -113,26 +117,14 @@ func (r *Reader) streamDirectory(
 	// start serving goroutines.
 	var wg sync.WaitGroup
 
-	objectsToOpen := make(chan *string, bufferSize)
-
 	wg.Add(1)
+
+	objectsToProcess := make(chan *string, bufferSize)
 
 	go func() {
 		defer wg.Done()
-		r.openObjects(ctx, objectsToOpen, readersCh, errorsCh)
+		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
 	}()
-
-	var objectsToSort chan *string
-	if r.sort != "" {
-		objectsToSort = make(chan *string, bufferSize)
-
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			r.sortObjects(ctx, objectsToSort, objectsToOpen)
-		}()
-	}
 
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix:      path,
@@ -168,35 +160,32 @@ func (r *Reader) streamDirectory(
 			}
 		}
 
-		switch {
-		case r.sort != "":
-			objectsToSort <- &objAttrs.Name
-		default:
-			objectsToOpen <- &objAttrs.Name
-		}
+		objectsToProcess <- &objAttrs.Name
 	}
 
-	if r.sort != "" {
-		// Don't defer this line. We must close this channel, to stop goroutine and release a wait group.
-		close(objectsToSort)
-	}
-
-	// Close only if we are not sorting. If we sort, this channel will be closed in another goroutine.
-	if r.sort == "" {
-		// Don't defer this line. We must close this channel, to stop goroutine and release a wait group.
-		close(objectsToOpen)
-	}
-
+	close(objectsToProcess)
 	wg.Wait()
 }
 
-// sortObjects receives keys, sort them, and then send to open chan.
-func (r *Reader) sortObjects(ctx context.Context, objectsToSort <-chan *string, objectsToOpen chan<- *string) {
-	defer close(objectsToOpen)
+// processObjects receives keys, sort them, and then send to open chan.
+func (r *Reader) processObjects(
+	ctx context.Context,
+	objectsToProcess <-chan *string,
+	readersCh chan<- io.ReadCloser,
+	errorsCh chan<- error,
+) {
+	// If we don't need to sort objects, open them.
+	if r.sort == "" {
+		for path := range objectsToProcess {
+			r.openObject(ctx, path, readersCh, errorsCh)
+		}
 
+		return
+	}
+	// If we need to sort.
 	keys := make([]string, 0)
 
-	for key := range objectsToSort {
+	for key := range objectsToProcess {
 		if ctx.Err() != nil {
 			return
 		}
@@ -205,45 +194,39 @@ func (r *Reader) sortObjects(ctx context.Context, objectsToSort <-chan *string, 
 	}
 
 	switch r.sort {
-	case SortASC:
+	case SortAsc:
 		sort.Strings(keys)
-	case SortDESC:
+	case SortDesc:
 		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 	default:
 		return
 	}
 
 	for _, k := range keys {
-		objectsToOpen <- &k
+		r.openObject(ctx, &k, readersCh, errorsCh)
 	}
 }
 
-// openObjects creates object readers and sends them readersCh.
-func (r *Reader) openObjects(
+// openObject creates object readers and sends them readersCh.
+func (r *Reader) openObject(
 	ctx context.Context,
-	objectsToOpen <-chan *string,
+	path *string,
 	readersCh chan<- io.ReadCloser,
 	errorsCh chan<- error,
 ) {
-	for name := range objectsToOpen {
-		if ctx.Err() != nil {
+	reader, err := r.bucketHandle.Object(*path).NewReader(ctx)
+	if err != nil {
+		// Skip 404 not found error.
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return
 		}
+		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *path, err)
 
-		reader, err := r.bucketHandle.Object(*name).NewReader(ctx)
-		if err != nil {
-			// Skip 404 not found error.
-			if errors.Is(err, storage.ErrObjectNotExist) {
-				continue
-			}
-			errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *name, err)
+		return
+	}
 
-			return
-		}
-
-		if reader != nil {
-			readersCh <- reader
-		}
+	if reader != nil {
+		readersCh <- reader
 	}
 }
 

@@ -460,7 +460,7 @@ func (s *readerTestSuite) TestReader_getFilesListASC() {
 
 	r, err := NewReader(
 		WithDir(dir),
-		WithSorted(SortASC),
+		WithSorted(SortAsc),
 	)
 	s.Require().NoError(err)
 
@@ -489,7 +489,7 @@ func (s *readerTestSuite) TestReader_getFilesListDesc() {
 
 	r, err := NewReader(
 		WithDir(dir),
-		WithSorted(SortDESC),
+		WithSorted(SortDesc),
 	)
 	s.Require().NoError(err)
 

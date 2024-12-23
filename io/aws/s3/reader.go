@@ -72,7 +72,7 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.sort != "" && r.sort != SortASC && r.sort != SortDESC {
+	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
 		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
 	}
 
@@ -126,11 +126,11 @@ func (r *Reader) streamDirectory(
 
 	wg.Add(1)
 
-	objectsToSort := make(chan *string, bufferSize)
+	objectsToProcess := make(chan *string, bufferSize)
 
 	go func() {
 		defer wg.Done()
-		r.sortObjects(ctx, objectsToSort, readersCh, errorsCh)
+		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
 	}()
 
 	var continuationToken *string
@@ -163,7 +163,7 @@ func (r *Reader) streamDirectory(
 				}
 			}
 
-			objectsToSort <- p.Key
+			objectsToProcess <- p.Key
 		}
 
 		continuationToken = listResponse.NextContinuationToken
@@ -172,20 +172,20 @@ func (r *Reader) streamDirectory(
 		}
 	}
 
-	close(objectsToSort)
+	close(objectsToProcess)
 	wg.Wait()
 }
 
-// sortObjects receives keys, sort them, and then send to open chan.
-func (r *Reader) sortObjects(
+// processObjects receives keys, sort them if needed, and then send to open chan.
+func (r *Reader) processObjects(
 	ctx context.Context,
-	objectsToSort <-chan *string,
+	objectsToProcess <-chan *string,
 	readersCh chan<- io.ReadCloser,
 	errorsCh chan<- error,
 ) {
 	// If we don't need to sort objects, open them.
 	if r.sort == "" {
-		for path := range objectsToSort {
+		for path := range objectsToProcess {
 			r.openObject(ctx, path, readersCh, errorsCh)
 		}
 
@@ -194,7 +194,7 @@ func (r *Reader) sortObjects(
 	// If we need to sort.
 	keys := make([]string, 0)
 
-	for key := range objectsToSort {
+	for key := range objectsToProcess {
 		if ctx.Err() != nil {
 			return
 		}
@@ -203,9 +203,9 @@ func (r *Reader) sortObjects(
 	}
 
 	switch r.sort {
-	case SortASC:
+	case SortAsc:
 		sort.Strings(keys)
-	case SortDESC:
+	case SortDesc:
 		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 	default:
 		return
@@ -216,7 +216,9 @@ func (r *Reader) sortObjects(
 	}
 }
 
-func (r *Reader) openObject(ctx context.Context,
+// openObject creates object readers and sends them readersCh.
+func (r *Reader) openObject(
+	ctx context.Context,
 	path *string,
 	readersCh chan<- io.ReadCloser,
 	errorsCh chan<- error,

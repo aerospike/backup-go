@@ -321,7 +321,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
 		testBucketName,
 		WithDir(testReadFolderSorted),
 		WithValidator(validatorMock{}),
-		WithSorted(SortASC),
+		WithSorted(SortAsc),
 	)
 	s.Require().NoError(err)
 
@@ -367,7 +367,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedDESC() {
 		testBucketName,
 		WithDir(testReadFolderSorted),
 		WithValidator(validatorMock{}),
-		WithSorted(SortDESC),
+		WithSorted(SortDesc),
 	)
 	s.Require().NoError(err)
 

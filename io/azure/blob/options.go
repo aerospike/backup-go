@@ -17,8 +17,8 @@ package blob
 type SortOrder string
 
 const (
-	SortASC  SortOrder = "asc"
-	SortDESC SortOrder = "desc"
+	SortAsc  SortOrder = "asc"
+	SortDesc SortOrder = "desc"
 )
 
 type options struct {
@@ -44,7 +44,7 @@ type options struct {
 	startAfter string
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
-	// Sort can be "", asc, desc (Use SortASC, SortDesc constants).
+	// Sort can be "", asc, desc (Use SortAsc, SortDesc constants).
 	// If sort is set, files will be sorted before read.
 	sort SortOrder
 }

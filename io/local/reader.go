@@ -53,7 +53,7 @@ func NewReader(opts ...Opt) (*Reader, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.sort != "" && r.sort != SortASC && r.sort != SortDESC {
+	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
 		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
 	}
 
@@ -226,11 +226,11 @@ func (r *Reader) getFilesList(path string) ([]os.DirEntry, error) {
 	switch r.sort {
 	case "":
 		return fileInfo, nil
-	case SortASC:
+	case SortAsc:
 		sort.Slice(fileInfo, func(i, j int) bool {
 			return fileInfo[i].Name() < fileInfo[j].Name()
 		})
-	case SortDESC:
+	case SortDesc:
 		sort.Slice(fileInfo, func(i, j int) bool {
 			return fileInfo[i].Name() > fileInfo[j].Name()
 		})

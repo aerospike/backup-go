@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 const localType = "directory"
@@ -50,6 +51,10 @@ func NewReader(opts ...Opt) (*Reader, error) {
 
 	if len(r.pathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
+	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
+		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
 	}
 
 	return r, nil
@@ -84,7 +89,7 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
-	fileInfo, err := os.ReadDir(path)
+	fileInfo, err := r.getFilesList(path)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to read path %s: %w", path, err)
 		return
@@ -209,6 +214,29 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 	}
 
 	return nil
+}
+
+// getFilesList returns sorted or unsorted files list from directory.
+func (r *Reader) getFilesList(path string) ([]os.DirEntry, error) {
+	fileInfo, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
+	}
+
+	switch r.sort {
+	case "":
+		return fileInfo, nil
+	case SortAsc:
+		sort.Slice(fileInfo, func(i, j int) bool {
+			return fileInfo[i].Name() < fileInfo[j].Name()
+		})
+	case SortDesc:
+		sort.Slice(fileInfo, func(i, j int) bool {
+			return fileInfo[i].Name() > fileInfo[j].Name()
+		})
+	}
+
+	return fileInfo, nil
 }
 
 // GetType returns the type of the reader.

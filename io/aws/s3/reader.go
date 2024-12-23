@@ -21,7 +21,9 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -29,7 +31,10 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-const s3type = "s3"
+const (
+	s3type     = "s3"
+	bufferSize = 256
+)
 
 type validator interface {
 	Run(fileName string) error
@@ -67,6 +72,10 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
+	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
+		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
+	}
+
 	// Check if the bucket exists and we have permissions.
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
@@ -80,8 +89,7 @@ func NewReader(
 	return r, nil
 }
 
-// StreamFiles read files form s3 and send io.Readers to `readersCh` communication
-// chan for lazy loading.
+// StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error we send error to `errorsCh` channel.
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
@@ -108,9 +116,23 @@ func (r *Reader) StreamFiles(
 	}
 }
 
+// streamDirectory reads directory form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// In case of error we send error to `errorsCh` channel.
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
+	// start serving goroutines.
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	objectsToProcess := make(chan *string, bufferSize)
+
+	go func() {
+		defer wg.Done()
+		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
+	}()
+
 	var continuationToken *string
 
 	for {
@@ -141,37 +163,89 @@ func (r *Reader) streamDirectory(
 				}
 			}
 
-			var object *s3.GetObjectOutput
-
-			object, err = r.client.GetObject(ctx, &s3.GetObjectInput{
-				Bucket: &r.bucketName,
-				Key:    p.Key,
-			})
-			if err != nil {
-				// Skip 404 not found error.
-				var opErr *smithy.OperationError
-				if errors.As(err, &opErr) {
-					var httpErr *awsHttp.ResponseError
-					if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound {
-						continue
-					}
-				}
-
-				// We check *p.Key == nil in the beginning.
-				errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *p.Key, err)
-
-				return
-			}
-
-			if object != nil {
-				readersCh <- object.Body
-			}
+			objectsToProcess <- p.Key
 		}
 
 		continuationToken = listResponse.NextContinuationToken
 		if continuationToken == nil {
 			break
 		}
+	}
+
+	close(objectsToProcess)
+	wg.Wait()
+}
+
+// processObjects receives keys, sort them if needed, and then send to open chan.
+func (r *Reader) processObjects(
+	ctx context.Context,
+	objectsToProcess <-chan *string,
+	readersCh chan<- io.ReadCloser,
+	errorsCh chan<- error,
+) {
+	// If we don't need to sort objects, open them.
+	if r.sort == "" {
+		for path := range objectsToProcess {
+			r.openObject(ctx, path, readersCh, errorsCh)
+		}
+
+		return
+	}
+	// If we need to sort.
+	keys := make([]string, 0)
+
+	for key := range objectsToProcess {
+		if ctx.Err() != nil {
+			return
+		}
+
+		keys = append(keys, *key)
+	}
+
+	switch r.sort {
+	case SortAsc:
+		sort.Strings(keys)
+	case SortDesc:
+		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	default:
+		return
+	}
+
+	for _, k := range keys {
+		r.openObject(ctx, &k, readersCh, errorsCh)
+	}
+}
+
+// openObject creates object readers and sends them readersCh.
+func (r *Reader) openObject(
+	ctx context.Context,
+	path *string,
+	readersCh chan<- io.ReadCloser,
+	errorsCh chan<- error,
+) {
+	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &r.bucketName,
+		Key:    path,
+	})
+
+	if err != nil {
+		// Skip 404 not found error.
+		var opErr *smithy.OperationError
+		if errors.As(err, &opErr) {
+			var httpErr *awsHttp.ResponseError
+			if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound {
+				return
+			}
+		}
+
+		// We check *p.Key == nil in the beginning.
+		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *path, err)
+
+		return
+	}
+
+	if object != nil {
+		readersCh <- object.Body
 	}
 }
 

@@ -40,9 +40,14 @@ const (
 	testFolderStartAfter    = "folder_start_after"
 	testFolderPathList      = "folder_path_list"
 	testFolderFileList      = "folder_file_list"
+	testFolderSorted        = "folder_sorted"
 	testFileNameMetadata    = "metadata.yaml"
 	testFileNameAsbTemplate = "backup_%d.asb"
 	testFileContent         = "content"
+
+	testFileContentSorted1 = "sorted1"
+	testFileContentSorted2 = "sorted2"
+	testFileContentSorted3 = "sorted3"
 
 	testFoldersNumber = 5
 )
@@ -123,6 +128,34 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		}); err != nil {
 			return err
 		}
+	}
+
+	// Unsorted files.
+	fileName := fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbTemplate, 3))
+	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(testBucket),
+		Key:    aws.String(fileName),
+		Body:   bytes.NewReader([]byte(testFileContentSorted3)),
+	}); err != nil {
+		return err
+	}
+
+	fileName = fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbTemplate, 1))
+	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(testBucket),
+		Key:    aws.String(fileName),
+		Body:   bytes.NewReader([]byte(testFileContentSorted1)),
+	}); err != nil {
+		return err
+	}
+
+	fileName = fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbTemplate, 2))
+	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(testBucket),
+		Key:    aws.String(fileName),
+		Body:   bytes.NewReader([]byte(testFileContentSorted2)),
+	}); err != nil {
+		return err
 	}
 
 	return nil
@@ -276,4 +309,116 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 			filesCounter++
 		}
 	}
+}
+
+func (s *AwsSuite) TestReader_StreamFilesASC() {
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		WithDir(testFolderSorted),
+		WithValidator(mockValidator),
+		WithSorted(SortAsc),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
+
+			s.Require().NoError(err)
+			s.Require().Equal(expecting, result)
+		}
+	}
+}
+
+func (s *AwsSuite) TestReader_StreamFilesDESC() {
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asb" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		WithDir(testFolderSorted),
+		WithValidator(mockValidator),
+		WithSorted(SortDesc),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+	expectedPostfix := 3
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
+			expectedPostfix--
+
+			s.Require().NoError(err)
+			s.Require().Equal(expecting, result)
+		}
+	}
+}
+
+func readAll(r io.ReadCloser) (string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("failed to read data: %w", err)
+	}
+	defer r.Close()
+
+	return string(data), nil
 }

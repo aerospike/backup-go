@@ -41,6 +41,7 @@ const (
 	testReadFolderWithStartOffset = "folder_read_with_start_offset/"
 	testReadFolderPathList        = "folder_path_list/"
 	testReadFolderFileList        = "folder_file_list/"
+	testReadFolderSorted          = "folder_sorted/"
 
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
@@ -52,9 +53,14 @@ const (
 	testFileNameTemplate      = "backup_%d.asb"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
-	testFileContent           = "content"
-	testFileContentLength     = 7
-	testFilesNumber           = 5
+
+	testFileContent        = "content"
+	testFileContentSorted1 = "sorted1"
+	testFileContentSorted2 = "sorted2"
+	testFileContentSorted3 = "sorted3"
+
+	testFileContentLength = 7
+	testFilesNumber       = 5
 )
 
 type GCPSuite struct {
@@ -189,6 +195,28 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 		}
 	}
 
+	// unsorted files.
+	fileName := fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 3))
+	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+	sw.ContentType = fileType
+	if err := writeContent(sw, testFileContentSorted3); err != nil {
+		return err
+	}
+
+	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 1))
+	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+	sw.ContentType = fileType
+	if err := writeContent(sw, testFileContentSorted1); err != nil {
+		return err
+	}
+
+	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 2))
+	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+	sw.ContentType = fileType
+	if err := writeContent(sw, testFileContentSorted2); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -274,6 +302,100 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 				return
 			}
 			filesCounter++
+		}
+	}
+}
+
+func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		WithDir(testReadFolderSorted),
+		WithValidator(validatorMock{}),
+		WithSorted(SortAsc),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
+
+			s.Require().NoError(err)
+			s.Require().Equal(expecting, result)
+		}
+	}
+}
+
+func (s *GCPSuite) TestReader_StreamFilesSortedDESC() {
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		WithDir(testReadFolderSorted),
+		WithValidator(validatorMock{}),
+		WithSorted(SortDesc),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+	expectedPostfix := 3
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
+			expectedPostfix--
+
+			s.Require().NoError(err)
+			s.Require().Equal(expecting, result)
 		}
 	}
 }
@@ -737,4 +859,14 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 			filesCounter++
 		}
 	}
+}
+
+func readAll(r io.ReadCloser) (string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("failed to read data: %w", err)
+	}
+	defer r.Close()
+
+	return string(data), nil
 }

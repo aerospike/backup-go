@@ -21,13 +21,18 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
-const azureBlobType = "azure-blob"
+const (
+	azureBlobType = "azure-blob"
+	bufferSize    = 256
+)
 
 type validator interface {
 	Run(fileName string) error
@@ -62,6 +67,10 @@ func NewReader(
 
 	if len(r.pathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
+	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
+		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
 	}
 
 	// Check if container exists.
@@ -104,6 +113,18 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
+	// start serving goroutines.
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	objectsToProcess := make(chan *string, bufferSize)
+
+	go func() {
+		defer wg.Done()
+		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
+	}()
+
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &path,
 	})
@@ -130,25 +151,76 @@ func (r *Reader) streamDirectory(
 				}
 			}
 
-			var resp azblob.DownloadStreamResponse
-
-			resp, err = r.client.DownloadStream(ctx, r.containerName, *blob.Name, nil)
-			if err != nil {
-				// Skip 404 not found error.
-				var respErr *azcore.ResponseError
-				if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
-					continue
-				}
-
-				errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *blob.Name, err)
-
-				return
-			}
-
-			if resp.Body != nil {
-				readersCh <- resp.Body
-			}
+			objectsToProcess <- blob.Name
 		}
+	}
+
+	close(objectsToProcess)
+	wg.Wait()
+}
+
+// processObjects receives keys, sort them, and then send to open chan.
+func (r *Reader) processObjects(
+	ctx context.Context,
+	objectsToProcess <-chan *string,
+	readersCh chan<- io.ReadCloser,
+	errorsCh chan<- error,
+) {
+	// If we don't need to sort objects, open them.
+	if r.sort == "" {
+		for path := range objectsToProcess {
+			r.openObject(ctx, path, readersCh, errorsCh)
+		}
+
+		return
+	}
+
+	keys := make([]string, 0)
+
+	for key := range objectsToProcess {
+		if ctx.Err() != nil {
+			return
+		}
+
+		keys = append(keys, *key)
+	}
+
+	switch r.sort {
+	case SortAsc:
+		sort.Strings(keys)
+	case SortDesc:
+		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	default:
+		return
+	}
+
+	for _, k := range keys {
+		r.openObject(ctx, &k, readersCh, errorsCh)
+	}
+}
+
+// openObject creates object readers and sends them readersCh.
+func (r *Reader) openObject(
+	ctx context.Context,
+	path *string,
+	readersCh chan<- io.ReadCloser,
+	errorsCh chan<- error,
+) {
+	resp, err := r.client.DownloadStream(ctx, r.containerName, *path, nil)
+	if err != nil {
+		// Skip 404 not found error.
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
+			return
+		}
+
+		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *path, err)
+
+		return
+	}
+
+	if resp.Body != nil {
+		readersCh <- resp.Body
 	}
 }
 

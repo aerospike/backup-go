@@ -53,6 +53,10 @@ func NewReader(opts ...Opt) (*Reader, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
+	if r.sort != "" && r.sort != SortASC && r.sort != SortDESC {
+		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
+	}
+
 	return r, nil
 }
 

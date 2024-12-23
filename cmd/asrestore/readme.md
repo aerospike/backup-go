@@ -80,7 +80,6 @@ Restore Flags:
                                   Don't touch them.
                                   
   -r, --replace                   Fully replace records that already exist in the namespace.
-                                  Generation check is conducted during replace.
                                   This option still does a generation check by default and would need to be combined with the -g option 
                                   if no generation check is desired. 
                                   Note: this option is mutually exclusive to --unique.

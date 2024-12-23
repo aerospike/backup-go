@@ -51,7 +51,6 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVarP(&f.Replace, "replace", "r",
 		false,
 		"Fully replace records that already exist in the namespace.\n"+
-			"Generation check is conducted during replace.\n"+
 			"This option still does a generation check by default and would need to be combined with the -g option \n"+
 			"if no generation check is desired. \n"+
 			"Note: this option is mutually exclusive to --unique.")

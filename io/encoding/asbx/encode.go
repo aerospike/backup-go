@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	// asbx file version.
+	// version of asbx file.
 	version = 1
 )
 
@@ -44,8 +44,6 @@ func NewEncoder(namespace string) *Encoder {
 
 // GenerateFilename generates a file name for the given namespace.
 func (e *Encoder) GenerateFilename() string {
-	// TODO: using prefix and suffix for asbx is prohibited.
-	// TODO: think about file naming, so we can sort them
 	return fmt.Sprintf("%s_%d.asbx", e.namespace, e.fileNumber.Add(1))
 }
 
@@ -54,60 +52,66 @@ func (e *Encoder) GenerateFilename() string {
 // fails.
 func (e *Encoder) EncodeToken(token *models.XDRToken) ([]byte, error) {
 	// Message contains:
-	// Digest - 20 bytes
-	// Payload Size - 4 bytes
+	// Digest - 20 bytes.
+	// Payload Size - 6 bytes.
 	// Payload - contains a raw message from tcp protocol.
-	payloadLen := len(token.Payload)
+	pLen := len(token.Payload)
 
-	message := make([]byte, 24+payloadLen)
+	msg := make([]byte, 26+pLen)
 
-	copy(message[:20], token.Key.Digest())
+	copy(msg[:20], token.Key.Digest())
 
 	// Fill payload len.
-	message[20] = byte(payloadLen >> 24)
-	message[21] = byte(payloadLen >> 16)
-	message[22] = byte(payloadLen >> 8)
-	message[23] = byte(payloadLen)
+	msg[20] = byte(pLen >> 40)
+	msg[21] = byte(pLen >> 32)
+	msg[22] = byte(pLen >> 24)
+	msg[23] = byte(pLen >> 16)
+	msg[24] = byte(pLen >> 8)
+	msg[25] = byte(pLen)
 
 	// Fill token.
-	copy(message[24:], token.Payload)
+	copy(msg[26:], token.Payload)
 
-	return message, nil
+	return msg, nil
 }
 
 // GetHeader returns prepared file header as []byte.
 func (e *Encoder) GetHeader() []byte {
 	// Header has fixed size of 40 bytes and contains:
-	// Version - 1 byte
-	// File number - 4 bytes
-	// Reserved - 4 bytes
-	// Namespace - 31 byte
-	head := make([]byte, 40)
+	// Version - 1 byte.
+	// File number - 8 bytes.
+	// Reserved - 4 bytes.
+	// Namespace - 31 byte.
+	head := make([]byte, 44)
 
 	// Set version. 1 byte.
 	head[0] = byte(version)
 
-	// File number (4 bytes)
+	// File number (8 bytes)
 	num := e.fileNumber.Load()
-	head[1] = byte(num >> 24)
-	head[2] = byte(num >> 16)
-	head[3] = byte(num >> 8)
-	head[4] = byte(num)
+	head[1] = byte(num >> 56)
+	head[2] = byte(num >> 48)
+	head[3] = byte(num >> 40)
+	head[4] = byte(num >> 32)
+	head[5] = byte(num >> 24)
+	head[6] = byte(num >> 16)
+	head[7] = byte(num >> 8)
+	head[8] = byte(num)
 
-	// Reserved (4 bytes) are already zeroed
+	// Reserved (4 bytes) are already zeroed.
 
-	// Namespace (31 bytes)
-	copy(head[9:], e.namespaceBytes)
+	// Namespace (31 bytes).
+	copy(head[13:], e.namespaceBytes)
 
 	return head
 }
 
-// stringToField writes any string to fixed len []byte slice.
+// stringToField writes any string to fixed size []byte slice.
 func stringToField(s string, size int) []byte {
 	field := make([]byte, size)
 
-	// If string is shorter than size, it will be left-padded with zeros
-	// If string is longer than size, it will be truncated
+	// If the string is shorter than size, it will be left-padded with zeros.
+	// If string is longer than size, it will be truncated.
 	strBytes := []byte(s)
 	copy(field[max(0, size-len(strBytes)):], strBytes[max(0, len(strBytes)-size):])
 

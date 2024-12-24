@@ -25,18 +25,19 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-const maxPayloadSize = 10 * 1024 * 1024
+// maxPayloadSize according to TCP protocol.
+const maxPayloadSize = 128 * 1024 * 1024
 
 // Decoder contains logic for decoding backup data from the binary .asbx format.
 // This is a stateful object that should be created for each file being decoded.
 type Decoder struct {
-	fileNumber int64
+	fileNumber uint64
 	namespace  string
 	reader     io.Reader
 }
 
 // NewDecoder creates a new Decoder that reads from the provided io.Reader.
-func NewDecoder(r io.Reader, fileNumber int64) (*Decoder, error) {
+func NewDecoder(r io.Reader, fileNumber uint64) (*Decoder, error) {
 	d := &Decoder{
 		reader: r,
 	}
@@ -44,9 +45,9 @@ func NewDecoder(r io.Reader, fileNumber int64) (*Decoder, error) {
 	if err := d.readHeader(); err != nil {
 		return nil, err
 	}
-	// TODO: think how to validate order and where to do it.
+
 	if d.fileNumber != fileNumber {
-		return nil, errors.New("file number mismatch")
+		return nil, fmt.Errorf("file number mismatch got %d, want %d", fileNumber, d.fileNumber)
 	}
 
 	return d, nil
@@ -55,7 +56,7 @@ func NewDecoder(r io.Reader, fileNumber int64) (*Decoder, error) {
 // readHeader reads and validates the file header, returning an error if the header
 // is invalid or if a read error occurs.
 func (d *Decoder) readHeader() error {
-	head := make([]byte, 40)
+	head := make([]byte, 44)
 	if _, err := io.ReadFull(d.reader, head); err != nil {
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return fmt.Errorf("unexpected end of file, header: %w", err)
@@ -64,16 +65,16 @@ func (d *Decoder) readHeader() error {
 		return fmt.Errorf("failed to read header: %w", err)
 	}
 
-	// Validate version
+	// Validate version.
 	if head[0] != version {
 		return fmt.Errorf("invalid version: got %d, want %d", head[0], version)
 	}
 
-	// Extract file number
-	d.fileNumber = int64(binary.BigEndian.Uint32(head[1:5]))
+	// Extract file number.
+	d.fileNumber = binary.BigEndian.Uint64(head[1:9])
 
-	// Extract namespace (trim trailing zeros)
-	d.namespace = string(bytes.TrimRight(head[9:40], "\x00"))
+	// Extract namespace (trim trailing zeros).
+	d.namespace = string(bytes.TrimLeft(head[13:44], "\x00"))
 	if d.namespace == "" {
 		return fmt.Errorf("namespace is empty")
 	}
@@ -85,7 +86,7 @@ func (d *Decoder) readHeader() error {
 // It returns the decoded token and any error that occurred.
 // io.EOF is returned when the end of the file is reached.
 func (d *Decoder) NextToken() (*models.XDRToken, error) {
-	// Read digest (20 bytes)
+	// Read digest (20 bytes).
 	digest := make([]byte, 20)
 	_, err := io.ReadFull(d.reader, digest)
 
@@ -100,8 +101,8 @@ func (d *Decoder) NextToken() (*models.XDRToken, error) {
 		return nil, fmt.Errorf("failed to read digest: %w", err)
 	}
 
-	// Read payload size (4 bytes)
-	sizeBuf := make([]byte, 4)
+	// Read payload size (6 bytes).
+	sizeBuf := make([]byte, 6)
 	if _, err = io.ReadFull(d.reader, sizeBuf); err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil, fmt.Errorf("unexpected end of file, payload size")
@@ -110,15 +111,15 @@ func (d *Decoder) NextToken() (*models.XDRToken, error) {
 		return nil, fmt.Errorf("failed to read payload size: %w", err)
 	}
 
-	payloadSize := binary.BigEndian.Uint32(sizeBuf)
-	// 10MB sanity check
+	payloadSize := fieldToInt64(sizeBuf)
+	// 10MB sanity check.
 	if payloadSize > maxPayloadSize {
 		return nil, fmt.Errorf("max payload size reached: %d bytes", payloadSize)
 	}
 
 	// Read payload
 	payload := make([]byte, payloadSize)
-	if _, err := io.ReadFull(d.reader, payload); err != nil {
+	if _, err = io.ReadFull(d.reader, payload); err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil, fmt.Errorf("unexpected end of file, payload")
 		}
@@ -134,4 +135,16 @@ func (d *Decoder) NextToken() (*models.XDRToken, error) {
 	}
 
 	return models.NewXDRToken(key, payload), nil
+}
+
+// fieldToInt64 is converting byte slice to int64.
+// As we store payload size in 6 bytes (according to TCP protocol), I have to implement this function.
+// Because binary.BigEndian works only with standard sizes (uint16, uint32, uint64).
+func fieldToInt64(header []byte) int64 {
+	var num int64
+	for i := 0; i < len(header); i++ {
+		num = (num << 8) | int64(header[i])
+	}
+
+	return num
 }

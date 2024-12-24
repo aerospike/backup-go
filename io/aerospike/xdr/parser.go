@@ -221,16 +221,24 @@ func ParseField(message []byte) (field *Field, end int32) {
 // NewPayload creates payload from received message.
 func NewPayload(body []byte) []byte {
 	bLen := len(body)
+	msg := make([]byte, LenProtoHeader+bLen)
 
-	msg := make([]byte, 0, bLen+LenProtoHeader)
 	// version 1 byte
-	msg = append(msg, intToField(ProtoVersion, 1)...)
+	msg[0] = byte(ProtoVersion)
+
 	// type 1 byte
-	msg = append(msg, intToField(ProtoTypeMessage, 1)...)
-	// Len 6 byte
-	msg = append(msg, intToField(bLen, 6)...)
-	// Success message
-	msg = append(msg, body...)
+	msg[1] = byte(ProtoTypeMessage)
+
+	// Len 6 bytes (writing big-endian)
+	msg[2] = byte(bLen >> 40)
+	msg[3] = byte(bLen >> 32)
+	msg[4] = byte(bLen >> 24)
+	msg[5] = byte(bLen >> 16)
+	msg[6] = byte(bLen >> 8)
+	msg[7] = byte(bLen)
+
+	// Copy body after header
+	copy(msg[LenProtoHeader:], body)
 
 	return msg
 }
@@ -244,15 +252,27 @@ func ResetXDRBit(message []byte) []byte {
 
 // NewAckMessage returns new acknowledge message.
 func NewAckMessage(code int) []byte {
-	msg := make([]byte, 0, LenProtoHeader+LenMessageHeader)
+	msg := make([]byte, LenProtoHeader+LenMessageHeader)
+
 	// version 1 byte
-	msg = append(msg, intToField(ProtoVersion, 1)...)
+	msg[0] = byte(ProtoVersion)
+
 	// type 1 byte
-	msg = append(msg, intToField(ProtoTypeMessage, 1)...)
-	// Len 6 byte
-	msg = append(msg, intToField(LenMessageHeader, 6)...)
-	// Success message
-	msg = append(msg, intToField(code, 22)...)
+	msg[1] = byte(ProtoTypeMessage)
+
+	// Len 6 bytes (writing big-endian)
+	msg[2] = byte(LenMessageHeader >> 40)
+	msg[3] = byte(LenMessageHeader >> 32)
+	msg[4] = byte(LenMessageHeader >> 24)
+	msg[5] = byte(LenMessageHeader >> 16)
+	msg[6] = byte(LenMessageHeader >> 8)
+	msg[7] = byte(LenMessageHeader)
+
+	// code 22 bytes (writing big-endian)
+	for i := 0; i < 22; i++ {
+		msg[LenProtoHeader+21-i] = byte(code)
+		code >>= 8
+	}
 
 	return msg
 }
@@ -307,16 +327,6 @@ func fieldToInt16(header []byte) int16 {
 	}
 
 	return num
-}
-
-func intToField(num, size int) []byte {
-	field := make([]byte, size)
-	for i := size - 1; i >= 0; i-- {
-		field[i] = byte(num & 0xFF)
-		num >>= 8
-	}
-
-	return field
 }
 
 const (

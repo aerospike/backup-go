@@ -50,8 +50,10 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"Don't touch them.\n")
 	flagSet.BoolVarP(&f.Replace, "replace", "r",
 		false,
-		"Fully replace records that already exist in the namespace;\n"+
-			"Don't update them.\n")
+		"Fully replace records that already exist in the namespace.\n"+
+			"This option still does a generation check by default and would need to be combined with the -g option \n"+
+			"if no generation check is desired. \n"+
+			"Note: this option is mutually exclusive to --unique.")
 	flagSet.BoolVarP(&f.NoGeneration, "no-generation", "g",
 		false,
 		"Don't check the generation of records that already exist in the namespace.")

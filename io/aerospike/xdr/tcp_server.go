@@ -93,7 +93,7 @@ type TCPServer struct {
 	cancel            context.CancelFunc
 
 	// Results will be sent here.
-	resultChan chan *models.XDRToken
+	resultChan chan *models.ASBXToken
 
 	logger *slog.Logger
 }
@@ -105,13 +105,13 @@ func NewTCPServer(
 ) *TCPServer {
 	return &TCPServer{
 		config:     config,
-		resultChan: make(chan *models.XDRToken, config.ResultQueueSize),
+		resultChan: make(chan *models.ASBXToken, config.ResultQueueSize),
 		logger:     logger,
 	}
 }
 
 // Start launch tcp server for XDR.
-func (s *TCPServer) Start(ctx context.Context) (chan *models.XDRToken, error) {
+func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 	var err error
 
 	// Redefine cancel function, so we can use it on Stop()
@@ -220,7 +220,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 type ConnectionHandler struct {
 	conn net.Conn
 	// channel to send results.
-	resultChan chan *models.XDRToken
+	resultChan chan *models.ASBXToken
 	// Timeouts in nanoseconds.
 	readTimoutNano   int64
 	writeTimeoutNano int64
@@ -244,7 +244,7 @@ type ConnectionHandler struct {
 // For each connection must be created a separate handler.
 func NewConnectionHandler(
 	conn net.Conn,
-	resultChan chan *models.XDRToken,
+	resultChan chan *models.ASBXToken,
 	ackQueueSize int,
 	readTimout int64,
 	writeTimeout int64,
@@ -389,9 +389,9 @@ func (h *ConnectionHandler) processMessage(ctx context.Context) {
 			message = ResetXDRBit(message)
 			// Add headers.
 			payload := NewPayload(message)
-			// Create token XDRToken.
-			token := models.NewXDRToken(key, payload)
-			// Send XDRToken to results queue.
+			// Create token ASBXToken.
+			token := models.NewASBXToken(key, payload)
+			// Send ASBXToken to results queue.
 			h.resultChan <- token
 
 			// Make acknowledgement.

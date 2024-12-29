@@ -73,7 +73,7 @@ type infoCommander interface {
 
 // RecordReader satisfies the pipeline DataReader interface.
 // It reads receives records from an Aerospike database through XDR protocol
-// and returns them as *models.XDRToken.
+// and returns them as *models.ASBXToken.
 type RecordReader struct {
 	ctx context.Context
 	// Info client to start and stop XDR, also to get current state.
@@ -83,7 +83,7 @@ type RecordReader struct {
 	// TCP server to serve XDR backup.
 	tcpServer *TCPServer
 	// Received results will be placed here.
-	results chan *models.XDRToken
+	results chan *models.ASBXToken
 	// Time when recovery finished.
 	checkpoint int64
 	// To check if the reader is running.
@@ -113,7 +113,7 @@ func NewRecordReader(
 }
 
 // Read reads the next record from the Aerospike database.
-func (r *RecordReader) Read() (*models.XDRToken, error) {
+func (r *RecordReader) Read() (*models.ASBXToken, error) {
 	// Check if the server already started.
 	if !r.isRunning.Load() {
 		// If not started.
@@ -128,7 +128,7 @@ func (r *RecordReader) Read() (*models.XDRToken, error) {
 		return nil, io.EOF
 	}
 
-	t := models.NewXDRToken(res.Key, res.Payload)
+	t := models.NewASBXToken(res.Key, res.Payload)
 
 	return t, nil
 }

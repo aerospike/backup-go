@@ -221,16 +221,19 @@ func ParseField(message []byte) (field *Field, end int32) {
 // NewPayload creates payload from received message.
 func NewPayload(body []byte) []byte {
 	bLen := len(body)
+	msg := make([]byte, LenProtoHeader+bLen)
 
-	msg := make([]byte, 0, bLen+LenProtoHeader)
 	// version 1 byte
-	msg = append(msg, intToField(ProtoVersion, 1)...)
+	msg[0] = byte(ProtoVersion)
+
 	// type 1 byte
-	msg = append(msg, intToField(ProtoTypeMessage, 1)...)
-	// Len 6 byte
-	msg = append(msg, intToField(bLen, 6)...)
-	// Success message
-	msg = append(msg, body...)
+	msg[1] = byte(ProtoTypeMessage)
+
+	// Len 6 bytes (writing big-endian)
+	setLength(msg, bLen)
+
+	// Copy body after header
+	copy(msg[LenProtoHeader:], body)
 
 	return msg
 }
@@ -243,18 +246,31 @@ func ResetXDRBit(message []byte) []byte {
 }
 
 // NewAckMessage returns new acknowledge message.
-func NewAckMessage(code int) []byte {
-	msg := make([]byte, 0, LenProtoHeader+LenMessageHeader)
+func NewAckMessage(code int8) []byte {
+	msg := make([]byte, LenProtoHeader+LenMessageHeader)
+
 	// version 1 byte
-	msg = append(msg, intToField(ProtoVersion, 1)...)
+	msg[0] = byte(ProtoVersion)
+
 	// type 1 byte
-	msg = append(msg, intToField(ProtoTypeMessage, 1)...)
-	// Len 6 byte
-	msg = append(msg, intToField(LenMessageHeader, 6)...)
-	// Success message
-	msg = append(msg, intToField(code, 22)...)
+	msg[1] = byte(ProtoTypeMessage)
+
+	// Len 6 bytes (writing big-endian)
+	setLength(msg, LenMessageHeader)
+
+	// Result code is in byte 27.
+	msg[LenProtoHeader+5] = byte(code)
 
 	return msg
+}
+
+func setLength(msg []byte, msgLen int) {
+	msg[2] = byte(msgLen >> 40)
+	msg[3] = byte(msgLen >> 32)
+	msg[4] = byte(msgLen >> 24)
+	msg[5] = byte(msgLen >> 16)
+	msg[6] = byte(msgLen >> 8)
+	msg[7] = byte(msgLen)
 }
 
 // readBytes reads length number of bytes from conn.
@@ -307,16 +323,6 @@ func fieldToInt16(header []byte) int16 {
 	}
 
 	return num
-}
-
-func intToField(num, size int) []byte {
-	field := make([]byte, size)
-	for i := size - 1; i >= 0; i-- {
-		field[i] = byte(num & 0xFF)
-		num >>= 8
-	}
-
-	return field
 }
 
 const (

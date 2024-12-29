@@ -24,6 +24,9 @@ import (
 const (
 	// version of asbx file.
 	version = 1
+	// maxPayloadSize according to TCP protocol.
+	maxPayloadSize = 128 * 1024 * 1024
+	headerSize     = 44
 )
 
 // Encoder contains logic for encoding backup data into the binary .asbx format.
@@ -82,7 +85,7 @@ func (e *Encoder) GetHeader() []byte {
 	// File number - 8 bytes.
 	// Reserved - 4 bytes.
 	// Namespace - 31 byte.
-	head := make([]byte, 44)
+	head := make([]byte, headerSize)
 
 	// Set version. 1 byte.
 	head[0] = byte(version)
@@ -110,10 +113,10 @@ func (e *Encoder) GetHeader() []byte {
 func stringToField(s string, size int) []byte {
 	field := make([]byte, size)
 
-	// If the string is shorter than size, it will be left-padded with zeros.
+	// If the string is shorter than size, it will be right-padded with zeros.
 	// If string is longer than size, it will be truncated.
 	strBytes := []byte(s)
-	copy(field[max(0, size-len(strBytes)):], strBytes[max(0, len(strBytes)-size):])
+	copy(field, strBytes)
 
 	return field
 }

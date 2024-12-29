@@ -230,12 +230,7 @@ func NewPayload(body []byte) []byte {
 	msg[1] = byte(ProtoTypeMessage)
 
 	// Len 6 bytes (writing big-endian)
-	msg[2] = byte(bLen >> 40)
-	msg[3] = byte(bLen >> 32)
-	msg[4] = byte(bLen >> 24)
-	msg[5] = byte(bLen >> 16)
-	msg[6] = byte(bLen >> 8)
-	msg[7] = byte(bLen)
+	setLength(msg, bLen)
 
 	// Copy body after header
 	copy(msg[LenProtoHeader:], body)
@@ -251,7 +246,7 @@ func ResetXDRBit(message []byte) []byte {
 }
 
 // NewAckMessage returns new acknowledge message.
-func NewAckMessage(code int) []byte {
+func NewAckMessage(code int8) []byte {
 	msg := make([]byte, LenProtoHeader+LenMessageHeader)
 
 	// version 1 byte
@@ -261,20 +256,21 @@ func NewAckMessage(code int) []byte {
 	msg[1] = byte(ProtoTypeMessage)
 
 	// Len 6 bytes (writing big-endian)
-	msg[2] = byte(LenMessageHeader >> 40)
-	msg[3] = byte(LenMessageHeader >> 32)
-	msg[4] = byte(LenMessageHeader >> 24)
-	msg[5] = byte(LenMessageHeader >> 16)
-	msg[6] = byte(LenMessageHeader >> 8)
-	msg[7] = byte(LenMessageHeader)
+	setLength(msg, LenMessageHeader)
 
-	// code 22 bytes (writing big-endian)
-	for i := 0; i < 22; i++ {
-		msg[LenProtoHeader+21-i] = byte(code)
-		code >>= 8
-	}
+	// Result code is in byte 27.
+	msg[LenProtoHeader+5] = byte(code)
 
 	return msg
+}
+
+func setLength(msg []byte, msgLen int) {
+	msg[2] = byte(msgLen >> 40)
+	msg[3] = byte(msgLen >> 32)
+	msg[4] = byte(msgLen >> 24)
+	msg[5] = byte(msgLen >> 16)
+	msg[6] = byte(msgLen >> 8)
+	msg[7] = byte(msgLen)
 }
 
 // readBytes reads length number of bytes from conn.

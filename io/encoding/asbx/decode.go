@@ -17,16 +17,12 @@ package asbx
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/models"
 )
-
-// maxPayloadSize according to TCP protocol.
-const maxPayloadSize = 128 * 1024 * 1024
 
 // Decoder contains logic for decoding backup data from the binary .asbx format.
 // This is a stateful object that should be created for each file being decoded.
@@ -43,7 +39,7 @@ func NewDecoder(r io.Reader, fileNumber uint64) (*Decoder, error) {
 	}
 
 	if err := d.readHeader(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading asbx header: %w", err)
 	}
 
 	if d.fileNumber != fileNumber {
@@ -56,13 +52,9 @@ func NewDecoder(r io.Reader, fileNumber uint64) (*Decoder, error) {
 // readHeader reads and validates the file header, returning an error if the header
 // is invalid or if a read error occurs.
 func (d *Decoder) readHeader() error {
-	head := make([]byte, 44)
+	head := make([]byte, headerSize)
 	if _, err := io.ReadFull(d.reader, head); err != nil {
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			return fmt.Errorf("unexpected end of file, header: %w", err)
-		}
-
-		return fmt.Errorf("failed to read header: %w", err)
+		return err
 	}
 
 	// Validate version.
@@ -74,7 +66,7 @@ func (d *Decoder) readHeader() error {
 	d.fileNumber = binary.BigEndian.Uint64(head[1:9])
 
 	// Extract namespace (trim trailing zeros).
-	d.namespace = string(bytes.TrimLeft(head[13:44], "\x00"))
+	d.namespace = string(bytes.TrimRight(head[13:headerSize], "\x00"))
 	if d.namespace == "" {
 		return fmt.Errorf("namespace is empty")
 	}
@@ -88,26 +80,15 @@ func (d *Decoder) readHeader() error {
 func (d *Decoder) NextToken() (*models.XDRToken, error) {
 	// Read digest (20 bytes).
 	digest := make([]byte, 20)
-	_, err := io.ReadFull(d.reader, digest)
 
-	switch {
-	case err == nil:
-	// ok
-	case errors.Is(err, io.EOF):
-		return nil, err
-	case errors.Is(err, io.ErrUnexpectedEOF):
-		return nil, fmt.Errorf("unexpected end of file, digest")
-	default:
+	_, err := io.ReadFull(d.reader, digest)
+	if err != nil {
 		return nil, fmt.Errorf("failed to read digest: %w", err)
 	}
 
 	// Read payload size (6 bytes).
 	sizeBuf := make([]byte, 6)
 	if _, err = io.ReadFull(d.reader, sizeBuf); err != nil {
-		if errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, fmt.Errorf("unexpected end of file, payload size")
-		}
-
 		return nil, fmt.Errorf("failed to read payload size: %w", err)
 	}
 
@@ -120,10 +101,6 @@ func (d *Decoder) NextToken() (*models.XDRToken, error) {
 	// Read payload
 	payload := make([]byte, payloadSize)
 	if _, err = io.ReadFull(d.reader, payload); err != nil {
-		if errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, fmt.Errorf("unexpected end of file, payload")
-		}
-
 		return nil, fmt.Errorf("failed to read payload: %w", err)
 	}
 

@@ -53,7 +53,7 @@ func (e *Encoder) GenerateFilename() string {
 // EncodeToken encodes a token to the ASBX format.
 // It returns a byte slice of the encoded token and an error if the encoding
 // fails.
-func (e *Encoder) EncodeToken(token *models.XDRToken) ([]byte, error) {
+func (e *Encoder) EncodeToken(token *models.ASBXToken) ([]byte, error) {
 	// Message contains:
 	// Digest - 20 bytes.
 	// Payload Size - 6 bytes.

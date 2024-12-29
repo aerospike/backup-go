@@ -35,7 +35,7 @@ const (
 	testFileNumber = 1
 )
 
-func testToken() (*models.XDRToken, error) {
+func testToken() (*models.ASBXToken, error) {
 	digest, err := base64.StdEncoding.DecodeString(testDigestB64)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func testToken() (*models.XDRToken, error) {
 		return nil, err
 	}
 
-	return models.NewXDRToken(k, payload), nil
+	return models.NewASBXToken(k, payload), nil
 }
 
 func TestEncoder_Decoder(t *testing.T) {

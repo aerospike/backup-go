@@ -134,15 +134,15 @@ func NewUDFToken(u *UDF, size uint64) *Token {
 	}
 }
 
-// XDRToken represents data received from XDR.
-type XDRToken struct {
+// ASBXToken represents data received from XDR or RAW payload data.
+type ASBXToken struct {
 	Key     *a.Key
 	Payload []byte
 }
 
-// NewXDRToken creates new XDR Token from XDR request data.
-func NewXDRToken(key *a.Key, payload []byte) *XDRToken {
-	return &XDRToken{
+// NewASBXToken creates new ASBX Token from XDR or RAW payload data.
+func NewASBXToken(key *a.Key, payload []byte) *ASBXToken {
+	return &ASBXToken{
 		Key:     key,
 		Payload: payload,
 	}

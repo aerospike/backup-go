@@ -77,7 +77,7 @@ func (d *Decoder) readHeader() error {
 // NextToken reads and decodes the next token from the file.
 // It returns the decoded token and any error that occurred.
 // io.EOF is returned when the end of the file is reached.
-func (d *Decoder) NextToken() (*models.XDRToken, error) {
+func (d *Decoder) NextToken() (*models.ASBXToken, error) {
 	// Read digest (20 bytes).
 	digest := make([]byte, 20)
 
@@ -111,7 +111,7 @@ func (d *Decoder) NextToken() (*models.XDRToken, error) {
 		return nil, fmt.Errorf("failed to create key: %w", err)
 	}
 
-	return models.NewXDRToken(key, payload), nil
+	return models.NewASBXToken(key, payload), nil
 }
 
 // fieldToInt64 is converting byte slice to int64.

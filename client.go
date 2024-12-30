@@ -224,6 +224,36 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
+// BackupXDR starts an xdr backup operation that writes data to a provided writer.
+//   - ctx can be used to cancel the backup operation.
+//   - config is the configuration for the xdr backup operation.
+//   - writer creates new writers for the backup operation.
+func (c *Client) BackupXDR(
+	ctx context.Context,
+	config *ConfigBackupXDR,
+	writer Writer,
+) (*HandlerBackupXDR, error) {
+	if config == nil {
+		return nil, fmt.Errorf("xdr backup config required")
+	}
+
+	// copy the policies so we don't modify the original
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+
+	if err := config.validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
+	}
+
+	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
+
+	// TODO: wrap to go routine
+	if err := handler.start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start xdr backup handler: %w", err)
+	}
+
+	return handler, nil
+}
+
 // Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
 //   - ctx can be used to cancel the restore operation.

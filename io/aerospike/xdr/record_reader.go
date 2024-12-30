@@ -40,7 +40,7 @@ type RecordReaderConfig struct {
 	currentHostPort string
 	// TCP server config to serve XDR backup.
 	tcpConfig *TCPConfig
-	// infoPolingPeriod how often stats will bew requested.
+	// infoPolingPeriod how often stats will be requested.
 	// To measure recovery state and lag.
 	infoPolingPeriod time.Duration
 }

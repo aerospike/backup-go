@@ -18,6 +18,7 @@ import (
 	"io"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -27,26 +28,29 @@ type EncoderType int
 const (
 	// EncoderTypeASB matches ASB Encoder with id 0.
 	EncoderTypeASB EncoderType = iota
+	EncoderTypeASBX
 )
 
 // Encoder is an interface for encoding the types from the models package.
 // It is used to support different data formats.
 //
 //go:generate mockery --name Encoder
-type Encoder interface {
-	EncodeToken(*models.Token) ([]byte, error)
+type Encoder[T any] interface {
+	EncodeToken(T) ([]byte, error)
 	GetHeader() []byte
 	GenerateFilename(prefix, suffix string) string
 }
 
 // NewEncoder returns a new Encoder according to `EncoderType`.
-func NewEncoder(eType EncoderType, namespace string, compact bool) Encoder {
+func NewEncoder[T any](eType EncoderType, namespace string, compact bool) Encoder[T] {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewEncoder(namespace, compact)
+		return asb.NewEncoder[T](namespace, compact)
+	case EncoderTypeASBX:
+		return asbx.NewEncoder[T](namespace)
 	default:
-		return asb.NewEncoder(namespace, compact)
+		return asb.NewEncoder[T](namespace, compact)
 	}
 }
 

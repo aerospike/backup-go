@@ -27,6 +27,11 @@ type BackupStats struct {
 	TotalRecords uint64
 }
 
+// NewBackupStats returns new backup stats.
+func NewBackupStats() *BackupStats {
+	return &BackupStats{}
+}
+
 // IncFiles increments by one the number of files per backup.
 func (b *BackupStats) IncFiles() {
 	b.fileCount.Add(1)

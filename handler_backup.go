@@ -59,7 +59,7 @@ type BackupHandler struct {
 	cancel context.CancelFunc
 
 	writer          Writer
-	encoder         Encoder
+	encoder         Encoder[*models.Token]
 	config          *BackupConfig
 	aerospikeClient AerospikeClient
 
@@ -130,7 +130,7 @@ func newBackupHandler(
 		logger:                 logger,
 		writer:                 writer,
 		firstFileHeaderWritten: &atomic.Bool{},
-		encoder:                NewEncoder(config.EncoderType, config.Namespace, config.Compact),
+		encoder:                NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact),
 		limiter:                limiter,
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
 		scanLimiter:            scanLimiter,

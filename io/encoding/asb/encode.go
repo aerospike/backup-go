@@ -30,7 +30,7 @@ import (
 
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
-type Encoder struct {
+type Encoder[T any] struct {
 	namespace string
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	compact bool
@@ -40,22 +40,27 @@ type Encoder struct {
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder(namespace string, compact bool) *Encoder {
-	return &Encoder{
+func NewEncoder[T any](namespace string, compact bool) *Encoder[T] {
+	return &Encoder[T]{
 		namespace: namespace,
 		compact:   compact,
 	}
 }
 
 // GenerateFilename generates a file name for the given namespace.
-func (e *Encoder) GenerateFilename(prefix, suffix string) string {
+func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 	return fmt.Sprintf("%s%s_%d%s.asb", prefix, e.namespace, e.id.Add(1), suffix)
 }
 
 // EncodeToken encodes a token to the ASB format.
 // It returns a byte slice of the encoded token and an error if the encoding
 // fails.
-func (e *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
+func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
+	t, ok := any(token).(*models.Token)
+	if !ok {
+		return nil, fmt.Errorf("unsupported token type for ASB encoder")
+	}
+
 	var (
 		n   int
 		err error
@@ -63,17 +68,17 @@ func (e *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 
 	buff := bytes.NewBuffer(make([]byte, 0, 256))
 
-	switch token.Type {
+	switch t.Type {
 	case models.TokenTypeRecord:
-		n, err = e.encodeRecord(token.Record, buff)
+		n, err = e.encodeRecord(t.Record, buff)
 	case models.TokenTypeUDF:
-		n, err = e.encodeUDF(token.UDF, buff)
+		n, err = e.encodeUDF(t.UDF, buff)
 	case models.TokenTypeSIndex:
-		n, err = e.encodeSIndex(token.SIndex, buff)
+		n, err = e.encodeSIndex(t.SIndex, buff)
 	case models.TokenTypeInvalid:
 		n, err = 0, errors.New("invalid token")
 	default:
-		n, err = 0, fmt.Errorf("invalid token type: %v", token.Type)
+		n, err = 0, fmt.Errorf("invalid token type: %v", t.Type)
 	}
 
 	if err != nil {
@@ -83,19 +88,19 @@ func (e *Encoder) EncodeToken(token *models.Token) ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
-func (e *Encoder) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
+func (e *Encoder[T]) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
 	return recordToASB(e.compact, rec, buff)
 }
 
-func (e *Encoder) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
+func (e *Encoder[T]) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
 	return udfToASB(udf, buff)
 }
 
-func (e *Encoder) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (int, error) {
+func (e *Encoder[T]) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (int, error) {
 	return sindexToASB(sindex, buff)
 }
 
-func (e *Encoder) GetHeader() []byte {
+func (e *Encoder[T]) GetHeader() []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 256))
 

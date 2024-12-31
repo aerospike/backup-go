@@ -80,14 +80,14 @@ func NewSingleParallelRoutes[T any](sf splitFunc[T]) []Route[T] {
 		input:  NewRouteRuleSingle[T](channelSize, nil),
 		output: NewRouteRuleSingle[T](channelSize, nil),
 	}
-	// second step with split fun on output.
+	// second step.
 	result[1] = Route[T]{
 		input:  NewRouteRuleSingle[T](channelSize, nil),
-		output: NewRouteRuleSingle[T](channelSize, sf),
+		output: NewRouteRuleSingle[T](channelSize, nil),
 	}
-	// third step.
+	// third step with split function on input.
 	result[2] = Route[T]{
-		input:  NewRouteRuleParallel[T](channelSize, nil),
+		input:  NewRouteRuleParallel[T](channelSize, sf),
 		output: NewRouteRuleParallel[T](channelSize, nil),
 	}
 
@@ -157,7 +157,7 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 			output = append(output, op)
 		case prevOutMode == routeRuleModeSingle && s.route.input.mode == routeRuleModeParallel:
 			// Split channels.
-			if s.route.output.sf == nil {
+			if s.route.input.sf == nil {
 				return fmt.Errorf("split function not set for stage %d", i)
 			}
 

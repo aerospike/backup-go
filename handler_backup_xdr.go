@@ -67,6 +67,7 @@ func newBackupXDRHandler(
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy)
 
 	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
+		config,
 		aerospikeClient,
 		infoClient,
 		nil,

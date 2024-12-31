@@ -31,7 +31,7 @@ import (
 // TODO: or may be RecordReaderHandler
 type recordReaderProcessor[T any] struct {
 	xdrConfig *ConfigBackupXDR
-
+	// add scanConfig in future.
 	aerospikeClient AerospikeClient
 	infoClient      *asinfo.InfoClient
 	state           *State
@@ -42,6 +42,7 @@ type recordReaderProcessor[T any] struct {
 
 // newRecordReaderProcessor returns new record reader processor.
 func newRecordReaderProcessor[T any](
+	xdrConfig *ConfigBackupXDR,
 	aerospikeClient AerospikeClient,
 	infoClient *asinfo.InfoClient,
 	state *State,
@@ -51,6 +52,7 @@ func newRecordReaderProcessor[T any](
 	logger.Debug("created new records reader processor")
 
 	return &recordReaderProcessor[T]{
+		xdrConfig:       xdrConfig,
 		aerospikeClient: aerospikeClient,
 		infoClient:      infoClient,
 		scanLimiter:     scanLimiter,

@@ -74,6 +74,6 @@ type ConfigBackupXDR struct {
 	InfoPolingPeriodMilliseconds int64
 }
 
-func (cfg *ConfigBackupXDR) Validate() error {
+func (cfg *ConfigBackupXDR) validate() error {
 	return nil
 }

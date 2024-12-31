@@ -74,13 +74,13 @@ func NewParallelRoutes[T any](stagesNum int) []Route[T] {
 // parallel mode between second and third.
 func NewSingleParallelRoutes[T any](sf splitFunc[T]) []Route[T] {
 	// This helper is made for XDR support, so stages number is hardcoded.
-	result := make([]Route[T], 0, 3)
+	result := make([]Route[T], 3)
 	// first step.
 	result[0] = Route[T]{
 		input:  NewRouteRuleSingle[T](channelSize, nil),
 		output: NewRouteRuleSingle[T](channelSize, nil),
 	}
-	// second step.
+	// second step with split fun on output.
 	result[1] = Route[T]{
 		input:  NewRouteRuleSingle[T](channelSize, nil),
 		output: NewRouteRuleSingle[T](channelSize, sf),

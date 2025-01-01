@@ -106,11 +106,11 @@ func (c *ConfigBackupXDR) validate() error {
 	}
 
 	if c.ReadTimoutMilliseconds < 0 {
-		return fmt.Errorf("readtimout must not be negative, got %d", c.ReadTimoutMilliseconds)
+		return fmt.Errorf("read timout must not be negative, got %d", c.ReadTimoutMilliseconds)
 	}
 
 	if c.WriteTimeoutMilliseconds < 0 {
-		return fmt.Errorf("writetimeout must not be negative, got %d", c.WriteTimeoutMilliseconds)
+		return fmt.Errorf("write timeout must not be negative, got %d", c.WriteTimeoutMilliseconds)
 	}
 
 	if c.ResultQueueSize < 0 {

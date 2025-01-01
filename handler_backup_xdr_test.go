@@ -29,7 +29,7 @@ const (
 	testBackupDir           = "xdr_backup"
 	testBackupDirLimit      = "xdr_backup_limit"
 	testParallel            = 8
-	testXDRHost             = "127.0.0.1"
+	testXDRHost             = "localhost"
 	testXDRPort             = 8066
 	testTimeoutMilliseconds = 10000
 	testAckQueueSize        = 256

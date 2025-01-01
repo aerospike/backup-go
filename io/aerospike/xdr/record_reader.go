@@ -195,6 +195,9 @@ func (r *RecordReader) serve() {
 	ticker := time.NewTicker(r.config.infoPolingPeriod)
 	defer ticker.Stop()
 
+	// TODO: think how to set this delay! As server starts xdr not so fast
+	time.Sleep(20 * time.Second)
+
 	for {
 		select {
 		case <-r.ctx.Done():
@@ -208,7 +211,7 @@ func (r *RecordReader) serve() {
 
 			r.logger.Debug("got stats", slog.Any("stats", stats))
 
-			if stats.Recoveries != 0 || stats.RecoveriesPending != 0 {
+			if stats.RecoveriesPending != 0 {
 				// Recovery in progress.
 				continue
 			}

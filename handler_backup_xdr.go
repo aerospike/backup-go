@@ -102,14 +102,22 @@ func newBackupXDRHandler(
 		config:          config,
 		infoClient:      infoClient,
 		stats:           stats,
-		errors:          make(chan error, 1),
 		logger:          logger,
+		errors:          make(chan error, 1),
 	}
 }
 
-func (bh *HandlerBackupXDR) start(ctx context.Context) error {
+// run runs the backup job.
+// currently this should only be run once.
+func (bh *HandlerBackupXDR) run() {
 	bh.stats.Start()
 
+	go doWork(bh.errors, bh.logger, func() error {
+		return bh.backupSync(bh.ctx)
+	})
+}
+
+func (bh *HandlerBackupXDR) backupSync(ctx context.Context) error {
 	// Read workers.
 	readWorkers, err := bh.readProcessor.newReadWorkersXDR(ctx)
 	if err != nil {
@@ -191,4 +199,9 @@ func newUNTYPEDTokenWorker[T any](processor pipeline.DataProcessor[T], parallel 
 	return []pipeline.Worker[T]{
 		pipeline.NewProcessorWorker[T](processor),
 	}
+}
+
+// GetStats returns the stats of the backup job
+func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
+	return bh.stats
 }

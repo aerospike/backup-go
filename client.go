@@ -246,10 +246,7 @@ func (c *Client) BackupXDR(
 
 	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
 
-	// TODO: wrap to go routine
-	if err := handler.start(ctx); err != nil {
-		return nil, fmt.Errorf("failed to start xdr backup handler: %w", err)
-	}
+	handler.run()
 
 	return handler, nil
 }

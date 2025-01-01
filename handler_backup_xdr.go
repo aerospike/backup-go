@@ -135,7 +135,7 @@ func (bh *HandlerBackupXDR) backupSync(ctx context.Context) error {
 	writeWorkers := bh.writerProcessor.newWriteWorkers(backupWriters)
 
 	// Process workers.
-	composeProcessor := newUNTYPEDTokenWorker[*models.ASBXToken](
+	composeProcessor := newTokenWorker[*models.ASBXToken](
 		processors.NewComposeProcessor[*models.ASBXToken](
 			processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
 		), 1)
@@ -183,22 +183,6 @@ func (bh *HandlerBackupXDR) splitFunc(t *models.ASBXToken) int {
 	}
 
 	return id
-}
-
-// TODO: move this func somewhere. May be data_processor in root.
-func newUNTYPEDTokenWorker[T any](processor pipeline.DataProcessor[T], parallel int) []pipeline.Worker[T] {
-	if parallel > 0 {
-		workers := make([]pipeline.Worker[T], 0, parallel)
-		for i := 0; i < parallel; i++ {
-			workers = append(workers, pipeline.NewProcessorWorker[T](processor))
-		}
-
-		return workers
-	}
-
-	return []pipeline.Worker[T]{
-		pipeline.NewProcessorWorker[T](processor),
-	}
 }
 
 // GetStats returns the stats of the backup job

@@ -31,7 +31,7 @@ import (
 // TODO: or may be RecordReaderHandler
 type recordReaderProcessor[T any] struct {
 	xdrConfig *ConfigBackupXDR
-	// add scanConfig in future.
+	// add scanConfig in the future.
 	aerospikeClient AerospikeClient
 	infoClient      *asinfo.InfoClient
 	state           *State

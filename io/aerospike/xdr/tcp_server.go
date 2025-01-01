@@ -95,9 +95,6 @@ type TCPServer struct {
 	// Results will be sent here.
 	resultChan chan *models.ASBXToken
 
-	// If at least one connection was initialized, isActive will be true.
-	isActive atomic.Bool
-
 	logger *slog.Logger
 }
 
@@ -206,8 +203,6 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 
 				s.logger.Debug("accepted new connection",
 					slog.String("address", conn.RemoteAddr().String()))
-				// After receiving the first connection, switch active to true.
-				s.isActive.CompareAndSwap(false, true)
 			} else {
 				s.logger.Info("connection pool is full, rejecting TCP connection",
 					slog.String("address", conn.RemoteAddr().String()))

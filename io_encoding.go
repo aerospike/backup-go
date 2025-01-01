@@ -35,14 +35,14 @@ const (
 // It is used to support different data formats.
 //
 //go:generate mockery --name Encoder
-type Encoder[T any] interface {
+type Encoder[T models.TokenConstraint] interface {
 	EncodeToken(T) ([]byte, error)
 	GetHeader() []byte
 	GenerateFilename(prefix, suffix string) string
 }
 
 // NewEncoder returns a new Encoder according to `EncoderType`.
-func NewEncoder[T any](eType EncoderType, namespace string, compact bool) Encoder[T] {
+func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, compact bool) Encoder[T] {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:

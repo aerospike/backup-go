@@ -31,14 +31,14 @@ const (
 
 // Encoder contains logic for encoding backup data into the binary .asbx format.
 // This is a stateful object that must be created for every backup operation.
-type Encoder[T any] struct {
+type Encoder[T models.TokenConstraint] struct {
 	namespace      string
 	namespaceBytes []byte
 	fileNumber     atomic.Int64
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder[T any](namespace string) *Encoder[T] {
+func NewEncoder[T models.TokenConstraint](namespace string) *Encoder[T] {
 	return &Encoder[T]{
 		namespace:      namespace,
 		namespaceBytes: stringToField(namespace, 31),

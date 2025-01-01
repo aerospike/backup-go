@@ -34,13 +34,13 @@ type statsSetterToken interface {
 	AddSIndexes(uint32)
 }
 
-type tokenStatsWriter[T any] struct {
+type tokenStatsWriter[T models.TokenConstraint] struct {
 	writer pipeline.DataWriter[T]
 	stats  statsSetterToken
 	logger *slog.Logger
 }
 
-func newWriterWithTokenStats[T any](writer pipeline.DataWriter[T],
+func newWriterWithTokenStats[T models.TokenConstraint](writer pipeline.DataWriter[T],
 	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter[T] {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
@@ -84,7 +84,7 @@ func (tw *tokenStatsWriter[T]) Close() error {
 // tokenWriter satisfies the DataWriter interface.
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
-type tokenWriter[T any] struct {
+type tokenWriter[T models.TokenConstraint] struct {
 	encoder   Encoder[T]
 	output    io.Writer
 	logger    *slog.Logger
@@ -106,7 +106,7 @@ func newStateInfo(recordsStateChan chan<- models.PartitionFilterSerialized, n in
 }
 
 // newTokenWriter creates a new tokenWriter.
-func newTokenWriter[T any](
+func newTokenWriter[T models.TokenConstraint](
 	encoder Encoder[T],
 	output io.Writer,
 	logger *slog.Logger,

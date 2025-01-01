@@ -30,7 +30,7 @@ import (
 
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
-type Encoder[T any] struct {
+type Encoder[T models.TokenConstraint] struct {
 	namespace string
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	compact bool
@@ -40,7 +40,7 @@ type Encoder[T any] struct {
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder[T any](namespace string, compact bool) *Encoder[T] {
+func NewEncoder[T models.TokenConstraint](namespace string, compact bool) *Encoder[T] {
 	return &Encoder[T]{
 		namespace: namespace,
 		compact:   compact,

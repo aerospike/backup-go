@@ -16,14 +16,18 @@ package processors
 
 import (
 	"sync/atomic"
+
+	"github.com/aerospike/backup-go/models"
 )
 
-type TokenCounter[T any] struct {
+// TokenCounter count processed tokens. It's like a record counter but for XDR.
+// This counter will count the number of received XDR payloads.
+type TokenCounter[T models.TokenConstraint] struct {
 	counter *atomic.Uint64
 }
 
-// NewTokenCounter simple token counter.
-func NewTokenCounter[T any](counter *atomic.Uint64) *TokenCounter[T] {
+// NewTokenCounter returns new token counter.
+func NewTokenCounter[T models.TokenConstraint](counter *atomic.Uint64) *TokenCounter[T] {
 	return &TokenCounter[T]{
 		counter: counter,
 	}

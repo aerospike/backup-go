@@ -16,6 +16,8 @@ package backup
 
 import (
 	"crypto/tls"
+	"fmt"
+	"strconv"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
@@ -48,8 +50,8 @@ type ConfigBackupXDR struct {
 	// Namespace is the Aerospike namespace to back up.
 	Namespace string
 	// Rewind is used to ship all existing records of a namespace.
-	// When rewinding a namespace, XDR will scan through the index and ship all the records for that namespace,
-	// partition by partition.
+	// When rewinding a namespace, XDR will scan through the index and ship
+	// all the records for that namespace, partition by partition.
 	// Can be `all` or number of seconds.
 	Rewind string
 	// TLS config for secure XDR connection.
@@ -74,6 +76,83 @@ type ConfigBackupXDR struct {
 	InfoPolingPeriodMilliseconds int64
 }
 
-func (cfg *ConfigBackupXDR) validate() error {
+func (c *ConfigBackupXDR) validate() error {
+	if err := validateRewind(c.Rewind); err != nil {
+		return err
+	}
+
+	if c.FileLimit < 0 {
+		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
+	}
+
+	if c.ParallelWrite < MinParallel || c.ParallelWrite > MaxParallel {
+		return fmt.Errorf("parallel write must be between 1 and 1024, got %d", c.ParallelWrite)
+	}
+
+	if c.DC == "" {
+		return fmt.Errorf("dc name must not be empty")
+	}
+
+	if c.LocalAddress == "" {
+		return fmt.Errorf("local address must not be empty")
+	}
+
+	if c.LocalPort < 0 || c.LocalPort > 65535 {
+		return fmt.Errorf("local port must be between 0 and 65535, got %d", c.LocalPort)
+	}
+
+	if c.Namespace == "" {
+		return fmt.Errorf("namespace must not be empty")
+	}
+
+	if c.ReadTimoutMilliseconds < 0 {
+		return fmt.Errorf("readtimout must not be negative, got %d", c.ReadTimoutMilliseconds)
+	}
+
+	if c.WriteTimeoutMilliseconds < 0 {
+		return fmt.Errorf("writetimeout must not be negative, got %d", c.WriteTimeoutMilliseconds)
+	}
+
+	if c.ResultQueueSize < 0 {
+		return fmt.Errorf("result queue size must not be negative, got %d", c.ResultQueueSize)
+	}
+
+	if c.AckQueueSize < 0 {
+		return fmt.Errorf("ack queue size must not be negative, got %d", c.AckQueueSize)
+	}
+
+	if c.MaxConnections < 1 {
+		return fmt.Errorf("max connections must not be less than 1, got %d", c.MaxConnections)
+	}
+
+	if c.InfoPolingPeriodMilliseconds < 0 {
+		return fmt.Errorf("info poling period must not be negative, got %d", c.InfoPolingPeriodMilliseconds)
+	}
+
+	if err := c.CompressionPolicy.validate(); err != nil {
+		return fmt.Errorf("compression policy invalid: %w", err)
+	}
+
+	if err := c.EncryptionPolicy.validate(); err != nil {
+		return fmt.Errorf("encryption policy invalid: %w", err)
+	}
+
+	if err := c.SecretAgentConfig.validate(); err != nil {
+		return fmt.Errorf("secret agent invalid: %w", err)
+	}
+
+	return nil
+}
+
+func validateRewind(value string) error {
+	if value == "all" {
+		return nil
+	}
+
+	num, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || num == 0 {
+		return fmt.Errorf("rewind must be a positive number or 'all', got: %s", value)
+	}
+
 	return nil
 }

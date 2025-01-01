@@ -30,7 +30,7 @@ import (
 
 // fileWriterProcessor configure and creates file writers pipelines.
 // TODO: or may be FileWriterHandler?
-type fileWriterProcessor[T any] struct {
+type fileWriterProcessor[T models.TokenConstraint] struct {
 	prefixGenerator func() string
 	suffixGenerator func() string
 
@@ -52,7 +52,7 @@ type fileWriterProcessor[T any] struct {
 }
 
 // newFileWriterProcessor returns new file writer processor instance.
-func newFileWriterProcessor[T any](
+func newFileWriterProcessor[T models.TokenConstraint](
 	prefixGenerator func() string,
 	suffixGenerator func() string,
 	saveCommandChan chan int,

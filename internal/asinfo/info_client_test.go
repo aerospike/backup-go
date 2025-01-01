@@ -33,7 +33,7 @@ const (
 	testASHost          = "127.0.0.1"
 	testASPort          = 3000
 	testASRewind        = "all"
-	testXRdHostPort     = "127.0.0.1:3003"
+	testXDRHostPort     = "127.0.0.1:3003"
 )
 
 func Test_parseAerospikeVersion(t *testing.T) {
@@ -1722,13 +1722,13 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 
 	ic := NewInfoClientFromAerospike(client, infoPolicy)
 
-	err := ic.StartXDR(testASDC, testXRdHostPort, testASNamespace, testASRewind)
+	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind)
 	require.NoError(t, err)
 
 	_, err = ic.GetStats(testASDC, testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.StopXDR(testASDC, testXRdHostPort, testASNamespace)
+	err = ic.StopXDR(testASDC, testXDRHostPort, testASNamespace)
 	require.NoError(t, err)
 }
 

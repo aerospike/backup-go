@@ -163,7 +163,7 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 	select {
 	case <-bh.ctx.Done():
 		// Wait for global context.
-		return bh.ctx.Err()
+		return nil
 	case <-ctx.Done():
 		// Process local context.
 		bh.cancel()
@@ -176,7 +176,11 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 // splitFunc distributes token between pipeline workers.
 func (bh *HandlerBackupXDR) splitFunc(t *models.ASBXToken) int {
 	partPerWorker := MaxPartitions / bh.config.ParallelWrite
-	id := t.Key.PartitionId() / partPerWorker
+
+	var id int
+	if partPerWorker > 0 {
+		id = t.Key.PartitionId() / partPerWorker
+	}
 
 	if id >= bh.config.ParallelWrite {
 		return id - 1

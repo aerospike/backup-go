@@ -29,7 +29,7 @@ import (
 
 // recordReaderProcessor configure and create record readers pipelines.
 // TODO: or may be RecordReaderHandler
-type recordReaderProcessor[T any] struct {
+type recordReaderProcessor[T models.TokenConstraint] struct {
 	xdrConfig *ConfigBackupXDR
 	// add scanConfig in the future.
 	aerospikeClient AerospikeClient
@@ -41,7 +41,7 @@ type recordReaderProcessor[T any] struct {
 }
 
 // newRecordReaderProcessor returns new record reader processor.
-func newRecordReaderProcessor[T any](
+func newRecordReaderProcessor[T models.TokenConstraint](
 	xdrConfig *ConfigBackupXDR,
 	aerospikeClient AerospikeClient,
 	infoClient *asinfo.InfoClient,

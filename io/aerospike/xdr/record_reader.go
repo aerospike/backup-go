@@ -195,14 +195,16 @@ func (r *RecordReader) serve() {
 	ticker := time.NewTicker(r.config.infoPolingPeriod)
 	defer ticker.Stop()
 
-	// TODO: think how to set this delay! As server starts xdr not so fast
-	time.Sleep(20 * time.Second)
-
 	for {
 		select {
 		case <-r.ctx.Done():
 			return
 		case <-ticker.C:
+			// If we don't have any active connection, we skip this check.
+			if !r.tcpServer.isActive.Load() {
+				continue
+			}
+
 			stats, err := r.infoClient.GetStats(r.config.dc, r.config.namespace)
 			if err != nil {
 				r.logger.Error("failed to get xdr stats", slog.Any("error", err))

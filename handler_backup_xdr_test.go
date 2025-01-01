@@ -29,7 +29,7 @@ const (
 	testBackupDir           = "xdr_backup"
 	testBackupDirLimit      = "xdr_backup_limit"
 	testParallel            = 8
-	testXDRHost             = "localhost"
+	testXDRHost             = "host.docker.internal"
 	testXDRPort             = 8066
 	testTimeoutMilliseconds = 10000
 	testAckQueueSize        = 256

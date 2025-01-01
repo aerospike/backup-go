@@ -22,7 +22,7 @@ jobs:
     - name: Set up Aerospike Server
       run: |
         docker run -d --name aerospike-server -p 3000-3002:3000-3002 \
-        aerospike/aerospike-server-enterprise:7.1.0.2 --network=host
+        aerospike/aerospike-server-enterprise:7.1.0.2
     - name: Set up Minio
       run: |
         docker run -d \

@@ -24,7 +24,7 @@ import (
 
 func validateBackup(params *ASBackupParams) error {
 	if params.BackupParams != nil && params.CommonParams != nil {
-		if params.BackupParams.OutputFile == "" || params.CommonParams.Directory == "" {
+		if params.BackupParams.OutputFile == "" && params.CommonParams.Directory == "" {
 			return fmt.Errorf("output file or directory required")
 		}
 

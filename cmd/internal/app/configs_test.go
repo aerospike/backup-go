@@ -119,23 +119,6 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	assert.ElementsMatch(t, []string{"node1", "node2"}, config.NodeList, "The NodeList should be set correctly")
 }
 
-func TestMapBackupConfig_MissingNamespace(t *testing.T) {
-	t.Parallel()
-
-	params := &ASBackupParams{
-		BackupParams: &models.Backup{},
-		CommonParams: &models.Common{},
-		Compression:  testCompression(),
-		Encryption:   testEncryption(),
-		SecretAgent:  testSecretAgent(),
-	}
-
-	config, err := mapBackupConfig(params)
-	assert.Error(t, err)
-	assert.Nil(t, config)
-	assert.Equal(t, "namespace is required", err.Error())
-}
-
 func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 	t.Parallel()
 

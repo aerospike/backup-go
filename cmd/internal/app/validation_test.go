@@ -374,6 +374,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  1000,
 				SocketTimeout: 500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     false,
 			expectedErr: "",
@@ -383,6 +384,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  -1,
 				SocketTimeout: 500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "total-timeout must be non-negative",
@@ -392,6 +394,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  1000,
 				SocketTimeout: -1,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "socket-timeout must be non-negative",
@@ -401,6 +404,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  -1000,
 				SocketTimeout: -500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "total-timeout must be non-negative",
@@ -410,6 +414,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  0,
 				SocketTimeout: 0,
+				Namespace:     testNamespace,
 			},
 			wantErr:     false,
 			expectedErr: "",

@@ -56,6 +56,9 @@ func TestNewLocalWriter(t *testing.T) {
 		CommonParams: &models.Common{
 			Directory: t.TempDir(),
 		},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 	ctx := context.Background()
 	writer, err := newWriter(ctx, params, nil)
@@ -113,8 +116,7 @@ func TestNewS3Writer(t *testing.T) {
 
 	params = &ASBackupParams{
 		BackupParams: &models.Backup{
-			OutputFile:  t.TempDir() + testFileName,
-			RemoveFiles: true,
+			OutputFile: t.TempDir() + testFileName,
 		},
 		CommonParams: &models.Common{},
 		AwsS3: &models.AwsS3{
@@ -192,8 +194,7 @@ func TestGcpWriter(t *testing.T) {
 
 	params = &ASBackupParams{
 		BackupParams: &models.Backup{
-			RemoveFiles: true,
-			OutputFile:  t.TempDir() + testFileName,
+			OutputFile: t.TempDir() + testFileName,
 		},
 		CommonParams: &models.Common{},
 		GcpStorage: &models.GcpStorage{
@@ -258,8 +259,7 @@ func TestAzureWriter(t *testing.T) {
 
 	params = &ASBackupParams{
 		BackupParams: &models.Backup{
-			RemoveFiles: true,
-			OutputFile:  t.TempDir() + testFileName,
+			OutputFile: t.TempDir() + testFileName,
 		},
 		CommonParams: &models.Common{},
 		AzureBlob: &models.AzureBlob{

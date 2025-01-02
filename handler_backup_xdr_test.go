@@ -1,13 +1,11 @@
 package backup
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -28,10 +26,10 @@ const (
 	testASPort          = 3000
 	testASRewind        = "all"
 
-	testBackupDir      = "xdr_backup"
-	testBackupDirLimit = "xdr_backup_limit"
-	testParallel       = 8
-	// testXDRHost             = "host.docker.internal"
+	testBackupDir           = "xdr_backup"
+	testBackupDirLimit      = "xdr_backup_limit"
+	testParallel            = 8
+	testXDRHost             = "172.17.0.1"
 	testXDRPort             = 8066
 	testTimeoutMilliseconds = 10000
 	testAckQueueSize        = 256
@@ -41,8 +39,7 @@ const (
 
 type handlerBackupXDRTestSuite struct {
 	suite.Suite
-	client  *a.Client
-	xdrHost string
+	client *a.Client
 }
 
 func TestHandlerBackupXDR(t *testing.T) {
@@ -57,13 +54,9 @@ func (s *handlerBackupXDRTestSuite) SetupTest() {
 	client, aErr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
 	s.Require().NoError(aErr)
 
-	xdrHost, err := myIP()
-	s.Require().NoError(err)
-
 	s.client = client
-	s.xdrHost = xdrHost
 
-	err = fillTestData(client)
+	err := fillTestData(client)
 	s.Require().NoError(err)
 }
 
@@ -154,7 +147,7 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 		FileLimit:                    0,
 		ParallelWrite:                testParallel,
 		DC:                           testASDC,
-		LocalAddress:                 s.xdrHost,
+		LocalAddress:                 testXDRHost,
 		LocalPort:                    testXDRPort,
 		Namespace:                    testASNamespace,
 		Rewind:                       testASRewind,
@@ -207,7 +200,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 		FileLimit:                    1000,
 		ParallelWrite:                testParallel,
 		DC:                           testASDCFileLimit,
-		LocalAddress:                 s.xdrHost,
+		LocalAddress:                 testXDRHost,
 		LocalPort:                    testXDRPort,
 		Namespace:                    testASNamespace,
 		Rewind:                       testASRewind,
@@ -248,15 +241,4 @@ func newBackupClient(aerospikeClient *a.Client) (*Client, error) {
 	}
 
 	return backupClient, nil
-}
-
-func myIP() (string, error) {
-	cmd := exec.Command("sh", "-c", `ip -4 addr show dev eth0 | awk '/inet / {print $2}' | cut -d/ -f1`)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	if err != nil {
-		return "", err
-	}
-	return out.String(), nil
 }

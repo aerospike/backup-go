@@ -71,6 +71,9 @@ func TestNewLocalWriter(t *testing.T) {
 			OutputFile: t.TempDir() + testFileName,
 		},
 		CommonParams: &models.Common{},
+		AwsS3:        &models.AwsS3{},
+		GcpStorage:   &models.GcpStorage{},
+		AzureBlob:    &models.AzureBlob{},
 	}
 	writer, err = newWriter(ctx, params, nil)
 	assert.NoError(t, err)
@@ -79,6 +82,10 @@ func TestNewLocalWriter(t *testing.T) {
 
 	params = &ASBackupParams{
 		BackupParams: &models.Backup{},
+		CommonParams: &models.Common{},
+		AwsS3:        &models.AwsS3{},
+		GcpStorage:   &models.GcpStorage{},
+		AzureBlob:    &models.AzureBlob{},
 	}
 	writer, err = newWriter(ctx, params, nil)
 	assert.Error(t, err)

@@ -100,6 +100,8 @@ func TestNewS3Writer(t *testing.T) {
 			Profile:    testS3Profile,
 			Endpoint:   testS3Endpoint,
 		},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 
 	ctx := context.Background()
@@ -121,6 +123,8 @@ func TestNewS3Writer(t *testing.T) {
 			Profile:    testS3Profile,
 			Endpoint:   testS3Endpoint,
 		},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 
 	writer, err = newWriter(ctx, params, nil)
@@ -175,6 +179,8 @@ func TestGcpWriter(t *testing.T) {
 			BucketName: testBucket,
 			Endpoint:   testGcpEndpoint,
 		},
+		AzureBlob: &models.AzureBlob{},
+		AwsS3:     &models.AwsS3{},
 	}
 
 	ctx := context.Background()
@@ -194,6 +200,8 @@ func TestGcpWriter(t *testing.T) {
 			BucketName: testBucket,
 			Endpoint:   testGcpEndpoint,
 		},
+		AzureBlob: &models.AzureBlob{},
+		AwsS3:     &models.AwsS3{},
 	}
 
 	writer, err = newWriter(ctx, params, nil)
@@ -237,6 +245,8 @@ func TestAzureWriter(t *testing.T) {
 			Endpoint:      testAzureEndpoint,
 			ContainerName: testBucket,
 		},
+		GcpStorage: &models.GcpStorage{},
+		AwsS3:      &models.AwsS3{},
 	}
 
 	ctx := context.Background()
@@ -258,6 +268,8 @@ func TestAzureWriter(t *testing.T) {
 			Endpoint:      testAzureEndpoint,
 			ContainerName: testBucket,
 		},
+		GcpStorage: &models.GcpStorage{},
+		AwsS3:      &models.AwsS3{},
 	}
 
 	writer, err = newWriter(ctx, params, nil)

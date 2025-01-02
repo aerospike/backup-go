@@ -51,34 +51,35 @@ func testSecretAgent() *models.SecretAgent {
 
 func TestMapBackupConfig_Success(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		FileLimit:        5000,
-		AfterDigest:      "AvDsV2KuSZHZugDBftnLxGpR+88=",
-		ModifiedBefore:   "2023-09-01_12:00:00",
-		ModifiedAfter:    "2023-09-02_12:00:00",
-		FilterExpression: "k1EDpHRlc3Q=",
-		ParallelNodes:    true,
-		Compact:          true,
-		NodeList:         "node1,node2",
-		NoTTLOnly:        true,
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			FileLimit:        5000,
+			AfterDigest:      "AvDsV2KuSZHZugDBftnLxGpR+88=",
+			ModifiedBefore:   "2023-09-01_12:00:00",
+			ModifiedAfter:    "2023-09-02_12:00:00",
+			FilterExpression: "k1EDpHRlc3Q=",
+			ParallelNodes:    true,
+			Compact:          true,
+			NodeList:         "node1,node2",
+			NoTTLOnly:        true,
+		},
+		CommonParams: &models.Common{
+			Namespace:        "test-namespace",
+			SetList:          "set1,set2",
+			BinList:          "bin1,bin2",
+			NoRecords:        true,
+			NoIndexes:        false,
+			RecordsPerSecond: 1000,
+			Nice:             10,
+			Parallel:         5,
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
 
-	commonModel := &models.Common{
-		Namespace:        "test-namespace",
-		SetList:          "set1,set2",
-		BinList:          "bin1,bin2",
-		NoRecords:        true,
-		NoIndexes:        false,
-		RecordsPerSecond: 1000,
-		Nice:             10,
-		Parallel:         5,
-	}
-
-	compression := testCompression()
-	encryption := testEncryption()
-	secretAgent := testSecretAgent()
-
-	config, err := mapBackupConfig(backupModel, commonModel, compression, encryption, secretAgent)
+	config, err := mapBackupConfig(params)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "test-namespace", config.Namespace)
@@ -120,9 +121,16 @@ func TestMapBackupConfig_Success(t *testing.T) {
 
 func TestMapBackupConfig_MissingNamespace(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{}
-	commonModel := &models.Common{}
-	config, err := mapBackupConfig(backupModel, commonModel, nil, nil, nil)
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{},
+		CommonParams: &models.Common{},
+		Compression:  testCompression(),
+		Encryption:   testEncryption(),
+		SecretAgent:  testSecretAgent(),
+	}
+
+	config, err := mapBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Equal(t, "namespace is required", err.Error())
@@ -130,13 +138,20 @@ func TestMapBackupConfig_MissingNamespace(t *testing.T) {
 
 func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		ModifiedBefore: "invalid-date",
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			ModifiedBefore: "invalid-date",
+		},
+		CommonParams: &models.Common{
+			Namespace: "test-namespace",
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
+
+	config, err := mapBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified before date")
@@ -144,13 +159,20 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 
 func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		ModifiedAfter: "invalid-date",
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			ModifiedAfter: "invalid-date",
+		},
+		CommonParams: &models.Common{
+			Namespace: "test-namespace",
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
+
+	config, err := mapBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified after date")
@@ -158,13 +180,20 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 
 func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		FilterExpression: "invalid-exp",
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			FilterExpression: "invalid-exp",
+		},
+		CommonParams: &models.Common{
+			Namespace: "test-namespace",
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
+
+	config, err := mapBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse filter expression")

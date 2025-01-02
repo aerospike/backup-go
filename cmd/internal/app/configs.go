@@ -39,56 +39,46 @@ var (
 	expDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2}$`)
 )
 
-func mapBackupConfig(
-	backupParams *models.Backup,
-	commonParams *models.Common,
-	compression *models.Compression,
-	encryption *models.Encryption,
-	secretAgent *models.SecretAgent,
-) (*backup.BackupConfig, error) {
-	if commonParams.Namespace == "" {
-		return nil, fmt.Errorf("namespace is required")
-	}
-
+func mapBackupConfig(params *ASBackupParams) (*backup.BackupConfig, error) {
 	c := backup.NewDefaultBackupConfig()
-	c.Namespace = commonParams.Namespace
-	c.SetList = splitByComma(commonParams.SetList)
-	c.BinList = splitByComma(commonParams.BinList)
-	c.NoRecords = commonParams.NoRecords
-	c.NoIndexes = commonParams.NoIndexes
-	c.RecordsPerSecond = commonParams.RecordsPerSecond
-	c.FileLimit = backupParams.FileLimit
-	c.NoUDFs = commonParams.NoUDFs
+	c.Namespace = params.CommonParams.Namespace
+	c.SetList = splitByComma(params.CommonParams.SetList)
+	c.BinList = splitByComma(params.CommonParams.BinList)
+	c.NoRecords = params.CommonParams.NoRecords
+	c.NoIndexes = params.CommonParams.NoIndexes
+	c.RecordsPerSecond = params.CommonParams.RecordsPerSecond
+	c.FileLimit = params.BackupParams.FileLimit
+	c.NoUDFs = params.CommonParams.NoUDFs
 	// The original backup tools have a single parallelism configuration property.
 	// We may consider splitting the configuration in the future.
-	c.ParallelWrite = commonParams.Parallel
-	c.ParallelRead = commonParams.Parallel
+	c.ParallelWrite = params.CommonParams.Parallel
+	c.ParallelRead = params.CommonParams.Parallel
 	// As we set --nice in MiB we must convert it to bytes
-	c.Bandwidth = commonParams.Nice * 1024 * 1024
-	c.Compact = backupParams.Compact
-	c.NoTTLOnly = backupParams.NoTTLOnly
-	c.OutputFilePrefix = backupParams.OutputFilePrefix
+	c.Bandwidth = params.CommonParams.Nice * 1024 * 1024
+	c.Compact = params.BackupParams.Compact
+	c.NoTTLOnly = params.BackupParams.NoTTLOnly
+	c.OutputFilePrefix = params.BackupParams.OutputFilePrefix
 
-	if backupParams.Continue != "" {
-		c.StateFile = backupParams.Continue
+	if params.BackupParams.Continue != "" {
+		c.StateFile = params.BackupParams.Continue
 		c.Continue = true
 		c.PipelinesMode = pipeline.ModeParallel
-		c.PageSize = backupParams.ScanPageSize
+		c.PageSize = params.BackupParams.ScanPageSize
 	}
 
-	if backupParams.StateFileDst != "" {
-		c.StateFile = backupParams.StateFileDst
+	if params.BackupParams.StateFileDst != "" {
+		c.StateFile = params.BackupParams.StateFileDst
 		c.PipelinesMode = pipeline.ModeParallel
-		c.PageSize = backupParams.ScanPageSize
+		c.PageSize = params.BackupParams.ScanPageSize
 	}
 
 	// Overwrite partitions if we use nodes.
-	if backupParams.ParallelNodes || backupParams.NodeList != "" {
-		c.ParallelNodes = backupParams.ParallelNodes
-		c.NodeList = splitByComma(backupParams.NodeList)
+	if params.BackupParams.ParallelNodes || params.BackupParams.NodeList != "" {
+		c.ParallelNodes = params.BackupParams.ParallelNodes
+		c.NodeList = splitByComma(params.BackupParams.NodeList)
 	}
 
-	pf, err := mapPartitionFilter(backupParams, commonParams)
+	pf, err := mapPartitionFilter(params.BackupParams, params.CommonParams)
 	if err != nil {
 		return nil, err
 	}
@@ -99,18 +89,18 @@ func mapBackupConfig(
 
 	c.PartitionFilters = pf
 
-	sp, err := mapScanPolicy(backupParams, commonParams)
+	sp, err := mapScanPolicy(params.BackupParams, params.CommonParams)
 	if err != nil {
 		return nil, err
 	}
 
 	c.ScanPolicy = sp
-	c.CompressionPolicy = mapCompressionPolicy(compression)
-	c.EncryptionPolicy = mapEncryptionPolicy(encryption)
-	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
+	c.CompressionPolicy = mapCompressionPolicy(params.Compression)
+	c.EncryptionPolicy = mapEncryptionPolicy(params.Encryption)
+	c.SecretAgentConfig = mapSecretAgentConfig(params.SecretAgent)
 
-	if backupParams.ModifiedBefore != "" {
-		modBeforeTime, err := parseLocalTimeToUTC(backupParams.ModifiedBefore)
+	if params.BackupParams.ModifiedBefore != "" {
+		modBeforeTime, err := parseLocalTimeToUTC(params.BackupParams.ModifiedBefore)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified before date: %w", err)
 		}
@@ -118,8 +108,8 @@ func mapBackupConfig(
 		c.ModBefore = &modBeforeTime
 	}
 
-	if backupParams.ModifiedAfter != "" {
-		modAfterTime, err := parseLocalTimeToUTC(backupParams.ModifiedAfter)
+	if params.BackupParams.ModifiedAfter != "" {
+		modAfterTime, err := parseLocalTimeToUTC(params.BackupParams.ModifiedAfter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified after date: %w", err)
 		}
@@ -128,6 +118,32 @@ func mapBackupConfig(
 	}
 
 	return c, nil
+}
+
+func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
+	c := &backup.ConfigBackupXDR{
+		InfoPolicy:                   aerospike.NewInfoPolicy(),
+		EncryptionPolicy:             mapEncryptionPolicy(params.Encryption),
+		CompressionPolicy:            mapCompressionPolicy(params.Compression),
+		SecretAgentConfig:            mapSecretAgentConfig(params.SecretAgent),
+		EncoderType:                  backup.EncoderTypeASBX,
+		FileLimit:                    params.BackupXDRParams.FileLimit,
+		ParallelWrite:                params.BackupXDRParams.ParallelWrite,
+		DC:                           params.BackupXDRParams.DC,
+		LocalAddress:                 params.BackupXDRParams.LocalAddress,
+		LocalPort:                    params.BackupXDRParams.LocalPort,
+		Namespace:                    params.BackupXDRParams.Namespace,
+		Rewind:                       params.BackupXDRParams.Rewind,
+		TLSConfig:                    nil,
+		ReadTimoutMilliseconds:       params.BackupXDRParams.ReadTimoutMilliseconds,
+		WriteTimeoutMilliseconds:     params.BackupXDRParams.WriteTimeoutMilliseconds,
+		ResultQueueSize:              params.BackupXDRParams.ResultQueueSize,
+		AckQueueSize:                 params.BackupXDRParams.AckQueueSize,
+		MaxConnections:               params.BackupXDRParams.MaxConnections,
+		InfoPolingPeriodMilliseconds: params.BackupXDRParams.InfoPolingPeriodMilliseconds,
+	}
+
+	return c
 }
 
 func mapRestoreConfig(

@@ -48,30 +48,36 @@ const (
 
 func TestNewLocalWriter(t *testing.T) {
 	t.Parallel()
-	b := &models.Backup{
-		RemoveFiles: true,
-	}
-	c := &models.Common{
-		Directory: t.TempDir(),
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			RemoveFiles: true,
+		},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
 	}
 	ctx := context.Background()
-	writer, err := newLocalWriter(ctx, b, c)
+	writer, err := newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
 
-	b = &models.Backup{
-		OutputFile: t.TempDir() + testFileName,
+	params = &ASBackupParams{
+		BackupParams: &models.Backup{
+			OutputFile: t.TempDir() + testFileName,
+		},
+		CommonParams: &models.Common{},
 	}
-	c = &models.Common{}
-
-	writer, err = newLocalWriter(ctx, b, c)
+	writer, err = newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
 
-	b = &models.Backup{}
-	writer, err = newLocalWriter(ctx, b, c)
+	params = &ASBackupParams{
+		BackupParams: &models.Backup{},
+	}
+	writer, err = newWriter(ctx, params, nil)
 	assert.Error(t, err)
 	assert.Nil(t, writer)
 }
@@ -81,34 +87,43 @@ func TestNewS3Writer(t *testing.T) {
 	err := createAwsCredentials()
 	assert.NoError(t, err)
 
-	b := &models.Backup{
-		RemoveFiles: true,
-	}
-	c := &models.Common{
-		Directory: t.TempDir(),
-	}
-
-	s3cfg := &models.AwsS3{
-		BucketName: testS3Bucket,
-		Region:     testS3Region,
-		Profile:    testS3Profile,
-		Endpoint:   testS3Endpoint,
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			RemoveFiles: true,
+		},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
+		AwsS3: &models.AwsS3{
+			BucketName: testS3Bucket,
+			Region:     testS3Region,
+			Profile:    testS3Profile,
+			Endpoint:   testS3Endpoint,
+		},
 	}
 
 	ctx := context.Background()
 
-	writer, err := newS3Writer(ctx, s3cfg, b, c)
+	writer, err := newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
 
-	b = &models.Backup{
-		OutputFile:  t.TempDir() + testFileName,
-		RemoveFiles: true,
+	params = &ASBackupParams{
+		BackupParams: &models.Backup{
+			OutputFile:  t.TempDir() + testFileName,
+			RemoveFiles: true,
+		},
+		CommonParams: &models.Common{},
+		AwsS3: &models.AwsS3{
+			BucketName: testS3Bucket,
+			Region:     testS3Region,
+			Profile:    testS3Profile,
+			Endpoint:   testS3Endpoint,
+		},
 	}
-	c = &models.Common{}
 
-	writer, err = newS3Writer(ctx, s3cfg, b, c)
+	writer, err = newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
@@ -149,31 +164,39 @@ func TestGcpWriter(t *testing.T) {
 	err := createGcpBucket()
 	assert.NoError(t, err)
 
-	b := &models.Backup{
-		RemoveFiles: true,
-	}
-	c := &models.Common{
-		Directory: t.TempDir(),
-	}
-
-	cfg := &models.GcpStorage{
-		BucketName: testBucket,
-		Endpoint:   testGcpEndpoint,
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			RemoveFiles: true,
+		},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
+		GcpStorage: &models.GcpStorage{
+			BucketName: testBucket,
+			Endpoint:   testGcpEndpoint,
+		},
 	}
 
 	ctx := context.Background()
 
-	writer, err := newGcpWriter(ctx, cfg, b, c)
+	writer, err := newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
 
-	b = &models.Backup{
-		OutputFile: t.TempDir() + testFileName,
+	params = &ASBackupParams{
+		BackupParams: &models.Backup{
+			RemoveFiles: true,
+			OutputFile:  t.TempDir() + testFileName,
+		},
+		CommonParams: &models.Common{},
+		GcpStorage: &models.GcpStorage{
+			BucketName: testBucket,
+			Endpoint:   testGcpEndpoint,
+		},
 	}
-	c = &models.Common{}
 
-	writer, err = newGcpWriter(ctx, cfg, b, c)
+	writer, err = newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
@@ -201,33 +224,43 @@ func TestAzureWriter(t *testing.T) {
 	err := createAzureContainer()
 	assert.NoError(t, err)
 
-	b := &models.Backup{
-		RemoveFiles: true,
-	}
-	c := &models.Common{
-		Directory: t.TempDir(),
-	}
-
-	cfg := &models.AzureBlob{
-		AccountName:   testAzureAccountName,
-		AccountKey:    testAzureAccountKey,
-		Endpoint:      testAzureEndpoint,
-		ContainerName: testBucket,
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			RemoveFiles: true,
+		},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
+		AzureBlob: &models.AzureBlob{
+			AccountName:   testAzureAccountName,
+			AccountKey:    testAzureAccountKey,
+			Endpoint:      testAzureEndpoint,
+			ContainerName: testBucket,
+		},
 	}
 
 	ctx := context.Background()
 
-	writer, err := newAzureWriter(ctx, cfg, b, c)
+	writer, err := newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())
 
-	b = &models.Backup{
-		OutputFile: t.TempDir() + testFileName,
+	params = &ASBackupParams{
+		BackupParams: &models.Backup{
+			RemoveFiles: true,
+			OutputFile:  t.TempDir() + testFileName,
+		},
+		CommonParams: &models.Common{},
+		AzureBlob: &models.AzureBlob{
+			AccountName:   testAzureAccountName,
+			AccountKey:    testAzureAccountKey,
+			Endpoint:      testAzureEndpoint,
+			ContainerName: testBucket,
+		},
 	}
-	c = &models.Common{}
 
-	writer, err = newAzureWriter(ctx, cfg, b, c)
+	writer, err = newWriter(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())

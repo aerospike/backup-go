@@ -41,50 +41,43 @@ func Test_BackupRestore(t *testing.T) {
 
 	ctx := context.Background()
 	dir := t.TempDir()
-
 	hostPort := client.NewDefaultHostTLSPort()
-	clientCfg := &client.AerospikeConfig{
-		Seeds: client.HostTLSPortSlice{
-			hostPort,
+
+	asbParams := &ASBackupParams{
+		ClientConfig: &client.AerospikeConfig{
+			Seeds: client.HostTLSPortSlice{
+				hostPort,
+			},
+			User:     testASLoginPassword,
+			Password: testASLoginPassword,
 		},
-		User:     testASLoginPassword,
-		Password: testASLoginPassword,
+		ClientPolicy: &models.ClientPolicy{
+			Timeout:      1000,
+			IdleTimeout:  1000,
+			LoginTimeout: 1000,
+		},
+		BackupParams: &models.Backup{},
+		CommonParams: &models.Common{
+			Directory: dir,
+			Namespace: testNamespace,
+			Parallel:  1,
+		},
+		Compression: &models.Compression{
+			Mode: backup.CompressNone,
+		},
+		Encryption:  &models.Encryption{},
+		SecretAgent: &models.SecretAgent{},
+		AwsS3:       &models.AwsS3{},
+		GcpStorage:  &models.GcpStorage{},
+		AzureBlob:   &models.AzureBlob{},
 	}
 
-	clientPolicy := &models.ClientPolicy{
-		Timeout:      1000,
-		IdleTimeout:  1000,
-		LoginTimeout: 1000,
-	}
-
-	bParams := &models.Backup{}
-
-	cParams := &models.Common{
-		Directory: dir,
-		Namespace: testNamespace,
-		Parallel:  1,
-	}
-
-	comp := &models.Compression{
-		Mode: backup.CompressNone,
-	}
-
-	enc := &models.Encryption{}
-
-	sa := &models.SecretAgent{}
-
-	aws := &models.AwsS3{}
-
-	gcp := &models.GcpStorage{}
-
-	azure := &models.AzureBlob{}
-
-	err := createRecords(clientCfg, clientPolicy, testNamespace, testSet)
+	err := createRecords(asbParams.ClientConfig, asbParams.ClientPolicy, testNamespace, testSet)
 	require.NoError(t, err)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	asb, err := NewASBackup(ctx, clientCfg, clientPolicy, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asb, err := NewASBackup(ctx, asbParams, logger)
 	require.NoError(t, err)
 
 	err = asb.Run(ctx)
@@ -95,7 +88,19 @@ func Test_BackupRestore(t *testing.T) {
 		MaxAsyncBatches: 1,
 	}
 
-	asr, err := NewASRestore(ctx, clientCfg, clientPolicy, rParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asr, err := NewASRestore(
+		ctx,
+		asbParams.ClientConfig,
+		asbParams.ClientPolicy,
+		rParams,
+		asbParams.CommonParams,
+		asbParams.Compression,
+		asbParams.Encryption,
+		asbParams.SecretAgent,
+		asbParams.AwsS3,
+		asbParams.GcpStorage,
+		asbParams.AzureBlob,
+		logger)
 	require.NoError(t, err)
 
 	err = asr.Run(ctx)
@@ -107,54 +112,47 @@ func Test_BackupWithState(t *testing.T) {
 
 	ctx := context.Background()
 	dir := t.TempDir()
-
 	hostPort := client.NewDefaultHostTLSPort()
-	clientCfg := &client.AerospikeConfig{
-		Seeds: client.HostTLSPortSlice{
-			hostPort,
+
+	asbParams := &ASBackupParams{
+		ClientConfig: &client.AerospikeConfig{
+			Seeds: client.HostTLSPortSlice{
+				hostPort,
+			},
+			User:     testASLoginPassword,
+			Password: testASLoginPassword,
 		},
-		User:     testASLoginPassword,
-		Password: testASLoginPassword,
+		ClientPolicy: &models.ClientPolicy{
+			Timeout:      1000,
+			IdleTimeout:  1000,
+			LoginTimeout: 1000,
+		},
+		BackupParams: &models.Backup{
+			StateFileDst: testStateFile,
+			ScanPageSize: 10,
+			FileLimit:    100000,
+		},
+		CommonParams: &models.Common{
+			Directory: dir,
+			Namespace: testNamespace,
+			Parallel:  1,
+		},
+		Compression: &models.Compression{
+			Mode: backup.CompressNone,
+		},
+		Encryption:  &models.Encryption{},
+		SecretAgent: &models.SecretAgent{},
+		AwsS3:       &models.AwsS3{},
+		GcpStorage:  &models.GcpStorage{},
+		AzureBlob:   &models.AzureBlob{},
 	}
 
-	clientPolicy := &models.ClientPolicy{
-		Timeout:      1000,
-		IdleTimeout:  1000,
-		LoginTimeout: 1000,
-	}
-
-	bParams := &models.Backup{
-		StateFileDst: testStateFile,
-		ScanPageSize: 10,
-		FileLimit:    100000,
-	}
-
-	cParams := &models.Common{
-		Directory: dir,
-		Namespace: testNamespace,
-		Parallel:  1,
-	}
-
-	comp := &models.Compression{
-		Mode: backup.CompressNone,
-	}
-
-	enc := &models.Encryption{}
-
-	sa := &models.SecretAgent{}
-
-	aws := &models.AwsS3{}
-
-	gcp := &models.GcpStorage{}
-
-	azure := &models.AzureBlob{}
-
-	err := createRecords(clientCfg, clientPolicy, testNamespace, testSet)
+	err := createRecords(asbParams.ClientConfig, asbParams.ClientPolicy, testNamespace, testSet)
 	require.NoError(t, err)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	asb, err := NewASBackup(ctx, clientCfg, clientPolicy, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asb, err := NewASBackup(ctx, asbParams, logger)
 	require.NoError(t, err)
 
 	err = asb.Run(ctx)

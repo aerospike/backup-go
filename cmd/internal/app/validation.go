@@ -22,6 +22,28 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/models"
 )
 
+func validateBackup(params *ASBackupParams) error {
+	if params.BackupParams != nil && params.CommonParams != nil {
+		if params.BackupParams.OutputFile == "" || params.CommonParams.Directory == "" {
+			return fmt.Errorf("output file or directory required")
+		}
+
+		if err := validateBackupParams(params.BackupParams, params.CommonParams); err != nil {
+			return err
+		}
+
+		if err := validateCommonParams(params.CommonParams); err != nil {
+			return err
+		}
+	}
+
+	if err := validateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func validateStorages(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
@@ -95,6 +117,10 @@ func validateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 }
 
 func validateCommonParams(commonParams *models.Common) error {
+	if commonParams.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+
 	if commonParams.TotalTimeout < 0 {
 		return fmt.Errorf("total-timeout must be non-negative")
 	}

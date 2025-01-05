@@ -71,7 +71,10 @@ func NewASBackup(
 		return nil, err
 	}
 
-	secretAgent := getSecretAgent(backupConfig, backupXDRConfig)
+	secretAgent, err := getSecretAgent(backupConfig, backupXDRConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	writer, err := initializeWriter(ctx, params, secretAgent)
 	if err != nil {
@@ -229,10 +232,13 @@ func (b *ASBackup) Run(ctx context.Context) error {
 	return nil
 }
 
-func getSecretAgent(b *backup.BackupConfig, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
-	if b != nil {
-		return b.SecretAgentConfig
+func getSecretAgent(b *backup.BackupConfig, bxdr *backup.ConfigBackupXDR) (*backup.SecretAgentConfig, error) {
+	switch {
+	case b != nil:
+		return b.SecretAgentConfig, nil
+	case bxdr != nil:
+		return bxdr.SecretAgentConfig, nil
+	default:
+		return nil, fmt.Errorf("no secret agent configuration found")
 	}
-
-	return bxdr.SecretAgentConfig
 }

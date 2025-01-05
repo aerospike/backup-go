@@ -72,6 +72,10 @@ type SIndex struct {
 	IndexType SIndexType
 }
 
+type TokenConstraint interface {
+	*Token | *ASBXToken
+}
+
 type UDFType byte
 
 const (

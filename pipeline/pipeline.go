@@ -189,8 +189,12 @@ func (s *stage[T]) Run(ctx context.Context) error {
 
 	wg.Wait()
 
-	for i := range s.send {
-		if s.send[i] != nil {
+	// Closing channels in different ways for split and normal modes.
+	switch {
+	case s.route.output.sf != nil:
+		close(s.route.output.routedChan)
+	default:
+		for i := range s.send {
 			close(s.send[i])
 		}
 	}

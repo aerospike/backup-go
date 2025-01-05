@@ -40,7 +40,7 @@ type RecordReaderConfig struct {
 	currentHostPort string
 	// TCP server config to serve XDR backup.
 	tcpConfig *TCPConfig
-	// infoPolingPeriod how often stats will bew requested.
+	// infoPolingPeriod how often stats will be requested.
 	// To measure recovery state and lag.
 	infoPolingPeriod time.Duration
 }
@@ -195,6 +195,9 @@ func (r *RecordReader) serve() {
 	ticker := time.NewTicker(r.config.infoPolingPeriod)
 	defer ticker.Stop()
 
+	// TODO: replace it with something. When we will decide how to delay stats check.
+	time.Sleep(3 * time.Second)
+
 	for {
 		select {
 		case <-r.ctx.Done():
@@ -208,7 +211,7 @@ func (r *RecordReader) serve() {
 
 			r.logger.Debug("got stats", slog.Any("stats", stats))
 
-			if stats.Recoveries != 0 || stats.RecoveriesPending != 0 {
+			if stats.RecoveriesPending != 0 {
 				// Recovery in progress.
 				continue
 			}

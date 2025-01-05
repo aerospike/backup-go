@@ -122,6 +122,36 @@ func TestValidateStorages(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:       "Azure Blob with client credentials",
+			awsS3:      &models.AwsS3{},
+			gcpStorage: &models.GcpStorage{},
+			azureBlob: &models.AzureBlob{
+				TenantID:     "tenant-id",
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Only endpoints configured",
+			awsS3: &models.AwsS3{
+				Endpoint: "custom-endpoint",
+			},
+			gcpStorage: &models.GcpStorage{},
+			azureBlob:  &models.AzureBlob{},
+			wantErr:    false,
+		},
+		{
+			name: "Multiple providers with only endpoints",
+			awsS3: &models.AwsS3{
+				Endpoint: "aws-endpoint",
+			},
+			gcpStorage: &models.GcpStorage{
+				Endpoint: "gcp-endpoint",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -274,6 +304,84 @@ func TestValidateBackupParams(t *testing.T) {
 			wantErr:      true,
 			expectedErr:  "saving states and calculating estimates is not possible in parallel node mode",
 		},
+		{
+			name: "Continue with valid state file",
+			backupParams: &models.Backup{
+				Continue:   "state.json",
+				OutputFile: "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "NodeList with parallel nodes",
+			backupParams: &models.Backup{
+				NodeList:      "node1,node2",
+				ParallelNodes: true,
+				OutputFile:    "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "FilterExpression with valid expression",
+			backupParams: &models.Backup{
+				FilterExpression: "age > 25",
+				OutputFile:       "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "Modified time filters",
+			backupParams: &models.Backup{
+				ModifiedAfter:  "2024-01-01",
+				ModifiedBefore: "2024-12-31",
+				OutputFile:     "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "NoTTLOnly flag",
+			backupParams: &models.Backup{
+				NoTTLOnly:  true,
+				OutputFile: "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "Estimate with FilterExpression",
+			backupParams: &models.Backup{
+				Estimate:         true,
+				FilterExpression: "age > 25",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "estimate with any filter is not allowed",
+		},
+		{
+			name: "Estimate with ModifiedAfter",
+			backupParams: &models.Backup{
+				Estimate:      true,
+				ModifiedAfter: "2024-01-01",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "estimate with any filter is not allowed",
+		},
+		{
+			name: "Both directory and output file configured",
+			backupParams: &models.Backup{
+				OutputFile: "output.asb",
+			},
+			commonParams: &models.Common{
+				Directory: "backup-dir",
+			},
+			wantErr:     true,
+			expectedErr: "only one of output-file and directory may be configured at the same time",
+		},
 	}
 
 	for _, tt := range tests {
@@ -374,6 +482,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  1000,
 				SocketTimeout: 500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     false,
 			expectedErr: "",
@@ -383,6 +492,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  -1,
 				SocketTimeout: 500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "total-timeout must be non-negative",
@@ -392,6 +502,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  1000,
 				SocketTimeout: -1,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "socket-timeout must be non-negative",
@@ -401,6 +512,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  -1000,
 				SocketTimeout: -500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "total-timeout must be non-negative",
@@ -410,6 +522,27 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  0,
 				SocketTimeout: 0,
+				Namespace:     testNamespace,
+			},
+			wantErr:     false,
+			expectedErr: "",
+		},
+		{
+			name: "Missing namespace",
+			commonParams: &models.Common{
+				TotalTimeout:  1000,
+				SocketTimeout: 500,
+				Namespace:     "",
+			},
+			wantErr:     true,
+			expectedErr: "namespace is required",
+		},
+		{
+			name: "Valid namespace with all timeouts",
+			commonParams: &models.Common{
+				TotalTimeout:  1000,
+				SocketTimeout: 500,
+				Namespace:     "test-ns",
 			},
 			wantErr:     false,
 			expectedErr: "",

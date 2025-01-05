@@ -36,7 +36,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
 	if aerr != nil {
@@ -66,7 +66,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -87,7 +87,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -113,7 +113,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -126,7 +126,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 
 	var recExpr int64 = 10
 
@@ -154,7 +154,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -177,7 +177,7 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 	firstHeader := encoder.GetHeader()
 	suite.Assert().Equal(expected, string(firstHeader))
 
@@ -1571,7 +1571,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
-	encoder := NewEncoder("test", false)
+	encoder := NewEncoder[*models.Token]("test", false)
 
 	key := genKey()
 	rec := &models.Record{

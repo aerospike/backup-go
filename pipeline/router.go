@@ -74,13 +74,23 @@ func NewParallelRoutes[T any](stagesNum int) []Route[T] {
 // parallel mode between second and third.
 func NewSingleParallelRoutes[T any](sf splitFunc[T]) []Route[T] {
 	// This helper is made for XDR support, so stages number is hardcoded.
-	result := make([]Route[T], 0, 3)
-	result = append(result, NewSingleRoutes[T](2)...)
-	r := Route[T]{
+	result := make([]Route[T], 3)
+	// first step.
+	result[0] = Route[T]{
+		input:  NewRouteRuleSingle[T](channelSize, nil),
+		output: NewRouteRuleSingle[T](channelSize, nil),
+	}
+	// second step.
+	result[1] = Route[T]{
+		input: NewRouteRuleSingle[T](channelSize, nil),
+		// We should set sf function here too, to properly stop it.
+		output: NewRouteRuleSingle[T](channelSize, sf),
+	}
+	// third step with split function on input.
+	result[2] = Route[T]{
 		input:  NewRouteRuleParallel[T](channelSize, sf),
 		output: NewRouteRuleParallel[T](channelSize, nil),
 	}
-	result = append(result, r)
 
 	return result
 }
@@ -93,6 +103,9 @@ type RouteRule[T any] struct {
 	bufferSize int
 	// sf split function is used when previous and next step routes have different mode.
 	sf splitFunc[T]
+	// routedChan is a channel routed by splitFunction.
+	// If sf is set, we must close routedChan except worker chan.
+	routedChan chan T
 }
 
 // NewRouteRuleSingle returns new route rule for single mode communication.
@@ -148,11 +161,16 @@ func (r *router[T]) apply(stages []*stage[T]) error {
 			output = append(output, op)
 		case prevOutMode == routeRuleModeSingle && s.route.input.mode == routeRuleModeParallel:
 			// Split channels.
-			if s.route.output.sf == nil {
+			if s.route.input.sf == nil {
 				return fmt.Errorf("split function not set for stage %d", i)
 			}
+			// Set to close for the previous stage.
+			stages[i-1].route.output.routedChan = prevOutput[0]
+			prevOutput = r.splitChannels(prevOutput[0], len(s.workers), s.route.input.sf)
 
-			output = r.splitChannels(prevOutput[0], len(s.workers), s.route.input.sf)
+			// output for last step.
+			op := make(chan T)
+			output = append(output, op)
 		}
 
 		if err := r.connect(s, prevOutput, output); err != nil {

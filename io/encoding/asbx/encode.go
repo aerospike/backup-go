@@ -31,38 +31,43 @@ const (
 
 // Encoder contains logic for encoding backup data into the binary .asbx format.
 // This is a stateful object that must be created for every backup operation.
-type Encoder struct {
+type Encoder[T models.TokenConstraint] struct {
 	namespace      string
 	namespaceBytes []byte
 	fileNumber     atomic.Int64
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder(namespace string) *Encoder {
-	return &Encoder{
+func NewEncoder[T models.TokenConstraint](namespace string) *Encoder[T] {
+	return &Encoder[T]{
 		namespace:      namespace,
 		namespaceBytes: stringToField(namespace, 31),
 	}
 }
 
 // GenerateFilename generates a file name for the given namespace.
-func (e *Encoder) GenerateFilename() string {
+// Empty values are used to implement Encoder interface.
+func (e *Encoder[T]) GenerateFilename(_, _ string) string {
 	return fmt.Sprintf("%s_%d.asbx", e.namespace, e.fileNumber.Add(1))
 }
 
 // EncodeToken encodes a token to the ASBX format.
 // It returns a byte slice of the encoded token and an error if the encoding
 // fails.
-func (e *Encoder) EncodeToken(token *models.ASBXToken) ([]byte, error) {
+func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
+	t, ok := any(token).(*models.ASBXToken)
+	if !ok {
+		return nil, fmt.Errorf("unsupported token type for ASBX encoder")
+	}
 	// Message contains:
 	// Digest - 20 bytes.
 	// Payload Size - 6 bytes.
 	// Payload - contains a raw message from tcp protocol.
-	pLen := len(token.Payload)
+	pLen := len(t.Payload)
 
 	msg := make([]byte, 26+pLen)
 
-	copy(msg[:20], token.Key.Digest())
+	copy(msg[:20], t.Key.Digest())
 
 	// Fill payload len.
 	msg[20] = byte(pLen >> 40)
@@ -73,13 +78,13 @@ func (e *Encoder) EncodeToken(token *models.ASBXToken) ([]byte, error) {
 	msg[25] = byte(pLen)
 
 	// Fill token.
-	copy(msg[26:], token.Payload)
+	copy(msg[26:], t.Payload)
 
 	return msg, nil
 }
 
 // GetHeader returns prepared file header as []byte.
-func (e *Encoder) GetHeader() []byte {
+func (e *Encoder[T]) GetHeader() []byte {
 	// Header has fixed size of 40 bytes and contains:
 	// Version - 1 byte.
 	// File number - 8 bytes.

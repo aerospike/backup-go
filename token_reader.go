@@ -19,6 +19,7 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // tokenReader satisfies the DataReader interface.
@@ -83,4 +84,19 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 // but is a no-op for the tokenReader.
 func (tr *tokenReader) Close() {
 	tr.logger.Debug("closed token reader")
+}
+
+func newTokenWorker[T any](processor pipeline.DataProcessor[T], parallel int) []pipeline.Worker[T] {
+	if parallel > 0 {
+		workers := make([]pipeline.Worker[T], 0, parallel)
+		for i := 0; i < parallel; i++ {
+			workers = append(workers, pipeline.NewProcessorWorker[T](processor))
+		}
+
+		return workers
+	}
+
+	return []pipeline.Worker[T]{
+		pipeline.NewProcessorWorker[T](processor),
+	}
 }

@@ -27,55 +27,73 @@ import (
 	"github.com/aerospike/backup-go/io/local"
 )
 
-func getWriter(
+func newWriter(
 	ctx context.Context,
-	backupParams *models.Backup,
-	commonParams *models.Common,
-	awsS3 *models.AwsS3,
-	gcpStorage *models.GcpStorage,
-	azureBlob *models.AzureBlob,
-	secretAgent *backup.SecretAgentConfig,
+	params *ASBackupParams,
+	sa *backup.SecretAgentConfig,
 ) (backup.Writer, error) {
+	directory, outputFile := getDirectoryOutputFile(params)
+	shouldClearTarget, continueBackup := getShouldCleanContinue(params)
+
 	switch {
-	case awsS3.Region != "":
-		if err := awsS3.LoadSecrets(secretAgent); err != nil {
+	case params.AwsS3.Region != "":
+		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
-		return newS3Writer(ctx, awsS3, backupParams, commonParams)
-	case gcpStorage.BucketName != "":
-		if err := gcpStorage.LoadSecrets(secretAgent); err != nil {
+		return newS3Writer(ctx, params.AwsS3, directory, outputFile, shouldClearTarget, continueBackup)
+	case params.GcpStorage.BucketName != "":
+		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
 		}
 
-		return newGcpWriter(ctx, gcpStorage, backupParams, commonParams)
-	case azureBlob.ContainerName != "":
-		if err := azureBlob.LoadSecrets(secretAgent); err != nil {
+		return newGcpWriter(ctx, params.GcpStorage, directory, outputFile, shouldClearTarget, continueBackup)
+	case params.AzureBlob.ContainerName != "":
+		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
-		return newAzureWriter(ctx, azureBlob, backupParams, commonParams)
+		return newAzureWriter(ctx, params.AzureBlob, directory, outputFile, shouldClearTarget, continueBackup)
 	default:
-		return newLocalWriter(ctx, backupParams, commonParams)
+		return newLocalWriter(ctx, directory, outputFile, shouldClearTarget, continueBackup)
 	}
 }
 
-func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (backup.Writer, error) {
+func getDirectoryOutputFile(params *ASBackupParams) (directory, outputFile string) {
+	if params.BackupParams != nil {
+		return params.CommonParams.Directory, params.BackupParams.OutputFile
+	}
+	// Xdr backup.
+	return params.BackupXDRParams.Directory, ""
+}
+
+func getShouldCleanContinue(params *ASBackupParams) (shouldClearTarget, continueBackup bool) {
+	if params.BackupParams != nil {
+		return params.BackupParams.ShouldClearTarget(), params.BackupParams.Continue != ""
+	}
+	// Xdr backup.
+	return false, false
+}
+
+func newLocalWriter(ctx context.Context,
+	directory, outputFile string,
+	shouldClearTarget, continueBackup bool,
+) (backup.Writer, error) {
 	var opts []local.Opt
 
-	if c.Directory != "" && b.OutputFile == "" {
-		opts = append(opts, local.WithDir(c.Directory))
+	if directory != "" && outputFile == "" {
+		opts = append(opts, local.WithDir(directory))
 	}
 
-	if b.OutputFile != "" && c.Directory == "" {
-		opts = append(opts, local.WithFile(b.OutputFile))
+	if outputFile != "" && directory == "" {
+		opts = append(opts, local.WithFile(outputFile))
 	}
 
-	if b.ShouldClearTarget() {
+	if shouldClearTarget {
 		opts = append(opts, local.WithRemoveFiles())
 	}
 
-	if b.Continue != "" {
+	if continueBackup {
 		opts = append(opts, local.WithSkipDirCheck())
 	}
 
@@ -87,8 +105,8 @@ func newLocalWriter(ctx context.Context, b *models.Backup, c *models.Common) (ba
 func newS3Writer(
 	ctx context.Context,
 	a *models.AwsS3,
-	b *models.Backup,
-	c *models.Common,
+	directory, outputFile string,
+	shouldClearTarget, continueBackup bool,
 ) (backup.Writer, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
@@ -97,19 +115,19 @@ func newS3Writer(
 
 	opts := make([]s3.Opt, 0)
 
-	if c.Directory != "" && b.OutputFile == "" {
-		opts = append(opts, s3.WithDir(c.Directory))
+	if directory != "" && outputFile == "" {
+		opts = append(opts, s3.WithDir(directory))
 	}
 
-	if b.OutputFile != "" && c.Directory == "" {
-		opts = append(opts, s3.WithFile(b.OutputFile))
+	if outputFile != "" && directory == "" {
+		opts = append(opts, s3.WithFile(outputFile))
 	}
 
-	if b.ShouldClearTarget() {
+	if shouldClearTarget {
 		opts = append(opts, s3.WithRemoveFiles())
 	}
 
-	if b.Continue != "" {
+	if continueBackup {
 		opts = append(opts, s3.WithSkipDirCheck())
 	}
 
@@ -121,8 +139,8 @@ func newS3Writer(
 func newGcpWriter(
 	ctx context.Context,
 	g *models.GcpStorage,
-	b *models.Backup,
-	c *models.Common,
+	directory, outputFile string,
+	shouldClearTarget, continueBackup bool,
 ) (backup.Writer, error) {
 	client, err := newGcpClient(ctx, g)
 	if err != nil {
@@ -131,19 +149,19 @@ func newGcpWriter(
 
 	opts := make([]storage.Opt, 0)
 
-	if c.Directory != "" && b.OutputFile == "" {
-		opts = append(opts, storage.WithDir(c.Directory), storage.WithValidator(asb.NewValidator()))
+	if directory != "" && outputFile == "" {
+		opts = append(opts, storage.WithDir(directory), storage.WithValidator(asb.NewValidator()))
 	}
 
-	if b.OutputFile != "" && c.Directory == "" {
-		opts = append(opts, storage.WithFile(b.OutputFile))
+	if outputFile != "" && directory == "" {
+		opts = append(opts, storage.WithFile(outputFile))
 	}
 
-	if b.ShouldClearTarget() {
+	if shouldClearTarget {
 		opts = append(opts, storage.WithRemoveFiles())
 	}
 
-	if b.Continue != "" {
+	if continueBackup {
 		opts = append(opts, storage.WithSkipDirCheck())
 	}
 
@@ -155,8 +173,8 @@ func newGcpWriter(
 func newAzureWriter(
 	ctx context.Context,
 	a *models.AzureBlob,
-	b *models.Backup,
-	c *models.Common,
+	directory, outputFile string,
+	shouldClearTarget, continueBackup bool,
 ) (backup.Writer, error) {
 	client, err := newAzureClient(a)
 	if err != nil {
@@ -165,19 +183,19 @@ func newAzureWriter(
 
 	opts := make([]blob.Opt, 0)
 
-	if c.Directory != "" && b.OutputFile == "" {
-		opts = append(opts, blob.WithDir(c.Directory), blob.WithValidator(asb.NewValidator()))
+	if directory != "" && outputFile == "" {
+		opts = append(opts, blob.WithDir(directory), blob.WithValidator(asb.NewValidator()))
 	}
 
-	if b.OutputFile != "" && c.Directory == "" {
-		opts = append(opts, blob.WithFile(b.OutputFile))
+	if outputFile != "" && directory == "" {
+		opts = append(opts, blob.WithFile(outputFile))
 	}
 
-	if b.ShouldClearTarget() {
+	if shouldClearTarget {
 		opts = append(opts, blob.WithRemoveFiles())
 	}
 
-	if b.Continue != "" {
+	if continueBackup {
 		opts = append(opts, blob.WithSkipDirCheck())
 	}
 

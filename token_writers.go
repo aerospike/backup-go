@@ -26,8 +26,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// **** Token Stats Writer ****
-
 // statsSetterToken is an interface for setting the stats of a backup job.
 //
 //go:generate mockery --name statsSetterToken --inpackage --exported=false
@@ -36,56 +34,58 @@ type statsSetterToken interface {
 	AddSIndexes(uint32)
 }
 
-type tokenStatsWriter struct {
-	writer pipeline.DataWriter[*models.Token]
+type tokenStatsWriter[T models.TokenConstraint] struct {
+	writer pipeline.DataWriter[T]
 	stats  statsSetterToken
 	logger *slog.Logger
 }
 
-func newWriterWithTokenStats(writer pipeline.DataWriter[*models.Token],
-	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter {
+func newWriterWithTokenStats[T models.TokenConstraint](writer pipeline.DataWriter[T],
+	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter[T] {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
 	logger.Debug("created new token stats writer")
 
-	return &tokenStatsWriter{
+	return &tokenStatsWriter[T]{
 		writer: writer,
 		stats:  stats,
 		logger: logger,
 	}
 }
 
-func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
+func (tw *tokenStatsWriter[T]) Write(data T) (int, error) {
 	n, err := tw.writer.Write(data)
 	if err != nil {
 		return 0, err
 	}
 
-	switch data.Type {
-	case models.TokenTypeRecord:
-	case models.TokenTypeUDF:
-		tw.stats.AddUDFs(1)
-	case models.TokenTypeSIndex:
-		tw.stats.AddSIndexes(1)
-	case models.TokenTypeInvalid:
-		return 0, errors.New("invalid token")
+	// We set stats only for ASB Tokens at the moment.
+	t, ok := any(data).(*models.Token)
+	if ok {
+		switch t.Type {
+		case models.TokenTypeRecord:
+		case models.TokenTypeUDF:
+			tw.stats.AddUDFs(1)
+		case models.TokenTypeSIndex:
+			tw.stats.AddSIndexes(1)
+		case models.TokenTypeInvalid:
+			return 0, errors.New("invalid token")
+		}
 	}
 
 	return n, nil
 }
 
-func (tw *tokenStatsWriter) Close() error {
+func (tw *tokenStatsWriter[T]) Close() error {
 	tw.logger.Debug("closed token stats writer")
 	return tw.writer.Close()
 }
 
-// **** Token Writer ****
-
 // tokenWriter satisfies the DataWriter interface.
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
-type tokenWriter struct {
-	encoder   Encoder
+type tokenWriter[T models.TokenConstraint] struct {
+	encoder   Encoder[T]
 	output    io.Writer
 	logger    *slog.Logger
 	stateInfo *stateInfo
@@ -106,17 +106,17 @@ func newStateInfo(recordsStateChan chan<- models.PartitionFilterSerialized, n in
 }
 
 // newTokenWriter creates a new tokenWriter.
-func newTokenWriter(
-	encoder Encoder,
+func newTokenWriter[T models.TokenConstraint](
+	encoder Encoder[T],
 	output io.Writer,
 	logger *slog.Logger,
 	stateInfo *stateInfo,
-) *tokenWriter {
+) *tokenWriter[T] {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
 	logger.Debug("created new token writer")
 
-	return &tokenWriter{
+	return &tokenWriter[T]{
 		encoder:   encoder,
 		output:    output,
 		logger:    logger,
@@ -125,16 +125,20 @@ func newTokenWriter(
 }
 
 // Write encodes v and writes it to the output.
-func (w *tokenWriter) Write(v *models.Token) (int, error) {
+func (w *tokenWriter[T]) Write(v T) (int, error) {
 	data, err := w.encoder.EncodeToken(v)
 	if err != nil {
 		return 0, fmt.Errorf("error encoding token: %w", err)
 	}
 
-	if w.stateInfo != nil && v.Filter != nil {
-		// Set worker number.
-		v.Filter.N = w.stateInfo.n
-		w.stateInfo.recordsStateChan <- *v.Filter
+	// We set state only for ASB Tokens at the moment.
+	t, ok := any(v).(*models.Token)
+	if ok {
+		if w.stateInfo != nil && t.Filter != nil {
+			// Set worker number.
+			t.Filter.N = w.stateInfo.n
+			w.stateInfo.recordsStateChan <- *t.Filter
+		}
 	}
 
 	return w.output.Write(data)
@@ -142,7 +146,7 @@ func (w *tokenWriter) Write(v *models.Token) (int, error) {
 
 // Close satisfies the DataWriter interface
 // but is a no-op for the tokenWriter.
-func (w *tokenWriter) Close() error {
+func (w *tokenWriter[T]) Close() error {
 	w.logger.Debug("closed token writer")
 	return nil
 }

@@ -153,7 +153,9 @@ func (s *TCPServer) Stop() {
 
 	s.wg.Wait()
 
-	close(s.resultChan)
+	if s.resultChan != nil {
+		close(s.resultChan)
+	}
 
 	s.logger.Info("server shutdown complete")
 }

@@ -104,7 +104,6 @@ func (d *Decoder) NextToken() (*models.ASBXToken, error) {
 		return nil, fmt.Errorf("failed to read payload: %w", err)
 	}
 
-	// TODO: rework this part: set name and key, when client will be ready.
 	// Create token
 	key, err := aerospike.NewKeyWithDigest(d.namespace, "", "", digest)
 	if err != nil {

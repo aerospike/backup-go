@@ -254,21 +254,6 @@ func (rh *RestoreHandler) useBatchWrites() (bool, error) {
 	return infoClient.SupportsBatchWrite()
 }
 
-func newTokenWorker(processor processors.TokenProcessor, parallel int) []pipeline.Worker[*models.Token] {
-	if parallel > 0 {
-		workers := make([]pipeline.Worker[*models.Token], 0, parallel)
-		for i := 0; i < parallel; i++ {
-			workers = append(workers, pipeline.NewProcessorWorker(processor))
-		}
-
-		return workers
-	}
-
-	return []pipeline.Worker[*models.Token]{
-		pipeline.NewProcessorWorker(processor),
-	}
-}
-
 // wrapReader applies encryption and compression wrappers to the reader based on the configuration
 func (rh *RestoreHandler) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
 	r, err := newEncryptionReader(rh.config.EncryptionPolicy, rh.config.SecretAgentConfig, reader)

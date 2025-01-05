@@ -57,12 +57,12 @@ func testToken() (*models.ASBXToken, error) {
 func TestEncoder_Decoder(t *testing.T) {
 	// Encode.
 	content := make([]byte, 0)
-	enc := NewEncoder(testNamespace)
+	enc := NewEncoder[*models.ASBXToken](testNamespace)
 
 	token, err := testToken()
 	require.NoError(t, err)
 
-	fileName := enc.GenerateFilename()
+	fileName := enc.GenerateFilename("", "")
 	require.Equal(t, testFileName, fileName)
 
 	h := enc.GetHeader()
@@ -94,9 +94,9 @@ func TestDecoder_ErrorHeader(t *testing.T) {
 }
 
 func TestDecoder_ErrorToken(t *testing.T) {
-	enc := NewEncoder(testNamespace)
+	enc := NewEncoder[*models.ASBXToken](testNamespace)
 
-	fileName := enc.GenerateFilename()
+	fileName := enc.GenerateFilename("", "")
 	require.Equal(t, testFileName, fileName)
 
 	content := make([]byte, 0)
@@ -112,7 +112,7 @@ func TestDecoder_ErrorToken(t *testing.T) {
 }
 
 func TestDecoder_ErrorFileNumber(t *testing.T) {
-	enc := NewEncoder(testNamespace)
+	enc := NewEncoder[*models.ASBXToken](testNamespace)
 
 	content := make([]byte, 0)
 	h := enc.GetHeader()

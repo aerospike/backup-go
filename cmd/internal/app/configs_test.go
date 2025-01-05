@@ -51,34 +51,35 @@ func testSecretAgent() *models.SecretAgent {
 
 func TestMapBackupConfig_Success(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		FileLimit:        5000,
-		AfterDigest:      "AvDsV2KuSZHZugDBftnLxGpR+88=",
-		ModifiedBefore:   "2023-09-01_12:00:00",
-		ModifiedAfter:    "2023-09-02_12:00:00",
-		FilterExpression: "k1EDpHRlc3Q=",
-		ParallelNodes:    true,
-		Compact:          true,
-		NodeList:         "node1,node2",
-		NoTTLOnly:        true,
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			FileLimit:        5000,
+			AfterDigest:      "AvDsV2KuSZHZugDBftnLxGpR+88=",
+			ModifiedBefore:   "2023-09-01_12:00:00",
+			ModifiedAfter:    "2023-09-02_12:00:00",
+			FilterExpression: "k1EDpHRlc3Q=",
+			ParallelNodes:    true,
+			Compact:          true,
+			NodeList:         "node1,node2",
+			NoTTLOnly:        true,
+		},
+		CommonParams: &models.Common{
+			Namespace:        "test-namespace",
+			SetList:          "set1,set2",
+			BinList:          "bin1,bin2",
+			NoRecords:        true,
+			NoIndexes:        false,
+			RecordsPerSecond: 1000,
+			Nice:             10,
+			Parallel:         5,
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
 
-	commonModel := &models.Common{
-		Namespace:        "test-namespace",
-		SetList:          "set1,set2",
-		BinList:          "bin1,bin2",
-		NoRecords:        true,
-		NoIndexes:        false,
-		RecordsPerSecond: 1000,
-		Nice:             10,
-		Parallel:         5,
-	}
-
-	compression := testCompression()
-	encryption := testEncryption()
-	secretAgent := testSecretAgent()
-
-	config, err := mapBackupConfig(backupModel, commonModel, compression, encryption, secretAgent)
+	config, err := mapBackupConfig(params)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "test-namespace", config.Namespace)
@@ -118,25 +119,22 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	assert.ElementsMatch(t, []string{"node1", "node2"}, config.NodeList, "The NodeList should be set correctly")
 }
 
-func TestMapBackupConfig_MissingNamespace(t *testing.T) {
-	t.Parallel()
-	backupModel := &models.Backup{}
-	commonModel := &models.Common{}
-	config, err := mapBackupConfig(backupModel, commonModel, nil, nil, nil)
-	assert.Error(t, err)
-	assert.Nil(t, config)
-	assert.Equal(t, "namespace is required", err.Error())
-}
-
 func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		ModifiedBefore: "invalid-date",
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			ModifiedBefore: "invalid-date",
+		},
+		CommonParams: &models.Common{
+			Namespace: "test-namespace",
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
+
+	config, err := mapBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified before date")
@@ -144,13 +142,20 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 
 func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		ModifiedAfter: "invalid-date",
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			ModifiedAfter: "invalid-date",
+		},
+		CommonParams: &models.Common{
+			Namespace: "test-namespace",
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
+
+	config, err := mapBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified after date")
@@ -158,13 +163,20 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 
 func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{
-		FilterExpression: "invalid-exp",
+
+	params := &ASBackupParams{
+		BackupParams: &models.Backup{
+			FilterExpression: "invalid-exp",
+		},
+		CommonParams: &models.Common{
+			Namespace: "test-namespace",
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-	config, err := mapBackupConfig(backupModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
+
+	config, err := mapBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse filter expression")
@@ -613,6 +625,164 @@ func TestParseLocalTimeToUTC(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, localTime.UTC(), result)
 			}
+		})
+	}
+}
+
+func TestMapBackupXDRConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		params *ASBackupParams
+		verify func(*testing.T, *backup.ConfigBackupXDR)
+	}{
+		{
+			name: "Default configuration",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:           "dc1",
+					LocalAddress: "127.0.0.1",
+					LocalPort:    3004,
+					Namespace:    "test",
+				},
+				Compression: testCompression(),
+				Encryption:  testEncryption(),
+				SecretAgent: testSecretAgent(),
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, "dc1", cfg.DC)
+				assert.Equal(t, "127.0.0.1", cfg.LocalAddress)
+				assert.Equal(t, 3004, cfg.LocalPort)
+				assert.Equal(t, "test", cfg.Namespace)
+				assert.Equal(t, backup.EncoderTypeASBX, cfg.EncoderType)
+
+				// Verify compression policy
+				assert.NotNil(t, cfg.CompressionPolicy)
+				assert.Equal(t, "ZSTD", cfg.CompressionPolicy.Mode)
+				assert.Equal(t, 3, cfg.CompressionPolicy.Level)
+
+				// Verify encryption policy
+				assert.NotNil(t, cfg.EncryptionPolicy)
+				assert.Equal(t, "AES256", cfg.EncryptionPolicy.Mode)
+				assert.Equal(t, "/path/to/keyfile", *cfg.EncryptionPolicy.KeyFile)
+
+				// Verify secret agent config
+				assert.NotNil(t, cfg.SecretAgentConfig)
+				assert.Equal(t, "localhost", *cfg.SecretAgentConfig.Address)
+				assert.Equal(t, "tcp", *cfg.SecretAgentConfig.ConnectionType)
+				assert.Equal(t, 8080, *cfg.SecretAgentConfig.Port)
+			},
+		},
+		{
+			name: "Full configuration with all parameters",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:                           "dc1",
+					LocalAddress:                 "127.0.0.1",
+					LocalPort:                    3004,
+					Namespace:                    "test",
+					FileLimit:                    1000,
+					ParallelWrite:                4,
+					Rewind:                       "1h",
+					ReadTimoutMilliseconds:       5000,
+					WriteTimeoutMilliseconds:     5000,
+					ResultQueueSize:              1000,
+					AckQueueSize:                 1000,
+					MaxConnections:               100,
+					InfoPolingPeriodMilliseconds: 1000,
+				},
+				Compression: testCompression(),
+				Encryption:  testEncryption(),
+				SecretAgent: testSecretAgent(),
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, int64(1000), cfg.FileLimit)
+				assert.Equal(t, 4, cfg.ParallelWrite)
+				assert.Equal(t, "1h", cfg.Rewind)
+				assert.Equal(t, int64(5000), cfg.ReadTimoutMilliseconds)
+				assert.Equal(t, int64(5000), cfg.WriteTimeoutMilliseconds)
+				assert.Equal(t, 1000, cfg.ResultQueueSize)
+				assert.Equal(t, 1000, cfg.AckQueueSize)
+				assert.Equal(t, 100, cfg.MaxConnections)
+				assert.Equal(t, int64(1000), cfg.InfoPolingPeriodMilliseconds)
+			},
+		},
+		{
+			name: "Configuration without optional policies",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:           "dc1",
+					LocalAddress: "127.0.0.1",
+					LocalPort:    3004,
+					Namespace:    "test",
+				},
+				// No compression, encryption or secret agent
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Nil(t, cfg.CompressionPolicy)
+				assert.Nil(t, cfg.EncryptionPolicy)
+				assert.Nil(t, cfg.SecretAgentConfig)
+				assert.NotNil(t, cfg.InfoPolicy)
+			},
+		},
+		{
+			name: "Configuration with only required fields",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:        "dc1",
+					Namespace: "test",
+				},
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, "dc1", cfg.DC)
+				assert.Equal(t, "test", cfg.Namespace)
+				assert.Equal(t, "", cfg.LocalAddress)
+				assert.Equal(t, 0, cfg.LocalPort)
+				assert.Equal(t, backup.EncoderTypeASBX, cfg.EncoderType)
+			},
+		},
+		{
+			name: "Configuration with zero values",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:                           "dc1",
+					Namespace:                    "test",
+					FileLimit:                    0,
+					ParallelWrite:                0,
+					ReadTimoutMilliseconds:       0,
+					WriteTimeoutMilliseconds:     0,
+					ResultQueueSize:              0,
+					AckQueueSize:                 0,
+					MaxConnections:               0,
+					InfoPolingPeriodMilliseconds: 0,
+				},
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, int64(0), cfg.FileLimit)
+				assert.Equal(t, 0, cfg.ParallelWrite)
+				assert.Equal(t, int64(0), cfg.ReadTimoutMilliseconds)
+				assert.Equal(t, int64(0), cfg.WriteTimeoutMilliseconds)
+				assert.Equal(t, 0, cfg.ResultQueueSize)
+				assert.Equal(t, 0, cfg.AckQueueSize)
+				assert.Equal(t, 0, cfg.MaxConnections)
+				assert.Equal(t, int64(0), cfg.InfoPolingPeriodMilliseconds)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			config := mapBackupXDRConfig(tt.params)
+			assert.NotNil(t, config)
+			tt.verify(t, config)
 		})
 	}
 }

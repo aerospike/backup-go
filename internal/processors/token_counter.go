@@ -12,36 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package processors
 
 import (
-	"context"
-	"log"
-	"os"
-	"os/signal"
+	"sync/atomic"
 
-	"github.com/aerospike/backup-go/cmd/asbackup/cmd"
+	"github.com/aerospike/backup-go/models"
 )
 
-var (
-	appVersion = cmd.VersionDev
-	commitHash = cmd.VersionDev
-)
+// TokenCounter count processed tokens. It's like a record counter but for XDR.
+// This counter will count the number of received XDR payloads.
+type TokenCounter[T models.TokenConstraint] struct {
+	counter *atomic.Uint64
+}
 
-func main() {
-	// Initializing context with cancel for graceful shutdown.
-	ctx, cancel := context.WithCancel(context.Background())
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
-
-	go func() {
-		sig := <-sigChan
-		log.Printf("stopping asbackup: %v\n", sig)
-		cancel()
-	}()
-
-	rootCmd := cmd.NewCmd(appVersion, commitHash)
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		log.Fatal(err)
+// NewTokenCounter returns new token counter.
+func NewTokenCounter[T models.TokenConstraint](counter *atomic.Uint64) *TokenCounter[T] {
+	return &TokenCounter[T]{
+		counter: counter,
 	}
+}
+
+func (c TokenCounter[T]) Process(token T) (T, error) {
+	c.counter.Add(1)
+
+	return token, nil
 }

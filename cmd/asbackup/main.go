@@ -23,11 +23,9 @@ import (
 	"github.com/aerospike/backup-go/cmd/asbackup/cmd"
 )
 
-const devVersion = "dev"
-
 var (
-	appVersion = devVersion
-	commitHash = devVersion
+	appVersion = cmd.VersionDev
+	commitHash = cmd.VersionDev
 )
 
 func main() {
@@ -42,7 +40,7 @@ func main() {
 		cancel()
 	}()
 
-	rootCmd := cmd.NewCmd(devVersion, appVersion, commitHash)
+	rootCmd := cmd.NewCmd(appVersion, commitHash)
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		log.Fatal(err)
 	}

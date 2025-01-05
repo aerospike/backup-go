@@ -26,10 +26,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const VersionDev = "dev"
+
 // Cmd represents the base command when called without any subcommands
 type Cmd struct {
 	// Version params.
-	devVersion string
 	appVersion string
 	commitHash string
 
@@ -49,9 +50,8 @@ type Cmd struct {
 	flagsCommon *flags.Common
 }
 
-func NewCmd(devVersion, appVersion, commitHash string) *cobra.Command {
+func NewCmd(appVersion, commitHash string) *cobra.Command {
 	c := &Cmd{
-		devVersion: devVersion,
 		appVersion: appVersion,
 		commitHash: commitHash,
 
@@ -244,7 +244,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 
 func (c *Cmd) printVersion() {
 	version := c.appVersion
-	if c.appVersion == c.devVersion {
+	if c.appVersion == VersionDev {
 		version += " (" + c.commitHash + ")"
 	}
 

@@ -51,17 +51,17 @@ func validateStorages(
 ) error {
 	var count int
 
-	if awsS3.Region != "" || awsS3.Profile != "" || awsS3.Endpoint != "" {
+	if awsS3 != nil && (awsS3.Region != "" || awsS3.Profile != "" || awsS3.Endpoint != "") {
 		count++
 	}
 
-	if gcpStorage.BucketName != "" || gcpStorage.KeyFile != "" || gcpStorage.Endpoint != "" {
+	if gcpStorage != nil && (gcpStorage.BucketName != "" || gcpStorage.KeyFile != "" || gcpStorage.Endpoint != "") {
 		count++
 	}
 
-	if azureBlob.ContainerName != "" || azureBlob.AccountName != "" || azureBlob.AccountKey != "" ||
+	if azureBlob != nil && (azureBlob.ContainerName != "" || azureBlob.AccountName != "" || azureBlob.AccountKey != "" ||
 		azureBlob.Endpoint != "" || azureBlob.TenantID != "" || azureBlob.ClientID != "" ||
-		azureBlob.ClientSecret != "" {
+		azureBlob.ClientSecret != "") {
 		count++
 	}
 

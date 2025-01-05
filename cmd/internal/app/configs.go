@@ -205,6 +205,10 @@ func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
 }
 
 func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
+	if c == nil {
+		return nil
+	}
+
 	if c.Mode == "" {
 		return nil
 	}
@@ -213,6 +217,10 @@ func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
 }
 
 func mapEncryptionPolicy(e *models.Encryption) *backup.EncryptionPolicy {
+	if e == nil {
+		return nil
+	}
+
 	if e.Mode == "" {
 		return nil
 	}
@@ -237,6 +245,10 @@ func mapEncryptionPolicy(e *models.Encryption) *backup.EncryptionPolicy {
 }
 
 func mapSecretAgentConfig(s *models.SecretAgent) *backup.SecretAgentConfig {
+	if s == nil {
+		return nil
+	}
+
 	if s.Address == "" {
 		return nil
 	}

@@ -628,3 +628,161 @@ func TestParseLocalTimeToUTC(t *testing.T) {
 		})
 	}
 }
+
+func TestMapBackupXDRConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		params *ASBackupParams
+		verify func(*testing.T, *backup.ConfigBackupXDR)
+	}{
+		{
+			name: "Default configuration",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:           "dc1",
+					LocalAddress: "127.0.0.1",
+					LocalPort:    3004,
+					Namespace:    "test",
+				},
+				Compression: testCompression(),
+				Encryption:  testEncryption(),
+				SecretAgent: testSecretAgent(),
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, "dc1", cfg.DC)
+				assert.Equal(t, "127.0.0.1", cfg.LocalAddress)
+				assert.Equal(t, 3004, cfg.LocalPort)
+				assert.Equal(t, "test", cfg.Namespace)
+				assert.Equal(t, backup.EncoderTypeASBX, cfg.EncoderType)
+
+				// Verify compression policy
+				assert.NotNil(t, cfg.CompressionPolicy)
+				assert.Equal(t, "ZSTD", cfg.CompressionPolicy.Mode)
+				assert.Equal(t, 3, cfg.CompressionPolicy.Level)
+
+				// Verify encryption policy
+				assert.NotNil(t, cfg.EncryptionPolicy)
+				assert.Equal(t, "AES256", cfg.EncryptionPolicy.Mode)
+				assert.Equal(t, "/path/to/keyfile", *cfg.EncryptionPolicy.KeyFile)
+
+				// Verify secret agent config
+				assert.NotNil(t, cfg.SecretAgentConfig)
+				assert.Equal(t, "localhost", *cfg.SecretAgentConfig.Address)
+				assert.Equal(t, "tcp", *cfg.SecretAgentConfig.ConnectionType)
+				assert.Equal(t, 8080, *cfg.SecretAgentConfig.Port)
+			},
+		},
+		{
+			name: "Full configuration with all parameters",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:                           "dc1",
+					LocalAddress:                 "127.0.0.1",
+					LocalPort:                    3004,
+					Namespace:                    "test",
+					FileLimit:                    1000,
+					ParallelWrite:                4,
+					Rewind:                       "1h",
+					ReadTimoutMilliseconds:       5000,
+					WriteTimeoutMilliseconds:     5000,
+					ResultQueueSize:              1000,
+					AckQueueSize:                 1000,
+					MaxConnections:               100,
+					InfoPolingPeriodMilliseconds: 1000,
+				},
+				Compression: testCompression(),
+				Encryption:  testEncryption(),
+				SecretAgent: testSecretAgent(),
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, int64(1000), cfg.FileLimit)
+				assert.Equal(t, 4, cfg.ParallelWrite)
+				assert.Equal(t, "1h", cfg.Rewind)
+				assert.Equal(t, int64(5000), cfg.ReadTimoutMilliseconds)
+				assert.Equal(t, int64(5000), cfg.WriteTimeoutMilliseconds)
+				assert.Equal(t, 1000, cfg.ResultQueueSize)
+				assert.Equal(t, 1000, cfg.AckQueueSize)
+				assert.Equal(t, 100, cfg.MaxConnections)
+				assert.Equal(t, int64(1000), cfg.InfoPolingPeriodMilliseconds)
+			},
+		},
+		{
+			name: "Configuration without optional policies",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:           "dc1",
+					LocalAddress: "127.0.0.1",
+					LocalPort:    3004,
+					Namespace:    "test",
+				},
+				// No compression, encryption or secret agent
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Nil(t, cfg.CompressionPolicy)
+				assert.Nil(t, cfg.EncryptionPolicy)
+				assert.Nil(t, cfg.SecretAgentConfig)
+				assert.NotNil(t, cfg.InfoPolicy)
+			},
+		},
+		{
+			name: "Configuration with only required fields",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:        "dc1",
+					Namespace: "test",
+				},
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, "dc1", cfg.DC)
+				assert.Equal(t, "test", cfg.Namespace)
+				assert.Equal(t, "", cfg.LocalAddress)
+				assert.Equal(t, 0, cfg.LocalPort)
+				assert.Equal(t, backup.EncoderTypeASBX, cfg.EncoderType)
+			},
+		},
+		{
+			name: "Configuration with zero values",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					DC:                           "dc1",
+					Namespace:                    "test",
+					FileLimit:                    0,
+					ParallelWrite:                0,
+					ReadTimoutMilliseconds:       0,
+					WriteTimeoutMilliseconds:     0,
+					ResultQueueSize:              0,
+					AckQueueSize:                 0,
+					MaxConnections:               0,
+					InfoPolingPeriodMilliseconds: 0,
+				},
+			},
+			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+				t.Helper()
+				assert.Equal(t, int64(0), cfg.FileLimit)
+				assert.Equal(t, 0, cfg.ParallelWrite)
+				assert.Equal(t, int64(0), cfg.ReadTimoutMilliseconds)
+				assert.Equal(t, int64(0), cfg.WriteTimeoutMilliseconds)
+				assert.Equal(t, 0, cfg.ResultQueueSize)
+				assert.Equal(t, 0, cfg.AckQueueSize)
+				assert.Equal(t, 0, cfg.MaxConnections)
+				assert.Equal(t, int64(0), cfg.InfoPolingPeriodMilliseconds)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			config := mapBackupXDRConfig(tt.params)
+			assert.NotNil(t, config)
+			tt.verify(t, config)
+		})
+	}
+}

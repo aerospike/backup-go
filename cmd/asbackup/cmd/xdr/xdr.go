@@ -85,7 +85,9 @@ func NewCmd(
 		fmt.Println("\nUsage:")
 		fmt.Println("  asbackup xdr [flags]")
 		// Print section: XDR Flags
-		fmt.Println("\nXDR Flags:")
+		fmt.Println("\nXDR Backup Flags:")
+		fmt.Println("This sections replace Backup Flags section in main documentation." +
+			"\nAll other flags are valid for XDR backup.")
 		backupXDRFlagSet.PrintDefaults()
 	}
 

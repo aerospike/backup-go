@@ -72,6 +72,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 
 	for attemptsLeft(rw.retryPolicy, attempt) {
 		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
+
 		if aerr == nil {
 			rw.stats.IncrRecordsInserted()
 

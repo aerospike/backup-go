@@ -71,8 +71,8 @@ func (bh *backupRecordsHandler) run(
 	}
 
 	composeProcessor := newTokenWorker(processors.NewComposeProcessor(
-		processors.NewRecordCounter(recordsReadTotal),
-		processors.NewVoidTimeSetter(bh.logger),
+		processors.NewRecordCounter[*models.Token](recordsReadTotal),
+		processors.NewVoidTimeSetter[*models.Token](bh.logger),
 		processors.NewTPSLimiter[*models.Token](
 			ctx, bh.config.RecordsPerSecond),
 	), bh.config.ParallelRead)

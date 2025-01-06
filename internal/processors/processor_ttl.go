@@ -29,7 +29,7 @@ import (
 
 // expirationSetter is a DataProcessor that sets the Expiration (TTL) of a record based on its VoidTime.
 // It is used during restore to set the TTL of records from their backed up VoidTime.
-type expirationSetter struct {
+type expirationSetter[T models.TokenConstraint] struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
 	getNow   func() cltime.CLTime
@@ -39,12 +39,13 @@ type expirationSetter struct {
 }
 
 // NewExpirationSetter creates a new expirationSetter processor
-func NewExpirationSetter(expired *atomic.Uint64, extraTTL int64, logger *slog.Logger) TokenProcessor {
+func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extraTTL int64, logger *slog.Logger,
+) pipeline.DataProcessor[T] {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
 	logger.Debug("created new TTL processor")
 
-	return &expirationSetter{
+	return &expirationSetter[T]{
 		getNow:   cltime.Now,
 		expired:  expired,
 		extraTTL: extraTTL,
@@ -58,13 +59,17 @@ func NewExpirationSetter(expired *atomic.Uint64, extraTTL int64, logger *slog.Lo
 var errExpiredRecord = fmt.Errorf("%w: record is expired", pipeline.ErrFilteredOut)
 
 // Process sets the TTL of a record based on its VoidTime
-func (p *expirationSetter) Process(token *models.Token) (*models.Token, error) {
+func (p *expirationSetter[T]) Process(token T) (T, error) {
+	t, ok := any(token).(*models.Token)
+	if !ok {
+		return nil, fmt.Errorf("unsupported token type for ttl")
+	}
 	// if the token is not a record, we don't need to process it
-	if token.Type != models.TokenTypeRecord {
+	if t.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 
-	record := token.Record
+	record := t.Record
 	now := p.getNow()
 
 	switch {
@@ -89,5 +94,5 @@ func (p *expirationSetter) Process(token *models.Token) (*models.Token, error) {
 		return nil, fmt.Errorf("invalid void time %d", record.VoidTime)
 	}
 
-	return token, nil
+	return any(t).(T), nil
 }

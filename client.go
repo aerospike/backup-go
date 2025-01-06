@@ -24,6 +24,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/models"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -58,6 +59,7 @@ type AerospikeClient interface {
 	) (*a.Recordset, a.Error)
 	Close()
 	GetNodes() []*a.Node
+	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
 }
 
 // Client is the main entry point for the backup package.
@@ -224,7 +226,7 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
-// BackupXDR starts an xdr backup operation that writes data to a provided writer.
+// BackupXDR starts a xdr backup operation that writes data to a provided writer.
 //   - ctx can be used to cancel the backup operation.
 //   - config is the configuration for the xdr backup operation.
 //   - writer creates new writers for the backup operation.
@@ -260,7 +262,7 @@ func (c *Client) Restore(
 	ctx context.Context,
 	config *RestoreConfig,
 	streamingReader StreamingReader,
-) (*RestoreHandler, error) {
+) (*RestoreHandler[*models.Token], error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")
 	}
@@ -273,8 +275,36 @@ func (c *Client) Restore(
 		return nil, fmt.Errorf("failed to validate restore config: %w", err)
 	}
 
-	handler := newRestoreHandler(ctx, config, c.aerospikeClient, c.logger, streamingReader)
-	handler.startAsync()
+	handler := newRestoreHandler[*models.Token](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+	handler.run()
+
+	return handler, nil
+}
+
+// RestoreXDR starts a xdr restore operation that reads data from given readers.
+// The backup data may be in a single file or multiple files.
+//   - ctx can be used to cancel the restore operation.
+//   - config is the configuration for the restore operation.
+//   - streamingReader provides readers with access to backup data.
+func (c *Client) RestoreXDR(
+	ctx context.Context,
+	config *RestoreConfig,
+	streamingReader StreamingReader,
+) (*RestoreHandler[*models.ASBXToken], error) {
+	if config == nil {
+		return nil, fmt.Errorf("restore config required")
+	}
+
+	// copy the policies so we don't modify the original
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
+
+	if err := config.validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate restore config: %w", err)
+	}
+
+	handler := newRestoreHandler[*models.ASBXToken](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+	handler.run()
 
 	return handler, nil
 }

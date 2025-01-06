@@ -113,11 +113,11 @@ func (bh *HandlerBackupXDR) run() {
 	bh.stats.Start()
 
 	go doWork(bh.errors, bh.logger, func() error {
-		return bh.backupSync(bh.ctx)
+		return bh.backup(bh.ctx)
 	})
 }
 
-func (bh *HandlerBackupXDR) backupSync(ctx context.Context) error {
+func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	// Read workers.
 	readWorkers, err := bh.readProcessor.newReadWorkersXDR(ctx)
 	if err != nil {

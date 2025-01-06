@@ -24,28 +24,28 @@ import (
 
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
-type tokenReader struct {
+type tokenReader[T models.TokenConstraint] struct {
 	readersCh     <-chan io.ReadCloser
-	decoder       Decoder
+	decoder       Decoder[T]
 	logger        *slog.Logger
-	newDecoderFn  func(io.ReadCloser) Decoder
+	newDecoderFn  func(io.ReadCloser) Decoder[T]
 	currentReader io.Closer
 }
 
 // newTokenReader creates a new tokenReader.
-func newTokenReader(
+func newTokenReader[T models.TokenConstraint](
 	readersCh <-chan io.ReadCloser,
 	logger *slog.Logger,
-	newDecoderFn func(io.ReadCloser) Decoder,
-) *tokenReader {
-	return &tokenReader{
+	newDecoderFn func(io.ReadCloser) Decoder[T],
+) *tokenReader[T] {
+	return &tokenReader[T]{
 		readersCh:    readersCh,
 		newDecoderFn: newDecoderFn,
 		logger:       logger,
 	}
 }
 
-func (tr *tokenReader) Read() (*models.Token, error) {
+func (tr *tokenReader[T]) Read() (T, error) {
 	for {
 		if tr.decoder != nil {
 			token, err := tr.decoder.NextToken()
@@ -82,11 +82,11 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 
 // Close satisfies the DataReader interface
 // but is a no-op for the tokenReader.
-func (tr *tokenReader) Close() {
+func (tr *tokenReader[T]) Close() {
 	tr.logger.Debug("closed token reader")
 }
 
-func newTokenWorker[T any](processor pipeline.DataProcessor[T], parallel int) []pipeline.Worker[T] {
+func newTokenWorker[T models.TokenConstraint](processor pipeline.DataProcessor[T], parallel int) []pipeline.Worker[T] {
 	if parallel > 0 {
 		workers := make([]pipeline.Worker[T], 0, parallel)
 		for i := 0; i < parallel; i++ {

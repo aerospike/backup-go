@@ -87,7 +87,7 @@ func TestASBReader_readHeader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -216,7 +216,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -490,7 +490,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 			if tt.name == "positive random 48" {
 				fmt.Println("test")
 			}
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -664,7 +664,7 @@ func TestASBReader_readUDF(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -1224,7 +1224,7 @@ func TestASBReader_readBin(t *testing.T) {
 			if tt.name == "positive random 10" {
 				fmt.Println("test")
 			}
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -1463,7 +1463,7 @@ func TestASBReader_readKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -1951,7 +1951,7 @@ func TestASBReader_readRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -2031,7 +2031,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -2103,7 +2103,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -2185,7 +2185,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -2247,7 +2247,7 @@ func TestASBReader_readSet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -2312,7 +2312,7 @@ func TestASBReader_readDigest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -3418,7 +3418,7 @@ func TestASBReader_readBins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -3621,7 +3621,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -3739,7 +3739,7 @@ func TestASBReader_NextToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Decoder{
+			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -3762,7 +3762,7 @@ func TestNewASBReader(t *testing.T) {
 	}
 	tests := []struct {
 		args    args
-		want    *Decoder
+		want    *Decoder[*models.Token]
 		name    string
 		wantErr bool
 	}{
@@ -3775,7 +3775,7 @@ func TestNewASBReader(t *testing.T) {
 						"# first-file\na", // "a" appended to avoid EOF error
 				),
 			},
-			want: &Decoder{
+			want: &Decoder[*models.Token]{
 				countingByteScanner: countingByteScanner{
 					ByteScanner: bufio.NewReader(strings.NewReader(
 						"Version 3.1\n" +
@@ -3818,7 +3818,7 @@ func TestNewASBReader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewDecoder(tt.args.src)
+			got, err := NewDecoder[*models.Token](tt.args.src)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)
 				return

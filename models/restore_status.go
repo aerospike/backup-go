@@ -42,6 +42,11 @@ type RestoreStats struct {
 	TotalBytesRead atomic.Uint64
 }
 
+// NewRestoreStats returns new restore stats.
+func NewRestoreStats() *RestoreStats {
+	return &RestoreStats{}
+}
+
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
 	return rs.RecordsExpired.Load()
 }

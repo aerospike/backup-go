@@ -15,6 +15,7 @@
 package processors
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/util"
@@ -23,38 +24,42 @@ import (
 )
 
 // filterByBin will remove bins with names in binsToRemove from every record it receives.
-type filterByBin struct {
+type filterByBin[T models.TokenConstraint] struct {
 	binsToRemove map[string]bool
 	skipped      *atomic.Uint64
 }
 
 // NewFilterByBin creates new filterByBin processor with given binList.
-func NewFilterByBin(binList []string, skipped *atomic.Uint64) TokenProcessor {
-	return &filterByBin{
+func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.Uint64) pipeline.DataProcessor[T] {
+	return &filterByBin[T]{
 		binsToRemove: util.ListToMap(binList),
 		skipped:      skipped,
 	}
 }
 
-func (p filterByBin) Process(token *models.Token) (*models.Token, error) {
+func (p filterByBin[T]) Process(token T) (T, error) {
+	t, ok := any(token).(*models.Token)
+	if !ok {
+		return nil, fmt.Errorf("unsupported token type for filter by bin")
+	}
 	// if the token is not a record, we don't need to process it
-	if token.Type != models.TokenTypeRecord {
+	if t.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 
 	// If the filter bin list is not empty, perform filtering.
 	if len(p.binsToRemove) > 0 {
-		for key := range token.Record.Bins {
+		for key := range t.Record.Bins {
 			if !p.binsToRemove[key] {
-				delete(token.Record.Bins, key)
+				delete(t.Record.Bins, key)
 			}
 		}
 	}
 
-	if len(token.Record.Bins) == 0 {
+	if len(t.Record.Bins) == 0 {
 		p.skipped.Add(1)
 		return nil, pipeline.ErrFilteredOut
 	}
 
-	return token, nil
+	return any(t).(T), nil
 }

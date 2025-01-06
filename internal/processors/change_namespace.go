@@ -19,34 +19,39 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // changeNamespace is used to restore to another namespace.
-type changeNamespace struct {
+type changeNamespace[T models.TokenConstraint] struct {
 	source      *string
 	destination *string
 }
 
 // NewChangeNamespace creates new changeNamespace
-func NewChangeNamespace(source, destination *string) TokenProcessor {
+func NewChangeNamespace[T models.TokenConstraint](source, destination *string) pipeline.DataProcessor[T] {
 	if source == nil || destination == nil {
-		return &noopProcessor[*models.Token]{}
+		return &noopProcessor[T]{}
 	}
 
-	return &changeNamespace{
+	return &changeNamespace[T]{
 		source:      source,
 		destination: destination,
 	}
 }
 
 // Process filters tokens by type.
-func (p changeNamespace) Process(token *models.Token) (*models.Token, error) {
+func (p changeNamespace[T]) Process(token T) (T, error) {
+	t, ok := any(token).(*models.Token)
+	if !ok {
+		return nil, fmt.Errorf("unsupported token type for change namespace")
+	}
 	// if the token is not a record, we don't need to process it
-	if token.Type != models.TokenTypeRecord {
+	if t.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 
-	key := token.Record.Key
+	key := t.Record.Key
 	if key.Namespace() != *p.source {
 		return nil, fmt.Errorf("invalid namespace %s (expected: %s)", key.Namespace(), *p.source)
 	}
@@ -56,7 +61,7 @@ func (p changeNamespace) Process(token *models.Token) (*models.Token, error) {
 		return nil, err
 	}
 
-	token.Record.Key = newKey
+	t.Record.Key = newKey
 
-	return token, nil
+	return any(t).(T), nil
 }

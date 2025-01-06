@@ -33,7 +33,6 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 
 	readersCh chan io.ReadCloser
 	errorsCh  chan error
-	doneCh    chan struct{}
 
 	logger *slog.Logger
 

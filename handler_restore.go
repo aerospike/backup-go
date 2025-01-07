@@ -113,7 +113,6 @@ func newRestoreHandler[T models.TokenConstraint](
 }
 
 func (rh *RestoreHandler[T]) run() {
-	rh.errors = make(chan error, 1)
 	rh.stats.Start()
 
 	go doWork(rh.errors, rh.logger, func() error {

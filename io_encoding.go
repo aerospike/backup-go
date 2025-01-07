@@ -73,7 +73,7 @@ func NewDecoder[T models.TokenConstraint](eType EncoderType, src io.Reader) (Dec
 		return asb.NewDecoder[T](src)
 	case EncoderTypeASBX:
 		// TODO: pass file number.
-		return asbx.NewDecoder[T](src, 0)
+		return asbx.NewDecoder[T](src)
 	default:
 		return asb.NewDecoder[T](src)
 	}

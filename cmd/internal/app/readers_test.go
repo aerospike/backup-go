@@ -74,7 +74,7 @@ func TestNewS3Reader(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newS3Reader(ctx, s3cfg, r, c, b)
+	writer, err := newS3Reader(ctx, s3cfg, r, c, b, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
@@ -84,7 +84,7 @@ func TestNewS3Reader(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	writer, err = newS3Reader(ctx, s3cfg, r, c, b)
+	writer, err = newS3Reader(ctx, s3cfg, r, c, b, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
@@ -108,7 +108,7 @@ func TestNewGcpReader(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newGcpReader(ctx, cfg, r, c, b)
+	writer, err := newGcpReader(ctx, cfg, r, c, b, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
@@ -118,7 +118,7 @@ func TestNewGcpReader(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	writer, err = newGcpReader(ctx, cfg, r, c, b)
+	writer, err = newGcpReader(ctx, cfg, r, c, b, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
@@ -144,7 +144,7 @@ func TestNewAzureReader(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newAzureReader(ctx, cfg, r, c, b)
+	writer, err := newAzureReader(ctx, cfg, r, c, b, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())
@@ -154,7 +154,7 @@ func TestNewAzureReader(t *testing.T) {
 	}
 	c = &models.Common{}
 
-	writer, err = newAzureReader(ctx, cfg, r, c, b)
+	writer, err = newAzureReader(ctx, cfg, r, c, b, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())

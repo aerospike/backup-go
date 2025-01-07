@@ -55,6 +55,10 @@ type ASBackupParams struct {
 	AzureBlob       *models.AzureBlob
 }
 
+func (a *ASBackupParams) isXDR() bool {
+	return a.BackupXDRParams != nil && a.BackupParams == nil
+}
+
 func NewASBackup(
 	ctx context.Context,
 	params *ASBackupParams,
@@ -66,14 +70,14 @@ func NewASBackup(
 	}
 
 	// Initializations.
-	backupConfig, backupXDRConfig, err := initializeConfigs(params)
+	backupConfig, backupXDRConfig, err := initializeBackupConfigs(params)
 	if err != nil {
 		return nil, err
 	}
 
 	secretAgent := getSecretAgent(backupConfig, backupXDRConfig)
 
-	writer, err := initializeWriter(ctx, params, secretAgent)
+	writer, err := initializeBackupWriter(ctx, params, secretAgent)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +87,7 @@ func NewASBackup(
 		return nil, nil
 	}
 
-	reader, err := initializeReader(ctx, params, secretAgent)
+	reader, err := initializeBackupReader(ctx, params, secretAgent)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +123,7 @@ func NewASBackup(
 	return asb, nil
 }
 
-func initializeConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.ConfigBackupXDR, error) {
+func initializeBackupConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.ConfigBackupXDR, error) {
 	var (
 		backupConfig    *backup.BackupConfig
 		backupXDRConfig *backup.ConfigBackupXDR
@@ -127,19 +131,19 @@ func initializeConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.Co
 	)
 
 	switch {
-	case params.BackupParams != nil:
+	case !params.isXDR():
 		backupConfig, err = mapBackupConfig(params)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create backup config: %w", err)
 		}
-	case params.BackupXDRParams != nil:
+	case params.isXDR():
 		backupXDRConfig = mapBackupXDRConfig(params)
 	}
 
 	return backupConfig, backupXDRConfig, nil
 }
 
-func initializeReader(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
+func initializeBackupReader(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
 ) (backup.StreamingReader, error) {
 	if params.BackupParams == nil {
 		return nil, nil
@@ -160,6 +164,7 @@ func initializeReader(ctx context.Context, params *ASBackupParams, sa *backup.Se
 		params.AzureBlob,
 		params.BackupParams,
 		sa,
+		false,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader: %w", err)
@@ -168,7 +173,7 @@ func initializeReader(ctx context.Context, params *ASBackupParams, sa *backup.Se
 	return reader, nil
 }
 
-func initializeWriter(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
+func initializeBackupWriter(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
 ) (backup.Writer, error) {
 	// We initialize a writer only if output is configured.
 	writer, err := newWriter(ctx, params, sa)
@@ -207,7 +212,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start xdr backup: %w", err)
 		}
 
-		if err := h.Wait(ctx); err != nil {
+		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr backup: %w", err)
 		}
 
@@ -219,7 +224,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}
 
-		if err := h.Wait(ctx); err != nil {
+		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 

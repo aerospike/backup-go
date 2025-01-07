@@ -184,23 +184,24 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 
 func TestMapRestoreConfig_Success(t *testing.T) {
 	t.Parallel()
-	restoreModel := &models.Restore{}
-	commonModel := &models.Common{
-		Namespace:        "test-namespace",
-		SetList:          "set1,set2",
-		BinList:          "bin1,bin2",
-		NoRecords:        true,
-		NoIndexes:        false,
-		RecordsPerSecond: 1000,
-		Nice:             10, // 10 MiB
+	params := &ASRestoreParams{
+		RestoreParams: &models.Restore{},
+		CommonParams: &models.Common{
+			Namespace:        "test-namespace",
+			SetList:          "set1,set2",
+			BinList:          "bin1,bin2",
+			NoRecords:        true,
+			NoIndexes:        false,
+			RecordsPerSecond: 1000,
+			Nice:             10,
+			Parallel:         5,
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
 
-	compression := testCompression()
-	encryption := testEncryption()
-	secretAgent := testSecretAgent()
-
-	config, err := mapRestoreConfig(restoreModel, commonModel, compression, encryption, secretAgent)
-	assert.NoError(t, err)
+	config := mapRestoreConfig(params)
 	assert.Equal(t, "test-namespace", *config.Namespace.Source)
 	assert.Equal(t, "test-namespace", *config.Namespace.Destination)
 	assert.ElementsMatch(t, []string{"set1", "set2"}, config.SetList)
@@ -461,32 +462,26 @@ func TestParsePartitionFilter_InvalidFilter(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to parse partition filter")
 }
 
-func TestMapRestoreConfig_MissingNamespace(t *testing.T) {
-	t.Parallel()
-	restoreModel := &models.Restore{}
-	commonModel := &models.Common{}
-	config, err := mapRestoreConfig(restoreModel, commonModel, nil, nil, nil)
-	assert.Error(t, err)
-	assert.Nil(t, config)
-	assert.Equal(t, "namespace is required", err.Error())
-}
-
 func TestMapRestoreConfig_PartialConfig(t *testing.T) {
 	t.Parallel()
-	restoreModel := &models.Restore{
-		ExtraTTL:           3600,
-		IgnoreRecordError:  true,
-		DisableBatchWrites: true,
-		BatchSize:          1000,
-		MaxAsyncBatches:    5,
+
+	params := &ASRestoreParams{
+		RestoreParams: &models.Restore{
+			ExtraTTL:           3600,
+			IgnoreRecordError:  true,
+			DisableBatchWrites: true,
+			BatchSize:          1000,
+			MaxAsyncBatches:    5,
+		},
+		CommonParams: &models.Common{
+			Namespace: "test-namespace",
+		},
+		Compression: testCompression(),
+		Encryption:  testEncryption(),
+		SecretAgent: testSecretAgent(),
 	}
 
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-
-	config, err := mapRestoreConfig(restoreModel, commonModel, testCompression(), testEncryption(), testSecretAgent())
-	assert.NoError(t, err)
+	config := mapRestoreConfig(params)
 	assert.Equal(t, int64(3600), config.ExtraTTL)
 	assert.True(t, config.IgnoreRecordError)
 	assert.True(t, config.DisableBatchWrites)

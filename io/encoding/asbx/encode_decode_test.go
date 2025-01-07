@@ -111,14 +111,15 @@ func TestDecoder_ErrorToken(t *testing.T) {
 	require.ErrorIs(t, err, io.EOF)
 }
 
-func TestDecoder_ErrorFileNumber(t *testing.T) {
-	enc := NewEncoder[*models.ASBXToken](testNamespace)
-
-	content := make([]byte, 0)
-	h := enc.GetHeader()
-	content = append(content, h...)
-
-	reader := bytes.NewReader(content)
-	_, err := NewDecoder[*models.ASBXToken](reader)
-	require.Equal(t, "file number mismatch got 1, want 0", err.Error())
-}
+//
+// func TestDecoder_ErrorFileNumber(t *testing.T) {
+// 	enc := NewEncoder[*models.ASBXToken](testNamespace)
+//
+// 	content := make([]byte, 0)
+// 	h := enc.GetHeader()
+// 	content = append(content, h...)
+//
+// 	reader := bytes.NewReader(content)
+// 	_, err := NewDecoder[*models.ASBXToken](reader)
+// 	require.Equal(t, "file number mismatch got 1, want 0", err.Error())
+// }

@@ -24,6 +24,7 @@ import (
 	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/azure/blob"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
@@ -37,6 +38,7 @@ func getReader(
 	azureBlob *models.AzureBlob,
 	backupParams *models.Backup,
 	secretAgent *backup.SecretAgentConfig,
+	isXdrRestore bool,
 ) (backup.StreamingReader, error) {
 	switch {
 	case awsS3.Region != "":
@@ -44,19 +46,19 @@ func getReader(
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
-		return newS3Reader(ctx, awsS3, restoreParams, commonParams, backupParams)
+		return newS3Reader(ctx, awsS3, restoreParams, commonParams, backupParams, isXdrRestore)
 	case gcpStorage.BucketName != "":
 		if err := gcpStorage.LoadSecrets(secretAgent); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
 		}
 
-		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams, backupParams)
+		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams, backupParams, isXdrRestore)
 	case azureBlob.ContainerName != "":
 		if err := azureBlob.LoadSecrets(secretAgent); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
-		return newAzureReader(ctx, azureBlob, restoreParams, commonParams, backupParams)
+		return newAzureReader(ctx, azureBlob, restoreParams, commonParams, backupParams, isXdrRestore)
 	default:
 		return newLocalReader(restoreParams, commonParams, backupParams)
 	}
@@ -91,6 +93,7 @@ func newS3Reader(
 	r *models.Restore,
 	c *models.Common,
 	b *models.Backup,
+	isXdrRestore bool,
 ) (backup.StreamingReader, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
@@ -106,7 +109,11 @@ func newS3Reader(
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
-			opts = append(opts, s3.WithValidator(asb.NewValidator()))
+			if isXdrRestore {
+				opts = append(opts, s3.WithValidator(asbx.NewValidator()), s3.WithSorted(s3.SortAsc))
+			} else {
+				opts = append(opts, s3.WithValidator(asb.NewValidator()))
+			}
 		}
 	case r.InputFile != "":
 		opts = append(opts, s3.WithFile(r.InputFile))
@@ -125,6 +132,7 @@ func newGcpReader(
 	r *models.Restore,
 	c *models.Common,
 	b *models.Backup,
+	isXdrRestore bool,
 ) (backup.StreamingReader, error) {
 	client, err := newGcpClient(ctx, g)
 	if err != nil {
@@ -140,7 +148,11 @@ func newGcpReader(
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
-			opts = append(opts, storage.WithValidator(asb.NewValidator()))
+			if isXdrRestore {
+				opts = append(opts, storage.WithValidator(asbx.NewValidator()), storage.WithSorted(storage.SortAsc))
+			} else {
+				opts = append(opts, storage.WithValidator(asb.NewValidator()))
+			}
 		}
 	case r.InputFile != "":
 		opts = append(opts, storage.WithFile(r.InputFile))
@@ -158,6 +170,7 @@ func newAzureReader(
 	r *models.Restore,
 	c *models.Common,
 	b *models.Backup,
+	isXdrRestore bool,
 ) (backup.StreamingReader, error) {
 	client, err := newAzureClient(a)
 	if err != nil {
@@ -173,7 +186,11 @@ func newAzureReader(
 		// Append Validator only if backup params are not set.
 		// That means we don't need to check that we are saving a state file.
 		if b == nil {
-			opts = append(opts, blob.WithValidator(asb.NewValidator()))
+			if isXdrRestore {
+				opts = append(opts, blob.WithValidator(asbx.NewValidator()), blob.WithSorted(blob.SortAsc))
+			} else {
+				opts = append(opts, blob.WithValidator(asb.NewValidator()))
+			}
 		}
 	case r.InputFile != "":
 		opts = append(opts, blob.WithFile(r.InputFile))

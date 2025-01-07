@@ -83,24 +83,39 @@ func Test_BackupRestore(t *testing.T) {
 	err = asb.Run(ctx)
 	require.NoError(t, err)
 
-	rParams := &models.Restore{
-		BatchSize:       1,
-		MaxAsyncBatches: 1,
+	asrParams := &ASRestoreParams{
+		ClientConfig: &client.AerospikeConfig{
+			Seeds: client.HostTLSPortSlice{
+				hostPort,
+			},
+			User:     testASLoginPassword,
+			Password: testASLoginPassword,
+		},
+		ClientPolicy: &models.ClientPolicy{
+			Timeout:      1000,
+			IdleTimeout:  1000,
+			LoginTimeout: 1000,
+		},
+		RestoreParams: &models.Restore{
+			BatchSize:       1,
+			MaxAsyncBatches: 1,
+		},
+		CommonParams: &models.Common{
+			Directory: dir,
+			Namespace: testNamespace,
+			Parallel:  1,
+		},
+		Compression: &models.Compression{
+			Mode: backup.CompressNone,
+		},
+		Encryption:  &models.Encryption{},
+		SecretAgent: &models.SecretAgent{},
+		AwsS3:       &models.AwsS3{},
+		GcpStorage:  &models.GcpStorage{},
+		AzureBlob:   &models.AzureBlob{},
 	}
 
-	asr, err := NewASRestore(
-		ctx,
-		asbParams.ClientConfig,
-		asbParams.ClientPolicy,
-		rParams,
-		asbParams.CommonParams,
-		asbParams.Compression,
-		asbParams.Encryption,
-		asbParams.SecretAgent,
-		asbParams.AwsS3,
-		asbParams.GcpStorage,
-		asbParams.AzureBlob,
-		logger)
+	asr, err := NewASRestore(ctx, asrParams, logger)
 	require.NoError(t, err)
 
 	err = asr.Run(ctx)

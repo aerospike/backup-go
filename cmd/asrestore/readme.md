@@ -50,40 +50,48 @@ Aerospike Client Flags:
 
 Restore Flags:
   -d, --directory string         The Directory that holds the backup files. Required, unless -o or -e is used.
-  -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
-  -s, --set string               Only restore the given sets from the backup.
-                                 Default: restore all sets.
-  -B, --bin-list string          Only restore the given bins in the backup.
-                                 Default: restore all bins.
-                                 
-  -R, --no-records               Don't restore any records.
-  -I, --no-indexes               Don't restore any secondary indexes.
-      --no-udfs                  Don't restore any UDFs.
-  -w, --parallel int             The number of restore threads. (default - the number of available CPUs)
+  -n, --namespace string         The namespace to be backed up. Required.
+  -s, --set string               The set(s) to be backed up.
+                                 If multiple sets are being backed up, filter-exp cannot be used.
+                                 if empty all sets.
+  -B, --bin-list string          Only include the given bins in the backup.
+                                 If empty include all bins.
+  -R, --no-records               Don't backup any records.
+  -I, --no-indexes               Don't backup any indexes.
+      --no-udfs                  Don't backup any UDFs.
+  -w, --parallel int             Maximum number of scan calls to run in parallel.
+                                 If only one partition range is given, or the entire namespace is being backed up, the range
+                                 of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
+                                 filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
+                                 partition filters. (default 1)
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
-      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
+      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout.
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to total-timeout. If both are 0,
                                  there is no socket idle time limit (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -i, --input-file string         Restore from a single backup file. Use - for stdin.
                                   Required, unless --directory or --directory-list is used.
-                                  
+                                  Don't work with --mode=asb
       --directory-list string     A comma separated list of paths to directories that hold the backup files. Required,
                                   unless -i or -d is used. The paths may not contain commas
                                   Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2
+                                  Don't work with --mode=asb
       --parent-directory string   A common root path for all paths used in --directory-list.
                                   This path is prepended to all entries in --directory-list.
                                   Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2
+                                  Don't work with --mode=asb
   -u, --unique                    Skip records that already exist in the namespace;
                                   Don't touch them.
-                                  
+                                  Don't work with --mode=asb
   -r, --replace                   Fully replace records that already exist in the namespace.
                                   This option still does a generation check by default and would need to be combined with the -g option 
                                   if no generation check is desired. 
                                   Note: this option is mutually exclusive to --unique.
+                                  Don't work with --mode=asb
   -g, --no-generation             Don't check the generation of records that already exist in the namespace.
+                                  Don't work with --mode=asb
       --ignore-record-error       Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
                                   By default such errors are not ignored and asrestore terminates.
                                   Optional: Use verbose mode to see errors in detail.
@@ -92,32 +100,38 @@ Restore Flags:
                                   don't want
                                   batch writes to be used or asrestore is failing to recognize that batch writes are disabled
                                   and is failing to work because of it.
+                                  Don't work with --mode=asb
       --max-async-batches int     The max number of outstanding async record batch write calls at a time.
                                   For pre-6.0 servers, 'batches' are only a logical grouping of
                                   records, and each record is uploaded individually. The true max
                                   number of async aerospike calls would then be
-                                  <max-async-batches> * <batch-size>. (default 32)
+                                  <max-async-batches> * <batch-size>.
+                                  Don't work with --mode=asb (default 32)
       --batch-size int            The max allowed number of records to simultaneously upload
                                   in an async batch write calls to make to aerospike at a time.
-                                  Default is 128 with batch writes enabled, or 16 without batch writes. (default 128)
+                                  Default is 128 with batch writes enabled, or 16 without batch writes.
+                                  Don't work with --mode=asb (default 128)
       --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
                                   recorded void-time.
+                                  Don't work with --mode=asb
   -T, --timeout int               Set the timeout (ms) for info commands. (default 10000)
       --retry-base-timeout int    Set the initial delay between retry attempts in milliseconds (default 1000)
       --retry-multiplier float    retry-multiplier is used to increase the delay between subsequent retry attempts.
                                   The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
       --retry-max-retries uint    Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.
+      --mode string               Restore mode: auto, asb, asbx. According to this parameter different restore processes wil be started.
+                                  auto - starts restoring from both .asb and .asbx files.
+                                  asb - restore only .asb backup files.
+                                  asbx - restore only .asbx backup files. (default "auto")
 
 Compression Flags:
-  -z, --compress string         Enables decompressing of backup files using the specified compression algorithm.
-                                This must match the compression mode used when backing up the data.
+  -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
                                 Supported compression algorithms are: zstd, none
                                 Set the zstd compression level via the --compression-level option. Default level is 3. (default "NONE")
       --compression-level int   zstd compression level. (default 3)
 
 Encryption Flags:
-      --encrypt string                 Enables decryption of backup files using the specified encryption algorithm.
-                                       This must match the encryption mode used when backing up the data.
+      --encrypt string                 Enables encryption of backup files using the specified encryption algorithm.
                                        Supported encryption algorithms are: none, aes128, aes256.
                                        A private key must be given, either via the --encryption-key-file option or
                                        the --encryption-key-env option or the --encryption-key-secret.

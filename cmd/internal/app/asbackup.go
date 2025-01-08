@@ -19,8 +19,10 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -57,6 +59,10 @@ type ASBackupParams struct {
 
 func (a *ASBackupParams) isXDR() bool {
 	return a.BackupXDRParams != nil && a.BackupParams == nil
+}
+
+func (a *ASBackupParams) isStop() bool {
+	return a.BackupXDRParams != nil && a.BackupXDRParams.Stop
 }
 
 func NewASBackup(
@@ -100,6 +106,15 @@ func NewASBackup(
 	aerospikeClient, err := newAerospikeClient(params.ClientConfig, params.ClientPolicy, racks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
+	}
+
+	// Stop xdr.
+	if params.isStop() {
+		if err := stopXDR(aerospikeClient, backupXDRConfig); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
@@ -161,7 +176,7 @@ func initializeBackupReader(ctx context.Context, params *ASBackupParams, sa *bac
 		CommonParams: &models.Common{},
 	}
 
-	reader, err := newReader(ctx, restoreParams, sa)
+	reader, err := newReader(ctx, restoreParams, sa, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}
@@ -239,4 +254,15 @@ func getSecretAgent(b *backup.BackupConfig, bxdr *backup.ConfigBackupXDR) *backu
 	default:
 		return nil
 	}
+}
+
+func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+	address := fmt.Sprintf("%s:%d", cfg.LocalAddress, cfg.LocalPort)
+
+	if err := infoClient.StopXDR(cfg.DC, address, cfg.Namespace); err != nil {
+		return fmt.Errorf("failed to stop xdr: %w", err)
+	}
+
+	return nil
 }

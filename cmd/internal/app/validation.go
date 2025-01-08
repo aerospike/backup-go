@@ -46,6 +46,13 @@ func validateBackup(params *ASBackupParams) error {
 
 func validateRestore(params *ASRestoreParams) error {
 	if params.RestoreParams != nil && params.CommonParams != nil {
+		switch params.RestoreParams.Mode {
+		case models.RestoreModeAuto, models.RestoreModeASB, models.RestoreModeASBX:
+			// ok.
+		default:
+			return fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
+		}
+
 		if params.RestoreParams.InputFile == "" && params.CommonParams.Directory == "" {
 			return fmt.Errorf("input file or directory required")
 		}

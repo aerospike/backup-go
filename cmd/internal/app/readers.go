@@ -33,9 +33,10 @@ func newReader(
 	ctx context.Context,
 	params *ASRestoreParams,
 	sa *backup.SecretAgentConfig,
+	isXdr bool,
 ) (backup.StreamingReader, error) {
-	directory, inputFile := getDirectoryInputFile(params)
-	parentDirectory, directoryList := getParentDirectoryList(params)
+	directory, inputFile := params.CommonParams.Directory, params.RestoreParams.InputFile
+	parentDirectory, directoryList := params.CommonParams.Directory, params.RestoreParams.DirectoryList
 
 	switch {
 	case params.AwsS3 != nil && params.AwsS3.Region != "":
@@ -43,38 +44,22 @@ func newReader(
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
-		return newS3Reader(ctx, params.AwsS3, directory, inputFile, parentDirectory, directoryList, params.isXDR())
+		return newS3Reader(ctx, params.AwsS3, directory, inputFile, parentDirectory, directoryList, isXdr)
 	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
 		}
 
-		return newGcpReader(ctx, params.GcpStorage, directory, inputFile, parentDirectory, directoryList, params.isXDR())
+		return newGcpReader(ctx, params.GcpStorage, directory, inputFile, parentDirectory, directoryList, isXdr)
 	case params.AzureBlob != nil && params.AzureBlob.ContainerName != "":
 		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
-		return newAzureReader(ctx, params.AzureBlob, directory, inputFile, parentDirectory, directoryList, params.isXDR())
+		return newAzureReader(ctx, params.AzureBlob, directory, inputFile, parentDirectory, directoryList, isXdr)
 	default:
-		return newLocalReader(directory, inputFile, parentDirectory, directoryList, params.isXDR())
+		return newLocalReader(directory, inputFile, parentDirectory, directoryList, isXdr)
 	}
-}
-
-func getDirectoryInputFile(params *ASRestoreParams) (directory, inputFile string) {
-	if params.RestoreParams != nil {
-		return params.CommonParams.Directory, params.RestoreParams.InputFile
-	}
-	// Xdr backup.
-	return params.RestoreXDRParams.Directory, ""
-}
-
-func getParentDirectoryList(params *ASRestoreParams) (parentDirectory, directoryList string) {
-	if params.RestoreParams != nil {
-		return params.CommonParams.Directory, params.RestoreParams.DirectoryList
-	}
-
-	return "", ""
 }
 
 func newLocalReader(directory, inputFile, parentDirectory, directoryList string, isXDR bool,
@@ -84,10 +69,12 @@ func newLocalReader(directory, inputFile, parentDirectory, directoryList string,
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, local.WithDir(directory))
+		opts = append(opts, local.WithDir(directory), local.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, local.WithValidator(asbx.NewValidator()), local.WithSorted(local.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return local.NewReader(opts...)
 		} else {
 			opts = append(opts, local.WithValidator(asb.NewValidator()))
 		}
@@ -121,10 +108,12 @@ func newS3Reader(
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, s3.WithDir(directory))
+		opts = append(opts, s3.WithDir(directory), s3.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, s3.WithValidator(asbx.NewValidator()), s3.WithSorted(s3.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return s3.NewReader(ctx, client, a.BucketName, opts...)
 		} else {
 			opts = append(opts, s3.WithValidator(asb.NewValidator()))
 		}
@@ -158,10 +147,12 @@ func newGcpReader(
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, storage.WithDir(directory))
+		opts = append(opts, storage.WithDir(directory), storage.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, storage.WithValidator(asbx.NewValidator()), storage.WithSorted(storage.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return storage.NewReader(ctx, client, g.BucketName, opts...)
 		} else {
 			opts = append(opts, storage.WithValidator(asb.NewValidator()))
 		}
@@ -194,10 +185,12 @@ func newAzureReader(
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, blob.WithDir(directory))
+		opts = append(opts, blob.WithDir(directory), blob.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, blob.WithValidator(asbx.NewValidator()), blob.WithSorted(blob.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return blob.NewReader(ctx, client, a.ContainerName, opts...)
 		} else {
 			opts = append(opts, blob.WithValidator(asb.NewValidator()))
 		}

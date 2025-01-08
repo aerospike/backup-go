@@ -30,24 +30,22 @@ type ASRestore struct {
 	backupClient  *backup.Client
 	restoreConfig *backup.RestoreConfig
 	reader        backup.StreamingReader
+	xdrReader     backup.StreamingReader
+	// Restore Mode: auto, asb, asbx
+	mode string
 }
 
 type ASRestoreParams struct {
-	ClientConfig     *client.AerospikeConfig
-	ClientPolicy     *models.ClientPolicy
-	RestoreParams    *models.Restore
-	RestoreXDRParams *models.RestoreXDR
-	CommonParams     *models.Common
-	Compression      *models.Compression
-	Encryption       *models.Encryption
-	SecretAgent      *models.SecretAgent
-	AwsS3            *models.AwsS3
-	GcpStorage       *models.GcpStorage
-	AzureBlob        *models.AzureBlob
-}
-
-func (a *ASRestoreParams) isXDR() bool {
-	return a.RestoreXDRParams != nil && a.RestoreParams == nil
+	ClientConfig  *client.AerospikeConfig
+	ClientPolicy  *models.ClientPolicy
+	RestoreParams *models.Restore
+	CommonParams  *models.Common
+	Compression   *models.Compression
+	Encryption    *models.Encryption
+	SecretAgent   *models.SecretAgent
+	AwsS3         *models.AwsS3
+	GcpStorage    *models.GcpStorage
+	AzureBlob     *models.AzureBlob
 }
 
 func NewASRestore(
@@ -63,7 +61,7 @@ func NewASRestore(
 	// Initializations.
 	restoreConfig := initializeRestoreConfigs(params)
 
-	reader, err := initializeRestoreReader(ctx, params, restoreConfig.SecretAgentConfig)
+	reader, xdrReader, err := initializeRestoreReader(ctx, params, restoreConfig.SecretAgentConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
@@ -82,6 +80,8 @@ func NewASRestore(
 		backupClient:  backupClient,
 		restoreConfig: restoreConfig,
 		reader:        reader,
+		xdrReader:     xdrReader,
+		mode:          params.RestoreParams.Mode,
 	}, nil
 }
 
@@ -90,8 +90,8 @@ func (r *ASRestore) Run(ctx context.Context) error {
 		return nil
 	}
 
-	switch r.restoreConfig.EncoderType {
-	case backup.EncoderTypeASB:
+	switch r.mode {
+	case models.RestoreModeASB:
 		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 		if err != nil {
 			return fmt.Errorf("failed to start restore: %w", err)
@@ -102,8 +102,8 @@ func (r *ASRestore) Run(ctx context.Context) error {
 		}
 
 		printRestoreReport(h.GetStats())
-	case backup.EncoderTypeASBX:
-		h, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.reader)
+	case models.RestoreModeASBX:
+		h, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
 		if err != nil {
 			return fmt.Errorf("failed to start xdr restore: %w", err)
 		}
@@ -113,28 +113,68 @@ func (r *ASRestore) Run(ctx context.Context) error {
 		}
 
 		printRestoreReport(h.GetStats())
+	case models.RestoreModeAuto:
+		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
+		if err != nil {
+			return fmt.Errorf("failed to start restore: %w", err)
+		}
+
+		hXdr, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
+		if err != nil {
+			return fmt.Errorf("failed to start xdr restore: %w", err)
+		}
+
+		if err = h.Wait(ctx); err != nil {
+			return fmt.Errorf("failed to restore: %w", err)
+		}
+
+		if err = hXdr.Wait(ctx); err != nil {
+			return fmt.Errorf("failed to xdr restore: %w", err)
+		}
+
+		printRestoreReport(h.GetStats())
+		printRestoreReport(hXdr.GetStats())
+	default:
+		return fmt.Errorf("invalid mode: %s", r.mode)
 	}
 
 	return nil
 }
 
 func initializeRestoreConfigs(params *ASRestoreParams) *backup.RestoreConfig {
-	switch {
-	case !params.isXDR():
-		return mapRestoreConfig(params)
-	case params.isXDR():
-		return mapRestoreXDRConfig(params)
-	default:
-		return nil
-	}
+	return mapRestoreConfig(params)
 }
 
 func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *backup.SecretAgentConfig,
-) (backup.StreamingReader, error) {
-	reader, err := newReader(ctx, params, sa)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create reader: %w", err)
-	}
+) (reader, xdrReader backup.StreamingReader, err error) {
+	switch params.RestoreParams.Mode {
+	case models.RestoreModeASB:
+		reader, err = newReader(ctx, params, sa, false)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+		}
 
-	return reader, nil
+		return reader, nil, nil
+	case models.RestoreModeASBX:
+		xdrReader, err = newReader(ctx, params, sa, true)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+		}
+
+		return nil, xdrReader, nil
+	case models.RestoreModeAuto:
+		reader, err = newReader(ctx, params, sa, false)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+		}
+
+		xdrReader, err = newReader(ctx, params, sa, true)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+		}
+
+		return reader, xdrReader, nil
+	default:
+		return nil, nil, fmt.Errorf("invalid mode: %s", params.RestoreParams.Mode)
+	}
 }

@@ -178,27 +178,6 @@ func mapRestoreConfig(params *ASRestoreParams) *backup.RestoreConfig {
 	return c
 }
 
-func mapRestoreXDRConfig(params *ASRestoreParams) *backup.RestoreConfig {
-	c := backup.NewDefaultRestoreConfig()
-	c.Namespace = mapRestoreNamespace(params.RestoreXDRParams.Namespace)
-	c.RecordsPerSecond = params.RestoreXDRParams.RecordsPerSecond
-	c.Parallel = params.RestoreXDRParams.Parallel
-	c.WritePolicy = mapWritePolicy(params.RestoreParams, params.CommonParams)
-	c.InfoPolicy = mapInfoPolicy(params.RestoreXDRParams.TimeOut)
-	c.IgnoreRecordError = params.RestoreXDRParams.IgnoreRecordError
-	c.CompressionPolicy = mapCompressionPolicy(params.Compression)
-	c.EncryptionPolicy = mapEncryptionPolicy(params.Encryption)
-	c.SecretAgentConfig = mapSecretAgentConfig(params.SecretAgent)
-	c.RetryPolicy = mapRetryPolicy(
-		params.RestoreXDRParams.RetryBaseTimeout,
-		params.RestoreXDRParams.RetryMultiplier,
-		params.RestoreXDRParams.RetryMaxRetries,
-	)
-	c.EncoderType = backup.EncoderTypeASBX
-
-	return c
-}
-
 func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
 	nsArr := splitByComma(n)
 

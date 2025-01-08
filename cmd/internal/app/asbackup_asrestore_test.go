@@ -35,7 +35,7 @@ const (
 	testStateFile = "state"
 )
 
-// Test_BackupRestore one test for both so we can restore from just backed up files.
+// Test_BackupRestore one test for both so we can restore from just backed-up files.
 func Test_BackupRestore(t *testing.T) {
 	t.Parallel()
 
@@ -99,6 +99,7 @@ func Test_BackupRestore(t *testing.T) {
 		RestoreParams: &models.Restore{
 			BatchSize:       1,
 			MaxAsyncBatches: 1,
+			Mode:            models.RestoreModeASB,
 		},
 		CommonParams: &models.Common{
 			Directory: dir,

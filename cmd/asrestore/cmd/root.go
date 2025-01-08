@@ -19,7 +19,6 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/aerospike/backup-go/cmd/asrestore/cmd/xdr"
 	"github.com/aerospike/backup-go/cmd/internal/app"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
 	asFlags "github.com/aerospike/tools-common-go/flags"
@@ -79,20 +78,6 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 	rootCmd.PersistentFlags().SortFlags = false
 	rootCmd.SilenceUsage = true
 
-	// Add sub command
-	xdrCmd := xdr.NewCmd(
-		c.flagsApp,
-		c.flagsAerospike,
-		c.flagsClientPolicy,
-		c.flagsCompression,
-		c.flagsEncryption,
-		c.flagsSecretAgent,
-		c.flagsAws,
-		c.flagsGcp,
-		c.flagsAzure,
-	)
-	rootCmd.AddCommand(xdrCmd)
-
 	appFlagSet := c.flagsApp.NewFlagSet()
 	aerospikeFlagSet := c.flagsAerospike.NewFlagSet(func(str string) string { return str })
 	clientPolicyFlagSet := c.flagsClientPolicy.NewFlagSet()
@@ -126,7 +111,6 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		fmt.Println("-----------------------------------------")
 		fmt.Println("\nUsage:")
 		fmt.Println("  asrestore [flags]")
-		fmt.Println("  asrestore xdr [flags]")
 
 		// Print section: App Flags
 		fmt.Println("\nGeneral Flags:")

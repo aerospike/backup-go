@@ -40,7 +40,7 @@ func TestNewLocalReader(t *testing.T) {
 		AzureBlob:  &models.AzureBlob{},
 	}
 
-	reader, err := newReader(ctx, params, nil)
+	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
@@ -55,7 +55,7 @@ func TestNewLocalReader(t *testing.T) {
 		AzureBlob:    &models.AzureBlob{},
 	}
 
-	reader, err = newReader(ctx, params, nil)
+	reader, err = newReader(ctx, params, nil, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
@@ -67,7 +67,7 @@ func TestNewLocalReader(t *testing.T) {
 		GcpStorage:    &models.GcpStorage{},
 		AzureBlob:     &models.AzureBlob{},
 	}
-	reader, err = newReader(ctx, params, nil)
+	reader, err = newReader(ctx, params, nil, false)
 	assert.Error(t, err)
 	assert.Nil(t, reader)
 }
@@ -94,7 +94,7 @@ func TestNewS3Reader(t *testing.T) {
 
 	ctx := context.Background()
 
-	reader, err := newReader(ctx, params, nil)
+	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
@@ -114,7 +114,7 @@ func TestNewS3Reader(t *testing.T) {
 		AzureBlob:  &models.AzureBlob{},
 	}
 
-	reader, err = newReader(ctx, params, nil)
+	reader, err = newReader(ctx, params, nil, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
@@ -140,7 +140,7 @@ func TestNewGcpReader(t *testing.T) {
 
 	ctx := context.Background()
 
-	reader, err := newReader(ctx, params, nil)
+	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testGcpType, reader.GetType())
@@ -158,7 +158,7 @@ func TestNewGcpReader(t *testing.T) {
 		AzureBlob: &models.AzureBlob{},
 	}
 
-	reader, err = newReader(ctx, params, nil)
+	reader, err = newReader(ctx, params, nil, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testGcpType, reader.GetType())
@@ -186,7 +186,7 @@ func TestNewAzureReader(t *testing.T) {
 
 	ctx := context.Background()
 
-	reader, err := newReader(ctx, params, nil)
+	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())
@@ -206,7 +206,7 @@ func TestNewAzureReader(t *testing.T) {
 		GcpStorage: &models.GcpStorage{},
 	}
 
-	reader, err = newReader(ctx, params, nil)
+	reader, err = newReader(ctx, params, nil, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())

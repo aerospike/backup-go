@@ -13,6 +13,7 @@ Version artifacts are automatically built and uploaded under releases in GitHub.
 ```
 Usage:
   asbackup [flags]
+  asbackup xdr [flags]
 
 General Flags:
   -Z, --help      Display help information.
@@ -76,7 +77,7 @@ Backup Flags:
   -o, --output-file string          Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
   -q, --output-file-prefix string   When using directory parameter, prepend a prefix to the names of the generated files.
   -F, --file-limit int              Rotate backup files, when their size crosses the given
-                                    value (in bytes) Only used when backing up to a Directory. (default 262144000)
+                                    value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
   -x, --no-bins                     Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.
                                     On restore all records, that don't contain bin data will be skipped.
       --no-ttl-only                 Only include records that have no ttl set (persistent records).
@@ -201,6 +202,36 @@ Any Azure parameter can be retrieved from secret agent.
       --azure-client-secret string    Azure client secret for Azure Active Directory authorization.
       --azure-endpoint string         Azure endpoint.
       --azure-container-name string   Azure container Name.
+```
+
+```
+Usage:
+  asbackup xdr [flags]
+
+XDR Backup Flags:
+This sections replace Backup Flags section in main documentation.
+All other flags are valid for XDR backup.
+  -n, --namespace string         The namespace to be backed up. Required.
+  -d, --directory string         The Directory that holds the backup files. Required.
+  -F, --file-limit int           Rotate backup files, when their size crosses the given
+                                 value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
+      --parallel-write int       Number of concurrent backup files writing. (default 12)
+      --dc string                DC that will be created on source instance for xdr backup. (default "dc")
+      --local-address string     Local IP address on which XDR server listens on. (default "127.0.0.1")
+      --local-port int           Local port on which XDR server listens on. (default 8080)
+      --rewind all               Rewind is used to ship all existing records of a namespace.
+                                 When rewinding a namespace, XDR will scan through the index and ship
+                                 all the records for that namespace, partition by partition.
+                                 Can be all or number of seconds. (default "all")
+      --read-timeout int         Timeout in milliseconds for TCP read operations. Used by TCP server for XDR. (default 1000)
+      --write-timeout int        Timeout in milliseconds for TCP write operations. Used by TCP server for XDR. (default 1000)
+      --results-queue-size int   Buffer for processing messages received from XDR. (default 256)
+      --ack-queue-size int       Buffer for processing acknowledge messages sent to XDR. (default 256)
+      --max-connections int      Maximum number of concurrent TCP connections. (default 100)
+      --info-poling-period int   How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.
+                                 To measure recovery state and lag. (default 1000)
+      --stop-xdr                 Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, 
+                                 and database server still sends XDR events.
 ```
 
 ## Unsupported flags

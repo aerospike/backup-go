@@ -33,4 +33,6 @@ type BackupXDR struct {
 	InfoPolingPeriodMilliseconds int64
 
 	TLSConfig *tls.Config
+
+	Stop bool
 }

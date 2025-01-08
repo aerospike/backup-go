@@ -38,19 +38,19 @@ func newReader(
 	parentDirectory, directoryList := getParentDirectoryList(params)
 
 	switch {
-	case params.AwsS3.Region != "":
+	case params.AwsS3 != nil && params.AwsS3.Region != "":
 		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
 		return newS3Reader(ctx, params.AwsS3, directory, inputFile, parentDirectory, directoryList, params.isXDR())
-	case params.GcpStorage.BucketName != "":
+	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
 		}
 
 		return newGcpReader(ctx, params.GcpStorage, directory, inputFile, parentDirectory, directoryList, params.isXDR())
-	case params.AzureBlob.ContainerName != "":
+	case params.AzureBlob != nil && params.AzureBlob.ContainerName != "":
 		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}

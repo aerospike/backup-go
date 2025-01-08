@@ -1,3 +1,17 @@
+// Copyright 2024 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package backup
 
 import (
@@ -19,9 +33,9 @@ import (
 const (
 	testASLoginPassword = "admin"
 	testASNamespace     = "test"
-	testASSet           = "xdr"
-	testASDC            = "DC-XDR"
-	testASDCFileLimit   = "DC-XDR-File-Limit"
+	testSetBackupXDR    = "xdr"
+	testDCXDR           = "DC-XDR"
+	testDCFileLimit     = "DC-XDR-File-Limit"
 	testASHost          = "127.0.0.1"
 	testASPort          = 3000
 	testASRewind        = "all"
@@ -31,6 +45,7 @@ const (
 	testParallel            = 8
 	testXDRHost             = "172.17.0.1"
 	testXDRPort             = 8066
+	testXDRPortFileLimit    = 8067
 	testTimeoutMilliseconds = 10000
 	testAckQueueSize        = 256
 	testResultQueueSize     = 256
@@ -56,11 +71,11 @@ func (s *handlerBackupXDRTestSuite) SetupTest() {
 
 	s.client = client
 
-	err := fillTestData(client)
+	err := fillTestData(client, testSetBackupXDR)
 	s.Require().NoError(err)
 }
 
-func fillTestData(client *a.Client) error {
+func fillTestData(client *a.Client, setName string) error {
 	wp := a.NewWritePolicy(0, 0)
 
 	var (
@@ -70,10 +85,10 @@ func fillTestData(client *a.Client) error {
 
 	for i := 0; i < 100; i++ {
 		if i%2 == 0 {
-			key, _ = a.NewKey(testASNamespace, testASSet, fmt.Sprintf("map-key-%d", i))
+			key, _ = a.NewKey(testASNamespace, setName, fmt.Sprintf("map-key-%d", i))
 			bin1 = generateMap()
 		} else {
-			key, _ = a.NewKey(testASNamespace, testASSet, fmt.Sprintf("list-key-%d", i))
+			key, _ = a.NewKey(testASNamespace, setName, fmt.Sprintf("list-key-%d", i))
 			bin1 = generateList()
 		}
 
@@ -146,7 +161,7 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 		EncoderType:                  EncoderTypeASBX,
 		FileLimit:                    0,
 		ParallelWrite:                testParallel,
-		DC:                           testASDC,
+		DC:                           testDCXDR,
 		LocalAddress:                 testXDRHost,
 		LocalPort:                    testXDRPort,
 		Namespace:                    testASNamespace,
@@ -199,9 +214,9 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 		EncoderType:                  EncoderTypeASBX,
 		FileLimit:                    1000,
 		ParallelWrite:                testParallel,
-		DC:                           testASDCFileLimit,
+		DC:                           testDCFileLimit,
 		LocalAddress:                 testXDRHost,
-		LocalPort:                    testXDRPort,
+		LocalPort:                    testXDRPortFileLimit,
 		Namespace:                    testASNamespace,
 		Rewind:                       testASRewind,
 		TLSConfig:                    nil,
@@ -228,7 +243,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 func newBackupClient(aerospikeClient *a.Client) (*Client, error) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		// Uncomment for test debugging.
-		// Level: slog.LevelDebug,
+		Level: slog.LevelDebug,
 	}))
 
 	backupClient, err := NewClient(

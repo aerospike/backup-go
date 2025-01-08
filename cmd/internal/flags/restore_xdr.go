@@ -37,16 +37,6 @@ func (f *RestoreXDR) NewFlagSet() *pflag.FlagSet {
 		"",
 		"Restore from a single backup file. Use - for stdin.\n"+
 			"Required, unless --directory or --directory-list is used.\n")
-	flagSet.StringVar(&f.DirectoryList, "directory-list",
-		"",
-		"A comma separated list of paths to directories that hold the backup files. Required,\n"+
-			"unless -i or -d is used. The paths may not contain commas\n"+
-			"Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2")
-	flagSet.StringVar(&f.ParentDirectory, "parent-directory",
-		"",
-		"A common root path for all paths used in --directory-list.\n"+
-			"This path is prepended to all entries in --directory-list.\n"+
-			"Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2")
 	flagSet.StringVarP(&f.Directory, "directory", "d",
 		"",
 		"The Directory that holds the backup files. Required, unless -o or -e is used.")

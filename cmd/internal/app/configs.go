@@ -324,6 +324,11 @@ func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, e
 
 func mapWritePolicy(r *models.Restore, c *models.Common) *aerospike.WritePolicy {
 	p := aerospike.NewWritePolicy(0, 0)
+
+	if c == nil {
+		return p
+	}
+
 	p.SendKey = true
 	p.MaxRetries = c.MaxRetries
 	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond

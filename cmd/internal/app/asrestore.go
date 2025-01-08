@@ -131,17 +131,7 @@ func initializeRestoreConfigs(params *ASRestoreParams) *backup.RestoreConfig {
 
 func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *backup.SecretAgentConfig,
 ) (backup.StreamingReader, error) {
-	reader, err := getReader(
-		ctx,
-		params.RestoreParams,
-		params.CommonParams,
-		params.AwsS3,
-		params.GcpStorage,
-		params.AzureBlob,
-		nil,
-		sa,
-		params.isXDR(),
-	)
+	reader, err := newReader(ctx, params, sa)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}

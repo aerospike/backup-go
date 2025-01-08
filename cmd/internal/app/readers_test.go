@@ -27,29 +27,47 @@ const testS3Bucket = "asbackup"
 
 func TestNewLocalReader(t *testing.T) {
 	t.Parallel()
-	r := &models.Restore{}
-	c := &models.Common{
-		Directory: t.TempDir(),
-	}
-	b := &models.Backup{}
 
-	reader, err := newLocalReader(r, c, b)
+	ctx := context.Background()
+
+	params := &ASRestoreParams{
+		RestoreParams: &models.Restore{},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
+	}
+
+	reader, err := newReader(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	r = &models.Restore{
-		InputFile: t.TempDir() + testFileName,
+	params = &ASRestoreParams{
+		RestoreParams: &models.Restore{
+			InputFile: t.TempDir() + testFileName,
+		},
+		CommonParams: &models.Common{},
+		AwsS3:        &models.AwsS3{},
+		GcpStorage:   &models.GcpStorage{},
+		AzureBlob:    &models.AzureBlob{},
 	}
-	c = &models.Common{}
 
-	reader, err = newLocalReader(r, c, b)
+	reader, err = newReader(ctx, params, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	r = &models.Restore{}
-	reader, err = newLocalReader(r, c, b)
+	params = &ASRestoreParams{
+		RestoreParams: &models.Restore{},
+		CommonParams:  &models.Common{},
+		AwsS3:         &models.AwsS3{},
+		GcpStorage:    &models.GcpStorage{},
+		AzureBlob:     &models.AzureBlob{},
+	}
+	reader, err = newReader(ctx, params, nil)
 	assert.Error(t, err)
 	assert.Nil(t, reader)
 }
@@ -59,35 +77,47 @@ func TestNewS3Reader(t *testing.T) {
 	err := createAwsCredentials()
 	assert.NoError(t, err)
 
-	r := &models.Restore{}
-	c := &models.Common{
-		Directory: t.TempDir(),
-	}
-	b := &models.Backup{}
-
-	s3cfg := &models.AwsS3{
-		BucketName: testS3Bucket,
-		Region:     testS3Region,
-		Profile:    testS3Profile,
-		Endpoint:   testS3Endpoint,
+	params := &ASRestoreParams{
+		RestoreParams: &models.Restore{},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
+		AwsS3: &models.AwsS3{
+			BucketName: testS3Bucket,
+			Region:     testS3Region,
+			Profile:    testS3Profile,
+			Endpoint:   testS3Endpoint,
+		},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 
 	ctx := context.Background()
 
-	writer, err := newS3Reader(ctx, s3cfg, r, c, b, false)
+	reader, err := newReader(ctx, params, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, writer)
-	assert.Equal(t, testS3Type, writer.GetType())
+	assert.NotNil(t, reader)
+	assert.Equal(t, testS3Type, reader.GetType())
 
-	r = &models.Restore{
-		InputFile: t.TempDir() + testFileName,
+	params = &ASRestoreParams{
+		RestoreParams: &models.Restore{
+			InputFile: t.TempDir() + testFileName,
+		},
+		CommonParams: &models.Common{},
+		AwsS3: &models.AwsS3{
+			BucketName: testS3Bucket,
+			Region:     testS3Region,
+			Profile:    testS3Profile,
+			Endpoint:   testS3Endpoint,
+		},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
-	c = &models.Common{}
 
-	writer, err = newS3Reader(ctx, s3cfg, r, c, b, false)
+	reader, err = newReader(ctx, params, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, writer)
-	assert.Equal(t, testS3Type, writer.GetType())
+	assert.NotNil(t, reader)
+	assert.Equal(t, testS3Type, reader.GetType())
 }
 
 func TestNewGcpReader(t *testing.T) {
@@ -95,33 +125,43 @@ func TestNewGcpReader(t *testing.T) {
 	err := createGcpBucket()
 	assert.NoError(t, err)
 
-	r := &models.Restore{}
-	c := &models.Common{
-		Directory: t.TempDir(),
-	}
-	b := &models.Backup{}
-
-	cfg := &models.GcpStorage{
-		BucketName: testBucket,
-		Endpoint:   testGcpEndpoint,
+	params := &ASRestoreParams{
+		RestoreParams: &models.Restore{},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
+		GcpStorage: &models.GcpStorage{
+			BucketName: testBucket,
+			Endpoint:   testGcpEndpoint,
+		},
+		AwsS3:     &models.AwsS3{},
+		AzureBlob: &models.AzureBlob{},
 	}
 
 	ctx := context.Background()
 
-	writer, err := newGcpReader(ctx, cfg, r, c, b, false)
+	reader, err := newReader(ctx, params, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, writer)
-	assert.Equal(t, testGcpType, writer.GetType())
+	assert.NotNil(t, reader)
+	assert.Equal(t, testGcpType, reader.GetType())
 
-	r = &models.Restore{
-		InputFile: t.TempDir() + testFileName,
+	params = &ASRestoreParams{
+		RestoreParams: &models.Restore{
+			InputFile: t.TempDir() + testFileName,
+		},
+		CommonParams: &models.Common{},
+		GcpStorage: &models.GcpStorage{
+			BucketName: testBucket,
+			Endpoint:   testGcpEndpoint,
+		},
+		AwsS3:     &models.AwsS3{},
+		AzureBlob: &models.AzureBlob{},
 	}
-	c = &models.Common{}
 
-	writer, err = newGcpReader(ctx, cfg, r, c, b, false)
+	reader, err = newReader(ctx, params, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, writer)
-	assert.Equal(t, testGcpType, writer.GetType())
+	assert.NotNil(t, reader)
+	assert.Equal(t, testGcpType, reader.GetType())
 }
 
 func TestNewAzureReader(t *testing.T) {
@@ -129,35 +169,47 @@ func TestNewAzureReader(t *testing.T) {
 	err := createAzureContainer()
 	assert.NoError(t, err)
 
-	r := &models.Restore{}
-	c := &models.Common{
-		Directory: t.TempDir(),
-	}
-	b := &models.Backup{}
-
-	cfg := &models.AzureBlob{
-		AccountName:   testAzureAccountName,
-		AccountKey:    testAzureAccountKey,
-		Endpoint:      testAzureEndpoint,
-		ContainerName: testBucket,
+	params := &ASRestoreParams{
+		RestoreParams: &models.Restore{},
+		CommonParams: &models.Common{
+			Directory: t.TempDir(),
+		},
+		AzureBlob: &models.AzureBlob{
+			AccountName:   testAzureAccountName,
+			AccountKey:    testAzureAccountKey,
+			Endpoint:      testAzureEndpoint,
+			ContainerName: testBucket,
+		},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
 	}
 
 	ctx := context.Background()
 
-	writer, err := newAzureReader(ctx, cfg, r, c, b, false)
+	reader, err := newReader(ctx, params, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, writer)
-	assert.Equal(t, testAzureType, writer.GetType())
+	assert.NotNil(t, reader)
+	assert.Equal(t, testAzureType, reader.GetType())
 
-	r = &models.Restore{
-		InputFile: t.TempDir() + testFileName,
+	params = &ASRestoreParams{
+		RestoreParams: &models.Restore{
+			InputFile: t.TempDir() + testFileName,
+		},
+		CommonParams: &models.Common{},
+		AzureBlob: &models.AzureBlob{
+			AccountName:   testAzureAccountName,
+			AccountKey:    testAzureAccountKey,
+			Endpoint:      testAzureEndpoint,
+			ContainerName: testBucket,
+		},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
 	}
-	c = &models.Common{}
 
-	writer, err = newAzureReader(ctx, cfg, r, c, b, false)
+	reader, err = newReader(ctx, params, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, writer)
-	assert.Equal(t, testAzureType, writer.GetType())
+	assert.NotNil(t, reader)
+	assert.Equal(t, testAzureType, reader.GetType())
 }
 
 func TestPrepareDirectoryList(t *testing.T) {

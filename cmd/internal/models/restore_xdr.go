@@ -16,8 +16,6 @@ package models
 
 type RestoreXDR struct {
 	InputFile         string
-	DirectoryList     string
-	ParentDirectory   string
 	Directory         string
 	Namespace         string
 	Parallel          int

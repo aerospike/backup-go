@@ -153,19 +153,13 @@ func initializeBackupReader(ctx context.Context, params *ASBackupParams, sa *bac
 		return nil, nil
 	}
 
-	restore := &models.Restore{InputFile: params.BackupParams.OutputFile}
+	restoreParams := &ASRestoreParams{
+		RestoreParams: &models.Restore{
+			InputFile: params.BackupParams.OutputFile,
+		},
+	}
 
-	reader, err := getReader(
-		ctx,
-		restore,
-		params.CommonParams,
-		params.AwsS3,
-		params.GcpStorage,
-		params.AzureBlob,
-		params.BackupParams,
-		sa,
-		false,
-	)
+	reader, err := newReader(ctx, restoreParams, sa)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}

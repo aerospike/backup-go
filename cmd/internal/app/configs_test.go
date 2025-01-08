@@ -781,3 +781,252 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestMapRestoreXDRConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		params *ASRestoreParams
+		verify func(*testing.T, *backup.RestoreConfig)
+	}{
+		{
+			name: "Default configuration",
+			params: &ASRestoreParams{
+				RestoreXDRParams: &models.RestoreXDR{
+					Namespace:        "source-ns,dest-ns",
+					RecordsPerSecond: 1000,
+					Parallel:         4,
+					TimeOut:          5000,
+				},
+				Compression: testCompression(),
+				Encryption:  testEncryption(),
+				SecretAgent: testSecretAgent(),
+			},
+			verify: func(t *testing.T, cfg *backup.RestoreConfig) {
+				t.Helper()
+				assert.Equal(t, "source-ns", *cfg.Namespace.Source)
+				assert.Equal(t, "dest-ns", *cfg.Namespace.Destination)
+				assert.Equal(t, 1000, cfg.RecordsPerSecond)
+				assert.Equal(t, 4, cfg.Parallel)
+				assert.Equal(t, backup.EncoderTypeASBX, cfg.EncoderType)
+
+				// Verify compression policy
+				assert.NotNil(t, cfg.CompressionPolicy)
+				assert.Equal(t, "ZSTD", cfg.CompressionPolicy.Mode)
+				assert.Equal(t, 3, cfg.CompressionPolicy.Level)
+
+				// Verify encryption policy
+				assert.NotNil(t, cfg.EncryptionPolicy)
+				assert.Equal(t, "AES256", cfg.EncryptionPolicy.Mode)
+				assert.Equal(t, "/path/to/keyfile", *cfg.EncryptionPolicy.KeyFile)
+
+				// Verify secret agent config
+				assert.NotNil(t, cfg.SecretAgentConfig)
+				assert.Equal(t, "localhost", *cfg.SecretAgentConfig.Address)
+				assert.Equal(t, "tcp", *cfg.SecretAgentConfig.ConnectionType)
+				assert.Equal(t, 8080, *cfg.SecretAgentConfig.Port)
+
+				// Verify info policy
+				assert.NotNil(t, cfg.InfoPolicy)
+				assert.Equal(t, time.Duration(5000)*time.Millisecond, cfg.InfoPolicy.Timeout)
+			},
+		},
+		{
+			name: "Full configuration with all parameters",
+			params: &ASRestoreParams{
+				RestoreXDRParams: &models.RestoreXDR{
+					Namespace:         "source-ns,dest-ns",
+					RecordsPerSecond:  1000,
+					Parallel:          4,
+					TimeOut:           5000,
+					IgnoreRecordError: true,
+					RetryBaseTimeout:  1000,
+					RetryMultiplier:   2.0,
+					RetryMaxRetries:   5,
+				},
+				RestoreParams: &models.Restore{
+					Replace:            true,
+					NoGeneration:       true,
+					DisableBatchWrites: true,
+					BatchSize:          1000,
+					MaxAsyncBatches:    10,
+				},
+				Compression: testCompression(),
+				Encryption:  testEncryption(),
+				SecretAgent: testSecretAgent(),
+			},
+			verify: func(t *testing.T, cfg *backup.RestoreConfig) {
+				t.Helper()
+				// Verify base configuration
+				assert.Equal(t, "source-ns", *cfg.Namespace.Source)
+				assert.Equal(t, "dest-ns", *cfg.Namespace.Destination)
+				assert.Equal(t, 1000, cfg.RecordsPerSecond)
+				assert.Equal(t, 4, cfg.Parallel)
+				assert.True(t, cfg.IgnoreRecordError)
+
+				// Verify retry policy
+				assert.NotNil(t, cfg.RetryPolicy)
+				assert.Equal(t, time.Duration(1000)*time.Millisecond, cfg.RetryPolicy.BaseTimeout)
+				assert.Equal(t, 2.0, cfg.RetryPolicy.Multiplier)
+				assert.Equal(t, uint(5), cfg.RetryPolicy.MaxRetries)
+			},
+		},
+		{
+			name: "Configuration without optional policies",
+			params: &ASRestoreParams{
+				RestoreXDRParams: &models.RestoreXDR{
+					Namespace: "test-ns",
+					TimeOut:   5000,
+				},
+			},
+			verify: func(t *testing.T, cfg *backup.RestoreConfig) {
+				t.Helper()
+				assert.Equal(t, "test-ns", *cfg.Namespace.Source)
+				assert.Equal(t, "test-ns", *cfg.Namespace.Destination)
+				assert.Nil(t, cfg.CompressionPolicy)
+				assert.Nil(t, cfg.EncryptionPolicy)
+				assert.Nil(t, cfg.SecretAgentConfig)
+				assert.NotNil(t, cfg.InfoPolicy)
+				assert.NotNil(t, cfg.WritePolicy)
+			},
+		},
+		{
+			name: "Configuration with only required fields",
+			params: &ASRestoreParams{
+				RestoreXDRParams: &models.RestoreXDR{
+					Namespace: "test-ns",
+				},
+			},
+			verify: func(t *testing.T, cfg *backup.RestoreConfig) {
+				t.Helper()
+				assert.Equal(t, "test-ns", *cfg.Namespace.Source)
+				assert.Equal(t, "test-ns", *cfg.Namespace.Destination)
+				assert.Equal(t, 0, cfg.RecordsPerSecond)
+				assert.Equal(t, 0, cfg.Parallel)
+				assert.Equal(t, backup.EncoderTypeASBX, cfg.EncoderType)
+			},
+		},
+		{
+			name: "Configuration with zero values",
+			params: &ASRestoreParams{
+				RestoreXDRParams: &models.RestoreXDR{
+					Namespace:        "test-ns",
+					RecordsPerSecond: 0,
+					Parallel:         0,
+					TimeOut:          0,
+					RetryBaseTimeout: 0,
+					RetryMultiplier:  0,
+					RetryMaxRetries:  0,
+				},
+			},
+			verify: func(t *testing.T, cfg *backup.RestoreConfig) {
+				t.Helper()
+				assert.Equal(t, 0, cfg.RecordsPerSecond)
+				assert.Equal(t, 0, cfg.Parallel)
+				assert.NotNil(t, cfg.InfoPolicy)
+				assert.Equal(t, time.Duration(0), cfg.InfoPolicy.Timeout)
+
+				assert.NotNil(t, cfg.RetryPolicy)
+				assert.Equal(t, time.Duration(0), cfg.RetryPolicy.BaseTimeout)
+				assert.Equal(t, float64(0), cfg.RetryPolicy.Multiplier)
+				assert.Equal(t, uint(0), cfg.RetryPolicy.MaxRetries)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			config := mapRestoreXDRConfig(tt.params)
+			assert.NotNil(t, config)
+			tt.verify(t, config)
+		})
+	}
+}
+
+func TestMapScanPolicy_Errors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		backupModel *models.Backup
+		commonModel *models.Common
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "invalid filter expression",
+			backupModel: &models.Backup{
+				FilterExpression: "invalid-base64",
+			},
+			commonModel: &models.Common{},
+			wantErr:     true,
+			errContains: "failed to parse filter expression",
+		},
+		{
+			name:        "empty models",
+			backupModel: &models.Backup{},
+			commonModel: &models.Common{},
+			wantErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := mapScanPolicy(tt.backupModel, tt.commonModel)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				assert.Nil(t, got)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, got)
+			}
+		})
+	}
+}
+
+func TestMapWritePolicy_ConfigurationCombinations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		restoreModel  *models.Restore
+		commonModel   *models.Common
+		wantAction    aerospike.RecordExistsAction
+		wantGenPolicy aerospike.GenerationPolicy
+	}{
+		{
+			name: "replace with generation",
+			restoreModel: &models.Restore{
+				Replace:      true,
+				NoGeneration: false,
+			},
+			commonModel:   &models.Common{},
+			wantAction:    aerospike.REPLACE,
+			wantGenPolicy: aerospike.EXPECT_GEN_GT,
+		},
+		{
+			name:          "default update with generation",
+			restoreModel:  &models.Restore{},
+			commonModel:   &models.Common{},
+			wantAction:    aerospike.UPDATE,
+			wantGenPolicy: aerospike.EXPECT_GEN_GT,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := mapWritePolicy(tt.restoreModel, tt.commonModel)
+			assert.Equal(t, tt.wantAction, got.RecordExistsAction)
+			assert.Equal(t, tt.wantGenPolicy, got.GenerationPolicy)
+			assert.True(t, got.SendKey)
+		})
+	}
+}

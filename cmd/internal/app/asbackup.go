@@ -156,7 +156,7 @@ func initializeBackupReader(ctx context.Context, params *ASBackupParams, sa *bac
 	// Fill params to load a state file.
 	restoreParams := &ASRestoreParams{
 		RestoreParams: &models.Restore{
-			InputFile: params.BackupParams.OutputFile,
+			InputFile: params.BackupParams.StateFileDst,
 		},
 		CommonParams: &models.Common{},
 	}

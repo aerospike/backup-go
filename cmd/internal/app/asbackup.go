@@ -110,6 +110,8 @@ func NewASBackup(
 
 	// Stop xdr.
 	if params.isStop() {
+		logger.Info("stopping XDR on the database")
+
 		if err := stopXDR(aerospikeClient, backupXDRConfig); err != nil {
 			return nil, err
 		}

@@ -45,7 +45,7 @@ func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool)
 func (p filterByType[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type for record counter")
+		return nil, fmt.Errorf("unsupported token type %T for record counter", token)
 	}
 
 	if p.noRecords && t.Type == models.TokenTypeRecord {

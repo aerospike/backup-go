@@ -226,7 +226,7 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
-// BackupXDR starts a xdr backup operation that writes data to a provided writer.
+// BackupXDR starts an xdr backup operation that writes data to a provided writer.
 //   - ctx can be used to cancel the backup operation.
 //   - config is the configuration for the xdr backup operation.
 //   - writer creates new writers for the backup operation.
@@ -281,7 +281,7 @@ func (c *Client) Restore(
 	return handler, nil
 }
 
-// RestoreXDR starts a xdr restore operation that reads data from given readers.
+// RestoreXDR starts an xdr restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
 //   - ctx can be used to cancel the restore operation.
 //   - config is the configuration for the restore operation.

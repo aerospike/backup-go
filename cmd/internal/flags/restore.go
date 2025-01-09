@@ -34,35 +34,35 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		"",
 		"Restore from a single backup file. Use - for stdin.\n"+
 			"Required, unless --directory or --directory-list is used.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.StringVar(&f.DirectoryList, "directory-list",
 		"",
 		"A comma separated list of paths to directories that hold the backup files. Required,\n"+
 			"unless -i or -d is used. The paths may not contain commas\n"+
 			"Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.StringVar(&f.ParentDirectory, "parent-directory",
 		"",
 		"A common root path for all paths used in --directory-list.\n"+
 			"This path is prepended to all entries in --directory-list.\n"+
 			"Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.BoolVarP(&f.Uniq, "unique", "u",
 		false,
 		"Skip records that already exist in the namespace;\n"+
 			"Don't touch them.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.BoolVarP(&f.Replace, "replace", "r",
 		false,
 		"Fully replace records that already exist in the namespace.\n"+
 			"This option still does a generation check by default and would need to be combined with the -g option \n"+
 			"if no generation check is desired. \n"+
 			"Note: this option is mutually exclusive to --unique.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.BoolVarP(&f.NoGeneration, "no-generation", "g",
 		false,
 		"Don't check the generation of records that already exist in the namespace.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.BoolVar(&f.IgnoreRecordError, "ignore-record-error",
 		false,
 		"Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.\n"+
@@ -74,7 +74,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"By default, the cluster is checked for batch write support, so only set this flag if you explicitly\n"+
 			"don't want\nbatch writes to be used or asrestore is failing to recognize that batch writes are disabled\n"+
 			"and is failing to work because of it.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.IntVar(&f.MaxAsyncBatches, "max-async-batches",
 		32,
 		"The max number of outstanding async record batch write calls at a time.\n"+
@@ -82,17 +82,17 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"records, and each record is uploaded individually. The true max\n"+
 			"number of async aerospike calls would then be\n"+
 			"<max-async-batches> * <batch-size>.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.IntVar(&f.BatchSize, "batch-size", 128,
 		"The max allowed number of records to simultaneously upload\n"+
 			"in an async batch write calls to make to aerospike at a time.\n"+
 			"Default is 128 with batch writes enabled, or 16 without batch writes.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.Int64Var(&f.ExtraTTL, "extra-ttl",
 		0,
 		"For records with expirable void-times, add N seconds of extra-ttl to the\n"+
 			"recorded void-time.\n"+
-			"Don't work with --mode=asb")
+			"Incompatible with --mode=asb")
 	flagSet.Int64VarP(&f.TimeOut, "timeout", "T",
 		10000,
 		"Set the timeout (ms) for info commands.")

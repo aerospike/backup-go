@@ -184,6 +184,6 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 
 		return reader, xdrReader, nil
 	default:
-		return nil, nil, fmt.Errorf("invalid mode: %s", params.RestoreParams.Mode)
+		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
 	}
 }

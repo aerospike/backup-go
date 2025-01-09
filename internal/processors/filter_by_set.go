@@ -41,7 +41,7 @@ func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.
 func (p filterBySet[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type for filter by set")
+		return nil, fmt.Errorf("unsupported token type %T for filter by set", token)
 	}
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {

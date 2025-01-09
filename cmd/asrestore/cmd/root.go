@@ -219,12 +219,12 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 		AzureBlob:     c.flagsAzure.GetAzureBlob(),
 	}
 
-	asb, err := app.NewASRestore(cmd.Context(), asrParams, logger)
+	asr, err := app.NewASRestore(cmd.Context(), asrParams, logger)
 	if err != nil {
 		return err
 	}
 
-	return asb.Run(cmd.Context())
+	return asr.Run(cmd.Context())
 }
 
 func (c *Cmd) printVersion() {

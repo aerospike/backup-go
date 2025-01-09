@@ -73,25 +73,25 @@ Restore Flags:
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -i, --input-file string         Restore from a single backup file. Use - for stdin.
                                   Required, unless --directory or --directory-list is used.
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
       --directory-list string     A comma separated list of paths to directories that hold the backup files. Required,
                                   unless -i or -d is used. The paths may not contain commas
                                   Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
       --parent-directory string   A common root path for all paths used in --directory-list.
                                   This path is prepended to all entries in --directory-list.
                                   Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
   -u, --unique                    Skip records that already exist in the namespace;
                                   Don't touch them.
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
   -r, --replace                   Fully replace records that already exist in the namespace.
                                   This option still does a generation check by default and would need to be combined with the -g option 
                                   if no generation check is desired. 
                                   Note: this option is mutually exclusive to --unique.
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
   -g, --no-generation             Don't check the generation of records that already exist in the namespace.
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
       --ignore-record-error       Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
                                   By default such errors are not ignored and asrestore terminates.
                                   Optional: Use verbose mode to see errors in detail.
@@ -100,20 +100,20 @@ Restore Flags:
                                   don't want
                                   batch writes to be used or asrestore is failing to recognize that batch writes are disabled
                                   and is failing to work because of it.
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
       --max-async-batches int     The max number of outstanding async record batch write calls at a time.
                                   For pre-6.0 servers, 'batches' are only a logical grouping of
                                   records, and each record is uploaded individually. The true max
                                   number of async aerospike calls would then be
                                   <max-async-batches> * <batch-size>.
-                                  Don't work with --mode=asb (default 32)
+                                  Incompatible with --mode=asb (default 32)
       --batch-size int            The max allowed number of records to simultaneously upload
                                   in an async batch write calls to make to aerospike at a time.
                                   Default is 128 with batch writes enabled, or 16 without batch writes.
-                                  Don't work with --mode=asb (default 128)
+                                  Incompatible with --mode=asb (default 128)
       --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
                                   recorded void-time.
-                                  Don't work with --mode=asb
+                                  Incompatible with --mode=asb
   -T, --timeout int               Set the timeout (ms) for info commands. (default 10000)
       --retry-base-timeout int    Set the initial delay between retry attempts in milliseconds (default 1000)
       --retry-multiplier float    retry-multiplier is used to increase the delay between subsequent retry attempts.

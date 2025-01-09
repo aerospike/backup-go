@@ -51,7 +51,7 @@ func NewVoidTimeSetter[T models.TokenConstraint](logger *slog.Logger) pipeline.D
 func (p *voidTimeSetter[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type for void time")
+		return nil, fmt.Errorf("unsupported token type %T for void time", token)
 	}
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {

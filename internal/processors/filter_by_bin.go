@@ -40,7 +40,7 @@ func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.
 func (p filterByBin[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type for filter by bin")
+		return nil, fmt.Errorf("unsupported token type %T for filter by bin", token)
 	}
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {

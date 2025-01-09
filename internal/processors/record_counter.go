@@ -35,7 +35,7 @@ func NewRecordCounter[T models.TokenConstraint](counter *atomic.Uint64) pipeline
 func (c recordCounter[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type for record counter")
+		return nil, fmt.Errorf("unsupported token type %T for record counter", token)
 	}
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {

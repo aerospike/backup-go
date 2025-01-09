@@ -227,7 +227,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to xdr backup: %w", err)
 		}
 
-		printBackupReport(h.GetStats())
+		printBackupReport(reportHeaderBackupXDR, h.GetStats())
 	default:
 		// Running ordinary backup.
 		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
@@ -239,7 +239,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 
-		printBackupReport(h.GetStats())
+		printBackupReport(reportHeaderBackup, h.GetStats())
 	}
 
 	return nil

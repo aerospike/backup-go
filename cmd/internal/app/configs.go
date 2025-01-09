@@ -173,7 +173,6 @@ func mapRestoreConfig(params *ASRestoreParams) *backup.RestoreConfig {
 		params.RestoreParams.RetryBaseTimeout,
 		params.RestoreParams.RetryMultiplier, params.RestoreParams.RetryMaxRetries,
 	)
-	c.EncoderType = backup.EncoderTypeASB
 
 	return c
 }

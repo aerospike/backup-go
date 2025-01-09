@@ -92,6 +92,8 @@ func (r *ASRestore) Run(ctx context.Context) error {
 
 	switch r.mode {
 	case models.RestoreModeASB:
+		r.restoreConfig.EncoderType = backup.EncoderTypeASB
+
 		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 		if err != nil {
 			return fmt.Errorf("failed to start restore: %w", err)
@@ -101,23 +103,29 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to restore: %w", err)
 		}
 
-		printRestoreReport(h.GetStats())
+		printRestoreReport(reportHeaderRestore, h.GetStats())
 	case models.RestoreModeASBX:
-		h, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
+		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
+
+		hXdr, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
 		if err != nil {
 			return fmt.Errorf("failed to start xdr restore: %w", err)
 		}
 
-		if err = h.Wait(ctx); err != nil {
+		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr restore: %w", err)
 		}
 
-		printRestoreReport(h.GetStats())
+		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
 	case models.RestoreModeAuto:
+		r.restoreConfig.EncoderType = backup.EncoderTypeASB
+
 		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 		if err != nil {
 			return fmt.Errorf("failed to start restore: %w", err)
 		}
+
+		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
 
 		hXdr, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
 		if err != nil {
@@ -132,8 +140,9 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to xdr restore: %w", err)
 		}
 
-		printRestoreReport(h.GetStats())
-		printRestoreReport(hXdr.GetStats())
+		printRestoreReport(reportHeaderRestore, h.GetStats())
+		fmt.Println() // For pretty print.
+		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
 	default:
 		return fmt.Errorf("invalid mode: %s", r.mode)
 	}

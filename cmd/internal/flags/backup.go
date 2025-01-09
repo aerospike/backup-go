@@ -60,7 +60,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"partitions. Used to resume backup with last record received from previous\n"+
 			"incomplete backup.\n"+
 			"This argument is mutually exclusive to partition-list.\n"+
-			"Format: base64 encoded string\n"+
+			"Format: Base64 encoded string\n"+
 			"Example: EjRWeJq83vEjRRI0VniavN7xI0U=\n")
 	flagSet.StringVarP(&f.ModifiedAfter, "modified-after", "a",
 		"",
@@ -78,20 +78,22 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVarP(&f.FilterExpression, "filter-exp", "f",
 		"",
 		"Base64 encoded expression. Use the encoded filter expression in each scan call,\n"+
-			"which can be used to do a partial backup. The expression to be used can be base64 \n"+
+			"which can be used to do a partial backup. The expression to be used can be Base64 \n"+
 			"encoded through any client. This argument is mutually exclusive with multi-set backup.\n")
 	flagSet.BoolVar(&f.ParallelNodes, "parallel-nodes",
 		false,
-		"Specifies how to perform scan. If set to true, we launch parallel workers for nodes;\n"+
-			"otherwise workers run in parallel for partitions. \n"+
-			"This option is mutually exclusive to --continue and --estimate.")
+		"Specifies how to perform the query of the database run for each backup.\n"+
+			"By default, asbackup runs parallel workers for partitions.\n"+
+			"If this flag is set to true, asbackup launches parallel workers for nodes.\n"+
+			"The number of parallel workers is set by the --parallel flag.\n"+
+			"This option is mutually exclusive with --continue and --estimate.")
 	flagSet.StringVarP(&f.NodeList, "node-list", "l",
 		"",
 		"<IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]\n"+
 			"<IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]\n"+
-			"Backup the given cluster nodes only.\n"+
+			"Back up the given cluster nodes only.\n"+
 			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
-			"This argument is mutually exclusive to partition-list/after-digest arguments.\n"+
+			"This argument is mutually exclusive with --partition-list and --after-digest arguments.\n"+
 			"Default: backup all nodes in the cluster")
 	flagSet.StringVarP(&f.PartitionList, "partition-list", "X",
 		"",
@@ -101,29 +103,31 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"Filter: <begin partition>[-<partition count>]|<digest>\n"+
 			"begin partition: 0-4095\n"+
 			"partition count: 1-4096 Default: 1\n"+
-			"digest: base64 encoded string\n"+
+			"digest: Base64 encoded string\n"+
 			"Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=\n"+
 			"Default: 0-4096 (all partitions)\n")
 	flagSet.StringVar(&f.PreferRacks, "prefer-racks",
 		"",
 		"<rack id 1>[,<rack id 2>[,...]]\n"+
-			"A list of Aerospike Server rack IDs to prefer when reading records for a backup.")
+			"A list of Aerospike Database rack IDs to prefer when reading records for a backup.")
 	flagSet.Int64VarP(&f.MaxRecords, "max-records", "M",
 		0,
 		"The number of records approximately to back up. 0 - all records")
 	flagSet.IntVar(&f.SleepBetweenRetries, "sleep-between-retries",
 		5,
-		"The amount of milliseconds to sleep between retries.")
+		"The amount of milliseconds to sleep between retries after an error.\n"+
+			"This field is ignored when --max-retries is zero.")
 	flagSet.BoolVarP(&f.Compact, "compact", "C",
 		false,
-		"Do not apply base-64 encoding to BLOBs; results in smaller backup files.")
+		"If true, do not apply base-64 encoding to BLOBs and instead write raw binary data,\n"+
+			"resulting in smaller backup files.\n"+
+			"Deprecated.")
 	flagSet.BoolVarP(&f.Estimate, "estimate", "e",
 		false,
 		"Estimate the backed-up record size from a random sample of \n"+
-			"10,000 (default) records at 99.9999%% confidence.\n"+
-			"It ignores any filter:  filter-exp, node-list, modified-after, modified-before, no-ttl-only,\n"+
-			"after-digest, partition-list.\n"+
-			"It calculates estimate size of full backup.")
+			"10,000 (default) records at 99.9999% confidence to estimate the full backup size.\n"+
+			"It ignores any filter:  --filter-exp, --node-list, --modified-after, --modified-before, --no-ttl-only,\n"+
+			"--after-digest, --partition-list.")
 	flagSet.Int64Var(&f.EstimateSamples, "estimate-samples",
 		10000,
 		"The number of samples to take when running a backup estimate.")
@@ -134,14 +138,14 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.StateFileDst, "state-file-dst",
 		"",
 		"Name of a state file that will be saved in backup --directory.\n"+
-			"Works only with --file-limit parameter. As we reach --file-limit and close file,\n"+
-			"current state will be saved. Works only for default and/or partition backup. \n"+
+			"Works only with --file-limit parameter. As --file-limit is reached and the file is closed,\n"+
+			"the current state will be saved. Works only for default and/or partition backup.\n"+
 			"Not work with --parallel-nodes or --node--list.")
 	flagSet.Int64Var(&f.ScanPageSize, "scan-page-size",
 		10000,
-		"How many records will be read on one iteration for continuation backup.\n"+
+		"Number of records will be read on one iteration for continuation backup.\n"+
 			"Affects size if overlap on resuming backup after an error.\n"+
-			"Is used only with --state-file-dst or --continue.")
+			"Used only with --state-file-dst or --continue.")
 
 	return flagSet
 }

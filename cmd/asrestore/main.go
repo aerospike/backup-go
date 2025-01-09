@@ -63,7 +63,7 @@ func init() {
 	rootCmd.SilenceUsage = true
 
 	appFlagSet := flagsApp.NewFlagSet()
-	aerospikeFlagSet := flagsAerospike.NewFlagSet(func(str string) string { return str })
+	aerospikeFlagSet := flagsAerospike.NewFlagSet(asFlags.DefaultWrapHelpString)
 	clientPolicyFlagSet := flagsClientPolicy.NewFlagSet()
 	commonFlagSet := flagsCommon.NewFlagSet()
 	restoreFlagSet := flagsRestore.NewFlagSet()

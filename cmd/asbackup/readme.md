@@ -23,16 +23,26 @@ Aerospike Client Flags:
   -h, --host host[:tls-name][:port][,...]                                                           The Aerospike host. (default 127.0.0.1)
   -p, --port int                                                                                    The default Aerospike port. (default 3000)
   -U, --user string                                                                                 The Aerospike user to use to connect to the Aerospike cluster.
-  -P, --password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"                   The Aerospike password to use to connect to the Aerospike cluster.
-      --auth INTERNAL,EXTERNAL,PKI                                                                  The authentication mode used by the Aerospike server. INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP) which are configured on the server. EXTERNAL requires TLS. PKI allows TLS authentication and authorization based on a certificate. No user name needs to be configured. (default INTERNAL)
-      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other tls options are ignored.
-      --tls-name string                                                                             The server TLS context to use to authenticate the connection to Aerospike.
+  -P, --password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"                   The Aerospike password to use to connect to the Aerospike 
+                                                                                                    cluster.
+      --auth INTERNAL,EXTERNAL,PKI                                                                  The authentication mode used by the Aerospike server. INTERNAL 
+                                                                                                    uses standard user/pass. EXTERNAL uses external methods (like LDAP) 
+                                                                                                    which are configured on the server. EXTERNAL requires TLS. PKI allows 
+                                                                                                    TLS authentication and authorization based on a certificate. No user 
+                                                                                                    name needs to be configured. (default INTERNAL)
+      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other tls 
+                                                                                                    options are ignored.
+      --tls-name string                                                                             The server TLS context to use to authenticate the connection to 
+                                                                                                    Aerospike.
       --tls-cafile env-b64:<cert>,b64:<cert>,<cert-file-name>                                       The CA used when connecting to Aerospike.
       --tls-capath <cert-path-name>                                                                 A path containing CAs for connecting to Aerospike.
-      --tls-certfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                     The certificate file for mutual TLS authentication with Aerospike.
+      --tls-certfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                     The certificate file for mutual TLS authentication with 
+                                                                                                    Aerospike.
       --tls-keyfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                      The key file used for mutual TLS authentication with Aerospike.
       --tls-keyfile-password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"       The password used to decrypt the key-file if encrypted.
-      --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
+      --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same 
+                                                                                                    as Apache's SSLProtocol documented at 
+                                                                                                    https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
       --client-timeout int         Initial host connection timeout duration. The timeout when opening a connection
                                    to the server host for the first time. (default 30000)
       --client-idle-timeout int    Idle timeout. Every time a connection is used, its idle
@@ -54,7 +64,8 @@ Backup Flags:
   -s, --set string               The set(s) to be backed up. Accepts comma-separated values with no spaces: 'set1,set2,set3'
                                  If multiple sets are being backed up, filter-exp cannot be used.
                                  If empty, include all sets.
-  -B, --bin-list string          Only include the given bins in the backup. Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
+  -B, --bin-list string          Only include the given bins in the backup.
+                                 Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
                                  If empty include all bins.
   -R, --no-records               Don't back up any records.
   -I, --no-indexes               Don't back up any indexes.

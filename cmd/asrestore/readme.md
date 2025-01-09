@@ -23,16 +23,26 @@ Aerospike Client Flags:
   -h, --host host[:tls-name][:port][,...]                                                           The Aerospike host. (default 127.0.0.1)
   -p, --port int                                                                                    The default Aerospike port. (default 3000)
   -U, --user string                                                                                 The Aerospike user to use to connect to the Aerospike cluster.
-  -P, --password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"                   The Aerospike password to use to connect to the Aerospike cluster.
-      --auth INTERNAL,EXTERNAL,PKI                                                                  The authentication mode used by the Aerospike server. INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP) which are configured on the server. EXTERNAL requires TLS. PKI allows TLS authentication and authorization based on a certificate. No user name needs to be configured. (default INTERNAL)
-      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other tls options are ignored.
-      --tls-name string                                                                             The server TLS context to use to authenticate the connection to Aerospike.
+  -P, --password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"                   The Aerospike password to use to connect to the Aerospike 
+                                                                                                    cluster.
+      --auth INTERNAL,EXTERNAL,PKI                                                                  The authentication mode used by the Aerospike server. INTERNAL 
+                                                                                                    uses standard user/pass. EXTERNAL uses external methods (like LDAP) 
+                                                                                                    which are configured on the server. EXTERNAL requires TLS. PKI allows 
+                                                                                                    TLS authentication and authorization based on a certificate. No user 
+                                                                                                    name needs to be configured. (default INTERNAL)
+      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other tls 
+                                                                                                    options are ignored.
+      --tls-name string                                                                             The server TLS context to use to authenticate the connection to 
+                                                                                                    Aerospike.
       --tls-cafile env-b64:<cert>,b64:<cert>,<cert-file-name>                                       The CA used when connecting to Aerospike.
       --tls-capath <cert-path-name>                                                                 A path containing CAs for connecting to Aerospike.
-      --tls-certfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                     The certificate file for mutual TLS authentication with Aerospike.
+      --tls-certfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                     The certificate file for mutual TLS authentication with 
+                                                                                                    Aerospike.
       --tls-keyfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                      The key file used for mutual TLS authentication with Aerospike.
       --tls-keyfile-password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"       The password used to decrypt the key-file if encrypted.
-      --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
+      --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same 
+                                                                                                    as Apache's SSLProtocol documented at 
+                                                                                                    https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
       --client-timeout int         Initial host connection timeout duration. The timeout when opening a connection
                                    to the server host for the first time. (default 30000)
       --client-idle-timeout int    Idle timeout. Every time a connection is used, its idle
@@ -68,65 +78,67 @@ Restore Flags:
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
                                  If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
-  -i, --input-file string                                                                                               Restore from a single backup file. Use - for stdin.
-                                                                                                                        Required, unless --directory or --directory-list is used.
-                                                                                                                        
-      --directory-list asrestore --directory-list /path/to/dir1/,/path/to/dir2                                          A comma-separated list of paths to directories that hold the backup files. Required,
-                                                                                                                        unless -i or -d is used. The paths may not contain commas.
-                                                                                                                        Example: asrestore --directory-list /path/to/dir1/,/path/to/dir2
-      --parent-directory asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2   A common root path for all paths used in --directory-list.
-                                                                                                                        This path is prepended to all entries in --directory-list.
-                                                                                                                        Example: asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2
-  -u, --unique                                                                                                          Skip modifying records that already exist in the namespace.
-                                                                                                                        
-  -r, --replace                                                                                                         Fully replace records that already exist in the namespace.
-                                                                                                                        This option still performs a generation check by default and needs to be combined with the -g option
-                                                                                                                        if you do not want to perform a generation check.
-                                                                                                                        This option is mutually exclusive with --unique.
-  -g, --no-generation                                                                                                   Don't check the generation of records that already exist in the namespace.
-      --ignore-record-error                                                                                             Ignore errors specific to records, not UDFs or indexes. The errors are:
-                                                                                                                        AEROSPIKE_RECORD_TOO_BIG,
-                                                                                                                        AEROSPIKE_KEY_MISMATCH,
-                                                                                                                        AEROSPIKE_BIN_NAME_TOO_LONG,
-                                                                                                                        AEROSPIKE_ALWAYS_FORBIDDEN,
-                                                                                                                        AEROSPIKE_FAIL_FORBIDDEN,
-                                                                                                                        AEROSPIKE_BIN_TYPE_ERROR,
-                                                                                                                        AEROSPIKE_BIN_NOT_FOUND.
-                                                                                                                        By default, these errors are not ignored and asrestore terminates.
-      --disable-batch-writes                                                                                            Disables the use of batch writes when restoring records to the Aerospike cluster.
-                                                                                                                        By default, the cluster is checked for batch write support. Only set this flag if you explicitly
-                                                                                                                        don't want batch writes to be used or if asrestore is failing to work because it cannot recognize
-                                                                                                                        that batch writes are disabled.
-      --max-async-batches int                                                                                           To send data to Aerospike Database, asrestore creates write workers that work in parallel.
-                                                                                                                        This value is the number of workers that form batches and send them to the database.
-                                                                                                                        For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,
-                                                                                                                        and each record is uploaded individually.
-                                                                                                                        The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>. (default 32)
-      --batch-size int                                                                                                  The max allowed number of records to simultaneously upload to Aerospike.
-                                                                                                                        Default is 128 with batch writes enabled. If you disable batch writes,
-                                                                                                                        this flag is superseded because each worker sends writes one by one.
-                                                                                                                        All three batch flags are linked. If --disable-batch-writes=false,
-                                                                                                                        asrestore uses batch write workers to send data to the database.
-                                                                                                                        Asrestore creates a number of workers equal to --max-async-batches that work in parallel,
-                                                                                                                        and form and send a number of records equal to --batch-size to the database. (default 128)
-      --extra-ttl int                                                                                                   For records with expirable void-times, add N seconds of extra-ttl to the
-                                                                                                                        recorded void-time.
-  -T, --timeout int                                                                                                     Set the timeout (ms) for asinfo commands sent from asrestore to the database.
-                                                                                                                        The info commands are to check version, get indexes, get udfs, count records, and check batch write support. (default 10000)
-      --retry-base-timeout int                                                                                          Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database
-                                                                                                                        during a restore. This retry sequence is triggered by the following non-critical errors:
-                                                                                                                        AEROSPIKE_NO_AVAILABLE_CONNECTIONS_TO_NODE,
-                                                                                                                        AEROSPIKE_TIMEOUT,
-                                                                                                                        AEROSPIKE_DEVICE_OVERLOAD,
-                                                                                                                        AEROSPIKE_NETWORK_ERROR,
-                                                                                                                        AEROSPIKE_SERVER_NOT_AVAILABLE,
-                                                                                                                        AEROSPIKE_BATCH_FAILED,
-                                                                                                                        AEROSPIKE_MAX_ERROR_RATE.
-                                                                                                                        This base timeout value is also used as the interval multiplied by --retry-multiplier to increase
-                                                                                                                        the timeout value between retry attempts. (default 1000)
-      --retry-multiplier float                                                                                          Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
-      --retry-max-retries uint                                                                                          Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.
-                                                                                                                        The default is 0, indicating no retries will be performed
+  -i, --input-file string         Restore from a single backup file. Use - for stdin.
+                                  Required, unless --directory or --directory-list is used.
+                                  
+      --directory-list string     A comma-separated list of paths to directories that hold the backup files. Required,
+                                  unless -i or -d is used. The paths may not contain commas.
+                                  Example: 'asrestore --directory-list /path/to/dir1/,/path/to/dir2'
+      --parent-directory string   A common root path for all paths used in --directory-list.
+                                  This path is prepended to all entries in --directory-list.
+                                  Example: 'asrestore --parent-directory /common/root/path
+                                  --directory-list /path/to/dir1/,/path/to/dir2'
+  -u, --unique                    Skip modifying records that already exist in the namespace.
+                                  
+  -r, --replace                   Fully replace records that already exist in the namespace.
+                                  This option still performs a generation check by default and needs to be combined with the -g option
+                                  if you do not want to perform a generation check.
+                                  This option is mutually exclusive with --unique.
+  -g, --no-generation             Don't check the generation of records that already exist in the namespace.
+      --ignore-record-error       Ignore errors specific to records, not UDFs or indexes. The errors are:
+                                  AEROSPIKE_RECORD_TOO_BIG,
+                                  AEROSPIKE_KEY_MISMATCH,
+                                  AEROSPIKE_BIN_NAME_TOO_LONG,
+                                  AEROSPIKE_ALWAYS_FORBIDDEN,
+                                  AEROSPIKE_FAIL_FORBIDDEN,
+                                  AEROSPIKE_BIN_TYPE_ERROR,
+                                  AEROSPIKE_BIN_NOT_FOUND.
+                                  By default, these errors are not ignored and asrestore terminates.
+      --disable-batch-writes      Disables the use of batch writes when restoring records to the Aerospike cluster.
+                                  By default, the cluster is checked for batch write support. Only set this flag if you explicitly
+                                  don't want batch writes to be used or if asrestore is failing to work because it cannot recognize
+                                  that batch writes are disabled.
+      --max-async-batches int     To send data to Aerospike Database, asrestore creates write workers that work in parallel.
+                                  This value is the number of workers that form batches and send them to the database.
+                                  For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,
+                                  and each record is uploaded individually.
+                                  The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>. (default 32)
+      --batch-size int            The max allowed number of records to simultaneously upload to Aerospike.
+                                  Default is 128 with batch writes enabled. If you disable batch writes,
+                                  this flag is superseded because each worker sends writes one by one.
+                                  All three batch flags are linked. If --disable-batch-writes=false,
+                                  asrestore uses batch write workers to send data to the database.
+                                  Asrestore creates a number of workers equal to --max-async-batches that work in parallel,
+                                  and form and send a number of records equal to --batch-size to the database. (default 128)
+      --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
+                                  recorded void-time.
+  -T, --timeout int               Set the timeout (ms) for asinfo commands sent from asrestore to the database.
+                                  The info commands are to check version, get indexes, get udfs, count records, and check batch write support. (default 10000)
+      --retry-base-timeout int    Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database
+                                  during a restore. This retry sequence is triggered by the following non-critical errors:
+                                  AEROSPIKE_NO_AVAILABLE_CONNECTIONS_TO_NODE,
+                                  AEROSPIKE_TIMEOUT,
+                                  AEROSPIKE_DEVICE_OVERLOAD,
+                                  AEROSPIKE_NETWORK_ERROR,
+                                  AEROSPIKE_SERVER_NOT_AVAILABLE,
+                                  AEROSPIKE_BATCH_FAILED,
+                                  AEROSPIKE_MAX_ERROR_RATE.
+                                  This base timeout value is also used as the interval multiplied by --retry-multiplier to increase
+                                  the timeout value between retry attempts. (default 1000)
+      --retry-multiplier float    Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.
+                                  The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
+      --retry-max-retries uint    Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.
+                                  The default is 0, indicating no retries will be performed
 
 Compression Flags:
   -z, --compress string         Enables decompressing of backup files using the specified compression algorithm.

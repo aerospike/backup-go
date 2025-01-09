@@ -38,12 +38,13 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		"",
 		"A comma-separated list of paths to directories that hold the backup files. Required,\n"+
 			"unless -i or -d is used. The paths may not contain commas.\n"+
-			"Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2`")
+			"Example: 'asrestore --directory-list /path/to/dir1/,/path/to/dir2'")
 	flagSet.StringVar(&f.ParentDirectory, "parent-directory",
 		"",
 		"A common root path for all paths used in --directory-list.\n"+
 			"This path is prepended to all entries in --directory-list.\n"+
-			"Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2`")
+			"Example: 'asrestore --parent-directory /common/root/path\n"+
+			"--directory-list /path/to/dir1/,/path/to/dir2'")
 	flagSet.BoolVarP(&f.Uniq, "unique", "u",
 		false,
 		"Skip modifying records that already exist in the namespace.\n")
@@ -112,7 +113,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"the timeout value between retry attempts.")
 	flagSet.Float64Var(&f.RetryMultiplier, "retry-multiplier",
 		1,
-		"Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout."+
+		"Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.\n"+
 			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.RetryMaxRetries, "retry-max-retries",
 		0,

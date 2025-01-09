@@ -519,6 +519,56 @@ func (_c *MockAerospikeClient_Put_Call) RunAndReturn(run func(*aerospike.WritePo
 	return _c
 }
 
+// PutPayload provides a mock function with given fields: policy, key, payload
+func (_m *MockAerospikeClient) PutPayload(policy *aerospike.WritePolicy, key *aerospike.Key, payload []byte) aerospike.Error {
+	ret := _m.Called(policy, key, payload)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PutPayload")
+	}
+
+	var r0 aerospike.Error
+	if rf, ok := ret.Get(0).(func(*aerospike.WritePolicy, *aerospike.Key, []byte) aerospike.Error); ok {
+		r0 = rf(policy, key, payload)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(aerospike.Error)
+		}
+	}
+
+	return r0
+}
+
+// MockAerospikeClient_PutPayload_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PutPayload'
+type MockAerospikeClient_PutPayload_Call struct {
+	*mock.Call
+}
+
+// PutPayload is a helper method to define mock.On call
+//   - policy *aerospike.WritePolicy
+//   - key *aerospike.Key
+//   - payload []byte
+func (_e *MockAerospikeClient_Expecter) PutPayload(policy interface{}, key interface{}, payload interface{}) *MockAerospikeClient_PutPayload_Call {
+	return &MockAerospikeClient_PutPayload_Call{Call: _e.mock.On("PutPayload", policy, key, payload)}
+}
+
+func (_c *MockAerospikeClient_PutPayload_Call) Run(run func(policy *aerospike.WritePolicy, key *aerospike.Key, payload []byte)) *MockAerospikeClient_PutPayload_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*aerospike.WritePolicy), args[1].(*aerospike.Key), args[2].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockAerospikeClient_PutPayload_Call) Return(_a0 aerospike.Error) *MockAerospikeClient_PutPayload_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAerospikeClient_PutPayload_Call) RunAndReturn(run func(*aerospike.WritePolicy, *aerospike.Key, []byte) aerospike.Error) *MockAerospikeClient_PutPayload_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RegisterUDF provides a mock function with given fields: policy, udfBody, serverPath, language
 func (_m *MockAerospikeClient) RegisterUDF(policy *aerospike.WritePolicy, udfBody []byte, serverPath string, language aerospike.Language) (*aerospike.RegisterTask, aerospike.Error) {
 	ret := _m.Called(policy, udfBody, serverPath, language)

@@ -44,6 +44,35 @@ func validateBackup(params *ASBackupParams) error {
 	return nil
 }
 
+func validateRestore(params *ASRestoreParams) error {
+	if params.RestoreParams != nil && params.CommonParams != nil {
+		switch params.RestoreParams.Mode {
+		case models.RestoreModeAuto, models.RestoreModeASB, models.RestoreModeASBX:
+			// ok.
+		default:
+			return fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
+		}
+
+		if params.RestoreParams.InputFile == "" && params.CommonParams.Directory == "" {
+			return fmt.Errorf("input file or directory required")
+		}
+
+		if err := validateRestoreParams(params.RestoreParams, params.CommonParams); err != nil {
+			return err
+		}
+
+		if err := validateCommonParams(params.CommonParams); err != nil {
+			return err
+		}
+	}
+
+	if err := validateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func validateStorages(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,

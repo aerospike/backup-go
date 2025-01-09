@@ -14,6 +14,12 @@
 
 package models
 
+const (
+	RestoreModeAuto = "auto"
+	RestoreModeASB  = "asb"
+	RestoreModeASBX = "asbx"
+)
+
 type Restore struct {
 	InputFile          string
 	DirectoryList      string
@@ -31,4 +37,6 @@ type Restore struct {
 	RetryBaseTimeout int64
 	RetryMultiplier  float64
 	RetryMaxRetries  uint
+
+	Mode string
 }

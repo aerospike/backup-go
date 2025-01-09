@@ -24,60 +24,64 @@ import (
 	"github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/azure/blob"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/io/gcp/storage"
 	"github.com/aerospike/backup-go/io/local"
 )
 
-func getReader(
+func newReader(
 	ctx context.Context,
-	restoreParams *models.Restore,
-	commonParams *models.Common,
-	awsS3 *models.AwsS3,
-	gcpStorage *models.GcpStorage,
-	azureBlob *models.AzureBlob,
-	backupParams *models.Backup,
-	secretAgent *backup.SecretAgentConfig,
+	params *ASRestoreParams,
+	sa *backup.SecretAgentConfig,
+	isXdr bool,
 ) (backup.StreamingReader, error) {
+	directory, inputFile := params.CommonParams.Directory, params.RestoreParams.InputFile
+	parentDirectory, directoryList := params.CommonParams.Directory, params.RestoreParams.DirectoryList
+
 	switch {
-	case awsS3.Region != "":
-		if err := awsS3.LoadSecrets(secretAgent); err != nil {
+	case params.AwsS3 != nil && params.AwsS3.Region != "":
+		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
-		return newS3Reader(ctx, awsS3, restoreParams, commonParams, backupParams)
-	case gcpStorage.BucketName != "":
-		if err := gcpStorage.LoadSecrets(secretAgent); err != nil {
+		return newS3Reader(ctx, params.AwsS3, directory, inputFile, parentDirectory, directoryList, isXdr)
+	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
+		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
 		}
 
-		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams, backupParams)
-	case azureBlob.ContainerName != "":
-		if err := azureBlob.LoadSecrets(secretAgent); err != nil {
+		return newGcpReader(ctx, params.GcpStorage, directory, inputFile, parentDirectory, directoryList, isXdr)
+	case params.AzureBlob != nil && params.AzureBlob.ContainerName != "":
+		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
-		return newAzureReader(ctx, azureBlob, restoreParams, commonParams, backupParams)
+		return newAzureReader(ctx, params.AzureBlob, directory, inputFile, parentDirectory, directoryList, isXdr)
 	default:
-		return newLocalReader(restoreParams, commonParams, backupParams)
+		return newLocalReader(directory, inputFile, parentDirectory, directoryList, isXdr)
 	}
 }
 
-func newLocalReader(r *models.Restore, c *models.Common, b *models.Backup) (backup.StreamingReader, error) {
+func newLocalReader(directory, inputFile, parentDirectory, directoryList string, isXDR bool,
+) (backup.StreamingReader, error) {
 	opts := make([]local.Opt, 0)
 
 	// As we validate this fields in validation function, we can switch here.
 	switch {
-	case c.Directory != "":
-		opts = append(opts, local.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
+	case directory != "":
+		opts = append(opts, local.WithDir(directory), local.WithSkipDirCheck())
+		// Append Validator only for directory.
+		if isXDR {
+			opts = append(opts, local.WithValidator(asbx.NewValidator()), local.WithSorted(local.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return local.NewReader(opts...)
+		} else {
 			opts = append(opts, local.WithValidator(asb.NewValidator()))
 		}
-	case r.InputFile != "":
-		opts = append(opts, local.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+	case inputFile != "":
+		opts = append(opts, local.WithFile(inputFile))
+	case directoryList != "":
+		dirList := prepareDirectoryList(parentDirectory, directoryList)
 		opts = append(opts, local.WithDirList(dirList))
 	}
 
@@ -88,9 +92,11 @@ func newLocalReader(r *models.Restore, c *models.Common, b *models.Backup) (back
 func newS3Reader(
 	ctx context.Context,
 	a *models.AwsS3,
-	r *models.Restore,
-	c *models.Common,
-	b *models.Backup,
+	directory,
+	inputFile,
+	parentDirectory,
+	directoryList string,
+	isXDR bool,
 ) (backup.StreamingReader, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
@@ -101,17 +107,20 @@ func newS3Reader(
 
 	// As we validate this fields in validation function, we can switch here.
 	switch {
-	case c.Directory != "":
-		opts = append(opts, s3.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
+	case directory != "":
+		opts = append(opts, s3.WithDir(directory), s3.WithSkipDirCheck())
+		// Append Validator only for directory.
+		if isXDR {
+			opts = append(opts, s3.WithValidator(asbx.NewValidator()), s3.WithSorted(s3.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return s3.NewReader(ctx, client, a.BucketName, opts...)
+		} else {
 			opts = append(opts, s3.WithValidator(asb.NewValidator()))
 		}
-	case r.InputFile != "":
-		opts = append(opts, s3.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+	case inputFile != "":
+		opts = append(opts, s3.WithFile(inputFile))
+	case directoryList != "":
+		dirList := prepareDirectoryList(parentDirectory, directoryList)
 		opts = append(opts, s3.WithDirList(dirList))
 	}
 
@@ -122,9 +131,11 @@ func newS3Reader(
 func newGcpReader(
 	ctx context.Context,
 	g *models.GcpStorage,
-	r *models.Restore,
-	c *models.Common,
-	b *models.Backup,
+	directory,
+	inputFile,
+	parentDirectory,
+	directoryList string,
+	isXDR bool,
 ) (backup.StreamingReader, error) {
 	client, err := newGcpClient(ctx, g)
 	if err != nil {
@@ -135,17 +146,20 @@ func newGcpReader(
 
 	// As we validate this fields in validation function, we can switch here.
 	switch {
-	case c.Directory != "":
-		opts = append(opts, storage.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
+	case directory != "":
+		opts = append(opts, storage.WithDir(directory), storage.WithSkipDirCheck())
+		// Append Validator only for directory.
+		if isXDR {
+			opts = append(opts, storage.WithValidator(asbx.NewValidator()), storage.WithSorted(storage.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return storage.NewReader(ctx, client, g.BucketName, opts...)
+		} else {
 			opts = append(opts, storage.WithValidator(asb.NewValidator()))
 		}
-	case r.InputFile != "":
-		opts = append(opts, storage.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+	case inputFile != "":
+		opts = append(opts, storage.WithFile(inputFile))
+	case directoryList != "":
+		dirList := prepareDirectoryList(parentDirectory, directoryList)
 		opts = append(opts, storage.WithDirList(dirList))
 	}
 
@@ -155,9 +169,11 @@ func newGcpReader(
 func newAzureReader(
 	ctx context.Context,
 	a *models.AzureBlob,
-	r *models.Restore,
-	c *models.Common,
-	b *models.Backup,
+	directory,
+	inputFile,
+	parentDirectory,
+	directoryList string,
+	isXDR bool,
 ) (backup.StreamingReader, error) {
 	client, err := newAzureClient(a)
 	if err != nil {
@@ -168,17 +184,20 @@ func newAzureReader(
 
 	// As we validate this fields in validation function, we can switch here.
 	switch {
-	case c.Directory != "":
-		opts = append(opts, blob.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
+	case directory != "":
+		opts = append(opts, blob.WithDir(directory), blob.WithSkipDirCheck())
+		// Append Validator only for directory.
+		if isXDR {
+			opts = append(opts, blob.WithValidator(asbx.NewValidator()), blob.WithSorted(blob.SortAsc))
+			// ASBX restore supports only restore from directory.
+			return blob.NewReader(ctx, client, a.ContainerName, opts...)
+		} else {
 			opts = append(opts, blob.WithValidator(asb.NewValidator()))
 		}
-	case r.InputFile != "":
-		opts = append(opts, blob.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
+	case inputFile != "":
+		opts = append(opts, blob.WithFile(inputFile))
+	case directoryList != "":
+		dirList := prepareDirectoryList(parentDirectory, directoryList)
 		opts = append(opts, blob.WithDirList(dirList))
 	}
 

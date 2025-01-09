@@ -46,10 +46,10 @@ func TestTokenReader_ReadSingleToken(t *testing.T) {
 	mockReader := new(MockReadCloser)
 	readersCh <- mockReader
 
-	mockDecoder := mocks.NewMockDecoder(t)
+	mockDecoder := mocks.NewMockDecoder[*models.Token](t)
 	mockDecoder.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Once()
 
-	convertFn := func(io.ReadCloser) Decoder {
+	convertFn := func(io.ReadCloser) Decoder[*models.Token] {
 		return mockDecoder
 	}
 
@@ -69,11 +69,11 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	mockReader := new(MockReadCloser)
 	readersCh <- mockReader
 
-	mockDecoder := mocks.NewMockDecoder(t)
+	mockDecoder := mocks.NewMockDecoder[*models.Token](t)
 	mockDecoder.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Times(3)
 	mockDecoder.EXPECT().NextToken().Return((*models.Token)(nil), io.EOF).Once()
 
-	convertFn := func(io.ReadCloser) Decoder {
+	convertFn := func(io.ReadCloser) Decoder[*models.Token] {
 		return mockDecoder
 	}
 
@@ -104,15 +104,15 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 	readersCh <- mockReader1
 	readersCh <- mockReader2
 
-	mockDecoder1 := mocks.NewMockDecoder(t)
+	mockDecoder1 := mocks.NewMockDecoder[*models.Token](t)
 	mockDecoder1.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Once()
 	mockDecoder1.EXPECT().NextToken().Return((*models.Token)(nil), io.EOF).Once()
 
-	mockDecoder2 := mocks.NewMockDecoder(t)
+	mockDecoder2 := mocks.NewMockDecoder[*models.Token](t)
 	mockDecoder2.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeUDF}, nil).Once()
 
 	currentDecoder := mockDecoder1
-	convertFn := func(io.ReadCloser) Decoder {
+	convertFn := func(io.ReadCloser) Decoder[*models.Token] {
 		defer func() {
 			currentDecoder = mockDecoder2
 		}()
@@ -145,7 +145,7 @@ func TestTokenReader_ReadFromClosedChannel(t *testing.T) {
 	readersCh := make(chan io.ReadCloser)
 	close(readersCh)
 
-	tr := newTokenReader(readersCh, logger, nil)
+	tr := newTokenReader[*models.Token](readersCh, logger, nil)
 
 	token, err := tr.Read()
 	assert.Equal(t, io.EOF, err)
@@ -158,11 +158,11 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 	mockReader := new(MockReadCloser)
 	readersCh <- mockReader
 
-	mockDecoder := mocks.NewMockDecoder(t)
+	mockDecoder := mocks.NewMockDecoder[*models.Token](t)
 	expectedErr := io.ErrUnexpectedEOF
 	mockDecoder.EXPECT().NextToken().Return((*models.Token)(nil), expectedErr).Once()
 
-	convertFn := func(io.ReadCloser) Decoder {
+	convertFn := func(io.ReadCloser) Decoder[*models.Token] {
 		return mockDecoder
 	}
 
@@ -179,7 +179,7 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 func TestTokenReader_Close(t *testing.T) {
 	logger := slog.Default()
 	readersCh := make(chan io.ReadCloser)
-	tr := newTokenReader(readersCh, logger, nil)
+	tr := newTokenReader[*models.Token](readersCh, logger, nil)
 
 	// Close is a no-op, so we just ensure it doesn't panic
 	assert.NotPanics(t, func() {

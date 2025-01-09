@@ -252,6 +252,56 @@ func (_c *MockdbWriter_Put_Call) RunAndReturn(run func(*aerospike.WritePolicy, *
 	return _c
 }
 
+// PutPayload provides a mock function with given fields: policy, key, payload
+func (_m *MockdbWriter) PutPayload(policy *aerospike.WritePolicy, key *aerospike.Key, payload []byte) aerospike.Error {
+	ret := _m.Called(policy, key, payload)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PutPayload")
+	}
+
+	var r0 aerospike.Error
+	if rf, ok := ret.Get(0).(func(*aerospike.WritePolicy, *aerospike.Key, []byte) aerospike.Error); ok {
+		r0 = rf(policy, key, payload)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(aerospike.Error)
+		}
+	}
+
+	return r0
+}
+
+// MockdbWriter_PutPayload_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PutPayload'
+type MockdbWriter_PutPayload_Call struct {
+	*mock.Call
+}
+
+// PutPayload is a helper method to define mock.On call
+//   - policy *aerospike.WritePolicy
+//   - key *aerospike.Key
+//   - payload []byte
+func (_e *MockdbWriter_Expecter) PutPayload(policy interface{}, key interface{}, payload interface{}) *MockdbWriter_PutPayload_Call {
+	return &MockdbWriter_PutPayload_Call{Call: _e.mock.On("PutPayload", policy, key, payload)}
+}
+
+func (_c *MockdbWriter_PutPayload_Call) Run(run func(policy *aerospike.WritePolicy, key *aerospike.Key, payload []byte)) *MockdbWriter_PutPayload_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*aerospike.WritePolicy), args[1].(*aerospike.Key), args[2].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockdbWriter_PutPayload_Call) Return(_a0 aerospike.Error) *MockdbWriter_PutPayload_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockdbWriter_PutPayload_Call) RunAndReturn(run func(*aerospike.WritePolicy, *aerospike.Key, []byte) aerospike.Error) *MockdbWriter_PutPayload_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RegisterUDF provides a mock function with given fields: policy, udfBody, serverPath, language
 func (_m *MockdbWriter) RegisterUDF(policy *aerospike.WritePolicy, udfBody []byte, serverPath string, language aerospike.Language) (*aerospike.RegisterTask, aerospike.Error) {
 	ret := _m.Called(policy, udfBody, serverPath, language)

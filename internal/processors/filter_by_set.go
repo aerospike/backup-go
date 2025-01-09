@@ -15,6 +15,7 @@
 package processors
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/util"
@@ -23,23 +24,27 @@ import (
 )
 
 // filterBySet filter records by set.
-type filterBySet struct {
+type filterBySet[T models.TokenConstraint] struct {
 	setsToRestore map[string]bool
 	skipped       *atomic.Uint64
 }
 
 // NewFilterBySet creates new filterBySet processor with given setList.
-func NewFilterBySet(setList []string, skipped *atomic.Uint64) TokenProcessor {
-	return &filterBySet{
+func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.Uint64) pipeline.DataProcessor[T] {
+	return &filterBySet[T]{
 		setsToRestore: util.ListToMap(setList),
 		skipped:       skipped,
 	}
 }
 
 // Process filters out records that does not belong to setsToRestore
-func (p filterBySet) Process(token *models.Token) (*models.Token, error) {
+func (p filterBySet[T]) Process(token T) (T, error) {
+	t, ok := any(token).(*models.Token)
+	if !ok {
+		return nil, fmt.Errorf("unsupported token type %T for filter by set", token)
+	}
 	// if the token is not a record, we don't need to process it
-	if token.Type != models.TokenTypeRecord {
+	if t.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 
@@ -48,7 +53,7 @@ func (p filterBySet) Process(token *models.Token) (*models.Token, error) {
 		return token, nil
 	}
 
-	set := token.Record.Key.SetName()
+	set := t.Record.Key.SetName()
 	if p.setsToRestore[set] {
 		return token, nil
 	}

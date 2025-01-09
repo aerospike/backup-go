@@ -57,7 +57,7 @@ func (e *Encoder[T]) GenerateFilename(_, _ string) string {
 func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	t, ok := any(token).(*models.ASBXToken)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type for ASBX encoder")
+		return nil, fmt.Errorf("unsupported token type %T for ASBX encoder", token)
 	}
 	// Message contains:
 	// Digest - 20 bytes.

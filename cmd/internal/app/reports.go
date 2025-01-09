@@ -21,8 +21,15 @@ import (
 	bModels "github.com/aerospike/backup-go/models"
 )
 
-func printBackupReport(stats *bModels.BackupStats) {
-	fmt.Println("Backup Report")
+const (
+	reportHeaderBackup     = "Backup Report"
+	reportHeaderBackupXDR  = "XDR Backup Report"
+	reportHeaderRestore    = "Restore Report"
+	reportHeaderRestoreXDR = "XDR Restore Report"
+)
+
+func printBackupReport(header string, stats *bModels.BackupStats) {
+	fmt.Println(header)
 	fmt.Println("--------------")
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
 	fmt.Printf("Duration:             %s\n", stats.GetDuration())
@@ -35,8 +42,8 @@ func printBackupReport(stats *bModels.BackupStats) {
 	fmt.Printf("Files Written:        %d\n", stats.GetFileCount())
 }
 
-func printRestoreReport(stats *bModels.RestoreStats) {
-	fmt.Println("Restore Report")
+func printRestoreReport(header string, stats *bModels.RestoreStats) {
+	fmt.Println(header)
 	fmt.Println("--------------")
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
 	fmt.Printf("Duration:             %s\n", stats.GetDuration())

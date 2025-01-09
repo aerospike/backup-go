@@ -146,42 +146,35 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 	return c
 }
 
-func mapRestoreConfig(
-	restoreParams *models.Restore,
-	commonParams *models.Common,
-	compression *models.Compression,
-	encryption *models.Encryption,
-	secretAgent *models.SecretAgent,
-) (*backup.RestoreConfig, error) {
-	if commonParams.Namespace == "" {
-		return nil, fmt.Errorf("namespace is required")
-	}
-
+func mapRestoreConfig(params *ASRestoreParams) *backup.RestoreConfig {
 	c := backup.NewDefaultRestoreConfig()
-	c.Namespace = mapRestoreNamespace(commonParams.Namespace)
-	c.SetList = splitByComma(commonParams.SetList)
-	c.BinList = splitByComma(commonParams.BinList)
-	c.NoRecords = commonParams.NoRecords
-	c.NoIndexes = commonParams.NoIndexes
-	c.NoUDFs = commonParams.NoUDFs
-	c.RecordsPerSecond = commonParams.RecordsPerSecond
-	c.Parallel = commonParams.Parallel
-	c.WritePolicy = mapWritePolicy(restoreParams, commonParams)
-	c.InfoPolicy = mapInfoPolicy(restoreParams.TimeOut)
+	c.Namespace = mapRestoreNamespace(params.CommonParams.Namespace)
+	c.SetList = splitByComma(params.CommonParams.SetList)
+	c.BinList = splitByComma(params.CommonParams.BinList)
+	c.NoRecords = params.CommonParams.NoRecords
+	c.NoIndexes = params.CommonParams.NoIndexes
+	c.NoUDFs = params.CommonParams.NoUDFs
+	c.RecordsPerSecond = params.CommonParams.RecordsPerSecond
+	c.Parallel = params.CommonParams.Parallel
+	c.WritePolicy = mapWritePolicy(params.RestoreParams, params.CommonParams)
+	c.InfoPolicy = mapInfoPolicy(params.RestoreParams.TimeOut)
 	// As we set --nice in MiB we must convert it to bytes
-	c.Bandwidth = commonParams.Nice * 1024 * 1024
-	c.ExtraTTL = restoreParams.ExtraTTL
-	c.IgnoreRecordError = restoreParams.IgnoreRecordError
-	c.DisableBatchWrites = restoreParams.DisableBatchWrites
-	c.BatchSize = restoreParams.BatchSize
-	c.MaxAsyncBatches = restoreParams.MaxAsyncBatches
+	c.Bandwidth = params.CommonParams.Nice * 1024 * 1024
+	c.ExtraTTL = params.RestoreParams.ExtraTTL
+	c.IgnoreRecordError = params.RestoreParams.IgnoreRecordError
+	c.DisableBatchWrites = params.RestoreParams.DisableBatchWrites
+	c.BatchSize = params.RestoreParams.BatchSize
+	c.MaxAsyncBatches = params.RestoreParams.MaxAsyncBatches
 
-	c.CompressionPolicy = mapCompressionPolicy(compression)
-	c.EncryptionPolicy = mapEncryptionPolicy(encryption)
-	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
-	c.RetryPolicy = mapRetryPolicy(restoreParams)
+	c.CompressionPolicy = mapCompressionPolicy(params.Compression)
+	c.EncryptionPolicy = mapEncryptionPolicy(params.Encryption)
+	c.SecretAgentConfig = mapSecretAgentConfig(params.SecretAgent)
+	c.RetryPolicy = mapRetryPolicy(
+		params.RestoreParams.RetryBaseTimeout,
+		params.RestoreParams.RetryMultiplier, params.RestoreParams.RetryMaxRetries,
+	)
 
-	return c, nil
+	return c
 }
 
 func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
@@ -309,6 +302,11 @@ func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, e
 
 func mapWritePolicy(r *models.Restore, c *models.Common) *aerospike.WritePolicy {
 	p := aerospike.NewWritePolicy(0, 0)
+
+	if c == nil {
+		return p
+	}
+
 	p.SendKey = true
 	p.MaxRetries = c.MaxRetries
 	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
@@ -341,11 +339,11 @@ func mapInfoPolicy(timeOut int64) *aerospike.InfoPolicy {
 	return p
 }
 
-func mapRetryPolicy(r *models.Restore) *bModels.RetryPolicy {
+func mapRetryPolicy(retryBaseTimeout int64, retryMultiplier float64, retryMaxRetries uint) *bModels.RetryPolicy {
 	return bModels.NewRetryPolicy(
-		time.Duration(r.RetryBaseTimeout)*time.Millisecond,
-		r.RetryMultiplier,
-		r.RetryMaxRetries,
+		time.Duration(retryBaseTimeout)*time.Millisecond,
+		retryMultiplier,
+		retryMaxRetries,
 	)
 }
 

@@ -63,14 +63,14 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-	mockEncoder := mocks.NewMockEncoder(suite.T())
+	mockEncoder := mocks.NewMockEncoder[*models.Token](suite.T())
 	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
 	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)
 	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
 	dst := bytes.Buffer{}
-	writer := newTokenWriter(mockEncoder, &dst, slog.Default(), nil)
+	writer := newTokenWriter[*models.Token](mockEncoder, &dst, slog.Default(), nil)
 	suite.NotNil(writer)
 
 	_, err := writer.Write(recToken)
@@ -113,7 +113,7 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockStats.EXPECT().AddUDFs(uint32(1))
 	mockStats.EXPECT().AddSIndexes(uint32(1))
 
-	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
+	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
 	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0, nil))
@@ -138,7 +138,7 @@ func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
 
 	mockStats := mocks.NewMockstatsSetterToken(suite.T())
 
-	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
+	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
 	_, err := writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))

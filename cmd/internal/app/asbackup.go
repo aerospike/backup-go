@@ -19,8 +19,10 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -55,6 +57,14 @@ type ASBackupParams struct {
 	AzureBlob       *models.AzureBlob
 }
 
+func (a *ASBackupParams) isXDR() bool {
+	return a.BackupXDRParams != nil && a.BackupParams == nil
+}
+
+func (a *ASBackupParams) isStop() bool {
+	return a.BackupXDRParams != nil && a.BackupXDRParams.Stop
+}
+
 func NewASBackup(
 	ctx context.Context,
 	params *ASBackupParams,
@@ -66,14 +76,14 @@ func NewASBackup(
 	}
 
 	// Initializations.
-	backupConfig, backupXDRConfig, err := initializeConfigs(params)
+	backupConfig, backupXDRConfig, err := initializeBackupConfigs(params)
 	if err != nil {
 		return nil, err
 	}
 
 	secretAgent := getSecretAgent(backupConfig, backupXDRConfig)
 
-	writer, err := initializeWriter(ctx, params, secretAgent)
+	writer, err := initializeBackupWriter(ctx, params, secretAgent)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +93,7 @@ func NewASBackup(
 		return nil, nil
 	}
 
-	reader, err := initializeReader(ctx, params, secretAgent)
+	reader, err := initializeBackupReader(ctx, params, secretAgent)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +106,17 @@ func NewASBackup(
 	aerospikeClient, err := newAerospikeClient(params.ClientConfig, params.ClientPolicy, racks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
+	}
+
+	// Stop xdr.
+	if params.isStop() {
+		logger.Info("stopping XDR on the database")
+
+		if err := stopXDR(aerospikeClient, backupXDRConfig); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
@@ -119,7 +140,7 @@ func NewASBackup(
 	return asb, nil
 }
 
-func initializeConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.ConfigBackupXDR, error) {
+func initializeBackupConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.ConfigBackupXDR, error) {
 	var (
 		backupConfig    *backup.BackupConfig
 		backupXDRConfig *backup.ConfigBackupXDR
@@ -127,19 +148,19 @@ func initializeConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.Co
 	)
 
 	switch {
-	case params.BackupParams != nil:
+	case !params.isXDR():
 		backupConfig, err = mapBackupConfig(params)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create backup config: %w", err)
 		}
-	case params.BackupXDRParams != nil:
+	case params.isXDR():
 		backupXDRConfig = mapBackupXDRConfig(params)
 	}
 
 	return backupConfig, backupXDRConfig, nil
 }
 
-func initializeReader(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
+func initializeBackupReader(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
 ) (backup.StreamingReader, error) {
 	if params.BackupParams == nil {
 		return nil, nil
@@ -149,18 +170,15 @@ func initializeReader(ctx context.Context, params *ASBackupParams, sa *backup.Se
 		return nil, nil
 	}
 
-	restore := &models.Restore{InputFile: params.BackupParams.OutputFile}
+	// Fill params to load a state file.
+	restoreParams := &ASRestoreParams{
+		RestoreParams: &models.Restore{
+			InputFile: params.BackupParams.StateFileDst,
+		},
+		CommonParams: &models.Common{},
+	}
 
-	reader, err := getReader(
-		ctx,
-		restore,
-		params.CommonParams,
-		params.AwsS3,
-		params.GcpStorage,
-		params.AzureBlob,
-		params.BackupParams,
-		sa,
-	)
+	reader, err := newReader(ctx, restoreParams, sa, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}
@@ -168,7 +186,7 @@ func initializeReader(ctx context.Context, params *ASBackupParams, sa *backup.Se
 	return reader, nil
 }
 
-func initializeWriter(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
+func initializeBackupWriter(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
 ) (backup.Writer, error) {
 	// We initialize a writer only if output is configured.
 	writer, err := newWriter(ctx, params, sa)
@@ -207,11 +225,11 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start xdr backup: %w", err)
 		}
 
-		if err := h.Wait(ctx); err != nil {
+		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr backup: %w", err)
 		}
 
-		printBackupReport(h.GetStats())
+		printBackupReport(reportHeaderBackupXDR, h.GetStats())
 	default:
 		// Running ordinary backup.
 		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
@@ -219,11 +237,11 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}
 
-		if err := h.Wait(ctx); err != nil {
+		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 
-		printBackupReport(h.GetStats())
+		printBackupReport(reportHeaderBackup, h.GetStats())
 	}
 
 	return nil
@@ -238,4 +256,15 @@ func getSecretAgent(b *backup.BackupConfig, bxdr *backup.ConfigBackupXDR) *backu
 	default:
 		return nil
 	}
+}
+
+func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+	address := fmt.Sprintf("%s:%d", cfg.LocalAddress, cfg.LocalPort)
+
+	if err := infoClient.StopXDR(cfg.DC, address, cfg.Namespace); err != nil {
+		return fmt.Errorf("failed to stop xdr: %w", err)
+	}
+
+	return nil
 }

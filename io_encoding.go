@@ -61,17 +61,20 @@ func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, c
 // e.g. *models.Record, *models.UDF and *models.SecondaryIndex
 //
 //go:generate mockery --name Decoder
-type Decoder interface {
-	NextToken() (*models.Token, error)
+type Decoder[T models.TokenConstraint] interface {
+	NextToken() (T, error)
 }
 
 // NewDecoder returns a new Decoder according to `EncoderType`.
-func NewDecoder(eType EncoderType, src io.Reader) (Decoder, error) {
+func NewDecoder[T models.TokenConstraint](eType EncoderType, src io.Reader) (Decoder[T], error) {
 	switch eType {
 	// As at the moment only one `ASB` Decoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewDecoder(src)
+		return asb.NewDecoder[T](src)
+	case EncoderTypeASBX:
+		// TODO: pass file number.
+		return asbx.NewDecoder[T](src)
 	default:
-		return asb.NewDecoder(src)
+		return asb.NewDecoder[T](src)
 	}
 }

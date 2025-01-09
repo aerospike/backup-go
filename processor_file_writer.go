@@ -43,12 +43,12 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	stats             *models.BackupStats
 	limiter           *rate.Limiter
 
-	logger *slog.Logger
-
 	saveCommandChan chan int
 
 	fileLimit int64
 	parallel  int
+
+	logger *slog.Logger
 }
 
 // newFileWriterProcessor returns new file writer processor instance.

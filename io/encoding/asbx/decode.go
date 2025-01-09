@@ -26,15 +26,15 @@ import (
 
 // Decoder contains logic for decoding backup data from the binary .asbx format.
 // This is a stateful object that should be created for each file being decoded.
-type Decoder struct {
+type Decoder[T models.TokenConstraint] struct {
 	fileNumber uint64
 	namespace  string
 	reader     io.Reader
 }
 
 // NewDecoder creates a new Decoder that reads from the provided io.Reader.
-func NewDecoder(r io.Reader, fileNumber uint64) (*Decoder, error) {
-	d := &Decoder{
+func NewDecoder[T models.TokenConstraint](r io.Reader) (*Decoder[T], error) {
+	d := &Decoder[T]{
 		reader: r,
 	}
 
@@ -42,16 +42,17 @@ func NewDecoder(r io.Reader, fileNumber uint64) (*Decoder, error) {
 		return nil, fmt.Errorf("error reading asbx header: %w", err)
 	}
 
-	if d.fileNumber != fileNumber {
-		return nil, fmt.Errorf("file number mismatch got %d, want %d", fileNumber, d.fileNumber)
-	}
+	// TODO: make oreder check
+	// if d.fileNumber != fileNumber {
+	// 	return nil, fmt.Errorf("file number mismatch got %d, want %d", fileNumber, d.fileNumber)
+	// }
 
 	return d, nil
 }
 
 // readHeader reads and validates the file header, returning an error if the header
 // is invalid or if a read error occurs.
-func (d *Decoder) readHeader() error {
+func (d *Decoder[T]) readHeader() error {
 	head := make([]byte, headerSize)
 	if _, err := io.ReadFull(d.reader, head); err != nil {
 		return err
@@ -77,7 +78,7 @@ func (d *Decoder) readHeader() error {
 // NextToken reads and decodes the next token from the file.
 // It returns the decoded token and any error that occurred.
 // io.EOF is returned when the end of the file is reached.
-func (d *Decoder) NextToken() (*models.ASBXToken, error) {
+func (d *Decoder[T]) NextToken() (T, error) {
 	// Read digest (20 bytes).
 	digest := make([]byte, 20)
 
@@ -110,7 +111,9 @@ func (d *Decoder) NextToken() (*models.ASBXToken, error) {
 		return nil, fmt.Errorf("failed to create key: %w", err)
 	}
 
-	return models.NewASBXToken(key, payload), nil
+	token := models.NewASBXToken(key, payload)
+
+	return any(token).(T), nil
 }
 
 // fieldToInt64 is converting byte slice to int64.

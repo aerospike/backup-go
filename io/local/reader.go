@@ -72,10 +72,12 @@ func (r *Reader) StreamFiles(
 		// If it is a folder, open and return.
 		switch r.isDir {
 		case true:
-			err := r.checkRestoreDirectory(path)
-			if err != nil {
-				errorsCh <- err
-				return
+			if !r.skipDirCheck {
+				err := r.checkRestoreDirectory(path)
+				if err != nil {
+					errorsCh <- err
+					return
+				}
 			}
 
 			r.streamDirectory(ctx, path, readersCh, errorsCh)

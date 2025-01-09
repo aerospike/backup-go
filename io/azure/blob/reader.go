@@ -95,11 +95,12 @@ func (r *Reader) StreamFiles(
 		switch r.isDir {
 		case true:
 			path = cleanPath(path)
-
-			err := r.checkRestoreDirectory(ctx, path)
-			if err != nil {
-				errorsCh <- err
-				return
+			if !r.skipDirCheck {
+				err := r.checkRestoreDirectory(ctx, path)
+				if err != nil {
+					errorsCh <- err
+					return
+				}
 			}
 
 			r.streamDirectory(ctx, path, readersCh, errorsCh)

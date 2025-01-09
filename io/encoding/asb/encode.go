@@ -58,7 +58,7 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type for ASB encoder")
+		return nil, fmt.Errorf("unsupported token type %T for ASB encoder", token)
 	}
 
 	var (

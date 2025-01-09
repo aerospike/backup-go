@@ -46,7 +46,7 @@ Aerospike Client Flags:
                                    stack will always be the least used. These connections are checked for IdleTimeout
                                    on every tend (usually 1 second).
                                    
-      --client-login-timeout int   specifies the timeout for login operation for external authentication such as LDAP. (default 10000)
+      --client-login-timeout int   Specifies the login operation timeout for external authentication methods such as LDAP. (default 10000)
 
 Backup Flags:
   -d, --directory string         The directory that holds the backup files. Required, unless -o or -e is used.

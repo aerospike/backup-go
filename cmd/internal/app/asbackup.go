@@ -151,10 +151,16 @@ func initializeBackupConfigs(params *ASBackupParams) (*backup.BackupConfig, *bac
 	case !params.isXDR():
 		backupConfig, err = mapBackupConfig(params)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create backup config: %w", err)
+			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
 		}
 	case params.isXDR():
 		backupXDRConfig = mapBackupXDRConfig(params)
+
+		// On xdr backup we backup only uds and indexes.
+		backupConfig = backup.NewDefaultBackupConfig()
+
+		backupConfig.NoRecords = true
+		backupConfig.Namespace = backupXDRConfig.Namespace
 	}
 
 	return backupConfig, backupXDRConfig, nil
@@ -220,16 +226,27 @@ func (b *ASBackup) Run(ctx context.Context) error {
 		printEstimateReport(estimates)
 	case b.backupConfigXDR != nil:
 		// Running xdr backup.
-		h, err := b.backupClient.BackupXDR(ctx, b.backupConfigXDR, b.writer)
+		hXdr, err := b.backupClient.BackupXDR(ctx, b.backupConfigXDR, b.writer)
 		if err != nil {
 			return fmt.Errorf("failed to start xdr backup: %w", err)
 		}
+		// Backup indexes and udfs.
+		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
+		if err != nil {
+			return fmt.Errorf("failed to start backup of indexes and udfs: %w", err)
+		}
 
-		if err = h.Wait(ctx); err != nil {
+		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr backup: %w", err)
 		}
 
-		printBackupReport(reportHeaderBackupXDR, h.GetStats())
+		if err = h.Wait(ctx); err != nil {
+			return fmt.Errorf("failed to backup indexes and udfs: %w", err)
+		}
+
+		printBackupReport(reportHeaderBackupXDR, hXdr.GetStats())
+		fmt.Println() // Pretty printing.
+		printBackupReport(reportHeaderBackup, h.GetStats())
 	default:
 		// Running ordinary backup.
 		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)

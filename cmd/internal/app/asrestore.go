@@ -118,16 +118,19 @@ func (r *ASRestore) Run(ctx context.Context) error {
 
 		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
 	case models.RestoreModeAuto:
-		r.restoreConfig.EncoderType = backup.EncoderTypeASB
+		// We should copy config to new variable, not to overwrite encoder.
+		restoreCfg := *r.restoreConfig
+		restoreCfg.EncoderType = backup.EncoderTypeASB
 
-		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
+		h, err := r.backupClient.Restore(ctx, &restoreCfg, r.reader)
 		if err != nil {
 			return fmt.Errorf("failed to start restore: %w", err)
 		}
 
-		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
+		restoreXdrCfg := *r.restoreConfig
+		restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
 
-		hXdr, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
+		hXdr, err := r.backupClient.RestoreXDR(ctx, &restoreXdrCfg, r.xdrReader)
 		if err != nil {
 			return fmt.Errorf("failed to start xdr restore: %w", err)
 		}
@@ -160,26 +163,26 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 	case models.RestoreModeASB:
 		reader, err = newReader(ctx, params, sa, false)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
 		}
 
 		return reader, nil, nil
 	case models.RestoreModeASBX:
 		xdrReader, err = newReader(ctx, params, sa, true)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
 		return nil, xdrReader, nil
 	case models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
 		}
 
 		xdrReader, err = newReader(ctx, params, sa, true)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
 		return reader, xdrReader, nil

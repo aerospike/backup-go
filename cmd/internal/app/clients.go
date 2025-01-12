@@ -26,7 +26,9 @@ import (
 	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"google.golang.org/api/option"
 )
@@ -67,10 +69,25 @@ func newAerospikeClient(cfg *client.AerospikeConfig, cp *models.ClientPolicy, ra
 }
 
 func newS3Client(ctx context.Context, a *models.AwsS3) (*s3.Client, error) {
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithSharedConfigProfile(a.Profile),
-		config.WithRegion(a.Region),
-	)
+	cfgOpts := make([]func(*config.LoadOptions) error, 0)
+
+	if a.Profile != "" {
+		cfgOpts = append(cfgOpts, config.WithSharedConfigProfile(a.Profile))
+	}
+
+	if a.Region != "" {
+		cfgOpts = append(cfgOpts, config.WithRegion(a.Region))
+	}
+
+	if a.AccessKeyID != "" && a.SecretAccessKey != "" {
+		cfgOpts = append(cfgOpts, config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+			Value: aws.Credentials{
+				AccessKeyID: a.AccessKeyID, SecretAccessKey: a.SecretAccessKey,
+			},
+		}))
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, cfgOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}

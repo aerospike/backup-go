@@ -39,6 +39,12 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.Profile, "s3-profile",
 		"",
 		"The S3 profile to use for credentials.")
+	flagSet.StringVar(&f.AccessKeyID, "s3-access-key-id",
+		"",
+		"S3 access key id. If not set, profile auth info will be used.")
+	flagSet.StringVar(&f.SecretAccessKey, "s3-secret-access-key",
+		"",
+		"S3 secret access key. If not set, profile auth info will be used.")
 	flagSet.StringVar(&f.Endpoint, "s3-endpoint-override",
 		"",
 		"An alternate url endpoint to send S3 API calls to.")

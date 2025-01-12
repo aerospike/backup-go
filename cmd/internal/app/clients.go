@@ -70,7 +70,14 @@ func newAerospikeClient(cfg *client.AerospikeConfig, cp *models.ClientPolicy, ra
 
 func newS3Client(ctx context.Context, a *models.AwsS3) (*s3.Client, error) {
 	cfgOpts := make([]func(*config.LoadOptions) error, 0)
-	cfgOpts = append(cfgOpts, config.WithSharedConfigProfile(a.Profile), config.WithRegion(a.Region))
+
+	if a.Profile != "" {
+		cfgOpts = append(cfgOpts, config.WithSharedConfigProfile(a.Profile))
+	}
+
+	if a.Region != "" {
+		cfgOpts = append(cfgOpts, config.WithRegion(a.Region))
+	}
 
 	if a.AccessKeyID != "" && a.SecretAccessKey != "" {
 		cfgOpts = append(cfgOpts, config.WithCredentialsProvider(credentials.StaticCredentialsProvider{

@@ -34,78 +34,100 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		"",
 		"Restore from a single backup file. Use - for stdin.\n"+
 			"Required, unless --directory or --directory-list is used.\n"+
-			"Incompatible with --mode=asb")
+			"Incompatible with --mode=asbx.")
 	flagSet.StringVar(&f.DirectoryList, "directory-list",
 		"",
-		"A comma separated list of paths to directories that hold the backup files. Required,\n"+
-			"unless -i or -d is used. The paths may not contain commas\n"+
-			"Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2\n"+
-			"Incompatible with --mode=asb")
+		"A comma-separated list of paths to directories that hold the backup files. Required,\n"+
+			"unless -i or -d is used. The paths may not contain commas.\n"+
+			"Example: 'asrestore --directory-list /path/to/dir1/,/path/to/dir2'\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.StringVar(&f.ParentDirectory, "parent-directory",
 		"",
 		"A common root path for all paths used in --directory-list.\n"+
 			"This path is prepended to all entries in --directory-list.\n"+
-			"Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2\n"+
-			"Incompatible with --mode=asb")
+			"Example: 'asrestore --parent-directory /common/root/path\n"+
+			"--directory-list /path/to/dir1/,/path/to/dir2'\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.BoolVarP(&f.Uniq, "unique", "u",
 		false,
-		"Skip records that already exist in the namespace;\n"+
-			"Don't touch them.\n"+
-			"Incompatible with --mode=asb")
+		"Skip modifying records that already exist in the namespace.\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.BoolVarP(&f.Replace, "replace", "r",
 		false,
 		"Fully replace records that already exist in the namespace.\n"+
-			"This option still does a generation check by default and would need to be combined with the -g option \n"+
-			"if no generation check is desired. \n"+
-			"Note: this option is mutually exclusive to --unique.\n"+
-			"Incompatible with --mode=asb")
+			"This option still performs a generation check by default and needs to be combined with the -g option\n"+
+			"if you do not want to perform a generation check.\n"+
+			"This option is mutually exclusive with --unique.\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.BoolVarP(&f.NoGeneration, "no-generation", "g",
 		false,
 		"Don't check the generation of records that already exist in the namespace.\n"+
-			"Incompatible with --mode=asb")
+			"Incompatible with --mode=asbx.")
 	flagSet.BoolVar(&f.IgnoreRecordError, "ignore-record-error",
 		false,
-		"Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.\n"+
-			"By default such errors are not ignored and asrestore terminates.\n"+
-			"Optional: Use verbose mode to see errors in detail.")
+		"Ignore errors specific to records, not UDFs or indexes. The errors are:\n"+
+			"AEROSPIKE_RECORD_TOO_BIG,\n"+
+			"AEROSPIKE_KEY_MISMATCH,\n"+
+			"AEROSPIKE_BIN_NAME_TOO_LONG,\n"+
+			"AEROSPIKE_ALWAYS_FORBIDDEN,\n"+
+			"AEROSPIKE_FAIL_FORBIDDEN,\n"+
+			"AEROSPIKE_BIN_TYPE_ERROR,\n"+
+			"AEROSPIKE_BIN_NOT_FOUND.\n"+
+			"By default, these errors are not ignored and asrestore terminates.")
 	flagSet.BoolVar(&f.DisableBatchWrites, "disable-batch-writes",
 		false,
 		"Disables the use of batch writes when restoring records to the Aerospike cluster.\n"+
-			"By default, the cluster is checked for batch write support, so only set this flag if you explicitly\n"+
-			"don't want\nbatch writes to be used or asrestore is failing to recognize that batch writes are disabled\n"+
-			"and is failing to work because of it.\n"+
-			"Incompatible with --mode=asb")
+			"By default, the cluster is checked for batch write support. Only set this flag if you explicitly\n"+
+			"don't want batch writes to be used or if asrestore is failing to work because it cannot recognize\n"+
+			"that batch writes are disabled.\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.IntVar(&f.MaxAsyncBatches, "max-async-batches",
 		32,
-		"The max number of outstanding async record batch write calls at a time.\n"+
-			"For pre-6.0 servers, 'batches' are only a logical grouping of\n"+
-			"records, and each record is uploaded individually. The true max\n"+
-			"number of async aerospike calls would then be\n"+
-			"<max-async-batches> * <batch-size>.\n"+
-			"Incompatible with --mode=asb")
+		"To send data to Aerospike Database, asrestore creates write workers that work in parallel.\n"+
+			"This value is the number of workers that form batches and send them to the database.\n"+
+			"For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,\n"+
+			"and each record is uploaded individually.\n"+
+			"The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.IntVar(&f.BatchSize, "batch-size", 128,
-		"The max allowed number of records to simultaneously upload\n"+
-			"in an async batch write calls to make to aerospike at a time.\n"+
-			"Default is 128 with batch writes enabled, or 16 without batch writes.\n"+
-			"Incompatible with --mode=asb")
+		"The max allowed number of records to simultaneously upload to Aerospike.\n"+
+			"Default is 128 with batch writes enabled. If you disable batch writes,\n"+
+			"this flag is superseded because each worker sends writes one by one.\n"+
+			"All three batch flags are linked. If --disable-batch-writes=false,\n"+
+			"asrestore uses batch write workers to send data to the database.\n"+
+			"Asrestore creates a number of workers equal to --max-async-batches that work in parallel,\n"+
+			"and form and send a number of records equal to --batch-size to the database.\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.Int64Var(&f.ExtraTTL, "extra-ttl",
 		0,
 		"For records with expirable void-times, add N seconds of extra-ttl to the\n"+
 			"recorded void-time.\n"+
-			"Incompatible with --mode=asb")
+			"Incompatible with --mode=asbx.")
 	flagSet.Int64VarP(&f.TimeOut, "timeout", "T",
 		10000,
-		"Set the timeout (ms) for info commands.")
+		"Set the timeout (ms) for asinfo commands sent from asrestore to the database.\n"+
+			"The info commands are to check version, get indexes, get udfs, count records, and check batch write support.")
 	flagSet.Int64Var(&f.RetryBaseTimeout, "retry-base-timeout",
 		1000,
-		"Set the initial delay between retry attempts in milliseconds")
+		"Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database\n"+
+			"during a restore. This retry sequence is triggered by the following non-critical errors:\n"+
+			"AEROSPIKE_NO_AVAILABLE_CONNECTIONS_TO_NODE,\n"+
+			"AEROSPIKE_TIMEOUT,\n"+
+			"AEROSPIKE_DEVICE_OVERLOAD,\n"+
+			"AEROSPIKE_NETWORK_ERROR,\n"+
+			"AEROSPIKE_SERVER_NOT_AVAILABLE,\n"+
+			"AEROSPIKE_BATCH_FAILED,\n"+
+			"AEROSPIKE_MAX_ERROR_RATE.\n"+
+			"This base timeout value is also used as the interval multiplied by --retry-multiplier to increase\n"+
+			"the timeout value between retry attempts.")
 	flagSet.Float64Var(&f.RetryMultiplier, "retry-multiplier",
 		1,
-		"retry-multiplier is used to increase the delay between subsequent retry attempts.\n"+
+		"Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.\n"+
 			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.RetryMaxRetries, "retry-max-retries",
 		0,
-		"Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.")
+		"Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.\n"+
+			"The default is 0, indicating no retries will be performed")
 
 	flagSet.StringVar(&f.Mode, "mode",
 		"auto",

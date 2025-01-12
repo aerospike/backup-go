@@ -23,16 +23,26 @@ Aerospike Client Flags:
   -h, --host host[:tls-name][:port][,...]                                                           The Aerospike host. (default 127.0.0.1)
   -p, --port int                                                                                    The default Aerospike port. (default 3000)
   -U, --user string                                                                                 The Aerospike user to use to connect to the Aerospike cluster.
-  -P, --password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"                   The Aerospike password to use to connect to the Aerospike cluster.
-      --auth INTERNAL,EXTERNAL,PKI                                                                  The authentication mode used by the Aerospike server. INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP) which are configured on the server. EXTERNAL requires TLS. PKI allows TLS authentication and authorization based on a certificate. No user name needs to be configured. (default INTERNAL)
-      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other tls options are ignored.
-      --tls-name string                                                                             The server TLS context to use to authenticate the connection to Aerospike.
+  -P, --password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"                   The Aerospike password to use to connect to the Aerospike 
+                                                                                                    cluster.
+      --auth INTERNAL,EXTERNAL,PKI                                                                  The authentication mode used by the Aerospike server. INTERNAL 
+                                                                                                    uses standard user/pass. EXTERNAL uses external methods (like LDAP) 
+                                                                                                    which are configured on the server. EXTERNAL requires TLS. PKI allows 
+                                                                                                    TLS authentication and authorization based on a certificate. No user 
+                                                                                                    name needs to be configured. (default INTERNAL)
+      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other tls 
+                                                                                                    options are ignored.
+      --tls-name string                                                                             The server TLS context to use to authenticate the connection to 
+                                                                                                    Aerospike.
       --tls-cafile env-b64:<cert>,b64:<cert>,<cert-file-name>                                       The CA used when connecting to Aerospike.
       --tls-capath <cert-path-name>                                                                 A path containing CAs for connecting to Aerospike.
-      --tls-certfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                     The certificate file for mutual TLS authentication with Aerospike.
+      --tls-certfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                     The certificate file for mutual TLS authentication with 
+                                                                                                    Aerospike.
       --tls-keyfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                      The key file used for mutual TLS authentication with Aerospike.
       --tls-keyfile-password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"       The password used to decrypt the key-file if encrypted.
-      --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
+      --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same 
+                                                                                                    as Apache's SSLProtocol documented at 
+                                                                                                    https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)
       --client-timeout int         Initial host connection timeout duration. The timeout when opening a connection
                                    to the server host for the first time. (default 30000)
       --client-idle-timeout int    Idle timeout. Every time a connection is used, its idle
@@ -46,79 +56,101 @@ Aerospike Client Flags:
                                    stack will always be the least used. These connections are checked for IdleTimeout
                                    on every tend (usually 1 second).
                                    
-      --client-login-timeout int   specifies the timeout for login operation for external authentication such as LDAP. (default 10000)
+      --client-login-timeout int   Specifies the login operation timeout for external authentication methods such as LDAP. (default 10000)
 
 Restore Flags:
-  -d, --directory string         The Directory that holds the backup files. Required, unless -o or -e is used.
+  -d, --directory string         The directory that holds the backup files. Required, unless -o or -e is used.
   -n, --namespace string         The namespace to be backed up. Required.
-  -s, --set string               The set(s) to be backed up.
+  -s, --set string               The set(s) to be backed up. Accepts comma-separated values with no spaces: 'set1,set2,set3'
                                  If multiple sets are being backed up, filter-exp cannot be used.
-                                 if empty all sets.
+                                 If empty, include all sets.
   -B, --bin-list string          Only include the given bins in the backup.
+                                 Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
                                  If empty include all bins.
-  -R, --no-records               Don't backup any records.
-  -I, --no-indexes               Don't backup any indexes.
-      --no-udfs                  Don't backup any UDFs.
+  -R, --no-records               Don't back up any records.
+  -I, --no-indexes               Don't back up any indexes.
+      --no-udfs                  Don't back up any UDFs.
   -w, --parallel int             Maximum number of scan calls to run in parallel.
                                  If only one partition range is given, or the entire namespace is being backed up, the range
                                  of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
                                  filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
-                                 partition filters. (default 1)
+                                 partition filters. Accepts values from 1-1024 inclusive. (default 1)
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
       --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout.
-      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to total-timeout. If both are 0,
-                                 there is no socket idle time limit (default 10000)
+      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
+                                 If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
   -i, --input-file string         Restore from a single backup file. Use - for stdin.
                                   Required, unless --directory or --directory-list is used.
-                                  Incompatible with --mode=asb
-      --directory-list string     A comma separated list of paths to directories that hold the backup files. Required,
-                                  unless -i or -d is used. The paths may not contain commas
-                                  Example: `asrestore --directory-list /path/to/dir1/,/path/to/dir2
-                                  Incompatible with --mode=asb
+                                  Incompatible with --mode=asbx.
+      --directory-list string     A comma-separated list of paths to directories that hold the backup files. Required,
+                                  unless -i or -d is used. The paths may not contain commas.
+                                  Example: 'asrestore --directory-list /path/to/dir1/,/path/to/dir2'
+                                  Incompatible with --mode=asbx.
       --parent-directory string   A common root path for all paths used in --directory-list.
                                   This path is prepended to all entries in --directory-list.
-                                  Example: `asrestore --parent-directory /common/root/path --directory-list /path/to/dir1/,/path/to/dir2
-                                  Incompatible with --mode=asb
-  -u, --unique                    Skip records that already exist in the namespace;
-                                  Don't touch them.
-                                  Incompatible with --mode=asb
+                                  Example: 'asrestore --parent-directory /common/root/path
+                                  --directory-list /path/to/dir1/,/path/to/dir2'
+                                  Incompatible with --mode=asbx.
+  -u, --unique                    Skip modifying records that already exist in the namespace.
+                                  Incompatible with --mode=asbx.
   -r, --replace                   Fully replace records that already exist in the namespace.
-                                  This option still does a generation check by default and would need to be combined with the -g option 
-                                  if no generation check is desired. 
-                                  Note: this option is mutually exclusive to --unique.
-                                  Incompatible with --mode=asb
+                                  This option still performs a generation check by default and needs to be combined with the -g option
+                                  if you do not want to perform a generation check.
+                                  This option is mutually exclusive with --unique.
+                                  Incompatible with --mode=asbx.
   -g, --no-generation             Don't check the generation of records that already exist in the namespace.
-                                  Incompatible with --mode=asb
-      --ignore-record-error       Ignore permanent record specific error. e.g AEROSPIKE_RECORD_TOO_BIG.
-                                  By default such errors are not ignored and asrestore terminates.
-                                  Optional: Use verbose mode to see errors in detail.
+                                  Incompatible with --mode=asbx.
+      --ignore-record-error       Ignore errors specific to records, not UDFs or indexes. The errors are:
+                                  AEROSPIKE_RECORD_TOO_BIG,
+                                  AEROSPIKE_KEY_MISMATCH,
+                                  AEROSPIKE_BIN_NAME_TOO_LONG,
+                                  AEROSPIKE_ALWAYS_FORBIDDEN,
+                                  AEROSPIKE_FAIL_FORBIDDEN,
+                                  AEROSPIKE_BIN_TYPE_ERROR,
+                                  AEROSPIKE_BIN_NOT_FOUND.
+                                  By default, these errors are not ignored and asrestore terminates.
       --disable-batch-writes      Disables the use of batch writes when restoring records to the Aerospike cluster.
-                                  By default, the cluster is checked for batch write support, so only set this flag if you explicitly
-                                  don't want
-                                  batch writes to be used or asrestore is failing to recognize that batch writes are disabled
-                                  and is failing to work because of it.
-                                  Incompatible with --mode=asb
-      --max-async-batches int     The max number of outstanding async record batch write calls at a time.
-                                  For pre-6.0 servers, 'batches' are only a logical grouping of
-                                  records, and each record is uploaded individually. The true max
-                                  number of async aerospike calls would then be
-                                  <max-async-batches> * <batch-size>.
-                                  Incompatible with --mode=asb (default 32)
-      --batch-size int            The max allowed number of records to simultaneously upload
-                                  in an async batch write calls to make to aerospike at a time.
-                                  Default is 128 with batch writes enabled, or 16 without batch writes.
-                                  Incompatible with --mode=asb (default 128)
+                                  By default, the cluster is checked for batch write support. Only set this flag if you explicitly
+                                  don't want batch writes to be used or if asrestore is failing to work because it cannot recognize
+                                  that batch writes are disabled.
+                                  Incompatible with --mode=asbx.
+      --max-async-batches int     To send data to Aerospike Database, asrestore creates write workers that work in parallel.
+                                  This value is the number of workers that form batches and send them to the database.
+                                  For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,
+                                  and each record is uploaded individually.
+                                  The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.
+                                  Incompatible with --mode=asbx. (default 32)
+      --batch-size int            The max allowed number of records to simultaneously upload to Aerospike.
+                                  Default is 128 with batch writes enabled. If you disable batch writes,
+                                  this flag is superseded because each worker sends writes one by one.
+                                  All three batch flags are linked. If --disable-batch-writes=false,
+                                  asrestore uses batch write workers to send data to the database.
+                                  Asrestore creates a number of workers equal to --max-async-batches that work in parallel,
+                                  and form and send a number of records equal to --batch-size to the database.
+                                  Incompatible with --mode=asbx. (default 128)
       --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
                                   recorded void-time.
-                                  Incompatible with --mode=asb
-  -T, --timeout int               Set the timeout (ms) for info commands. (default 10000)
-      --retry-base-timeout int    Set the initial delay between retry attempts in milliseconds (default 1000)
-      --retry-multiplier float    retry-multiplier is used to increase the delay between subsequent retry attempts.
+                                  Incompatible with --mode=asbx.
+  -T, --timeout int               Set the timeout (ms) for asinfo commands sent from asrestore to the database.
+                                  The info commands are to check version, get indexes, get udfs, count records, and check batch write support. (default 10000)
+      --retry-base-timeout int    Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database
+                                  during a restore. This retry sequence is triggered by the following non-critical errors:
+                                  AEROSPIKE_NO_AVAILABLE_CONNECTIONS_TO_NODE,
+                                  AEROSPIKE_TIMEOUT,
+                                  AEROSPIKE_DEVICE_OVERLOAD,
+                                  AEROSPIKE_NETWORK_ERROR,
+                                  AEROSPIKE_SERVER_NOT_AVAILABLE,
+                                  AEROSPIKE_BATCH_FAILED,
+                                  AEROSPIKE_MAX_ERROR_RATE.
+                                  This base timeout value is also used as the interval multiplied by --retry-multiplier to increase
+                                  the timeout value between retry attempts. (default 1000)
+      --retry-multiplier float    Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.
                                   The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
-      --retry-max-retries uint    Set the maximum number of retry attempts that will be made. If set to 0, no retries will be performed.
+      --retry-max-retries uint    Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.
+                                  The default is 0, indicating no retries will be performed
       --mode string               Restore mode: auto, asb, asbx. According to this parameter different restore processes wil be started.
                                   auto - starts restoring from both .asb and .asbx files.
                                   asb - restore only .asb backup files.
@@ -127,7 +159,7 @@ Restore Flags:
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
                                 Supported compression algorithms are: zstd, none
-                                Set the zstd compression level via the --compression-level option. Default level is 3. (default "NONE")
+                                Set the zstd compression level via the --compression-level option. (default "NONE")
       --compression-level int   zstd compression level. (default 3)
 
 Encryption Flags:
@@ -140,22 +172,23 @@ Encryption Flags:
       --encryption-key-secret string   Grabs the encryption key from secret-agent.
 
 Secret Agent Flags:
-Options pertaining to the Aerospike secret agent https://docs.aerospike.com/tools/secret-agent.
-Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike secret agent.
-To use a secret as an option, use this format 'secrets:<resource_name>:<secret_name>' 
-Example: asrestore --azure-account-name secret:resource1:azaccount
-      --sa-connection-type string   Secret agent connection type, supported types: tcp, unix. (default "tcp")
-      --sa-address string           Secret agent host for TCP connection or socket file path for UDS connection.
-      --sa-port int                 Secret agent port (only for TCP connection).
-      --sa-timeout int              Secret agent connection and reading timeout.
-      --sa-cafile string            Path to ca file for encrypted connection.
-      --sa-is-base64                Flag that shows if secret agent responses are encrypted with base64.
+Options pertaining to the Aerospike Secret Agent.
+See documentation here: https://aerospike.com/docs/tools/secret-agent.
+Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike Secret Agent.
+To use a secret as an option, use this format: 'secrets:<resource_name>:<secret_name>' 
+Example: asbackup --azure-account-name secret:resource1:azaccount
+      --sa-connection-type string   Secret Agent connection type, supported types: tcp, unix. (default "tcp")
+      --sa-address string           Secret Agent host for TCP connection or socket file path for UDS connection.
+      --sa-port int                 Secret Agent port (only for TCP connection).
+      --sa-timeout int              Secret Agent connection and reading timeout.
+      --sa-cafile string            Path to ca file for encrypted connections.
+      --sa-is-base64                Whether Secret Agent responses are Base64 encoded.
 
 AWS Flags:
 For S3 storage bucket name is mandatory, and is set with --s3-bucket-name flag.
 So --directory path will only contain folder name.
 --s3-endpoint-override is used in case you want to use minio, instead of AWS.
-Any AWS parameter can be retrieved from secret agent.
+Any AWS parameter can be retrieved from Secret Agent.
       --s3-bucket-name string         Existing S3 bucket name
       --s3-region string              The S3 region that the bucket(s) exist in.
       --s3-profile string             The S3 profile to use for credentials.
@@ -165,7 +198,7 @@ GCP Flags:
 For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
 So --directory path will only contain folder name.
 Flag --gcp-endpoint-override is mandatory, as each storage account has different service address.
-Any GCP parameter can be retrieved from secret agent.
+Any GCP parameter can be retrieved from Secret Agent.
       --gcp-key-path string            Path to file containing service account JSON key.
       --gcp-bucket-name string         Name of the Google cloud storage bucket.
       --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
@@ -176,7 +209,7 @@ So --directory path will only contain folder name.
 Flag --azure-endpoint is optional, and is used for tests with Azurit or any other Azure emulator.
 For authentication you can use --azure-account-name and --azure-account-key, or 
 --azure-tenant-id, --azure-client-id and azure-client-secret.
-Any Azure parameter can be retrieved from secret agent.
+Any Azure parameter can be retrieved from Secret Agent.
       --azure-account-name string     Azure account name for account name, key authorization.
       --azure-account-key string      Azure account key for account name, key authorization.
       --azure-tenant-id string        Azure tenant ID for Azure Active Directory authorization.

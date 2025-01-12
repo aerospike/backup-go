@@ -48,7 +48,7 @@ func (f *ClientPolicy) NewFlagSet() *pflag.FlagSet {
 			"on every tend (usually 1 second).\n")
 	flagSet.Int64Var(&f.LoginTimeout, "client-login-timeout",
 		10000,
-		"specifies the timeout for login operation for external authentication such as LDAP.")
+		"Specifies the login operation timeout for external authentication methods such as LDAP.")
 
 	return flagSet
 }

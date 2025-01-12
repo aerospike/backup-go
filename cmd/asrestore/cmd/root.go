@@ -79,7 +79,7 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 	rootCmd.SilenceUsage = true
 
 	appFlagSet := c.flagsApp.NewFlagSet()
-	aerospikeFlagSet := c.flagsAerospike.NewFlagSet(func(str string) string { return str })
+	aerospikeFlagSet := c.flagsAerospike.NewFlagSet(asFlags.DefaultWrapHelpString)
 	clientPolicyFlagSet := c.flagsClientPolicy.NewFlagSet()
 	commonFlagSet := c.flagsCommon.NewFlagSet()
 	restoreFlagSet := c.flagsRestore.NewFlagSet()
@@ -136,10 +136,11 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 
 		// Print section: Secret Agent Flags
 		fmt.Println("\nSecret Agent Flags:\n" +
-			"Options pertaining to the Aerospike secret agent https://docs.aerospike.com/tools/secret-agent.\n" +
-			"Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike secret agent.\n" +
-			"To use a secret as an option, use this format 'secrets:<resource_name>:<secret_name>' \n" +
-			"Example: asrestore --azure-account-name secret:resource1:azaccount")
+			"Options pertaining to the Aerospike Secret Agent.\n" +
+			"See documentation here: https://aerospike.com/docs/tools/secret-agent.\n" +
+			"Both asbackup and asrestore support getting all the cloud config parameters from the Aerospike Secret Agent.\n" +
+			"To use a secret as an option, use this format: 'secrets:<resource_name>:<secret_name>' \n" +
+			"Example: asbackup --azure-account-name secret:resource1:azaccount")
 		secretAgentFlagSet.PrintDefaults()
 
 		// Print section: AWS Flags
@@ -147,7 +148,7 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 			"For S3 storage bucket name is mandatory, and is set with --s3-bucket-name flag.\n" +
 			"So --directory path will only contain folder name.\n" +
 			"--s3-endpoint-override is used in case you want to use minio, instead of AWS.\n" +
-			"Any AWS parameter can be retrieved from secret agent.")
+			"Any AWS parameter can be retrieved from Secret Agent.")
 		awsFlagSet.PrintDefaults()
 
 		// Print section: GCP Flags
@@ -155,7 +156,7 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 			"For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.\n" +
 			"So --directory path will only contain folder name.\n" +
 			"Flag --gcp-endpoint-override is mandatory, as each storage account has different service address.\n" +
-			"Any GCP parameter can be retrieved from secret agent.")
+			"Any GCP parameter can be retrieved from Secret Agent.")
 		gcpFlagSet.PrintDefaults()
 
 		// Print section: Azure Flags
@@ -165,7 +166,7 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 			"Flag --azure-endpoint is optional, and is used for tests with Azurit or any other Azure emulator.\n" +
 			"For authentication you can use --azure-account-name and --azure-account-key, or \n" +
 			"--azure-tenant-id, --azure-client-id and azure-client-secret.\n" +
-			"Any Azure parameter can be retrieved from secret agent.")
+			"Any Azure parameter can be retrieved from Secret Agent.")
 		azureFlagSet.PrintDefaults()
 	}
 

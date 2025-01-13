@@ -37,6 +37,11 @@ type validator interface {
 type Reader struct {
 	// Optional parameters.
 	options
+
+	// objectsToStream is used to predefine a list of objects that must be read from storage.
+	// If objectsToStream is not set, we iterate through objects in storage and load them.
+	// If set, we load objects from this slice directly.
+	objectsToStream []string
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -67,6 +72,12 @@ func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	defer close(readersCh)
+
+	// If objects were preloaded, we stream them.
+	if len(r.objectsToStream) > 0 {
+		r.streamSetObjects(ctx, readersCh, errorsCh)
+		return
+	}
 
 	for _, path := range r.pathList {
 		// If it is a folder, open and return.
@@ -216,6 +227,34 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 	}
 
 	return nil
+}
+
+// ListObjects list all object in the path.
+func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
+	result := make([]string, 0)
+
+	fileInfo, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
+	}
+
+	for i := range fileInfo {
+		result = append(result, fileInfo[i].Name())
+	}
+
+	return result, nil
+}
+
+// SetObjectsToStream set objects to stream.
+func (r *Reader) SetObjectsToStream(list []string) {
+	r.objectsToStream = list
+}
+
+// streamSetObjects streams preloaded objects.
+func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	for i := range r.objectsToStream {
+		r.StreamFile(ctx, r.objectsToStream[i], readersCh, errorsCh)
+	}
 }
 
 // getFilesList returns sorted or unsorted files list from directory.

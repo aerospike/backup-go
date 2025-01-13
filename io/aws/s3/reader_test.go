@@ -37,13 +37,16 @@ const (
 	testS3Region   = "eu"
 	testS3Profile  = "minio"
 
-	testFolderStartAfter    = "folder_start_after"
-	testFolderPathList      = "folder_path_list"
-	testFolderFileList      = "folder_file_list"
-	testFolderSorted        = "folder_sorted"
-	testFileNameMetadata    = "metadata.yaml"
-	testFileNameAsbTemplate = "backup_%d.asb"
-	testFileContent         = "content"
+	testFolderStartAfter     = "folder_start_after"
+	testFolderPathList       = "folder_path_list"
+	testFolderFileList       = "folder_file_list"
+	testFolderSorted         = "folder_sorted"
+	testFolderMixed          = "folder_mixed"
+	testFileNameMetadata     = "metadata.yaml"
+	testFileNameAsbTemplate  = "backup_%d.asb"
+	testFileNameAsbxTemplate = "backup_%d.asbx"
+	testFileContentAsb       = "content"
+	testFileContentAsbx      = "content-asbx"
 
 	testFileContentSorted1 = "sorted1"
 	testFileContentSorted2 = "sorted2"
@@ -103,7 +106,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
 			Key:    aws.String(fileName),
-			Body:   bytes.NewReader([]byte(testFileContent)),
+			Body:   bytes.NewReader([]byte(testFileContentAsb)),
 		}); err != nil {
 			return err
 		}
@@ -113,7 +116,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
 			Key:    aws.String(fileName),
-			Body:   bytes.NewReader([]byte(testFileContent)),
+			Body:   bytes.NewReader([]byte(testFileContentAsb)),
 		}); err != nil {
 			return err
 		}
@@ -124,7 +127,25 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
 			Key:    aws.String(fileName),
-			Body:   bytes.NewReader([]byte(testFileContent)),
+			Body:   bytes.NewReader([]byte(testFileContentAsb)),
+		}); err != nil {
+			return err
+		}
+
+		fileName = fmt.Sprintf("%s/%s", testFolderMixed, fmt.Sprintf(testFileNameAsbTemplate, i))
+		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+			Body:   bytes.NewReader([]byte(testFileContentAsb)),
+		}); err != nil {
+			return err
+		}
+
+		fileName = fmt.Sprintf("%s/%s", testFolderMixed, fmt.Sprintf(testFileNameAsbxTemplate, i))
+		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+			Body:   bytes.NewReader([]byte(testFileContentAsbx)),
 		}); err != nil {
 			return err
 		}
@@ -411,6 +432,63 @@ func (s *AwsSuite) TestReader_StreamFilesDESC() {
 			s.Require().Equal(expecting, result)
 		}
 	}
+}
+
+func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		WithDir(testFolderMixed),
+	)
+	s.Require().NoError(err)
+
+	list, err := reader.ListObjects(ctx, testFolderMixed)
+	s.Require().NoError(err)
+
+	_, asbxList := filterList(list)
+
+	reader.SetObjectsToStream(asbxList)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 5, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			s.Require().NoError(err)
+			s.Require().Equal(testFileContentAsbx, result)
+		}
+	}
+}
+
+func filterList(list []string) (asbList, asbxList []string) {
+	for i := range list {
+		switch filepath.Ext(list[i]) {
+		case ".asb":
+			asbList = append(asbList, list[i])
+		case ".asbx":
+			asbxList = append(asbxList, list[i])
+		}
+	}
+	return asbList, asbxList
 }
 
 func readAll(r io.ReadCloser) (string, error) {

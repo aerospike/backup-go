@@ -1227,6 +1227,13 @@ type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
+func (b *byteReadWriterFactory) ListObjects(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
+func (b *byteReadWriterFactory) SetObjectsToStream(_ []string) {
+}
+
 func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
 	readersCh <- reader

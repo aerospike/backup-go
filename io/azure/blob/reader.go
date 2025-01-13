@@ -44,8 +44,14 @@ type Reader struct {
 	options
 
 	client *azblob.Client
+
 	// containerName contains name of the container to read from.
 	containerName string
+
+	// objectsToStream is used to predefine a list of objects that must be read from storage.
+	// If objectsToStream is not set, we iterate through objects in storage and load them.
+	// If set, we load objects from this slice directly.
+	objectsToStream []string
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -89,6 +95,12 @@ func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	defer close(readersCh)
+
+	// If objects were preloaded, we stream them.
+	if len(r.objectsToStream) > 0 {
+		r.streamSetObjects(ctx, readersCh, errorsCh)
+		return
+	}
 
 	for _, path := range r.pathList {
 		// If it is a folder, open and return.
@@ -297,6 +309,62 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	}
 
 	return fmt.Errorf("%s is empty", path)
+}
+
+// ListObjects list all object in the path.
+func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
+	result := make([]string, 0)
+
+	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
+		Prefix: &path,
+	})
+
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		for _, blob := range page.Segment.BlobItems {
+			// Skip files in folders.
+			if r.shouldSkip(path, *blob.Name) {
+				continue
+			}
+
+			if blob.Name != nil {
+				result = append(result, *blob.Name)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// SetObjectsToStream set objects to stream.
+func (r *Reader) SetObjectsToStream(list []string) {
+	r.objectsToStream = list
+}
+
+// streamSetObjects streams preloaded objects.
+func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	objectsToProcess := make(chan *string, bufferSize)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
+	}()
+
+	for i := range r.objectsToStream {
+		k := r.objectsToStream[i]
+		objectsToProcess <- &k
+	}
+
+	close(objectsToProcess)
+	wg.Wait()
 }
 
 func isDirectory(prefix, fileName string) bool {

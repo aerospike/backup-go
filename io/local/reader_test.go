@@ -503,3 +503,56 @@ func (s *readerTestSuite) TestReader_getFilesListDesc() {
 
 	s.Equal(expResult, result)
 }
+
+func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
+	dir := s.T().TempDir()
+	ctx := context.Background()
+
+	expResult := []string{"file3.asb", "file2.asbx", "file1.asb", "file2.asb", "file1.asbx"}
+
+	for i := range expResult {
+		err := createTmpFile(dir, expResult[i])
+		require.NoError(s.T(), err)
+	}
+
+	r, err := NewReader(
+		WithDir(dir),
+	)
+	s.Require().NoError(err)
+
+	list, err := r.ListObjects(ctx, dir)
+	s.Require().NoError(err)
+	_, asbxList := filterList(list)
+	r.SetObjectsToStream(asbxList)
+
+	readerChan := make(chan io.ReadCloser)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(2, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
+}
+
+func filterList(list []string) (asbList, asbxList []string) {
+	for i := range list {
+		switch filepath.Ext(list[i]) {
+		case ".asb":
+			asbList = append(asbList, list[i])
+		case ".asbx":
+			asbxList = append(asbxList, list[i])
+		}
+	}
+	return asbList, asbxList
+}

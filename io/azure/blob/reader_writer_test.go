@@ -48,13 +48,16 @@ const (
 	testWriteFolderWithDataError = "folder_write_with_data_error/"
 	testWriteFolderMixedData     = "folder_write_mixed_data/"
 	testWriteFolderOneFile       = "folder_write_one_file/"
+	testFolderMixedBackups       = "folder_mixed_backup/"
 
 	testFolderNameTemplate    = "folder_%d/"
 	testFileNameTemplate      = "backup_%d.asb"
+	testFileNameTemplateAsbx  = "backup_%d.asbx"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
 
 	testFileContent       = "content"
+	testFileContentAsbx   = "content-asbx"
 	testFileContentLength = 7
 
 	testFileContentSorted1 = "sorted1"
@@ -163,6 +166,17 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 		// File list
 		fileName = fmt.Sprintf("%s%s", testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, i))
 		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
+			return err
+		}
+
+		// Mixed backup: asb and asbx.
+		fileName = fmt.Sprintf("%s%s", testFolderMixedBackups, fmt.Sprintf(testFileNameTemplate, i))
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
+			return err
+		}
+
+		fileName = fmt.Sprintf("%s%s", testFolderMixedBackups, fmt.Sprintf(testFileNameTemplateAsbx, i))
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContentAsbx), nil); err != nil {
 			return err
 		}
 	}
@@ -761,6 +775,52 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 	}
 }
 
+func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testContainerName,
+		WithDir(testFolderMixedBackups),
+	)
+	s.Require().NoError(err)
+
+	list, err := reader.ListObjects(ctx, testFolderMixedBackups)
+	s.Require().NoError(err)
+
+	_, asbxList := filterList(list)
+	reader.SetObjectsToStream(asbxList)
+
+	rCH := make(chan io.ReadCloser)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 5, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f)
+			s.Require().NoError(err)
+			s.Require().Equal(testFileContentAsbx, result)
+		}
+	}
+}
+
 func (s *AzureSuite) TestIsSkippedByStartAfter() {
 	tests := []struct {
 		name       string
@@ -802,6 +862,18 @@ func (s *AzureSuite) TestIsSkippedByStartAfter() {
 			}
 		})
 	}
+}
+
+func filterList(list []string) (asbList, asbxList []string) {
+	for i := range list {
+		switch filepath.Ext(list[i]) {
+		case ".asb":
+			asbList = append(asbList, list[i])
+		case ".asbx":
+			asbxList = append(asbxList, list[i])
+		}
+	}
+	return asbList, asbxList
 }
 
 func readAll(r io.ReadCloser) (string, error) {

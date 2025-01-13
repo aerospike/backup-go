@@ -18,9 +18,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -107,7 +110,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 	case models.RestoreModeASBX:
 		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
 
-		hXdr, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
+		hXdr, err := r.backupClient.Restore(ctx, r.restoreConfig, r.xdrReader)
 		if err != nil {
 			return fmt.Errorf("failed to start xdr restore: %w", err)
 		}
@@ -130,7 +133,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 		restoreXdrCfg := *r.restoreConfig
 		restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
 
-		hXdr, err := r.backupClient.RestoreXDR(ctx, &restoreXdrCfg, r.xdrReader)
+		hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
 		if err != nil {
 			return fmt.Errorf("failed to start xdr restore: %w", err)
 		}
@@ -179,14 +182,47 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
 		}
+		// List all files first.
+		list, err := reader.ListObjects(ctx, params.CommonParams.Directory)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to list objects: %w", err)
+		}
+		// Separate each file type for different lists.
+		asbList, asbxList := splitList(list)
+
+		// Load ASB files for reading.
+		reader.SetObjectsToStream(asbList)
 
 		xdrReader, err = newReader(ctx, params, sa, true)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
+		// Load ASBX files for reading.
+		xdrReader.SetObjectsToStream(asbxList)
 
 		return reader, xdrReader, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
 	}
+}
+
+// splitList splits one file list to 2 lists for asb and for asbx restore.
+func splitList(list []string) (asbList, asbxList []string) {
+	asbVal := asb.NewValidator()
+	asbxVal := asbx.NewValidator()
+
+	for i := range list {
+		// If valid for asb, append to asbList.
+		if err := asbVal.Run(list[i]); err == nil {
+			asbList = append(asbList, list[i])
+		}
+		// If valid for asbx, append to asbxList.
+		if err := asbxVal.Run(list[i]); err == nil {
+			asbxList = append(asbxList, list[i])
+		}
+	}
+	// TODO: check if this sort work with file limit set.
+	sort.Strings(asbxList)
+
+	return asbList, asbxList
 }

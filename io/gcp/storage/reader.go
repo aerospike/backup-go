@@ -44,8 +44,14 @@ type Reader struct {
 
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
 	bucketHandle *storage.BucketHandle
+
 	// bucketName contains name of the bucket to read from.
 	bucketName string
+
+	// objectsToStream is used to predefine a list of objects that must be read from storage.
+	// If objectsToStream is not set, we iterate through objects in storage and load them.
+	// If set, we load objects from this slice directly.
+	objectsToStream []string
 }
 
 // NewReader returns new GCP storage directory/file reader.
@@ -90,6 +96,12 @@ func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
 ) {
 	defer close(readersCh)
+
+	// If objects were preloaded, we stream them.
+	if len(r.objectsToStream) > 0 {
+		r.streamSetObjects(ctx, readersCh, errorsCh)
+		return
+	}
 
 	for _, path := range r.pathList {
 		// If it is a folder, open and return.
@@ -147,7 +159,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		// Skip files in folders.
-		if isDirectory(path, objAttrs.Name) && !r.withNestedDir {
+		if r.shouldSkip(path, objAttrs.Name) {
 			continue
 		}
 
@@ -285,7 +297,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 
 		// Skip files in folders.
-		if isDirectory(path, objAttrs.Name) && !r.withNestedDir {
+		if r.shouldSkip(path, objAttrs.Name) {
 			continue
 		}
 
@@ -304,6 +316,72 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	}
 
 	return fmt.Errorf("%s is empty", path)
+}
+
+// ListObjects list all object in the path.
+func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
+	result := make([]string, 0)
+
+	it := r.bucketHandle.Objects(ctx, &storage.Query{
+		Prefix:      path,
+		StartOffset: r.startOffset,
+	})
+
+	for {
+		// Iterate over bucket until we're done.
+		objAttrs, err := it.Next()
+		if err != nil {
+			if !errors.Is(err, iterator.Done) {
+				return nil, fmt.Errorf("failed to read object attr from bucket %s: %w",
+					r.bucketName, err)
+			}
+
+			break
+		}
+
+		// Skip files in folders.
+		if r.shouldSkip(path, objAttrs.Name) {
+			continue
+		}
+
+		if objAttrs.Name != "" {
+			result = append(result, objAttrs.Name)
+		}
+	}
+
+	return result, nil
+}
+
+// SetObjectsToStream set objects to stream.
+func (r *Reader) SetObjectsToStream(list []string) {
+	r.objectsToStream = list
+}
+
+// streamSetObjects streams preloaded objects.
+func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	objectsToProcess := make(chan *string, bufferSize)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
+	}()
+
+	for i := range r.objectsToStream {
+		k := r.objectsToStream[i]
+		objectsToProcess <- &k
+	}
+
+	close(objectsToProcess)
+	wg.Wait()
+}
+
+// shouldSkip performs check, is we should skip files.
+func (r *Reader) shouldSkip(path, fileName string) bool {
+	return isDirectory(path, fileName) && !r.withNestedDir
 }
 
 func isDirectory(prefix, fileName string) bool {

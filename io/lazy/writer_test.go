@@ -39,7 +39,7 @@ func TestLazyWriter(t *testing.T) {
 		return file, nil
 	}
 
-	writer, err := NewWriter(ctx, openFunc)
+	writer, err := NewWriter(ctx, 1, openFunc)
 	require.NoError(t, err)
 
 	// Check that file not exist.

@@ -166,7 +166,7 @@ func distributeFiles(input chan models.File, output []chan models.File, errors c
 
 		num, err := strconv.Atoi(parts[0])
 		if err != nil {
-			errors <- fmt.Errorf("failed to parse distibution file number: %w", err)
+			errors <- fmt.Errorf("failed to parse distibution file number for file %s: %w", file.Name, err)
 			return
 		}
 

@@ -328,7 +328,7 @@ func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, 
 		return sized.NewWriter(ctx, n, nil, bh.config.FileLimit, bh.newConfiguredWriter)
 	}
 
-	return lazy.NewWriter(ctx, bh.newConfiguredWriter)
+	return lazy.NewWriter(ctx, n, bh.newConfiguredWriter)
 }
 
 func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string) (io.WriteCloser, error) {

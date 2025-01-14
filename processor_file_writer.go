@@ -135,7 +135,7 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveComm
 		return sized.NewWriter(ctx, n, saveCommandChan, fileLimit, fw.configureWriter)
 	}
 
-	return lazy.NewWriter(ctx, fw.configureWriter)
+	return lazy.NewWriter(ctx, n, fw.configureWriter)
 }
 
 // configureWriter returns configured writer.

@@ -200,7 +200,7 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 //   - reader is used only for reading a state file for continuation operations.
 func (c *Client) Backup(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	writer Writer,
 	reader StreamingReader,
 ) (*BackupHandler, error) {
@@ -232,7 +232,7 @@ func (c *Client) Backup(
 //   - writer creates new writers for the backup operation.
 func (c *Client) BackupXDR(
 	ctx context.Context,
-	config *BackupConfigXDR,
+	config *ConfigBackupXDR,
 	writer Writer,
 ) (*HandlerBackupXDR, error) {
 	if config == nil {
@@ -266,7 +266,7 @@ type Restorer interface {
 //   - streamingReader provides readers with access to backup data.
 func (c *Client) Restore(
 	ctx context.Context,
-	config *RestoreConfig,
+	config *ConfigRestore,
 	streamingReader StreamingReader,
 ) (Restorer, error) {
 	if config == nil {
@@ -308,7 +308,7 @@ func (c *Client) AerospikeClient() AerospikeClient {
 //   - estimateSamples is number of records to be scanned for calculations.
 func (c *Client) Estimate(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	estimateSamples int64) (uint64, error) {
 	if config == nil {
 		return 0, fmt.Errorf("backup config required")

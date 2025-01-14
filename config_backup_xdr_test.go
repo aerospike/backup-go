@@ -19,13 +19,13 @@ import "testing"
 func TestConfigBackupXDR_validate(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  BackupConfigXDR
+		config  ConfigBackupXDR
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name: "valid config",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:                           "dc1",
 				LocalAddress:                 "127.0.0.1",
 				LocalPort:                    3000,
@@ -43,7 +43,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "invalid rewind",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      3000,
@@ -56,7 +56,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "negative file limit",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      3000,
@@ -70,7 +70,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "invalid parallel write - too low",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      3000,
@@ -84,7 +84,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "empty dc",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      3000,
 				Namespace:      "test",
@@ -97,7 +97,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "empty local address",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalPort:      3000,
 				Namespace:      "test",
@@ -110,7 +110,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "invalid port - negative",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      -1,
@@ -124,7 +124,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "invalid port - too high",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      65536,
@@ -138,7 +138,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "empty namespace",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      3000,
@@ -151,7 +151,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "negative read timeout",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:                     "dc1",
 				LocalAddress:           "127.0.0.1",
 				LocalPort:              3000,
@@ -166,7 +166,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "negative write timeout",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:                       "dc1",
 				LocalAddress:             "127.0.0.1",
 				LocalPort:                3000,
@@ -181,7 +181,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "negative result queue size",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:              "dc1",
 				LocalAddress:    "127.0.0.1",
 				LocalPort:       3000,
@@ -196,7 +196,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "negative ack queue size",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      3000,
@@ -211,7 +211,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "negative info polling period",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:                           "dc1",
 				LocalAddress:                 "127.0.0.1",
 				LocalPort:                    3000,
@@ -226,7 +226,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		},
 		{
 			name: "max connections less than 1",
-			config: BackupConfigXDR{
+			config: ConfigBackupXDR{
 				DC:             "dc1",
 				LocalAddress:   "127.0.0.1",
 				LocalPort:      3000,
@@ -244,11 +244,11 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("BackupConfigXDR.validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ConfigBackupXDR.validate() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr && err.Error() != tt.errMsg {
-				t.Errorf("BackupConfigXDR.validate() error message = %v, want %v", err.Error(), tt.errMsg)
+				t.Errorf("ConfigBackupXDR.validate() error message = %v, want %v", err.Error(), tt.errMsg)
 			}
 		})
 	}

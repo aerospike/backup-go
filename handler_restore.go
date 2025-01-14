@@ -59,7 +59,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 
 	readProcessor  *fileReaderProcessor[T]
 	writeProcessor *recordWriterProcessor[T]
-	config         *RestoreConfig
+	config         *ConfigRestore
 	stats          *models.RestoreStats
 
 	logger  *slog.Logger
@@ -71,7 +71,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 // newRestoreHandler creates a new RestoreHandler.
 func newRestoreHandler[T models.TokenConstraint](
 	ctx context.Context,
-	config *RestoreConfig,
+	config *ConfigRestore,
 	aerospikeClient AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,

@@ -33,7 +33,7 @@ const idRestore = "asrestore-cli"
 
 type ASRestore struct {
 	backupClient  *backup.Client
-	restoreConfig *backup.RestoreConfig
+	restoreConfig *backup.ConfigRestore
 	reader        backup.StreamingReader
 	xdrReader     backup.StreamingReader
 	// Restore Mode: auto, asb, asbx
@@ -166,7 +166,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 	return nil
 }
 
-func initializeRestoreConfigs(params *ASRestoreParams) *backup.RestoreConfig {
+func initializeRestoreConfigs(params *ASRestoreParams) *backup.ConfigRestore {
 	return mapRestoreConfig(params)
 }
 

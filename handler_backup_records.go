@@ -33,7 +33,7 @@ import (
 )
 
 type backupRecordsHandler struct {
-	config          *BackupConfig
+	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
@@ -41,7 +41,7 @@ type backupRecordsHandler struct {
 }
 
 func newBackupRecordsHandler(
-	config *BackupConfig,
+	config *ConfigBackup,
 	ac AerospikeClient,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,

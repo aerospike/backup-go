@@ -60,7 +60,7 @@ type BackupHandler struct {
 
 	writer          Writer
 	encoder         Encoder[*models.Token]
-	config          *BackupConfig
+	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 
 	logger                 *slog.Logger
@@ -79,7 +79,7 @@ type BackupHandler struct {
 // newBackupHandler creates a new BackupHandler.
 func newBackupHandler(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	ac AerospikeClient,
 	logger *slog.Logger,
 	writer Writer,

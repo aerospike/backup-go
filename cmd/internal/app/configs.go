@@ -39,7 +39,7 @@ var (
 	expDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2}$`)
 )
 
-func mapBackupConfig(params *ASBackupParams) (*backup.BackupConfig, error) {
+func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 	c := backup.NewDefaultBackupConfig()
 	c.Namespace = params.CommonParams.Namespace
 	c.SetList = splitByComma(params.CommonParams.SetList)
@@ -120,8 +120,8 @@ func mapBackupConfig(params *ASBackupParams) (*backup.BackupConfig, error) {
 	return c, nil
 }
 
-func mapBackupXDRConfig(params *ASBackupParams) *backup.BackupConfigXDR {
-	c := &backup.BackupConfigXDR{
+func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
+	c := &backup.ConfigBackupXDR{
 		InfoPolicy:                   aerospike.NewInfoPolicy(),
 		EncryptionPolicy:             mapEncryptionPolicy(params.Encryption),
 		CompressionPolicy:            mapCompressionPolicy(params.Compression),
@@ -146,7 +146,7 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.BackupConfigXDR {
 	return c
 }
 
-func mapRestoreConfig(params *ASRestoreParams) *backup.RestoreConfig {
+func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
 	c := backup.NewDefaultRestoreConfig()
 	c.Namespace = mapRestoreNamespace(params.CommonParams.Namespace)
 	c.SetList = splitByComma(params.CommonParams.SetList)

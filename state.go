@@ -60,7 +60,7 @@ type State struct {
 // if it is the first operation, new state instance will be returned.
 func NewState(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	reader StreamingReader,
 	writer Writer,
 	logger *slog.Logger,
@@ -80,7 +80,7 @@ func NewState(
 // newState creates status service from parameters, for backup operations.
 func newState(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	writer Writer,
 	logger *slog.Logger,
 ) *State {
@@ -105,7 +105,7 @@ func newState(
 // newStateFromFile creates a status service from the file, to continue operations.
 func newStateFromFile(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	reader StreamingReader,
 	writer Writer,
 	logger *slog.Logger,

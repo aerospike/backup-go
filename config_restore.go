@@ -21,8 +21,8 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-// RestoreConfig contains configuration for the restore operation.
-type RestoreConfig struct {
+// ConfigRestore contains configuration for the restore operation.
+type ConfigRestore struct {
 	// InfoPolicy applies to Aerospike Info requests made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -77,9 +77,9 @@ type RestoreConfig struct {
 	IgnoreRecordError bool
 }
 
-// NewDefaultRestoreConfig returns a new RestoreConfig with default values.
-func NewDefaultRestoreConfig() *RestoreConfig {
-	return &RestoreConfig{
+// NewDefaultRestoreConfig returns a new ConfigRestore with default values.
+func NewDefaultRestoreConfig() *ConfigRestore {
+	return &ConfigRestore{
 		Parallel:        4,
 		BatchSize:       128,
 		MaxAsyncBatches: 16,
@@ -87,7 +87,7 @@ func NewDefaultRestoreConfig() *RestoreConfig {
 	}
 }
 
-func (c *RestoreConfig) validate() error {
+func (c *ConfigRestore) validate() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}

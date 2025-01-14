@@ -29,7 +29,7 @@ import (
 
 // recordReaderProcessor configure and create record readers pipelines.
 type recordReaderProcessor[T models.TokenConstraint] struct {
-	xdrConfig *BackupConfigXDR
+	xdrConfig *ConfigBackupXDR
 	// add scanConfig in the future.
 	aerospikeClient AerospikeClient
 	infoClient      *asinfo.InfoClient
@@ -41,7 +41,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 
 // newRecordReaderProcessor returns new record reader processor.
 func newRecordReaderProcessor[T models.TokenConstraint](
-	xdrConfig *BackupConfigXDR,
+	xdrConfig *ConfigBackupXDR,
 	aerospikeClient AerospikeClient,
 	infoClient *asinfo.InfoClient,
 	state *State,

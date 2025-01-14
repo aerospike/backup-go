@@ -22,10 +22,8 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v7"
 )
 
-// BackupConfigXDR contains configuration for the xdr backup operation.
-//
-//nolint:revive // To remain consistent with old implementation, we use BackupConfigXDR name instead of ConfigBackupXDR.
-type BackupConfigXDR struct {
+// ConfigBackupXDR contains configuration for the xdr backup operation.
+type ConfigBackupXDR struct {
 	// InfoPolicy applies to Aerospike Info requests made during backup and
 	// restore. If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -78,7 +76,7 @@ type BackupConfigXDR struct {
 	InfoPolingPeriodMilliseconds int64
 }
 
-func (c *BackupConfigXDR) validate() error {
+func (c *ConfigBackupXDR) validate() error {
 	if err := validateRewind(c.Rewind); err != nil {
 		return err
 	}

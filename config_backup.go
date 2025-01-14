@@ -22,8 +22,8 @@ import (
 	"github.com/aerospike/backup-go/pipeline"
 )
 
-// BackupConfig contains configuration for the backup operation.
-type BackupConfig struct {
+// ConfigBackup contains configuration for the backup operation.
+type ConfigBackup struct {
 	// InfoPolicy applies to Aerospike Info requests made during backup and
 	// restore. If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -127,9 +127,9 @@ type BackupConfig struct {
 	OutputFilePrefix string
 }
 
-// NewDefaultBackupConfig returns a new BackupConfig with default values.
-func NewDefaultBackupConfig() *BackupConfig {
-	return &BackupConfig{
+// NewDefaultBackupConfig returns a new ConfigBackup with default values.
+func NewDefaultBackupConfig() *ConfigBackup {
+	return &ConfigBackup{
 		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
 		ParallelRead:     1,
 		ParallelWrite:    1,
@@ -140,12 +140,12 @@ func NewDefaultBackupConfig() *BackupConfig {
 }
 
 // isParalleledByNodes checks if backup is parallel by nodes.
-func (c *BackupConfig) isParalleledByNodes() bool {
+func (c *ConfigBackup) isParalleledByNodes() bool {
 	return c.ParallelNodes || len(c.NodeList) > 0
 }
 
 // isDefaultPartitionFilter checks if default filter is set.
-func (c *BackupConfig) isDefaultPartitionFilter() bool {
+func (c *ConfigBackup) isDefaultPartitionFilter() bool {
 	return len(c.PartitionFilters) == 1 &&
 		c.PartitionFilters[0].Begin == 0 &&
 		c.PartitionFilters[0].Count == MaxPartitions &&
@@ -153,22 +153,22 @@ func (c *BackupConfig) isDefaultPartitionFilter() bool {
 }
 
 // isStateFirstRun checks if it is first run of backup with a state file.
-func (c *BackupConfig) isStateFirstRun() bool {
+func (c *ConfigBackup) isStateFirstRun() bool {
 	return c.StateFile != "" && !c.Continue
 }
 
 // isStateContinueRun checks if we continue backup from a state file.
-func (c *BackupConfig) isStateContinue() bool {
+func (c *ConfigBackup) isStateContinue() bool {
 	return c.StateFile != "" && c.Continue
 }
 
-func (c *BackupConfig) isFullBackup() bool {
+func (c *ConfigBackup) isFullBackup() bool {
 	// full backup doesn't have a lower bound.
 	return c.ModAfter == nil && c.isDefaultPartitionFilter() && c.ScanPolicy.FilterExpression == nil
 }
 
 //nolint:gocyclo // validate func is long func with a lot of checks.
-func (c *BackupConfig) validate() error {
+func (c *ConfigBackup) validate() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
 	}

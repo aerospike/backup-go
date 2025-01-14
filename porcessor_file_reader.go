@@ -31,7 +31,7 @@ import (
 // fileReaderProcessor configure and create file readers pipelines.
 type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
-	config *RestoreConfig
+	config *ConfigRestore
 
 	readersCh chan models.File
 	errorsCh  chan error
@@ -43,7 +43,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 
 func newFileReaderProcessor[T models.TokenConstraint](
 	reader StreamingReader,
-	config *RestoreConfig,
+	config *ConfigRestore,
 	readersCh chan models.File,
 	errorsCh chan error,
 	logger *slog.Logger,

@@ -30,8 +30,8 @@ const idBackup = "asbackup-cli"
 
 type ASBackup struct {
 	backupClient    *backup.Client
-	backupConfig    *backup.BackupConfig
-	backupConfigXDR *backup.BackupConfigXDR
+	backupConfig    *backup.ConfigBackup
+	backupConfigXDR *backup.ConfigBackupXDR
 
 	writer backup.Writer
 	// reader is used to read a state file.
@@ -140,10 +140,10 @@ func NewASBackup(
 	return asb, nil
 }
 
-func initializeBackupConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.BackupConfigXDR, error) {
+func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *backup.ConfigBackupXDR, error) {
 	var (
-		backupConfig    *backup.BackupConfig
-		backupXDRConfig *backup.BackupConfigXDR
+		backupConfig    *backup.ConfigBackup
+		backupXDRConfig *backup.ConfigBackupXDR
 		err             error
 	)
 
@@ -264,7 +264,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 	return nil
 }
 
-func getSecretAgent(b *backup.BackupConfig, bxdr *backup.BackupConfigXDR) *backup.SecretAgentConfig {
+func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
 	switch {
 	case b != nil:
 		return b.SecretAgentConfig
@@ -275,7 +275,7 @@ func getSecretAgent(b *backup.BackupConfig, bxdr *backup.BackupConfigXDR) *backu
 	}
 }
 
-func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.BackupConfigXDR) error {
+func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
 	address := fmt.Sprintf("%s:%d", cfg.LocalAddress, cfg.LocalPort)
 

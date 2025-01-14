@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/io/local/mocks"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -215,7 +216,7 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -263,7 +264,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -311,7 +312,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -355,7 +356,7 @@ func (s *AwsSuite) TestReader_StreamFilesASC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -373,7 +374,7 @@ func (s *AwsSuite) TestReader_StreamFilesASC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
 
 			s.Require().NoError(err)
@@ -405,7 +406,7 @@ func (s *AwsSuite) TestReader_StreamFilesDESC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -424,7 +425,7 @@ func (s *AwsSuite) TestReader_StreamFilesDESC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
 			expectedPostfix--
 
@@ -454,7 +455,7 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 
 	reader.SetObjectsToStream(asbxList)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -472,7 +473,7 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			s.Require().NoError(err)
 			s.Require().Equal(testFileContentAsbx, result)
 		}

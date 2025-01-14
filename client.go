@@ -232,7 +232,7 @@ func (c *Client) Backup(
 //   - writer creates new writers for the backup operation.
 func (c *Client) BackupXDR(
 	ctx context.Context,
-	config *ConfigBackupXDR,
+	config *BackupConfigXDR,
 	writer Writer,
 ) (*HandlerBackupXDR, error) {
 	if config == nil {

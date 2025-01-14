@@ -41,6 +41,9 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVarP(&f.Directory, "directory", "d",
 		"",
 		"The Directory that holds the backup files. Required.")
+	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
+		false,
+		"Remove existing backup file (-o) or files (-d).")
 	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
 		262144000, // 250 MB
 		"Rotate backup files, when their size crosses the given\n"+

@@ -11,6 +11,7 @@ import (
 
 	s3Storasge "github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
@@ -172,17 +173,17 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 	)
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go reader.StreamFiles(context.Background(), readerChan, errorChan)
 
 	select {
 	case r := <-readerChan:
-		buffer, err := io.ReadAll(r)
+		buffer, err := io.ReadAll(r.Reader)
 		if err != nil {
 			s.FailNow("failed to read", err)
 		}
-		_ = r.Close()
+		_ = r.Reader.Close()
 		return buffer
 	case err = <-errorChan:
 		require.NoError(s.T(), err)
@@ -236,17 +237,17 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 	)
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go reader.StreamFiles(context.Background(), readerChan, errorChan)
 
 	select {
 	case r := <-readerChan:
-		buffer, err := io.ReadAll(r)
+		buffer, err := io.ReadAll(r.Reader)
 		if err != nil {
 			s.FailNow("failed to read", err)
 		}
-		_ = r.Close()
+		_ = r.Reader.Close()
 		return buffer
 	case err = <-errorChan:
 		require.NoError(s.T(), err)

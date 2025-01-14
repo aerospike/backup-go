@@ -248,7 +248,7 @@ func (s *State) getFileSuffix() string {
 }
 
 func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.ReadCloser, error) {
-	readCh := make(chan io.ReadCloser)
+	readCh := make(chan models.File)
 	errCh := make(chan error)
 
 	go reader.StreamFile(ctx, fileName, readCh, errCh)
@@ -259,6 +259,6 @@ func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.
 	case err := <-errCh:
 		return nil, err
 	case file := <-readCh:
-		return file, nil
+		return file.Reader, nil
 	}
 }

@@ -1234,21 +1234,21 @@ func (b *byteReadWriterFactory) ListObjects(_ context.Context, _ string) ([]stri
 func (b *byteReadWriterFactory) SetObjectsToStream(_ []string) {
 }
 
-func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
+func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- models.File, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	readersCh <- reader
+	readersCh <- models.File{Reader: reader}
 	close(readersCh)
 }
 
-func (b *byteReadWriterFactory) StreamFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
+func (b *byteReadWriterFactory) StreamFile(_ context.Context, _ string, readersCh chan<- models.File, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	readersCh <- reader
+	readersCh <- models.File{Reader: reader}
 	close(readersCh)
 }
 
-func (b *byteReadWriterFactory) OpenFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
+func (b *byteReadWriterFactory) OpenFile(_ context.Context, _ string, readersCh chan<- models.File, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	readersCh <- reader
+	readersCh <- models.File{Reader: reader}
 	close(readersCh)
 }
 

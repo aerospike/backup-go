@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -234,8 +236,26 @@ func splitList(list []string) (asbList, asbxList []string) {
 			asbxList = append(asbxList, list[i])
 		}
 	}
-	// TODO: check if this sort work with file limit set.
-	sort.Strings(asbxList)
+
+	sortBySuffix(asbxList)
 
 	return asbList, asbxList
+}
+
+func sortBySuffix(files []string) {
+	sort.Slice(files, func(i, j int) bool {
+		// Get last number from each filename
+		num1 := getNumber(files[i])
+		num2 := getNumber(files[j])
+
+		return num1 < num2
+	})
+}
+
+func getNumber(filename string) int {
+	// Split by underscore and get last part before extension
+	parts := strings.Split(strings.TrimSuffix(filename, ".asbx"), "_")
+	num, _ := strconv.Atoi(parts[len(parts)-1])
+
+	return num
 }

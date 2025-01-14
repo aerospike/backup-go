@@ -37,7 +37,7 @@ type HandlerBackupXDR struct {
 	readProcessor   *recordReaderProcessor[*models.ASBXToken]
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
 	encoder         Encoder[*models.ASBXToken]
-	config          *ConfigBackupXDR
+	config          *BackupConfigXDR
 	infoClient      *asinfo.InfoClient
 	stats           *models.BackupStats
 
@@ -49,7 +49,7 @@ type HandlerBackupXDR struct {
 // newHandlerBackupXDR returns new xdr backup handler.
 func newBackupXDRHandler(
 	ctx context.Context,
-	config *ConfigBackupXDR,
+	config *BackupConfigXDR,
 	aerospikeClient AerospikeClient,
 	writer Writer,
 	logger *slog.Logger,

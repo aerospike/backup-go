@@ -215,7 +215,8 @@ func (r *RecordReader) serve() {
 				// Recovery in progress.
 				continue
 			}
-			// set once
+			// set once.
+			// Stop MRT writes in this checkpoint.
 			if r.checkpoint == 0 {
 				r.checkpoint = time.Now().Unix()
 			}
@@ -224,7 +225,8 @@ func (r *RecordReader) serve() {
 			clLag := cltime.NewCLTime(stats.Lag)
 			unixLag := clLag.Unix()
 
-			if r.checkpoint-unixLag > 0 {
+			if r.checkpoint-unixLag < 0 || stats.Lag == 0 {
+				// Start mrt writes.
 				// Stop.
 				r.Close()
 				return

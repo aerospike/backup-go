@@ -17,7 +17,6 @@ package backup
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 
 	"github.com/aerospike/backup-go/internal/logging"
@@ -33,12 +32,12 @@ type StreamingReader interface {
 	// StreamFiles creates readers from files and sends them to the channel.
 	// In case of an error, the error is sent to the error channel.
 	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
-	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
+	StreamFiles(context.Context, chan<- models.File, chan<- error)
 
 	// StreamFile creates a single file reader and sends io.Readers to the `readersCh`
 	// In case of an error, it is sent to the `errorsCh` channel.
 	// Must be run in a goroutine `go rh.reader.StreamFile()`.
-	StreamFile(ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error)
+	StreamFile(ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error)
 
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
@@ -83,7 +82,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Channel for transferring readers.
-	readersCh := make(chan io.ReadCloser)
+	readersCh := make(chan models.File)
 	// Channel for processing errors from readers or writers.
 	errorsCh := make(chan error)
 

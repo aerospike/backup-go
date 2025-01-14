@@ -31,7 +31,7 @@ func TestLazyWriter(t *testing.T) {
 
 	filePath := path.Join(t.TempDir(), testFileName)
 
-	openFunc := func(_ context.Context) (io.WriteCloser, error) {
+	openFunc := func(_ context.Context, _ string) (io.WriteCloser, error) {
 		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 		if err != nil {
 			return nil, err

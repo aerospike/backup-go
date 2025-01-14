@@ -630,7 +630,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 	tests := []struct {
 		name   string
 		params *ASBackupParams
-		verify func(*testing.T, *backup.ConfigBackupXDR)
+		verify func(*testing.T, *backup.BackupConfigXDR)
 	}{
 		{
 			name: "Default configuration",
@@ -645,7 +645,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				Encryption:  testEncryption(),
 				SecretAgent: testSecretAgent(),
 			},
-			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+			verify: func(t *testing.T, cfg *backup.BackupConfigXDR) {
 				t.Helper()
 				assert.Equal(t, "dc1", cfg.DC)
 				assert.Equal(t, "127.0.0.1", cfg.LocalAddress)
@@ -692,7 +692,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				Encryption:  testEncryption(),
 				SecretAgent: testSecretAgent(),
 			},
-			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+			verify: func(t *testing.T, cfg *backup.BackupConfigXDR) {
 				t.Helper()
 				assert.Equal(t, int64(1000), cfg.FileLimit)
 				assert.Equal(t, 4, cfg.ParallelWrite)
@@ -716,7 +716,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				},
 				// No compression, encryption or secret agent
 			},
-			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+			verify: func(t *testing.T, cfg *backup.BackupConfigXDR) {
 				t.Helper()
 				assert.Nil(t, cfg.CompressionPolicy)
 				assert.Nil(t, cfg.EncryptionPolicy)
@@ -732,7 +732,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 					Namespace: "test",
 				},
 			},
-			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+			verify: func(t *testing.T, cfg *backup.BackupConfigXDR) {
 				t.Helper()
 				assert.Equal(t, "dc1", cfg.DC)
 				assert.Equal(t, "test", cfg.Namespace)
@@ -757,7 +757,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 					InfoPolingPeriodMilliseconds: 0,
 				},
 			},
-			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
+			verify: func(t *testing.T, cfg *backup.BackupConfigXDR) {
 				t.Helper()
 				assert.Equal(t, int64(0), cfg.FileLimit)
 				assert.Equal(t, 0, cfg.ParallelWrite)

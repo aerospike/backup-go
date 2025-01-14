@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/api/iterator"
@@ -303,7 +304,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -343,7 +344,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -361,7 +362,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
 
 			s.Require().NoError(err)
@@ -389,7 +390,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedDESC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -408,7 +409,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedDESC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
 			expectedPostfix--
 
@@ -437,7 +438,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -466,7 +467,7 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -673,7 +674,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -711,7 +712,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -770,7 +771,7 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -814,7 +815,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -858,7 +859,7 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -902,7 +903,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 	_, asbxList := filterList(list)
 	reader.SetObjectsToStream(asbxList)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -920,7 +921,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			s.Require().NoError(err)
 			s.Require().Equal(testFileContentAsbx, result)
 		}

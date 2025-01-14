@@ -331,7 +331,7 @@ func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, 
 	return lazy.NewWriter(ctx, bh.newConfiguredWriter)
 }
 
-func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
+func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string) (io.WriteCloser, error) {
 	suffix := ""
 	if bh.state != nil {
 		suffix = bh.state.getFileSuffix()

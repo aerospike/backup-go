@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -231,7 +232,7 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -269,7 +270,7 @@ func (s *AzureSuite) TestReader_StreamSortedASC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -287,7 +288,7 @@ func (s *AzureSuite) TestReader_StreamSortedASC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
 
 			s.Require().NoError(err)
@@ -313,7 +314,7 @@ func (s *AzureSuite) TestReader_StreamSortedDESC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -332,7 +333,7 @@ func (s *AzureSuite) TestReader_StreamSortedDESC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
 			expectedPostfix--
 
@@ -358,7 +359,7 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -385,7 +386,7 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -459,7 +460,7 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -495,7 +496,7 @@ func (s *AzureSuite) TestReader_OpenFileErr() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -670,7 +671,7 @@ func (s *AzureSuite) TestReader_WithMarker() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -712,7 +713,7 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -754,7 +755,7 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -796,7 +797,7 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 	_, asbxList := filterList(list)
 	reader.SetObjectsToStream(asbxList)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -814,7 +815,7 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			s.Require().NoError(err)
 			s.Require().Equal(testFileContentAsbx, result)
 		}

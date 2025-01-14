@@ -46,7 +46,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
-	open := func(_ context.Context) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ string) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer: &bytes.Buffer{},
@@ -96,7 +96,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized_ErrLimit() {
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
-	open := func(_ context.Context) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ string) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer: &bytes.Buffer{},

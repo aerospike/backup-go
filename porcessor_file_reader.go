@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
+	"strings"
 
 	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
@@ -31,7 +33,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *RestoreConfig
 
-	readersCh chan io.ReadCloser
+	readersCh chan models.File
 	errorsCh  chan error
 
 	logger *slog.Logger
@@ -42,7 +44,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 func newFileReaderProcessor[T models.TokenConstraint](
 	reader StreamingReader,
 	config *RestoreConfig,
-	readersCh chan io.ReadCloser,
+	readersCh chan models.File,
 	errorsCh chan error,
 	logger *slog.Logger,
 ) *fileReaderProcessor[T] {
@@ -79,8 +81,22 @@ func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline
 	}
 
 	readWorkers := make([]pipeline.Worker[T], fr.parallel)
-	for i := 0; i < fr.parallel; i++ {
-		readWorkers[i] = pipeline.NewReadWorker[T](newTokenReader(fr.readersCh, fr.logger, fn))
+
+	switch fr.config.EncoderType {
+	case EncoderTypeASB:
+		for i := 0; i < fr.parallel; i++ {
+			readWorkers[i] = pipeline.NewReadWorker[T](newTokenReader(fr.readersCh, fr.logger, fn))
+		}
+	case EncoderTypeASBX:
+		workersReadChans := make([]chan models.File, fr.parallel)
+
+		for i := 0; i < fr.parallel; i++ {
+			rCh := make(chan models.File)
+			workersReadChans[i] = rCh
+			readWorkers[i] = pipeline.NewReadWorker[T](newTokenReader(rCh, fr.logger, fn))
+		}
+
+		go distributeFiles(fr.readersCh, workersReadChans, fr.errorsCh)
 	}
 
 	return readWorkers
@@ -136,4 +152,32 @@ func newEncryptionReader(
 	}
 
 	return encryptedReader, nil
+}
+
+// distributeFiles is only used for asbx restore, to follow the order of files.
+func distributeFiles(input chan models.File, output []chan models.File, errors chan<- error) {
+	if len(output) == 0 {
+		errors <- fmt.Errorf("failed to distibute files to 0 channels")
+		return
+	}
+
+	for file := range input {
+		parts := strings.SplitN(file.Name, "_", 2)
+
+		num, err := strconv.Atoi(parts[0])
+		if err != nil {
+			errors <- fmt.Errorf("failed to parse distibution file number: %w", err)
+			return
+		}
+
+		if num > len(output)-1 {
+			num = (len(output) - 1) % num
+		}
+
+		output[num] <- file
+	}
+	// Close channels at the end.
+	for i := range output {
+		close(output[i])
+	}
 }

@@ -120,8 +120,8 @@ func mapBackupConfig(params *ASBackupParams) (*backup.BackupConfig, error) {
 	return c, nil
 }
 
-func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
-	c := &backup.ConfigBackupXDR{
+func mapBackupXDRConfig(params *ASBackupParams) *backup.BackupConfigXDR {
+	c := &backup.BackupConfigXDR{
 		InfoPolicy:                   aerospike.NewInfoPolicy(),
 		EncryptionPolicy:             mapEncryptionPolicy(params.Encryption),
 		CompressionPolicy:            mapCompressionPolicy(params.Compression),

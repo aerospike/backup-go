@@ -29,7 +29,6 @@ import (
 )
 
 // fileWriterProcessor configure and creates file writers pipelines.
-// TODO: or may be FileWriterHandler?
 type fileWriterProcessor[T models.TokenConstraint] struct {
 	prefixGenerator func() string
 	suffixGenerator func() string
@@ -140,9 +139,9 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveComm
 }
 
 // configureWriter returns configured writer.
-func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context) (io.WriteCloser, error) {
+func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix string) (io.WriteCloser, error) {
 	// Generate file name.
-	filename := fw.encoder.GenerateFilename(fw.prefixGenerator(), fw.suffixGenerator())
+	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 
 	// Create a file writer.
 	storageWriter, err := fw.writer.NewWriter(ctx, filename)

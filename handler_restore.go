@@ -43,10 +43,10 @@ type StreamingReader interface {
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
 
-	// ListObjects return list of objects in the path.
+	// ListObjects returns list of objects in the path.
 	ListObjects(ctx context.Context, path string) ([]string, error)
 
-	// SetObjectsToStream overwrite the current list of objects to be streamed.
+	// SetObjectsToStream overwrites the current list of objects to be streamed.
 	// If set, files will be opened in this order without validation check.
 	SetObjectsToStream(list []string)
 }

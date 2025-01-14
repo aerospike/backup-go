@@ -99,11 +99,11 @@ func (r *ASRestore) Run(ctx context.Context) error {
 
 		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 		if err != nil {
-			return fmt.Errorf("failed to start restore: %w", err)
+			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
 		if err = h.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to restore: %w", err)
+			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
 		printRestoreReport(reportHeaderRestore, h.GetStats())
@@ -112,22 +112,25 @@ func (r *ASRestore) Run(ctx context.Context) error {
 
 		hXdr, err := r.backupClient.Restore(ctx, r.restoreConfig, r.xdrReader)
 		if err != nil {
-			return fmt.Errorf("failed to start xdr restore: %w", err)
+			return fmt.Errorf("failed to start asbx restore: %w", err)
 		}
 
 		if err = hXdr.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to xdr restore: %w", err)
+			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
 		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
 	case models.RestoreModeAuto:
+		// If one of restore operations fails, we cancel another.
+		ctx, cancel := context.WithCancel(ctx)
 		// We should copy config to new variable, not to overwrite encoder.
 		restoreCfg := *r.restoreConfig
 		restoreCfg.EncoderType = backup.EncoderTypeASB
 
 		h, err := r.backupClient.Restore(ctx, &restoreCfg, r.reader)
 		if err != nil {
-			return fmt.Errorf("failed to start restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
 		restoreXdrCfg := *r.restoreConfig
@@ -135,20 +138,25 @@ func (r *ASRestore) Run(ctx context.Context) error {
 
 		hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
 		if err != nil {
-			return fmt.Errorf("failed to start xdr restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to start asbx restore: %w", err)
 		}
 
 		if err = h.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
 		if err = hXdr.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to xdr restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
 		printRestoreReport(reportHeaderRestore, h.GetStats())
 		fmt.Println() // For pretty print.
 		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
+		// To prevent context leaking.
+		cancel()
 	default:
 		return fmt.Errorf("invalid mode: %s", r.mode)
 	}
@@ -189,6 +197,10 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		}
 		// Separate each file type for different lists.
 		asbList, asbxList := splitList(list)
+		if len(asbxList) == 0 && len(asbList) == 0 {
+			return nil, nil, fmt.Errorf("no asb or asbx file found in: %s",
+				params.CommonParams.Directory)
+		}
 
 		// Load ASB files for reading.
 		reader.SetObjectsToStream(asbList)
@@ -208,16 +220,17 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 
 // splitList splits one file list to 2 lists for asb and for asbx restore.
 func splitList(list []string) (asbList, asbxList []string) {
-	asbVal := asb.NewValidator()
-	asbxVal := asbx.NewValidator()
+	asbValidator := asb.NewValidator()
+	asbxValidator := asbx.NewValidator()
 
 	for i := range list {
 		// If valid for asb, append to asbList.
-		if err := asbVal.Run(list[i]); err == nil {
+		if err := asbValidator.Run(list[i]); err == nil {
 			asbList = append(asbList, list[i])
+			continue
 		}
 		// If valid for asbx, append to asbxList.
-		if err := asbxVal.Run(list[i]); err == nil {
+		if err := asbxValidator.Run(list[i]); err == nil {
 			asbxList = append(asbxList, list[i])
 		}
 	}

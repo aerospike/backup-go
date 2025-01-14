@@ -253,6 +253,7 @@ func (c *Client) BackupXDR(
 	return handler, nil
 }
 
+// Restorer represents restore handler interface.
 type Restorer interface {
 	GetStats() *models.RestoreStats
 	Wait(ctx context.Context) error

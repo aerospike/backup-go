@@ -45,7 +45,7 @@ const (
 	testFileNameMetadata     = "metadata.yaml"
 	testFileNameAsbTemplate  = "backup_%d.asb"
 	testFileNameAsbxTemplate = "backup_%d.asbx"
-	testFileContentAsb       = "content"
+	testFileContentAsb       = "content-asb"
 	testFileContentAsbx      = "content-asbx"
 
 	testFileContentSorted1 = "sorted1"

@@ -155,8 +155,8 @@ func newEncryptionReader(
 }
 
 // distributeFiles is only used for asbx restore, to follow the order of files.
-// All files myst be sorted with util.SortBackupFiles first.
-// Then they will be distributed over workers according to its prefix and in order according to its suffix.
+// To maintain XDR event order, files must be pre-sorted using util.SortBackupFiles.
+// Then they will be distributed to workers based on their prefixes, in suffix order.
 // Valid file name: <prefix>_<namespace>_<suffix>.asbx
 // Example: 4_source-ns1_47.asbx
 func distributeFiles(input chan models.File, output []chan models.File, errors chan<- error) {

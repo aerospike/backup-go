@@ -155,6 +155,8 @@ func newEncryptionReader(
 }
 
 // distributeFiles is only used for asbx restore, to follow the order of files.
+// All files myst be sorted with util.SortBackupFiles first.
+// Then they will be distributed over workers according to its prefix and in order according to its suffix.
 func distributeFiles(input chan models.File, output []chan models.File, errors chan<- error) {
 	if len(output) == 0 {
 		errors <- fmt.Errorf("failed to distibute files to 0 channels")

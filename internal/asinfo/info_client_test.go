@@ -1744,10 +1744,10 @@ func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
 
 	ic := NewInfoClientFromAerospike(client, infoPolicy)
 
-	err := ic.BlockMRTWrites(testASDC, testASNamespace)
+	err := ic.BlockMRTWrites(testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.UnBlockMRTWrites(testASDC, testASNamespace)
+	err = ic.UnBlockMRTWrites(testASNamespace)
 	require.NoError(t, err)
 }
 

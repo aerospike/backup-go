@@ -68,6 +68,10 @@ func newInfoMock(t *testing.T) infoCommander {
 		}, nil)
 	ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
+	ic.On("BlockMRTWrites", mock.Anything).
+		Return(nil)
+	ic.On("UnBlockMRTWrites", mock.Anything).
+		Return(nil)
 
 	return ic
 }

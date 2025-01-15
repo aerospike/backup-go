@@ -18,12 +18,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
-	"strconv"
-	"strings"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/tools-common-go/client"
@@ -198,7 +196,11 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 			return nil, nil, fmt.Errorf("failed to list objects: %w", err)
 		}
 		// Separate each file type for different lists.
-		asbList, asbxList := splitList(list)
+		asbList, asbxList, err := splitList(list)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to split objects: %w", err)
+		}
+
 		if len(asbxList) == 0 && len(asbList) == 0 {
 			return nil, nil, fmt.Errorf("no asb or asbx file found in: %s",
 				params.CommonParams.Directory)
@@ -221,7 +223,7 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 }
 
 // splitList splits one file list to 2 lists for asb and for asbx restore.
-func splitList(list []string) (asbList, asbxList []string) {
+func splitList(list []string) (asbList, asbxList []string, err error) {
 	asbValidator := asb.NewValidator()
 	asbxValidator := asbx.NewValidator()
 
@@ -237,25 +239,11 @@ func splitList(list []string) (asbList, asbxList []string) {
 		}
 	}
 
-	sortBySuffix(asbxList)
+	// We sort asb files by prefix and suffix to restore them in the correct order.
+	asbList, err = util.SortBackupFiles(asbList)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to sort asb files: %w", err)
+	}
 
-	return asbList, asbxList
-}
-
-func sortBySuffix(files []string) {
-	sort.Slice(files, func(i, j int) bool {
-		// Get last number from each filename
-		num1 := getNumber(files[i])
-		num2 := getNumber(files[j])
-
-		return num1 < num2
-	})
-}
-
-func getNumber(filename string) int {
-	// Split by underscore and get last part before extension
-	parts := strings.Split(strings.TrimSuffix(filename, ".asbx"), "_")
-	num, _ := strconv.Atoi(parts[len(parts)-1])
-
-	return num
+	return asbList, asbxList, nil
 }

@@ -61,8 +61,12 @@ func (a *ASBackupParams) isXDR() bool {
 	return a.BackupXDRParams != nil && a.BackupParams == nil
 }
 
-func (a *ASBackupParams) isStop() bool {
-	return a.BackupXDRParams != nil && a.BackupXDRParams.Stop
+func (a *ASBackupParams) isStopXDR() bool {
+	return a.BackupXDRParams != nil && a.BackupXDRParams.StopXDR
+}
+
+func (a *ASBackupParams) isUnblockMRT() bool {
+	return a.BackupXDRParams != nil && a.BackupXDRParams.UnblockMRT
 }
 
 func NewASBackup(
@@ -109,10 +113,21 @@ func NewASBackup(
 	}
 
 	// Stop xdr.
-	if params.isStop() {
+	if params.isStopXDR() {
 		logger.Info("stopping XDR on the database")
 
 		if err := stopXDR(aerospikeClient, backupXDRConfig); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
+	// Unblock mRT.
+	if params.isUnblockMRT() {
+		logger.Info("enabling MRT writes on the database")
+
+		if err := unblockMRT(aerospikeClient, backupXDRConfig); err != nil {
 			return nil, err
 		}
 
@@ -281,6 +296,16 @@ func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) err
 
 	if err := infoClient.StopXDR(cfg.DC, address, cfg.Namespace); err != nil {
 		return fmt.Errorf("failed to stop xdr: %w", err)
+	}
+
+	return nil
+}
+
+func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+
+	if err := infoClient.UnBlockMRTWrites(cfg.Namespace); err != nil {
+		return fmt.Errorf("failed to unblock MRT: %w", err)
 	}
 
 	return nil

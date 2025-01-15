@@ -35,5 +35,6 @@ type BackupXDR struct {
 
 	TLSConfig *tls.Config
 
-	Stop bool
+	StopXDR    bool
+	UnblockMRT bool
 }

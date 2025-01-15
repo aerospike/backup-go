@@ -85,10 +85,14 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		1000,
 		"How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.\n"+
 			"To measure recovery state and lag.")
-	flagSet.BoolVar(&f.Stop, "stop-xdr",
+	flagSet.BoolVar(&f.StopXDR, "stop-xdr",
 		false,
 		"Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, \n"+
-			"and database server still sends XDR events.")
+			"and database server still sends XDR events. Use this functionality to stop XDR after interrupted backup.")
+	flagSet.BoolVar(&f.UnblockMRT, "unblock-mrt",
+		false,
+		"Unblock MRT writes on the database.\n"+
+			"Use this functionality to unblock MRT writes after interrupted backup.")
 
 	return flagSet
 }

@@ -64,7 +64,7 @@ func TestBackupXDR_NewFlagSet(t *testing.T) {
 	assert.Equal(t, 512, result.AckQueueSize, "The ack-queue-size flag should be parsed correctly")
 	assert.Equal(t, 200, result.MaxConnections, "The max-connections flag should be parsed correctly")
 	assert.Equal(t, int64(2000), result.InfoPolingPeriodMilliseconds, "The info-poling-period flag should be parsed correctly")
-	assert.Equal(t, true, result.Stop, "The stop flag should be parsed correctly")
+	assert.Equal(t, true, result.StopXDR, "The stop flag should be parsed correctly")
 }
 
 func TestBackupXDR_NewFlagSet_DefaultValues(t *testing.T) {

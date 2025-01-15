@@ -38,8 +38,8 @@ const (
 
 	cmdGetStats = "get-stats:context=xdr;dc=%s;namespace=%s"
 
-	cmdBlockMRTWrites   = "namespaces"
-	cmdUnBlockMRTWrites = "namespaces"
+	cmdBlockMRTWrites   = "set-config:context=namespace;id=%s;disable-mrt-writes=true"
+	cmdUnBlockMRTWrites = "set-config:context=namespace;id=%s;disable-mrt-writes=false"
 
 	cmdRespErrPrefix = "ERROR"
 )
@@ -331,8 +331,8 @@ func (ic *InfoClient) removeXDRDC(dc string) error {
 }
 
 // BlockMRTWrites blocks MRT writes on cluster.
-func (ic *InfoClient) BlockMRTWrites(_, _ string) error {
-	cmd := cmdBlockMRTWrites
+func (ic *InfoClient) BlockMRTWrites(namespace string) error {
+	cmd := fmt.Sprintf(cmdBlockMRTWrites, namespace)
 
 	resp, err := ic.GetInfo(cmd)
 	if err != nil {
@@ -347,8 +347,8 @@ func (ic *InfoClient) BlockMRTWrites(_, _ string) error {
 }
 
 // UnBlockMRTWrites unblocks MRT writes on cluster.
-func (ic *InfoClient) UnBlockMRTWrites(_, _ string) error {
-	cmd := cmdUnBlockMRTWrites
+func (ic *InfoClient) UnBlockMRTWrites(namespace string) error {
+	cmd := fmt.Sprintf(cmdUnBlockMRTWrites, namespace)
 
 	resp, err := ic.GetInfo(cmd)
 	if err != nil {

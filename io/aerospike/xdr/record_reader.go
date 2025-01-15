@@ -69,6 +69,8 @@ type infoCommander interface {
 	StartXDR(dc, hostPort, namespace, rewind string) error
 	StopXDR(dc, hostPort, namespace string) error
 	GetStats(dc, namespace string) (asinfo.Stats, error)
+	BlockMRTWrites(namespace string) error
+	UnBlockMRTWrites(namespace string) error
 }
 
 // RecordReader satisfies the pipeline DataReader interface.
@@ -216,9 +218,13 @@ func (r *RecordReader) serve() {
 				continue
 			}
 			// set once.
-			// Stop MRT writes in this checkpoint.
 			if r.checkpoint == 0 {
 				r.checkpoint = time.Now().Unix()
+				// Stop MRT writes in this checkpoint.
+				if err = r.infoClient.BlockMRTWrites(r.config.namespace); err != nil {
+					r.logger.Error("failed to block mrt writes", slog.Any("error", err))
+					break // Or return?
+				}
 			}
 
 			// Convert lag from citrus leaf epoch.
@@ -226,9 +232,13 @@ func (r *RecordReader) serve() {
 			unixLag := clLag.Unix()
 
 			if r.checkpoint-unixLag < 0 || stats.Lag == 0 {
-				// Start mrt writes.
+				// Start MRT writes.
+				if err = r.infoClient.UnBlockMRTWrites(r.config.namespace); err != nil {
+					r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
+				}
 				// Stop.
 				r.Close()
+
 				return
 			}
 		}

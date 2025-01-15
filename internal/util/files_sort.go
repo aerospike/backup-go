@@ -47,7 +47,6 @@ func parseFileName(name string) (backupFile, error) {
 
 // SortBackupFiles sort files for better restore performance.
 func SortBackupFiles(files []string) ([]string, error) {
-	sort.Strings(files)
 	// Prepare strings for sorting.
 	presort := make([][]backupFile, len(files))
 	maxPrefix := 0
@@ -66,6 +65,13 @@ func SortBackupFiles(files []string) ([]string, error) {
 	}
 	// Trim nils.
 	presort = presort[:maxPrefix+1]
+
+	// sort each group.
+	for o := range presort {
+		sort.Slice(presort[o], func(i, j int) bool {
+			return presort[o][i].suffix < presort[o][j].suffix
+		})
+	}
 
 	result := make([]string, 0, len(files))
 

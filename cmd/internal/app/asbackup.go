@@ -26,7 +26,10 @@ import (
 	"github.com/aerospike/tools-common-go/client"
 )
 
-const idBackup = "asbackup-cli"
+const (
+	idBackup            = "asbackup-cli"
+	xdrSupportedVersion = 8
+)
 
 type ASBackup struct {
 	backupClient    *backup.Client
@@ -110,6 +113,12 @@ func NewASBackup(
 	aerospikeClient, err := newAerospikeClient(params.ClientConfig, params.ClientPolicy, racks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
+	}
+
+	if params.BackupXDRParams != nil {
+		if err := checkVersion(aerospikeClient, backupXDRConfig); err != nil {
+			return nil, err
+		}
 	}
 
 	// Stop xdr.
@@ -306,6 +315,22 @@ func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) 
 
 	if err := infoClient.UnBlockMRTWrites(cfg.Namespace); err != nil {
 		return fmt.Errorf("failed to unblock MRT: %w", err)
+	}
+
+	return nil
+}
+
+func checkVersion(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+
+	version, err := infoClient.GetVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get version: %w", err)
+	}
+
+	if version.Major < xdrSupportedVersion {
+		return fmt.Errorf("version %s is unsupported, only databse version %d+ is supproted",
+			version.String(), xdrSupportedVersion)
 	}
 
 	return nil

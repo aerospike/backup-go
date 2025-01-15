@@ -209,6 +209,7 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string) error {
 }
 
 // StopXDR disable replication and remove xdr config.
+
 func (ic *InfoClient) StopXDR(dc, hostPort, namespace string) error {
 	if err := ic.removeXDRNamespace(dc, namespace); err != nil {
 		return err

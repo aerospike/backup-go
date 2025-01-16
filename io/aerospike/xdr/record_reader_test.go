@@ -62,15 +62,11 @@ func newInfoMock(t *testing.T) infoCommander {
 		Return(nil)
 	ic.On("GetStats", mock.Anything, mock.Anything).
 		Return(asinfo.Stats{
-			Recoveries:        1,
+			Recoveries:        0,
 			RecoveriesPending: 1,
-			Lag:               time.Now().UnixNano(),
+			Lag:               0,
 		}, nil)
 	ic.On("StopXDR", mock.Anything).
-		Return(nil)
-	ic.On("BlockMRTWrites", mock.Anything).
-		Return(nil)
-	ic.On("UnBlockMRTWrites", mock.Anything).
 		Return(nil)
 
 	return ic

@@ -172,17 +172,17 @@ func (_c *MockinfoCommander_StartXDR_Call) RunAndReturn(run func(string, string,
 	return _c
 }
 
-// StopXDR provides a mock function with given fields: dc, hostPort, namespace
-func (_m *MockinfoCommander) StopXDR(dc string, hostPort string, namespace string) error {
-	ret := _m.Called(dc, hostPort, namespace)
+// StopXDR provides a mock function with given fields: dc
+func (_m *MockinfoCommander) StopXDR(dc string) error {
+	ret := _m.Called(dc)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StopXDR")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(dc, hostPort, namespace)
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(dc)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -197,15 +197,13 @@ type MockinfoCommander_StopXDR_Call struct {
 
 // StopXDR is a helper method to define mock.On call
 //   - dc string
-//   - hostPort string
-//   - namespace string
-func (_e *MockinfoCommander_Expecter) StopXDR(dc interface{}, hostPort interface{}, namespace interface{}) *MockinfoCommander_StopXDR_Call {
-	return &MockinfoCommander_StopXDR_Call{Call: _e.mock.On("StopXDR", dc, hostPort, namespace)}
+func (_e *MockinfoCommander_Expecter) StopXDR(dc interface{}) *MockinfoCommander_StopXDR_Call {
+	return &MockinfoCommander_StopXDR_Call{Call: _e.mock.On("StopXDR", dc)}
 }
 
-func (_c *MockinfoCommander_StopXDR_Call) Run(run func(dc string, hostPort string, namespace string)) *MockinfoCommander_StopXDR_Call {
+func (_c *MockinfoCommander_StopXDR_Call) Run(run func(dc string)) *MockinfoCommander_StopXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
+		run(args[0].(string))
 	})
 	return _c
 }
@@ -215,7 +213,7 @@ func (_c *MockinfoCommander_StopXDR_Call) Return(_a0 error) *MockinfoCommander_S
 	return _c
 }
 
-func (_c *MockinfoCommander_StopXDR_Call) RunAndReturn(run func(string, string, string) error) *MockinfoCommander_StopXDR_Call {
+func (_c *MockinfoCommander_StopXDR_Call) RunAndReturn(run func(string) error) *MockinfoCommander_StopXDR_Call {
 	_c.Call.Return(run)
 	return _c
 }

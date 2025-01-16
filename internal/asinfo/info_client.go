@@ -32,9 +32,7 @@ const (
 	cmdCreateXDRNode      = "set-config:context=xdr;dc=%s;node-address-port=%s;action=add"
 	cmdCreateXDRNamespace = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
 
-	cmdRemoveXDRNamespace = "set-config:context=xdr;dc=%s;namespace=%s;action=remove"
-	cmdRemoveXDRNode      = "set-config:context=xdr;dc=%s;node-address-port=%s;action=remove"
-	cmdRemoveXDRDC        = "set-config:context=xdr;dc=%s;action=remove"
+	cmdDeleteXDRDC = "set-config:context=xdr;dc=%s;action=delete"
 
 	cmdGetStats = "get-stats:context=xdr;dc=%s;namespace=%s"
 
@@ -210,16 +208,8 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string) error {
 
 // StopXDR disable replication and remove xdr config.
 
-func (ic *InfoClient) StopXDR(dc, hostPort, namespace string) error {
-	if err := ic.removeXDRNamespace(dc, namespace); err != nil {
-		return err
-	}
-
-	if err := ic.removeXDRNode(dc, hostPort); err != nil {
-		return err
-	}
-
-	if err := ic.removeXDRDC(dc); err != nil {
+func (ic *InfoClient) StopXDR(dc string) error {
+	if err := ic.deleteXDRDC(dc); err != nil {
 		return err
 	}
 
@@ -286,38 +276,8 @@ func (ic *InfoClient) createXDRNamespace(dc, namespace, rewind string) error {
 	return nil
 }
 
-func (ic *InfoClient) removeXDRNamespace(dc, namespace string) error {
-	cmd := fmt.Sprintf(cmdRemoveXDRNamespace, dc, namespace)
-
-	resp, err := ic.GetInfo(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to remove xdr namespace: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse remove xdr namespace response: %w", err)
-	}
-
-	return nil
-}
-
-func (ic *InfoClient) removeXDRNode(dc, hostPort string) error {
-	cmd := fmt.Sprintf(cmdRemoveXDRNode, dc, hostPort)
-
-	resp, err := ic.GetInfo(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to remove xdr node: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse remove xdr node response: %w", err)
-	}
-
-	return nil
-}
-
-func (ic *InfoClient) removeXDRDC(dc string) error {
-	cmd := fmt.Sprintf(cmdRemoveXDRDC, dc)
+func (ic *InfoClient) deleteXDRDC(dc string) error {
+	cmd := fmt.Sprintf(cmdDeleteXDRDC, dc)
 
 	resp, err := ic.GetInfo(cmd)
 	if err != nil {

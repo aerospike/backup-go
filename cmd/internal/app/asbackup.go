@@ -301,9 +301,8 @@ func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backu
 
 func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
-	address := fmt.Sprintf("%s:%d", cfg.LocalAddress, cfg.LocalPort)
 
-	if err := infoClient.StopXDR(cfg.DC, address, cfg.Namespace); err != nil {
+	if err := infoClient.StopXDR(cfg.DC); err != nil {
 		return fmt.Errorf("failed to stop xdr: %w", err)
 	}
 

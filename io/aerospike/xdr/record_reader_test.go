@@ -66,7 +66,7 @@ func newInfoMock(t *testing.T) infoCommander {
 			RecoveriesPending: 1,
 			Lag:               time.Now().UnixNano(),
 		}, nil)
-	ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).
+	ic.On("StopXDR", mock.Anything).
 		Return(nil)
 	ic.On("BlockMRTWrites", mock.Anything).
 		Return(nil)

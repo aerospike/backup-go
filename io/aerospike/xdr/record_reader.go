@@ -67,7 +67,7 @@ func NewRecordReaderConfig(
 // infoCommander interface for an info client.
 type infoCommander interface {
 	StartXDR(dc, hostPort, namespace, rewind string) error
-	StopXDR(dc, hostPort, namespace string) error
+	StopXDR(dc string) error
 	GetStats(dc, namespace string) (asinfo.Stats, error)
 	BlockMRTWrites(namespace string) error
 	UnBlockMRTWrites(namespace string) error
@@ -143,11 +143,7 @@ func (r *RecordReader) Close() {
 		return
 	}
 
-	if err := r.infoClient.StopXDR(
-		r.config.dc,
-		r.config.currentHostPort,
-		r.config.namespace,
-	); err != nil {
+	if err := r.infoClient.StopXDR(r.config.dc); err != nil {
 		r.logger.Error("failed to remove xdr config", slog.Any("error", err))
 	}
 

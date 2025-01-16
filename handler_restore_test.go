@@ -121,7 +121,7 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 		Destination: &namespace,
 	}
 
-	restoreHandler, err := bc.RestoreXDR(ctx, restoreCfg, readers)
+	restoreHandler, err := bc.Restore(ctx, restoreCfg, readers)
 	s.Require().NoError(err)
 
 	err = restoreHandler.Wait(ctx)

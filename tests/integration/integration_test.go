@@ -204,8 +204,8 @@ func (suite *backupRestoreTestSuite) TearDownTest() {
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	type args struct {
-		backupConfig  *backup.BackupConfig
-		restoreConfig *backup.RestoreConfig
+		backupConfig  *backup.ConfigBackup
+		restoreConfig *backup.ConfigRestore
 		bins          a.BinMap
 	}
 	var testsCases = []struct {
@@ -231,8 +231,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIO() {
 	}
 }
 
-func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig, expectedRecs []*a.Record) (*models.BackupStats, *models.RestoreStats) {
+func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.ConfigBackup,
+	restoreConfig *backup.ConfigRestore, expectedRecs []*a.Record) (*models.BackupStats, *models.RestoreStats) {
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
 
@@ -269,8 +269,8 @@ func runBackupRestore(suite *backupRestoreTestSuite, backupConfig *backup.Backup
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 	type args struct {
-		backupConfig  *backup.BackupConfig
-		restoreConfig *backup.RestoreConfig
+		backupConfig  *backup.ConfigBackup
+		restoreConfig *backup.ConfigRestore
 		bins          a.BinMap
 		expectedFiles int
 	}
@@ -324,7 +324,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		{
 			name: "with parallel backup",
 			args: args{
-				backupConfig: &backup.BackupConfig{
+				backupConfig: &backup.ConfigBackup{
 					PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
 					SetList:          []string{suite.set},
 					Namespace:        suite.namespace,
@@ -340,7 +340,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 		{
 			name: "parallel with file size limit",
 			args: args{
-				backupConfig: &backup.BackupConfig{
+				backupConfig: &backup.ConfigBackup{
 					PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
 					SetList:          []string{suite.set},
 					Namespace:        suite.namespace,
@@ -367,8 +367,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreDirectory() {
 }
 
 func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
-	backupConfig *backup.BackupConfig,
-	restoreConfig *backup.RestoreConfig,
+	backupConfig *backup.ConfigBackup,
+	restoreConfig *backup.ConfigRestore,
 	expectedRecs []*a.Record,
 	expectedFiles int) {
 	ctx := context.Background()
@@ -627,8 +627,8 @@ func (suite *backupRestoreTestSuite) TestRestoreContext() {
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryptionFile() {
 	type args struct {
-		backupConfig  *backup.BackupConfig
-		restoreConfig *backup.RestoreConfig
+		backupConfig  *backup.ConfigBackup
+		restoreConfig *backup.ConfigRestore
 		bins          a.BinMap
 	}
 
@@ -669,8 +669,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOEncryptionFile() {
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIONamespace() {
 	type args struct {
-		backupConfig  *backup.BackupConfig
-		restoreConfig *backup.RestoreConfig
+		backupConfig  *backup.ConfigBackup
+		restoreConfig *backup.ConfigRestore
 		bins          a.BinMap
 	}
 
@@ -707,8 +707,8 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIONamespace() {
 
 func (suite *backupRestoreTestSuite) TestBackupRestoreIOCompression() {
 	type args struct {
-		backupConfig  *backup.BackupConfig
-		restoreConfig *backup.RestoreConfig
+		backupConfig  *backup.ConfigBackup
+		restoreConfig *backup.ConfigRestore
 		bins          a.BinMap
 	}
 
@@ -968,7 +968,7 @@ func (suite *backupRestoreTestSuite) TestBinFilter() {
 		"BackupRestore": 1,
 	})
 
-	var backupConfig = &backup.BackupConfig{
+	var backupConfig = &backup.ConfigBackup{
 		PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
 		SetList:          []string{suite.set},
 		Namespace:        suite.namespace,
@@ -1012,7 +1012,7 @@ func (suite *backupRestoreTestSuite) TestFilterTimestamp() {
 	// batch3 contains too fresh values.
 	var expectedRecords = tests.Subtract(batch2, batch3)
 
-	var backupConfig = &backup.BackupConfig{
+	var backupConfig = &backup.ConfigBackup{
 		PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
 		SetList:          []string{suite.set},
 		Namespace:        suite.namespace,
@@ -1039,7 +1039,7 @@ func (suite *backupRestoreTestSuite) TestRecordsPerSecond() {
 	records := genRecords(suite.namespace, suite.set, numRec, a.BinMap{"a": "b"})
 	suite.SetupTest(records)
 
-	var backupConfig = &backup.BackupConfig{
+	var backupConfig = &backup.ConfigBackup{
 		PartitionFilters: []*a.PartitionFilter{backup.NewPartitionFilterAll()},
 		SetList:          []string{suite.set},
 		Namespace:        suite.namespace,
@@ -1073,7 +1073,7 @@ func (suite *backupRestoreTestSuite) TestBackupAfterDigestOk() {
 	afterDigestFilter, err := backup.NewPartitionFilterAfterDigest(suite.namespace, digest)
 	suite.Nil(err)
 
-	var backupConfig = &backup.BackupConfig{
+	var backupConfig = &backup.ConfigBackup{
 		PartitionFilters: []*a.PartitionFilter{afterDigestFilter},
 		SetList:          []string{suite.set},
 		Namespace:        suite.namespace,
@@ -1227,21 +1227,28 @@ type byteReadWriterFactory struct {
 	buffer *bytes.Buffer
 }
 
-func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- io.ReadCloser, _ chan<- error) {
+func (b *byteReadWriterFactory) ListObjects(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
+func (b *byteReadWriterFactory) SetObjectsToStream(_ []string) {
+}
+
+func (b *byteReadWriterFactory) StreamFiles(_ context.Context, readersCh chan<- models.File, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	readersCh <- reader
+	readersCh <- models.File{Reader: reader}
 	close(readersCh)
 }
 
-func (b *byteReadWriterFactory) StreamFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
+func (b *byteReadWriterFactory) StreamFile(_ context.Context, _ string, readersCh chan<- models.File, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	readersCh <- reader
+	readersCh <- models.File{Reader: reader}
 	close(readersCh)
 }
 
-func (b *byteReadWriterFactory) OpenFile(_ context.Context, _ string, readersCh chan<- io.ReadCloser, _ chan<- error) {
+func (b *byteReadWriterFactory) OpenFile(_ context.Context, _ string, readersCh chan<- models.File, _ chan<- error) {
 	reader := io.NopCloser(bytes.NewReader(b.buffer.Bytes()))
-	readersCh <- reader
+	readersCh <- models.File{Reader: reader}
 	close(readersCh)
 }
 

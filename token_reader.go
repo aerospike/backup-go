@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 
@@ -25,7 +26,7 @@ import (
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
 type tokenReader[T models.TokenConstraint] struct {
-	readersCh     <-chan io.ReadCloser
+	readersCh     <-chan models.File
 	decoder       Decoder[T]
 	logger        *slog.Logger
 	newDecoderFn  func(io.ReadCloser) Decoder[T]
@@ -34,7 +35,7 @@ type tokenReader[T models.TokenConstraint] struct {
 
 // newTokenReader creates a new tokenReader.
 func newTokenReader[T models.TokenConstraint](
-	readersCh <-chan io.ReadCloser,
+	readersCh <-chan models.File,
 	logger *slog.Logger,
 	newDecoderFn func(io.ReadCloser) Decoder[T],
 ) *tokenReader[T] {
@@ -49,10 +50,11 @@ func (tr *tokenReader[T]) Read() (T, error) {
 	for {
 		if tr.decoder != nil {
 			token, err := tr.decoder.NextToken()
-			switch err {
-			case nil:
+
+			switch {
+			case err == nil:
 				return token, nil
-			case io.EOF:
+			case errors.Is(err, io.EOF):
 				// Current decoder has finished, close the current reader
 				if tr.currentReader != nil {
 					_ = tr.currentReader.Close()
@@ -67,15 +69,15 @@ func (tr *tokenReader[T]) Read() (T, error) {
 
 		if tr.decoder == nil {
 			// We need a new decoder
-			reader, ok := <-tr.readersCh
+			file, ok := <-tr.readersCh
 			if !ok {
 				// Channel is closed, return EOF
 				return nil, io.EOF
 			}
 
 			// Assign the new reader
-			tr.currentReader = reader
-			tr.decoder = tr.newDecoderFn(reader)
+			tr.currentReader = file.Reader
+			tr.decoder = tr.newDecoderFn(file.Reader)
 		}
 	}
 }

@@ -21,6 +21,9 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -28,7 +31,7 @@ const idRestore = "asrestore-cli"
 
 type ASRestore struct {
 	backupClient  *backup.Client
-	restoreConfig *backup.RestoreConfig
+	restoreConfig *backup.ConfigRestore
 	reader        backup.StreamingReader
 	xdrReader     backup.StreamingReader
 	// Restore Mode: auto, asb, asbx
@@ -96,53 +99,64 @@ func (r *ASRestore) Run(ctx context.Context) error {
 
 		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 		if err != nil {
-			return fmt.Errorf("failed to start restore: %w", err)
+			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
 		if err = h.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to restore: %w", err)
+			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
 		printRestoreReport(reportHeaderRestore, h.GetStats())
 	case models.RestoreModeASBX:
 		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
 
-		hXdr, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
+		hXdr, err := r.backupClient.Restore(ctx, r.restoreConfig, r.xdrReader)
 		if err != nil {
-			return fmt.Errorf("failed to start xdr restore: %w", err)
+			return fmt.Errorf("failed to start asbx restore: %w", err)
 		}
 
 		if err = hXdr.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to xdr restore: %w", err)
+			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
 		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
 	case models.RestoreModeAuto:
-		r.restoreConfig.EncoderType = backup.EncoderTypeASB
+		// If one of restore operations fails, we cancel another.
+		ctx, cancel := context.WithCancel(ctx)
+		// We should copy config to new variable, not to overwrite encoder.
+		restoreCfg := *r.restoreConfig
+		restoreCfg.EncoderType = backup.EncoderTypeASB
 
-		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
+		h, err := r.backupClient.Restore(ctx, &restoreCfg, r.reader)
 		if err != nil {
-			return fmt.Errorf("failed to start restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
-		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
+		restoreXdrCfg := *r.restoreConfig
+		restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
 
-		hXdr, err := r.backupClient.RestoreXDR(ctx, r.restoreConfig, r.xdrReader)
+		hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
 		if err != nil {
-			return fmt.Errorf("failed to start xdr restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to start asbx restore: %w", err)
 		}
 
 		if err = h.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
 		if err = hXdr.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to xdr restore: %w", err)
+			cancel()
+			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
 		printRestoreReport(reportHeaderRestore, h.GetStats())
 		fmt.Println() // For pretty print.
 		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
+		// To prevent context leaking.
+		cancel()
 	default:
 		return fmt.Errorf("invalid mode: %s", r.mode)
 	}
@@ -150,7 +164,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 	return nil
 }
 
-func initializeRestoreConfigs(params *ASRestoreParams) *backup.RestoreConfig {
+func initializeRestoreConfigs(params *ASRestoreParams) *backup.ConfigRestore {
 	return mapRestoreConfig(params)
 }
 
@@ -160,30 +174,76 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 	case models.RestoreModeASB:
 		reader, err = newReader(ctx, params, sa, false)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
 		}
 
 		return reader, nil, nil
 	case models.RestoreModeASBX:
 		xdrReader, err = newReader(ctx, params, sa, true)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
 		return nil, xdrReader, nil
 	case models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
 		}
+		// List all files first.
+		list, err := reader.ListObjects(ctx, params.CommonParams.Directory)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to list objects: %w", err)
+		}
+		// Separate each file type for different lists.
+		asbList, asbxList, err := splitList(list)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to split objects: %w", err)
+		}
+
+		if len(asbxList) == 0 && len(asbList) == 0 {
+			return nil, nil, fmt.Errorf("no asb or asbx file found in: %s",
+				params.CommonParams.Directory)
+		}
+
+		// Load ASB files for reading.
+		reader.SetObjectsToStream(asbList)
 
 		xdrReader, err = newReader(ctx, params, sa, true)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
+		// Load ASBX files for reading.
+		xdrReader.SetObjectsToStream(asbxList)
 
 		return reader, xdrReader, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
 	}
+}
+
+// splitList splits one file list to 2 lists for asb and for asbx restore.
+func splitList(list []string) (asbList, asbxList []string, err error) {
+	asbValidator := asb.NewValidator()
+	asbxValidator := asbx.NewValidator()
+
+	for i := range list {
+		// If valid for asb, append to asbList.
+		if err := asbValidator.Run(list[i]); err == nil {
+			asbList = append(asbList, list[i])
+			continue
+		}
+		// If valid for asbx, append to asbxList.
+		if err := asbxValidator.Run(list[i]); err == nil {
+			asbxList = append(asbxList, list[i])
+		}
+	}
+
+	// We sort asb files by prefix and suffix to restore them in the correct order.
+	asbList, err = util.SortBackupFiles(asbList)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to sort asb files: %w", err)
+	}
+
+	return asbList, asbxList, nil
 }

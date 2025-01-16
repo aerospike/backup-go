@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/aerospike/backup-go/models"
 )
 
 const localType = "directory"
@@ -37,6 +39,11 @@ type validator interface {
 type Reader struct {
 	// Optional parameters.
 	options
+
+	// objectsToStream is used to predefine a list of objects that must be read from storage.
+	// If objectsToStream is not set, we iterate through objects in storage and load them.
+	// If set, we load objects from this slice directly.
+	objectsToStream []string
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -64,9 +71,15 @@ func NewReader(opts ...Opt) (*Reader, error) {
 // communication channel for lazy loading.
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
 	defer close(readersCh)
+
+	// If objects were preloaded, we stream them.
+	if len(r.objectsToStream) > 0 {
+		r.streamSetObjects(ctx, readersCh, errorsCh)
+		return
+	}
 
 	for _, path := range r.pathList {
 		// If it is a folder, open and return.
@@ -89,7 +102,7 @@ func (r *Reader) StreamFiles(
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
 	fileInfo, err := r.getFilesList(path)
 	if err != nil {
@@ -132,14 +145,14 @@ func (r *Reader) streamDirectory(
 			return
 		}
 
-		readersCh <- reader
+		readersCh <- models.File{Reader: reader, Name: filepath.Base(file.Name())}
 	}
 }
 
 // StreamFile opens single file and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
-	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
 	if ctx.Err() != nil {
 		errorsCh <- ctx.Err()
 		return
@@ -163,7 +176,7 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	readersCh <- reader
+	readersCh <- models.File{Reader: reader, Name: filepath.Base(filename)}
 }
 
 // checkRestoreDirectory checks that the restore directory exists,
@@ -216,6 +229,34 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 	}
 
 	return nil
+}
+
+// ListObjects list all object in the path.
+func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
+	result := make([]string, 0)
+
+	fileInfo, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
+	}
+
+	for i := range fileInfo {
+		result = append(result, fileInfo[i].Name())
+	}
+
+	return result, nil
+}
+
+// SetObjectsToStream set objects to stream.
+func (r *Reader) SetObjectsToStream(list []string) {
+	r.objectsToStream = list
+}
+
+// streamSetObjects streams preloaded objects.
+func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
+	for i := range r.objectsToStream {
+		r.StreamFile(ctx, r.objectsToStream[i], readersCh, errorsCh)
+	}
 }
 
 // getFilesList returns sorted or unsorted files list from directory.

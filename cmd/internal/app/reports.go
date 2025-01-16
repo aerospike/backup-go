@@ -24,8 +24,8 @@ import (
 const (
 	reportHeaderBackup     = "Backup Report"
 	reportHeaderBackupXDR  = "XDR Backup Report"
-	reportHeaderRestore    = "Restore Report"
-	reportHeaderRestoreXDR = "XDR Restore Report"
+	reportHeaderRestore    = "ASB Restore Report"
+	reportHeaderRestoreXDR = "ASBX Restore Report"
 )
 
 func printBackupReport(header string, stats *bModels.BackupStats) {

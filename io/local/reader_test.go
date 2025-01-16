@@ -17,12 +17,12 @@ package local
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/aerospike/backup-go/io/local/mocks"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -76,7 +76,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -112,7 +112,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 	r, err := NewReader(WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go r.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -146,7 +146,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -172,7 +172,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir("file1.asb"))
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -244,7 +244,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
 	r, err := NewReader(WithValidator(mockValidator), WithFile(path))
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go r.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -275,7 +275,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
 	r, err := NewReader(WithValidator(mockValidator), WithFile(path))
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go r.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -320,7 +320,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir), WithNestedDir())
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -373,7 +373,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 	)
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go r.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -426,7 +426,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 	)
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go r.StreamFiles(context.Background(), readerChan, errorChan)
 
@@ -502,4 +502,57 @@ func (s *readerTestSuite) TestReader_getFilesListDesc() {
 	}
 
 	s.Equal(expResult, result)
+}
+
+func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
+	dir := s.T().TempDir()
+	ctx := context.Background()
+
+	expResult := []string{"file3.asb", "file2.asbx", "file1.asb", "file2.asb", "file1.asbx"}
+
+	for i := range expResult {
+		err := createTmpFile(dir, expResult[i])
+		require.NoError(s.T(), err)
+	}
+
+	r, err := NewReader(
+		WithDir(dir),
+	)
+	s.Require().NoError(err)
+
+	list, err := r.ListObjects(ctx, dir)
+	s.Require().NoError(err)
+	_, asbxList := filterList(list)
+	r.SetObjectsToStream(asbxList)
+
+	readerChan := make(chan models.File)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
+
+	var counter int
+	for {
+		select {
+		case _, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Require().Equal(2, counter)
+				return
+			}
+			counter++
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
+	}
+}
+
+func filterList(list []string) (asbList, asbxList []string) {
+	for i := range list {
+		switch filepath.Ext(list[i]) {
+		case ".asb":
+			asbList = append(asbList, list[i])
+		case ".asbx":
+			asbxList = append(asbxList, list[i])
+		}
+	}
+	return asbList, asbxList
 }

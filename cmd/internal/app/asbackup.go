@@ -26,11 +26,14 @@ import (
 	"github.com/aerospike/tools-common-go/client"
 )
 
-const idBackup = "asbackup-cli"
+const (
+	idBackup            = "asbackup-cli"
+	xdrSupportedVersion = 8
+)
 
 type ASBackup struct {
 	backupClient    *backup.Client
-	backupConfig    *backup.BackupConfig
+	backupConfig    *backup.ConfigBackup
 	backupConfigXDR *backup.ConfigBackupXDR
 
 	writer backup.Writer
@@ -61,8 +64,12 @@ func (a *ASBackupParams) isXDR() bool {
 	return a.BackupXDRParams != nil && a.BackupParams == nil
 }
 
-func (a *ASBackupParams) isStop() bool {
-	return a.BackupXDRParams != nil && a.BackupXDRParams.Stop
+func (a *ASBackupParams) isStopXDR() bool {
+	return a.BackupXDRParams != nil && a.BackupXDRParams.StopXDR
+}
+
+func (a *ASBackupParams) isUnblockMRT() bool {
+	return a.BackupXDRParams != nil && a.BackupXDRParams.UnblockMRT
 }
 
 func NewASBackup(
@@ -108,11 +115,28 @@ func NewASBackup(
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
 
+	if params.BackupXDRParams != nil {
+		if err := checkVersion(aerospikeClient, backupXDRConfig); err != nil {
+			return nil, err
+		}
+	}
+
 	// Stop xdr.
-	if params.isStop() {
+	if params.isStopXDR() {
 		logger.Info("stopping XDR on the database")
 
 		if err := stopXDR(aerospikeClient, backupXDRConfig); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
+	// Unblock mRT.
+	if params.isUnblockMRT() {
+		logger.Info("enabling MRT writes on the database")
+
+		if err := unblockMRT(aerospikeClient, backupXDRConfig); err != nil {
 			return nil, err
 		}
 
@@ -140,9 +164,9 @@ func NewASBackup(
 	return asb, nil
 }
 
-func initializeBackupConfigs(params *ASBackupParams) (*backup.BackupConfig, *backup.ConfigBackupXDR, error) {
+func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *backup.ConfigBackupXDR, error) {
 	var (
-		backupConfig    *backup.BackupConfig
+		backupConfig    *backup.ConfigBackup
 		backupXDRConfig *backup.ConfigBackupXDR
 		err             error
 	)
@@ -151,10 +175,16 @@ func initializeBackupConfigs(params *ASBackupParams) (*backup.BackupConfig, *bac
 	case !params.isXDR():
 		backupConfig, err = mapBackupConfig(params)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create backup config: %w", err)
+			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
 		}
 	case params.isXDR():
 		backupXDRConfig = mapBackupXDRConfig(params)
+
+		// On xdr backup we backup only uds and indexes.
+		backupConfig = backup.NewDefaultBackupConfig()
+
+		backupConfig.NoRecords = true
+		backupConfig.Namespace = backupXDRConfig.Namespace
 	}
 
 	return backupConfig, backupXDRConfig, nil
@@ -220,16 +250,27 @@ func (b *ASBackup) Run(ctx context.Context) error {
 		printEstimateReport(estimates)
 	case b.backupConfigXDR != nil:
 		// Running xdr backup.
-		h, err := b.backupClient.BackupXDR(ctx, b.backupConfigXDR, b.writer)
+		hXdr, err := b.backupClient.BackupXDR(ctx, b.backupConfigXDR, b.writer)
 		if err != nil {
 			return fmt.Errorf("failed to start xdr backup: %w", err)
 		}
+		// Backup indexes and udfs.
+		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
+		if err != nil {
+			return fmt.Errorf("failed to start backup of indexes and udfs: %w", err)
+		}
 
-		if err = h.Wait(ctx); err != nil {
+		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr backup: %w", err)
 		}
 
-		printBackupReport(reportHeaderBackupXDR, h.GetStats())
+		if err = h.Wait(ctx); err != nil {
+			return fmt.Errorf("failed to backup indexes and udfs: %w", err)
+		}
+
+		printBackupReport(reportHeaderBackupXDR, hXdr.GetStats())
+		fmt.Println() // Pretty printing.
+		printBackupReport(reportHeaderBackup, h.GetStats())
 	default:
 		// Running ordinary backup.
 		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
@@ -247,7 +288,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 	return nil
 }
 
-func getSecretAgent(b *backup.BackupConfig, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
+func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
 	switch {
 	case b != nil:
 		return b.SecretAgentConfig
@@ -260,10 +301,35 @@ func getSecretAgent(b *backup.BackupConfig, bxdr *backup.ConfigBackupXDR) *backu
 
 func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
-	address := fmt.Sprintf("%s:%d", cfg.LocalAddress, cfg.LocalPort)
 
-	if err := infoClient.StopXDR(cfg.DC, address, cfg.Namespace); err != nil {
+	if err := infoClient.StopXDR(cfg.DC); err != nil {
 		return fmt.Errorf("failed to stop xdr: %w", err)
+	}
+
+	return nil
+}
+
+func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+
+	if err := infoClient.UnBlockMRTWrites(cfg.Namespace); err != nil {
+		return fmt.Errorf("failed to unblock MRT: %w", err)
+	}
+
+	return nil
+}
+
+func checkVersion(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+
+	version, err := infoClient.GetVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get version: %w", err)
+	}
+
+	if version.Major < xdrSupportedVersion {
+		return fmt.Errorf("version %s is unsupported, only databse version %d+ is supproted",
+			version.String(), xdrSupportedVersion)
 	}
 
 	return nil

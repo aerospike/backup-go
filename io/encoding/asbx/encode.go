@@ -47,8 +47,8 @@ func NewEncoder[T models.TokenConstraint](namespace string) *Encoder[T] {
 
 // GenerateFilename generates a file name for the given namespace.
 // Empty values are used to implement Encoder interface.
-func (e *Encoder[T]) GenerateFilename(_, _ string) string {
-	return fmt.Sprintf("%s_%d.asbx", e.namespace, e.fileNumber.Add(1))
+func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
+	return fmt.Sprintf("%s%s_%d%s.asbx", prefix, e.namespace, e.fileNumber.Add(1), suffix)
 }
 
 // EncodeToken encodes a token to the ASBX format.

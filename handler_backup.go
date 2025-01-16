@@ -60,7 +60,7 @@ type BackupHandler struct {
 
 	writer          Writer
 	encoder         Encoder[*models.Token]
-	config          *BackupConfig
+	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 
 	logger                 *slog.Logger
@@ -79,7 +79,7 @@ type BackupHandler struct {
 // newBackupHandler creates a new BackupHandler.
 func newBackupHandler(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	ac AerospikeClient,
 	logger *slog.Logger,
 	writer Writer,
@@ -328,10 +328,10 @@ func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, 
 		return sized.NewWriter(ctx, n, nil, bh.config.FileLimit, bh.newConfiguredWriter)
 	}
 
-	return lazy.NewWriter(ctx, bh.newConfiguredWriter)
+	return lazy.NewWriter(ctx, n, bh.newConfiguredWriter)
 }
 
-func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
+func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string) (io.WriteCloser, error) {
 	suffix := ""
 	if bh.state != nil {
 		suffix = bh.state.getFileSuffix()

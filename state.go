@@ -60,7 +60,7 @@ type State struct {
 // if it is the first operation, new state instance will be returned.
 func NewState(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	reader StreamingReader,
 	writer Writer,
 	logger *slog.Logger,
@@ -80,7 +80,7 @@ func NewState(
 // newState creates status service from parameters, for backup operations.
 func newState(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	writer Writer,
 	logger *slog.Logger,
 ) *State {
@@ -105,7 +105,7 @@ func newState(
 // newStateFromFile creates a status service from the file, to continue operations.
 func newStateFromFile(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	reader StreamingReader,
 	writer Writer,
 	logger *slog.Logger,
@@ -248,7 +248,7 @@ func (s *State) getFileSuffix() string {
 }
 
 func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.ReadCloser, error) {
-	readCh := make(chan io.ReadCloser)
+	readCh := make(chan models.File)
 	errCh := make(chan error)
 
 	go reader.StreamFile(ctx, fileName, readCh, errCh)
@@ -259,6 +259,6 @@ func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.
 	case err := <-errCh:
 		return nil, err
 	case file := <-readCh:
-		return file, nil
+		return file.Reader, nil
 	}
 }

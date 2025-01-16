@@ -28,7 +28,6 @@ import (
 )
 
 // recordReaderProcessor configure and create record readers pipelines.
-// TODO: or may be RecordReaderHandler
 type recordReaderProcessor[T models.TokenConstraint] struct {
 	xdrConfig *ConfigBackupXDR
 	// add scanConfig in the future.

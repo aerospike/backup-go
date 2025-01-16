@@ -27,7 +27,7 @@ import (
 
 type recordWriterProcessor[T models.TokenConstraint] struct {
 	aerospikeClient AerospikeClient
-	config          *RestoreConfig
+	config          *ConfigRestore
 	stats           *models.RestoreStats
 	limiter         *rate.Limiter
 
@@ -36,7 +36,7 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 
 func newRecordWriterProcessor[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
-	config *RestoreConfig,
+	config *ConfigRestore,
 	stats *models.RestoreStats,
 	limiter *rate.Limiter,
 	logger *slog.Logger,

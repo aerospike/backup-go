@@ -17,7 +17,6 @@ package backup
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 
 	"github.com/aerospike/backup-go/internal/logging"
@@ -33,15 +32,22 @@ type StreamingReader interface {
 	// StreamFiles creates readers from files and sends them to the channel.
 	// In case of an error, the error is sent to the error channel.
 	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
-	StreamFiles(context.Context, chan<- io.ReadCloser, chan<- error)
+	StreamFiles(context.Context, chan<- models.File, chan<- error)
 
 	// StreamFile creates a single file reader and sends io.Readers to the `readersCh`
 	// In case of an error, it is sent to the `errorsCh` channel.
 	// Must be run in a goroutine `go rh.reader.StreamFile()`.
-	StreamFile(ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error)
+	StreamFile(ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error)
 
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
+
+	// ListObjects returns list of objects in the path.
+	ListObjects(ctx context.Context, path string) ([]string, error)
+
+	// SetObjectsToStream overwrites the current list of objects to be streamed.
+	// If set, files will be opened in this order without validation check.
+	SetObjectsToStream(list []string)
 }
 
 // RestoreHandler handles a restore job using the given reader.
@@ -53,7 +59,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 
 	readProcessor  *fileReaderProcessor[T]
 	writeProcessor *recordWriterProcessor[T]
-	config         *RestoreConfig
+	config         *ConfigRestore
 	stats          *models.RestoreStats
 
 	logger  *slog.Logger
@@ -65,7 +71,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 // newRestoreHandler creates a new RestoreHandler.
 func newRestoreHandler[T models.TokenConstraint](
 	ctx context.Context,
-	config *RestoreConfig,
+	config *ConfigRestore,
 	aerospikeClient AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,
@@ -76,7 +82,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Channel for transferring readers.
-	readersCh := make(chan io.ReadCloser)
+	readersCh := make(chan models.File)
 	// Channel for processing errors from readers or writers.
 	errorsCh := make(chan error)
 

@@ -18,13 +18,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -46,8 +46,14 @@ type Reader struct {
 	options
 
 	client *s3.Client
-	// bucketName contains name of the bucket to read from.
+
+	// bucketName contains the name of the bucket to read from.
 	bucketName string
+
+	// objectsToStream is used to predefine a list of objects that must be read from storage.
+	// If objectsToStream is not set, we iterate through objects in storage and load them.
+	// If set, we load objects from this slice directly.
+	objectsToStream []string
 }
 
 // NewReader returns new S3 storage reader.
@@ -90,11 +96,17 @@ func NewReader(
 }
 
 // StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
-// In case of error we send error to `errorsCh` channel.
+// In case of error, we send error to `errorsCh` channel.
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
 	defer close(readersCh)
+
+	// If objects were preloaded, we stream them.
+	if len(r.objectsToStream) > 0 {
+		r.streamSetObjects(ctx, readersCh, errorsCh)
+		return
+	}
 
 	for _, path := range r.pathList {
 		// If it is a folder, open and return.
@@ -118,9 +130,9 @@ func (r *Reader) StreamFiles(
 }
 
 // streamDirectory reads directory form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
-// In case of error we send error to `errorsCh` channel.
+// In case of error, we send error to `errorsCh` channel.
 func (r *Reader) streamDirectory(
-	ctx context.Context, path string, readersCh chan<- io.ReadCloser, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
 	// start serving goroutines.
 	var wg sync.WaitGroup
@@ -150,7 +162,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || isDirectory(path, *p.Key) && !r.withNestedDir {
+			if r.shouldSkip(path, p.Key) {
 				continue
 			}
 
@@ -181,7 +193,7 @@ func (r *Reader) streamDirectory(
 func (r *Reader) processObjects(
 	ctx context.Context,
 	objectsToProcess <-chan *string,
-	readersCh chan<- io.ReadCloser,
+	readersCh chan<- models.File,
 	errorsCh chan<- error,
 ) {
 	// If we don't need to sort objects, open them.
@@ -221,7 +233,7 @@ func (r *Reader) processObjects(
 func (r *Reader) openObject(
 	ctx context.Context,
 	path *string,
-	readersCh chan<- io.ReadCloser,
+	readersCh chan<- models.File,
 	errorsCh chan<- error,
 ) {
 	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
@@ -246,14 +258,14 @@ func (r *Reader) openObject(
 	}
 
 	if object != nil {
-		readersCh <- object.Body
+		readersCh <- models.File{Reader: object.Body, Name: filepath.Base(*path)}
 	}
 }
 
 // StreamFile opens single file from s3 and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
-	ctx context.Context, filename string, readersCh chan<- io.ReadCloser, errorsCh chan<- error) {
+	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
 	// This condition will be true, only if we initialized reader for directory and then want to read
 	// a specific file. It is used for state file and by asb service. So it must be initialized with only
 	// one path.
@@ -276,7 +288,7 @@ func (r *Reader) StreamFile(
 	}
 
 	if object != nil {
-		readersCh <- object.Body
+		readersCh <- models.File{Reader: object.Body, Name: filepath.Base(filename)}
 	}
 }
 
@@ -302,7 +314,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || isDirectory(path, *p.Key) && !r.withNestedDir {
+			if r.shouldSkip(path, p.Key) {
 				continue
 			}
 
@@ -327,6 +339,74 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	}
 
 	return fmt.Errorf("%s is empty", path)
+}
+
+// ListObjects list all object in the path.
+func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
+	var continuationToken *string
+
+	result := make([]string, 0)
+
+	for {
+		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            &r.bucketName,
+			Prefix:            &path,
+			ContinuationToken: continuationToken,
+			StartAfter:        &r.startAfter,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list objects: %w", err)
+		}
+
+		for _, p := range listResponse.Contents {
+			if r.shouldSkip(path, p.Key) {
+				continue
+			}
+
+			if p.Key != nil {
+				result = append(result, *p.Key)
+			}
+		}
+
+		continuationToken = listResponse.NextContinuationToken
+		if continuationToken == nil {
+			break
+		}
+	}
+
+	return result, nil
+}
+
+// shouldSkip performs check, is we should skip files.
+func (r *Reader) shouldSkip(path string, fileName *string) bool {
+	return fileName == nil || isDirectory(path, *fileName) && !r.withNestedDir
+}
+
+// SetObjectsToStream set objects to stream.
+func (r *Reader) SetObjectsToStream(list []string) {
+	r.objectsToStream = list
+}
+
+// streamSetObjects streams preloaded objects.
+func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
+	objectsToProcess := make(chan *string, bufferSize)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
+	}()
+
+	for i := range r.objectsToStream {
+		k := r.objectsToStream[i]
+		objectsToProcess <- &k
+	}
+
+	close(objectsToProcess)
+	wg.Wait()
 }
 
 // cleanPath is protection from incorrect input.

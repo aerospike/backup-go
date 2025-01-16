@@ -1728,7 +1728,7 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 	_, err = ic.GetStats(testASDC, testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.StopXDR(testASDC, testXDRHostPort, testASNamespace)
+	err = ic.StopXDR(testASDC)
 	require.NoError(t, err)
 }
 
@@ -1744,10 +1744,10 @@ func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
 
 	ic := NewInfoClientFromAerospike(client, infoPolicy)
 
-	err := ic.BlockMRTWrites(testASDC, testASNamespace)
+	err := ic.BlockMRTWrites(testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.UnBlockMRTWrites(testASDC, testASNamespace)
+	err = ic.UnBlockMRTWrites(testASNamespace)
 	require.NoError(t, err)
 }
 

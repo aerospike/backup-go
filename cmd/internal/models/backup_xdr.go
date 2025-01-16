@@ -19,6 +19,7 @@ import "crypto/tls"
 type BackupXDR struct {
 	Directory                    string
 	FileLimit                    int64
+	RemoveFiles                  bool
 	ParallelWrite                int
 	DC                           string
 	LocalAddress                 string
@@ -34,5 +35,6 @@ type BackupXDR struct {
 
 	TLSConfig *tls.Config
 
-	Stop bool
+	StopXDR    bool
+	UnblockMRT bool
 }

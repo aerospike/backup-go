@@ -72,7 +72,8 @@ func getShouldCleanContinue(params *ASBackupParams) (shouldClearTarget, continue
 		return params.BackupParams.ShouldClearTarget(), params.BackupParams.Continue != ""
 	}
 	// Xdr backup.
-	return false, false
+
+	return params.BackupXDRParams.RemoveFiles, false
 }
 
 func newLocalWriter(ctx context.Context,

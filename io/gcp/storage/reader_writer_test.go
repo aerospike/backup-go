@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/api/iterator"
@@ -48,13 +49,16 @@ const (
 	testWriteFolderWithDataError = "folder_write_with_data_error/"
 	testWriteFolderMixedData     = "folder_write_mixed_data/"
 	testWriteFolderOneFile       = "folder_write_one_file/"
+	testFolderMixedBackups       = "folder_mixed_backup/"
 
 	testFolderNameTemplate    = "folder_%d/"
 	testFileNameTemplate      = "backup_%d.asb"
+	testFileNameTemplateAsbx  = "backup_%d.asbx"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
 
 	testFileContent        = "content"
+	testFileContentAsbx    = "content-asbx"
 	testFileContentSorted1 = "sorted1"
 	testFileContentSorted2 = "sorted2"
 	testFileContentSorted3 = "sorted3"
@@ -92,7 +96,7 @@ func TestGCPSuite(t *testing.T) {
 	suite.Run(t, new(GCPSuite))
 }
 
-// fillTestData creates test data in different folders.
+//nolint:gocyclo //it is a test function for filling data. No need to split it.
 func fillTestData(ctx context.Context, client *storage.Client) error {
 	bucket := client.Bucket(testBucketName)
 	if err := bucket.Create(ctx, testProjectID, nil); err != nil {
@@ -193,6 +197,21 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 		if err := writeContent(sw, testFileContent); err != nil {
 			return err
 		}
+
+		// Mixed backup: asb and asbx.
+		fileName = fmt.Sprintf("%s%s", testFolderMixedBackups, fmt.Sprintf(testFileNameTemplate, i))
+		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+		sw.ContentType = fileType
+		if err := writeContent(sw, testFileContent); err != nil {
+			return err
+		}
+
+		fileName = fmt.Sprintf("%s%s", testFolderMixedBackups, fmt.Sprintf(testFileNameTemplateAsbx, i))
+		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+		sw.ContentType = fileType
+		if err := writeContent(sw, testFileContentAsbx); err != nil {
+			return err
+		}
 	}
 
 	// unsorted files.
@@ -285,7 +304,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -325,7 +344,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -343,7 +362,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
 
 			s.Require().NoError(err)
@@ -371,7 +390,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedDESC() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -390,7 +409,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedDESC() {
 			}
 			filesCounter++
 
-			result, err := readAll(f)
+			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
 			expectedPostfix--
 
@@ -419,7 +438,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -448,7 +467,7 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -655,7 +674,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -693,7 +712,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -752,7 +771,7 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -796,7 +815,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -840,7 +859,7 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 	)
 	s.Require().NoError(err)
 
-	rCH := make(chan io.ReadCloser)
+	rCH := make(chan models.File)
 	eCH := make(chan error)
 
 	go reader.StreamFiles(ctx, rCH, eCH)
@@ -859,6 +878,66 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 			filesCounter++
 		}
 	}
+}
+
+func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		WithDir(testFolderMixedBackups),
+	)
+	s.Require().NoError(err)
+
+	list, err := reader.ListObjects(ctx, testFolderMixedBackups)
+	s.Require().NoError(err)
+
+	_, asbxList := filterList(list)
+	reader.SetObjectsToStream(asbxList)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case f, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 5, filesCounter)
+				return
+			}
+			filesCounter++
+
+			result, err := readAll(f.Reader)
+			s.Require().NoError(err)
+			s.Require().Equal(testFileContentAsbx, result)
+		}
+	}
+}
+
+func filterList(list []string) (asbList, asbxList []string) {
+	for i := range list {
+		switch filepath.Ext(list[i]) {
+		case ".asb":
+			asbList = append(asbList, list[i])
+		case ".asbx":
+			asbxList = append(asbxList, list[i])
+		}
+	}
+	return asbList, asbxList
 }
 
 func readAll(r io.ReadCloser) (string, error) {

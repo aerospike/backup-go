@@ -15,7 +15,10 @@
 package app
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -120,7 +123,7 @@ func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 	return c, nil
 }
 
-func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
+func mapBackupXDRConfig(params *ASBackupParams) (*backup.ConfigBackupXDR, error) {
 	c := &backup.ConfigBackupXDR{
 		InfoPolicy:                   aerospike.NewInfoPolicy(),
 		EncryptionPolicy:             mapEncryptionPolicy(params.Encryption),
@@ -143,7 +146,16 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 		InfoPolingPeriodMilliseconds: params.BackupXDRParams.InfoPolingPeriodMilliseconds,
 	}
 
-	return c
+	// If TLS enabled.
+	if params.BackupXDRParams.Enabled {
+		tlsCfg, err := mapTLSConfig(params.BackupXDRParams.TLSXdr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load TLS configuration: %w", err)
+		}
+		c.TLSConfig = tlsCfg
+	}
+
+	return c, nil
 }
 
 func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
@@ -464,4 +476,99 @@ func parseLocalTimeToUTC(timeString string) (time.Time, error) {
 	utcTime := localTime.UTC()
 
 	return utcTime, nil
+}
+
+func mapTLSConfig(cfg models.TLSXdr) (*tls.Config, error) {
+	if cfg.Cert == "" || cfg.Key == "" {
+		return nil, fmt.Errorf("TLS certificate and key files are required")
+	}
+
+	cert, err := tls.LoadX509KeyPair(cfg.Cert, cfg.Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed loading key pair: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   parseTLSVersion(cfg.MinVer),
+	}
+
+	// Handle cipher suites if provided
+	if len(cfg.Cipher) > 0 {
+		suites, err := parseCipherSuites(cfg.Cipher)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing cipher suites: %w", err)
+		}
+		tlsConfig.CipherSuites = suites
+	}
+
+	// Configure client authentication if CA file is provided
+	if cfg.Ca != "" {
+		caCert, err := os.ReadFile(cfg.Ca)
+		if err != nil {
+			return nil, fmt.Errorf("failed reading CA file: %w", err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed parsing CA certificate")
+		}
+
+		tlsConfig.ClientCAs = caCertPool
+		if cfg.ClientAuth {
+			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		} else {
+			tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
+		}
+	}
+
+	return tlsConfig, nil
+}
+
+func parseTLSVersion(version string) uint16 {
+	switch version {
+	case "1.0":
+		return tls.VersionTLS10
+	case "1.1":
+		return tls.VersionTLS11
+	case "1.2":
+		return tls.VersionTLS12
+	case "1.3":
+		return tls.VersionTLS13
+	default:
+		return tls.VersionTLS12 // default to TLS 1.2
+	}
+}
+
+// parseCipherSuites converts string cipher suite names to tls.uint16 constants
+func parseCipherSuites(cipherNames []string) ([]uint16, error) {
+	var suites []uint16
+	validSuites := map[string]uint16{
+		"TLS_RSA_WITH_AES_128_CBC_SHA":            tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+		"TLS_RSA_WITH_AES_256_CBC_SHA":            tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+		"TLS_RSA_WITH_AES_128_GCM_SHA256":         tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+		"TLS_RSA_WITH_AES_256_GCM_SHA384":         tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":   tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+		// TLS 1.3 cipher suites
+		"TLS_AES_128_GCM_SHA256":       tls.TLS_AES_128_GCM_SHA256,
+		"TLS_AES_256_GCM_SHA384":       tls.TLS_AES_256_GCM_SHA384,
+		"TLS_CHACHA20_POLY1305_SHA256": tls.TLS_CHACHA20_POLY1305_SHA256,
+	}
+
+	for _, name := range cipherNames {
+		suite, ok := validSuites[name]
+		if !ok {
+			return nil, fmt.Errorf("unsupported cipher suite: %s", name)
+		}
+		suites = append(suites, suite)
+	}
+
+	return suites, nil
 }

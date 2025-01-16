@@ -22,6 +22,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testCompression() *models.Compression {
@@ -775,7 +776,8 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			config := mapBackupXDRConfig(tt.params)
+			config, err := mapBackupXDRConfig(tt.params)
+			require.NoError(t, err)
 			assert.NotNil(t, config)
 			tt.verify(t, config)
 		})

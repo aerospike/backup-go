@@ -178,7 +178,10 @@ func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *bac
 			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
 		}
 	case params.isXDR():
-		backupXDRConfig = mapBackupXDRConfig(params)
+		backupXDRConfig, err = mapBackupXDRConfig(params)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to map xdr backup config: %w", err)
+		}
 
 		// On xdr backup we backup only uds and indexes.
 		backupConfig = backup.NewDefaultBackupConfig()

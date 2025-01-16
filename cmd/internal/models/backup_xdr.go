@@ -14,8 +14,6 @@
 
 package models
 
-import "crypto/tls"
-
 type BackupXDR struct {
 	Directory                    string
 	FileLimit                    int64
@@ -33,8 +31,18 @@ type BackupXDR struct {
 	MaxConnections               int
 	InfoPolingPeriodMilliseconds int64
 
-	TLSConfig *tls.Config
-
 	StopXDR    bool
 	UnblockMRT bool
+
+	TLSXdr
+}
+
+type TLSXdr struct {
+	Enabled    bool
+	Cert       string
+	Key        string
+	Ca         string
+	ClientAuth bool
+	MinVer     string
+	Cipher     []string
 }

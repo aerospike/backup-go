@@ -193,6 +193,8 @@ Any AWS parameter can be retrieved from Secret Agent.
       --s3-bucket-name string         Existing S3 bucket name
       --s3-region string              The S3 region that the bucket(s) exist in.
       --s3-profile string             The S3 profile to use for credentials.
+      --s3-access-key-id string       S3 access key id. If not set, profile auth info will be used.
+      --s3-secret-access-key string   S3 secret access key. If not set, profile auth info will be used.
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
 
 GCP Flags:
@@ -227,27 +229,37 @@ Usage:
 XDR Backup Flags:
 This sections replace Backup Flags section in main documentation.
 All other flags are valid for XDR backup.
-  -n, --namespace string         The namespace to be backed up. Required.
-  -d, --directory string         The Directory that holds the backup files. Required.
-  -F, --file-limit int           Rotate backup files, when their size crosses the given
-                                 value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
-      --parallel-write int       Number of concurrent backup files writing. (default 12)
-      --dc string                DC that will be created on source instance for xdr backup. (default "dc")
-      --local-address string     Local IP address on which XDR server listens on. (default "127.0.0.1")
-      --local-port int           Local port on which XDR server listens on. (default 8080)
-      --rewind all               Rewind is used to ship all existing records of a namespace.
-                                 When rewinding a namespace, XDR will scan through the index and ship
-                                 all the records for that namespace, partition by partition.
-                                 Can be all or number of seconds. (default "all")
-      --read-timeout int         Timeout in milliseconds for TCP read operations. Used by TCP server for XDR. (default 1000)
-      --write-timeout int        Timeout in milliseconds for TCP write operations. Used by TCP server for XDR. (default 1000)
-      --results-queue-size int   Buffer for processing messages received from XDR. (default 256)
-      --ack-queue-size int       Buffer for processing acknowledge messages sent to XDR. (default 256)
-      --max-connections int      Maximum number of concurrent TCP connections. (default 100)
-      --info-poling-period int   How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.
-                                 To measure recovery state and lag. (default 1000)
-      --stop-xdr                 Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, 
-                                 and database server still sends XDR events.
+  -n, --namespace string            The namespace to be backed up. Required.
+  -d, --directory string            The Directory that holds the backup files. Required.
+  -r, --remove-files                Remove existing backup file (-o) or files (-d).
+  -F, --file-limit int              Rotate backup files, when their size crosses the given
+                                    value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
+      --parallel-write int          Number of concurrent backup files writing. (default 12)
+      --dc string                   DC that will be created on source instance for xdr backup. (default "dc")
+      --local-address string        Local IP address on which XDR server listens on. (default "127.0.0.1")
+      --local-port int              Local port on which XDR server listens on. (default 8080)
+      --rewind all                  Rewind is used to ship all existing records of a namespace.
+                                    When rewinding a namespace, XDR will scan through the index and ship
+                                    all the records for that namespace, partition by partition.
+                                    Can be all or number of seconds. (default "all")
+      --read-timeout int            Timeout in milliseconds for TCP read operations. Used by TCP server for XDR. (default 1000)
+      --write-timeout int           Timeout in milliseconds for TCP write operations. Used by TCP server for XDR. (default 1000)
+      --results-queue-size int      Buffer for processing messages received from XDR. (default 256)
+      --ack-queue-size int          Buffer for processing acknowledge messages sent to XDR. (default 256)
+      --max-connections int         Maximum number of concurrent TCP connections. (default 100)
+      --info-poling-period int      How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.
+                                    To measure recovery state and lag. (default 1000)
+      --tls-enabled                 Enable TLS for XDR server.
+      --tls-cert string             Path to TLS certificate file
+      --tls-key string              Path to TLS private key file
+      --tls-ca string               Path to CA certificate file for client verification
+      --tls-client-auth             Require client certificate authentication
+      --tls-min-version string      Minimum TLS version (1.0, 1.1, 1.2, 1.3) (default "1.2")
+      --tls-cipher-suites strings   List of allowed cipher suites
+      --stop-xdr                    Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, 
+                                    and database server still sends XDR events. Use this functionality to stop XDR after interrupted backup.
+      --unblock-mrt                 Unblock MRT writes on the database.
+                                    Use this functionality to unblock MRT writes after interrupted backup.
 ```
 
 ## Unsupported flags

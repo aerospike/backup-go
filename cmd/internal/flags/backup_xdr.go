@@ -81,26 +81,26 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 	flagSet.IntVar(&f.MaxConnections, "max-connections",
 		100,
 		"Maximum number of concurrent TCP connections.")
-
-	flagSet.BoolVar(&f.Enabled, "xdr-tls-enabled", false,
-		"Enable TLS for XDR server.")
-	flagSet.StringVar(&f.Cert, "xdr-tls-cert", "",
-		"Path to TLS certificate file")
-	flagSet.StringVar(&f.Key, "xdr-tls-key", "",
-		"Path to TLS private key file")
-	flagSet.StringVar(&f.Ca, "xdr-tls-ca", "",
-		"Path to CA certificate file for client verification")
-	flagSet.BoolVar(&f.ClientAuth, "xdr-tls-client-auth", false,
-		"Require client certificate authentication")
-	flagSet.StringVar(&f.MinVer, "xdr-tls-min-version", "1.2",
-		"Minimum TLS version (1.0, 1.1, 1.2, 1.3)")
-	flagSet.StringSliceVar(&f.Cipher, "xdr-tls-cipher-suites", nil,
-		"List of allowed cipher suites")
-
 	flagSet.Int64Var(&f.InfoPolingPeriodMilliseconds, "info-poling-period",
 		1000,
 		"How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.\n"+
 			"To measure recovery state and lag.")
+
+	flagSet.BoolVar(&f.Enabled, "tls-enabled", false,
+		"Enable TLS for XDR server.")
+	flagSet.StringVar(&f.Cert, "tls-cert", "",
+		"Path to TLS certificate file")
+	flagSet.StringVar(&f.Key, "tls-key", "",
+		"Path to TLS private key file")
+	flagSet.StringVar(&f.Ca, "tls-ca", "",
+		"Path to CA certificate file for client verification")
+	flagSet.BoolVar(&f.ClientAuth, "tls-client-auth", false,
+		"Require client certificate authentication")
+	flagSet.StringVar(&f.MinVer, "tls-min-version", "1.2",
+		"Minimum TLS version (1.0, 1.1, 1.2, 1.3)")
+	flagSet.StringSliceVar(&f.Cipher, "tls-cipher-suites", nil,
+		"List of allowed cipher suites")
+
 	flagSet.BoolVar(&f.StopXDR, "stop-xdr",
 		false,
 		"Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, \n"+

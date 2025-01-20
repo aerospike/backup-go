@@ -240,10 +240,10 @@ func splitList(list []string) (asbList, asbxList []string, err error) {
 	}
 
 	if len(asbxList) > 0 {
-		// We sort asb files by prefix and suffix to restore them in the correct order.
+		// We sort asbx files by prefix and suffix to restore them in the correct order.
 		asbxList, err = util.SortBackupFiles(asbxList)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to sort asb files: %w", err)
+			return nil, nil, fmt.Errorf("failed to sort asbx files: %w", err)
 		}
 	}
 

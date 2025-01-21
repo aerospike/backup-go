@@ -93,8 +93,8 @@ type TCPServer struct {
 	cancel            context.CancelFunc
 
 	// Results will be sent here.
-	once       sync.Once
 	resultChan chan *models.ASBXToken
+	isActive   atomic.Bool
 
 	logger *slog.Logger
 }
@@ -139,6 +139,8 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 		slog.String("address", s.config.Address),
 		slog.Bool("tls", s.config.TLSConfig != nil))
 
+	s.isActive.Store(true)
+
 	return s.resultChan, nil
 }
 
@@ -154,9 +156,10 @@ func (s *TCPServer) Stop() {
 
 	s.wg.Wait()
 
-	s.once.Do(func() {
+	if s.isActive.Load() {
+		s.isActive.Store(false)
 		close(s.resultChan)
-	})
+	}
 
 	s.logger.Info("server shutdown complete")
 }
@@ -343,7 +346,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 
 			switch {
 			case err == nil:
-			// ok.
+				// ok.
 			case errors.Is(err, io.EOF):
 				// do nothing, wait for the next message.
 				continue
@@ -383,9 +386,9 @@ func (h *ConnectionHandler) processMessage(ctx context.Context) {
 
 			switch {
 			case err == nil:
-			// ok
+				// ok
 			case errors.Is(err, errSkipRecord):
-				// Make acknowledgement and skip record.
+				// Send acknowledgement and skip record.
 				h.ackQueue <- h.ackMsgSuccess
 				continue
 			default:

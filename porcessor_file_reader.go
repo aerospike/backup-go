@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -165,7 +166,14 @@ func distributeFiles(input chan models.File, output []chan models.File, errors c
 		return
 	}
 
+	validator := asbx.NewValidator()
+
 	for file := range input {
+		// Skip non asbx files.
+		if err := validator.Run(file.Name); err != nil {
+			continue
+		}
+
 		parts := strings.SplitN(file.Name, "_", 2)
 
 		num, err := strconv.Atoi(parts[0])

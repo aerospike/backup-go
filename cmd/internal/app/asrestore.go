@@ -196,8 +196,9 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
-		// Restore ASBX from list of dirs or input file is not supported.
-		if params.RestoreParams.InputFile == "" && params.RestoreParams.DirectoryList == "" {
+		// Restore ASBX from a list of dirs or input file is not supported.
+		// So we preprocess lists only for directory restore.
+		if params.RestoreParams.IsDirectoryRestore() {
 			// Separate each file type for different lists.
 			asbList, asbxList, err := prepareLists(ctx, params, reader)
 			if err != nil {

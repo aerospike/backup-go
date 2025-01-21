@@ -53,7 +53,9 @@ func validateRestore(params *ASRestoreParams) error {
 			return fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
 		}
 
-		if params.RestoreParams.InputFile == "" && params.CommonParams.Directory == "" {
+		if params.RestoreParams.InputFile == "" &&
+			params.CommonParams.Directory == "" &&
+			params.RestoreParams.DirectoryList == "" {
 			return fmt.Errorf("input file or directory required")
 		}
 

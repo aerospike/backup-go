@@ -201,5 +201,6 @@ func shouldIgnore(err a.Error) bool {
 		atypes.FAIL_FORBIDDEN,
 		atypes.BIN_TYPE_ERROR,
 		atypes.BIN_NOT_FOUND,
+		atypes.KEY_NOT_FOUND_ERROR,
 	)
 }

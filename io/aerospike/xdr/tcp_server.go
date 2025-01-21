@@ -93,6 +93,7 @@ type TCPServer struct {
 	cancel            context.CancelFunc
 
 	// Results will be sent here.
+	once       sync.Once
 	resultChan chan *models.ASBXToken
 
 	logger *slog.Logger
@@ -153,9 +154,9 @@ func (s *TCPServer) Stop() {
 
 	s.wg.Wait()
 
-	if s.resultChan != nil {
+	s.once.Do(func() {
 		close(s.resultChan)
-	}
+	})
 
 	s.logger.Info("server shutdown complete")
 }
@@ -379,7 +380,15 @@ func (h *ConnectionHandler) processMessage(ctx context.Context) {
 			}
 			// Create aerospike key.
 			key, err := NewAerospikeKey(aMsg.Fields)
-			if err != nil {
+
+			switch {
+			case err == nil:
+			// ok
+			case errors.Is(err, errSkipRecord):
+				// Make acknowledgement and skip record.
+				h.ackQueue <- h.ackMsgSuccess
+				continue
+			default:
 				h.logger.Error("failed to parse aerospike key", slog.Any("error", err))
 				// If we have an error on parsing message, we send an ack message with retry.
 				h.ackQueue <- h.ackMsgRetry

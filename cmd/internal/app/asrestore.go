@@ -190,36 +190,53 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
 		}
-		// List all files first.
-		list, err := reader.ListObjects(ctx, params.CommonParams.Directory)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to list objects: %w", err)
-		}
-		// Separate each file type for different lists.
-		asbList, asbxList, err := splitList(list)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to split objects: %w", err)
-		}
-
-		if len(asbxList) == 0 && len(asbList) == 0 {
-			return nil, nil, fmt.Errorf("no asb or asbx file found in: %s",
-				params.CommonParams.Directory)
-		}
-
-		// Load ASB files for reading.
-		reader.SetObjectsToStream(asbList)
 
 		xdrReader, err = newReader(ctx, params, sa, true)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
-		// Load ASBX files for reading.
-		xdrReader.SetObjectsToStream(asbxList)
+
+		// Restore ASBX from list of dirs or input file is not supported.
+		if params.RestoreParams.InputFile == "" && params.RestoreParams.DirectoryList == "" {
+			// Separate each file type for different lists.
+			asbList, asbxList, err := prepareLists(ctx, params, reader)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to split objects: %w", err)
+			}
+
+			// Load ASB files for reading.
+			reader.SetObjectsToStream(asbList)
+
+			// Load ASBX files for reading.
+			xdrReader.SetObjectsToStream(asbxList)
+		}
 
 		return reader, xdrReader, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
 	}
+}
+
+func prepareLists(ctx context.Context, params *ASRestoreParams, reader backup.StreamingReader,
+) (asbList, asbxList []string, err error) {
+	// List all files first.
+	list, err := reader.ListObjects(ctx, params.CommonParams.Directory)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list objects: %w", err)
+	}
+
+	// Separate each file type for different lists.
+	asbList, asbxList, err = splitList(list)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to split objects: %w", err)
+	}
+
+	if len(asbxList) == 0 && len(asbList) == 0 {
+		return nil, nil, fmt.Errorf("no asb or asbx file found in: %s",
+			params.CommonParams.Directory)
+	}
+
+	return asbList, asbxList, nil
 }
 
 // splitList splits one file list to 2 lists for asb and for asbx restore.

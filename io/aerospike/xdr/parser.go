@@ -15,6 +15,7 @@
 package xdr
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
@@ -29,12 +30,16 @@ const (
 	LenProtoHeader   = 8
 
 	MaxProtoBody = 128 * 1024 * 1024
+
+	setNameMRT = "<ERO~MRT"
 )
 
 const (
 	AckOK    = 0
 	AckRetry = 11
 )
+
+var errSkipRecord = errors.New("skip record")
 
 // Parser xdr protocol parser.
 // Read connection and process messages.
@@ -372,6 +377,10 @@ func NewAerospikeKey(fields []*Field) (*aerospike.Key, error) {
 			// Skip any other fields, as we don't need them for key.
 			continue
 		}
+	}
+
+	if set == setNameMRT {
+		return nil, errSkipRecord
 	}
 
 	ak, err := aerospike.NewKeyWithDigest(namespace, set, key, digest)

@@ -323,7 +323,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	if !strings.HasSuffix(path, "/") {
 		path += "/"
 	}
-	
+
 	result := make([]string, 0)
 
 	it := r.bucketHandle.Objects(ctx, &storage.Query{

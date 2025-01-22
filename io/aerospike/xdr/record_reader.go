@@ -147,7 +147,9 @@ func (r *RecordReader) Close() {
 		r.logger.Error("failed to remove xdr config", slog.Any("error", err))
 	}
 
-	r.tcpServer.Stop()
+	if err := r.tcpServer.Stop(); err != nil {
+		r.logger.Error("failed to stop tcp server", slog.Any("error", err))
+	}
 
 	r.isRunning.Store(false)
 

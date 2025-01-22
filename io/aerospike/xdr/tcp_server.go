@@ -112,13 +112,18 @@ func NewTCPServer(
 
 // Start launch tcp server for XDR.
 func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
-	var err error
+	if !s.isActive.CompareAndSwap(false, true) {
+		return nil, errors.New("server start already initiated")
+	}
+
+	s.resultChan = make(chan *models.ASBXToken, s.config.ResultQueueSize)
 
 	// Redefine cancel function, so we can use it on Stop()
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 
 	// Create listener
+	var err error
 	if s.config.TLSConfig != nil {
 		s.listener, err = tls.Listen("tcp", s.config.Address, s.config.TLSConfig)
 		if err != nil {
@@ -131,9 +136,6 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 		}
 	}
 
-	s.resultChan = make(chan *models.ASBXToken, s.config.ResultQueueSize)
-	s.isActive.Store(true)
-
 	// Start connection acceptor
 	go s.acceptConnections(ctx)
 
@@ -145,7 +147,11 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 }
 
 // Stop close listener and all communication channels.
-func (s *TCPServer) Stop() {
+func (s *TCPServer) Stop() error {
+	if !s.isActive.CompareAndSwap(true, false) {
+		return fmt.Errorf("server is not active")
+	}
+
 	s.cancel()
 
 	if s.listener != nil {
@@ -155,13 +161,11 @@ func (s *TCPServer) Stop() {
 	}
 
 	s.wg.Wait()
-
-	if s.isActive.Load() {
-		s.isActive.Store(false)
-		close(s.resultChan)
-	}
+	close(s.resultChan)
 
 	s.logger.Info("server shutdown complete")
+
+	return nil
 }
 
 // GetActiveConnections method for monitoring current state.

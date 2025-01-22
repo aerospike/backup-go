@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -51,9 +50,7 @@ func TestTCPServer(t *testing.T) {
 	ctx := context.Background()
 
 	results, err := srv.Start(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Wait for server to start.
 	time.Sleep(3 * time.Second)
@@ -78,7 +75,8 @@ func TestTCPServer(t *testing.T) {
 
 	go func() {
 		time.Sleep(5 + time.Second)
-		srv.Stop()
+		err = srv.Stop()
+		require.NoError(t, err)
 	}()
 
 	var counter int
@@ -114,4 +112,49 @@ func newMessage(message string) ([]byte, error) {
 	}
 
 	return NewPayload(body), nil
+}
+
+func TestTCPServer_DoubleStart(t *testing.T) {
+	t.Parallel()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	cfg := NewDefaultTCPConfig()
+
+	srv := NewTCPServer(
+		cfg,
+		logger,
+	)
+
+	ctx := context.Background()
+
+	_, err := srv.Start(ctx)
+	require.NoError(t, err)
+
+	_, err = srv.Start(ctx)
+	require.ErrorContains(t, err, "already initiated")
+}
+
+func TestTCPServer_DoubleStop(t *testing.T) {
+	t.Parallel()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	cfg := NewDefaultTCPConfig()
+
+	srv := NewTCPServer(
+		cfg,
+		logger,
+	)
+
+	ctx := context.Background()
+
+	_, err := srv.Start(ctx)
+	require.NoError(t, err)
+
+	err = srv.Stop()
+	require.NoError(t, err)
+
+	err = srv.Stop()
+	require.ErrorContains(t, err, "server is not active")
 }

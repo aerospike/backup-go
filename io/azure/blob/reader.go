@@ -313,6 +313,10 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 
 // ListObjects list all object in the path.
 func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
+	if !strings.HasSuffix(path, "/") {
+		path += "/"
+	}
+
 	result := make([]string, 0)
 
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{

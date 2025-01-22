@@ -72,6 +72,14 @@ func (a *ASBackupParams) isUnblockMRT() bool {
 	return a.BackupXDRParams != nil && a.BackupXDRParams.UnblockMRT
 }
 
+func (a *ASBackupParams) SkipWriterInit() bool {
+	if a.BackupParams != nil {
+		return !a.BackupParams.Estimate
+	}
+
+	return true
+}
+
 func NewASBackup(
 	ctx context.Context,
 	params *ASBackupParams,
@@ -92,7 +100,7 @@ func NewASBackup(
 
 	// We don't need writer for estimates.
 	var writer backup.Writer
-	if !params.BackupParams.Estimate {
+	if params.SkipWriterInit() {
 		writer, err = initializeBackupWriter(ctx, params, secretAgent)
 		if err != nil {
 			return nil, err

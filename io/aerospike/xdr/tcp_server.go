@@ -105,9 +105,8 @@ func NewTCPServer(
 	logger *slog.Logger,
 ) *TCPServer {
 	return &TCPServer{
-		config:     config,
-		resultChan: make(chan *models.ASBXToken, config.ResultQueueSize),
-		logger:     logger,
+		config: config,
+		logger: logger,
 	}
 }
 
@@ -132,14 +131,15 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 		}
 	}
 
+	s.resultChan = make(chan *models.ASBXToken, s.config.ResultQueueSize)
+	s.isActive.Store(true)
+
 	// Start connection acceptor
 	go s.acceptConnections(ctx)
 
 	s.logger.Info("server started",
 		slog.String("address", s.config.Address),
 		slog.Bool("tls", s.config.TLSConfig != nil))
-
-	s.isActive.Store(true)
 
 	return s.resultChan, nil
 }

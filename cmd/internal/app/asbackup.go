@@ -90,14 +90,18 @@ func NewASBackup(
 
 	secretAgent := getSecretAgent(backupConfig, backupXDRConfig)
 
-	writer, err := initializeBackupWriter(ctx, params, secretAgent)
-	if err != nil {
-		return nil, err
-	}
+	// We don't need writer for estimates.
+	var writer backup.Writer
+	if !params.BackupParams.Estimate {
+		writer, err = initializeBackupWriter(ctx, params, secretAgent)
+		if err != nil {
+			return nil, err
+		}
 
-	// For --remove-artifacts we shouldn't start backup.
-	if writer == nil {
-		return nil, nil
+		// For --remove-artifacts we shouldn't start backup.
+		if writer == nil {
+			return nil, nil
+		}
 	}
 
 	reader, err := initializeBackupReader(ctx, params, secretAgent)

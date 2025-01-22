@@ -24,7 +24,7 @@ import (
 
 func validateBackup(params *ASBackupParams) error {
 	if params.BackupParams != nil && params.CommonParams != nil {
-		if params.BackupParams.OutputFile == "" && params.CommonParams.Directory == "" {
+		if params.BackupParams.OutputFile == "" && params.CommonParams.Directory == "" && !params.BackupParams.Estimate {
 			return fmt.Errorf("output file or directory required")
 		}
 
@@ -53,7 +53,9 @@ func validateRestore(params *ASRestoreParams) error {
 			return fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
 		}
 
-		if params.RestoreParams.InputFile == "" && params.CommonParams.Directory == "" {
+		if params.RestoreParams.InputFile == "" &&
+			params.CommonParams.Directory == "" &&
+			params.RestoreParams.DirectoryList == "" {
 			return fmt.Errorf("input file or directory required")
 		}
 

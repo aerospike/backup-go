@@ -94,6 +94,7 @@ type TCPServer struct {
 
 	// Results will be sent here.
 	resultChan chan *models.ASBXToken
+	isActive   atomic.Bool
 
 	logger *slog.Logger
 }
@@ -104,21 +105,25 @@ func NewTCPServer(
 	logger *slog.Logger,
 ) *TCPServer {
 	return &TCPServer{
-		config:     config,
-		resultChan: make(chan *models.ASBXToken, config.ResultQueueSize),
-		logger:     logger,
+		config: config,
+		logger: logger,
 	}
 }
 
 // Start launch tcp server for XDR.
 func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
-	var err error
+	if !s.isActive.CompareAndSwap(false, true) {
+		return nil, errors.New("server start already initiated")
+	}
+
+	s.resultChan = make(chan *models.ASBXToken, s.config.ResultQueueSize)
 
 	// Redefine cancel function, so we can use it on Stop()
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 
 	// Create listener
+	var err error
 	if s.config.TLSConfig != nil {
 		s.listener, err = tls.Listen("tcp", s.config.Address, s.config.TLSConfig)
 		if err != nil {
@@ -142,7 +147,11 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 }
 
 // Stop close listener and all communication channels.
-func (s *TCPServer) Stop() {
+func (s *TCPServer) Stop() error {
+	if !s.isActive.CompareAndSwap(true, false) {
+		return fmt.Errorf("server is not active")
+	}
+
 	s.cancel()
 
 	if s.listener != nil {
@@ -152,12 +161,11 @@ func (s *TCPServer) Stop() {
 	}
 
 	s.wg.Wait()
-
-	if s.resultChan != nil {
-		close(s.resultChan)
-	}
+	close(s.resultChan)
 
 	s.logger.Info("server shutdown complete")
+
+	return nil
 }
 
 // GetActiveConnections method for monitoring current state.
@@ -342,7 +350,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 
 			switch {
 			case err == nil:
-			// ok.
+				// ok.
 			case errors.Is(err, io.EOF):
 				// do nothing, wait for the next message.
 				continue
@@ -379,7 +387,15 @@ func (h *ConnectionHandler) processMessage(ctx context.Context) {
 			}
 			// Create aerospike key.
 			key, err := NewAerospikeKey(aMsg.Fields)
-			if err != nil {
+
+			switch {
+			case err == nil:
+				// ok
+			case errors.Is(err, errSkipRecord):
+				// Send acknowledgement and skip record.
+				h.ackQueue <- h.ackMsgSuccess
+				continue
+			default:
 				h.logger.Error("failed to parse aerospike key", slog.Any("error", err))
 				// If we have an error on parsing message, we send an ack message with retry.
 				h.ackQueue <- h.ackMsgRetry

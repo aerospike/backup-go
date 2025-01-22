@@ -15,6 +15,8 @@
 package aerospike
 
 import (
+	"fmt"
+
 	a "github.com/aerospike/aerospike-client-go/v7"
 	atypes "github.com/aerospike/aerospike-client-go/v7/types"
 	"github.com/aerospike/backup-go/models"
@@ -66,7 +68,7 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			continue
 		}
 
-		return aerr
+		return fmt.Errorf("failed to write payload: %w", aerr)
 	}
 
 	return aerr

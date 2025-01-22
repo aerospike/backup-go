@@ -40,3 +40,7 @@ type Restore struct {
 
 	Mode string
 }
+
+func (restore *Restore) IsDirectoryRestore() bool {
+	return restore.DirectoryList == "" && restore.InputFile == ""
+}

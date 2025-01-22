@@ -36,7 +36,7 @@ func newReader(
 	isXdr bool,
 ) (backup.StreamingReader, error) {
 	directory, inputFile := params.CommonParams.Directory, params.RestoreParams.InputFile
-	parentDirectory, directoryList := params.CommonParams.Directory, params.RestoreParams.DirectoryList
+	parentDirectory, directoryList := params.RestoreParams.ParentDirectory, params.RestoreParams.DirectoryList
 
 	switch {
 	case params.AwsS3 != nil && params.AwsS3.Region != "":

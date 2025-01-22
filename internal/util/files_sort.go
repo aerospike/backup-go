@@ -47,6 +47,10 @@ func parseFileName(name string) (backupFile, error) {
 
 // SortBackupFiles sort files for better restore performance.
 func SortBackupFiles(files []string) ([]string, error) {
+	if len(files) < 2 {
+		return files, nil
+	}
+
 	// Prepare strings for sorting.
 	presort := make([][]backupFile, len(files))
 	maxPrefix := 0

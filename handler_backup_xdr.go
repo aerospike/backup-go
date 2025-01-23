@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -44,6 +45,8 @@ type HandlerBackupXDR struct {
 	logger *slog.Logger
 
 	errors chan error
+	// For graceful shutdown.
+	wg sync.WaitGroup
 }
 
 // newHandlerBackupXDR returns new xdr backup handler.
@@ -110,9 +113,11 @@ func newBackupXDRHandler(
 // run runs the backup job.
 // currently this should only be run once.
 func (bh *HandlerBackupXDR) run() {
+	bh.wg.Add(1)
 	bh.stats.Start()
 
 	go doWork(bh.errors, bh.logger, func() error {
+		defer bh.wg.Done()
 		return bh.backup(bh.ctx)
 	})
 }
@@ -162,11 +167,14 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 
 	select {
 	case <-bh.ctx.Done():
+		bh.wg.Wait()
 		// Wait for global context.
 		return nil
 	case <-ctx.Done():
 		// Process local context.
 		bh.cancel()
+		bh.wg.Wait()
+
 		return ctx.Err()
 	case err := <-bh.errors:
 		return err

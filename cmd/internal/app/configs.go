@@ -141,6 +141,7 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 		AckQueueSize:                 params.BackupXDRParams.AckQueueSize,
 		MaxConnections:               params.BackupXDRParams.MaxConnections,
 		InfoPolingPeriodMilliseconds: params.BackupXDRParams.InfoPolingPeriodMilliseconds,
+		StartTimeoutMilliseconds:     params.BackupXDRParams.StartTimeoutMilliseconds,
 	}
 
 	return c

@@ -229,6 +229,7 @@ This sections replace Backup Flags section in main documentation.
 All other flags are valid for XDR backup.
   -n, --namespace string         The namespace to be backed up. Required.
   -d, --directory string         The Directory that holds the backup files. Required.
+  -r, --remove-files             Remove existing backup file (-o) or files (-d).
   -F, --file-limit int           Rotate backup files, when their size crosses the given
                                  value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
       --parallel-write int       Number of concurrent backup files writing. (default 12)
@@ -246,8 +247,13 @@ All other flags are valid for XDR backup.
       --max-connections int      Maximum number of concurrent TCP connections. (default 100)
       --info-poling-period int   How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.
                                  To measure recovery state and lag. (default 1000)
+      --start-timeout int        Timeout for starting TCP server for XDR.
+                                 If TCP server for XDR doesn't receive anything for this timeout, it will be shut down.
+                                 This can happen if --local-address and --local-port were misconfigured. (default 30000)
       --stop-xdr                 Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, 
-                                 and database server still sends XDR events.
+                                 and database server still sends XDR events. Use this functionality to stop XDR after interrupted backup.
+      --unblock-mrt              Unblock MRT writes on the database.
+                                 Use this functionality to unblock MRT writes after interrupted backup.
 ```
 
 ## Unsupported flags

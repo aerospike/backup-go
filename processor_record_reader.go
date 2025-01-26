@@ -76,6 +76,7 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 	)
 
 	infoPolingPeriod := time.Duration(rr.xdrConfig.InfoPolingPeriodMilliseconds) * time.Millisecond
+	startTimeout := time.Duration(rr.xdrConfig.StartTimeoutMilliseconds) * time.Millisecond
 
 	return xdr.NewRecordReaderConfig(
 		rr.xdrConfig.DC,
@@ -84,6 +85,7 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 		localHostPort,
 		tcpConfig,
 		infoPolingPeriod,
+		startTimeout,
 	)
 }
 

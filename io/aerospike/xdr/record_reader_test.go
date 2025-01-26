@@ -35,6 +35,7 @@ const (
 	testRewind           = "all"
 	testCurrentHost      = ":8081"
 	testInfoPolingPeriod = 1 * time.Second
+	testStartTimeout     = 10 * time.Second
 )
 
 func testTCPConfig() *TCPConfig {
@@ -52,6 +53,7 @@ func testRecordReaderConfig() *RecordReaderConfig {
 		testCurrentHost,
 		testTCPConfig(),
 		testInfoPolingPeriod,
+		testStartTimeout,
 	)
 }
 

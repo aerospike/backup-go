@@ -74,6 +74,10 @@ type ConfigBackupXDR struct {
 	// How often a backup client will send info commands to check aerospike cluster stats.
 	// To measure recovery state and lag.
 	InfoPolingPeriodMilliseconds int64
+	// Timeout for starting TCP server for XDR.
+	// If TCP server for XDR doesn't receive anything for this timeout, it will be shut down.
+	// This can happen if LocalAddress and LocalPort were misconfigured.
+	StartTimeoutMilliseconds int64
 }
 
 func (c *ConfigBackupXDR) validate() error {

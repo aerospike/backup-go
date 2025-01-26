@@ -173,6 +173,7 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 		AckQueueSize:                 testResultQueueSize,
 		MaxConnections:               testMaxConnections,
 		InfoPolingPeriodMilliseconds: 10,
+		StartTimeoutMilliseconds:     testTimeoutMilliseconds,
 	}
 
 	backupHandler, err := bc.BackupXDR(ctx, backupCfg, writers)
@@ -226,6 +227,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 		AckQueueSize:                 testResultQueueSize,
 		MaxConnections:               testMaxConnections,
 		InfoPolingPeriodMilliseconds: 10,
+		StartTimeoutMilliseconds:     testTimeoutMilliseconds,
 	}
 
 	backupHandler, err := bc.BackupXDR(ctx, backupCfg, writers)

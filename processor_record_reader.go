@@ -68,7 +68,7 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 	tcpConfig := xdr.NewTCPConfig(
 		localTCPAddr,
 		rr.xdrConfig.TLSConfig,
-		rr.xdrConfig.ReadTimoutMilliseconds,
+		rr.xdrConfig.ReadTimeoutMilliseconds,
 		rr.xdrConfig.WriteTimeoutMilliseconds,
 		rr.xdrConfig.ResultQueueSize,
 		rr.xdrConfig.AckQueueSize,

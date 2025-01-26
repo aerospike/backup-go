@@ -66,7 +66,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"When rewinding a namespace, XDR will scan through the index and ship\n"+
 			"all the records for that namespace, partition by partition.\n"+
 			"Can be `all` or number of seconds.")
-	flagSet.Int64Var(&f.ReadTimoutMilliseconds, "read-timeout",
+	flagSet.Int64Var(&f.ReadTimeoutMilliseconds, "read-timeout",
 		1000,
 		"Timeout in milliseconds for TCP read operations. Used by TCP server for XDR.")
 	flagSet.Int64Var(&f.WriteTimeoutMilliseconds, "write-timeout",

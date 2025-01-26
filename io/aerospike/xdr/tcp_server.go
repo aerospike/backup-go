@@ -37,7 +37,7 @@ type TCPConfig struct {
 	// TLS config for secure connection.
 	TLSConfig *tls.Config
 	// Timeout in milliseconds for read operations.
-	ReadTimoutMilliseconds int64
+	ReadTimeoutMilliseconds int64
 	// Timeout in milliseconds for write operations.
 	WriteTimeoutMilliseconds int64
 	// Results queue size.
@@ -52,7 +52,7 @@ type TCPConfig struct {
 func NewTCPConfig(
 	address string,
 	tlsConfig *tls.Config,
-	readTimoutMilliseconds int64,
+	readTimeoutMilliseconds int64,
 	writeTimeoutMilliseconds int64,
 	resultQueueSize int,
 	ackQueueSize int,
@@ -61,7 +61,7 @@ func NewTCPConfig(
 	return &TCPConfig{
 		Address:                  address,
 		TLSConfig:                tlsConfig,
-		ReadTimoutMilliseconds:   readTimoutMilliseconds,
+		ReadTimeoutMilliseconds:  readTimeoutMilliseconds,
 		WriteTimeoutMilliseconds: writeTimeoutMilliseconds,
 		ResultQueueSize:          resultQueueSize,
 		AckQueueSize:             ackQueueSize,
@@ -200,7 +200,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 						conn,
 						s.resultChan,
 						s.config.AckQueueSize,
-						s.config.ReadTimoutMilliseconds,
+						s.config.ReadTimeoutMilliseconds,
 						s.config.WriteTimeoutMilliseconds,
 						s.logger,
 					)
@@ -232,7 +232,7 @@ type ConnectionHandler struct {
 	// channel to send results.
 	resultChan chan *models.ASBXToken
 	// Timeouts in nanoseconds.
-	readTimoutNano   int64
+	readTimeoutNano  int64
 	writeTimeoutNano int64
 	// To stop all goroutines from inside.
 	cancel context.CancelFunc
@@ -256,14 +256,14 @@ func NewConnectionHandler(
 	conn net.Conn,
 	resultChan chan *models.ASBXToken,
 	ackQueueSize int,
-	readTimout int64,
+	readTimeout int64,
 	writeTimeout int64,
 	logger *slog.Logger,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,
 		resultChan:       resultChan,
-		readTimoutNano:   readTimout * 1_000_000,
+		readTimeoutNano:  readTimeout * 1_000_000,
 		writeTimeoutNano: writeTimeout * 1_000_000,
 		timeNow:          time.Now().UnixNano(),
 		bodyQueue:        make(chan []byte, ackQueueSize),
@@ -338,7 +338,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			deadline := h.getDeadline(h.readTimoutNano)
+			deadline := h.getDeadline(h.readTimeoutNano)
 
 			if err := h.conn.SetReadDeadline(time.Unix(deadline, 0)); err != nil {
 				h.logger.Error("failed to set read deadline", slog.Any("error", err))

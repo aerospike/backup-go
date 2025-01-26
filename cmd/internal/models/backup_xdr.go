@@ -26,7 +26,7 @@ type BackupXDR struct {
 	LocalPort                    int
 	Namespace                    string
 	Rewind                       string
-	ReadTimoutMilliseconds       int64
+	ReadTimeoutMilliseconds      int64
 	WriteTimeoutMilliseconds     int64
 	ResultQueueSize              int
 	AckQueueSize                 int

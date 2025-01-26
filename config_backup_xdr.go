@@ -58,7 +58,7 @@ type ConfigBackupXDR struct {
 	TLSConfig *tls.Config
 	// Timeout in milliseconds for TCP read operations.
 	// Used by TCP server for XDR.
-	ReadTimoutMilliseconds int64
+	ReadTimeoutMilliseconds int64
 	// Timeout in milliseconds for TCP writes operations.
 	// Used by TCP server for XDR.
 	WriteTimeoutMilliseconds int64
@@ -74,6 +74,10 @@ type ConfigBackupXDR struct {
 	// How often a backup client will send info commands to check aerospike cluster stats.
 	// To measure recovery state and lag.
 	InfoPolingPeriodMilliseconds int64
+	// Timeout for starting TCP server for XDR.
+	// If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
+	// This situation can occur if the LocalAddress and LocalPort options are misconfigured.
+	StartTimeoutMilliseconds int64
 }
 
 func (c *ConfigBackupXDR) validate() error {
@@ -105,8 +109,8 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("namespace must not be empty")
 	}
 
-	if c.ReadTimoutMilliseconds < 0 {
-		return fmt.Errorf("read timout must not be negative, got %d", c.ReadTimoutMilliseconds)
+	if c.ReadTimeoutMilliseconds < 0 {
+		return fmt.Errorf("read timeout must not be negative, got %d", c.ReadTimeoutMilliseconds)
 	}
 
 	if c.WriteTimeoutMilliseconds < 0 {

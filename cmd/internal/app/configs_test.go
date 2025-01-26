@@ -681,7 +681,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 					FileLimit:                    1000,
 					ParallelWrite:                4,
 					Rewind:                       "1h",
-					ReadTimoutMilliseconds:       5000,
+					ReadTimeoutMilliseconds:      5000,
 					WriteTimeoutMilliseconds:     5000,
 					ResultQueueSize:              1000,
 					AckQueueSize:                 1000,
@@ -697,7 +697,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				assert.Equal(t, int64(1000), cfg.FileLimit)
 				assert.Equal(t, 4, cfg.ParallelWrite)
 				assert.Equal(t, "1h", cfg.Rewind)
-				assert.Equal(t, int64(5000), cfg.ReadTimoutMilliseconds)
+				assert.Equal(t, int64(5000), cfg.ReadTimeoutMilliseconds)
 				assert.Equal(t, int64(5000), cfg.WriteTimeoutMilliseconds)
 				assert.Equal(t, 1000, cfg.ResultQueueSize)
 				assert.Equal(t, 1000, cfg.AckQueueSize)
@@ -749,7 +749,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 					Namespace:                    "test",
 					FileLimit:                    0,
 					ParallelWrite:                0,
-					ReadTimoutMilliseconds:       0,
+					ReadTimeoutMilliseconds:      0,
 					WriteTimeoutMilliseconds:     0,
 					ResultQueueSize:              0,
 					AckQueueSize:                 0,
@@ -761,7 +761,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, int64(0), cfg.FileLimit)
 				assert.Equal(t, 0, cfg.ParallelWrite)
-				assert.Equal(t, int64(0), cfg.ReadTimoutMilliseconds)
+				assert.Equal(t, int64(0), cfg.ReadTimeoutMilliseconds)
 				assert.Equal(t, int64(0), cfg.WriteTimeoutMilliseconds)
 				assert.Equal(t, 0, cfg.ResultQueueSize)
 				assert.Equal(t, 0, cfg.AckQueueSize)

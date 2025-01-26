@@ -135,12 +135,13 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 		Namespace:                    params.BackupXDRParams.Namespace,
 		Rewind:                       params.BackupXDRParams.Rewind,
 		TLSConfig:                    nil,
-		ReadTimoutMilliseconds:       params.BackupXDRParams.ReadTimoutMilliseconds,
+		ReadTimeoutMilliseconds:      params.BackupXDRParams.ReadTimeoutMilliseconds,
 		WriteTimeoutMilliseconds:     params.BackupXDRParams.WriteTimeoutMilliseconds,
 		ResultQueueSize:              params.BackupXDRParams.ResultQueueSize,
 		AckQueueSize:                 params.BackupXDRParams.AckQueueSize,
 		MaxConnections:               params.BackupXDRParams.MaxConnections,
 		InfoPolingPeriodMilliseconds: params.BackupXDRParams.InfoPolingPeriodMilliseconds,
+		StartTimeoutMilliseconds:     params.BackupXDRParams.StartTimeoutMilliseconds,
 	}
 
 	return c

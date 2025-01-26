@@ -66,7 +66,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"When rewinding a namespace, XDR will scan through the index and ship\n"+
 			"all the records for that namespace, partition by partition.\n"+
 			"Can be `all` or number of seconds.")
-	flagSet.Int64Var(&f.ReadTimoutMilliseconds, "read-timeout",
+	flagSet.Int64Var(&f.ReadTimeoutMilliseconds, "read-timeout",
 		1000,
 		"Timeout in milliseconds for TCP read operations. Used by TCP server for XDR.")
 	flagSet.Int64Var(&f.WriteTimeoutMilliseconds, "write-timeout",
@@ -85,6 +85,11 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		1000,
 		"How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.\n"+
 			"To measure recovery state and lag.")
+	flagSet.Int64Var(&f.StartTimeoutMilliseconds, "start-timeout",
+		30000,
+		"Timeout for starting TCP server for XDR.\n"+
+			"If the TCP server for XDR does not receive any data within this timeout period, it will shut down.\n"+
+			"This situation can occur if the --local-address and --local-port options are misconfigured.")
 	flagSet.BoolVar(&f.StopXDR, "stop-xdr",
 		false,
 		"Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, \n"+

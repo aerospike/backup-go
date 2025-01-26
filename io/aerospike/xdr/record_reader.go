@@ -43,6 +43,8 @@ type RecordReaderConfig struct {
 	// infoPolingPeriod how often stats will be requested.
 	// To measure recovery state and lag.
 	infoPolingPeriod time.Duration
+	// Timeout for reading the first message after XDR start.
+	startTimeout time.Duration
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -53,6 +55,7 @@ func NewRecordReaderConfig(
 	currentHostPort string,
 	tcpConfig *TCPConfig,
 	infoPolingPeriod time.Duration,
+	startTimeout time.Duration,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		dc:               dc,
@@ -61,6 +64,7 @@ func NewRecordReaderConfig(
 		currentHostPort:  currentHostPort,
 		tcpConfig:        tcpConfig,
 		infoPolingPeriod: infoPolingPeriod,
+		startTimeout:     startTimeout,
 	}
 }
 
@@ -123,6 +127,20 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 		// If not started.
 		if err := r.start(); err != nil {
 			return nil, fmt.Errorf("failed to start xdr scan: %w", err)
+		}
+
+		// Add timeout after start
+		select {
+		case res, ok := <-r.results:
+			if !ok {
+				return nil, io.EOF
+			}
+
+			return models.NewASBXToken(res.Key, res.Payload), nil
+		case <-time.After(r.config.startTimeout):
+			r.Close()
+
+			return nil, fmt.Errorf("xdr scan timed out after: %s", r.config.startTimeout)
 		}
 	}
 

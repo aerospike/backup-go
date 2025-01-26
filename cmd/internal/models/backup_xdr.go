@@ -26,12 +26,13 @@ type BackupXDR struct {
 	LocalPort                    int
 	Namespace                    string
 	Rewind                       string
-	ReadTimoutMilliseconds       int64
+	ReadTimeoutMilliseconds      int64
 	WriteTimeoutMilliseconds     int64
 	ResultQueueSize              int
 	AckQueueSize                 int
 	MaxConnections               int
 	InfoPolingPeriodMilliseconds int64
+	StartTimeoutMilliseconds     int64
 
 	TLSConfig *tls.Config
 

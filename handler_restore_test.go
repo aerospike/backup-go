@@ -91,12 +91,13 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 		Namespace:                    testASNamespace,
 		Rewind:                       testASRewind,
 		TLSConfig:                    nil,
-		ReadTimoutMilliseconds:       testTimeoutMilliseconds,
+		ReadTimeoutMilliseconds:      testTimeoutMilliseconds,
 		WriteTimeoutMilliseconds:     testTimeoutMilliseconds,
 		ResultQueueSize:              testAckQueueSize,
 		AckQueueSize:                 testResultQueueSize,
 		MaxConnections:               testMaxConnections,
 		InfoPolingPeriodMilliseconds: 10,
+		StartTimeoutMilliseconds:     testTimeoutMilliseconds,
 	}
 
 	backupHandler, err := bc.BackupXDR(ctx, backupCfg, writers)

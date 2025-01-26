@@ -75,8 +75,8 @@ type ConfigBackupXDR struct {
 	// To measure recovery state and lag.
 	InfoPolingPeriodMilliseconds int64
 	// Timeout for starting TCP server for XDR.
-	// If TCP server for XDR doesn't receive anything for this timeout, it will be shut down.
-	// This can happen if LocalAddress and LocalPort were misconfigured.
+	// If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
+	// This situation can occur if the LocalAddress and LocalPort options are misconfigured.
 	StartTimeoutMilliseconds int64
 }
 

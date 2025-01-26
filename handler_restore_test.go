@@ -97,6 +97,7 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 		AckQueueSize:                 testResultQueueSize,
 		MaxConnections:               testMaxConnections,
 		InfoPolingPeriodMilliseconds: 10,
+		StartTimeoutMilliseconds:     testTimeoutMilliseconds,
 	}
 
 	backupHandler, err := bc.BackupXDR(ctx, backupCfg, writers)

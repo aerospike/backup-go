@@ -106,7 +106,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
-		printRestoreReport(reportHeaderRestore, h.GetStats())
+		printRestoreReport(h.GetStats(), nil)
 	case models.RestoreModeASBX:
 		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
 
@@ -119,7 +119,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
-		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
+		printRestoreReport(hXdr.GetStats(), nil)
 	case models.RestoreModeAuto:
 		// If one of restore operations fails, we cancel another.
 		ctx, cancel := context.WithCancel(ctx)
@@ -152,9 +152,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
-		printRestoreReport(reportHeaderRestore, h.GetStats())
-		fmt.Println() // For pretty print.
-		printRestoreReport(reportHeaderRestoreXDR, hXdr.GetStats())
+		printRestoreReport(h.GetStats(), hXdr.GetStats())
 		// To prevent context leaking.
 		cancel()
 	default:

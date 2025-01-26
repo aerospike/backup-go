@@ -90,6 +90,8 @@ type RecordReader struct {
 	checkpoint int64
 	// To check if the reader is running.
 	isRunning atomic.Bool
+	// To check if mrt is stopped.
+	mrtWritesStopped atomic.Bool
 
 	logger *slog.Logger
 }
@@ -137,21 +139,29 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 
 // Close cancels the Aerospike scan used to read records.
 func (r *RecordReader) Close() {
-	r.logger.Debug("closing aerospike xdr record reader")
 	// If not running, do nothing.
-	if !r.isRunning.Load() {
+	if !r.isRunning.CompareAndSwap(true, false) {
 		return
 	}
+
+	r.logger.Debug("closing aerospike xdr record reader")
 
 	if err := r.infoClient.StopXDR(r.config.dc); err != nil {
 		r.logger.Error("failed to remove xdr config", slog.Any("error", err))
 	}
 
+	// If mrt was stopped.
+	if r.mrtWritesStopped.Load() {
+		if err := r.infoClient.UnBlockMRTWrites(r.config.namespace); err != nil {
+			r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
+		}
+		// Only after successful unblocking.
+		r.mrtWritesStopped.Store(false)
+	}
+
 	if err := r.tcpServer.Stop(); err != nil {
 		r.logger.Error("failed to stop tcp server", slog.Any("error", err))
 	}
-
-	r.isRunning.Store(false)
 
 	r.logger.Debug("closed aerospike xdr record reader")
 }
@@ -180,13 +190,13 @@ func (r *RecordReader) start() error {
 		return fmt.Errorf("failed to start xdr: %w", err)
 	}
 
+	r.isRunning.Store(true)
+
 	r.results = results
 
 	r.logger.Debug("started xdr tcp server")
 
 	go r.serve()
-
-	r.isRunning.Store(true)
 
 	return nil
 }
@@ -194,6 +204,7 @@ func (r *RecordReader) start() error {
 func (r *RecordReader) serve() {
 	ticker := time.NewTicker(r.config.infoPolingPeriod)
 	defer ticker.Stop()
+	defer r.Close()
 
 	// TODO: replace it with something. When we will decide how to delay stats check.
 	time.Sleep(3 * time.Second)
@@ -223,6 +234,8 @@ func (r *RecordReader) serve() {
 					r.logger.Error("failed to block mrt writes", slog.Any("error", err))
 					break // Or return?
 				}
+
+				r.mrtWritesStopped.Store(true)
 			}
 
 			// Convert lag from citrus leaf epoch.
@@ -234,6 +247,8 @@ func (r *RecordReader) serve() {
 				if err = r.infoClient.UnBlockMRTWrites(r.config.namespace); err != nil {
 					r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
 				}
+
+				r.mrtWritesStopped.Store(false)
 				// Stop.
 				r.Close()
 

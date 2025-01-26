@@ -280,9 +280,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to backup indexes and udfs: %w", err)
 		}
 
-		printBackupReport(reportHeaderBackupXDR, hXdr.GetStats())
-		fmt.Println() // Pretty printing.
-		printBackupReport(reportHeaderBackup, h.GetStats())
+		printBackupReport(h.GetStats(), hXdr.GetStats())
 	default:
 		// Running ordinary backup.
 		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
@@ -294,7 +292,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 
-		printBackupReport(reportHeaderBackup, h.GetStats())
+		printBackupReport(h.GetStats(), nil)
 	}
 
 	return nil

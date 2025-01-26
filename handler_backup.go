@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
@@ -74,6 +75,8 @@ type BackupHandler struct {
 	stats models.BackupStats
 	// Backup state for continuation.
 	state *State
+	// For graceful shutdown.
+	wg sync.WaitGroup
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -141,10 +144,12 @@ func newBackupHandler(
 // run runs the backup job.
 // currently this should only be run once.
 func (bh *BackupHandler) run() {
+	bh.wg.Add(1)
 	bh.errors = make(chan error, 1)
 	bh.stats.Start()
 
 	go doWork(bh.errors, bh.logger, func() error {
+		defer bh.wg.Done()
 		return bh.backupSync(bh.ctx)
 	})
 }
@@ -443,11 +448,18 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 	select {
 	case <-bh.ctx.Done():
-		// Wait for global context.
+		// When global context is done, wait until all routine finish their work properly.
+		// Global context - is context that was passed to Backup() method.
+		bh.wg.Wait()
+
 		return bh.ctx.Err()
 	case <-ctx.Done():
-		// Process local context.
+		// When local context is done, we cancel global context.
+		// Then wait until all routines finish their work properly.
+		// Local context - is context that was passed to Wait() method.
 		bh.cancel()
+		bh.wg.Wait()
+
 		return ctx.Err()
 	case err := <-bh.errors:
 		return err

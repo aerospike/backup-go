@@ -16,53 +16,85 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	bModels "github.com/aerospike/backup-go/models"
 )
 
 const (
-	reportHeaderBackup     = "Backup Report"
-	reportHeaderBackupXDR  = "XDR Backup Report"
-	reportHeaderRestore    = "ASB Restore Report"
-	reportHeaderRestoreXDR = "ASBX Restore Report"
+	headerBackupReport   = "Backup Report"
+	headerRestoreReport  = "Restore Report"
+	headerEstimateReport = "Estimate Report"
 )
 
-func printBackupReport(header string, stats *bModels.BackupStats) {
-	fmt.Println(header)
-	fmt.Println("--------------")
+func printBackupReport(stats, xdrStats *bModels.BackupStats) {
+	fmt.Println(headerBackupReport)
+	fmt.Println(strings.Repeat("-", len(headerBackupReport)))
+
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
 	fmt.Printf("Duration:             %s\n", stats.GetDuration())
+
+	fmt.Println()
+
 	fmt.Printf("Records Read:         %d\n", stats.GetReadRecords())
+
+	var bw, fw uint64
+	if xdrStats != nil {
+		bw = xdrStats.GetBytesWritten()
+		fw = xdrStats.GetFileCount()
+		fmt.Printf("Records Received:     %d\n", xdrStats.GetReadRecords())
+	}
+
 	fmt.Printf("sIndex Read:          %d\n", stats.GetSIndexes())
 	fmt.Printf("UDFs Read:            %d\n", stats.GetUDFs())
-	fmt.Printf("Bytes Written:        %d bytes\n", stats.GetBytesWritten())
 
+	fmt.Println()
+
+	fmt.Printf("Bytes Written:        %d bytes\n", stats.GetBytesWritten()+bw)
 	fmt.Printf("Total Records:        %d\n", stats.TotalRecords)
-	fmt.Printf("Files Written:        %d\n", stats.GetFileCount())
+	fmt.Printf("Files Written:        %d\n", stats.GetFileCount()+fw)
 }
 
-func printRestoreReport(header string, stats *bModels.RestoreStats) {
-	fmt.Println(header)
-	fmt.Println("--------------")
-	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
-	fmt.Printf("Duration:             %s\n", stats.GetDuration())
-	fmt.Printf("Records Read:         %d\n", stats.GetReadRecords())
-	fmt.Printf("sIndex Read:          %d\n", stats.GetSIndexes())
-	fmt.Printf("UDFs Read:            %d\n", stats.GetUDFs())
-	fmt.Printf("Bytes Written:        %d bytes\n", stats.GetBytesWritten())
+func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
+	fmt.Println(headerRestoreReport)
+	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
-	fmt.Printf("Expired Records:      %d\n", stats.GetRecordsExpired())
-	fmt.Printf("Skipped Records:      %d\n", stats.GetRecordsSkipped())
-	fmt.Printf("Ignored Records:      %d\n", stats.GetRecordsIgnored())
-	fmt.Printf("Fresher Records:     %d\n", stats.GetRecordsFresher())
-	fmt.Printf("Existed Records:      %d\n", stats.GetRecordsExisted())
-	fmt.Printf("Inserted Records:     %d\n", stats.GetRecordsInserted())
-	fmt.Printf("Total Bytes Read:     %d\n", stats.GetTotalBytesRead())
+	fmt.Printf("Start Time:           %s\n", asbStats.StartTime.Format(time.RFC1123))
+	fmt.Printf("Duration:             %s\n", asbStats.GetDuration())
+
+	fmt.Println()
+
+	var rr, ir, ri, br uint64
+	if asbxStats != nil {
+		rr = asbxStats.GetReadRecords()
+		ir = asbStats.GetRecordsIgnored()
+		ri = asbxStats.GetRecordsInserted()
+		br = asbxStats.GetTotalBytesRead()
+	}
+
+	fmt.Printf("Records Read:         %d\n", asbStats.GetReadRecords()+rr)
+	fmt.Printf("sIndex Read:          %d\n", asbStats.GetSIndexes())
+	fmt.Printf("UDFs Read:            %d\n", asbStats.GetUDFs())
+	fmt.Printf("Bytes Written:        %d bytes\n", asbStats.GetBytesWritten())
+
+	fmt.Println()
+
+	fmt.Printf("Expired Records:      %d\n", asbStats.GetRecordsExpired())
+	fmt.Printf("Skipped Records:      %d\n", asbStats.GetRecordsSkipped())
+	fmt.Printf("Ignored Records:      %d\n", asbStats.GetRecordsIgnored()+ir)
+	fmt.Printf("Fresher Records:      %d\n", asbStats.GetRecordsFresher())
+	fmt.Printf("Existed Records:      %d\n", asbStats.GetRecordsExisted())
+
+	fmt.Println()
+
+	fmt.Printf("Inserted Records:     %d\n", asbStats.GetRecordsInserted()+ri)
+	fmt.Printf("Total Bytes Read:     %d\n", asbStats.GetTotalBytesRead()+br)
 }
 
 func printEstimateReport(estimate uint64) {
-	fmt.Println("Estimate Report")
-	fmt.Println("--------------")
+	fmt.Println(headerEstimateReport)
+	fmt.Println(strings.Repeat("-", len(headerEstimateReport)))
+
 	fmt.Printf("File size: %d bytes\n", estimate)
 }

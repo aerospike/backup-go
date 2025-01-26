@@ -248,8 +248,8 @@ All other flags are valid for XDR backup.
       --info-poling-period int   How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.
                                  To measure recovery state and lag. (default 1000)
       --start-timeout int        Timeout for starting TCP server for XDR.
-                                 If TCP server for XDR doesn't receive anything for this timeout, it will be shut down.
-                                 This can happen if --local-address and --local-port were misconfigured. (default 30000)
+                                 If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
+                                 This situation can occur if the --local-address and --local-port options are misconfigured. (default 30000)
       --stop-xdr                 Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, 
                                  and database server still sends XDR events. Use this functionality to stop XDR after interrupted backup.
       --unblock-mrt              Unblock MRT writes on the database.

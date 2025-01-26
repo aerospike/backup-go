@@ -16,14 +16,22 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	bModels "github.com/aerospike/backup-go/models"
 )
 
+const (
+	headerBackupReport   = "Backup Report"
+	headerRestoreReport  = "Restore Report"
+	headerEstimateReport = "Estimate Report"
+)
+
 func printBackupReport(stats, xdrStats *bModels.BackupStats) {
-	fmt.Println("Backup Report")
-	fmt.Println("--------------")
+	fmt.Println(headerBackupReport)
+	fmt.Println(strings.Repeat("-", len(headerBackupReport)))
+
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
 	fmt.Printf("Duration:             %s\n", stats.GetDuration())
 
@@ -49,8 +57,9 @@ func printBackupReport(stats, xdrStats *bModels.BackupStats) {
 }
 
 func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
-	fmt.Println("Restore Report")
-	fmt.Println("--------------")
+	fmt.Println(headerRestoreReport)
+	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
+
 	fmt.Printf("Start Time:           %s\n", asbStats.StartTime.Format(time.RFC1123))
 	fmt.Printf("Duration:             %s\n", asbStats.GetDuration())
 
@@ -74,7 +83,7 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	fmt.Printf("Expired Records:      %d\n", asbStats.GetRecordsExpired())
 	fmt.Printf("Skipped Records:      %d\n", asbStats.GetRecordsSkipped())
 	fmt.Printf("Ignored Records:      %d\n", asbStats.GetRecordsIgnored()+ir)
-	fmt.Printf("Fresher Records:     %d\n", asbStats.GetRecordsFresher())
+	fmt.Printf("Fresher Records:      %d\n", asbStats.GetRecordsFresher())
 	fmt.Printf("Existed Records:      %d\n", asbStats.GetRecordsExisted())
 
 	fmt.Println()
@@ -84,7 +93,8 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 }
 
 func printEstimateReport(estimate uint64) {
-	fmt.Println("Estimate Report")
-	fmt.Println("--------------")
+	fmt.Println(headerEstimateReport)
+	fmt.Println(strings.Repeat("-", len(headerEstimateReport)))
+
 	fmt.Printf("File size: %d bytes\n", estimate)
 }

@@ -91,7 +91,7 @@ type RecordReader struct {
 	// To check if the reader is running.
 	isRunning atomic.Bool
 	// To check if mrt is stopped.
-	mrtStopped atomic.Bool
+	mrtWritesStopped atomic.Bool
 
 	logger *slog.Logger
 }
@@ -151,12 +151,12 @@ func (r *RecordReader) Close() {
 	}
 
 	// If mrt was stopped.
-	if r.mrtStopped.Load() {
+	if r.mrtWritesStopped.Load() {
 		if err := r.infoClient.UnBlockMRTWrites(r.config.namespace); err != nil {
 			r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
 		}
 		// Only after successful unblocking.
-		r.mrtStopped.Store(false)
+		r.mrtWritesStopped.Store(false)
 	}
 
 	if err := r.tcpServer.Stop(); err != nil {
@@ -167,7 +167,6 @@ func (r *RecordReader) Close() {
 }
 
 func (r *RecordReader) start() error {
-	fmt.Println("======SATRT+++++++++")
 	// Create XDR config.
 	if err := r.infoClient.StartXDR(
 		r.config.dc,
@@ -236,7 +235,7 @@ func (r *RecordReader) serve() {
 					break // Or return?
 				}
 
-				r.mrtStopped.Store(true)
+				r.mrtWritesStopped.Store(true)
 			}
 
 			// Convert lag from citrus leaf epoch.
@@ -249,7 +248,7 @@ func (r *RecordReader) serve() {
 					r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
 				}
 
-				r.mrtStopped.Store(false)
+				r.mrtWritesStopped.Store(false)
 				// Stop.
 				r.Close()
 

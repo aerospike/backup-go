@@ -448,11 +448,15 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 	select {
 	case <-bh.ctx.Done():
+		// When global context is done, wait until all routine finish their work properly.
+		// Global context - is context that was passed to Backup() method.
 		bh.wg.Wait()
-		// Wait for global context.
+
 		return bh.ctx.Err()
 	case <-ctx.Done():
-		// Process local context.
+		// When local context is done, we cancel global context.
+		// Then wait until all routines finish their work properly.
+		// Local context - is context that was passed to Wait() method.
 		bh.cancel()
 		bh.wg.Wait()
 

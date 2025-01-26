@@ -140,7 +140,7 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 		case <-time.After(r.config.startTimeout):
 			r.Close()
 
-			return nil, fmt.Errorf("xdr scan timed out")
+			return nil, fmt.Errorf("xdr scan timed out after: %s", r.config.startTimeout)
 		}
 	}
 

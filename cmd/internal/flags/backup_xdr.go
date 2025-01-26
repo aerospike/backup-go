@@ -88,8 +88,8 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 	flagSet.Int64Var(&f.StartTimeoutMilliseconds, "start-timeout",
 		30000,
 		"Timeout for starting TCP server for XDR.\n"+
-			"If TCP server for XDR doesn't receive anything for this timeout, it will be shut down.\n"+
-			"This can happen if --local-address and --local-port were misconfigured.")
+			"If the TCP server for XDR does not receive any data within this timeout period, it will shut down.\n"+
+			"This situation can occur if the --local-address and --local-port options are misconfigured.")
 	flagSet.BoolVar(&f.StopXDR, "stop-xdr",
 		false,
 		"Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, \n"+

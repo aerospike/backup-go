@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,10 +19,11 @@ type backupFile struct {
 
 // parseFileName parse file name to backupFile struct.
 func parseFileName(name string) (backupFile, error) {
+	fileName := filepath.Base(name)
 	// Split by underscore to get parts.
-	parts := strings.Split(name, "_")
+	parts := strings.Split(fileName, "_")
 	if len(parts) != 3 {
-		return backupFile{}, fmt.Errorf("invalid filename format: %s", name)
+		return backupFile{}, fmt.Errorf("invalid filename format: %s", fileName)
 	}
 
 	// Parse prefix number (before _source).

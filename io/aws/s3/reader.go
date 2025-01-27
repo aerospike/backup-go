@@ -345,9 +345,6 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
 	var continuationToken *string
 
-	// Remove starting / as s3 won't list anything if a path is started with /.
-	path = strings.TrimPrefix(path, "/")
-
 	result := make([]string, 0)
 
 	for {

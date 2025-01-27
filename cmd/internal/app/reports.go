@@ -68,7 +68,7 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	var rr, ir, ri, br uint64
 	if asbxStats != nil {
 		rr = asbxStats.GetReadRecords()
-		ir = asbStats.GetRecordsIgnored()
+		ir = asbxStats.GetRecordsIgnored()
 		ri = asbxStats.GetRecordsInserted()
 		br = asbxStats.GetTotalBytesRead()
 	}

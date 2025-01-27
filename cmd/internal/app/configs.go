@@ -17,6 +17,7 @@ package app
 import (
 	"fmt"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -121,6 +122,11 @@ func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 }
 
 func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
+	parallelWrite := runtime.NumCPU()
+	if params.BackupXDRParams.ParallelWrite > 0 {
+		parallelWrite = params.BackupXDRParams.ParallelWrite
+	}
+
 	c := &backup.ConfigBackupXDR{
 		InfoPolicy:                   aerospike.NewInfoPolicy(),
 		EncryptionPolicy:             mapEncryptionPolicy(params.Encryption),
@@ -128,7 +134,7 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 		SecretAgentConfig:            mapSecretAgentConfig(params.SecretAgent),
 		EncoderType:                  backup.EncoderTypeASBX,
 		FileLimit:                    params.BackupXDRParams.FileLimit,
-		ParallelWrite:                params.BackupXDRParams.ParallelWrite,
+		ParallelWrite:                parallelWrite,
 		DC:                           params.BackupXDRParams.DC,
 		LocalAddress:                 params.BackupXDRParams.LocalAddress,
 		LocalPort:                    params.BackupXDRParams.LocalPort,
@@ -148,6 +154,11 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 }
 
 func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
+	parallel := runtime.NumCPU()
+	if params.CommonParams.Parallel > 0 {
+		parallel = params.CommonParams.Parallel
+	}
+
 	c := backup.NewDefaultRestoreConfig()
 	c.Namespace = mapRestoreNamespace(params.CommonParams.Namespace)
 	c.SetList = splitByComma(params.CommonParams.SetList)
@@ -156,7 +167,7 @@ func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
 	c.NoIndexes = params.CommonParams.NoIndexes
 	c.NoUDFs = params.CommonParams.NoUDFs
 	c.RecordsPerSecond = params.CommonParams.RecordsPerSecond
-	c.Parallel = params.CommonParams.Parallel
+	c.Parallel = parallel
 	c.WritePolicy = mapWritePolicy(params.RestoreParams, params.CommonParams)
 	c.InfoPolicy = mapInfoPolicy(params.RestoreParams.TimeOut)
 	// As we set --nice in MiB we must convert it to bytes

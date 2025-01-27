@@ -210,6 +210,10 @@ func validateCommonParams(commonParams *models.Common) error {
 		return fmt.Errorf("socket-timeout must be non-negative")
 	}
 
+	if commonParams.Parallel < 0 {
+		return fmt.Errorf("parallel must be non-negative")
+	}
+
 	return nil
 }
 

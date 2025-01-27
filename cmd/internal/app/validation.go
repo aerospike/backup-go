@@ -37,8 +37,58 @@ func validateBackup(params *ASBackupParams) error {
 		}
 	}
 
+	if params.BackupXDRParams != nil {
+		if err := validateBackupXDRParams(params.BackupXDRParams); err != nil {
+			return err
+		}
+	}
+
 	if err := validateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func validateBackupXDRParams(params *models.BackupXDR) error {
+	if params.InfoRetryAttempts < 1 {
+		return fmt.Errorf("backup xdr retry attempts can't be less than 1")
+	}
+
+	if params.ReadTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr read timeout can't be negative")
+	}
+
+	if params.WriteTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr write timeout can't be negative")
+	}
+
+	if params.InfoPolingPeriodMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info poling period can't be negative")
+	}
+
+	if params.StartTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr start timeout can't be negative")
+	}
+
+	if params.ResultQueueSize < 0 {
+		return fmt.Errorf("backup xdr result queue size can't be negative")
+	}
+
+	if params.AckQueueSize < 0 {
+		return fmt.Errorf("backup xdr ack queue size can't be negative")
+	}
+
+	if params.MaxConnections < 1 {
+		return fmt.Errorf("backup xdr max connections can't be less than 1")
+	}
+
+	if params.ParallelWrite < 1 {
+		return fmt.Errorf("backup xdr parallel write can't be less than 1")
+	}
+
+	if params.FileLimit < 1 {
+		return fmt.Errorf("backup xdr file limit can't be less than 1")
 	}
 
 	return nil

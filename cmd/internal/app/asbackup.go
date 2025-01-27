@@ -137,8 +137,8 @@ func NewASBackup(
 	if params.isStopXDR() {
 		logger.Info("stopping XDR on the database")
 
-		if err := stopXDR(aerospikeClient, backupXDRConfig); err != nil {
-			return nil, err
+		if err = stopXDR(aerospikeClient, backupXDRConfig, params.BackupXDRParams.InfoRetryAttempts); err != nil {
+			return nil, fmt.Errorf("failed to stop XDR: %w", err)
 		}
 
 		return nil, nil
@@ -148,8 +148,8 @@ func NewASBackup(
 	if params.isUnblockMRT() {
 		logger.Info("enabling MRT writes on the database")
 
-		if err := unblockMRT(aerospikeClient, backupXDRConfig); err != nil {
-			return nil, err
+		if err = unblockMRT(aerospikeClient, backupXDRConfig, params.BackupXDRParams.InfoRetryAttempts); err != nil {
+			return nil, fmt.Errorf("failed to enable MRT: %w", err)
 		}
 
 		return nil, nil
@@ -309,24 +309,34 @@ func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backu
 	}
 }
 
-func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR, attempts int) error {
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
 
-	if err := infoClient.StopXDR(cfg.DC); err != nil {
-		return fmt.Errorf("failed to stop xdr: %w", err)
+	var err error
+
+	for range attempts {
+		err = infoClient.StopXDR(cfg.DC)
+		if err == nil {
+			return nil
+		}
 	}
 
-	return nil
+	return err
 }
 
-func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR, attempts int) error {
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
 
-	if err := infoClient.UnBlockMRTWrites(cfg.Namespace); err != nil {
-		return fmt.Errorf("failed to unblock MRT: %w", err)
+	var err error
+
+	for range attempts {
+		err = infoClient.UnBlockMRTWrites(cfg.Namespace)
+		if err == nil {
+			return nil
+		}
 	}
 
-	return nil
+	return err
 }
 
 func checkVersion(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {

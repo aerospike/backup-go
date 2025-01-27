@@ -85,6 +85,9 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		1000,
 		"How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.\n"+
 			"To measure recovery state and lag.")
+	flagSet.IntVar(&f.InfoRetryAttempts, "info-retry-attempts", 1,
+		"How many times to retry to send info commands before failing. "+
+			"This parameter is applied to stop xdr and unblock MRT writes requests.")
 	flagSet.Int64Var(&f.StartTimeoutMilliseconds, "start-timeout",
 		30000,
 		"Timeout for starting TCP server for XDR.\n"+

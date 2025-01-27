@@ -32,6 +32,7 @@ type BackupXDR struct {
 	AckQueueSize                 int
 	MaxConnections               int
 	InfoPolingPeriodMilliseconds int64
+	InfoRetryAttempts            int
 	StartTimeoutMilliseconds     int64
 
 	TLSConfig *tls.Config

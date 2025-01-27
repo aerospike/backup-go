@@ -654,3 +654,154 @@ func TestValidateRestoreParams(t *testing.T) {
 		})
 	}
 }
+
+func Test_validateBackupXDRParams(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  *models.BackupXDR
+		wantErr string
+	}{
+		{
+			name: "valid params",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            3,
+				ReadTimeoutMilliseconds:      1000,
+				WriteTimeoutMilliseconds:     1000,
+				InfoPolingPeriodMilliseconds: 1000,
+				StartTimeoutMilliseconds:     1000,
+				ResultQueueSize:              100,
+				AckQueueSize:                 100,
+				MaxConnections:               10,
+				ParallelWrite:                5,
+				FileLimit:                    1000,
+			},
+			wantErr: "",
+		},
+		{
+			name: "invalid info retry attempts",
+			params: &models.BackupXDR{
+				InfoRetryAttempts: 0,
+			},
+			wantErr: "backup xdr retry attempts can't be less than 1",
+		},
+		{
+			name: "negative read timeout",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:       1,
+				ReadTimeoutMilliseconds: -1,
+			},
+			wantErr: "backup xdr read timeout can't be negative",
+		},
+		{
+			name: "negative write timeout",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:        1,
+				ReadTimeoutMilliseconds:  0,
+				WriteTimeoutMilliseconds: -1,
+			},
+			wantErr: "backup xdr write timeout can't be negative",
+		},
+		{
+			name: "negative info polling period",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            1,
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: -1,
+			},
+			wantErr: "backup xdr info poling period can't be negative",
+		},
+		{
+			name: "negative start timeout",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            1,
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     -1,
+			},
+			wantErr: "backup xdr start timeout can't be negative",
+		},
+		{
+			name: "negative result queue size",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            1,
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              -1,
+			},
+			wantErr: "backup xdr result queue size can't be negative",
+		},
+		{
+			name: "negative ack queue size",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            1,
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              0,
+				AckQueueSize:                 -1,
+			},
+			wantErr: "backup xdr ack queue size can't be negative",
+		},
+		{
+			name: "invalid max connections",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            1,
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              0,
+				AckQueueSize:                 0,
+				MaxConnections:               0,
+			},
+			wantErr: "backup xdr max connections can't be less than 1",
+		},
+		{
+			name: "invalid parallel write",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            1,
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              0,
+				AckQueueSize:                 0,
+				MaxConnections:               1,
+				ParallelWrite:                0,
+			},
+			wantErr: "backup xdr parallel write can't be less than 1",
+		},
+		{
+			name: "invalid file limit",
+			params: &models.BackupXDR{
+				InfoRetryAttempts:            1,
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              0,
+				AckQueueSize:                 0,
+				MaxConnections:               1,
+				ParallelWrite:                1,
+				FileLimit:                    0,
+			},
+			wantErr: "backup xdr file limit can't be less than 1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateBackupXDRParams(tt.params)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}

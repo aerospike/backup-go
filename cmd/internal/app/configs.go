@@ -123,7 +123,7 @@ func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 
 func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 	parallelWrite := runtime.NumCPU()
-	if params.BackupXDRParams.ParallelWrite != 0 {
+	if params.BackupXDRParams.ParallelWrite > 0 {
 		parallelWrite = params.BackupXDRParams.ParallelWrite
 	}
 
@@ -155,7 +155,7 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 
 func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
 	parallel := runtime.NumCPU()
-	if params.CommonParams.Parallel != 0 {
+	if params.CommonParams.Parallel > 0 {
 		parallel = params.CommonParams.Parallel
 	}
 

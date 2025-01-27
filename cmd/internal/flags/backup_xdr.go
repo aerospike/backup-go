@@ -50,7 +50,8 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"value (in bytes) Only used when backing up to a Directory. 0 - no limit.")
 	flagSet.IntVar(&f.ParallelWrite, "parallel-write",
 		defaultParallel,
-		"Number of concurrent backup files writing.")
+		"Number of concurrent backup files writing.\n"+
+			"The default value is automatically calculated and appears as the number of CPUs on your machine.")
 	flagSet.StringVar(&f.DC, "dc",
 		"dc",
 		"DC that will be created on source instance for xdr backup.")

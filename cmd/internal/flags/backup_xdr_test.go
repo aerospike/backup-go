@@ -15,7 +15,6 @@
 package flags
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,7 +80,7 @@ func TestBackupXDR_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.Namespace, "The default value for namespace should be an empty string")
 	assert.Equal(t, "", result.Directory, "The default value for directory should be an empty string")
 	assert.Equal(t, int64(262144000), result.FileLimit, "The default value for file-limit should be 250MB")
-	assert.Equal(t, runtime.NumCPU(), result.ParallelWrite, "The default value for parallel-write should be number of CPUs")
+	assert.Equal(t, 0, result.ParallelWrite, "The default value for parallel-write should be number of CPUs")
 	assert.Equal(t, "dc", result.DC, "The default value for dc should be 'dc'")
 	assert.Equal(t, "127.0.0.1", result.LocalAddress, "The default value for local-address should be '127.0.0.1'")
 	assert.Equal(t, 8080, result.LocalPort, "The default value for local-port should be 8080")

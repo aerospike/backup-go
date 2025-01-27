@@ -80,6 +80,9 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 
 	fmt.Println()
 
+	fmt.Println("TESTING1:", ir)
+	fmt.Println("TESTING2:", asbStats.GetRecordsIgnored())
+
 	fmt.Printf("Expired Records:      %d\n", asbStats.GetRecordsExpired())
 	fmt.Printf("Skipped Records:      %d\n", asbStats.GetRecordsSkipped())
 	fmt.Printf("Ignored Records:      %d\n", asbStats.GetRecordsIgnored()+ir)

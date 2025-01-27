@@ -91,6 +91,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return nil
 
 		case rw.ignoreRecordError && shouldIgnore(aerr):
+			fmt.Println("-----------AERR RECORD write:", aerr)
 			rw.stats.IncrRecordsIgnored()
 			return nil
 

@@ -193,6 +193,7 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 		atypes.FAIL_FORBIDDEN,
 		atypes.BIN_TYPE_ERROR,
 		atypes.BIN_NOT_FOUND:
+		fmt.Println("-----------CODE batch write:", code)
 		rw.stats.IncrRecordsIgnored()
 		return false
 	case atypes.OK:

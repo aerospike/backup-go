@@ -345,6 +345,10 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
 	var continuationToken *string
 
+	if !strings.HasSuffix(path, "/") {
+		path += "/"
+	}
+
 	result := make([]string, 0)
 
 	for {

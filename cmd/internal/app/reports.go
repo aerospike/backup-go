@@ -68,7 +68,7 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	var rr, ir, ri, br uint64
 	if asbxStats != nil {
 		rr = asbxStats.GetReadRecords()
-		ir = asbStats.GetRecordsIgnored()
+		ir = asbxStats.GetRecordsIgnored()
 		ri = asbxStats.GetRecordsInserted()
 		br = asbxStats.GetTotalBytesRead()
 	}
@@ -79,9 +79,6 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	fmt.Printf("Bytes Written:        %d bytes\n", asbStats.GetBytesWritten())
 
 	fmt.Println()
-
-	fmt.Println("TESTING1:", ir)
-	fmt.Println("TESTING2:", asbStats.GetRecordsIgnored())
 
 	fmt.Printf("Expired Records:      %d\n", asbStats.GetRecordsExpired())
 	fmt.Printf("Skipped Records:      %d\n", asbStats.GetRecordsSkipped())

@@ -57,7 +57,6 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			return nil
 
 		case p.ignoreRecordError && shouldIgnore(aerr):
-			fmt.Println("-----------AERR PAYLOAD write:", aerr)
 			p.stats.IncrRecordsIgnored()
 			return nil
 

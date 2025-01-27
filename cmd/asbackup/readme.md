@@ -232,7 +232,8 @@ All other flags are valid for XDR backup.
   -r, --remove-files             Remove existing backup file (-o) or files (-d).
   -F, --file-limit int           Rotate backup files, when their size crosses the given
                                  value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
-      --parallel-write int       Number of concurrent backup files writing. (default 12)
+      --parallel-write int       Number of concurrent backup files writing.
+                                 If not set the default value is automatically calculated and appears as the number of CPUs on your machine.
       --dc string                DC that will be created on source instance for xdr backup. (default "dc")
       --local-address string     Local IP address on which XDR server listens on. (default "127.0.0.1")
       --local-port int           Local port on which XDR server listens on. (default 8080)

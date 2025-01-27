@@ -15,6 +15,7 @@
 package app
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -760,7 +761,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 			verify: func(t *testing.T, cfg *backup.ConfigBackupXDR) {
 				t.Helper()
 				assert.Equal(t, int64(0), cfg.FileLimit)
-				assert.Equal(t, 0, cfg.ParallelWrite)
+				assert.Equal(t, runtime.NumCPU(), cfg.ParallelWrite)
 				assert.Equal(t, int64(0), cfg.ReadTimeoutMilliseconds)
 				assert.Equal(t, int64(0), cfg.WriteTimeoutMilliseconds)
 				assert.Equal(t, 0, cfg.ResultQueueSize)

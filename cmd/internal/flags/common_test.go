@@ -77,7 +77,7 @@ func TestCommon_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.SetList, "The default value for set-list should be nil")
 	assert.Equal(t, 0, result.RecordsPerSecond, "The default value for records-per-second should be 0")
 	assert.Equal(t, "", result.BinList, "The default value for bin-list should be nil")
-	assert.Equal(t, 0, result.Parallel, "The default value for parallel should be 1")
+	assert.Equal(t, 0, result.Parallel, "The default value for parallel should be 0")
 	assert.False(t, result.NoRecords, "The default value for no-records should be false")
 	assert.False(t, result.NoIndexes, "The default value for no-indexes should be false")
 	assert.False(t, result.NoUDFs, "The default value for no-udfs should be false")

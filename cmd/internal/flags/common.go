@@ -15,8 +15,6 @@
 package flags
 
 import (
-	"runtime"
-
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
@@ -57,7 +55,7 @@ const (
 		"filter cannot be parallelized individually, so you may only achieve as much parallelism as there are\n" +
 		"partition filters. Accepts values from 1-1024 inclusive."
 	descParallelRestore = "The number of restore threads. Accepts values from 1-1024 inclusive.\n" +
-		"The default value is automatically calculated and appears as the number of CPUs on your machine."
+		"If not set the default value is automatically calculated and appears as the number of CPUs on your machine."
 
 	defaultTotalTimeoutBackup  = 0
 	defaultTotalTimeoutRestore = 10000
@@ -102,7 +100,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		descNoUDFs = descNoUDFsRestore
 		descParallel = descParallelRestore
 		defaultTotalTimeout = defaultTotalTimeoutRestore
-		defaultParallel = runtime.NumCPU()
+		defaultParallel = 0
 	}
 
 	flagSet.StringVarP(&f.Directory, "directory", "d",

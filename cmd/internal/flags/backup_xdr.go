@@ -15,8 +15,6 @@
 package flags
 
 import (
-	"runtime"
-
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
@@ -31,8 +29,6 @@ func NewBackupXDR() *BackupXDR {
 
 func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
-
-	defaultParallel := runtime.NumCPU()
 
 	flagSet.StringVarP(&f.Namespace, "namespace", "n",
 		"",
@@ -49,9 +45,9 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		"Rotate backup files, when their size crosses the given\n"+
 			"value (in bytes) Only used when backing up to a Directory. 0 - no limit.")
 	flagSet.IntVar(&f.ParallelWrite, "parallel-write",
-		defaultParallel,
+		0,
 		"Number of concurrent backup files writing.\n"+
-			"The default value is automatically calculated and appears as the number of CPUs on your machine.")
+			"If not set the default value is automatically calculated and appears as the number of CPUs on your machine.")
 	flagSet.StringVar(&f.DC, "dc",
 		"dc",
 		"DC that will be created on source instance for xdr backup.")

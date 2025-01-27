@@ -18,9 +18,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go/models"
@@ -99,14 +101,17 @@ type aerospikeClient interface {
 }
 
 type InfoClient struct {
-	policy  *a.InfoPolicy
-	cluster *a.Cluster
+	policy      *a.InfoPolicy
+	cluster     *a.Cluster
+	retryPolicy *models.RetryPolicy
 }
 
-func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy) *InfoClient {
+func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy, retryPolicy *models.RetryPolicy,
+) *InfoClient {
 	return &InfoClient{
-		cluster: aeroClient.Cluster(),
-		policy:  policy,
+		cluster:     aeroClient.Cluster(),
+		policy:      policy,
+		retryPolicy: retryPolicy,
 	}
 }
 
@@ -866,4 +871,23 @@ func parseUDFListResponse(resp string) ([]infoMap, error) {
 // example resp: type=LUA;content=LS0gQSB2ZXJ5IHNpbXBsZSBhcml0
 func parseUDFGetResponse(resp string) (infoMap, error) {
 	return parseInfoObject(resp, ";", "=")
+}
+
+func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
+	if policy == nil {
+		return fmt.Errorf("retry policy cannot be nil")
+	}
+
+	var err error
+	for i := range policy.MaxRetries {
+		err = command()
+		if err == nil {
+			return nil
+		}
+
+		duration := time.Duration(float64(policy.BaseTimeout) * math.Pow(policy.Multiplier, float64(i)))
+		time.Sleep(duration)
+	}
+	
+	return fmt.Errorf("after %d attempts: %w", policy.MaxRetries, err)
 }

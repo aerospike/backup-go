@@ -38,4 +38,8 @@ type BackupXDR struct {
 
 	StopXDR    bool
 	UnblockMRT bool
+
+	InfoMaxRetries                uint
+	InfoRetriesMultiplier         float64
+	InfoRetryIntervalMilliseconds int64
 }

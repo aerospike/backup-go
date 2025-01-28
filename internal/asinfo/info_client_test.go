@@ -1713,14 +1713,13 @@ func Test_parseInfoObject(t *testing.T) {
 func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 	t.Parallel()
 
-	infoPolicy := a.NewInfoPolicy()
 	asPolicy := a.NewClientPolicy()
 	asPolicy.User = testASLoginPassword
 	asPolicy.Password = testASLoginPassword
 	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
 	require.NoError(t, aerr)
 
-	ic := NewInfoClientFromAerospike(client, infoPolicy)
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
 	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind)
 	require.NoError(t, err)
@@ -1734,15 +1733,13 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 
 func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
 	t.Parallel()
-
-	infoPolicy := a.NewInfoPolicy()
 	asPolicy := a.NewClientPolicy()
 	asPolicy.User = testASLoginPassword
 	asPolicy.Password = testASLoginPassword
 	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
 	require.NoError(t, aerr)
 
-	ic := NewInfoClientFromAerospike(client, infoPolicy)
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
 	err := ic.BlockMRTWrites(testASNamespace)
 	require.NoError(t, err)

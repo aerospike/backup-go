@@ -38,6 +38,10 @@ type Backup struct {
 	Continue            string
 	ScanPageSize        int64
 	OutputFilePrefix    string
+
+	InfoMaxRetries                uint
+	InfoRetriesMultiplier         float64
+	InfoRetryIntervalMilliseconds int64
 }
 
 // ShouldClearTarget check if we should clean target directory.

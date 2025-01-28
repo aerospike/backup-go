@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/models"
 )
 
 // ConfigBackupXDR contains configuration for the xdr backup operation.
@@ -78,6 +79,8 @@ type ConfigBackupXDR struct {
 	// If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
 	// This situation can occur if the LocalAddress and LocalPort options are misconfigured.
 	StartTimeoutMilliseconds int64
+	// Retry policy for info commands.
+	InfoRetryPolicy *models.RetryPolicy
 }
 
 func (c *ConfigBackupXDR) validate() error {

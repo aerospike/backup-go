@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/internal/asinfo"
@@ -128,31 +127,43 @@ func NewASBackup(
 	}
 
 	if params.BackupXDRParams != nil {
-		if err := checkVersion(aerospikeClient, backupXDRConfig); err != nil {
-			return nil, err
-		}
-	}
+		infoClient := asinfo.NewInfoClientFromAerospike(
+			aerospikeClient,
+			backupXDRConfig.InfoPolicy,
+			backupXDRConfig.InfoRetryPolicy,
+		)
 
-	// Stop xdr.
-	if params.isStopXDR() {
-		logger.Info("stopping XDR on the database")
-
-		if err := stopXDR(aerospikeClient, backupXDRConfig); err != nil {
-			return nil, err
+		version, err := infoClient.GetVersion()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get version: %w", err)
 		}
 
-		return nil, nil
-	}
-
-	// Unblock mRT.
-	if params.isUnblockMRT() {
-		logger.Info("enabling MRT writes on the database")
-
-		if err := unblockMRT(aerospikeClient, backupXDRConfig); err != nil {
-			return nil, err
+		if version.Major < xdrSupportedVersion {
+			return nil, fmt.Errorf("version %s is unsupported, only databse version %d+ is supproted",
+				version.String(), xdrSupportedVersion)
 		}
 
-		return nil, nil
+		// Stop xdr.
+		if params.isStopXDR() {
+			logger.Info("stopping XDR on the database")
+
+			if err = infoClient.StopXDR(backupXDRConfig.DC); err != nil {
+				return nil, fmt.Errorf("failed to stop XDR: %w", err)
+			}
+
+			return nil, nil
+		}
+
+		// Unblock mRT.
+		if params.isUnblockMRT() {
+			logger.Info("enabling MRT writes on the database")
+
+			if err = infoClient.UnBlockMRTWrites(backupXDRConfig.Namespace); err != nil {
+				return nil, fmt.Errorf("failed to enable MRT writes: %w", err)
+			}
+
+			return nil, nil
+		}
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
@@ -307,40 +318,4 @@ func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backu
 	default:
 		return nil
 	}
-}
-
-func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
-
-	if err := infoClient.StopXDR(cfg.DC); err != nil {
-		return fmt.Errorf("failed to stop xdr: %w", err)
-	}
-
-	return nil
-}
-
-func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
-
-	if err := infoClient.UnBlockMRTWrites(cfg.Namespace); err != nil {
-		return fmt.Errorf("failed to unblock MRT: %w", err)
-	}
-
-	return nil
-}
-
-func checkVersion(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
-
-	version, err := infoClient.GetVersion()
-	if err != nil {
-		return fmt.Errorf("failed to get version: %w", err)
-	}
-
-	if version.Major < xdrSupportedVersion {
-		return fmt.Errorf("version %s is unsupported, only databse version %d+ is supproted",
-			version.String(), xdrSupportedVersion)
-	}
-
-	return nil
 }

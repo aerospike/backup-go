@@ -971,5 +971,9 @@ func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
 		time.Sleep(duration)
 	}
 
-	return fmt.Errorf("after %d attempts: %w", policy.MaxRetries, err)
+	if err != nil {
+		return fmt.Errorf("after %d attempts: %w", policy.MaxRetries, err)
+	}
+
+	return nil
 }

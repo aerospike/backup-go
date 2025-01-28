@@ -139,18 +139,18 @@ func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
 func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
 	var (
 		version AerospikeVersion
-		aErr    error
+		err     error
 	)
 
-	err := executeWithRetry(ic.retryPolicy, func() error {
-		node, err := ic.cluster.GetRandomNode()
-		if err != nil {
-			return err
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr.Unwrap()
 		}
 
-		version, aErr = getAerospikeVersion(node, ic.policy)
+		version, err = getAerospikeVersion(node, ic.policy)
 
-		return aErr
+		return err
 	})
 
 	return version, err
@@ -159,18 +159,18 @@ func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
 func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 	var (
 		indexes []*models.SIndex
-		aErr    error
+		err     error
 	)
 
-	err := executeWithRetry(ic.retryPolicy, func() error {
-		node, err := ic.cluster.GetRandomNode()
-		if err != nil {
-			return err
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr.Unwrap()
 		}
 
-		indexes, aErr = getSIndexes(node, namespace, ic.policy)
+		indexes, err = getSIndexes(node, namespace, ic.policy)
 
-		return aErr
+		return err
 	})
 
 	return indexes, err
@@ -179,18 +179,18 @@ func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 func (ic *InfoClient) GetUDFs() ([]*models.UDF, error) {
 	var (
 		udfs []*models.UDF
-		aErr error
+		err  error
 	)
 
-	err := executeWithRetry(ic.retryPolicy, func() error {
-		node, err := ic.cluster.GetRandomNode()
-		if err != nil {
-			return err
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr.Unwrap()
 		}
 
-		udfs, aErr = getUDFs(node, ic.policy)
+		udfs, err = getUDFs(node, ic.policy)
 
-		return aErr
+		return err
 	})
 
 	return udfs, err

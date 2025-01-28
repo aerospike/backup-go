@@ -88,7 +88,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 	flagSet.Float64Var(&f.InfoRetriesMultiplier, "info-retry-multiplier",
 		1,
 		"Used to increase the delay between subsequent retry attempts.\n"+
-			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)")
+			"The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.InfoMaxRetries, "info-max-retries", 3,
 		"How many times to retry to send info commands before failing. "+
 			"This parameter is applied to stop xdr and unblock MRT writes requests.")

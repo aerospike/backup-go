@@ -80,7 +80,7 @@ func validateBackupXDRParams(params *models.BackupXDR) error {
 	}
 
 	if params.ParallelWrite < 0 {
-		return fmt.Errorf("backup xdr parallel write can't be less than 1")
+		return fmt.Errorf("backup xdr parallel write can't be negative")
 	}
 
 	if params.FileLimit < 1 {

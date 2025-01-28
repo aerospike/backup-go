@@ -39,7 +39,7 @@ func NewRetryPolicy(baseTimeout time.Duration, multiplier float64, maxRetries ui
 	}
 }
 
-// NewDefaultRetryPolicy returns new default configuration for retry attempts
+// NewDefaultRetryPolicy returns a new RetryPolicy with default values.
 func NewDefaultRetryPolicy() *RetryPolicy {
 	return NewRetryPolicy(1000*time.Millisecond, 1, 3)
 }

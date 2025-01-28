@@ -118,6 +118,12 @@ func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 		c.ModAfter = &modAfterTime
 	}
 
+	c.InfoRetryPolicy = mapRetryPolicy(
+		params.BackupParams.InfoRetryIntervalMilliseconds,
+		params.BackupParams.InfoRetriesMultiplier,
+		params.BackupParams.InfoMaxRetries,
+	)
+
 	return c, nil
 }
 
@@ -148,6 +154,11 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 		MaxConnections:               params.BackupXDRParams.MaxConnections,
 		InfoPolingPeriodMilliseconds: params.BackupXDRParams.InfoPolingPeriodMilliseconds,
 		StartTimeoutMilliseconds:     params.BackupXDRParams.StartTimeoutMilliseconds,
+		InfoRetryPolicy: mapRetryPolicy(
+			params.BackupXDRParams.InfoRetryIntervalMilliseconds,
+			params.BackupXDRParams.InfoRetriesMultiplier,
+			params.BackupXDRParams.InfoMaxRetries,
+		),
 	}
 
 	return c

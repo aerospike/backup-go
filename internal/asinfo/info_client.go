@@ -108,6 +108,10 @@ type InfoClient struct {
 
 func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy, retryPolicy *models.RetryPolicy,
 ) *InfoClient {
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
 	return &InfoClient{
 		cluster:     aeroClient.Cluster(),
 		policy:      policy,
@@ -116,82 +120,145 @@ func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy
 }
 
 func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
-	node, err := ic.cluster.GetRandomNode()
-	if err != nil {
-		return nil, err
-	}
+	var result map[string]string
 
-	return node.RequestInfo(ic.policy, names...)
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		node, err := ic.cluster.GetRandomNode()
+		if err != nil {
+			return err
+		}
+
+		result, err = node.RequestInfo(ic.policy, names...)
+
+		return err
+	})
+
+	return result, err
 }
 
 func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
-	node, err := ic.cluster.GetRandomNode()
-	if err != nil {
-		return AerospikeVersion{}, err
-	}
+	var (
+		version AerospikeVersion
+		aErr    error
+	)
 
-	return getAerospikeVersion(node, ic.policy)
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		node, err := ic.cluster.GetRandomNode()
+		if err != nil {
+			return err
+		}
+
+		version, aErr = getAerospikeVersion(node, ic.policy)
+
+		return aErr
+	})
+
+	return version, err
 }
 
 func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
-	node, err := ic.cluster.GetRandomNode()
-	if err != nil {
-		return nil, err
-	}
+	var (
+		indexes []*models.SIndex
+		aErr    error
+	)
 
-	return getSIndexes(node, namespace, ic.policy)
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		node, err := ic.cluster.GetRandomNode()
+		if err != nil {
+			return err
+		}
+
+		indexes, aErr = getSIndexes(node, namespace, ic.policy)
+
+		return aErr
+	})
+
+	return indexes, err
 }
 
 func (ic *InfoClient) GetUDFs() ([]*models.UDF, error) {
-	node, err := ic.cluster.GetRandomNode()
-	if err != nil {
-		return nil, err
-	}
+	var (
+		udfs []*models.UDF
+		aErr error
+	)
 
-	return getUDFs(node, ic.policy)
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		node, err := ic.cluster.GetRandomNode()
+		if err != nil {
+			return err
+		}
+
+		udfs, aErr = getUDFs(node, ic.policy)
+
+		return aErr
+	})
+
+	return udfs, err
 }
 
 func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
-	version, err := ic.GetVersion()
-	if err != nil {
-		return false, fmt.Errorf("failed to get aerospike version: %w", err)
-	}
+	var supports bool
 
-	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		version, err := ic.GetVersion()
+		if err != nil {
+			return fmt.Errorf("failed to get aerospike version: %w", err)
+		}
+
+		supports = version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites)
+
+		return nil
+	})
+
+	return supports, err
 }
 
 // GetRecordCount counts number of records in given namespace and sets.
 func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, error) {
-	node, aerr := ic.cluster.GetRandomNode()
-	if aerr != nil {
-		return 0, aerr
-	}
+	var count uint64
 
-	effectiveReplicationFactor, err := getEffectiveReplicationFactor(node, ic.policy, namespace)
-	if err != nil {
-		return 0, err
-	}
-
-	var recordsNumber uint64
-
-	for _, node := range ic.cluster.GetNodes() {
-		if !node.IsActive() {
-			continue
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		node, aerr := ic.cluster.GetRandomNode()
+		if aerr != nil {
+			return aerr
 		}
 
-		recordCountForNode, err := getRecordCountForNode(node, ic.policy, namespace, sets)
+		effectiveReplicationFactor, err := getEffectiveReplicationFactor(node, ic.policy, namespace)
 		if err != nil {
-			return 0, err
+			return err
 		}
 
-		recordsNumber += recordCountForNode
-	}
+		var recordsNumber uint64
 
-	return recordsNumber / uint64(effectiveReplicationFactor), nil
+		for _, node := range ic.cluster.GetNodes() {
+			if !node.IsActive() {
+				continue
+			}
+
+			recordCountForNode, err := getRecordCountForNode(node, ic.policy, namespace, sets)
+			if err != nil {
+				return err
+			}
+
+			recordsNumber += recordCountForNode
+		}
+
+		count = recordsNumber / uint64(effectiveReplicationFactor)
+
+		return nil
+	})
+
+	return count, err
 }
 
 // StartXDR creates xdr config and starts replication.
 func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.startXDR(dc, hostPort, namespace, rewind)
+	})
+}
+
+func (ic *InfoClient) startXDR(dc, hostPort, namespace, rewind string) error {
 	if err := ic.createXDRDC(dc); err != nil {
 		return err
 	}
@@ -212,8 +279,13 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string) error {
 }
 
 // StopXDR disable replication and remove xdr config.
-
 func (ic *InfoClient) StopXDR(dc string) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.stopXDR(dc)
+	})
+}
+
+func (ic *InfoClient) stopXDR(dc string) error {
 	if err := ic.deleteXDRDC(dc); err != nil {
 		return err
 	}
@@ -298,6 +370,11 @@ func (ic *InfoClient) deleteXDRDC(dc string) error {
 
 // BlockMRTWrites blocks MRT writes on cluster.
 func (ic *InfoClient) BlockMRTWrites(namespace string) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.blockMRTWrites(namespace)
+	})
+}
+func (ic *InfoClient) blockMRTWrites(namespace string) error {
 	cmd := fmt.Sprintf(cmdBlockMRTWrites, namespace)
 
 	resp, err := ic.GetInfo(cmd)
@@ -314,6 +391,11 @@ func (ic *InfoClient) BlockMRTWrites(namespace string) error {
 
 // UnBlockMRTWrites unblocks MRT writes on cluster.
 func (ic *InfoClient) UnBlockMRTWrites(namespace string) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.unBlockMRTWrites(namespace)
+	})
+}
+func (ic *InfoClient) unBlockMRTWrites(namespace string) error {
 	cmd := fmt.Sprintf(cmdUnBlockMRTWrites, namespace)
 
 	resp, err := ic.GetInfo(cmd)
@@ -888,6 +970,6 @@ func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
 		duration := time.Duration(float64(policy.BaseTimeout) * math.Pow(policy.Multiplier, float64(i)))
 		time.Sleep(duration)
 	}
-	
+
 	return fmt.Errorf("after %d attempts: %w", policy.MaxRetries, err)
 }

@@ -135,7 +135,7 @@ func newBackupHandler(
 		firstFileHeaderWritten: &atomic.Bool{},
 		encoder:                NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact),
 		limiter:                limiter,
-		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
+		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy, config.InfoRetryPolicy),
 		scanLimiter:            scanLimiter,
 		state:                  state,
 	}, nil

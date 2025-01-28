@@ -51,10 +51,6 @@ func validateBackup(params *ASBackupParams) error {
 }
 
 func validateBackupXDRParams(params *models.BackupXDR) error {
-	if params.InfoRetryAttempts < 1 {
-		return fmt.Errorf("backup xdr retry attempts can't be less than 1")
-	}
-
 	if params.ReadTimeoutMilliseconds < 0 {
 		return fmt.Errorf("backup xdr read timeout can't be negative")
 	}
@@ -83,7 +79,7 @@ func validateBackupXDRParams(params *models.BackupXDR) error {
 		return fmt.Errorf("backup xdr max connections can't be less than 1")
 	}
 
-	if params.ParallelWrite < 1 {
+	if params.ParallelWrite < 0 {
 		return fmt.Errorf("backup xdr parallel write can't be less than 1")
 	}
 

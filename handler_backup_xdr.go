@@ -67,7 +67,7 @@ func newBackupXDRHandler(
 
 	stats := models.NewBackupStats()
 
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy)
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
 
 	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
 		config,
@@ -123,6 +123,14 @@ func (bh *HandlerBackupXDR) run() {
 }
 
 func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
+	// Count total records.
+	var err error
+
+	bh.stats.TotalRecords, err = bh.infoClient.GetRecordCount(bh.config.Namespace, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get records count: %w", err)
+	}
+
 	// Read workers.
 	readWorkers, err := bh.readProcessor.newReadWorkersXDR(ctx)
 	if err != nil {

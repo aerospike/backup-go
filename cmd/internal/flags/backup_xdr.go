@@ -82,11 +82,15 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		1000,
 		"How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.\n"+
 			"To measure recovery state and lag.")
-	flagSet.IntVar(&f.InfoRetryAttempts, "info-retry-attempts", 3,
-		"How many times to retry to send info commands before failing. "+
+	flagSet.Int64Var(&f.InfoRetryIntervalMilliseconds, "info-retry-timeout", 1000,
+		"Set the initial timeout for a retry in milliseconds when info commands are sent."+
 			"This parameter is applied to stop xdr and unblock MRT writes requests.")
-	flagSet.Int64Var(&f.InfoRetryIntervalMilliseconds, "info-retry-interval", 1000,
-		"Delay between retrying to send info commands."+
+	flagSet.Float64Var(&f.InfoRetriesMultiplier, "info-retry-multiplier",
+		1,
+		"Used to increase the delay between subsequent retry attempts.\n"+
+			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)")
+	flagSet.UintVar(&f.InfoMaxRetries, "info-max-retries", 3,
+		"How many times to retry to send info commands before failing. "+
 			"This parameter is applied to stop xdr and unblock MRT writes requests.")
 	flagSet.Int64Var(&f.StartTimeoutMilliseconds, "start-timeout",
 		30000,

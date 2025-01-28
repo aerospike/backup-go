@@ -19,6 +19,7 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 )
 
@@ -125,6 +126,8 @@ type ConfigBackup struct {
 	PipelinesMode pipeline.Mode
 	// When using directory parameter, prepend a prefix to the names of the generated files.
 	OutputFilePrefix string
+	// Retry policy for info commands.
+	InfoRetryPolicy *models.RetryPolicy
 }
 
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.

@@ -17,27 +17,29 @@ package models
 import "crypto/tls"
 
 type BackupXDR struct {
-	Directory                     string
-	FileLimit                     int64
-	RemoveFiles                   bool
-	ParallelWrite                 int
-	DC                            string
-	LocalAddress                  string
-	LocalPort                     int
-	Namespace                     string
-	Rewind                        string
-	ReadTimeoutMilliseconds       int64
-	WriteTimeoutMilliseconds      int64
-	ResultQueueSize               int
-	AckQueueSize                  int
-	MaxConnections                int
-	InfoPolingPeriodMilliseconds  int64
-	InfoRetryAttempts             int
-	InfoRetryIntervalMilliseconds int64
-	StartTimeoutMilliseconds      int64
+	Directory                    string
+	FileLimit                    int64
+	RemoveFiles                  bool
+	ParallelWrite                int
+	DC                           string
+	LocalAddress                 string
+	LocalPort                    int
+	Namespace                    string
+	Rewind                       string
+	ReadTimeoutMilliseconds      int64
+	WriteTimeoutMilliseconds     int64
+	ResultQueueSize              int
+	AckQueueSize                 int
+	MaxConnections               int
+	InfoPolingPeriodMilliseconds int64
+	StartTimeoutMilliseconds     int64
 
 	TLSConfig *tls.Config
 
 	StopXDR    bool
 	UnblockMRT bool
+
+	InfoMaxRetries                uint
+	InfoRetriesMultiplier         float64
+	InfoRetryIntervalMilliseconds int64
 }

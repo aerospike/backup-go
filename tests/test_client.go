@@ -40,9 +40,7 @@ type RecordMap map[digest]*a.Record
 
 // NewTestClient creates a new TestClient.
 func NewTestClient(asc *a.Client) *TestClient {
-	infoPolicy := a.NewInfoPolicy()
-
-	infoClient := asinfo.NewInfoClientFromAerospike(asc, infoPolicy)
+	infoClient := asinfo.NewInfoClientFromAerospike(asc, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
 	return &TestClient{
 		asc: asc,

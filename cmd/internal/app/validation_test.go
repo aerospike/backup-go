@@ -664,7 +664,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "valid params",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            3,
 				ReadTimeoutMilliseconds:      1000,
 				WriteTimeoutMilliseconds:     1000,
 				InfoPolingPeriodMilliseconds: 1000,
@@ -678,16 +677,8 @@ func Test_validateBackupXDRParams(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name: "invalid info retry attempts",
-			params: &models.BackupXDR{
-				InfoRetryAttempts: 0,
-			},
-			wantErr: "backup xdr retry attempts can't be less than 1",
-		},
-		{
 			name: "negative read timeout",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:       1,
 				ReadTimeoutMilliseconds: -1,
 			},
 			wantErr: "backup xdr read timeout can't be negative",
@@ -695,7 +686,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "negative write timeout",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:        1,
 				ReadTimeoutMilliseconds:  0,
 				WriteTimeoutMilliseconds: -1,
 			},
@@ -704,7 +694,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "negative info polling period",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            1,
 				ReadTimeoutMilliseconds:      0,
 				WriteTimeoutMilliseconds:     0,
 				InfoPolingPeriodMilliseconds: -1,
@@ -714,7 +703,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "negative start timeout",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            1,
 				ReadTimeoutMilliseconds:      0,
 				WriteTimeoutMilliseconds:     0,
 				InfoPolingPeriodMilliseconds: 0,
@@ -725,7 +713,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "negative result queue size",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            1,
 				ReadTimeoutMilliseconds:      0,
 				WriteTimeoutMilliseconds:     0,
 				InfoPolingPeriodMilliseconds: 0,
@@ -737,7 +724,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "negative ack queue size",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            1,
 				ReadTimeoutMilliseconds:      0,
 				WriteTimeoutMilliseconds:     0,
 				InfoPolingPeriodMilliseconds: 0,
@@ -750,7 +736,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "invalid max connections",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            1,
 				ReadTimeoutMilliseconds:      0,
 				WriteTimeoutMilliseconds:     0,
 				InfoPolingPeriodMilliseconds: 0,
@@ -764,7 +749,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "invalid parallel write",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            1,
 				ReadTimeoutMilliseconds:      0,
 				WriteTimeoutMilliseconds:     0,
 				InfoPolingPeriodMilliseconds: 0,
@@ -779,7 +763,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 		{
 			name: "invalid file limit",
 			params: &models.BackupXDR{
-				InfoRetryAttempts:            1,
 				ReadTimeoutMilliseconds:      0,
 				WriteTimeoutMilliseconds:     0,
 				InfoPolingPeriodMilliseconds: 0,

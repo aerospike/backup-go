@@ -75,6 +75,8 @@ type ConfigRestore struct {
 	// E.g.: AEROSPIKE_RECORD_TOO_BIG.
 	// By default, such errors are not ignored and restore terminates.
 	IgnoreRecordError bool
+	// Retry policy for info commands.
+	InfoRetryPolicy *models.RetryPolicy
 }
 
 // NewDefaultRestoreConfig returns a new ConfigRestore with default values.

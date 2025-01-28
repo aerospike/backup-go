@@ -39,10 +39,11 @@ func printBackupReport(stats, xdrStats *bModels.BackupStats) {
 
 	fmt.Printf("Records Read:         %d\n", stats.GetReadRecords())
 
-	var bw, fw uint64
+	var bw, fw, tr uint64
 	if xdrStats != nil {
 		bw = xdrStats.GetBytesWritten()
 		fw = xdrStats.GetFileCount()
+		tr = xdrStats.TotalRecords
 		fmt.Printf("Records Received:     %d\n", xdrStats.GetReadRecords())
 	}
 
@@ -52,7 +53,7 @@ func printBackupReport(stats, xdrStats *bModels.BackupStats) {
 	fmt.Println()
 
 	fmt.Printf("Bytes Written:        %d bytes\n", stats.GetBytesWritten()+bw)
-	fmt.Printf("Total Records:        %d\n", stats.TotalRecords)
+	fmt.Printf("Total Records:        %d\n", stats.TotalRecords+tr)
 	fmt.Printf("Files Written:        %d\n", stats.GetFileCount()+fw)
 }
 

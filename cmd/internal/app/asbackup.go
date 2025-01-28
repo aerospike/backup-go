@@ -131,28 +131,28 @@ func NewASBackup(
 		if err := checkVersion(aerospikeClient, backupXDRConfig); err != nil {
 			return nil, err
 		}
-	}
 
-	// Stop xdr.
-	if params.isStopXDR() {
-		logger.Info("stopping XDR on the database")
+		// Stop xdr.
+		if params.isStopXDR() {
+			logger.Info("stopping XDR on the database")
 
-		if err = stopXDR(aerospikeClient, backupXDRConfig, params.BackupXDRParams.InfoRetryAttempts); err != nil {
-			return nil, fmt.Errorf("failed to stop XDR: %w", err)
+			if err = stopXDR(aerospikeClient, backupXDRConfig); err != nil {
+				return nil, fmt.Errorf("failed to stop XDR: %w", err)
+			}
+
+			return nil, nil
 		}
 
-		return nil, nil
-	}
+		// Unblock mRT.
+		if params.isUnblockMRT() {
+			logger.Info("enabling MRT writes on the database")
 
-	// Unblock mRT.
-	if params.isUnblockMRT() {
-		logger.Info("enabling MRT writes on the database")
+			if err = unblockMRT(aerospikeClient, backupXDRConfig); err != nil {
+				return nil, fmt.Errorf("failed to enable MRT: %w", err)
+			}
 
-		if err = unblockMRT(aerospikeClient, backupXDRConfig, params.BackupXDRParams.InfoRetryAttempts); err != nil {
-			return nil, fmt.Errorf("failed to enable MRT: %w", err)
+			return nil, nil
 		}
-
-		return nil, nil
 	}
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
@@ -309,38 +309,20 @@ func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backu
 	}
 }
 
-func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR, attempts int) error {
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+func stopXDR(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy, cfg.InfoRetryPolicy)
 
-	var err error
-
-	for range attempts {
-		err = infoClient.StopXDR(cfg.DC)
-		if err == nil {
-			return nil
-		}
-	}
-
-	return err
+	return infoClient.StopXDR(cfg.DC)
 }
 
-func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR, attempts int) error {
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+func unblockMRT(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy, cfg.InfoRetryPolicy)
 
-	var err error
-
-	for range attempts {
-		err = infoClient.UnBlockMRTWrites(cfg.Namespace)
-		if err == nil {
-			return nil
-		}
-	}
-
-	return err
+	return infoClient.UnBlockMRTWrites(cfg.Namespace)
 }
 
 func checkVersion(aerospikeClient *aerospike.Client, cfg *backup.ConfigBackupXDR) error {
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy)
+	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, cfg.InfoPolicy, cfg.InfoRetryPolicy)
 
 	version, err := infoClient.GetVersion()
 	if err != nil {

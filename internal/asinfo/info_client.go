@@ -108,7 +108,7 @@ type InfoClient struct {
 
 func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy, retryPolicy *models.RetryPolicy,
 ) *InfoClient {
-	if retryPolicy.MaxRetries == 0 {
+	if retryPolicy == nil {
 		retryPolicy = models.NewDefaultRetryPolicy()
 	}
 

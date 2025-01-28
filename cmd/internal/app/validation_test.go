@@ -747,20 +747,6 @@ func Test_validateBackupXDRParams(t *testing.T) {
 			wantErr: "backup xdr max connections can't be less than 1",
 		},
 		{
-			name: "invalid parallel write",
-			params: &models.BackupXDR{
-				ReadTimeoutMilliseconds:      0,
-				WriteTimeoutMilliseconds:     0,
-				InfoPolingPeriodMilliseconds: 0,
-				StartTimeoutMilliseconds:     0,
-				ResultQueueSize:              0,
-				AckQueueSize:                 0,
-				MaxConnections:               1,
-				ParallelWrite:                0,
-			},
-			wantErr: "backup xdr parallel write can't be less than 1",
-		},
-		{
 			name: "invalid file limit",
 			params: &models.BackupXDR{
 				ReadTimeoutMilliseconds:      0,

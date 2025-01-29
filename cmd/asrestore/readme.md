@@ -60,25 +60,24 @@ Aerospike Client Flags:
 
 Restore Flags:
   -d, --directory string         The directory that holds the backup files. Required, unless -o or -e is used.
-  -n, --namespace string         The namespace to be backed up. Required.
-  -s, --set string               The set(s) to be backed up. Accepts comma-separated values with no spaces: 'set1,set2,set3'
-                                 If multiple sets are being backed up, filter-exp cannot be used.
-                                 If empty, include all sets.
-  -B, --bin-list string          Only include the given bins in the backup.
-                                 Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
-                                 If empty include all bins.
-  -R, --no-records               Don't back up any records.
-  -I, --no-indexes               Don't back up any indexes.
-      --no-udfs                  Don't back up any UDFs.
-  -w, --parallel int             Maximum number of scan calls to run in parallel.
-                                 If only one partition range is given, or the entire namespace is being backed up, the range
-                                 of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
-                                 filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
-                                 partition filters. Accepts values from 1-1024 inclusive. (default 1)
+  -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
+  -s, --set string               Only restore the given sets from the backup.
+                                 Default: restore all sets.
+  -B, --bin-list string          Only restore the given bins in the backup.
+                                 If empty, include all bins.
+                                 
+  -R, --no-records               Don't restore any records.
+                                 Incompatible with --mode=asbx.
+  -I, --no-indexes               Don't restore any secondary indexes.
+                                 Incompatible with --mode=asbx.
+      --no-udfs                  Don't restore any UDFs.
+                                 Incompatible with --mode=asbx.
+  -w, --parallel int             The number of restore threads. Accepts values from 1-1024 inclusive.
+                                 If not set the default value is automatically calculated and appears as the number of CPUs on your machine.
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
-      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout.
+      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
                                  If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
@@ -157,13 +156,15 @@ Restore Flags:
                                   asbx - restore only .asbx backup files. (default "auto")
 
 Compression Flags:
-  -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
+  -z, --compress string         Enables decompressing of backup files using the specified compression algorithm.
+                                This must match the compression mode used when backing up the data.
                                 Supported compression algorithms are: zstd, none
                                 Set the zstd compression level via the --compression-level option. (default "NONE")
       --compression-level int   zstd compression level. (default 3)
 
 Encryption Flags:
-      --encrypt string                 Enables encryption of backup files using the specified encryption algorithm.
+      --encrypt string                 Enables decryption of backup files using the specified encryption algorithm.
+                                       This must match the encryption mode used when backing up the data.
                                        Supported encryption algorithms are: none, aes128, aes256.
                                        A private key must be given, either via the --encryption-key-file option or
                                        the --encryption-key-env option or the --encryption-key-secret.

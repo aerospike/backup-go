@@ -54,23 +54,16 @@ func SortBackupFiles(files []string) ([]string, error) {
 	}
 
 	// Prepare strings for sorting.
-	presort := make([][]backupFile, len(files))
-	maxPrefix := 0
+	presort := make(map[int][]backupFile)
 
 	for _, file := range files {
 		f, err := parseFileName(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse file name: %s", file)
 		}
-		// Set max prefix.
-		if f.prefix > maxPrefix {
-			maxPrefix = f.prefix
-		}
 
 		presort[f.prefix] = append(presort[f.prefix], f)
 	}
-	// Trim nils.
-	presort = presort[:maxPrefix+1]
 
 	// sort each group.
 	for o := range presort {

@@ -14,7 +14,7 @@
 
 package aerospike
 
-import "github.com/aerospike/aerospike-client-go/v7"
+import "github.com/aerospike/aerospike-client-go/v8"
 
 // dbWriter is an interface for writing data to an Aerospike cluster.
 // The Aerospike Go client satisfies this interface.

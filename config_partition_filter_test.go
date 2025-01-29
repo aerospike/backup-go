@@ -17,7 +17,7 @@ package backup
 import (
 	"testing"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/stretchr/testify/assert"
 )
 

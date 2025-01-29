@@ -1802,3 +1802,69 @@ func TestInfoCommander_parseResultResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestInfoCommander_GetSIndexes(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	_, err := ic.GetSIndexes(testASNamespace)
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_GetUDFs(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	_, err := ic.GetUDFs()
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_GetRecordCount(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	_, err := ic.GetRecordCount(testASNamespace, nil)
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_XDR(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind)
+	require.NoError(t, err)
+
+	_, err = ic.GetStats(testASDC, testASNamespace)
+	require.NoError(t, err)
+
+	err = ic.StopXDR(testASDC)
+	require.NoError(t, err)
+}

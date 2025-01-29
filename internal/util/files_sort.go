@@ -54,7 +54,8 @@ func SortBackupFiles(files []string) ([]string, error) {
 	}
 
 	// Prepare strings for sorting.
-	presort := make([][]backupFile, len(files))
+	presort := make(map[int][]backupFile)
+
 	maxPrefix := 0
 
 	for _, file := range files {
@@ -69,8 +70,6 @@ func SortBackupFiles(files []string) ([]string, error) {
 
 		presort[f.prefix] = append(presort[f.prefix], f)
 	}
-	// Trim nils.
-	presort = presort[:maxPrefix+1]
 
 	// sort each group.
 	for o := range presort {

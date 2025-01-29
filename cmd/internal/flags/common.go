@@ -41,13 +41,13 @@ const (
 		"If empty, include all bins.\n"
 
 	descNoRecordsBackup  = "Don't back up any records."
-	descNoRecordsRestore = "Don't restore any records."
+	descNoRecordsRestore = "Don't restore any records.\nIncompatible with --mode=asbx."
 
 	descNoIndexesBackup  = "Don't back up any indexes."
-	descNoIndexesRestore = "Don't restore any secondary indexes."
+	descNoIndexesRestore = "Don't restore any secondary indexes.\nIncompatible with --mode=asbx."
 
 	descNoUDFsBackup  = "Don't back up any UDFs."
-	descNoUDFsRestore = "Don't restore any UDFs."
+	descNoUDFsRestore = "Don't restore any UDFs.\nIncompatible with --mode=asbx."
 
 	descParallelBackup = "Maximum number of scan calls to run in parallel.\n" +
 		"If only one partition range is given, or the entire namespace is being backed up, the range\n" +

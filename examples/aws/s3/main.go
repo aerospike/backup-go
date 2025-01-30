@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	s3Storasge "github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"

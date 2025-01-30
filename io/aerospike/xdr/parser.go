@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 )
 
 const (

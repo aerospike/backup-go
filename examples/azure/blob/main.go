@@ -19,7 +19,7 @@ import (
 	"log"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/azure/blob"
 	"github.com/aerospike/backup-go/io/encoding/asb"

@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 )

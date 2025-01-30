@@ -19,7 +19,7 @@ import (
 	"log"
 
 	"cloud.google.com/go/storage"
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	gcpStorage "github.com/aerospike/backup-go/io/gcp/storage"

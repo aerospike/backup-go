@@ -24,7 +24,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/local"
@@ -105,7 +105,7 @@ More examples can be found under the [examples](examples) folder.
 
 Requirements
 
-- [Go](https://go.dev/) version v1.22+
+- [Go](https://go.dev/) version v1.23+
 - [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v7
 
 Testing Requirements

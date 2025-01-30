@@ -26,13 +26,16 @@ const (
 	headerBackupReport   = "Backup Report"
 	headerRestoreReport  = "Restore Report"
 	headerEstimateReport = "Estimate Report"
+
+	templateString = "%s%s\n"
+	templateInt    = "%s%d\n"
 )
 
 func printBackupReport(stats, xdrStats *bModels.BackupStats) {
 	fmt.Println(headerBackupReport)
 	fmt.Println(strings.Repeat("-", len(headerBackupReport)))
 
-	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
+	fmt.Printf(templateString, indent("Start Time"), stats.StartTime.Format(time.RFC1123))
 
 	dur := stats.GetDuration()
 
@@ -48,25 +51,25 @@ func printBackupReport(stats, xdrStats *bModels.BackupStats) {
 		}
 	}
 
-	fmt.Printf("Duration:             %s\n", dur)
+	fmt.Printf(templateInt, indent("Duration"), dur)
 
 	fmt.Println()
 
 	switch {
 	case xdrStats != nil:
-		fmt.Printf("Records Received:     %d\n", xdrStats.GetReadRecords())
+		fmt.Printf(templateInt, indent("Records Received"), xdrStats.GetReadRecords())
 	default:
-		fmt.Printf("Records Read:         %d\n", stats.GetReadRecords())
+		fmt.Printf(templateInt, indent("Records Read"), stats.GetReadRecords())
 	}
 
-	fmt.Printf("sIndex Read:          %d\n", stats.GetSIndexes())
-	fmt.Printf("UDFs Read:            %d\n", stats.GetUDFs())
+	fmt.Printf(templateInt, indent("sIndex Read"), stats.GetSIndexes())
+	fmt.Printf(templateInt, indent("UDFs Read"), stats.GetUDFs())
 
 	fmt.Println()
 
-	fmt.Printf("Bytes Written:        %d bytes\n", stats.GetBytesWritten()+bw)
-	fmt.Printf("Total Records:        %d\n", stats.TotalRecords+tr)
-	fmt.Printf("Files Written:        %d\n", stats.GetFileCount()+fw)
+	fmt.Printf(templateInt, indent("Bytes Written"), stats.GetBytesWritten()+bw)
+	fmt.Printf(templateInt, indent("Total Records"), stats.TotalRecords+tr)
+	fmt.Printf(templateInt, indent("Files Written"), stats.GetFileCount()+fw)
 }
 
 func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
@@ -88,28 +91,27 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 		}
 	}
 
-	fmt.Printf("Start Time:           %s\n", asbStats.StartTime.Format(time.RFC1123))
-	fmt.Printf("Duration:             %s\n", dur)
+	fmt.Printf(templateString, indent("Start Time"), asbStats.StartTime.Format(time.RFC1123))
+	fmt.Printf(templateInt, indent("Duration"), dur)
 
 	fmt.Println()
 
-	fmt.Printf("Records Read:         %d\n", asbStats.GetReadRecords()+rr)
-	fmt.Printf("sIndex Read:          %d\n", asbStats.GetSIndexes())
-	fmt.Printf("UDFs Read:            %d\n", asbStats.GetUDFs())
-	fmt.Printf("Bytes Written:        %d bytes\n", asbStats.GetBytesWritten())
+	fmt.Printf(templateInt, indent("Records Read"), asbStats.GetReadRecords()+rr)
+	fmt.Printf(templateInt, indent("sIndex Read"), asbStats.GetSIndexes())
+	fmt.Printf(templateInt, indent("UDFs Read"), asbStats.GetUDFs())
 
 	fmt.Println()
 
-	fmt.Printf("Expired Records:      %d\n", asbStats.GetRecordsExpired())
-	fmt.Printf("Skipped Records:      %d\n", asbStats.GetRecordsSkipped())
-	fmt.Printf("Ignored Records:      %d\n", asbStats.GetRecordsIgnored()+ir)
-	fmt.Printf("Fresher Records:      %d\n", asbStats.GetRecordsFresher())
-	fmt.Printf("Existed Records:      %d\n", asbStats.GetRecordsExisted())
+	fmt.Printf(templateInt, indent("Expired Records"), asbStats.GetRecordsExpired())
+	fmt.Printf(templateInt, indent("Skipped Records"), asbStats.GetRecordsSkipped())
+	fmt.Printf(templateInt, indent("Ignored Records"), asbStats.GetRecordsIgnored()+ir)
+	fmt.Printf(templateInt, indent("Fresher Records"), asbStats.GetRecordsFresher())
+	fmt.Printf(templateInt, indent("Existed Records"), asbStats.GetRecordsExisted())
 
 	fmt.Println()
 
-	fmt.Printf("Inserted Records:     %d\n", asbStats.GetRecordsInserted()+ri)
-	fmt.Printf("Total Bytes Read:     %d\n", asbStats.GetTotalBytesRead()+br)
+	fmt.Printf(templateInt, indent("Inserted Records"), asbStats.GetRecordsInserted()+ri)
+	fmt.Printf(templateInt, indent("Total Bytes Read"), asbStats.GetTotalBytesRead()+br)
 }
 
 func printEstimateReport(estimate uint64) {
@@ -117,4 +119,8 @@ func printEstimateReport(estimate uint64) {
 	fmt.Println(strings.Repeat("-", len(headerEstimateReport)))
 
 	fmt.Printf("File size: %d bytes\n", estimate)
+}
+
+func indent(key string) string {
+	return fmt.Sprintf("%s:%s", key, strings.Repeat(" ", 21-len(key)))
 }

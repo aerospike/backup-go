@@ -35,7 +35,9 @@ func printBackupReport(stats, xdrStats *bModels.BackupStats) {
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
 
 	dur := stats.GetDuration()
+
 	var bw, fw, tr uint64
+
 	if xdrStats != nil {
 		bw = xdrStats.GetBytesWritten()
 		fw = xdrStats.GetFileCount()
@@ -72,7 +74,9 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
 	dur := asbStats.GetDuration()
+
 	var rr, ir, ri, br uint64
+
 	if asbxStats != nil {
 		rr = asbxStats.GetReadRecords()
 		ir = asbxStats.GetRecordsIgnored()

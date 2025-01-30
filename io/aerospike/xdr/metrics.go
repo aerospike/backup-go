@@ -63,7 +63,7 @@ func (mc *metricsCollector) reportMetrics() {
 
 			mc.lastTime = t
 		case <-mc.ctx.Done():
-			break
+			return
 		}
 	}
 }

@@ -33,18 +33,28 @@ func printBackupReport(stats, xdrStats *bModels.BackupStats) {
 	fmt.Println(strings.Repeat("-", len(headerBackupReport)))
 
 	fmt.Printf("Start Time:           %s\n", stats.StartTime.Format(time.RFC1123))
-	fmt.Printf("Duration:             %s\n", stats.GetDuration())
 
-	fmt.Println()
-
-	fmt.Printf("Records Read:         %d\n", stats.GetReadRecords())
-
+	dur := stats.GetDuration()
 	var bw, fw, tr uint64
 	if xdrStats != nil {
 		bw = xdrStats.GetBytesWritten()
 		fw = xdrStats.GetFileCount()
 		tr = xdrStats.TotalRecords
+
+		if xdrStats.GetDuration() > dur {
+			dur = xdrStats.GetDuration()
+		}
+	}
+
+	fmt.Printf("Duration:             %s\n", dur)
+
+	fmt.Println()
+
+	switch {
+	case xdrStats != nil:
 		fmt.Printf("Records Received:     %d\n", xdrStats.GetReadRecords())
+	default:
+		fmt.Printf("Records Read:         %d\n", stats.GetReadRecords())
 	}
 
 	fmt.Printf("sIndex Read:          %d\n", stats.GetSIndexes())
@@ -61,18 +71,23 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	fmt.Println(headerRestoreReport)
 	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
-	fmt.Printf("Start Time:           %s\n", asbStats.StartTime.Format(time.RFC1123))
-	fmt.Printf("Duration:             %s\n", asbStats.GetDuration())
-
-	fmt.Println()
-
+	dur := asbStats.GetDuration()
 	var rr, ir, ri, br uint64
 	if asbxStats != nil {
 		rr = asbxStats.GetReadRecords()
 		ir = asbxStats.GetRecordsIgnored()
 		ri = asbxStats.GetRecordsInserted()
 		br = asbxStats.GetTotalBytesRead()
+
+		if asbxStats.GetDuration() > dur {
+			dur = asbxStats.GetDuration()
+		}
 	}
+
+	fmt.Printf("Start Time:           %s\n", asbStats.StartTime.Format(time.RFC1123))
+	fmt.Printf("Duration:             %s\n", dur)
+
+	fmt.Println()
 
 	fmt.Printf("Records Read:         %d\n", asbStats.GetReadRecords()+rr)
 	fmt.Printf("sIndex Read:          %d\n", asbStats.GetSIndexes())

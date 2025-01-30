@@ -15,43 +15,55 @@
 package xdr
 
 import (
+	"context"
 	"log/slog"
 	"sync/atomic"
 	"time"
 )
 
-type MetricsCollector struct {
-	requestCount uint64
+type metricsCollector struct {
+	ctx context.Context
+
+	requestCount atomic.Uint64
+	increment    func()
 	lastTime     time.Time
-	logger       *slog.Logger
+
+	logger *slog.Logger
 }
 
-func NewMetricsCollector(logger *slog.Logger) *MetricsCollector {
-	mc := &MetricsCollector{
-		lastTime: time.Now(),
-		logger:   logger,
+func mewMetricsCollector(ctx context.Context, logger *slog.Logger) *metricsCollector {
+	mc := &metricsCollector{
+		ctx:       ctx,
+		increment: func() {},
+		lastTime:  time.Now(),
+		logger:    logger,
 	}
-	go mc.reportMetrics()
+
+	// enable only for logger debug level
+	if mc.logger.Enabled(mc.ctx, slog.LevelDebug) {
+		mc.increment = func() { mc.requestCount.Add(1) }
+		go mc.reportMetrics()
+	}
 
 	return mc
 }
 
-func (mc *MetricsCollector) IncrementRequests() {
-	atomic.AddUint64(&mc.requestCount, 1)
-}
-
-func (mc *MetricsCollector) reportMetrics() {
+func (mc *metricsCollector) reportMetrics() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		now := time.Now()
-		count := atomic.SwapUint64(&mc.requestCount, 0)
-		elapsed := now.Sub(mc.lastTime).Seconds()
-		rps := float64(count) / elapsed
+	for {
+		select {
+		case t := <-ticker.C:
+			count := mc.requestCount.Swap(0)
+			elapsed := t.Sub(mc.lastTime).Seconds()
+			rps := float64(count) / elapsed
 
-		mc.logger.Debug("metrics", slog.Float64("rps", rps))
+			mc.logger.Debug("metrics", slog.Float64("rps", rps))
 
-		mc.lastTime = now
+			mc.lastTime = t
+		case <-mc.ctx.Done():
+			break
+		}
 	}
 }

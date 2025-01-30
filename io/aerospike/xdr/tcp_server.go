@@ -176,7 +176,7 @@ func (s *TCPServer) GetActiveConnections() int32 {
 // acceptConnections serves connections, not more than maxConnections.
 // All connections over pool will be rejected.
 func (s *TCPServer) acceptConnections(ctx context.Context) {
-	metrics := NewMetricsCollector(s.logger)
+	metrics := mewMetricsCollector(ctx, s.logger)
 
 	for {
 		select {
@@ -251,7 +251,7 @@ type ConnectionHandler struct {
 	timeNow       int64
 
 	logger  *slog.Logger
-	metrics *MetricsCollector
+	metrics *metricsCollector
 }
 
 // NewConnectionHandler returns new connection handler.
@@ -263,7 +263,7 @@ func NewConnectionHandler(
 	readTimeout int64,
 	writeTimeout int64,
 	logger *slog.Logger,
-	metrics *MetricsCollector,
+	metrics *metricsCollector,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,
@@ -368,7 +368,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 				return
 			}
 
-			h.metrics.IncrementRequests()
+			h.metrics.increment()
 
 			// Process message asynchronously
 			h.bodyQueue <- message

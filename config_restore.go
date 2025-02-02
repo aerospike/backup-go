@@ -42,8 +42,10 @@ type ConfigRestore struct {
 	// Secret agent config.
 	SecretAgentConfig *SecretAgentConfig
 	// The sets to restore (optional, given an empty list, all sets will be restored).
+	// Not applicable for XDR restore.
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
+	// Not applicable for XDR restore.
 	BinList []string
 	// EncoderType describes an Encoder type that will be used on restoring.
 	// Default `EncoderTypeASB` = 0.
@@ -59,21 +61,28 @@ type ConfigRestore struct {
 	// Don't restore any records.
 	NoRecords bool
 	// Don't restore any secondary indexes.
+	// Not applicable for XDR restore.
 	NoIndexes bool
 	// Don't restore any UDFs.
+	// Not applicable for XDR restore.
 	NoUDFs bool
 	// Disables the use of batch writes when restoring records to the Aerospike cluster.
+	// Not applicable for XDR restore.
 	DisableBatchWrites bool
 	// The max allowed number of records per batch write call.
+	// Not applicable for XDR restore.
 	BatchSize int
 	// Max number of parallel writers to target AS cluster.
+	// Not applicable for XDR restore.
 	MaxAsyncBatches int
 	// Amount of extra time-to-live to add to records that have expirable void-times.
 	// Must be set in seconds.
+	// Not applicable for XDR restore.
 	ExtraTTL int64
 	// Ignore permanent record-specific error.
 	// E.g.: AEROSPIKE_RECORD_TOO_BIG.
 	// By default, such errors are not ignored and restore terminates.
+	// Not applicable for XDR restore.
 	IgnoreRecordError bool
 	// Retry policy for info commands.
 	InfoRetryPolicy *models.RetryPolicy

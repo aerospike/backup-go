@@ -99,6 +99,115 @@ func main() {
 	_ = restoreHandler.GetStats()
 }
 ```
+
+### MRT Backup
+
+How it works:
+- tcp server is started on local address and port
+- database transfers data over xdr protocol
+- data is saved to the binary format files
+
+Library can be used for backing up MRT data. To achieve this, you should use XDR backup handler and config. XDR backup will be done using new binary file format `.asbx`.
+Restore operation requires backup files sorting; that can be archived with `backup.SortBackupFiles()` method. Pay attention that not all restore config parameters are available for `.asbx` restore
+
+```Go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/local"
+)
+
+func main() {
+	aerospikeClient, aerr := aerospike.NewClient("127.0.0.1", 3000)
+	if aerr != nil {
+		panic(aerr)
+	}
+
+	backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
+	if err != nil {
+		panic(err)
+	}
+
+	// For backup to single file use local.WithFile(fileName)
+	writers, err := local.NewWriter(
+		context.Background(),
+		local.WithRemoveFiles(),
+		local.WithDir("backups_folder"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	var backupXdrCfg *backup.ConfigBackupXDR
+	backupXdrCfg.Namespace = "test"
+	backupXdrCfg.ParallelWrite = 10
+	backupXdrCfg.LocalAddress = "host.docker.internal"
+	ctx := context.Background()
+
+	backupHandler, err := backupClient.BackupXDR(ctx, backupXdrCfg, writers)
+	if err != nil {
+		panic(err)
+	}
+
+	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
+	// You can use different context here, and if it is canceled
+	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
+	err = backupHandler.Wait(ctx)
+	if err != nil {
+		log.Printf("Backup failed: %v", err)
+	}
+
+	restoreCfg := backup.NewDefaultRestoreConfig()
+	restoreCfg.Parallel = 5
+
+	// For restore from single file use local.WithFile(fileName)
+	reader, err := local.NewReader(
+		local.WithValidator(asb.NewValidator()),
+		local.WithDir("backups_folder"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// List all files first.
+	list, err := reader.ListObjects(ctx, "backups_folder")
+	if err != nil {
+		panic(err)
+	}
+	
+	// Sort files.
+	list, err = backup.SortBackupFiles(list)
+	if err != nil {
+		panic(err)
+	}
+
+	// Pass sorted list to reader.
+	reader.SetObjectsToStream(list)
+
+	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, reader)
+	if err != nil {
+		panic(err)
+	}
+
+	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.
+	// You can use different context here, and if it is canceled
+	// backupClient.Restore(ctx, restoreCfg, streamingReader) context will be cancelled too.
+	err = restoreHandler.Wait(ctx)
+	if err != nil {
+		log.Printf("Restore failed: %v", err)
+	}
+
+	// optionally check the stats of the restore job
+	_ = restoreHandler.GetStats()
+}
+```
+
 More examples can be found under the [examples](examples) folder.
 
 ## Prerequisites
@@ -106,7 +215,7 @@ More examples can be found under the [examples](examples) folder.
 Requirements
 
 - [Go](https://go.dev/) version v1.23+
-- [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v7
+- [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v8
 
 Testing Requirements
 

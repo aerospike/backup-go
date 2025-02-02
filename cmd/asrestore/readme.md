@@ -28,9 +28,9 @@ Aerospike Client Flags:
       --auth INTERNAL,EXTERNAL,PKI                                                                  The authentication mode used by the Aerospike server. INTERNAL 
                                                                                                     uses standard user/pass. EXTERNAL uses external methods (like LDAP) 
                                                                                                     which are configured on the server. EXTERNAL requires TLS. PKI allows 
-                                                                                                    TLS authentication and authorization based on a certificate. No user 
-                                                                                                    name needs to be configured. (default INTERNAL)
-      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other tls 
+                                                                                                    TLS authentication and authorization based on a certificate. No 
+                                                                                                    username needs to be configured. (default INTERNAL)
+      --tls-enable                                                                                  Enable TLS authentication with Aerospike. If false, other TLS 
                                                                                                     options are ignored.
       --tls-name string                                                                             The server TLS context to use to authenticate the connection to 
                                                                                                     Aerospike.
@@ -39,7 +39,7 @@ Aerospike Client Flags:
       --tls-certfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                     The certificate file for mutual TLS authentication with 
                                                                                                     Aerospike.
       --tls-keyfile env-b64:<cert>,b64:<cert>,<cert-file-name>                                      The key file used for mutual TLS authentication with Aerospike.
-      --tls-keyfile-password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"       The password used to decrypt the key-file if encrypted.
+      --tls-keyfile-password "env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>"       The password used to decrypt the key file if encrypted.
       --tls-protocols "[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2] [[+][-]TLSv1.3]"   Set the TLS protocol selection criteria. This format is the same 
                                                                                                     as Apache's SSLProtocol documented at 
                                                                                                     https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol. (default +TLSv1.2)

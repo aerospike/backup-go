@@ -21,7 +21,6 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/tools-common-go/client"
@@ -257,7 +256,7 @@ func splitList(list []string) (asbList, asbxList []string, err error) {
 
 	if len(asbxList) > 0 {
 		// We sort asbx files by prefix and suffix to restore them in the correct order.
-		asbxList, err = util.SortBackupFiles(asbxList)
+		asbxList, err = backup.SortBackupFiles(asbxList)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to sort asbx files: %w", err)
 		}

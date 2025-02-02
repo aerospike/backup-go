@@ -17,11 +17,14 @@ package backup
 import (
 	"crypto/tls"
 	"fmt"
+	"regexp"
 	"strconv"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
 )
+
+var expDCName = regexp.MustCompile(`^[a-zA-Z0-9_\-$]+$`)
 
 // ConfigBackupXDR contains configuration for the xdr backup operation.
 type ConfigBackupXDR struct {
@@ -92,12 +95,20 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
 	}
 
-	if c.ParallelWrite < MinParallel || c.ParallelWrite > MaxParallel {
-		return fmt.Errorf("parallel write must be between 1 and 1024, got %d", c.ParallelWrite)
-	}
-
 	if c.DC == "" {
 		return fmt.Errorf("dc name must not be empty")
+	}
+
+	if len(c.DC) > 31 {
+		return fmt.Errorf("dc name must be less than 32 characters")
+	}
+
+	if !expDCName.MatchString(c.DC) {
+		return fmt.Errorf("dc name must match ^[a-zA-Z0-9_\\-$]+$")
+	}
+
+	if c.ParallelWrite < MinParallel || c.ParallelWrite > MaxParallel {
+		return fmt.Errorf("parallel write must be between 1 and 1024, got %d", c.ParallelWrite)
 	}
 
 	if c.LocalAddress == "" {

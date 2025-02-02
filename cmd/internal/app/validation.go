@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 )
 
@@ -85,6 +85,14 @@ func validateBackupXDRParams(params *models.BackupXDR) error {
 
 	if params.FileLimit < 1 {
 		return fmt.Errorf("backup xdr file limit can't be less than 1")
+	}
+
+	if params.InfoRetryIntervalMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info retry interval can't be negative")
+	}
+
+	if params.InfoRetriesMultiplier < 0 {
+		return fmt.Errorf("backup xdr info retries multiplier can't be negative")
 	}
 
 	return nil

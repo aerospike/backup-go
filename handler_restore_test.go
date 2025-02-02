@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/io/local"
 	"github.com/stretchr/testify/suite"

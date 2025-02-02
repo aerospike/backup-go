@@ -17,7 +17,7 @@ package processors
 import (
 	"testing"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"

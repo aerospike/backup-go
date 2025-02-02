@@ -20,7 +20,7 @@ import (
 	"log/slog"
 	"runtime/debug"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 )
 
 func handlePanic(errors chan<- error, logger *slog.Logger) {

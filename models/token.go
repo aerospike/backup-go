@@ -14,7 +14,7 @@
 
 package models
 
-import a "github.com/aerospike/aerospike-client-go/v7"
+import a "github.com/aerospike/aerospike-client-go/v8"
 
 type TokenConstraint interface {
 	*Token | *ASBXToken

@@ -176,6 +176,8 @@ func (s *TCPServer) GetActiveConnections() int32 {
 // acceptConnections serves connections, not more than maxConnections.
 // All connections over pool will be rejected.
 func (s *TCPServer) acceptConnections(ctx context.Context) {
+	metrics := mewMetricsCollector(ctx, s.logger)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -203,6 +205,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 						s.config.ReadTimeoutMilliseconds,
 						s.config.WriteTimeoutMilliseconds,
 						s.logger,
+						metrics,
 					)
 					// Handlers wait when all goroutines are finished.
 					handler.Start(ctx)
@@ -247,7 +250,8 @@ type ConnectionHandler struct {
 	ackMsgRetry   []byte
 	timeNow       int64
 
-	logger *slog.Logger
+	logger  *slog.Logger
+	metrics *metricsCollector
 }
 
 // NewConnectionHandler returns new connection handler.
@@ -259,6 +263,7 @@ func NewConnectionHandler(
 	readTimeout int64,
 	writeTimeout int64,
 	logger *slog.Logger,
+	metrics *metricsCollector,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,
@@ -271,6 +276,7 @@ func NewConnectionHandler(
 		ackMsgSuccess:    NewAckMessage(AckOK),
 		ackMsgRetry:      NewAckMessage(AckRetry),
 		logger:           logger,
+		metrics:          metrics,
 	}
 }
 
@@ -361,6 +367,8 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 				h.logger.Error("failed to read message", slog.Any("error", err))
 				return
 			}
+
+			h.metrics.increment()
 
 			// Process message asynchronously
 			h.bodyQueue <- message

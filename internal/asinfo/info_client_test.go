@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/asinfo/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"

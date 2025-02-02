@@ -17,7 +17,7 @@ package app
 import (
 	"testing"
 
-	"github.com/aerospike/aerospike-client-go/v7"
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -761,6 +761,26 @@ func Test_validateBackupXDRParams(t *testing.T) {
 			},
 			wantErr: "backup xdr file limit can't be less than 1",
 		},
+		{
+			name: "negative info retry interval",
+			params: &models.BackupXDR{
+				MaxConnections:                1,
+				ParallelWrite:                 1,
+				FileLimit:                     1,
+				InfoRetryIntervalMilliseconds: -1,
+			},
+			wantErr: "backup xdr info retry interval can't be negative",
+		},
+		{
+			name: "negative info retries multiplier",
+			params: &models.BackupXDR{
+				MaxConnections:        1,
+				ParallelWrite:         1,
+				FileLimit:             1,
+				InfoRetriesMultiplier: -1,
+			},
+			wantErr: "backup xdr info retries multiplier can't be negative",
+		},
 	}
 
 	for _, tt := range tests {
@@ -780,9 +800,10 @@ func TestValidateBackup(t *testing.T) {
 		name    string
 		params  *ASBackupParams
 		wantErr bool
+		errMsg  string
 	}{
 		{
-			name: "Valid backup params with output file",
+			name: "Valid backup configuration with output file",
 			params: &ASBackupParams{
 				BackupParams: &models.Backup{
 					OutputFile: "backup.asb",
@@ -794,7 +815,7 @@ func TestValidateBackup(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Valid backup params with directory",
+			name: "Valid backup configuration with directory",
 			params: &ASBackupParams{
 				BackupParams: &models.Backup{},
 				CommonParams: &models.Common{
@@ -805,10 +826,11 @@ func TestValidateBackup(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Valid backup params with estimate",
+			name: "Valid backup configuration with estimate",
 			params: &ASBackupParams{
 				BackupParams: &models.Backup{
-					Estimate: true,
+					Estimate:        true,
+					EstimateSamples: 100,
 				},
 				CommonParams: &models.Common{
 					Namespace: "test",
@@ -817,7 +839,17 @@ func TestValidateBackup(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Invalid - no output file or directory and not estimate",
+			name: "Valid backup configuration with BackupXDR",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					MaxConnections: 10,
+					FileLimit:      1000,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing output file and directory",
 			params: &ASBackupParams{
 				BackupParams: &models.Backup{},
 				CommonParams: &models.Common{
@@ -825,28 +857,45 @@ func TestValidateBackup(t *testing.T) {
 				},
 			},
 			wantErr: true,
+			errMsg:  "output file or directory required",
 		},
 		{
-			name: "Valid backup XDR params",
+			name: "Invalid backup params - both output file and directory",
 			params: &ASBackupParams{
-				BackupXDRParams: &models.BackupXDR{
-					MaxConnections: 1,
-					FileLimit:      1,
+				BackupParams: &models.Backup{
+					OutputFile: "backup.asb",
 				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Invalid backup XDR params",
-			params: &ASBackupParams{
-				BackupXDRParams: &models.BackupXDR{
-					MaxConnections: 0,
+				CommonParams: &models.Common{
+					Directory: "backup-dir",
+					Namespace: "test",
 				},
 			},
 			wantErr: true,
+			errMsg:  "only one of output-file and directory may be configured at the same time",
 		},
 		{
-			name: "Invalid - multiple cloud storages configured",
+			name: "Invalid common params - missing namespace",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{
+					OutputFile: "backup.asb",
+				},
+				CommonParams: &models.Common{},
+			},
+			wantErr: true,
+			errMsg:  "namespace is required",
+		},
+		{
+			name: "Invalid BackupXDR params",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					MaxConnections: 0, // Invalid: must be >= 1
+				},
+			},
+			wantErr: true,
+			errMsg:  "backup xdr max connections can't be less than 1",
+		},
+		{
+			name: "Multiple cloud storage providers configured",
 			params: &ASBackupParams{
 				BackupParams: &models.Backup{
 					OutputFile: "backup.asb",
@@ -858,10 +907,11 @@ func TestValidateBackup(t *testing.T) {
 					Region: "us-west-2",
 				},
 				GcpStorage: &models.GcpStorage{
-					BucketName: "test-bucket",
+					BucketName: "my-bucket",
 				},
 			},
 			wantErr: true,
+			errMsg:  "only one cloud provider can be configured",
 		},
 	}
 
@@ -870,6 +920,9 @@ func TestValidateBackup(t *testing.T) {
 			err := validateBackup(tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Equal(t, tt.errMsg, err.Error())
+				}
 			} else {
 				assert.NoError(t, err)
 			}
@@ -882,13 +935,14 @@ func TestValidateRestore(t *testing.T) {
 		name    string
 		params  *ASRestoreParams
 		wantErr bool
+		errMsg  string
 	}{
 		{
-			name: "Valid restore params with input file",
+			name: "Valid restore configuration with input file",
 			params: &ASRestoreParams{
 				RestoreParams: &models.Restore{
 					InputFile: "backup.asb",
-					Mode:      models.RestoreModeAuto,
+					Mode:      models.RestoreModeASB,
 				},
 				CommonParams: &models.Common{
 					Namespace: "test",
@@ -897,7 +951,7 @@ func TestValidateRestore(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Valid restore params with directory",
+			name: "Valid restore configuration with directory",
 			params: &ASRestoreParams{
 				RestoreParams: &models.Restore{
 					Mode: models.RestoreModeASB,
@@ -910,30 +964,18 @@ func TestValidateRestore(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Valid restore params with directory list",
+			name: "Valid restore configuration with directory list",
 			params: &ASRestoreParams{
 				RestoreParams: &models.Restore{
 					DirectoryList:   "dir1,dir2",
 					ParentDirectory: "parent",
-					Mode:            models.RestoreModeASBX,
+					Mode:            models.RestoreModeASB,
 				},
 				CommonParams: &models.Common{
 					Namespace: "test",
 				},
 			},
 			wantErr: false,
-		},
-		{
-			name: "Invalid - no input file or directory",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
-					Mode: models.RestoreModeAuto,
-				},
-				CommonParams: &models.Common{
-					Namespace: "test",
-				},
-			},
-			wantErr: true,
 		},
 		{
 			name: "Invalid restore mode",
@@ -947,13 +989,54 @@ func TestValidateRestore(t *testing.T) {
 				},
 			},
 			wantErr: true,
+			errMsg:  "invalid restore mode: invalid-mode",
 		},
 		{
-			name: "Invalid - multiple cloud storages configured",
+			name: "Missing input source",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					Mode: models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: true,
+			errMsg:  "input file or directory required",
+		},
+		{
+			name: "Invalid restore params - both input file and directory",
 			params: &ASRestoreParams{
 				RestoreParams: &models.Restore{
 					InputFile: "backup.asb",
-					Mode:      models.RestoreModeAuto,
+					Mode:      models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Directory: "restore-dir",
+					Namespace: "test",
+				},
+			},
+			wantErr: true,
+			errMsg:  "only one of directory and input-file may be configured at the same time",
+		},
+		{
+			name: "Invalid common params - missing namespace",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					InputFile: "backup.asb",
+					Mode:      models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{},
+			},
+			wantErr: true,
+			errMsg:  "namespace is required",
+		},
+		{
+			name: "Multiple cloud storage providers configured",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					InputFile: "backup.asb",
+					Mode:      models.RestoreModeASB,
 				},
 				CommonParams: &models.Common{
 					Namespace: "test",
@@ -962,23 +1045,11 @@ func TestValidateRestore(t *testing.T) {
 					Region: "us-west-2",
 				},
 				AzureBlob: &models.AzureBlob{
-					ContainerName: "test-container",
+					ContainerName: "my-container",
 				},
 			},
 			wantErr: true,
-		},
-		{
-			name: "Invalid - parent directory without directory list",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
-					ParentDirectory: "parent",
-					Mode:            models.RestoreModeAuto,
-				},
-				CommonParams: &models.Common{
-					Namespace: "test",
-				},
-			},
-			wantErr: true,
+			errMsg:  "only one cloud provider can be configured",
 		},
 	}
 
@@ -987,6 +1058,9 @@ func TestValidateRestore(t *testing.T) {
 			err := validateRestore(tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Equal(t, tt.errMsg, err.Error())
+				}
 			} else {
 				assert.NoError(t, err)
 			}

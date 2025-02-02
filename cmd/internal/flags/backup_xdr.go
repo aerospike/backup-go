@@ -50,7 +50,9 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"If not set the default value is automatically calculated and appears as the number of CPUs on your machine.")
 	flagSet.StringVar(&f.DC, "dc",
 		"dc",
-		"DC that will be created on source instance for xdr backup.")
+		"DC that will be created on source instance for xdr backup.\n"+
+			"DC name can include only Latin lowercase and uppercase letters with no diacritical marks (a-z, A-Z),\n"+
+			"digits 0-9, underscores (_), hyphens (-), and dollar signs ($). Max length is 31 bytes.")
 	flagSet.StringVar(&f.LocalAddress, "local-address",
 		"127.0.0.1",
 		"Local IP address on which XDR server listens on.")

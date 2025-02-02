@@ -87,6 +87,14 @@ func validateBackupXDRParams(params *models.BackupXDR) error {
 		return fmt.Errorf("backup xdr file limit can't be less than 1")
 	}
 
+	if params.InfoRetryIntervalMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info retry interval can't be negative")
+	}
+
+	if params.InfoRetriesMultiplier < 0 {
+		return fmt.Errorf("backup xdr info retries multiplier can't be negative")
+	}
+
 	return nil
 }
 

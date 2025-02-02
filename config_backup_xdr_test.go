@@ -238,6 +238,61 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "max connections must not be less than 1, got 0",
 		},
+		{
+			name: "parallel write too high",
+			config: ConfigBackupXDR{
+				DC:             "dc1",
+				LocalAddress:   "127.0.0.1",
+				LocalPort:      3000,
+				Namespace:      "test",
+				Rewind:         "all",
+				ParallelWrite:  1025,
+				MaxConnections: 1,
+			},
+			wantErr: true,
+			errMsg:  "parallel write must be between 1 and 1024, got 1025",
+		},
+		{
+			name: "dc name too long (32 chars)",
+			config: ConfigBackupXDR{
+				DC:             "abcdefghijklmnopqrstuvwxyz123456",
+				LocalAddress:   "127.0.0.1",
+				LocalPort:      3000,
+				Namespace:      "test",
+				Rewind:         "all",
+				MaxConnections: 1,
+				ParallelWrite:  1,
+			},
+			wantErr: true,
+			errMsg:  "dc name must be less than 32 characters",
+		},
+		{
+			name: "dc name with invalid characters",
+			config: ConfigBackupXDR{
+				DC:             "dc@name",
+				LocalAddress:   "127.0.0.1",
+				LocalPort:      3000,
+				Namespace:      "test",
+				Rewind:         "all",
+				MaxConnections: 1,
+				ParallelWrite:  1,
+			},
+			wantErr: true,
+			errMsg:  "dc name must match ^[a-zA-Z0-9_\\-$]+$",
+		},
+		{
+			name: "dc name with valid special chars",
+			config: ConfigBackupXDR{
+				DC:             "dc-name_$123",
+				LocalAddress:   "127.0.0.1",
+				LocalPort:      3000,
+				Namespace:      "test",
+				Rewind:         "all",
+				MaxConnections: 1,
+				ParallelWrite:  1,
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

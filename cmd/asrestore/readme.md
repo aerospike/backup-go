@@ -11,6 +11,10 @@ Version artifacts are automatically built and uploaded under releases in GitHub.
 
 ## Supported flags
 ```
+The restore tool automatically identifies and restores ASB and ASBX backup files found in the specified folder.
+You can set restore mode manually with --mode flag. Flags that are incompatible with restore mode,
+are also incompatible in automatic mode (when mode is not set).
+
 Usage:
   asrestore [flags]
 
@@ -61,11 +65,13 @@ Aerospike Client Flags:
 Restore Flags:
   -d, --directory string         The directory that holds the backup files. Required, unless -o or -e is used.
   -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
+                                 Restoring to different namespace is incompatible with --mode=asbx.
   -s, --set string               Only restore the given sets from the backup.
                                  Default: restore all sets.
+                                 Incompatible with --mode=asbx.
   -B, --bin-list string          Only restore the given bins in the backup.
                                  If empty, include all bins.
-                                 
+                                 Incompatible with --mode=asbx.
   -R, --no-records               Don't restore any records.
                                  Incompatible with --mode=asbx.
   -I, --no-indexes               Don't restore any secondary indexes.

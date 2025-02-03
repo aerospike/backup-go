@@ -24,6 +24,7 @@ import (
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -133,13 +134,24 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
-		restoreXdrCfg := *r.restoreConfig
-		restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
+		var xdrStats *bModels.RestoreStats
+		// Check if we have asbx files and reader is inited.
+		if r.xdrReader != nil {
+			restoreXdrCfg := *r.restoreConfig
+			restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
 
-		hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
-		if err != nil {
-			cancel()
-			return fmt.Errorf("failed to start asbx restore: %w", err)
+			hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
+			if err != nil {
+				cancel()
+				return fmt.Errorf("failed to start asbx restore: %w", err)
+			}
+
+			if err = hXdr.Wait(ctx); err != nil {
+				cancel()
+				return fmt.Errorf("failed to asbx restore: %w", err)
+			}
+
+			xdrStats = hXdr.GetStats()
 		}
 
 		if err = h.Wait(ctx); err != nil {
@@ -147,12 +159,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
-		if err = hXdr.Wait(ctx); err != nil {
-			cancel()
-			return fmt.Errorf("failed to asbx restore: %w", err)
-		}
-
-		printRestoreReport(h.GetStats(), hXdr.GetStats())
+		printRestoreReport(h.GetStats(), xdrStats)
 		// To prevent context leaking.
 		cancel()
 	default:
@@ -182,6 +189,21 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
+		// List all files first.
+		list, err := xdrReader.ListObjects(ctx, params.CommonParams.Directory)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to list asbx files: %w", err)
+		}
+
+		// Sort files.
+		list, err = util.SortBackupFiles(list)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to sort asbx files: %w", err)
+		}
+
+		// Load ASBX files for reading.
+		xdrReader.SetObjectsToStream(list)
+
 		return nil, xdrReader, nil
 	case models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false)
@@ -208,6 +230,11 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 
 			// Load ASBX files for reading.
 			xdrReader.SetObjectsToStream(asbxList)
+
+			// For initializing auto mode correctly, we will check reader for nil.
+			if len(asbxList) == 0 {
+				xdrReader = nil
+			}
 		}
 
 		return reader, xdrReader, nil

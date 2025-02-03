@@ -288,6 +288,10 @@ func (c *Client) Restore(
 
 		return handler, nil
 	case EncoderTypeASBX:
+		if err := config.isValidForASBX(); err != nil {
+			return nil, fmt.Errorf("failed to validate restore config: %w", err)
+		}
+
 		handler := newRestoreHandler[*models.ASBXToken](ctx, config, c.aerospikeClient, c.logger, streamingReader)
 		handler.run()
 

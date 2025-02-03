@@ -134,3 +134,40 @@ func (c *ConfigRestore) validate() error {
 
 	return nil
 }
+
+// isValidForASBX check if config is valid for restoring from asbx.
+func (c *ConfigRestore) isValidForASBX() error {
+	if *c.Namespace.Source != *c.Namespace.Destination {
+		return fmt.Errorf("changing namespace is not supported for ASBX")
+	}
+
+	if len(c.SetList) > 0 {
+		return fmt.Errorf("set list is not supported for ASBX")
+	}
+
+	if len(c.BinList) > 0 {
+		return fmt.Errorf("bin list is not supported for ASBX")
+	}
+
+	if c.NoRecords {
+		return fmt.Errorf("no records is not supported for ASBX")
+	}
+
+	if c.NoIndexes {
+		return fmt.Errorf("no indexes is not supported for ASBX")
+	}
+
+	if c.NoUDFs {
+		return fmt.Errorf("no udfs is not supported for ASBX")
+	}
+
+	if c.DisableBatchWrites {
+		return fmt.Errorf("disable batch writes is not supported for ASBX")
+	}
+
+	if c.ExtraTTL > 0 {
+		return fmt.Errorf("extra ttl value is not supported for ASBX")
+	}
+
+	return nil
+}

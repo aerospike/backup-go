@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -140,4 +141,127 @@ func TestEncryptionPolicy_Validate(t *testing.T) {
 	keyEnv := "keyEnv"
 	policy.KeyEnv = &keyEnv
 	assert.ErrorContains(t, policy.validate(), "only one encryption key source may be specified")
+}
+
+func TestConfigRestore_IsValidForASBX(t *testing.T) {
+	source := "source-ns"
+	destination := "dest-ns"
+	sameNs := "same-ns"
+
+	tests := []struct {
+		name    string
+		config  *ConfigRestore
+		wantErr string
+	}{
+		{
+			name: "valid config with same namespace",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+			},
+			wantErr: "",
+		},
+		{
+			name: "different source and destination namespaces",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &source,
+					Destination: &destination,
+				},
+			},
+			wantErr: "changing namespace is not supported for ASBX",
+		},
+		{
+			name: "set list not empty",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+				SetList: []string{"set1"},
+			},
+			wantErr: "set list is not supported for ASBX",
+		},
+		{
+			name: "bin list not empty",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+				BinList: []string{"bin1"},
+			},
+			wantErr: "bin list is not supported for ASBX",
+		},
+		{
+			name: "no records set to true",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+				NoRecords: true,
+			},
+			wantErr: "no records is not supported for ASBX",
+		},
+		{
+			name: "no indexes set to true",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+				NoIndexes: true,
+			},
+			wantErr: "no indexes is not supported for ASBX",
+		},
+		{
+			name: "no UDFs set to true",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+				NoUDFs: true,
+			},
+			wantErr: "no udfs is not supported for ASBX",
+		},
+		{
+			name: "disable batch writes set to true",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+				DisableBatchWrites: true,
+			},
+			wantErr: "disable batch writes is not supported for ASBX",
+		},
+		{
+			name: "extra TTL greater than zero",
+			config: &ConfigRestore{
+				Namespace: &RestoreNamespaceConfig{
+					Source:      &sameNs,
+					Destination: &sameNs,
+				},
+				ExtraTTL: 1,
+			},
+			wantErr: "extra ttl value is not supported for ASBX",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.isValidForASBX()
+			if tt.wantErr != "" {
+				assert.Error(t, err)
+				assert.True(t, strings.Contains(err.Error(), tt.wantErr),
+					"expected error containing '%s', got '%s'", tt.wantErr, err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

@@ -110,10 +110,10 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		fmt.Println("Welcome to the Aerospike restore CLI tool!")
 		fmt.Println("-----------------------------------------")
 
-		fmt.Println("Restore tool automatically detects file types in restoring directory.")
-		fmt.Println("And perform restore according to detected type: asb or asbx.")
-		fmt.Println("You can set restore mode manually with --mode flag.")
-		fmt.Println("Flags that are incompatible with restore mode,")
+		fmt.Println("The restore tool automatically identifies and " +
+			"restores ASB and ASBX backup files found in the specified folder.")
+		fmt.Println("You can set restore mode manually with --mode flag. " +
+			"Flags that are incompatible with restore mode,")
 		fmt.Println("are also incompatible in automatic mode (when mode is not set).")
 
 		fmt.Println("\nUsage:")

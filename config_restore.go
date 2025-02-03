@@ -135,7 +135,7 @@ func (c *ConfigRestore) validate() error {
 	return nil
 }
 
-// isValidForASBX check if config is valid for restoring from asbx.
+// isValidForASBX checks if config is valid for restoring from asbx.
 func (c *ConfigRestore) isValidForASBX() error {
 	if *c.Namespace.Source != *c.Namespace.Destination {
 		return fmt.Errorf("changing namespace is not supported for ASBX")

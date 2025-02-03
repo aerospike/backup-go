@@ -11,10 +11,8 @@ Version artifacts are automatically built and uploaded under releases in GitHub.
 
 ## Supported flags
 ```
-Restore tool automatically detects file types in restoring directory.
-And perform restore according to detected type: asb or asbx.
-You can set restore mode manually with --mode flag.
-Flags that are incompatible with restore mode,
+The restore tool automatically identifies and restores ASB and ASBX backup files found in the specified folder.
+You can set restore mode manually with --mode flag. Flags that are incompatible with restore mode,
 are also incompatible in automatic mode (when mode is not set).
 
 Usage:

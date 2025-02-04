@@ -107,7 +107,7 @@ type Client struct {
 type ClientOpt func(*Client)
 
 // WithID sets the ID for the [Client].
-// Is used for loging.
+// This ID is used for logging purposes.
 func WithID(id string) ClientOpt {
 	return func(c *Client) {
 		c.id = id

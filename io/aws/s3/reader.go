@@ -86,7 +86,7 @@ func NewReader(
 
 	// Presort files if needed.
 	if err := r.preSort(ctx); err != nil {
-		return nil, fmt.Errorf("failed to pre sort: %v", err)
+		return nil, fmt.Errorf("failed to pre sort: %w", err)
 	}
 
 	return r, nil
@@ -343,7 +343,7 @@ func cleanPath(path string) string {
 
 // preSort performs files sorting before read.
 func (r *Reader) preSort(ctx context.Context) error {
-	if !r.isSorting || len(r.pathList) != 1 {
+	if !r.sortFiles || len(r.pathList) != 1 {
 		return nil
 	}
 

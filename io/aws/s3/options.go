@@ -34,8 +34,8 @@ type options struct {
 	startAfter string
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
-	// isSorting shows if we need to sort files before read.
-	isSorting bool
+	// sortFiles shows if we need to sort files before read.
+	sortFiles bool
 }
 
 type Opt func(*options)
@@ -118,6 +118,6 @@ func WithSkipDirCheck() Opt {
 // Is used only for Reader.
 func WithSorting() Opt {
 	return func(r *options) {
-		r.isSorting = true
+		r.sortFiles = true
 	}
 }

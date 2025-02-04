@@ -15,7 +15,7 @@ A Go library for backing up and restoring [Aerospike](https://aerospike.com/) da
     - Incremental backups using modification time filters
     - Compression (ZSTD)
     - Encryption (AES-128/256)
-    - Secret Agent integration
+    - [Secret Agent](https://aerospike.com/docs/tools/secret-agent) integration
 - Multiple backup formats:
     - ASB (Aerospike Backup) text format
     - ASBX (Aerospike Backup XDR) binary format

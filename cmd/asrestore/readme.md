@@ -107,7 +107,6 @@ Restore Flags:
                                   This option is mutually exclusive with --unique.
                                   Incompatible with --mode=asbx.
   -g, --no-generation             Don't check the generation of records that already exist in the namespace.
-                                  Incompatible with --mode=asbx.
       --ignore-record-error       Ignore errors specific to records, not UDFs or indexes. The errors are:
                                   AEROSPIKE_RECORD_TOO_BIG,
                                   AEROSPIKE_KEY_MISMATCH,

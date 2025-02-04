@@ -21,6 +21,7 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
 	bModels "github.com/aerospike/backup-go/models"
@@ -188,21 +189,6 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
-		// List all files first.
-		list, err := xdrReader.ListObjects(ctx, params.CommonParams.Directory)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to list asbx files: %w", err)
-		}
-
-		// Sort files.
-		list, err = util.SortBackupFiles(list)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to sort asbx files: %w", err)
-		}
-
-		// Load ASBX files for reading.
-		xdrReader.SetObjectsToStream(list)
-
 		return nil, xdrReader, nil
 	case models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false)
@@ -283,7 +269,7 @@ func splitList(list []string) (asbList, asbxList []string, err error) {
 
 	if len(asbxList) > 0 {
 		// We sort asbx files by prefix and suffix to restore them in the correct order.
-		asbxList, err = backup.SortBackupFiles(asbxList)
+		asbxList, err = util.SortBackupFiles(asbxList)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to sort asbx files: %w", err)
 		}

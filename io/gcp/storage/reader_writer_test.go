@@ -53,7 +53,7 @@ const (
 
 	testFolderNameTemplate    = "folder_%d/"
 	testFileNameTemplate      = "backup_%d.asb"
-	testFileNameTemplateAsbx  = "backup_%d.asbx"
+	testFileNameTemplateAsbx  = "%d_backup_%d.asbx"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
 
@@ -206,7 +206,7 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 			return err
 		}
 
-		fileName = fmt.Sprintf("%s%s", testFolderMixedBackups, fmt.Sprintf(testFileNameTemplateAsbx, i))
+		fileName = fmt.Sprintf("%s%s", testFolderMixedBackups, fmt.Sprintf(testFileNameTemplateAsbx, 0, i))
 		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
 		sw.ContentType = fileType
 		if err := writeContent(sw, testFileContentAsbx); err != nil {
@@ -215,21 +215,21 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 	}
 
 	// unsorted files.
-	fileName := fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 3))
+	fileName := fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplateAsbx, 0, 3))
 	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
 	sw.ContentType = fileType
 	if err := writeContent(sw, testFileContentSorted3); err != nil {
 		return err
 	}
 
-	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 1))
+	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplateAsbx, 0, 1))
 	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
 	sw.ContentType = fileType
 	if err := writeContent(sw, testFileContentSorted1); err != nil {
 		return err
 	}
 
-	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplate, 2))
+	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplateAsbx, 0, 2))
 	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
 	sw.ContentType = fileType
 	if err := writeContent(sw, testFileContentSorted2); err != nil {
@@ -325,7 +325,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	}
 }
 
-func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
+func (s *GCPSuite) TestReader_WithSorting() {
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -340,7 +340,7 @@ func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
 		testBucketName,
 		WithDir(testReadFolderSorted),
 		WithValidator(validatorMock{}),
-		WithSorted(SortAsc),
+		WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -364,54 +364,6 @@ func (s *GCPSuite) TestReader_StreamFilesSortedASC() {
 
 			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
-
-			s.Require().NoError(err)
-			s.Require().Equal(expecting, result)
-		}
-	}
-}
-
-func (s *GCPSuite) TestReader_StreamFilesSortedDESC() {
-	ctx := context.Background()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucketName,
-		WithDir(testReadFolderSorted),
-		WithValidator(validatorMock{}),
-		WithSorted(SortDesc),
-	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH)
-
-	var filesCounter int
-	expectedPostfix := 3
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
-			expectedPostfix--
 
 			s.Require().NoError(err)
 			s.Require().Equal(expecting, result)

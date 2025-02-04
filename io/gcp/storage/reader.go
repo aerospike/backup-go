@@ -19,19 +19,15 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
-	"sync"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"google.golang.org/api/iterator"
 )
 
-const (
-	gcpStorageType = "gcp-storage"
-	bufferSize     = 256
-)
+const gcpStorageType = "gcp-storage"
 
 type validator interface {
 	Run(fileName string) error
@@ -73,10 +69,6 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
-		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
-	}
-
 	bucket := client.Bucket(bucketName)
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
@@ -86,6 +78,11 @@ func NewReader(
 
 	r.bucketHandle = bucket
 	r.bucketName = bucketName
+
+	// Presort files if needed.
+	if err = r.preSort(ctx); err != nil {
+		return nil, fmt.Errorf("failed to pre sort: %v", err)
+	}
 
 	return r, nil
 }
@@ -127,18 +124,6 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
-	// start serving goroutines.
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	objectsToProcess := make(chan *string, bufferSize)
-
-	go func() {
-		defer wg.Done()
-		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
-	}()
-
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix:      path,
 		StartOffset: r.startOffset,
@@ -173,73 +158,31 @@ func (r *Reader) streamDirectory(
 			}
 		}
 
-		objectsToProcess <- &objAttrs.Name
-	}
-
-	close(objectsToProcess)
-	wg.Wait()
-}
-
-// processObjects receives keys, sort them, and then send to open chan.
-func (r *Reader) processObjects(
-	ctx context.Context,
-	objectsToProcess <-chan *string,
-	readersCh chan<- models.File,
-	errorsCh chan<- error,
-) {
-	// If we don't need to sort objects, open them.
-	if r.sort == "" {
-		for path := range objectsToProcess {
-			r.openObject(ctx, path, readersCh, errorsCh)
-		}
-
-		return
-	}
-	// If we need to sort.
-	keys := make([]string, 0)
-
-	for key := range objectsToProcess {
-		if ctx.Err() != nil {
-			return
-		}
-
-		keys = append(keys, *key)
-	}
-
-	switch r.sort {
-	case SortAsc:
-		sort.Strings(keys)
-	case SortDesc:
-		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
-	default:
-		return
-	}
-
-	for _, k := range keys {
-		r.openObject(ctx, &k, readersCh, errorsCh)
+		r.openObject(ctx, objAttrs.Name, readersCh, errorsCh, true)
 	}
 }
 
 // openObject creates object readers and sends them readersCh.
 func (r *Reader) openObject(
 	ctx context.Context,
-	path *string,
+	path string,
 	readersCh chan<- models.File,
 	errorsCh chan<- error,
+	skipNotFound bool,
 ) {
-	reader, err := r.bucketHandle.Object(*path).NewReader(ctx)
+	reader, err := r.bucketHandle.Object(path).NewReader(ctx)
 	if err != nil {
 		// Skip 404 not found error.
-		if errors.Is(err, storage.ErrObjectNotExist) {
+		if errors.Is(err, storage.ErrObjectNotExist) && skipNotFound {
 			return
 		}
-		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *path, err)
+		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", path, err)
 
 		return
 	}
 
 	if reader != nil {
-		readersCh <- models.File{Reader: reader, Name: filepath.Base(*path)}
+		readersCh <- models.File{Reader: reader, Name: filepath.Base(path)}
 	}
 }
 
@@ -259,15 +202,7 @@ func (r *Reader) StreamFile(
 		filename = filepath.Join(r.pathList[0], filename)
 	}
 
-	reader, err := r.bucketHandle.Object(filename).NewReader(ctx)
-	if err != nil {
-		errorsCh <- fmt.Errorf("failed to open file %s: %w", filename, err)
-		return
-	}
-
-	if reader != nil {
-		readersCh <- models.File{Reader: reader, Name: filepath.Base(filename)}
-	}
+	r.openObject(ctx, filename, readersCh, errorsCh, false)
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.
@@ -363,24 +298,9 @@ func (r *Reader) SetObjectsToStream(list []string) {
 
 // streamSetObjects streams preloaded objects.
 func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	objectsToProcess := make(chan *string, bufferSize)
-
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
-	}()
-
 	for i := range r.objectsToStream {
-		k := r.objectsToStream[i]
-		objectsToProcess <- &k
+		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
 	}
-
-	close(objectsToProcess)
-	wg.Wait()
 }
 
 // shouldSkip performs check, is we should skip files.
@@ -418,4 +338,28 @@ func cleanPath(path string) string {
 	}
 
 	return result
+}
+
+// preSort performs files sorting before read.
+func (r *Reader) preSort(ctx context.Context) error {
+	if !r.isSorting || len(r.pathList) != 1 {
+		return nil
+	}
+
+	// List all files first.
+	list, err := r.ListObjects(ctx, r.pathList[0])
+	if err != nil {
+		return err
+	}
+
+	// Sort files.
+	list, err = util.SortBackupFiles(list)
+	if err != nil {
+		return err
+	}
+
+	// Pass sorted list to reader.
+	r.SetObjectsToStream(list)
+
+	return nil
 }

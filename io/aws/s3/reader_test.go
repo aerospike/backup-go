@@ -45,7 +45,7 @@ const (
 	testFolderMixed          = "folder_mixed"
 	testFileNameMetadata     = "metadata.yaml"
 	testFileNameAsbTemplate  = "backup_%d.asb"
-	testFileNameAsbxTemplate = "backup_%d.asbx"
+	testFileNameAsbxTemplate = "%d_backup_%d.asbx"
 	testFileContentAsb       = "content-asb"
 	testFileContentAsbx      = "content-asbx"
 
@@ -142,7 +142,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 			return err
 		}
 
-		fileName = fmt.Sprintf("%s/%s", testFolderMixed, fmt.Sprintf(testFileNameAsbxTemplate, i))
+		fileName = fmt.Sprintf("%s/%s", testFolderMixed, fmt.Sprintf(testFileNameAsbxTemplate, 0, i))
 		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
 			Key:    aws.String(fileName),
@@ -153,7 +153,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 	}
 
 	// Unsorted files.
-	fileName := fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbTemplate, 3))
+	fileName := fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbxTemplate, 0, 3))
 	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(testBucket),
 		Key:    aws.String(fileName),
@@ -162,7 +162,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		return err
 	}
 
-	fileName = fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbTemplate, 1))
+	fileName = fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbxTemplate, 0, 1))
 	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(testBucket),
 		Key:    aws.String(fileName),
@@ -171,7 +171,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		return err
 	}
 
-	fileName = fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbTemplate, 2))
+	fileName = fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbxTemplate, 0, 2))
 	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(testBucket),
 		Key:    aws.String(fileName),
@@ -333,14 +333,14 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	}
 }
 
-func (s *AwsSuite) TestReader_StreamFilesASC() {
+func (s *AwsSuite) TestReader_WithSorting() {
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == ".asbx" {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -352,7 +352,7 @@ func (s *AwsSuite) TestReader_StreamFilesASC() {
 		testBucket,
 		WithDir(testFolderSorted),
 		WithValidator(mockValidator),
-		WithSorted(SortAsc),
+		WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -376,58 +376,6 @@ func (s *AwsSuite) TestReader_StreamFilesASC() {
 
 			result, err := readAll(f.Reader)
 			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
-
-			s.Require().NoError(err)
-			s.Require().Equal(expecting, result)
-		}
-	}
-}
-
-func (s *AwsSuite) TestReader_StreamFilesDESC() {
-	ctx := context.Background()
-	client, err := testClient(ctx)
-	s.Require().NoError(err)
-
-	mockValidator := new(mocks.Mockvalidator)
-	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
-			return nil
-		}
-		return fmt.Errorf("invalid file extension")
-	})
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucket,
-		WithDir(testFolderSorted),
-		WithValidator(mockValidator),
-		WithSorted(SortDesc),
-	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH)
-
-	var filesCounter int
-	expectedPostfix := 3
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			expecting := fmt.Sprintf("%s%d", "sorted", expectedPostfix)
-			expectedPostfix--
 
 			s.Require().NoError(err)
 			s.Require().Equal(expecting, result)

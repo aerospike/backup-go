@@ -53,6 +53,7 @@ func TestState(t *testing.T) {
 	cfg.PartitionFilters = testFilters
 
 	reader, err := local.NewReader(
+		ctx,
 		local.WithDir(testDir),
 	)
 	require.NoError(t, err)

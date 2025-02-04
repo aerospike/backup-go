@@ -20,8 +20,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -49,7 +49,7 @@ type Reader struct {
 // NewReader creates a new local directory/file Reader.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithValidator(v validator) - optional.
-func NewReader(opts ...Opt) (*Reader, error) {
+func NewReader(ctx context.Context, opts ...Opt) (*Reader, error) {
 	r := &Reader{}
 
 	for _, opt := range opts {
@@ -60,8 +60,8 @@ func NewReader(opts ...Opt) (*Reader, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
-		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
+	if err := r.preSort(ctx); err != nil {
+		return nil, fmt.Errorf("failed to pre sort: %v", err)
 	}
 
 	return r, nil
@@ -104,7 +104,7 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
-	fileInfo, err := r.getFilesList(path)
+	fileInfo, err := os.ReadDir(path)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to read path %s: %w", path, err)
 		return
@@ -259,30 +259,31 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 	}
 }
 
-// getFilesList returns sorted or unsorted files list from directory.
-func (r *Reader) getFilesList(path string) ([]os.DirEntry, error) {
-	fileInfo, err := os.ReadDir(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
-	}
-
-	switch r.sort {
-	case "":
-		return fileInfo, nil
-	case SortAsc:
-		sort.Slice(fileInfo, func(i, j int) bool {
-			return fileInfo[i].Name() < fileInfo[j].Name()
-		})
-	case SortDesc:
-		sort.Slice(fileInfo, func(i, j int) bool {
-			return fileInfo[i].Name() > fileInfo[j].Name()
-		})
-	}
-
-	return fileInfo, nil
-}
-
 // GetType returns the type of the reader.
 func (r *Reader) GetType() string {
 	return localType
+}
+
+// preSort performs files sorting before read.
+func (r *Reader) preSort(ctx context.Context) error {
+	if !r.isSorting || len(r.pathList) != 1 {
+		return nil
+	}
+
+	// List all files first.
+	list, err := r.ListObjects(ctx, r.pathList[0])
+	if err != nil {
+		return err
+	}
+
+	// Sort files.
+	list, err = util.SortBackupFiles(list)
+	if err != nil {
+		return err
+	}
+
+	// Pass sorted list to reader.
+	r.SetObjectsToStream(list)
+
+	return nil
 }

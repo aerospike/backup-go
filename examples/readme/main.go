@@ -69,6 +69,7 @@ func main() {
 
 	// For restore from single file use local.WithFile(fileName)
 	reader, err := local.NewReader(
+		ctx,
 		local.WithDir("backups_folder"),
 		local.WithValidator(asb.NewValidator()),
 	)

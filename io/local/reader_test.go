@@ -44,8 +44,8 @@ func (s *readerTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-
-	reader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
+	ctx := context.Background()
+	reader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
 	s.NoError(err)
 	err = reader.checkRestoreDirectory(dir)
 	s.Error(err)
@@ -72,8 +72,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-
-	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
+	ctx := context.Background()
+	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -108,8 +108,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-
-	r, err := NewReader(WithValidator(mockValidator), WithDir(dir))
+	ctx := context.Background()
+	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -142,8 +142,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-
-	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir))
+	ctx := context.Background()
+	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -168,8 +168,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-
-	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir("file1.asb"))
+	ctx := context.Background()
+	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir("file1.asb"))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -203,8 +203,8 @@ func (s *readerTestSuite) TestDirectoryReader_GetType() {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-
-	r, err := NewReader(WithValidator(mockValidator), WithDir(dir))
+	ctx := context.Background()
+	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
 	s.Require().NoError(err)
 
 	s.Equal(localType, r.GetType())
@@ -241,7 +241,8 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
 	mockValidator := new(mocks.Mockvalidator)
 
 	path := filepath.Join(dir, fileName)
-	r, err := NewReader(WithValidator(mockValidator), WithFile(path))
+	ctx := context.Background()
+	r, err := NewReader(ctx, WithValidator(mockValidator), WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -272,7 +273,8 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
 	mockValidator := new(mocks.Mockvalidator)
 
 	path := filepath.Join(dir, "error")
-	r, err := NewReader(WithValidator(mockValidator), WithFile(path))
+	ctx := context.Background()
+	r, err := NewReader(ctx, WithValidator(mockValidator), WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -316,8 +318,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-
-	streamingReader, err := NewReader(WithValidator(mockValidator), WithDir(dir), WithNestedDir())
+	ctx := context.Background()
+	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithNestedDir())
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -367,7 +369,10 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 		filepath.Join(dir, "nested2", "file2.asb"),
 	}
 
+	ctx := context.Background()
+
 	r, err := NewReader(
+		ctx,
 		WithValidator(mockValidator),
 		WithFileList(pathList),
 	)
@@ -420,7 +425,10 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 		filepath.Join(dir, "nested2"),
 	}
 
+	ctx := context.Background()
+
 	r, err := NewReader(
+		ctx,
 		WithValidator(mockValidator),
 		WithDirList(pathList),
 	)
@@ -446,62 +454,43 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 	}
 }
 
-func (s *readerTestSuite) TestReader_getFilesListASC() {
+func (s *readerTestSuite) TestReader_WithSorting() {
 	dir := s.T().TempDir()
 
-	expResult := []string{"file1.asb", "file2.asb", "file3.asb"}
+	expResult := []string{"0_file_1.asbx", "0_file_2.asbx", "0_file_3.asbx"}
 
-	err := createTmpFile(dir, "file3.asb")
+	err := createTmpFile(dir, "0_file_3.asbx")
 	require.NoError(s.T(), err)
-	err = createTmpFile(dir, "file1.asb")
+	err = createTmpFile(dir, "0_file_1.asbx")
 	require.NoError(s.T(), err)
-	err = createTmpFile(dir, "file2.asb")
+	err = createTmpFile(dir, "0_file_2.asbx")
 	require.NoError(s.T(), err)
-
+	ctx := context.Background()
 	r, err := NewReader(
+		ctx,
 		WithDir(dir),
-		WithSorted(SortAsc),
+		WithSorting(),
 	)
 	s.Require().NoError(err)
 
-	list, err := r.getFilesList(dir)
-	s.Require().NoError(err)
+	readerChan := make(chan models.File)
+	errorChan := make(chan error)
+	go r.StreamFiles(context.Background(), readerChan, errorChan)
 
-	result := make([]string, 0, len(list))
-	for i := range list {
-		result = append(result, list[i].Name())
+	result := make([]string, 0, 3)
+	for {
+		select {
+		case f, ok := <-readerChan:
+			// if chan closed, we're done.
+			if !ok {
+				s.Equal(expResult, result)
+				return
+			}
+			result = append(result, f.Name)
+		case err = <-errorChan:
+			require.NoError(s.T(), err)
+		}
 	}
-
-	s.Equal(expResult, result)
-}
-
-func (s *readerTestSuite) TestReader_getFilesListDesc() {
-	dir := s.T().TempDir()
-
-	expResult := []string{"file3.asb", "file2.asb", "file1.asb"}
-
-	err := createTmpFile(dir, "file3.asb")
-	require.NoError(s.T(), err)
-	err = createTmpFile(dir, "file1.asb")
-	require.NoError(s.T(), err)
-	err = createTmpFile(dir, "file2.asb")
-	require.NoError(s.T(), err)
-
-	r, err := NewReader(
-		WithDir(dir),
-		WithSorted(SortDesc),
-	)
-	s.Require().NoError(err)
-
-	list, err := r.getFilesList(dir)
-	s.Require().NoError(err)
-
-	result := make([]string, 0, len(list))
-	for i := range list {
-		result = append(result, list[i].Name())
-	}
-
-	s.Equal(expResult, result)
 }
 
 func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
@@ -516,6 +505,7 @@ func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
 	}
 
 	r, err := NewReader(
+		ctx,
 		WithDir(dir),
 	)
 	s.Require().NoError(err)

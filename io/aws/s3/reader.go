@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"sort"
 	"strings"
-	"sync"
 
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -31,10 +30,7 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-const (
-	s3type     = "s3"
-	bufferSize = 256
-)
+const s3type = "s3"
 
 type validator interface {
 	Run(fileName string) error
@@ -78,10 +74,6 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
-		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
-	}
-
 	// Check if the bucket exists and we have permissions.
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
@@ -91,6 +83,11 @@ func NewReader(
 
 	r.client = client
 	r.bucketName = bucketName
+
+	// Presort files if needed.
+	if err := r.preSort(ctx); err != nil {
+		return nil, fmt.Errorf("failed to pre sort: %v", err)
+	}
 
 	return r, nil
 }
@@ -134,18 +131,6 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
-	// start serving goroutines.
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	objectsToProcess := make(chan *string, bufferSize)
-
-	go func() {
-		defer wg.Done()
-		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
-	}()
-
 	var continuationToken *string
 
 	for {
@@ -176,7 +161,7 @@ func (r *Reader) streamDirectory(
 				}
 			}
 
-			objectsToProcess <- p.Key
+			r.openObject(ctx, *p.Key, readersCh, errorsCh, true)
 		}
 
 		continuationToken = listResponse.NextContinuationToken
@@ -184,61 +169,19 @@ func (r *Reader) streamDirectory(
 			break
 		}
 	}
-
-	close(objectsToProcess)
-	wg.Wait()
-}
-
-// processObjects receives keys, sort them if needed, and then send to open chan.
-func (r *Reader) processObjects(
-	ctx context.Context,
-	objectsToProcess <-chan *string,
-	readersCh chan<- models.File,
-	errorsCh chan<- error,
-) {
-	// If we don't need to sort objects, open them.
-	if r.sort == "" {
-		for path := range objectsToProcess {
-			r.openObject(ctx, path, readersCh, errorsCh)
-		}
-
-		return
-	}
-	// If we need to sort.
-	keys := make([]string, 0)
-
-	for key := range objectsToProcess {
-		if ctx.Err() != nil {
-			return
-		}
-
-		keys = append(keys, *key)
-	}
-
-	switch r.sort {
-	case SortAsc:
-		sort.Strings(keys)
-	case SortDesc:
-		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
-	default:
-		return
-	}
-
-	for _, k := range keys {
-		r.openObject(ctx, &k, readersCh, errorsCh)
-	}
 }
 
 // openObject creates object readers and sends them readersCh.
 func (r *Reader) openObject(
 	ctx context.Context,
-	path *string,
+	path string,
 	readersCh chan<- models.File,
 	errorsCh chan<- error,
+	skipNotFound bool,
 ) {
 	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &r.bucketName,
-		Key:    path,
+		Key:    &path,
 	})
 
 	if err != nil {
@@ -246,19 +189,19 @@ func (r *Reader) openObject(
 		var opErr *smithy.OperationError
 		if errors.As(err, &opErr) {
 			var httpErr *awsHttp.ResponseError
-			if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound {
+			if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound && skipNotFound {
 				return
 			}
 		}
 
 		// We check *p.Key == nil in the beginning.
-		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *path, err)
+		errorsCh <- fmt.Errorf("failed to open file %s: %w", path, err)
 
 		return
 	}
 
 	if object != nil {
-		readersCh <- models.File{Reader: object.Body, Name: filepath.Base(*path)}
+		readersCh <- models.File{Reader: object.Body, Name: filepath.Base(path)}
 	}
 }
 
@@ -278,18 +221,7 @@ func (r *Reader) StreamFile(
 		filename = filepath.Join(r.pathList[0], filename)
 	}
 
-	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &r.bucketName,
-		Key:    &filename,
-	})
-	if err != nil {
-		errorsCh <- fmt.Errorf("failed to open file %s: %w", filename, err)
-		return
-	}
-
-	if object != nil {
-		readersCh <- models.File{Reader: object.Body, Name: filepath.Base(filename)}
-	}
+	r.openObject(ctx, filename, readersCh, errorsCh, false)
 }
 
 // GetType return `s3type` type of storage. Used in logging.
@@ -389,24 +321,9 @@ func (r *Reader) SetObjectsToStream(list []string) {
 
 // streamSetObjects streams preloaded objects.
 func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	objectsToProcess := make(chan *string, bufferSize)
-
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
-	}()
-
 	for i := range r.objectsToStream {
-		k := r.objectsToStream[i]
-		objectsToProcess <- &k
+		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
 	}
-
-	close(objectsToProcess)
-	wg.Wait()
 }
 
 // cleanPath is protection from incorrect input.
@@ -422,4 +339,28 @@ func cleanPath(path string) string {
 	}
 
 	return result
+}
+
+// preSort performs files sorting before read.
+func (r *Reader) preSort(ctx context.Context) error {
+	if !r.isSorting || len(r.pathList) != 1 {
+		return nil
+	}
+
+	// List all files first.
+	list, err := r.ListObjects(ctx, r.pathList[0])
+	if err != nil {
+		return err
+	}
+
+	// Sort files.
+	list, err = util.SortBackupFiles(list)
+	if err != nil {
+		return err
+	}
+
+	// Pass sorted list to reader.
+	r.SetObjectsToStream(list)
+
+	return nil
 }

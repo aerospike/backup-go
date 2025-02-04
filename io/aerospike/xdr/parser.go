@@ -35,6 +35,44 @@ const (
 )
 
 const (
+	// MsgInfo1Read - Contains a read operation
+	MsgInfo1Read = 1 << iota // 1
+	// MsgInfo1GetAll - Get all bins' data
+	MsgInfo1GetAll // 2
+	// MsgInfo1ShortQuery - Bypass monitoring, inline if data-in-memory
+	MsgInfo1ShortQuery // 4
+	// MsgInfo1Batch - New batch protocol
+	MsgInfo1Batch // 8
+	// MsgInfo1Xdr - Operation is performed by XDR
+	MsgInfo1Xdr // 16
+	// MsgInfo1GetNoBins - Get record metadata only - no bin metadata or data
+	MsgInfo1GetNoBins // 32
+	// MsgInfo1ConsistencyLevelAll - Duplicate resolve reads
+	MsgInfo1ConsistencyLevelAll // 64
+	// MsgInfo1CompressResponse - Compress the response
+	MsgInfo1CompressResponse // 128
+)
+
+const (
+	// MsgInfo2Write - Contains a write operation
+	MsgInfo2Write = 1 << iota // 1
+	// MsgInfo2Delete - Delete record
+	MsgInfo2Delete // 2
+	// MsgInfo2Generation - Pay attention to the generation
+	MsgInfo2Generation // 4
+	// MsgInfo2GenerationGt - Apply write if new generation >= old, good for restore
+	MsgInfo2GenerationGt // 8
+	// MsgInfo2DurableDelete - Op resulting in record deletion leaves tombstone (enterprise only)
+	MsgInfo2DurableDelete // 16
+	// MsgInfo2CreateOnly - Write record only if it doesn't exist
+	MsgInfo2CreateOnly // 32
+	// Bit 64 is unused
+	_ = 1 << 6 // 64
+	// MsgInfo2RespondAllOps - All bin ops (read, write, or modify) require a response, in request order
+	MsgInfo2RespondAllOps // 128
+)
+
+const (
 	AckOK    = 0
 	AckRetry = 11
 )
@@ -246,7 +284,24 @@ func NewPayload(body []byte) []byte {
 // ResetXDRBit nullify xdr bit from Info1 field of AerospikeMessage.
 // Receives body without a header.
 func ResetXDRBit(message []byte) []byte {
-	message[1] = 0
+	message[1] &= ^byte(MsgInfo1Xdr)
+
+	return message
+}
+
+// SetGenerationBit set info2 field to 8, which means apply write if new generation >= old.
+func SetGenerationBit(policy aerospike.GenerationPolicy, offset int, message []byte) []byte {
+	info2pos := 2
+	info2pos += offset
+
+	switch policy {
+	case aerospike.EXPECT_GEN_GT:
+		message[info2pos] |= MsgInfo2GenerationGt
+	default:
+		// default NONE
+		message[info2pos] &= ^byte(MsgInfo2GenerationGt)
+	}
+
 	return message
 }
 

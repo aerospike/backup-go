@@ -61,8 +61,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"Incompatible with --mode=asbx.")
 	flagSet.BoolVarP(&f.NoGeneration, "no-generation", "g",
 		false,
-		"Don't check the generation of records that already exist in the namespace.\n"+
-			"Incompatible with --mode=asbx.")
+		"Don't check the generation of records that already exist in the namespace.")
 	flagSet.BoolVar(&f.IgnoreRecordError, "ignore-record-error",
 		false,
 		"Ignore errors specific to records, not UDFs or indexes. The errors are:\n"+

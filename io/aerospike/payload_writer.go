@@ -19,6 +19,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/io/aerospike/xdr"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -35,6 +36,8 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 		aerr    a.Error
 		attempt uint
 	)
+
+	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, xdr.LenProtoHeader, t.Payload)
 
 	for attemptsLeft(p.retryPolicy, attempt) {
 		aerr = p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)

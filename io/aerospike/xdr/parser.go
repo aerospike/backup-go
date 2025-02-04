@@ -35,55 +35,41 @@ const (
 )
 
 const (
-	// AS_MSG_INFO1_READ - Contains a read operation
-	AS_MSG_INFO1_READ = 1 << iota // 1
-
-	// AS_MSG_INFO1_GET_ALL - Get all bins' data
-	AS_MSG_INFO1_GET_ALL // 2
-
-	// AS_MSG_INFO1_SHORT_QUERY - Bypass monitoring, inline if data-in-memory
-	AS_MSG_INFO1_SHORT_QUERY // 4
-
-	// AS_MSG_INFO1_BATCH - New batch protocol
-	AS_MSG_INFO1_BATCH // 8
-
-	// AS_MSG_INFO1_XDR - Operation is performed by XDR
-	AS_MSG_INFO1_XDR // 16
-
-	// AS_MSG_INFO1_GET_NO_BINS - Get record metadata only - no bin metadata or data
-	AS_MSG_INFO1_GET_NO_BINS // 32
-
-	// AS_MSG_INFO1_CONSISTENCY_LEVEL_ALL - Duplicate resolve reads
-	AS_MSG_INFO1_CONSISTENCY_LEVEL_ALL // 64
-
-	// AS_MSG_INFO1_COMPRESS_RESPONSE - Compress the response
-	AS_MSG_INFO1_COMPRESS_RESPONSE // 128
+	// MsgInfo1Read - Contains a read operation
+	MsgInfo1Read = 1 << iota // 1
+	// MsgInfo1GetAll - Get all bins' data
+	MsgInfo1GetAll // 2
+	// MsgInfo1ShortQuery - Bypass monitoring, inline if data-in-memory
+	MsgInfo1ShortQuery // 4
+	// MsgInfo1Batch - New batch protocol
+	MsgInfo1Batch // 8
+	// MsgInfo1Xdr - Operation is performed by XDR
+	MsgInfo1Xdr // 16
+	// MsgInfo1GetNoBins - Get record metadata only - no bin metadata or data
+	MsgInfo1GetNoBins // 32
+	// MsgInfo1ConsistencyLevelAll - Duplicate resolve reads
+	MsgInfo1ConsistencyLevelAll // 64
+	// MsgInfo1CompressResponse - Compress the response
+	MsgInfo1CompressResponse // 128
 )
 
 const (
-	// AS_MSG_INFO2_WRITE - Contains a write operation
-	AS_MSG_INFO2_WRITE = 1 << iota // 1
-
-	// AS_MSG_INFO2_DELETE - Delete record
-	AS_MSG_INFO2_DELETE // 2
-
-	// AS_MSG_INFO2_GENERATION - Pay attention to the generation
-	AS_MSG_INFO2_GENERATION // 4
-
-	// AS_MSG_INFO2_GENERATION_GT - Apply write if new generation >= old, good for restore
-	AS_MSG_INFO2_GENERATION_GT // 8
-
-	// AS_MSG_INFO2_DURABLE_DELETE - Op resulting in record deletion leaves tombstone (enterprise only)
-	AS_MSG_INFO2_DURABLE_DELETE // 16
-
-	// AS_MSG_INFO2_CREATE_ONLY - Write record only if it doesn't exist
-	AS_MSG_INFO2_CREATE_ONLY // 32
-
+	// MsgInfo2Write - Contains a write operation
+	MsgInfo2Write = 1 << iota // 1
+	// MsgInfo2Delete - Delete record
+	MsgInfo2Delete // 2
+	// MsgInfo2Generation - Pay attention to the generation
+	MsgInfo2Generation // 4
+	// MsgInfo2GenerationGt - Apply write if new generation >= old, good for restore
+	MsgInfo2GenerationGt // 8
+	// MsgInfo2DurableDelete - Op resulting in record deletion leaves tombstone (enterprise only)
+	MsgInfo2DurableDelete // 16
+	// MsgInfo2CreateOnly - Write record only if it doesn't exist
+	MsgInfo2CreateOnly // 32
 	// Bit 64 is unused
 	_ = 1 << 6 // 64
-
-	// AS_MSG_INFO2_RESPOND_ALL_OPS - All bin ops (read, write, or modify) require a response, in request order
-	AS_MSG_INFO2_RESPOND_ALL_OPS // 128
+	// MsgInfo2RespondAllOps - All bin ops (read, write, or modify) require a response, in request order
+	MsgInfo2RespondAllOps // 128
 )
 
 const (
@@ -298,7 +284,7 @@ func NewPayload(body []byte) []byte {
 // ResetXDRBit nullify xdr bit from Info1 field of AerospikeMessage.
 // Receives body without a header.
 func ResetXDRBit(message []byte) []byte {
-	message[1] = message[1] & ^byte(AS_MSG_INFO1_XDR)
+	message[1] &= ^byte(MsgInfo1Xdr)
 
 	return message
 }
@@ -307,12 +293,13 @@ func ResetXDRBit(message []byte) []byte {
 func SetGenerationBit(policy aerospike.GenerationPolicy, offset int, message []byte) []byte {
 	info2pos := 2
 	info2pos += offset
+
 	switch policy {
 	case aerospike.EXPECT_GEN_GT:
-		message[info2pos] = message[info2pos] | AS_MSG_INFO2_GENERATION_GT
+		message[info2pos] |= MsgInfo2GenerationGt
 	default:
 		// default NONE
-		message[info2pos] = message[info2pos] & ^byte(AS_MSG_INFO2_GENERATION_GT)
+		message[info2pos] &= ^byte(MsgInfo2GenerationGt)
 	}
 
 	return message

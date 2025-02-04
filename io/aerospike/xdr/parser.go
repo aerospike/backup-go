@@ -299,12 +299,22 @@ func NewPayload(body []byte) []byte {
 // Receives body without a header.
 func ResetXDRBit(message []byte) []byte {
 	message[1] = message[1] & ^byte(AS_MSG_INFO1_XDR)
+
 	return message
 }
 
 // SetGenerationBit set info2 field to 8, which means apply write if new generation >= old.
-func SetGenerationBit(message []byte) []byte {
-	message[2] = message[2] | AS_MSG_INFO2_GENERATION_GT
+func SetGenerationBit(policy aerospike.GenerationPolicy, offset int, message []byte) []byte {
+	info2pos := 2
+	info2pos += offset
+	switch policy {
+	case aerospike.EXPECT_GEN_GT:
+		message[info2pos] = message[info2pos] | AS_MSG_INFO2_GENERATION_GT
+	default:
+		// default NONE
+		message[info2pos] = message[info2pos] & ^byte(AS_MSG_INFO2_GENERATION_GT)
+	}
+
 	return message
 }
 

@@ -14,13 +14,6 @@
 
 package local
 
-type SortOrder string
-
-const (
-	SortAsc  SortOrder = "asc"
-	SortDesc SortOrder = "desc"
-)
-
 type options struct {
 	// pathList contains list of files or directories.
 	pathList []string
@@ -36,9 +29,8 @@ type options struct {
 	withNestedDir bool
 	// skipDirCheck if true, backup directory won't be checked.
 	skipDirCheck bool
-	// Sort can be "", asc, desc (Use SortAsc, SortDesc constants).
-	// If sort is set, files will be sorted before read.
-	sort SortOrder
+	// sortFiles shows if we need to sort files before read.
+	sortFiles bool
 }
 
 type Opt func(*options)
@@ -108,11 +100,11 @@ func WithSkipDirCheck() Opt {
 	}
 }
 
-// WithSorted adds a sorting flag.
+// WithSorting adds a sorting flag.
 // Which means that files will be read from directory in the sorted order.
 // Is used only for Reader.
-func WithSorted(sort SortOrder) Opt {
+func WithSorting() Opt {
 	return func(r *options) {
-		r.sort = sort
+		r.sortFiles = true
 	}
 }

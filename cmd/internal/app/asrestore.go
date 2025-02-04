@@ -189,21 +189,6 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
-		// List all files first.
-		list, err := xdrReader.ListObjects(ctx, params.CommonParams.Directory)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to list asbx files: %w", err)
-		}
-
-		// Sort files.
-		list, err = util.SortBackupFiles(list)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to sort asbx files: %w", err)
-		}
-
-		// Load ASBX files for reading.
-		xdrReader.SetObjectsToStream(list)
-
 		return nil, xdrReader, nil
 	case models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false)

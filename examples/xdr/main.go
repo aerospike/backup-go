@@ -47,12 +47,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	backupCfg := backup.NewDefaultBackupConfig()
-	backupCfg.Namespace = "test"
-	backupCfg.ParallelRead = 10
-	backupCfg.ParallelWrite = 10
+	xdrConfig := &backup.ConfigBackupXDR{
+		DC:             "dc1",
+		LocalAddress:   "host.docker.internal",
+		LocalPort:      3000,
+		Namespace:      "test",
+		ParallelWrite:  10,
+		Rewind:         "all",
+		MaxConnections: 10,
+	}
 
-	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
+	backupHandler, err := backupClient.BackupXDR(ctx, xdrConfig, writers)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -73,6 +78,7 @@ func main() {
 		ctx,
 		local.WithDir("backups_folder"),
 		local.WithValidator(asb.NewValidator()),
+		local.WithSorting(), // Required for ASBX files
 	)
 	if err != nil {
 		log.Fatal(err)

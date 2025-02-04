@@ -59,7 +59,7 @@ func SortBackupFiles(files []string) ([]string, error) {
 	for _, file := range files {
 		f, err := parseFileName(file)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse file name: %s", file)
+			return nil, fmt.Errorf("failed to parse file name %s: %w", file, err)
 		}
 
 		presort[f.prefix] = append(presort[f.prefix], f)

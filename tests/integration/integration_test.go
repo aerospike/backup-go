@@ -411,7 +411,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	readers, err := local.NewReader(local.WithDir(backupDir))
+	readers, err := local.NewReader(ctx, local.WithDir(backupDir))
 	suite.Nil(err)
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -572,7 +572,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	suite.Nil(err)
 
 	restoreConfig := backup.NewDefaultRestoreConfig()
-	readers, err := local.NewReader(local.WithDir(backupDir))
+	readers, err := local.NewReader(ctx, local.WithDir(backupDir))
 	suite.Nil(err)
 
 	rh, err := suite.backupClient.Restore(
@@ -1156,6 +1156,7 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 	suite.Nil(err)
 
 	readers, err := local.NewReader(
+		ctx,
 		local.WithDir(bFolder),
 	)
 	suite.Nil(err)
@@ -1196,6 +1197,7 @@ func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, test
 	suite.Nil(err)
 
 	readers, err := local.NewReader(
+		ctx,
 		local.WithDir(bFolder),
 	)
 	suite.Nil(err)

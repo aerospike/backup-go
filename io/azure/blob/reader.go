@@ -20,19 +20,15 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"sort"
 	"strings"
-	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 )
 
-const (
-	azureBlobType = "azure-blob"
-	bufferSize    = 256
-)
+const azureBlobType = "azure-blob"
 
 type validator interface {
 	Run(fileName string) error
@@ -75,16 +71,17 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.sort != "" && r.sort != SortAsc && r.sort != SortDesc {
-		return nil, fmt.Errorf("unknown sorting type %s", r.sort)
-	}
-
 	// Check if container exists.
 	if _, err := client.ServiceClient().NewContainerClient(containerName).GetProperties(ctx, nil); err != nil {
 		return nil, fmt.Errorf("unable to get container properties: %w", err)
 	}
 
 	r.containerName = containerName
+
+	// Presort files if needed.
+	if err := r.preSort(ctx); err != nil {
+		return nil, fmt.Errorf("failed to pre sort: %w", err)
+	}
 
 	return r, nil
 }
@@ -126,18 +123,6 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
-	// start serving goroutines.
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	objectsToProcess := make(chan *string, bufferSize)
-
-	go func() {
-		defer wg.Done()
-		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
-	}()
-
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &path,
 	})
@@ -164,76 +149,34 @@ func (r *Reader) streamDirectory(
 				}
 			}
 
-			objectsToProcess <- blob.Name
+			r.openObject(ctx, *blob.Name, readersCh, errorsCh, true)
 		}
-	}
-
-	close(objectsToProcess)
-	wg.Wait()
-}
-
-// processObjects receives keys, sort them, and then send to open chan.
-func (r *Reader) processObjects(
-	ctx context.Context,
-	objectsToProcess <-chan *string,
-	readersCh chan<- models.File,
-	errorsCh chan<- error,
-) {
-	// If we don't need to sort objects, open them.
-	if r.sort == "" {
-		for path := range objectsToProcess {
-			r.openObject(ctx, path, readersCh, errorsCh)
-		}
-
-		return
-	}
-
-	keys := make([]string, 0)
-
-	for key := range objectsToProcess {
-		if ctx.Err() != nil {
-			return
-		}
-
-		keys = append(keys, *key)
-	}
-
-	switch r.sort {
-	case SortAsc:
-		sort.Strings(keys)
-	case SortDesc:
-		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
-	default:
-		return
-	}
-
-	for _, k := range keys {
-		r.openObject(ctx, &k, readersCh, errorsCh)
 	}
 }
 
 // openObject creates object readers and sends them readersCh.
 func (r *Reader) openObject(
 	ctx context.Context,
-	path *string,
+	path string,
 	readersCh chan<- models.File,
 	errorsCh chan<- error,
+	skipNotFound bool,
 ) {
-	resp, err := r.client.DownloadStream(ctx, r.containerName, *path, nil)
+	resp, err := r.client.DownloadStream(ctx, r.containerName, path, nil)
 	if err != nil {
 		// Skip 404 not found error.
 		var respErr *azcore.ResponseError
-		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound && skipNotFound {
 			return
 		}
 
-		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", *path, err)
+		errorsCh <- fmt.Errorf("failed to open file %s: %w", path, err)
 
 		return
 	}
 
 	if resp.Body != nil {
-		readersCh <- models.File{Reader: resp.Body, Name: filepath.Base(*path)}
+		readersCh <- models.File{Reader: resp.Body, Name: filepath.Base(path)}
 	}
 }
 
@@ -253,15 +196,7 @@ func (r *Reader) StreamFile(
 		filename = filepath.Join(r.pathList[0], filename)
 	}
 
-	resp, err := r.client.DownloadStream(ctx, r.containerName, filename, nil)
-	if err != nil {
-		errorsCh <- fmt.Errorf("failed to open file %s: %w", filename, err)
-		return
-	}
-
-	if resp.Body != nil {
-		readersCh <- models.File{Reader: resp.Body, Name: filepath.Base(filename)}
-	}
+	r.openObject(ctx, filename, readersCh, errorsCh, false)
 }
 
 // shouldSkip performs check, is we should skip files.
@@ -351,24 +286,9 @@ func (r *Reader) SetObjectsToStream(list []string) {
 
 // streamSetObjects streams preloaded objects.
 func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	objectsToProcess := make(chan *string, bufferSize)
-
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		r.processObjects(ctx, objectsToProcess, readersCh, errorsCh)
-	}()
-
 	for i := range r.objectsToStream {
-		k := r.objectsToStream[i]
-		objectsToProcess <- &k
+		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
 	}
-
-	close(objectsToProcess)
-	wg.Wait()
 }
 
 func isDirectory(prefix, fileName string) bool {
@@ -406,4 +326,28 @@ func cleanPath(path string) string {
 	}
 
 	return result
+}
+
+// preSort performs files sorting before read.
+func (r *Reader) preSort(ctx context.Context) error {
+	if !r.sortFiles || len(r.pathList) != 1 {
+		return nil
+	}
+
+	// List all files first.
+	list, err := r.ListObjects(ctx, r.pathList[0])
+	if err != nil {
+		return err
+	}
+
+	// Sort files.
+	list, err = util.SortBackupFiles(list)
+	if err != nil {
+		return err
+	}
+
+	// Pass sorted list to reader.
+	r.SetObjectsToStream(list)
+
+	return nil
 }

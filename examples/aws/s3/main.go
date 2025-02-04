@@ -62,7 +62,7 @@ func initBackupClient() *backup.Client {
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	return backupClient
@@ -76,7 +76,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		"http://localhost:9000",
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	writers, err := s3Storasge.NewWriter(
@@ -87,7 +87,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		s3Storasge.WithRemoveFiles(),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	backupCfg := backup.NewDefaultBackupConfig()
@@ -99,7 +99,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 
 	backupHandler, err := c.Backup(ctx, backupCfg, writers, nil)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
@@ -121,7 +121,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		"http://localhost:9000",
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	reader, err := s3Storasge.NewReader(
@@ -132,7 +132,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		s3Storasge.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	source := dbNameSource
@@ -149,7 +149,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 
 	restoreHandler, err := c.Restore(ctx, restoreCfg, reader)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.

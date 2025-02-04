@@ -58,11 +58,17 @@ func newReader(
 
 		return newAzureReader(ctx, params.AzureBlob, directory, inputFile, parentDirectory, directoryList, isXdr)
 	default:
-		return newLocalReader(directory, inputFile, parentDirectory, directoryList, isXdr)
+		return newLocalReader(ctx, directory, inputFile, parentDirectory, directoryList, isXdr)
 	}
 }
 
-func newLocalReader(directory, inputFile, parentDirectory, directoryList string, isXDR bool,
+func newLocalReader(
+	ctx context.Context,
+	directory,
+	inputFile,
+	parentDirectory,
+	directoryList string,
+	isXDR bool,
 ) (backup.StreamingReader, error) {
 	opts := make([]local.Opt, 0)
 
@@ -72,9 +78,9 @@ func newLocalReader(directory, inputFile, parentDirectory, directoryList string,
 		opts = append(opts, local.WithDir(directory), local.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
-			opts = append(opts, local.WithValidator(asbx.NewValidator()), local.WithSorted(local.SortAsc))
+			opts = append(opts, local.WithValidator(asbx.NewValidator()), local.WithSorting())
 			// ASBX restore supports only restore from directory.
-			return local.NewReader(opts...)
+			return local.NewReader(ctx, opts...)
 		} else {
 			opts = append(opts, local.WithValidator(asb.NewValidator()))
 		}
@@ -85,7 +91,7 @@ func newLocalReader(directory, inputFile, parentDirectory, directoryList string,
 		opts = append(opts, local.WithDirList(dirList))
 	}
 
-	return local.NewReader(opts...)
+	return local.NewReader(ctx, opts...)
 }
 
 //nolint:dupl // This code is not duplicated, it is a different initialization.
@@ -111,7 +117,7 @@ func newS3Reader(
 		opts = append(opts, s3.WithDir(directory), s3.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
-			opts = append(opts, s3.WithValidator(asbx.NewValidator()), s3.WithSorted(s3.SortAsc))
+			opts = append(opts, s3.WithValidator(asbx.NewValidator()), s3.WithSorting())
 			// ASBX restore supports only restore from directory.
 			return s3.NewReader(ctx, client, a.BucketName, opts...)
 		} else {
@@ -150,7 +156,7 @@ func newGcpReader(
 		opts = append(opts, storage.WithDir(directory), storage.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
-			opts = append(opts, storage.WithValidator(asbx.NewValidator()), storage.WithSorted(storage.SortAsc))
+			opts = append(opts, storage.WithValidator(asbx.NewValidator()), storage.WithSorting())
 			// ASBX restore supports only restore from directory.
 			return storage.NewReader(ctx, client, g.BucketName, opts...)
 		} else {
@@ -188,7 +194,7 @@ func newAzureReader(
 		opts = append(opts, blob.WithDir(directory), blob.WithSkipDirCheck())
 		// Append Validator only for directory.
 		if isXDR {
-			opts = append(opts, blob.WithValidator(asbx.NewValidator()), blob.WithSorted(blob.SortAsc))
+			opts = append(opts, blob.WithValidator(asbx.NewValidator()), blob.WithSorting())
 			// ASBX restore supports only restore from directory.
 			return blob.NewReader(ctx, client, a.ContainerName, opts...)
 		} else {

@@ -107,9 +107,10 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 	s.Require().NoError(err)
 
 	readers, err := local.NewReader(
+		ctx,
 		local.WithDir(backupDir),
 		local.WithValidator(asbx.NewValidator()),
-		local.WithSorted(local.SortAsc),
+		local.WithSorting(),
 	)
 	s.Require().NoError(err)
 

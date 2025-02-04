@@ -76,12 +76,12 @@ func NewReader(
 		return nil, fmt.Errorf("unable to get container properties: %w", err)
 	}
 
+	r.containerName = containerName
+
 	// Presort files if needed.
 	if err := r.preSort(ctx); err != nil {
 		return nil, fmt.Errorf("failed to pre sort: %v", err)
 	}
-
-	r.containerName = containerName
 
 	return r, nil
 }

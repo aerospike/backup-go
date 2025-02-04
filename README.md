@@ -168,27 +168,16 @@ func main() {
 
 	// For restore from single file use local.WithFile(fileName)
 	reader, err := local.NewReader(
+		ctx, 
 		local.WithValidator(asb.NewValidator()),
 		local.WithDir("backups_folder"),
+		// For restore asbx files, you must initialize reader with a sorting option.
+		// Because asbx files must be restored in the correct order, not to overwrite any record.
+		local.WithSorting(),
 	)
 	if err != nil {
 		panic(err)
 	}
-
-	// List all files first.
-	list, err := reader.ListObjects(ctx, "backups_folder")
-	if err != nil {
-		panic(err)
-	}
-	
-	// Sort files.
-	list, err = backup.SortBackupFiles(list)
-	if err != nil {
-		panic(err)
-	}
-
-	// Pass sorted list to reader.
-	reader.SetObjectsToStream(list)
 
 	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, reader)
 	if err != nil {

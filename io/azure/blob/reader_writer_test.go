@@ -91,7 +91,7 @@ func (s *AzureSuite) TearDownSuite() {
 	s.Require().NoError(err)
 }
 
-func TestGCPSuite(t *testing.T) {
+func TestAzureSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(AzureSuite))
 }

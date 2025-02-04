@@ -35,6 +35,58 @@ const (
 )
 
 const (
+	// AS_MSG_INFO1_READ - Contains a read operation
+	AS_MSG_INFO1_READ = 1 << iota // 1
+
+	// AS_MSG_INFO1_GET_ALL - Get all bins' data
+	AS_MSG_INFO1_GET_ALL // 2
+
+	// AS_MSG_INFO1_SHORT_QUERY - Bypass monitoring, inline if data-in-memory
+	AS_MSG_INFO1_SHORT_QUERY // 4
+
+	// AS_MSG_INFO1_BATCH - New batch protocol
+	AS_MSG_INFO1_BATCH // 8
+
+	// AS_MSG_INFO1_XDR - Operation is performed by XDR
+	AS_MSG_INFO1_XDR // 16
+
+	// AS_MSG_INFO1_GET_NO_BINS - Get record metadata only - no bin metadata or data
+	AS_MSG_INFO1_GET_NO_BINS // 32
+
+	// AS_MSG_INFO1_CONSISTENCY_LEVEL_ALL - Duplicate resolve reads
+	AS_MSG_INFO1_CONSISTENCY_LEVEL_ALL // 64
+
+	// AS_MSG_INFO1_COMPRESS_RESPONSE - Compress the response
+	AS_MSG_INFO1_COMPRESS_RESPONSE // 128
+)
+
+const (
+	// AS_MSG_INFO2_WRITE - Contains a write operation
+	AS_MSG_INFO2_WRITE = 1 << iota // 1
+
+	// AS_MSG_INFO2_DELETE - Delete record
+	AS_MSG_INFO2_DELETE // 2
+
+	// AS_MSG_INFO2_GENERATION - Pay attention to the generation
+	AS_MSG_INFO2_GENERATION // 4
+
+	// AS_MSG_INFO2_GENERATION_GT - Apply write if new generation >= old, good for restore
+	AS_MSG_INFO2_GENERATION_GT // 8
+
+	// AS_MSG_INFO2_DURABLE_DELETE - Op resulting in record deletion leaves tombstone (enterprise only)
+	AS_MSG_INFO2_DURABLE_DELETE // 16
+
+	// AS_MSG_INFO2_CREATE_ONLY - Write record only if it doesn't exist
+	AS_MSG_INFO2_CREATE_ONLY // 32
+
+	// Bit 64 is unused
+	_ = 1 << 6 // 64
+
+	// AS_MSG_INFO2_RESPOND_ALL_OPS - All bin ops (read, write, or modify) require a response, in request order
+	AS_MSG_INFO2_RESPOND_ALL_OPS // 128
+)
+
+const (
 	AckOK    = 0
 	AckRetry = 11
 )
@@ -246,7 +298,13 @@ func NewPayload(body []byte) []byte {
 // ResetXDRBit nullify xdr bit from Info1 field of AerospikeMessage.
 // Receives body without a header.
 func ResetXDRBit(message []byte) []byte {
-	message[1] = 0
+	message[1] = message[1] & ^byte(AS_MSG_INFO1_XDR)
+	return message
+}
+
+// SetGenerationBit set info2 field to 8, which means apply write if new generation >= old.
+func SetGenerationBit(message []byte) []byte {
+	message[2] = message[2] | AS_MSG_INFO2_GENERATION_GT
 	return message
 }
 

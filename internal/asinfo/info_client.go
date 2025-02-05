@@ -43,7 +43,7 @@ const (
 
 	cmdRespErrPrefix = "ERROR"
 
-	setNameMRT = "<ERO~MRT"
+	monitorRecordsSetName = "<ERO~MRT"
 )
 
 var (
@@ -763,8 +763,8 @@ func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace stri
 			return 0, fmt.Errorf("set name missing in response %s", response[cmd])
 		}
 
-		// Skipping mrt service set.
-		if setName == setNameMRT {
+		// Skip MRT monitor records.
+		if setName == monitorRecordsSetName {
 			continue
 		}
 

@@ -143,8 +143,8 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("max connections must not be less than 1, got %d", c.MaxConnections)
 	}
 
-	if c.InfoPolingPeriodMilliseconds < 0 {
-		return fmt.Errorf("info poling period must not be negative, got %d", c.InfoPolingPeriodMilliseconds)
+	if c.InfoPolingPeriodMilliseconds < 1 {
+		return fmt.Errorf("info poling period must not be less than 1, got %d", c.InfoPolingPeriodMilliseconds)
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

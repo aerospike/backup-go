@@ -177,7 +177,7 @@ When restoring ASBX format backups, files must be processed in the correct order
 ```go
 reader, err := local.NewReader(
     ctx,
-    local.WithValidator(asb.NewValidator()),
+    local.WithValidator(asbx.NewValidator()), // change validator to ASBX
     local.WithDir("backups_folder"),
     local.WithSorting(), // Required for ASBX files
 )

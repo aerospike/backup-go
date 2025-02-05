@@ -42,6 +42,8 @@ const (
 	cmdUnBlockMRTWrites = "set-config:context=namespace;id=%s;disable-mrt-writes=false"
 
 	cmdRespErrPrefix = "ERROR"
+
+	setNameMRT = "<ERO~MRT"
 )
 
 var (
@@ -759,6 +761,11 @@ func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace stri
 		setName, ok := setInfo["set"]
 		if !ok {
 			return 0, fmt.Errorf("set name missing in response %s", response[cmd])
+		}
+
+		// Skipping mrt service set.
+		if setName == setNameMRT {
+			continue
 		}
 
 		if len(sets) == 0 || contains(sets, setName) {

@@ -61,6 +61,12 @@ func NewReader(ctx context.Context, opts ...Opt) (*Reader, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
+	if r.isDir && !r.skipDirCheck {
+		if err := r.checkRestoreDirectory(r.pathList[0]); err != nil {
+			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
+		}
+	}
+
 	if err := r.preSort(ctx); err != nil {
 		return nil, fmt.Errorf("failed to pre sort: %w", err)
 	}
@@ -275,10 +281,6 @@ func (r *Reader) GetType() string {
 func (r *Reader) preSort(ctx context.Context) error {
 	if !r.sortFiles || len(r.pathList) != 1 {
 		return nil
-	}
-
-	if err := r.checkRestoreDirectory(r.pathList[0]); err != nil {
-		return common.ErrEmptyStorage
 	}
 
 	// List all files first.

@@ -73,6 +73,11 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	fmt.Println(headerRestoreReport)
 	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
+	// Swap vars if one of them null.
+	if asbStats == nil && asbxStats != nil {
+		asbStats, asbxStats = asbxStats, nil
+	}
+
 	dur := asbStats.GetDuration()
 
 	var rr, ir, ri, rf, re uint64

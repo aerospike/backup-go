@@ -85,6 +85,12 @@ func NewReader(
 	r.client = client
 	r.bucketName = bucketName
 
+	if r.isDir && !r.skipDirCheck {
+		if err := r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
+			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
+		}
+	}
+
 	// Presort files if needed.
 	if err := r.preSort(ctx); err != nil {
 		return nil, fmt.Errorf("failed to pre sort: %w", err)
@@ -352,10 +358,6 @@ func cleanPath(path string) string {
 func (r *Reader) preSort(ctx context.Context) error {
 	if !r.sortFiles || len(r.pathList) != 1 {
 		return nil
-	}
-
-	if err := r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
-		return common.ErrEmptyStorage
 	}
 
 	// List all files first.

@@ -38,7 +38,7 @@ type ConfigBackupXDR struct {
 	// Secret agent config.
 	SecretAgentConfig *SecretAgentConfig
 	// EncoderType describes an Encoder type that will be used on backing up.
-	// Default `EncoderTypeASBX` = 1.
+	// For XDR must be set to `EncoderTypeASBX` = 1.
 	EncoderType EncoderType
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.

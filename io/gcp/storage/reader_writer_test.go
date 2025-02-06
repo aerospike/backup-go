@@ -386,6 +386,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 		WithDir(testReadFolderEmpty),
 		WithValidator(validatorMock{}),
 		WithNestedDir(),
+		WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -763,6 +764,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 		testBucketName,
 		WithDirList(pathList),
 		WithValidator(validatorMock{}),
+		WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 

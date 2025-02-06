@@ -309,6 +309,7 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 		testContainerName,
 		WithDir(testReadFolderEmpty),
 		WithValidator(validatorMock{}),
+		WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -663,6 +664,7 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 		testContainerName,
 		WithDirList(pathList),
 		WithValidator(validatorMock{}),
+		WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 

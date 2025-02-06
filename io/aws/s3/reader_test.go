@@ -261,6 +261,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 		testBucket,
 		WithDirList(pathList),
 		WithValidator(mockValidator),
+		WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 

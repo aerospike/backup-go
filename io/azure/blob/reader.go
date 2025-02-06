@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/io/common"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -338,6 +339,10 @@ func cleanPath(path string) string {
 func (r *Reader) preSort(ctx context.Context) error {
 	if !r.sortFiles || len(r.pathList) != 1 {
 		return nil
+	}
+
+	if err := r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
+		return common.ErrEmptyStorage
 	}
 
 	// List all files first.

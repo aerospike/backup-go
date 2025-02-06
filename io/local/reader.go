@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/io/common"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -274,6 +275,10 @@ func (r *Reader) GetType() string {
 func (r *Reader) preSort(ctx context.Context) error {
 	if !r.sortFiles || len(r.pathList) != 1 {
 		return nil
+	}
+
+	if err := r.checkRestoreDirectory(r.pathList[0]); err != nil {
+		return common.ErrEmptyStorage
 	}
 
 	// List all files first.

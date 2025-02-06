@@ -75,13 +75,14 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 
 	dur := asbStats.GetDuration()
 
-	var rr, ir, ri, br uint64
+	var rr, ir, ri, rf, re uint64
 
 	if asbxStats != nil {
 		rr = asbxStats.GetReadRecords()
 		ir = asbxStats.GetRecordsIgnored()
 		ri = asbxStats.GetRecordsInserted()
-		br = asbxStats.GetTotalBytesRead()
+		rf = asbxStats.GetRecordsFresher()
+		re = asbxStats.GetRecordsExisted()
 
 		if asbxStats.GetDuration() > dur {
 			dur = asbxStats.GetDuration()
@@ -102,13 +103,17 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	printMetric("Expired Records", asbStats.GetRecordsExpired())
 	printMetric("Skipped Records", asbStats.GetRecordsSkipped())
 	printMetric("Ignored Records", asbStats.GetRecordsIgnored()+ir)
-	printMetric("Fresher Records", asbStats.GetRecordsFresher())
-	printMetric("Existed Records", asbStats.GetRecordsExisted())
+	printMetric("Fresher Records", asbStats.GetRecordsFresher()+rf)
+	printMetric("Existed Records", asbStats.GetRecordsExisted()+re)
 
 	fmt.Println()
 
 	printMetric("Inserted Records", asbStats.GetRecordsInserted()+ri)
-	printMetric("Total Bytes Read", asbStats.GetTotalBytesRead()+br)
+
+	if asbxStats == nil {
+		// At the moment, we don't count the size of records.
+		printMetric("Total Bytes Read", asbStats.GetTotalBytesRead())
+	}
 }
 
 func printEstimateReport(estimate uint64) {

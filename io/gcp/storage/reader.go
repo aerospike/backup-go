@@ -284,6 +284,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		}
 
 		if objAttrs.Name != "" {
+			if r.validator != nil {
+				if err = r.validator.Run(objAttrs.Name); err != nil {
+					continue
+				}
+			}
+
 			result = append(result, objAttrs.Name)
 		}
 	}

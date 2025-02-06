@@ -241,6 +241,12 @@ func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
 	}
 
 	for i := range fileInfo {
+		if r.validator != nil {
+			if err = r.validator.Run(fileInfo[i].Name()); err != nil {
+				continue
+			}
+		}
+
 		result = append(result, fileInfo[i].Name())
 	}
 

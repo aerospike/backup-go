@@ -21,10 +21,6 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/aerospike/backup-go/internal/util"
-	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/encoding/asbx"
-	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -134,24 +130,18 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
-		var xdrStats *bModels.RestoreStats
-		// Check if we have asbx files and reader is inited.
-		if r.xdrReader != nil {
-			restoreXdrCfg := *r.restoreConfig
-			restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
+		restoreXdrCfg := *r.restoreConfig
+		restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
 
-			hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
-			if err != nil {
-				cancel()
-				return fmt.Errorf("failed to start asbx restore: %w", err)
-			}
+		hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
+		if err != nil {
+			cancel()
+			return fmt.Errorf("failed to start asbx restore: %w", err)
+		}
 
-			if err = hXdr.Wait(ctx); err != nil {
-				cancel()
-				return fmt.Errorf("failed to asbx restore: %w", err)
-			}
-
-			xdrStats = hXdr.GetStats()
+		if err = hXdr.Wait(ctx); err != nil {
+			cancel()
+			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
 		if err = h.Wait(ctx); err != nil {
@@ -159,7 +149,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
-		printRestoreReport(h.GetStats(), xdrStats)
+		printRestoreReport(h.GetStats(), hXdr.GetStats())
 		// To prevent context leaking.
 		cancel()
 	default:
@@ -201,79 +191,8 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
-		// Restore ASBX from a list of dirs or input file is not supported.
-		// So we preprocess lists only for directory restore.
-		if params.RestoreParams.IsDirectoryRestore() {
-			// Separate each file type for different lists.
-			asbList, asbxList, err := prepareLists(ctx, params, reader)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to split objects: %w", err)
-			}
-
-			// Load ASB files for reading.
-			reader.SetObjectsToStream(asbList)
-
-			// Load ASBX files for reading.
-			xdrReader.SetObjectsToStream(asbxList)
-
-			// For initializing auto mode correctly, we will check reader for nil.
-			if len(asbxList) == 0 {
-				xdrReader = nil
-			}
-		}
-
 		return reader, xdrReader, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
 	}
-}
-
-func prepareLists(ctx context.Context, params *ASRestoreParams, reader backup.StreamingReader,
-) (asbList, asbxList []string, err error) {
-	// List all files first.
-	list, err := reader.ListObjects(ctx, params.CommonParams.Directory)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list objects: %w", err)
-	}
-
-	// Separate each file type for different lists.
-	asbList, asbxList, err = splitList(list)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to split objects: %w", err)
-	}
-
-	if len(asbxList) == 0 && len(asbList) == 0 {
-		return nil, nil, fmt.Errorf("no asb or asbx file found in: %s",
-			params.CommonParams.Directory)
-	}
-
-	return asbList, asbxList, nil
-}
-
-// splitList splits one file list to 2 lists for asb and for asbx restore.
-func splitList(list []string) (asbList, asbxList []string, err error) {
-	asbValidator := asb.NewValidator()
-	asbxValidator := asbx.NewValidator()
-
-	for i := range list {
-		// If valid for asb, append to asbList.
-		if err := asbValidator.Run(list[i]); err == nil {
-			asbList = append(asbList, list[i])
-			continue
-		}
-		// If valid for asbx, append to asbxList.
-		if err := asbxValidator.Run(list[i]); err == nil {
-			asbxList = append(asbxList, list[i])
-		}
-	}
-
-	if len(asbxList) > 0 {
-		// We sort asbx files by prefix and suffix to restore them in the correct order.
-		asbxList, err = util.SortBackupFiles(asbxList)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to sort asbx files: %w", err)
-		}
-	}
-
-	return asbList, asbxList, nil
 }

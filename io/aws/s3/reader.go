@@ -295,6 +295,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 				continue
 			}
 
+			if r.validator != nil {
+				if err = r.validator.Run(*p.Key); err != nil {
+					continue
+				}
+			}
+
 			if p.Key != nil {
 				result = append(result, *p.Key)
 			}

@@ -270,6 +270,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 				continue
 			}
 
+			if r.validator != nil {
+				if err = r.validator.Run(*blob.Name); err != nil {
+					continue
+				}
+			}
+
 			if blob.Name != nil {
 				result = append(result, *blob.Name)
 			}

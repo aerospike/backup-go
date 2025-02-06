@@ -265,7 +265,6 @@ func (s *AzureSuite) TestReader_WithSorting() {
 		client,
 		testContainerName,
 		WithDir(testReadFolderSorted),
-		WithValidator(validatorMock{}),
 		WithSorting(),
 	)
 	s.Require().NoError(err)

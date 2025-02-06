@@ -246,6 +246,7 @@ func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
 				continue
 			}
 		}
+
 		result = append(result, fileInfo[i].Name())
 	}
 

@@ -339,7 +339,6 @@ func (s *GCPSuite) TestReader_WithSorting() {
 		client,
 		testBucketName,
 		WithDir(testReadFolderSorted),
-		WithValidator(validatorMock{}),
 		WithSorting(),
 	)
 	s.Require().NoError(err)

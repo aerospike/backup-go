@@ -75,7 +75,7 @@ func newLocalReader(
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, local.WithDir(directory), local.WithSkipDirCheck())
+		opts = append(opts, local.WithDir(directory))
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, local.WithValidator(asbx.NewValidator()), local.WithSorting())
@@ -114,7 +114,7 @@ func newS3Reader(
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, s3.WithDir(directory), s3.WithSkipDirCheck())
+		opts = append(opts, s3.WithDir(directory))
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, s3.WithValidator(asbx.NewValidator()), s3.WithSorting())
@@ -153,7 +153,7 @@ func newGcpReader(
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, storage.WithDir(directory), storage.WithSkipDirCheck())
+		opts = append(opts, storage.WithDir(directory))
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, storage.WithValidator(asbx.NewValidator()), storage.WithSorting())
@@ -191,7 +191,7 @@ func newAzureReader(
 	// As we validate this fields in validation function, we can switch here.
 	switch {
 	case directory != "":
-		opts = append(opts, blob.WithDir(directory), blob.WithSkipDirCheck())
+		opts = append(opts, blob.WithDir(directory))
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, blob.WithValidator(asbx.NewValidator()), blob.WithSorting())

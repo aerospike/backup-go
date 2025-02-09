@@ -303,25 +303,14 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
 	s.Require().NoError(err)
 
-	reader, err := NewReader(
+	_, err = NewReader(
 		ctx,
 		client,
 		testContainerName,
 		WithDir(testReadFolderEmpty),
 		WithValidator(validatorMock{}),
-		WithSkipDirCheck(),
 	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH)
-
-	for err = range eCH {
-		s.Require().ErrorContains(err, "is empty")
-		return
-	}
+	s.Require().ErrorContains(err, "is empty")
 }
 
 func (s *AzureSuite) TestReader_StreamFilesMixed() {

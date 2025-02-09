@@ -379,26 +379,15 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	)
 	s.Require().NoError(err)
 
-	reader, err := NewReader(
+	_, err = NewReader(
 		ctx,
 		client,
 		testBucketName,
 		WithDir(testReadFolderEmpty),
 		WithValidator(validatorMock{}),
 		WithNestedDir(),
-		WithSkipDirCheck(),
 	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH)
-
-	for err = range eCH {
-		s.Require().ErrorContains(err, "is empty")
-		return
-	}
+	s.Require().ErrorContains(err, "is empty")
 }
 
 func (s *GCPSuite) TestReader_StreamFilesMixed() {

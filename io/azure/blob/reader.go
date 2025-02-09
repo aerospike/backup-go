@@ -318,6 +318,7 @@ func isDirectory(prefix, fileName string) bool {
 		}
 
 		clean := strings.TrimPrefix(fileName, prefix)
+
 		return strings.Contains(clean, "/")
 	}
 	// All other variants.

@@ -23,7 +23,7 @@ import (
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/aerospike/backup-go/io/common"
+	"github.com/aerospike/backup-go/io/storage"
 	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
@@ -238,7 +238,7 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		reader, err = newReader(ctx, params, sa, false)
 
 		switch {
-		case errors.Is(err, common.ErrEmptyStorage):
+		case errors.Is(err, storage.ErrEmptyStorage):
 			reader = nil
 		case err != nil:
 			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
@@ -248,7 +248,7 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		xdrReader, err = newReader(ctx, params, sa, true)
 
 		switch {
-		case errors.Is(err, common.ErrEmptyStorage):
+		case errors.Is(err, storage.ErrEmptyStorage):
 			xdrReader = nil
 		case err != nil:
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)

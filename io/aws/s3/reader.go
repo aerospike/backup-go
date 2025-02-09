@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/aerospike/backup-go/internal/util"
-	"github.com/aerospike/backup-go/io/common"
+	"github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -87,7 +87,7 @@ func NewReader(
 
 	if r.isDir && !r.skipDirCheck {
 		if err := r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
+			return nil, fmt.Errorf("%w: %w", storage.ErrEmptyStorage, err)
 		}
 	}
 

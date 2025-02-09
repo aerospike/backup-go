@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/aerospike/backup-go/internal/util"
-	"github.com/aerospike/backup-go/io/common"
+	"github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -63,7 +63,7 @@ func NewReader(ctx context.Context, opts ...Opt) (*Reader, error) {
 
 	if r.isDir && !r.skipDirCheck {
 		if err := r.checkRestoreDirectory(r.pathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
+			return nil, fmt.Errorf("%w: %w", storage.ErrEmptyStorage, err)
 		}
 	}
 

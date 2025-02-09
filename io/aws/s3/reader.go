@@ -240,6 +240,10 @@ func (r *Reader) GetType() string {
 func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	var continuationToken *string
 
+	if path == "/" {
+		path = ""
+	}
+
 	for {
 		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 			Bucket:            &r.bucketName,

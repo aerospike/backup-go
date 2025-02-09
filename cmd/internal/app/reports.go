@@ -73,7 +73,7 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	fmt.Println(headerRestoreReport)
 	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
-	// Swap vars if one of them null.
+	// In case of asbx restore, asbStats will be nil, so we swap vars to print a report from asbx values.
 	if asbStats == nil && asbxStats != nil {
 		asbStats, asbxStats = asbxStats, nil
 	}

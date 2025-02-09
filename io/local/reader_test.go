@@ -205,7 +205,7 @@ func createTmpFile(dir, fileName string) error {
 	filePath := filepath.Join(dir, fileName)
 	f, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %v", err)
+		return fmt.Errorf("failed to create file: %w", err)
 	}
 	_ = f.Close()
 

@@ -55,6 +55,7 @@ func TestState(t *testing.T) {
 	reader, err := local.NewReader(
 		ctx,
 		local.WithDir(testDir),
+		local.WithSkipDirCheck(),
 	)
 	require.NoError(t, err)
 

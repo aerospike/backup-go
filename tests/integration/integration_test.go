@@ -83,7 +83,7 @@ type backupRestoreTestSuite struct {
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
-	testutils.Image = "aerospike/aerospike-server-enterprise:8.0.0.1"
+	testutils.Image = "aerospike/aerospike-server-enterprise:8.0.0.2"
 
 	clusterSize := 1
 	err := testutils.Start(clusterSize)
@@ -1158,6 +1158,7 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 	readers, err := local.NewReader(
 		ctx,
 		local.WithDir(bFolder),
+		local.WithSkipDirCheck(),
 	)
 	suite.Nil(err)
 

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -83,6 +84,12 @@ func NewReader(
 
 	r.client = client
 	r.bucketName = bucketName
+
+	if r.isDir && !r.skipDirCheck {
+		if err := r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
+			return nil, fmt.Errorf("%w: %w", storage.ErrEmptyStorage, err)
+		}
+	}
 
 	// Presort files if needed.
 	if err := r.preSort(ctx); err != nil {
@@ -232,6 +239,10 @@ func (r *Reader) GetType() string {
 // checkRestoreDirectory checks that the restore directory contains any file.
 func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	var continuationToken *string
+
+	if path == "/" {
+		path = ""
+	}
 
 	for {
 		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{

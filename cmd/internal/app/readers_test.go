@@ -15,30 +15,48 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"cloud.google.com/go/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-const testS3Bucket = "asbackup"
+const (
+	testS3Bucket     = "asbackup"
+	testFileNameASBX = "0_test_1.asbx"
+)
 
 func TestNewLocalReader(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 
+	dir := t.TempDir()
+
 	params := &ASRestoreParams{
 		RestoreParams: &models.Restore{},
 		CommonParams: &models.Common{
-			Directory: t.TempDir(),
+			Directory: dir,
 		},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
 		AzureBlob:  &models.AzureBlob{},
 	}
+
+	err := createTmpFileLocal(dir, testFileNameASBX)
+	require.NoError(t, err)
 
 	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
@@ -47,7 +65,7 @@ func TestNewLocalReader(t *testing.T) {
 
 	params = &ASRestoreParams{
 		RestoreParams: &models.Restore{
-			InputFile: t.TempDir() + testFileName,
+			InputFile: dir + testFileNameASBX,
 		},
 		CommonParams: &models.Common{},
 		AwsS3:        &models.AwsS3{},
@@ -72,15 +90,29 @@ func TestNewLocalReader(t *testing.T) {
 	assert.Nil(t, reader)
 }
 
+func createTmpFileLocal(dir, fileName string) error {
+	filePath := filepath.Join(dir, fileName)
+	f, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	_ = f.Close()
+
+	return nil
+}
+
 func TestNewS3Reader(t *testing.T) {
 	t.Parallel()
 	err := createAwsCredentials()
 	assert.NoError(t, err)
 
+	dir := t.TempDir()
+	dir = strings.TrimPrefix(dir, "/")
+
 	params := &ASRestoreParams{
 		RestoreParams: &models.Restore{},
 		CommonParams: &models.Common{
-			Directory: t.TempDir(),
+			Directory: dir,
 		},
 		AwsS3: &models.AwsS3{
 			BucketName: testS3Bucket,
@@ -93,6 +125,10 @@ func TestNewS3Reader(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	client, err := newS3Client(ctx, params.AwsS3)
+	require.NoError(t, err)
+	err = createTmpFileS3(ctx, client, dir, testFileNameASBX)
+	require.NoError(t, err)
 
 	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
@@ -101,7 +137,7 @@ func TestNewS3Reader(t *testing.T) {
 
 	params = &ASRestoreParams{
 		RestoreParams: &models.Restore{
-			InputFile: t.TempDir() + testFileName,
+			InputFile: dir + testFileName,
 		},
 		CommonParams: &models.Common{},
 		AwsS3: &models.AwsS3{
@@ -118,6 +154,19 @@ func TestNewS3Reader(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
+}
+
+func createTmpFileS3(ctx context.Context, client *s3.Client, dir, fileName string) error {
+	fileName = filepath.Join(dir, fileName)
+	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(testS3Bucket),
+		Key:    aws.String(fileName),
+		Body:   bytes.NewReader([]byte("test")),
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func TestNewGcpReader(t *testing.T) {
@@ -125,10 +174,13 @@ func TestNewGcpReader(t *testing.T) {
 	err := createGcpBucket()
 	assert.NoError(t, err)
 
+	dir := t.TempDir()
+	dir = strings.TrimPrefix(dir, "/")
+
 	params := &ASRestoreParams{
 		RestoreParams: &models.Restore{},
 		CommonParams: &models.Common{
-			Directory: t.TempDir(),
+			Directory: dir,
 		},
 		GcpStorage: &models.GcpStorage{
 			BucketName: testBucket,
@@ -139,6 +191,10 @@ func TestNewGcpReader(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	client, err := newGcpClient(ctx, params.GcpStorage)
+	require.NoError(t, err)
+	err = createTmpFileGcp(ctx, client, dir, testFileNameASBX)
+	require.NoError(t, err)
 
 	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
@@ -147,7 +203,7 @@ func TestNewGcpReader(t *testing.T) {
 
 	params = &ASRestoreParams{
 		RestoreParams: &models.Restore{
-			InputFile: t.TempDir() + testFileName,
+			InputFile: dir + testFileName,
 		},
 		CommonParams: &models.Common{},
 		GcpStorage: &models.GcpStorage{
@@ -164,15 +220,31 @@ func TestNewGcpReader(t *testing.T) {
 	assert.Equal(t, testGcpType, reader.GetType())
 }
 
+func createTmpFileGcp(ctx context.Context, client *storage.Client, dir, fileName string) error {
+	fileName = filepath.Join(dir, fileName)
+	sw := client.Bucket(testBucket).Object(fileName).NewWriter(ctx)
+	if _, err := sw.Write([]byte("test")); err != nil {
+		return err
+	}
+	if err := sw.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func TestNewAzureReader(t *testing.T) {
 	t.Parallel()
 	err := createAzureContainer()
 	assert.NoError(t, err)
 
+	dir := t.TempDir()
+	dir = strings.TrimPrefix(dir, "/")
+
 	params := &ASRestoreParams{
 		RestoreParams: &models.Restore{},
 		CommonParams: &models.Common{
-			Directory: t.TempDir(),
+			Directory: dir,
 		},
 		AzureBlob: &models.AzureBlob{
 			AccountName:   testAzureAccountName,
@@ -185,6 +257,10 @@ func TestNewAzureReader(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	client, err := newAzureClient(params.AzureBlob)
+	require.NoError(t, err)
+	err = createTmpFileAzure(ctx, client, dir, testFileNameASBX)
+	require.NoError(t, err)
 
 	reader, err := newReader(ctx, params, nil, true)
 	assert.NoError(t, err)
@@ -193,7 +269,7 @@ func TestNewAzureReader(t *testing.T) {
 
 	params = &ASRestoreParams{
 		RestoreParams: &models.Restore{
-			InputFile: t.TempDir() + testFileName,
+			InputFile: dir + testFileName,
 		},
 		CommonParams: &models.Common{},
 		AzureBlob: &models.AzureBlob{
@@ -210,6 +286,15 @@ func TestNewAzureReader(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())
+}
+
+func createTmpFileAzure(ctx context.Context, client *azblob.Client, dir, fileName string) error {
+	fileName = filepath.Join(dir, fileName)
+	if _, err := client.UploadStream(ctx, testBucket, fileName, strings.NewReader("test"), nil); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func TestPrepareDirectoryList(t *testing.T) {

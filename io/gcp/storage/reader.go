@@ -23,6 +23,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/internal/util"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 	"google.golang.org/api/iterator"
 )
@@ -78,6 +79,12 @@ func NewReader(
 
 	r.bucketHandle = bucket
 	r.bucketName = bucketName
+
+	if r.isDir && !r.skipDirCheck {
+		if err = r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
+			return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+		}
+	}
 
 	// Presort files if needed.
 	if err = r.preSort(ctx); err != nil {

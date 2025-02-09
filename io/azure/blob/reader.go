@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -77,6 +78,12 @@ func NewReader(
 	}
 
 	r.containerName = containerName
+
+	if r.isDir && !r.skipDirCheck {
+		if err := r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
+			return nil, fmt.Errorf("%w: %w", storage.ErrEmptyStorage, err)
+		}
+	}
 
 	// Presort files if needed.
 	if err := r.preSort(ctx); err != nil {
@@ -305,7 +312,13 @@ func isDirectory(prefix, fileName string) bool {
 
 	// If we look inside some folder.
 	if strings.HasPrefix(fileName, prefix) {
+		// For root folder we should add.
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+
 		clean := strings.TrimPrefix(fileName, prefix)
+
 		return strings.Contains(clean, "/")
 	}
 	// All other variants.

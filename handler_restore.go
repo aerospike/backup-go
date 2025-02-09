@@ -132,8 +132,13 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		return fmt.Errorf("failed to create compose processor: %w", err)
 	}
 
+	pipelineMode := pipeline.ModeSingle
+	if rh.config.EncoderType == EncoderTypeASBX {
+		pipelineMode = pipeline.ModeParallel
+	}
+
 	pl, err := pipeline.NewPipeline(
-		pipeline.ModeSingle, nil,
+		pipelineMode, nil,
 		readWorkers,
 		composeProcessor,
 		writeWorkers,

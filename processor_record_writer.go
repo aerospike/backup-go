@@ -53,14 +53,23 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 }
 
 func (rw *recordWriterProcessor[T]) newWriterWorkers() ([]pipeline.Worker[T], error) {
-	writeWorkers := make([]pipeline.Worker[T], rw.config.MaxAsyncBatches)
+	var parallelism int
+
+	switch {
+	case rw.config.EncoderType == EncoderTypeASBX, rw.config.DisableBatchWrites:
+		parallelism = rw.config.Parallel
+	default:
+		parallelism = rw.config.MaxAsyncBatches
+	}
 
 	useBatchWrites, err := rw.useBatchWrites()
 	if err != nil {
 		return nil, fmt.Errorf("failed to check batch writes: %w", err)
 	}
 
-	for i := 0; i < rw.config.MaxAsyncBatches; i++ {
+	writeWorkers := make([]pipeline.Worker[T], parallelism)
+
+	for i := 0; i < parallelism; i++ {
 		writer := aerospike.NewRestoreWriter[T](
 			rw.aerospikeClient,
 			rw.config.WritePolicy,

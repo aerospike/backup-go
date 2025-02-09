@@ -16,11 +16,15 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/io/storage"
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -120,36 +124,86 @@ func (r *ASRestore) Run(ctx context.Context) error {
 	case models.RestoreModeAuto:
 		// If one of restore operations fails, we cancel another.
 		ctx, cancel := context.WithCancel(ctx)
-		// We should copy config to new variable, not to overwrite encoder.
-		restoreCfg := *r.restoreConfig
-		restoreCfg.EncoderType = backup.EncoderTypeASB
 
-		h, err := r.backupClient.Restore(ctx, &restoreCfg, r.reader)
-		if err != nil {
-			cancel()
-			return fmt.Errorf("failed to start asb restore: %w", err)
+		var (
+			wg              sync.WaitGroup
+			xdrStats, stats *bModels.RestoreStats
+		)
+
+		errChan := make(chan error, 2)
+
+		if r.reader != nil {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				restoreCfg := *r.restoreConfig
+				restoreCfg.EncoderType = backup.EncoderTypeASB
+
+				h, err := r.backupClient.Restore(ctx, &restoreCfg, r.reader)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to start asb restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				if err = h.Wait(ctx); err != nil {
+					errChan <- fmt.Errorf("failed to asb restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				stats = h.GetStats()
+			}()
 		}
 
-		restoreXdrCfg := *r.restoreConfig
-		restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
+		if r.xdrReader != nil {
+			wg.Add(1)
 
-		hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
-		if err != nil {
-			cancel()
-			return fmt.Errorf("failed to start asbx restore: %w", err)
+			go func() {
+				defer wg.Done()
+
+				restoreXdrCfg := *r.restoreConfig
+				restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
+
+				hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to start asbx restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				if err = hXdr.Wait(ctx); err != nil {
+					errChan <- fmt.Errorf("failed to asbx restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				xdrStats = hXdr.GetStats()
+			}()
 		}
 
-		if err = hXdr.Wait(ctx); err != nil {
-			cancel()
-			return fmt.Errorf("failed to asbx restore: %w", err)
+		wg.Wait()
+		close(errChan)
+
+		// Return the first error encountered
+		for err := range errChan {
+			if err != nil {
+				cancel()
+				return err
+			}
 		}
 
-		if err = h.Wait(ctx); err != nil {
-			cancel()
-			return fmt.Errorf("failed to asb restore: %w", err)
-		}
-
-		printRestoreReport(h.GetStats(), hXdr.GetStats())
+		printRestoreReport(stats, xdrStats)
 		// To prevent context leaking.
 		cancel()
 	default:
@@ -182,13 +236,23 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		return nil, xdrReader, nil
 	case models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false)
-		if err != nil {
+
+		switch {
+		case errors.Is(err, storage.ErrEmptyStorage):
+			reader = nil
+		case err != nil:
 			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
+		default:
 		}
 
 		xdrReader, err = newReader(ctx, params, sa, true)
-		if err != nil {
+
+		switch {
+		case errors.Is(err, storage.ErrEmptyStorage):
+			xdrReader = nil
+		case err != nil:
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
+		default:
 		}
 
 		return reader, xdrReader, nil

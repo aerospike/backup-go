@@ -143,17 +143,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
-	s.Require().NoError(err)
-
-	readerChan := make(chan models.File)
-	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan)
-
-	for err = range errorChan {
-		s.Require().ErrorContains(err, "is empty")
-		return
-	}
+	_, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	s.Require().ErrorContains(err, "is empty")
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
@@ -169,7 +160,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir("file1.asb"))
+	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir("file1.asb"), WithSkipDirCheck())
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -204,7 +195,7 @@ func (s *readerTestSuite) TestDirectoryReader_GetType() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithSkipDirCheck())
 	s.Require().NoError(err)
 
 	s.Equal(localType, r.GetType())

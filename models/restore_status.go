@@ -20,7 +20,7 @@ import (
 
 // RestoreStats stores the stats of a restore operation from the reader job.
 type RestoreStats struct {
-	commonStats
+	*commonStats
 	// The number of records dropped because they were expired.
 	RecordsExpired atomic.Uint64
 	// The number of records dropped because they didn't contain any of the
@@ -89,4 +89,21 @@ func (rs *RestoreStats) GetRecordsIgnored() uint64 {
 
 func (rs *RestoreStats) IncrRecordsIgnored() {
 	rs.RecordsIgnored.Add(1)
+}
+
+// SumRestoreStats combines two RestoreStats into a new one
+func SumRestoreStats(a, b *RestoreStats) *RestoreStats {
+	result := &RestoreStats{
+		commonStats: sumCommonStats(a.commonStats, b.commonStats),
+	}
+
+	result.RecordsExpired.Store(a.GetRecordsExpired() + b.GetRecordsExpired())
+	result.RecordsSkipped.Store(a.GetRecordsSkipped() + b.GetRecordsSkipped())
+	result.RecordsIgnored.Store(a.GetRecordsIgnored() + b.GetRecordsIgnored())
+	result.TotalBytesRead.Store(a.GetTotalBytesRead() + b.GetTotalBytesRead())
+	result.recordsExisted.Store(a.GetRecordsExisted() + b.GetRecordsExisted())
+	result.recordsFresher.Store(a.GetRecordsFresher() + b.GetRecordsFresher())
+	result.recordsInserted.Store(a.GetRecordsInserted() + b.GetRecordsInserted())
+
+	return result
 }

@@ -73,3 +73,23 @@ func (s *commonStats) GetDuration() time.Duration {
 
 	return s.duration
 }
+
+// sumCommonStats combines two commonStats into a new one
+func sumCommonStats(a, b *commonStats) *commonStats {
+	result := &commonStats{}
+
+	// Handle start time - take the earlier of the two
+	if a.StartTime.IsZero() || b.StartTime.Before(a.StartTime) {
+		result.StartTime = b.StartTime
+	} else {
+		result.StartTime = a.StartTime
+	}
+
+	// Combine stats
+	result.ReadRecords.Store(a.GetReadRecords() + b.GetReadRecords())
+	result.sIndexes.Store(a.GetSIndexes() + b.GetSIndexes())
+	result.uDFs.Store(a.GetUDFs() + b.GetUDFs())
+	result.BytesWritten.Store(a.GetBytesWritten() + b.GetBytesWritten())
+
+	return result
+}

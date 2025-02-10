@@ -21,7 +21,7 @@ import (
 // BackupStats stores the status of a backup job.
 // Stats are updated in realtime by backup jobs.
 type BackupStats struct {
-	commonStats
+	*commonStats
 	fileCount atomic.Uint64
 	// total number of records in database
 	TotalRecords uint64
@@ -47,4 +47,17 @@ func (b *BackupStats) IsEmpty() bool {
 	return b.GetUDFs() == 0 &&
 		b.GetSIndexes() == 0 &&
 		b.GetReadRecords() == 0
+}
+
+// SumBackupStats combines two BackupStats into a new one
+func SumBackupStats(a, b *BackupStats) *BackupStats {
+	result := &BackupStats{
+		commonStats: sumCommonStats(a.commonStats, b.commonStats),
+	}
+
+	// Backup specific stats
+	result.fileCount.Store(a.GetFileCount() + b.GetFileCount())
+	result.TotalRecords = a.TotalRecords + b.TotalRecords
+
+	return result
 }

@@ -125,7 +125,7 @@ func printEstimateReport(estimate uint64) {
 	fmt.Println(headerEstimateReport)
 	fmt.Println(strings.Repeat("-", len(headerEstimateReport)))
 
-	printMetric("File size: %d bytes\n", estimate)
+	printMetric("File size (bytes)", estimate)
 }
 
 func printMetric(key string, value any) {

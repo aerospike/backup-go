@@ -72,7 +72,7 @@ type BackupHandler struct {
 	errors                 chan error
 	id                     string
 
-	stats models.BackupStats
+	stats *models.BackupStats
 	// Backup state for continuation.
 	state *State
 	// For graceful shutdown.
@@ -138,6 +138,7 @@ func newBackupHandler(
 		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy, config.InfoRetryPolicy),
 		scanLimiter:            scanLimiter,
 		state:                  state,
+		stats:                  models.NewBackupStats(),
 	}, nil
 }
 
@@ -289,7 +290,7 @@ func (bh *BackupHandler) makeWriteWorkers(
 			dataWriter = newTokenWriter(bh.encoder, w, bh.logger, stInfo)
 		}
 
-		dataWriter = newWriterWithTokenStats(dataWriter, &bh.stats, bh.logger)
+		dataWriter = newWriterWithTokenStats(dataWriter, bh.stats, bh.logger)
 		writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, bh.limiter)
 	}
 
@@ -437,7 +438,7 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 
 // GetStats returns the stats of the backup job
 func (bh *BackupHandler) GetStats() *models.BackupStats {
-	return &bh.stats
+	return bh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
@@ -487,7 +488,7 @@ func (bh *BackupHandler) backupSIndexes(
 		)
 	}
 
-	sindexWriter = newWriterWithTokenStats(sindexWriter, &bh.stats, bh.logger)
+	sindexWriter = newWriterWithTokenStats(sindexWriter, bh.stats, bh.logger)
 	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
 
 	sindexPipeline, err := pipeline.NewPipeline[*models.Token](
@@ -523,7 +524,7 @@ func (bh *BackupHandler) backupUDFs(
 		)
 	}
 
-	udfWriter = newWriterWithTokenStats(udfWriter, &bh.stats, bh.logger)
+	udfWriter = newWriterWithTokenStats(udfWriter, bh.stats, bh.logger)
 	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
 
 	udfPipeline, err := pipeline.NewPipeline[*models.Token](

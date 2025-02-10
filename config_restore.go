@@ -103,10 +103,8 @@ func (c *ConfigRestore) validate() error {
 		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
 	}
 
-	if c.Namespace != nil {
-		if err := c.Namespace.validate(); err != nil {
-			return fmt.Errorf("invalid restore namespace: %w", err)
-		}
+	if err := c.Namespace.validate(); err != nil {
+		return fmt.Errorf("invalid restore namespace: %w", err)
 	}
 
 	if c.Bandwidth < 0 {
@@ -146,7 +144,7 @@ func (c *ConfigRestore) validate() error {
 
 // isValidForASBX checks if config is valid for restoring from asbx.
 func (c *ConfigRestore) isValidForASBX() error {
-	if *c.Namespace.Source != *c.Namespace.Destination {
+	if c.Namespace != nil && *c.Namespace.Source != *c.Namespace.Destination {
 		return fmt.Errorf("changing namespace is not supported for ASBX")
 	}
 

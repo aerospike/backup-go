@@ -20,7 +20,7 @@ import (
 
 // RestoreStats stores the stats of a restore operation from the reader job.
 type RestoreStats struct {
-	commonStats
+	*commonStats
 	// The number of records dropped because they were expired.
 	RecordsExpired atomic.Uint64
 	// The number of records dropped because they didn't contain any of the
@@ -44,7 +44,9 @@ type RestoreStats struct {
 
 // NewRestoreStats returns new restore stats.
 func NewRestoreStats() *RestoreStats {
-	return &RestoreStats{}
+	return &RestoreStats{
+		commonStats: &commonStats{},
+	}
 }
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
@@ -89,4 +91,27 @@ func (rs *RestoreStats) GetRecordsIgnored() uint64 {
 
 func (rs *RestoreStats) IncrRecordsIgnored() {
 	rs.RecordsIgnored.Add(1)
+}
+
+// SumRestoreStats combines multiple RestoreStats.
+func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
+	result := &RestoreStats{}
+
+	for _, stat := range stats {
+		if stat == nil {
+			continue
+		}
+
+		result.commonStats = sumCommonStats(result.commonStats, stat.commonStats)
+
+		result.RecordsExpired.Add(stat.GetRecordsExpired())
+		result.RecordsSkipped.Add(stat.GetRecordsSkipped())
+		result.RecordsIgnored.Add(stat.GetRecordsIgnored())
+		result.TotalBytesRead.Add(stat.GetTotalBytesRead())
+		result.recordsExisted.Add(stat.GetRecordsExisted())
+		result.recordsFresher.Add(stat.GetRecordsFresher())
+		result.recordsInserted.Add(stat.GetRecordsInserted())
+	}
+
+	return result
 }

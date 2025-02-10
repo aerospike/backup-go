@@ -44,7 +44,9 @@ type RestoreStats struct {
 
 // NewRestoreStats returns new restore stats.
 func NewRestoreStats() *RestoreStats {
-	return &RestoreStats{}
+	return &RestoreStats{
+		commonStats: &commonStats{},
+	}
 }
 
 func (rs *RestoreStats) GetRecordsExpired() uint64 {

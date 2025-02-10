@@ -58,7 +58,7 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
-	stats := &models.RestoreStats{}
+	stats := models.NewRestoreStats()
 	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
 	suite.NotNil(writer)
 
@@ -75,7 +75,7 @@ func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
 	key, _ := a.NewKey(namespace, set, "key")
 	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	policy := &a.WritePolicy{}
-	stats := &models.RestoreStats{}
+	stats := models.NewRestoreStats()
 	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
 	rec := models.Record{
 		Record: &a.Record{
@@ -118,7 +118,7 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
-	stats := &models.RestoreStats{}
+	stats := models.NewRestoreStats()
 	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
 	suite.NotNil(writer)
 
@@ -134,7 +134,7 @@ func (suite *writersTestSuite) TestSingleRecordWriterRetry() {
 	key, _ := a.NewKey(namespace, set, "key")
 	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	policy := &a.WritePolicy{}
-	stats := &models.RestoreStats{}
+	stats := models.NewRestoreStats()
 	retryPolicy := &models.RetryPolicy{
 		BaseTimeout: 10 * time.Millisecond,
 		Multiplier:  1,
@@ -174,7 +174,7 @@ func (suite *writersTestSuite) TestBatchRecordWriterRetry() {
 	key, _ := a.NewKey(namespace, set, "key")
 	mockDBWriter := mocks.NewMockdbWriter(suite.T())
 	policy := &a.WritePolicy{}
-	stats := &models.RestoreStats{}
+	stats := models.NewRestoreStats()
 	retryPolicy := &models.RetryPolicy{
 		BaseTimeout: 10 * time.Millisecond,
 		Multiplier:  1,

@@ -93,19 +93,25 @@ func (rs *RestoreStats) IncrRecordsIgnored() {
 	rs.RecordsIgnored.Add(1)
 }
 
-// SumRestoreStats combines two RestoreStats into a new one
-func SumRestoreStats(a, b *RestoreStats) *RestoreStats {
-	result := &RestoreStats{
-		commonStats: sumCommonStats(a.commonStats, b.commonStats),
-	}
+// SumRestoreStats combines multiple RestoreStats.
+func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
+	result := &RestoreStats{}
 
-	result.RecordsExpired.Store(a.GetRecordsExpired() + b.GetRecordsExpired())
-	result.RecordsSkipped.Store(a.GetRecordsSkipped() + b.GetRecordsSkipped())
-	result.RecordsIgnored.Store(a.GetRecordsIgnored() + b.GetRecordsIgnored())
-	result.TotalBytesRead.Store(a.GetTotalBytesRead() + b.GetTotalBytesRead())
-	result.recordsExisted.Store(a.GetRecordsExisted() + b.GetRecordsExisted())
-	result.recordsFresher.Store(a.GetRecordsFresher() + b.GetRecordsFresher())
-	result.recordsInserted.Store(a.GetRecordsInserted() + b.GetRecordsInserted())
+	for _, stat := range stats {
+		if stat == nil {
+			continue
+		}
+
+		result.commonStats = sumCommonStats(result.commonStats, stat.commonStats)
+
+		result.RecordsExpired.Add(stat.GetRecordsExpired())
+		result.RecordsSkipped.Add(stat.GetRecordsSkipped())
+		result.RecordsIgnored.Add(stat.GetRecordsIgnored())
+		result.TotalBytesRead.Add(stat.GetTotalBytesRead())
+		result.recordsExisted.Add(stat.GetRecordsExisted())
+		result.recordsFresher.Add(stat.GetRecordsFresher())
+		result.recordsInserted.Add(stat.GetRecordsInserted())
+	}
 
 	return result
 }

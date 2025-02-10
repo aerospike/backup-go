@@ -74,22 +74,24 @@ func (s *commonStats) GetDuration() time.Duration {
 	return s.duration
 }
 
-// sumCommonStats combines two commonStats into a new one
-func sumCommonStats(a, b *commonStats) *commonStats {
+// sumCommonStats combines multiple commonStats.
+func sumCommonStats(stats ...*commonStats) *commonStats {
 	result := &commonStats{}
 
-	// Handle start time - take the earlier of the two
-	if a.StartTime.IsZero() || b.StartTime.Before(a.StartTime) {
-		result.StartTime = b.StartTime
-	} else {
-		result.StartTime = a.StartTime
-	}
+	for _, stat := range stats {
+		if stat == nil {
+			continue
+		}
 
-	// Combine stats
-	result.ReadRecords.Store(a.GetReadRecords() + b.GetReadRecords())
-	result.sIndexes.Store(a.GetSIndexes() + b.GetSIndexes())
-	result.uDFs.Store(a.GetUDFs() + b.GetUDFs())
-	result.BytesWritten.Store(a.GetBytesWritten() + b.GetBytesWritten())
+		if result.StartTime.IsZero() || stat.StartTime.Before(result.StartTime) {
+			result.StartTime = stat.StartTime
+		}
+
+		result.ReadRecords.Add(stat.GetReadRecords())
+		result.sIndexes.Add(stat.GetSIndexes())
+		result.uDFs.Add(stat.GetUDFs())
+		result.BytesWritten.Add(stat.GetBytesWritten())
+	}
 
 	return result
 }

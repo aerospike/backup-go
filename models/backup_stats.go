@@ -29,7 +29,9 @@ type BackupStats struct {
 
 // NewBackupStats returns new backup stats.
 func NewBackupStats() *BackupStats {
-	return &BackupStats{}
+	return &BackupStats{
+		commonStats: &commonStats{},
+	}
 }
 
 // IncFiles increments by one the number of files per backup.

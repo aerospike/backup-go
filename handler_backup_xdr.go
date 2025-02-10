@@ -123,9 +123,9 @@ func (bh *HandlerBackupXDR) run() {
 }
 
 func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
-	// Count total records.
 	var err error
 
+	// Count total records.
 	bh.stats.TotalRecords, err = bh.infoClient.GetRecordCount(bh.config.Namespace, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get records count: %w", err)
@@ -149,9 +149,8 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 
 	// Process workers.
 	composeProcessor := newTokenWorker[*models.ASBXToken](
-		processors.NewComposeProcessor[*models.ASBXToken](
-			processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
-		), 1)
+		processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
+		1)
 
 	// Create a pipeline and start.
 	pl, err := pipeline.NewPipeline(

@@ -28,73 +28,42 @@ const (
 	headerEstimateReport = "Estimate Report"
 )
 
-func printBackupReport(stats, xdrStats *bModels.BackupStats) {
+func printBackupReport(stats *bModels.BackupStats, isXdr bool) {
 	fmt.Println(headerBackupReport)
 	fmt.Println(strings.Repeat("-", len(headerBackupReport)))
 
 	printMetric("Start Time", stats.StartTime.Format(time.RFC1123))
-
-	dur := stats.GetDuration()
-
-	var bw, fw, tr uint64
-
-	if xdrStats != nil {
-		bw = xdrStats.GetBytesWritten()
-		fw = xdrStats.GetFileCount()
-		tr = xdrStats.TotalRecords
-
-		if xdrStats.GetDuration() > dur {
-			dur = xdrStats.GetDuration()
-		}
-	}
-
-	printMetric("Duration", dur)
+	printMetric("Duration", stats.GetDuration())
 
 	fmt.Println()
 
-	switch {
-	case xdrStats != nil:
-		printMetric("Records Received", xdrStats.GetReadRecords())
-	default:
-		printMetric("Records Read", stats.GetReadRecords())
+	recordsMetric := "Records Read"
+	if isXdr {
+		recordsMetric = "Records Received"
 	}
+
+	printMetric(recordsMetric, stats.GetReadRecords())
 
 	printMetric("sIndex Read", stats.GetSIndexes())
 	printMetric("UDFs Read", stats.GetUDFs())
 
 	fmt.Println()
 
-	printMetric("Bytes Written", stats.GetBytesWritten()+bw)
-	printMetric("Total Records", stats.TotalRecords+tr)
-	printMetric("Files Written", stats.GetFileCount()+fw)
+	printMetric("Bytes Written", stats.GetBytesWritten())
+	printMetric("Total Records", stats.TotalRecords)
+	printMetric("Files Written", stats.GetFileCount())
 }
 
-func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
+func printRestoreReport(asbStats *bModels.RestoreStats) {
 	fmt.Println(headerRestoreReport)
 	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
-	dur := asbStats.GetDuration()
-
-	var rr, ir, ri, rf, re uint64
-
-	if asbxStats != nil {
-		rr = asbxStats.GetReadRecords()
-		ir = asbxStats.GetRecordsIgnored()
-		ri = asbxStats.GetRecordsInserted()
-		rf = asbxStats.GetRecordsFresher()
-		re = asbxStats.GetRecordsExisted()
-
-		if asbxStats.GetDuration() > dur {
-			dur = asbxStats.GetDuration()
-		}
-	}
-
 	printMetric("Start Time", asbStats.StartTime.Format(time.RFC1123))
-	printMetric("Duration", dur)
+	printMetric("Duration", asbStats.GetDuration())
 
 	fmt.Println()
 
-	printMetric("Records Read", asbStats.GetReadRecords()+rr)
+	printMetric("Records Read", asbStats.GetReadRecords())
 	printMetric("sIndex Read", asbStats.GetSIndexes())
 	printMetric("UDFs Read", asbStats.GetUDFs())
 
@@ -102,13 +71,13 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 
 	printMetric("Expired Records", asbStats.GetRecordsExpired())
 	printMetric("Skipped Records", asbStats.GetRecordsSkipped())
-	printMetric("Ignored Records", asbStats.GetRecordsIgnored()+ir)
-	printMetric("Fresher Records", asbStats.GetRecordsFresher()+rf)
-	printMetric("Existed Records", asbStats.GetRecordsExisted()+re)
+	printMetric("Ignored Records", asbStats.GetRecordsIgnored())
+	printMetric("Fresher Records", asbStats.GetRecordsFresher())
+	printMetric("Existed Records", asbStats.GetRecordsExisted())
 
 	fmt.Println()
 
-	printMetric("Inserted Records", asbStats.GetRecordsInserted()+ri)
+	printMetric("Inserted Records", asbStats.GetRecordsInserted())
 
 	if asbStats.GetTotalBytesRead() > 0 {
 		// At the moment, we don't count the size of records.

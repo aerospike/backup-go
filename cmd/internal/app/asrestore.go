@@ -107,7 +107,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
-		printRestoreReport(h.GetStats(), nil)
+		printRestoreReport(h.GetStats())
 	case models.RestoreModeASBX:
 		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
 
@@ -120,7 +120,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
-		printRestoreReport(hXdr.GetStats(), nil)
+		printRestoreReport(hXdr.GetStats())
 	case models.RestoreModeAuto:
 		// If one of restore operations fails, we cancel another.
 		ctx, cancel := context.WithCancel(ctx)
@@ -203,7 +203,9 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			}
 		}
 
-		printRestoreReport(stats, xdrStats)
+		restStats := bModels.SumRestoreStats(xdrStats, stats)
+		printRestoreReport(restStats)
+
 		// To prevent context leaking.
 		cancel()
 	default:
@@ -253,6 +255,11 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		case err != nil:
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		default:
+		}
+
+		// If both readers are nil return an error, as no files were found.
+		if reader == nil && xdrReader == nil {
+			return nil, nil, err
 		}
 
 		return reader, xdrReader, nil

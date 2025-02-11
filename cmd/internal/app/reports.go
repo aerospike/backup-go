@@ -73,11 +73,6 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 	fmt.Println(headerRestoreReport)
 	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
-	// In case of asbx restore, asbStats will be nil, so we swap vars to print a report from asbx values.
-	if asbStats == nil && asbxStats != nil {
-		asbStats, asbxStats = asbxStats, nil
-	}
-
 	dur := asbStats.GetDuration()
 
 	var rr, ir, ri, rf, re uint64
@@ -115,7 +110,7 @@ func printRestoreReport(asbStats, asbxStats *bModels.RestoreStats) {
 
 	printMetric("Inserted Records", asbStats.GetRecordsInserted()+ri)
 
-	if asbxStats == nil {
+	if asbStats.GetTotalBytesRead() > 0 {
 		// At the moment, we don't count the size of records.
 		printMetric("Total Bytes Read", asbStats.GetTotalBytesRead())
 	}

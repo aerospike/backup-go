@@ -22,6 +22,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/internal/asinfo"
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -291,7 +292,8 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to backup indexes and udfs: %w", err)
 		}
 
-		printBackupReport(h.GetStats(), hXdr.GetStats())
+		stats := bModels.SumBackupStats(h.GetStats(), hXdr.GetStats())
+		printBackupReport(stats, true)
 	default:
 		// Running ordinary backup.
 		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
@@ -303,7 +305,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 
-		printBackupReport(h.GetStats(), nil)
+		printBackupReport(h.GetStats(), false)
 	}
 
 	return nil

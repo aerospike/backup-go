@@ -240,5 +240,9 @@ func (c *ConfigBackup) validate() error {
 		}
 	}
 
+	if err := c.InfoRetryPolicy.Validate(); err != nil {
+		return fmt.Errorf("info retry policy invalid: %w", err)
+	}
+
 	return nil
 }

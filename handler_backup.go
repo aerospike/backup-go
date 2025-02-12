@@ -259,7 +259,8 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
 
-	// If sets is not set, we get a list of sets, filter out monitor mrt set, and use a set list for scan.
+	// If the set list is not specified, fetch all available sets for the namespace,
+	// excluding the MRT monitor set.
 	if len(bh.config.SetList) == 0 {
 		bh.config.SetList, err = bh.infoClient.GetSetsList(bh.config.Namespace)
 		if err != nil {

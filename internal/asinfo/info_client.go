@@ -422,12 +422,12 @@ func (ic *InfoClient) GetSetsList(namespace string) ([]string, error) {
 
 	result, err := parseResultResponse(cmd, resp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse get sets response: %w", err)
+		return nil, fmt.Errorf("failed to parse sets info response: %w", err)
 	}
 
 	resultMap, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse to map get sets response: %w", err)
+		return nil, fmt.Errorf("failed to parse sets info: %w", err)
 	}
 
 	sets := make([]string, 0)

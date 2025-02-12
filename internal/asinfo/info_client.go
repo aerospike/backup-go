@@ -430,7 +430,8 @@ func (ic *InfoClient) GetSetsList(namespace string) ([]string, error) {
 		return nil, fmt.Errorf("failed to parse to map get sets response: %w", err)
 	}
 
-	var sets []string
+	sets := make([]string, 0)
+
 	for _, rec := range resultMap {
 		val, ok := rec["set"]
 		if !ok {

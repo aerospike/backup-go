@@ -54,11 +54,11 @@ func (p *RetryPolicy) Validate() error {
 	}
 
 	if p.BaseTimeout < 0 {
-		return fmt.Errorf("base timeout must be positive")
+		return fmt.Errorf("base timeout must be non-negative")
 	}
 
 	if p.Multiplier < 1 {
-		return fmt.Errorf("multiplier must be positive")
+		return fmt.Errorf("multiplier must be greater than 0")
 	}
 
 	if p.MaxRetries < 1 {

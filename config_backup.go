@@ -234,5 +234,11 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("secret agent invalid: %w", err)
 	}
 
+	for i := range c.SetList {
+		if c.SetList[i] == models.MonitorRecordsSetName {
+			return fmt.Errorf("mrt monitor set can't be backed up")
+		}
+	}
+
 	return nil
 }

@@ -253,6 +253,7 @@ func (r *RecordReader) serve() {
 					break // Or return?
 				}
 
+				r.logger.Debug("mrt blocked")
 				r.mrtWritesStopped.Store(true)
 			}
 
@@ -266,6 +267,7 @@ func (r *RecordReader) serve() {
 					r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
 				}
 
+				r.logger.Debug("mrt unblocked")
 				r.mrtWritesStopped.Store(false)
 				// Stop.
 				r.Close()

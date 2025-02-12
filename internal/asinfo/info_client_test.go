@@ -1866,3 +1866,18 @@ func TestInfoCommander_XDR(t *testing.T) {
 	err = ic.StopXDR(testASDC)
 	require.NoError(t, err)
 }
+
+func TestInfoCommander_GetSets(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	_, err := ic.GetSetsList(testASNamespace)
+	require.NoError(t, err)
+}

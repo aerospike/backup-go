@@ -20,6 +20,7 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,6 +72,10 @@ func TestBackupConfig_validate(t *testing.T) {
 	connectionType := "tcp"
 	config.SecretAgentConfig = &SecretAgentConfig{ConnectionType: &connectionType}
 	assert.ErrorContains(t, config.validate(), "secret agent")
+	config = NewDefaultBackupConfig()
+
+	config.SetList = append(config.SetList, models.MonitorRecordsSetName)
+	assert.ErrorContains(t, config.validate(), "mrt monitor set can't be backed up")
 }
 
 func TestRestoreConfig_validate(t *testing.T) {

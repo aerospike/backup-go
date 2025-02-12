@@ -62,7 +62,7 @@ func (p *RetryPolicy) Validate() error {
 	}
 
 	if p.MaxRetries < 1 {
-		return fmt.Errorf("max retries must be greater than 1")
+		return fmt.Errorf("max retries must be greater than 0")
 	}
 
 	return nil

@@ -75,7 +75,7 @@ func TestBackupConfig_validate(t *testing.T) {
 	config = NewDefaultBackupConfig()
 
 	config.SetList = append(config.SetList, models.MonitorRecordsSetName)
-	assert.ErrorContains(t, config.validate(), "mrt monitor set can't be backed up")
+	assert.ErrorContains(t, config.validate(), "mrt monitor set is not allowed")
 }
 
 func TestRestoreConfig_validate(t *testing.T) {

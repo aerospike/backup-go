@@ -17,7 +17,7 @@ package models
 import (
 	"fmt"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 )
 
 // PartitionFilterSerialized represent serialized a.PartitionFilter.

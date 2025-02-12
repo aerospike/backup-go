@@ -18,7 +18,7 @@ import (
 	"errors"
 	"testing"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/stretchr/testify/assert"
 )
 

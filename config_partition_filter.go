@@ -17,7 +17,7 @@ package backup
 import (
 	"fmt"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 )
 
 // NewPartitionFilterByRange returns a partition range with boundaries specified by the provided values.

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 )
 
 // Subtract returns a new list containing elements of list1 that are

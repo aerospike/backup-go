@@ -56,7 +56,11 @@ func Test_BackupRestore(t *testing.T) {
 			IdleTimeout:  1000,
 			LoginTimeout: 1000,
 		},
-		BackupParams: &models.Backup{},
+		BackupParams: &models.Backup{
+			InfoMaxRetries:                3,
+			InfoRetriesMultiplier:         1,
+			InfoRetryIntervalMilliseconds: 1000,
+		},
 		CommonParams: &models.Common{
 			Directory: dir,
 			Namespace: testNamespace,
@@ -144,9 +148,12 @@ func Test_BackupWithState(t *testing.T) {
 			LoginTimeout: 1000,
 		},
 		BackupParams: &models.Backup{
-			StateFileDst: testStateFile,
-			ScanPageSize: 10,
-			FileLimit:    100000,
+			StateFileDst:                  testStateFile,
+			ScanPageSize:                  10,
+			FileLimit:                     100000,
+			InfoMaxRetries:                3,
+			InfoRetriesMultiplier:         1,
+			InfoRetryIntervalMilliseconds: 1000,
 		},
 		CommonParams: &models.Common{
 			Directory: dir,

@@ -234,5 +234,15 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("secret agent invalid: %w", err)
 	}
 
+	for i := range c.SetList {
+		if c.SetList[i] == models.MonitorRecordsSetName {
+			return fmt.Errorf("mrt monitor set is not allowed for backup")
+		}
+	}
+
+	if err := c.InfoRetryPolicy.Validate(); err != nil {
+		return fmt.Errorf("invalid info retry policy: %w", err)
+	}
+
 	return nil
 }

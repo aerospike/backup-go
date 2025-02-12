@@ -20,6 +20,7 @@ import (
 	"net"
 
 	"github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/models"
 )
 
 const (
@@ -30,8 +31,6 @@ const (
 	LenProtoHeader   = 8
 
 	MaxProtoBody = 128 * 1024 * 1024
-
-	setNameMRT = "<ERO~MRT"
 )
 
 const (
@@ -434,7 +433,7 @@ func NewAerospikeKey(fields []*Field) (*aerospike.Key, error) {
 		}
 	}
 
-	if set == setNameMRT {
+	if set == models.MonitorRecordsSetName {
 		return nil, errSkipRecord
 	}
 

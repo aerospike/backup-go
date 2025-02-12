@@ -259,6 +259,15 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
 
+	// If the set list is not specified, fetch all available sets for the namespace,
+	// excluding the MRT monitor set.
+	if len(bh.config.SetList) == 0 {
+		bh.config.SetList, err = bh.infoClient.GetSetsList(bh.config.Namespace)
+		if err != nil {
+			return err
+		}
+	}
+
 	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
 
 	bh.stats.TotalRecords, err = handler.countRecords(ctx, bh.infoClient)

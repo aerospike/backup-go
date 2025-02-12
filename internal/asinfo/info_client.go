@@ -41,9 +41,9 @@ const (
 	cmdBlockMRTWrites   = "set-config:context=namespace;id=%s;disable-mrt-writes=true"
 	cmdUnBlockMRTWrites = "set-config:context=namespace;id=%s;disable-mrt-writes=false"
 
-	cmdRespErrPrefix = "ERROR"
+	cmdSetsOfNamespace = "sets/%s"
 
-	monitorRecordsSetName = "<ERO~MRT"
+	cmdRespErrPrefix = "ERROR"
 )
 
 var (
@@ -412,6 +412,42 @@ func (ic *InfoClient) unBlockMRTWrites(namespace string) error {
 	return nil
 }
 
+func (ic *InfoClient) GetSetsList(namespace string) ([]string, error) {
+	cmd := fmt.Sprintf(cmdSetsOfNamespace, namespace)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed get sets: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info response: %w", err)
+	}
+
+	resultMap, err := parseInfoResponse(result, ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info: %w", err)
+	}
+
+	sets := make([]string, 0)
+
+	for _, rec := range resultMap {
+		val, ok := rec["set"]
+		if !ok {
+			continue
+		}
+
+		if val == models.MonitorRecordsSetName {
+			continue
+		}
+
+		sets = append(sets, val)
+	}
+
+	return sets, nil
+}
+
 // Stats represent a result of get stats command.
 // In the future, other fields can be added.
 type Stats struct {
@@ -743,7 +779,7 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 }
 
 func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace string, sets []string) (uint64, error) {
-	cmd := fmt.Sprintf("sets/%s", namespace)
+	cmd := fmt.Sprintf(cmdSetsOfNamespace, namespace)
 
 	response, aerr := node.RequestInfo(policy, cmd)
 	if aerr != nil {
@@ -764,7 +800,7 @@ func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace stri
 		}
 
 		// Skip MRT monitor records.
-		if setName == monitorRecordsSetName {
+		if setName == models.MonitorRecordsSetName {
 			continue
 		}
 

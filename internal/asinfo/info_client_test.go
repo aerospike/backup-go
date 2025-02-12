@@ -34,6 +34,7 @@ const (
 	testASPort          = 3000
 	testASRewind        = "all"
 	testXDRHostPort     = "127.0.0.1:3003"
+	testSetInfo         = "info_set"
 )
 
 func Test_parseAerospikeVersion(t *testing.T) {
@@ -1865,4 +1866,28 @@ func TestInfoCommander_XDR(t *testing.T) {
 
 	err = ic.StopXDR(testASDC)
 	require.NoError(t, err)
+}
+
+func TestInfoCommander_GetSets(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	wp := a.NewWritePolicy(0, 0)
+	k, aerr := a.NewKey(testASNamespace, testSetInfo, "get-sets")
+	require.NoError(t, aerr)
+	b := a.NewBin("bin", "value")
+	aerr = client.PutBins(wp, k, b)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	result, err := ic.GetSetsList(testASNamespace)
+	require.NoError(t, err)
+
+	require.Greater(t, len(result), 1)
 }

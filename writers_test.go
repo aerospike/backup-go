@@ -20,7 +20,7 @@ import (
 	"log/slog"
 	"testing"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipeline/mocks"

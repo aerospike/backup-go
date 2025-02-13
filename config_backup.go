@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"time"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 )
 
 // BackupConfig contains configuration for the backup operation.

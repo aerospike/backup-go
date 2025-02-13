@@ -23,8 +23,8 @@ import (
 	"io"
 	"strconv"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
-	particleType "github.com/aerospike/aerospike-client-go/v7/types/particle_type"
+	a "github.com/aerospike/aerospike-client-go/v8"
+	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
 	"github.com/aerospike/backup-go/models"
 )
 

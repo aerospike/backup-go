@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	a "github.com/aerospike/aerospike-client-go/v7"
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/local"

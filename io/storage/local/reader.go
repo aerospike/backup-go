@@ -52,15 +52,17 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.IsDir && !r.SkipDirCheck {
-		if err := r.checkRestoreDirectory(r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+	if r.IsDir {
+		if !r.SkipDirCheck {
+			if err := r.checkRestoreDirectory(r.PathList[0]); err != nil {
+				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+			}
 		}
-	}
 
-	if !r.SortFiles || len(r.PathList) != 1 {
-		if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
+		if r.SortFiles && len(r.PathList) == 1 {
+			if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+				return nil, fmt.Errorf("failed to pre sort: %w", err)
+			}
 		}
 	}
 

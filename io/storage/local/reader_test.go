@@ -509,16 +509,25 @@ func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
 	dir := s.T().TempDir()
 	ctx := context.Background()
 
-	expResult := []string{"file3.asb", "file2.asbx", "file1.asb", "file2.asb", "file1.asbx"}
+	expResult := []string{"file3.asb", "0_file_2.asbx", "file1.asb", "file2.asb", "0_file_1.asbx"}
 
 	for i := range expResult {
 		err := createTmpFile(dir, expResult[i])
 		require.NoError(s.T(), err)
 	}
 
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == ".asbx" {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
 	r, err := NewReader(
 		ctx,
 		ioStorage.WithDir(dir),
+		ioStorage.WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 

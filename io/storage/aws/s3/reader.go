@@ -79,16 +79,18 @@ func NewReader(
 	r.client = client
 	r.bucketName = bucketName
 
-	if r.IsDir && !r.SkipDirCheck {
-		if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+	if r.IsDir {
+		if !r.SkipDirCheck {
+			if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
+				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+			}
 		}
-	}
 
-	// Presort files if needed.
-	if !r.SortFiles || len(r.PathList) != 1 {
-		if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
+		// Presort files if needed.
+		if r.SortFiles && len(r.PathList) == 1 {
+			if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+				return nil, fmt.Errorf("failed to pre sort: %w", err)
+			}
 		}
 	}
 

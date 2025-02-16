@@ -62,6 +62,10 @@ var (
 	AerospikeVersionSupportsBatchWrites   = AerospikeVersion{6, 0, 0}
 )
 
+var (
+	ErrReplicationFactorZero = errors.New("replication factor is zero")
+)
+
 func (av AerospikeVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d", av.Major, av.Minor, av.Patch)
 }
@@ -228,6 +232,11 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 		effectiveReplicationFactor, err := getEffectiveReplicationFactor(node, ic.policy, namespace)
 		if err != nil {
 			return err
+		}
+
+		// If a database not started yet, it can respond with 0.
+		if effectiveReplicationFactor == 0 {
+			return ErrReplicationFactorZero
 		}
 
 		var recordsNumber uint64

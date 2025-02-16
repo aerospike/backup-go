@@ -21,8 +21,8 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go/io/counter"
-	"github.com/aerospike/backup-go/io/storage/lazy"
-	"github.com/aerospike/backup-go/io/storage/sized"
+	"github.com/aerospike/backup-go/io/lazy"
+	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"golang.org/x/time/rate"

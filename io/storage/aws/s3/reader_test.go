@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aerospike/backup-go/internal/util"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local/mocks"
 	"github.com/aerospike/backup-go/models"
@@ -245,7 +246,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -294,7 +295,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -342,7 +343,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asbx" {
+		if filepath.Ext(fileName) == util.FileExtAsbx {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -433,9 +434,9 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 func filterList(list []string) (asbList, asbxList []string) {
 	for i := range list {
 		switch filepath.Ext(list[i]) {
-		case ".asb":
+		case util.FileExtAsb:
 			asbList = append(asbList, list[i])
-		case ".asbx":
+		case util.FileExtAsbx:
 			asbxList = append(asbxList, list[i])
 		}
 	}

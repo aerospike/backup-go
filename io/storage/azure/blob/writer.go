@@ -222,22 +222,22 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 			return fmt.Errorf("failed to get next page: %w", err)
 		}
 
-		for _, blob := range page.Segment.BlobItems {
+		for _, blobItem := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if ioStorage.IsDirectory(w.prefix, *blob.Name) && !w.WithNestedDir {
+			if ioStorage.IsDirectory(w.prefix, *blobItem.Name) && !w.WithNestedDir {
 				continue
 			}
 
 			// If validator is set, remove only valid files.
 			if w.Validator != nil {
-				if err = w.Validator.Run(*blob.Name); err != nil {
+				if err = w.Validator.Run(*blobItem.Name); err != nil {
 					continue
 				}
 			}
 
-			_, err = w.client.DeleteBlob(ctx, w.containerName, *blob.Name, nil)
+			_, err = w.client.DeleteBlob(ctx, w.containerName, *blobItem.Name, nil)
 			if err != nil {
-				return fmt.Errorf("failed to delete blob %s: %w", *blob.Name, err)
+				return fmt.Errorf("failed to delete blobItem %s: %w", *blobItem.Name, err)
 			}
 		}
 	}

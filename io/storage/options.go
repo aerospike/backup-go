@@ -41,7 +41,7 @@ type Options struct {
 	// SortFiles shows if we need to sort files before read.
 	SortFiles bool
 
-	// Concurrency defines the max number of concurrent uploads to be performed to upload the file.
+	// UploadConcurrency defines the max number of concurrent uploads to be performed to upload the file.
 	// Each concurrent upload will create a buffer of size BlockSize.
 	UploadConcurrency int
 }
@@ -129,8 +129,6 @@ func WithSorting() Opt {
 		r.SortFiles = true
 	}
 }
-
-// NOT FOR ALL----------------------------
 
 // WithUploadConcurrency define max number of concurrent uploads to be performed to upload the file.
 // Is used only for Azure Writer.

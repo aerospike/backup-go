@@ -139,15 +139,15 @@ func (r *Reader) streamDirectory(
 			errorsCh <- fmt.Errorf("failed to get next page: %w", err)
 		}
 
-		for _, blob := range page.Segment.BlobItems {
+		for _, blobItem := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if r.shouldSkip(path, *blob.Name) {
+			if r.shouldSkip(path, *blobItem.Name) {
 				continue
 			}
 
 			// Skip not valid files if validator is set.
 			if r.Validator != nil {
-				if err = r.Validator.Run(*blob.Name); err != nil {
+				if err = r.Validator.Run(*blobItem.Name); err != nil {
 					// Since we are passing invalid files, we don't need to handle this
 					// error and write a test for it. Maybe we should log this information
 					// for the user, so they know what is going on.
@@ -155,7 +155,7 @@ func (r *Reader) streamDirectory(
 				}
 			}
 
-			r.openObject(ctx, *blob.Name, readersCh, errorsCh, true)
+			r.openObject(ctx, *blobItem.Name, readersCh, errorsCh, true)
 		}
 	}
 }
@@ -228,21 +228,21 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 			return fmt.Errorf("failed to get next page: %w", err)
 		}
 
-		for _, blob := range page.Segment.BlobItems {
+		for _, blobItem := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if r.shouldSkip(path, *blob.Name) {
+			if r.shouldSkip(path, *blobItem.Name) {
 				continue
 			}
 
 			switch {
 			case r.Validator != nil:
 				// If we found a valid file, return.
-				if err = r.Validator.Run(*blob.Name); err == nil {
+				if err = r.Validator.Run(*blobItem.Name); err == nil {
 					return nil
 				}
 			default:
 				// If we found anything, then folder is not empty.
-				if blob.Name != nil {
+				if blobItem.Name != nil {
 					return nil
 				}
 			}
@@ -270,20 +270,20 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 			return nil, fmt.Errorf("failed to get next page: %w", err)
 		}
 
-		for _, blob := range page.Segment.BlobItems {
+		for _, blobItem := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if r.shouldSkip(path, *blob.Name) {
+			if r.shouldSkip(path, *blobItem.Name) {
 				continue
 			}
 
-			if blob.Name != nil {
+			if blobItem.Name != nil {
 				if r.Validator != nil {
-					if err = r.Validator.Run(*blob.Name); err != nil {
+					if err = r.Validator.Run(*blobItem.Name); err != nil {
 						continue
 					}
 				}
 
-				result = append(result, *blob.Name)
+				result = append(result, *blobItem.Name)
 			}
 		}
 	}

@@ -24,21 +24,16 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/aerospike/backup-go/internal/util"
-	"github.com/aerospike/backup-go/io/storage"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 )
 
 const azureBlobType = "azure-blob"
 
-type validator interface {
-	Run(fileName string) error
-}
-
 // Reader represents GCP storage reader.
 type Reader struct {
 	// Optional parameters.
-	options
+	ioStorage.Options
 
 	client *azblob.Client
 
@@ -58,17 +53,17 @@ func NewReader(
 	ctx context.Context,
 	client *azblob.Client,
 	containerName string,
-	opts ...Opt,
+	opts ...ioStorage.Opt,
 ) (*Reader, error) {
 	r := &Reader{
 		client: client,
 	}
 
 	for _, opt := range opts {
-		opt(&r.options)
+		opt(&r.Options)
 	}
 
-	if len(r.pathList) == 0 {
+	if len(r.PathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
@@ -79,15 +74,17 @@ func NewReader(
 
 	r.containerName = containerName
 
-	if r.isDir && !r.skipDirCheck {
-		if err := r.checkRestoreDirectory(ctx, r.pathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", storage.ErrEmptyStorage, err)
+	if r.IsDir && !r.SkipDirCheck {
+		if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
+			return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
 		}
 	}
 
 	// Presort files if needed.
-	if err := r.preSort(ctx); err != nil {
-		return nil, fmt.Errorf("failed to pre sort: %w", err)
+	if !r.SortFiles || len(r.PathList) != 1 {
+		if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+			return nil, fmt.Errorf("failed to pre sort: %w", err)
+		}
 	}
 
 	return r, nil
@@ -106,12 +103,12 @@ func (r *Reader) StreamFiles(
 		return
 	}
 
-	for _, path := range r.pathList {
+	for _, path := range r.PathList {
 		// If it is a folder, open and return.
-		switch r.isDir {
+		switch r.IsDir {
 		case true:
-			path = cleanPath(path)
-			if !r.skipDirCheck {
+			path = ioStorage.CleanPath(path, false)
+			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(ctx, path)
 				if err != nil {
 					errorsCh <- err
@@ -147,8 +144,8 @@ func (r *Reader) streamDirectory(
 			}
 
 			// Skip not valid files if validator is set.
-			if r.validator != nil {
-				if err = r.validator.Run(*blob.Name); err != nil {
+			if r.Validator != nil {
+				if err = r.Validator.Run(*blob.Name); err != nil {
 					// Since we are passing invalid files, we don't need to handle this
 					// error and write a test for it. Maybe we should log this information
 					// for the user, so they know what is going on.
@@ -194,13 +191,13 @@ func (r *Reader) StreamFile(
 	// This condition will be true, only if we initialized reader for directory and then want to read
 	// a specific file. It is used for state file and by asb service. So it must be initialized with only
 	// one path.
-	if r.isDir {
-		if len(r.pathList) != 1 {
+	if r.IsDir {
+		if len(r.PathList) != 1 {
 			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
 			return
 		}
 
-		filename = filepath.Join(r.pathList[0], filename)
+		filename = filepath.Join(r.PathList[0], filename)
 	}
 
 	r.openObject(ctx, filename, readersCh, errorsCh, false)
@@ -208,8 +205,8 @@ func (r *Reader) StreamFile(
 
 // shouldSkip performs check, is we should skip files.
 func (r *Reader) shouldSkip(path, fileName string) bool {
-	return (isDirectory(path, fileName) && !r.withNestedDir) ||
-		isSkippedByStartAfter(r.startAfter, fileName)
+	return (ioStorage.IsDirectory(path, fileName) && !r.WithNestedDir) ||
+		isSkippedByStartAfter(r.StartAfter, fileName)
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.
@@ -236,9 +233,9 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 			}
 
 			switch {
-			case r.validator != nil:
+			case r.Validator != nil:
 				// If we found a valid file, return.
-				if err = r.validator.Run(*blob.Name); err == nil {
+				if err = r.Validator.Run(*blob.Name); err == nil {
 					return nil
 				}
 			default:
@@ -278,8 +275,8 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 			}
 
 			if blob.Name != nil {
-				if r.validator != nil {
-					if err = r.validator.Run(*blob.Name); err != nil {
+				if r.Validator != nil {
+					if err = r.Validator.Run(*blob.Name); err != nil {
 						continue
 					}
 				}
@@ -304,27 +301,6 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 	}
 }
 
-func isDirectory(prefix, fileName string) bool {
-	// If file name ends with / it is 100% dir.
-	if strings.HasSuffix(fileName, "/") {
-		return true
-	}
-
-	// If we look inside some folder.
-	if strings.HasPrefix(fileName, prefix) {
-		// For root folder we should add.
-		if !strings.HasSuffix(prefix, "/") {
-			prefix += "/"
-		}
-
-		clean := strings.TrimPrefix(fileName, prefix)
-
-		return strings.Contains(clean, "/")
-	}
-	// All other variants.
-	return strings.Contains(fileName, "/")
-}
-
 func isSkippedByStartAfter(startAfter, fileName string) bool {
 	if startAfter == "" {
 		return false
@@ -335,38 +311,4 @@ func isSkippedByStartAfter(startAfter, fileName string) bool {
 	}
 
 	return false
-}
-
-// cleanPath is protection from incorrect input.
-func cleanPath(path string) string {
-	result := path
-	if !strings.HasSuffix(path, "/") && path != "/" && path != "" {
-		result = fmt.Sprintf("%s/", path)
-	}
-
-	return result
-}
-
-// preSort performs files sorting before read.
-func (r *Reader) preSort(ctx context.Context) error {
-	if !r.sortFiles || len(r.pathList) != 1 {
-		return nil
-	}
-
-	// List all files first.
-	list, err := r.ListObjects(ctx, r.pathList[0])
-	if err != nil {
-		return err
-	}
-
-	// Sort files.
-	list, err = util.SortBackupFiles(list)
-	if err != nil {
-		return err
-	}
-
-	// Pass sorted list to reader.
-	r.SetObjectsToStream(list)
-
-	return nil
 }

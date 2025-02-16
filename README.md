@@ -46,7 +46,8 @@ import (
 
     "github.com/aerospike/aerospike-client-go/v8"
     "github.com/aerospike/backup-go"
-    "github.com/aerospike/backup-go/io/local"
+    "github.com/aerospike/backup-go/io/storage/local"
+    ioStorage "github.com/aerospike/backup-go/io/storage"
 )
 
 func main() {
@@ -68,8 +69,8 @@ func main() {
 	// For backup to single file use local.WithFile(fileName).
     writers, err := local.NewWriter(
         ctx,
-        local.WithRemoveFiles(),
-        local.WithDir("backups_folder"),
+        ioStorage.WithRemoveFiles(),
+        ioStorage.WithDir("backups_folder"),
     )
     if err != nil {
 	    log.Fatal(err)
@@ -147,8 +148,8 @@ func main() {
 
     // Create reader for restore
     reader, err := local.NewReader(
-        local.WithValidator(asb.NewValidator()),
-        local.WithDir("backups_folder"),
+        ioStorage.WithValidator(asb.NewValidator()),
+        ioStorage.WithDir("backups_folder"),
     )
     if err != nil {
         panic(err)
@@ -177,9 +178,9 @@ When restoring ASBX format backups, files must be processed in the correct order
 ```go
 reader, err := local.NewReader(
     ctx,
-    local.WithValidator(asbx.NewValidator()), // change validator to ASBX
-    local.WithDir("backups_folder"),
-    local.WithSorting(), // Required for ASBX files
+    ioStorage.WithValidator(asbx.NewValidator()), // change validator to ASBX
+    ioStorage.WithDir("backups_folder"),
+    ioStorage.WithSorting(), // Required for ASBX files
 )
 ```
 

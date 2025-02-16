@@ -23,6 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 )
 
 const (
@@ -34,7 +35,7 @@ const (
 // Writer represents a GCP storage writer.
 type Writer struct {
 	// Optional parameters.
-	options
+	ioStorage.Options
 
 	client *azblob.Client
 	// containerName contains name of the container to read from.
@@ -49,24 +50,24 @@ func NewWriter(
 	ctx context.Context,
 	client *azblob.Client,
 	containerName string,
-	opts ...Opt,
+	opts ...ioStorage.Opt,
 ) (*Writer, error) {
 	w := &Writer{
 		client: client,
 	}
 	// Set default value.
-	w.uploadConcurrency = uploadStreamConcurrencyDefault
+	w.UploadConcurrency = uploadStreamConcurrencyDefault
 
 	for _, opt := range opts {
-		opt(&w.options)
+		opt(&w.Options)
 	}
 
-	if len(w.pathList) != 1 {
+	if len(w.PathList) != 1 {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if w.isDir {
-		w.prefix = cleanPath(w.pathList[0])
+	if w.IsDir {
+		w.prefix = ioStorage.CleanPath(w.PathList[0], false)
 	}
 
 	// Check if container exists.
@@ -74,21 +75,21 @@ func NewWriter(
 		return nil, fmt.Errorf("unable to get container properties: %w", err)
 	}
 
-	if w.isDir && !w.skipDirCheck {
+	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, client, containerName, w.prefix)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
 
-		if !isEmpty && !w.isRemovingFiles {
+		if !isEmpty && !w.IsRemovingFiles {
 			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 		}
 	}
 
 	w.containerName = containerName
 
-	if w.isRemovingFiles {
+	if w.IsRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
 		if err := w.RemoveFiles(ctx); err != nil {
 			return nil, fmt.Errorf("failed to remove files from folder: %w", err)
@@ -101,18 +102,18 @@ func NewWriter(
 // NewWriter returns a new Azure blob writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.isDir {
+	if !w.IsDir {
 		if !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 		// If we use backup to single file, we overwrite the file name.
-		filename = w.pathList[0]
+		filename = w.PathList[0]
 	}
 
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
 
-	return newBlobWriter(ctx, blockBlobClient, w.uploadConcurrency), nil
+	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency), nil
 }
 
 var _ io.WriteCloser = (*blobWriter)(nil)
@@ -202,10 +203,10 @@ func isEmptyDirectory(ctx context.Context, client *azblob.Client, containerName,
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	// Remove file.
-	if !w.isDir {
-		_, err := w.client.DeleteBlob(ctx, w.containerName, w.pathList[0], nil)
+	if !w.IsDir {
+		_, err := w.client.DeleteBlob(ctx, w.containerName, w.PathList[0], nil)
 		if err != nil {
-			return fmt.Errorf("failed to delete blob %s: %w", w.pathList[0], err)
+			return fmt.Errorf("failed to delete blob %s: %w", w.PathList[0], err)
 		}
 
 		return nil
@@ -223,13 +224,13 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 
 		for _, blob := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if isDirectory(w.prefix, *blob.Name) && !w.withNestedDir {
+			if ioStorage.IsDirectory(w.prefix, *blob.Name) && !w.WithNestedDir {
 				continue
 			}
 
 			// If validator is set, remove only valid files.
-			if w.validator != nil {
-				if err = w.validator.Run(*blob.Name); err != nil {
+			if w.Validator != nil {
+				if err = w.Validator.Run(*blob.Name); err != nil {
 					continue
 				}
 			}

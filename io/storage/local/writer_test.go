@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -31,7 +32,7 @@ func (suite *writerTestSuite) Test_openBackupFile() {
 	tmpDir := suite.T().TempDir()
 	ctx := context.Background()
 
-	factory, err := NewWriter(ctx, WithRemoveFiles(), WithDir(tmpDir))
+	factory, err := NewWriter(ctx, ioStorage.WithRemoveFiles(), ioStorage.WithDir(tmpDir))
 	suite.NoError(err)
 
 	w, err := factory.NewWriter(context.Background(), "test")
@@ -66,7 +67,7 @@ func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
 	tmpDir := suite.T().TempDir()
 	ctx := context.Background()
-	w, err := NewWriter(ctx, WithRemoveFiles(), WithDir(tmpDir))
+	w, err := NewWriter(ctx, ioStorage.WithRemoveFiles(), ioStorage.WithDir(tmpDir))
 	suite.NoError(err)
 
 	suite.Equal(localType, w.GetType())

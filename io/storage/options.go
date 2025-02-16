@@ -19,25 +19,31 @@ type validator interface {
 }
 
 type Options struct {
-	// pathList contains list of files or directories.
-	pathList []string
-	// isDir flag describes what we have in path, file or directory.
-	isDir bool
-	// isRemovingFiles flag describes should we remove everything from backup folder or not.
-	isRemovingFiles bool
-	// validator contains files validator that is applied to files if isDir = true.
-	validator validator
-	// withNestedDir describes if we should check for if an object is a directory for read/write operations.
+	// PathList contains list of files or directories.
+	PathList []string
+	// IsDir flag describes what we have in path, file or directory.
+	IsDir bool
+	// IsRemovingFiles flag describes should we remove everything from backup folder or not.
+	IsRemovingFiles bool
+	// Validator contains files Validator that is applied to files if IsDir = true.
+	Validator validator
+	// WithNestedDir describes if we should check for if an object is a directory for read/write operations.
 	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
 	// Default: false
-	withNestedDir bool
-	// startOffset is used to filter results to objects whose names are
-	// lexicographically equal to or after startOffset.
-	startOffset string
-	// skipDirCheck if true, backup directory won't be checked.
-	skipDirCheck bool
-	// sortFiles shows if we need to sort files before read.
-	sortFiles bool
+	WithNestedDir bool
+	// StartAfter is an artificial parameter. Used to skip objects in the storage.
+	// The Result will not include an object specified in startAfter.
+	// If it is set, then we compare the names received from the storage lexicographically,
+	// and if the name is less than the specified parameter, we skip this object.
+	StartAfter string
+	// SkipDirCheck, if true, backup directory won't be checked.
+	SkipDirCheck bool
+	// SortFiles shows if we need to sort files before read.
+	SortFiles bool
+
+	// Concurrency defines the max number of concurrent uploads to be performed to upload the file.
+	// Each concurrent upload will create a buffer of size BlockSize.
+	UploadConcurrency int
 }
 
 type Opt func(*Options)
@@ -45,8 +51,8 @@ type Opt func(*Options)
 // WithDir adds directory to reading/writing files from/to.
 func WithDir(path string) Opt {
 	return func(r *Options) {
-		r.pathList = append(r.pathList, path)
-		r.isDir = true
+		r.PathList = append(r.PathList, path)
+		r.IsDir = true
 	}
 }
 
@@ -54,16 +60,16 @@ func WithDir(path string) Opt {
 // Is used only for Reader.
 func WithDirList(pathList []string) Opt {
 	return func(r *Options) {
-		r.pathList = pathList
-		r.isDir = true
+		r.PathList = pathList
+		r.IsDir = true
 	}
 }
 
 // WithFile adds a file path to reading/writing from/to.
 func WithFile(path string) Opt {
 	return func(r *Options) {
-		r.pathList = append(r.pathList, path)
-		r.isDir = false
+		r.PathList = append(r.PathList, path)
+		r.IsDir = false
 	}
 }
 
@@ -71,23 +77,23 @@ func WithFile(path string) Opt {
 // Is used only for Reader.
 func WithFileList(pathList []string) Opt {
 	return func(r *Options) {
-		r.pathList = pathList
-		r.isDir = false
+		r.PathList = pathList
+		r.IsDir = false
 	}
 }
 
-// WithValidator adds validator to Reader, so files will be validated before reading.
+// WithValidator adds Validator to Reader, so files will be validated before reading.
 // Is used only for Reader.
 func WithValidator(v validator) Opt {
 	return func(r *Options) {
-		r.validator = v
+		r.Validator = v
 	}
 }
 
-// WithNestedDir adds withNestedDir = true parameter. That means that we won't skip nested folders.
+// WithNestedDir adds WithNestedDir = true parameter. That means that we won't skip nested folders.
 func WithNestedDir() Opt {
 	return func(r *Options) {
-		r.withNestedDir = true
+		r.WithNestedDir = true
 	}
 }
 
@@ -95,17 +101,15 @@ func WithNestedDir() Opt {
 // Is used only for Writer.
 func WithRemoveFiles() Opt {
 	return func(r *Options) {
-		r.isRemovingFiles = true
+		r.IsRemovingFiles = true
 	}
 }
 
-// WithStartOffset adds start offset parameter to list request.
-// The Value of start offset will be included in a result.
-// You will receive objects including start offset.
+// WithStartAfter adds start after parameter to list request.
 // Is used only for Reader.
-func WithStartOffset(v string) Opt {
+func WithStartAfter(v string) Opt {
 	return func(r *Options) {
-		r.startOffset = v
+		r.StartAfter = v
 	}
 }
 
@@ -113,7 +117,7 @@ func WithStartOffset(v string) Opt {
 // Which means that backup directory won't be checked for emptiness.
 func WithSkipDirCheck() Opt {
 	return func(r *Options) {
-		r.skipDirCheck = true
+		r.SkipDirCheck = true
 	}
 }
 
@@ -122,6 +126,16 @@ func WithSkipDirCheck() Opt {
 // Is used only for Reader.
 func WithSorting() Opt {
 	return func(r *Options) {
-		r.sortFiles = true
+		r.SortFiles = true
+	}
+}
+
+// NOT FOR ALL----------------------------
+
+// WithUploadConcurrency define max number of concurrent uploads to be performed to upload the file.
+// Is used only for Azure Writer.
+func WithUploadConcurrency(v int) Opt {
+	return func(r *Options) {
+		r.UploadConcurrency = v
 	}
 }

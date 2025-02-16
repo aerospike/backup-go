@@ -21,25 +21,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/aerospike/backup-go/internal/util"
-	"github.com/aerospike/backup-go/io/storage"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 )
 
 const localType = "directory"
 
-// Validator interface that describes backup files validator.
-// Must be part of encoder implementation.
-//
-//go:generate mockery --name Validator
-type validator interface {
-	Run(fileName string) error
-}
-
 // Reader represents local storage reader.
 type Reader struct {
 	// Optional parameters.
-	options
+	ioStorage.Options
 
 	// objectsToStream is used to predefine a list of objects that must be read from storage.
 	// If objectsToStream is not set, we iterate through objects in storage and load them.
@@ -50,25 +41,27 @@ type Reader struct {
 // NewReader creates a new local directory/file Reader.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithValidator(v validator) - optional.
-func NewReader(ctx context.Context, opts ...Opt) (*Reader, error) {
+func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 	r := &Reader{}
 
 	for _, opt := range opts {
-		opt(&r.options)
+		opt(&r.Options)
 	}
 
-	if len(r.pathList) == 0 {
+	if len(r.PathList) == 0 {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.isDir && !r.skipDirCheck {
-		if err := r.checkRestoreDirectory(r.pathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", storage.ErrEmptyStorage, err)
+	if r.IsDir && !r.SkipDirCheck {
+		if err := r.checkRestoreDirectory(r.PathList[0]); err != nil {
+			return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
 		}
 	}
 
-	if err := r.preSort(ctx); err != nil {
-		return nil, fmt.Errorf("failed to pre sort: %w", err)
+	if !r.SortFiles || len(r.PathList) != 1 {
+		if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+			return nil, fmt.Errorf("failed to pre sort: %w", err)
+		}
 	}
 
 	return r, nil
@@ -88,11 +81,11 @@ func (r *Reader) StreamFiles(
 		return
 	}
 
-	for _, path := range r.pathList {
+	for _, path := range r.PathList {
 		// If it is a folder, open and return.
-		switch r.isDir {
+		switch r.IsDir {
 		case true:
-			if !r.skipDirCheck {
+			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(path)
 				if err != nil {
 					errorsCh <- err
@@ -125,7 +118,7 @@ func (r *Reader) streamDirectory(
 
 		if file.IsDir() {
 			// Iterate over nested dirs recursively.
-			if r.withNestedDir {
+			if r.WithNestedDir {
 				nestedDir := filepath.Join(path, file.Name())
 				r.streamDirectory(ctx, nestedDir, readersCh, errorsCh)
 			}
@@ -135,8 +128,8 @@ func (r *Reader) streamDirectory(
 
 		filePath := filepath.Join(path, file.Name())
 
-		if r.validator != nil {
-			if err = r.validator.Run(filePath); err != nil {
+		if r.Validator != nil {
+			if err = r.Validator.Run(filePath); err != nil {
 				// Since we are passing invalid files, we don't need to handle this
 				// error and write a test for it. Maybe we should log this information
 				// for the user so they know what is going on.
@@ -168,13 +161,13 @@ func (r *Reader) StreamFile(
 	// This condition will be true, only if we initialized reader for directory and then want to read
 	// a specific file. It is used for state file and by asb service. So it must be initialized with only
 	// one path.
-	if r.isDir {
-		if len(r.pathList) != 1 {
+	if r.IsDir {
+		if len(r.PathList) != 1 {
 			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
 			return
 		}
 
-		filename = filepath.Join(r.pathList[0], filename)
+		filename = filepath.Join(r.PathList[0], filename)
 	}
 
 	reader, err := os.Open(filename)
@@ -206,11 +199,11 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 	}
 
 	switch {
-	case r.validator != nil:
+	case r.Validator != nil:
 		for _, file := range fileInfo {
 			if file.IsDir() {
 				// Iterate over nested dirs recursively.
-				if r.withNestedDir {
+				if r.WithNestedDir {
 					nestedDir := filepath.Join(dir, file.Name())
 					// If the nested folder is ok, then return nil.
 					if err = r.checkRestoreDirectory(nestedDir); err == nil {
@@ -222,7 +215,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 			}
 
 			// If we found a valid file, return.
-			if err = r.validator.Run(file.Name()); err == nil {
+			if err = r.Validator.Run(file.Name()); err == nil {
 				return nil
 			}
 		}
@@ -248,8 +241,8 @@ func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
 	}
 
 	for i := range fileInfo {
-		if r.validator != nil {
-			if err = r.validator.Run(fileInfo[i].Name()); err != nil {
+		if r.Validator != nil {
+			if err = r.Validator.Run(fileInfo[i].Name()); err != nil {
 				continue
 			}
 		}
@@ -275,28 +268,4 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 // GetType returns the type of the reader.
 func (r *Reader) GetType() string {
 	return localType
-}
-
-// preSort performs files sorting before read.
-func (r *Reader) preSort(ctx context.Context) error {
-	if !r.sortFiles || len(r.pathList) != 1 {
-		return nil
-	}
-
-	// List all files first.
-	list, err := r.ListObjects(ctx, r.pathList[0])
-	if err != nil {
-		return err
-	}
-
-	// Sort files.
-	list, err = util.SortBackupFiles(list)
-	if err != nil {
-		return err
-	}
-
-	// Pass sorted list to reader.
-	r.SetObjectsToStream(list)
-
-	return nil
 }

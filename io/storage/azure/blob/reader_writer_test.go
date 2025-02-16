@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -227,8 +228,8 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testReadFolderWithData),
-		WithValidator(validatorMock{}),
+		ioStorage.WithDir(testReadFolderWithData),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -264,8 +265,8 @@ func (s *AzureSuite) TestReader_WithSorting() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testReadFolderSorted),
-		WithSorting(),
+		ioStorage.WithDir(testReadFolderSorted),
+		ioStorage.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -307,8 +308,8 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testReadFolderEmpty),
-		WithValidator(validatorMock{}),
+		ioStorage.WithDir(testReadFolderEmpty),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().ErrorContains(err, "is empty")
 }
@@ -324,8 +325,8 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testReadFolderMixedData),
-		WithValidator(validatorMock{}),
+		ioStorage.WithDir(testReadFolderMixedData),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -361,31 +362,13 @@ func (s *AzureSuite) TestReader_GetType() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testReadFolderMixedData),
-		WithValidator(validatorMock{}),
+		ioStorage.WithDir(testReadFolderMixedData),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
 	result := reader.GetType()
 	require.Equal(s.T(), azureBlobType, result)
-}
-
-func (s *AzureSuite) TestReader_isDirectory() {
-	prefix := "/"
-	fileNames := []string{
-		"test/innerfldr/",
-		"test/innerfldr/test_inner.asb",
-		"test/test.asb",
-		"test/test2.asb",
-		"test3.asb",
-	}
-	var dirCounter int
-	for i := range fileNames {
-		if isDirectory(prefix, fileNames[i]) {
-			dirCounter++
-		}
-	}
-	require.Equal(s.T(), 4, dirCounter)
 }
 
 func (s *AzureSuite) TestReader_OpenFileOk() {
@@ -399,7 +382,7 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 		ctx,
 		client,
 		testContainerName,
-		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
+		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
@@ -435,7 +418,7 @@ func (s *AzureSuite) TestReader_OpenFileErr() {
 		ctx,
 		client,
 		testContainerName,
-		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
+		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
 	)
 	s.Require().NoError(err)
 
@@ -461,7 +444,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testWriteFolderEmpty),
+		ioStorage.WithDir(testWriteFolderEmpty),
 	)
 	s.Require().NoError(err)
 
@@ -488,7 +471,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testWriteFolderWithDataError),
+		ioStorage.WithDir(testWriteFolderWithDataError),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -504,8 +487,8 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testWriteFolderWithData),
-		WithRemoveFiles(),
+		ioStorage.WithDir(testWriteFolderWithData),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -532,8 +515,8 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testWriteFolderMixedData),
-		WithRemoveFiles(),
+		ioStorage.WithDir(testWriteFolderMixedData),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -560,7 +543,7 @@ func (s *AzureSuite) TestWriter_WriteSingleFile() {
 		ctx,
 		client,
 		testContainerName,
-		WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
+		ioStorage.WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
@@ -584,8 +567,8 @@ func (s *AzureSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testWriteFolderWithData),
-		WithRemoveFiles(),
+		ioStorage.WithDir(testWriteFolderWithData),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -606,11 +589,11 @@ func (s *AzureSuite) TestReader_WithMarker() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testReadFolderWithMarker),
-		WithStartAfter(marker),
-		WithUploadConcurrency(5),
-		WithSkipDirCheck(),
-		WithNestedDir(),
+		ioStorage.WithDir(testReadFolderWithMarker),
+		ioStorage.WithStartAfter(marker),
+		ioStorage.WithUploadConcurrency(5),
+		ioStorage.WithSkipDirCheck(),
+		ioStorage.WithNestedDir(),
 	)
 	s.Require().NoError(err)
 
@@ -651,9 +634,9 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 		ctx,
 		client,
 		testContainerName,
-		WithDirList(pathList),
-		WithValidator(validatorMock{}),
-		WithSkipDirCheck(),
+		ioStorage.WithDirList(pathList),
+		ioStorage.WithValidator(validatorMock{}),
+		ioStorage.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -694,8 +677,8 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 		ctx,
 		client,
 		testContainerName,
-		WithFileList(pathList),
-		WithValidator(validatorMock{}),
+		ioStorage.WithFileList(pathList),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -731,7 +714,7 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 		ctx,
 		client,
 		testContainerName,
-		WithDir(testFolderMixedBackups),
+		ioStorage.WithDir(testFolderMixedBackups),
 	)
 	s.Require().NoError(err)
 

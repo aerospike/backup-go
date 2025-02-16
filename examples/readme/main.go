@@ -21,7 +21,8 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/local"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local"
 )
 
 func main() {
@@ -40,8 +41,8 @@ func main() {
 	// For backup to single file use local.WithFile(fileName)
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithRemoveFiles(),
-		local.WithDir("backups_folder"),
+		ioStorage.WithRemoveFiles(),
+		ioStorage.WithDir("backups_folder"),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -71,8 +72,8 @@ func main() {
 	// For restore from single file use local.WithFile(fileName)
 	reader, err := local.NewReader(
 		ctx,
-		local.WithDir("backups_folder"),
-		local.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir("backups_folder"),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
 		log.Fatal(err)

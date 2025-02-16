@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	s3Storasge "github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	s3Storasge "github.com/aerospike/backup-go/io/storage/aws/s3"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -124,8 +125,8 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		s3Storasge.WithDir(backupDir),
-		s3Storasge.WithRemoveFiles(),
+		ioStorage.WithDir(backupDir),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -156,7 +157,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		s3Storasge.WithDir(backupDir),
+		ioStorage.WithDir(backupDir),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 
@@ -168,8 +169,8 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		s3Storasge.WithDir(backupDir),
-		s3Storasge.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(backupDir),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)
 
@@ -197,8 +198,8 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 		ctx,
 		client,
 		"backup",
-		s3Storasge.WithFile(backupFile),
-		s3Storasge.WithRemoveFiles(),
+		ioStorage.WithFile(backupFile),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -232,8 +233,8 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		s3Storasge.WithFile(backupFile),
-		s3Storasge.WithValidator(asb.NewValidator()),
+		ioStorage.WithFile(backupFile),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)
 

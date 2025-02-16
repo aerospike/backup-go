@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 )
 
 const bufferSize = 4096 * 1024 // 4mb
@@ -29,7 +31,7 @@ const bufferSize = 4096 * 1024 // 4mb
 // Writer represents a local storage writer.
 type Writer struct {
 	// Optional parameters.
-	options
+	ioStorage.Options
 	// Sync for running backup to one file.
 	called atomic.Bool
 }
@@ -37,42 +39,42 @@ type Writer struct {
 // NewWriter creates a new writer for local directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
-func NewWriter(ctx context.Context, opts ...Opt) (*Writer, error) {
+func NewWriter(ctx context.Context, opts ...ioStorage.Opt) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {
-		opt(&w.options)
+		opt(&w.Options)
 	}
 
-	if len(w.pathList) != 1 {
+	if len(w.PathList) != 1 {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
 	// If directory not exists, we don't need to check it for emptiness.
 	// For writer wi don't support pathList, so our path will always be the first element.
-	path := w.pathList[0]
-	if !w.isDir {
-		path = filepath.Dir(w.pathList[0])
+	path := w.PathList[0]
+	if !w.IsDir {
+		path = filepath.Dir(w.PathList[0])
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return w, nil
 	}
 
-	if w.isDir && !w.skipDirCheck {
+	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
-		isEmpty, err := isEmptyDirectory(w.pathList[0])
+		isEmpty, err := isEmptyDirectory(w.PathList[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
 
-		if !isEmpty && !w.isRemovingFiles {
+		if !isEmpty && !w.IsRemovingFiles {
 			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 		}
 	}
 
 	// If we want to remove files from backup path.
-	if w.isRemovingFiles {
+	if w.IsRemovingFiles {
 		err := w.RemoveFiles(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to remove files: %w", err)
@@ -124,7 +126,7 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	info, err := os.Stat(w.pathList[0])
+	info, err := os.Stat(w.PathList[0])
 
 	switch {
 	case err == nil:
@@ -133,40 +135,40 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 		// File doesn't exist, it's ok.
 		return nil
 	default:
-		return fmt.Errorf("failed to stat path %s: %w", w.pathList[0], err)
+		return fmt.Errorf("failed to stat path %s: %w", w.PathList[0], err)
 	}
 	// if it is a file.
 	if !info.IsDir() {
-		if err = os.Remove(w.pathList[0]); err != nil {
-			return fmt.Errorf("failed to remove file %s: %w", w.pathList[0], err)
+		if err = os.Remove(w.PathList[0]); err != nil {
+			return fmt.Errorf("failed to remove file %s: %w", w.PathList[0], err)
 		}
 
 		return nil
 	}
 
-	if w.withNestedDir {
-		if err = os.RemoveAll(w.pathList[0]); err != nil {
-			return fmt.Errorf("failed to remove path %s: %w", w.pathList[0], err)
+	if w.WithNestedDir {
+		if err = os.RemoveAll(w.PathList[0]); err != nil {
+			return fmt.Errorf("failed to remove path %s: %w", w.PathList[0], err)
 		}
 
 		return nil
 	}
 
 	// If it is a dir.
-	files, err := os.ReadDir(w.pathList[0])
+	files, err := os.ReadDir(w.PathList[0])
 	if err != nil {
-		return fmt.Errorf("failed to read directory %s: %w", w.pathList[0], err)
+		return fmt.Errorf("failed to read directory %s: %w", w.PathList[0], err)
 	}
 
 	for _, file := range files {
-		filePath := filepath.Join(w.pathList[0], file.Name())
+		filePath := filepath.Join(w.PathList[0], file.Name())
 		// Skip folders.
 		if file.IsDir() {
 			continue
 		}
 		// If validator is set, remove only valid files.
-		if w.validator != nil {
-			if err = w.validator.Run(filePath); err != nil {
+		if w.Validator != nil {
+			if err = w.Validator.Run(filePath); err != nil {
 				continue
 			}
 		}
@@ -201,21 +203,21 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 	}
 
 	// Create directory only if we have something to back up to this directory.
-	err := createDirIfNotExist(w.pathList[0], w.isDir)
+	err := createDirIfNotExist(w.PathList[0], w.IsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
 	// protection for single file backup.
-	if !w.isDir {
+	if !w.IsDir {
 		if !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 	}
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
-	filePath := w.pathList[0]
-	if w.isDir {
-		filePath = filepath.Join(w.pathList[0], fileName)
+	filePath := w.PathList[0]
+	if w.IsDir {
+		filePath = filepath.Join(w.PathList[0], fileName)
 	}
 
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)

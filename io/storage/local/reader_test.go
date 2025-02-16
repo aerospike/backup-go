@@ -21,7 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/io/local/mocks"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,12 @@ func (s *readerTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	reader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithSkipDirCheck())
+	reader, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir(dir),
+		ioStorage.WithSkipDirCheck(),
+	)
 	s.NoError(err)
 	err = reader.checkRestoreDirectory(dir)
 	s.Error(err)
@@ -73,7 +79,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	streamingReader, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -109,7 +115,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -143,7 +149,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	_, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	_, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
 	s.Require().ErrorContains(err, "is empty")
 }
 
@@ -160,7 +166,12 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir("file1.asb"), WithSkipDirCheck())
+	streamingReader, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir("file1.asb"),
+		ioStorage.WithSkipDirCheck(),
+	)
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -195,7 +206,12 @@ func (s *readerTestSuite) TestDirectoryReader_GetType() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithSkipDirCheck())
+	r, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir(dir),
+		ioStorage.WithSkipDirCheck(),
+	)
 	s.Require().NoError(err)
 
 	s.Equal(localType, r.GetType())
@@ -233,7 +249,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
 
 	path := filepath.Join(dir, fileName)
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithFile(path))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -265,7 +281,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
 
 	path := filepath.Join(dir, "error")
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithFile(path))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -310,7 +326,12 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithNestedDir())
+	streamingReader, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir(dir),
+		ioStorage.WithNestedDir(),
+	)
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -364,8 +385,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 
 	r, err := NewReader(
 		ctx,
-		WithValidator(mockValidator),
-		WithFileList(pathList),
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithFileList(pathList),
 	)
 	s.Require().NoError(err)
 
@@ -420,8 +441,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 
 	r, err := NewReader(
 		ctx,
-		WithValidator(mockValidator),
-		WithDirList(pathList),
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDirList(pathList),
 	)
 	s.Require().NoError(err)
 
@@ -459,8 +480,8 @@ func (s *readerTestSuite) TestReader_WithSorting() {
 	ctx := context.Background()
 	r, err := NewReader(
 		ctx,
-		WithDir(dir),
-		WithSorting(),
+		ioStorage.WithDir(dir),
+		ioStorage.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -497,7 +518,7 @@ func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
 
 	r, err := NewReader(
 		ctx,
-		WithDir(dir),
+		ioStorage.WithDir(dir),
 	)
 	s.Require().NoError(err)
 

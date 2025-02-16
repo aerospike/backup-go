@@ -81,7 +81,8 @@ type infoCommander interface {
 // It reads receives records from an Aerospike database through XDR protocol
 // and returns them as *models.ASBXToken.
 type RecordReader struct {
-	ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
 	// Info client to start and stop XDR, also to get current state.
 	infoClient infoCommander
 	// Records reader config.
@@ -108,9 +109,10 @@ func NewRecordReader(
 	logger *slog.Logger,
 ) (*RecordReader, error) {
 	tcpSrv := NewTCPServer(config.tcpConfig, logger)
-
+	ctx, cancel := context.WithCancel(ctx)
 	rr := &RecordReader{
 		ctx:        ctx,
+		cancel:     cancel,
 		infoClient: infoClient,
 		config:     config,
 		tcpServer:  tcpSrv,
@@ -180,6 +182,8 @@ func (r *RecordReader) Close() {
 	if err := r.tcpServer.Stop(); err != nil {
 		r.logger.Error("failed to stop tcp server", slog.Any("error", err))
 	}
+
+	r.cancel()
 
 	r.logger.Debug("closed aerospike xdr record reader")
 }

@@ -21,7 +21,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/io/local/mocks"
+	"github.com/aerospike/backup-go/internal/util"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,13 +41,18 @@ func (s *readerTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	reader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithSkipDirCheck())
+	reader, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir(dir),
+		ioStorage.WithSkipDirCheck(),
+	)
 	s.NoError(err)
 	err = reader.checkRestoreDirectory(dir)
 	s.Error(err)
@@ -67,13 +74,13 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	streamingReader, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -103,13 +110,13 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -137,13 +144,13 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	_, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir))
+	_, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
 	s.Require().ErrorContains(err, "is empty")
 }
 
@@ -154,13 +161,18 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir("file1.asb"), WithSkipDirCheck())
+	streamingReader, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir("file1.asb"),
+		ioStorage.WithSkipDirCheck(),
+	)
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -189,13 +201,18 @@ func (s *readerTestSuite) TestDirectoryReader_GetType() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithSkipDirCheck())
+	r, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir(dir),
+		ioStorage.WithSkipDirCheck(),
+	)
 	s.Require().NoError(err)
 
 	s.Equal(localType, r.GetType())
@@ -233,7 +250,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
 
 	path := filepath.Join(dir, fileName)
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithFile(path))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -265,7 +282,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
 
 	path := filepath.Join(dir, "error")
 	ctx := context.Background()
-	r, err := NewReader(ctx, WithValidator(mockValidator), WithFile(path))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -304,13 +321,18 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, WithValidator(mockValidator), WithDir(dir), WithNestedDir())
+	streamingReader, err := NewReader(
+		ctx,
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDir(dir),
+		ioStorage.WithNestedDir(),
+	)
 	s.Require().NoError(err)
 
 	readerChan := make(chan models.File)
@@ -349,7 +371,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -364,8 +386,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 
 	r, err := NewReader(
 		ctx,
-		WithValidator(mockValidator),
-		WithFileList(pathList),
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithFileList(pathList),
 	)
 	s.Require().NoError(err)
 
@@ -405,7 +427,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -420,8 +442,8 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 
 	r, err := NewReader(
 		ctx,
-		WithValidator(mockValidator),
-		WithDirList(pathList),
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithDirList(pathList),
 	)
 	s.Require().NoError(err)
 
@@ -459,8 +481,8 @@ func (s *readerTestSuite) TestReader_WithSorting() {
 	ctx := context.Background()
 	r, err := NewReader(
 		ctx,
-		WithDir(dir),
-		WithSorting(),
+		ioStorage.WithDir(dir),
+		ioStorage.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -488,16 +510,25 @@ func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
 	dir := s.T().TempDir()
 	ctx := context.Background()
 
-	expResult := []string{"file3.asb", "file2.asbx", "file1.asb", "file2.asb", "file1.asbx"}
+	expResult := []string{"file3.asb", "0_file_2.asbx", "file1.asb", "file2.asb", "0_file_1.asbx"}
 
 	for i := range expResult {
 		err := createTmpFile(dir, expResult[i])
 		require.NoError(s.T(), err)
 	}
 
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == util.FileExtAsbx {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
 	r, err := NewReader(
 		ctx,
-		WithDir(dir),
+		ioStorage.WithDir(dir),
+		ioStorage.WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 
@@ -529,9 +560,9 @@ func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
 func filterList(list []string) (asbList, asbxList []string) {
 	for i := range list {
 		switch filepath.Ext(list[i]) {
-		case ".asb":
+		case util.FileExtAsb:
 			asbList = append(asbList, list[i])
-		case ".asbx":
+		case util.FileExtAsbx:
 			asbxList = append(asbxList, list[i])
 		}
 	}

@@ -22,7 +22,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/io/local/mocks"
+	"github.com/aerospike/backup-go/internal/util"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -209,10 +211,10 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 		ctx,
 		client,
 		testBucket,
-		WithDir(testFolderStartAfter),
-		WithStartAfter(startAfter),
-		WithSkipDirCheck(),
-		WithNestedDir(),
+		ioStorage.WithDir(testFolderStartAfter),
+		ioStorage.WithStartAfter(startAfter),
+		ioStorage.WithSkipDirCheck(),
+		ioStorage.WithNestedDir(),
 	)
 	s.Require().NoError(err)
 
@@ -244,7 +246,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -259,9 +261,9 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 		ctx,
 		client,
 		testBucket,
-		WithDirList(pathList),
-		WithValidator(mockValidator),
-		WithSkipDirCheck(),
+		ioStorage.WithDirList(pathList),
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -293,7 +295,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asb" {
+		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -308,8 +310,8 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 		ctx,
 		client,
 		testBucket,
-		WithFileList(pathList),
-		WithValidator(mockValidator),
+		ioStorage.WithFileList(pathList),
+		ioStorage.WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 
@@ -341,7 +343,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == ".asbx" {
+		if filepath.Ext(fileName) == util.FileExtAsbx {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -351,9 +353,9 @@ func (s *AwsSuite) TestReader_WithSorting() {
 		ctx,
 		client,
 		testBucket,
-		WithDir(testFolderSorted),
-		WithValidator(mockValidator),
-		WithSorting(),
+		ioStorage.WithDir(testFolderSorted),
+		ioStorage.WithValidator(mockValidator),
+		ioStorage.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -393,7 +395,7 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 		ctx,
 		client,
 		testBucket,
-		WithDir(testFolderMixed),
+		ioStorage.WithDir(testFolderMixed),
 	)
 	s.Require().NoError(err)
 
@@ -432,9 +434,9 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 func filterList(list []string) (asbList, asbxList []string) {
 	for i := range list {
 		switch filepath.Ext(list[i]) {
-		case ".asb":
+		case util.FileExtAsb:
 			asbList = append(asbList, list[i])
-		case ".asbx":
+		case util.FileExtAsbx:
 			asbxList = append(asbxList, list[i])
 		}
 	}

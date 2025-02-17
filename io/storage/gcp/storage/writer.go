@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"google.golang.org/api/iterator"
 )
 
@@ -33,7 +34,7 @@ const (
 // Writer represents a GCP storage writer.
 type Writer struct {
 	// Optional parameters.
-	options
+	ioStorage.Options
 	// bucketName contains bucket name, is used for logging.
 	bucketName string
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
@@ -51,20 +52,20 @@ func NewWriter(
 	ctx context.Context,
 	client *storage.Client,
 	bucketName string,
-	opts ...Opt,
+	opts ...ioStorage.Opt,
 ) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {
-		opt(&w.options)
+		opt(&w.Options)
 	}
 
-	if len(w.pathList) != 1 {
+	if len(w.PathList) != 1 {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if w.isDir {
-		w.prefix = cleanPath(w.pathList[0])
+	if w.IsDir {
+		w.prefix = ioStorage.CleanPath(w.PathList[0], false)
 	}
 
 	bucketHandler := client.Bucket(bucketName)
@@ -74,21 +75,21 @@ func NewWriter(
 		return nil, fmt.Errorf("failed to get bucketHandler %s attr: %w", bucketName, err)
 	}
 
-	if w.isDir && !w.skipDirCheck {
+	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, bucketHandler, w.prefix)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
 
-		if !isEmpty && !w.isRemovingFiles {
+		if !isEmpty && !w.IsRemovingFiles {
 			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 		}
 	}
 
 	w.bucketHandle = bucketHandler
 
-	if w.isRemovingFiles {
+	if w.IsRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucketHandler.
 		if err = w.RemoveFiles(ctx); err != nil {
 			return nil, fmt.Errorf("failed to remove files from folder: %w", err)
@@ -101,12 +102,12 @@ func NewWriter(
 // NewWriter returns a new GCP storage writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.isDir {
+	if !w.IsDir {
 		if !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 		// If we use backup to single file, we overwrite the file name.
-		filename = w.pathList[0]
+		filename = w.PathList[0]
 	}
 
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
@@ -122,16 +123,16 @@ func (w *Writer) RemoveFiles(
 	ctx context.Context,
 ) error {
 	// Remove file.
-	if !w.isDir {
-		if err := w.bucketHandle.Object(w.pathList[0]).Delete(ctx); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", w.pathList[0], err)
+	if !w.IsDir {
+		if err := w.bucketHandle.Object(w.PathList[0]).Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", w.PathList[0], err)
 		}
 
 		return nil
 	}
 	// Remove files from dir.
 	it := w.bucketHandle.Objects(ctx, &storage.Query{
-		Prefix: w.pathList[0],
+		Prefix: w.PathList[0],
 	})
 
 	for {
@@ -146,13 +147,13 @@ func (w *Writer) RemoveFiles(
 		}
 
 		// Skip files in folders.
-		if isDirectory(w.pathList[0], objAttrs.Name) && !w.withNestedDir {
+		if ioStorage.IsDirectory(w.PathList[0], objAttrs.Name) && !w.WithNestedDir {
 			continue
 		}
 
 		// If validator is set, remove only valid files.
-		if w.validator != nil {
-			if err = w.validator.Run(objAttrs.Name); err != nil {
+		if w.Validator != nil {
+			if err = w.Validator.Run(objAttrs.Name); err != nil {
 				continue
 			}
 		}
@@ -187,7 +188,7 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 		}
 
 		// Skip files in folders.
-		if isDirectory(prefix, objAttrs.Name) {
+		if ioStorage.IsDirectory(prefix, objAttrs.Name) {
 			continue
 		}
 

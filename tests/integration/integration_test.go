@@ -29,7 +29,8 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/local"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/aerospike/backup-go/tests"
@@ -376,8 +377,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	backupDir := suite.T().TempDir()
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithValidator(asb.NewValidator()),
-		local.WithDir(backupDir),
+		ioStorage.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(backupDir),
 	)
 	suite.Nil(err)
 
@@ -411,7 +412,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = suite.testClient.Truncate(suite.namespace, suite.set)
 	suite.Nil(err)
 
-	readers, err := local.NewReader(ctx, local.WithDir(backupDir))
+	readers, err := local.NewReader(ctx, ioStorage.WithDir(backupDir))
 	suite.Nil(err)
 	rh, err := suite.backupClient.Restore(
 		ctx,
@@ -442,8 +443,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	_, err = local.NewWriter(
 		ctx,
-		local.WithValidator(asb.NewValidator()),
-		local.WithDir(backupDir),
+		ioStorage.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(backupDir),
 	)
 	suite.ErrorContains(err, "must be empty")
 }
@@ -551,9 +552,9 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	backupDir := suite.T().TempDir()
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithValidator(asb.NewValidator()),
-		local.WithDir(backupDir),
-		local.WithRemoveFiles(),
+		ioStorage.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(backupDir),
+		ioStorage.WithRemoveFiles(),
 	)
 	suite.Require().NoError(err)
 	bh, err := suite.backupClient.Backup(
@@ -572,7 +573,7 @@ func (suite *backupRestoreTestSuite) TestBackupRestoreIOWithPartitions() {
 	suite.Nil(err)
 
 	restoreConfig := backup.NewDefaultRestoreConfig()
-	readers, err := local.NewReader(ctx, local.WithDir(backupDir))
+	readers, err := local.NewReader(ctx, ioStorage.WithDir(backupDir))
 	suite.Nil(err)
 
 	rh, err := suite.backupClient.Restore(
@@ -1149,16 +1150,16 @@ func (suite *backupRestoreTestSuite) runFirstBackup(ctx context.Context, testFol
 
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithValidator(asb.NewValidator()),
-		local.WithSkipDirCheck(),
-		local.WithDir(bFolder),
+		ioStorage.WithValidator(asb.NewValidator()),
+		ioStorage.WithSkipDirCheck(),
+		ioStorage.WithDir(bFolder),
 	)
 	suite.Nil(err)
 
 	readers, err := local.NewReader(
 		ctx,
-		local.WithDir(bFolder),
-		local.WithSkipDirCheck(),
+		ioStorage.WithDir(bFolder),
+		ioStorage.WithSkipDirCheck(),
 	)
 	suite.Nil(err)
 
@@ -1191,15 +1192,15 @@ func (suite *backupRestoreTestSuite) runContinueBackup(ctx context.Context, test
 
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithValidator(asb.NewValidator()),
-		local.WithSkipDirCheck(),
-		local.WithDir(bFolder),
+		ioStorage.WithValidator(asb.NewValidator()),
+		ioStorage.WithSkipDirCheck(),
+		ioStorage.WithDir(bFolder),
 	)
 	suite.Nil(err)
 
 	readers, err := local.NewReader(
 		ctx,
-		local.WithDir(bFolder),
+		ioStorage.WithDir(bFolder),
 	)
 	suite.Nil(err)
 

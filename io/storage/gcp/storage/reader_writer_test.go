@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/internal/util"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -280,7 +282,7 @@ func writeContent(sw *storage.Writer, content string) error {
 type validatorMock struct{}
 
 func (mock validatorMock) Run(fileName string) error {
-	if !strings.HasSuffix(fileName, ".asb") {
+	if !strings.HasSuffix(fileName, util.FileExtAsb) {
 		return fmt.Errorf("file name must end with .asb")
 	}
 	return nil
@@ -299,8 +301,8 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testReadFolderWithData),
-		WithValidator(validatorMock{}),
+		ioStorage.WithDir(testReadFolderWithData),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -338,8 +340,8 @@ func (s *GCPSuite) TestReader_WithSorting() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testReadFolderSorted),
-		WithSorting(),
+		ioStorage.WithDir(testReadFolderSorted),
+		ioStorage.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -383,9 +385,9 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testReadFolderEmpty),
-		WithValidator(validatorMock{}),
-		WithNestedDir(),
+		ioStorage.WithDir(testReadFolderEmpty),
+		ioStorage.WithValidator(validatorMock{}),
+		ioStorage.WithNestedDir(),
 	)
 	s.Require().ErrorContains(err, "is empty")
 }
@@ -403,8 +405,8 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testReadFolderMixedData),
-		WithValidator(validatorMock{}),
+		ioStorage.WithDir(testReadFolderMixedData),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -442,31 +444,13 @@ func (s *GCPSuite) TestReader_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testReadFolderMixedData),
-		WithValidator(validatorMock{}),
+		ioStorage.WithDir(testReadFolderMixedData),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
 	result := reader.GetType()
 	require.Equal(s.T(), gcpStorageType, result)
-}
-
-func (s *GCPSuite) TestReader_isDirectory() {
-	prefix := "/"
-	fileNames := []string{
-		"test/innerfldr/",
-		"test/innerfldr/test_inner.asb",
-		"test/test.asb",
-		"test/test2.asb",
-		"test3.asb",
-	}
-	var dirCounter int
-	for i := range fileNames {
-		if isDirectory(prefix, fileNames[i]) {
-			dirCounter++
-		}
-	}
-	require.Equal(s.T(), 4, dirCounter)
 }
 
 func (s *GCPSuite) TestWriter_WriteEmptyDir() {
@@ -482,7 +466,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testWriteFolderEmpty),
+		ioStorage.WithDir(testWriteFolderEmpty),
 	)
 	s.Require().NoError(err)
 
@@ -511,7 +495,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testWriteFolderWithDataError),
+		ioStorage.WithDir(testWriteFolderWithDataError),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -529,8 +513,8 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testWriteFolderWithData),
-		WithRemoveFiles(),
+		ioStorage.WithDir(testWriteFolderWithData),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -559,8 +543,8 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testWriteFolderMixedData),
-		WithRemoveFiles(),
+		ioStorage.WithDir(testWriteFolderMixedData),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -589,8 +573,8 @@ func (s *GCPSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testWriteFolderWithData),
-		WithRemoveFiles(),
+		ioStorage.WithDir(testWriteFolderWithData),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -611,7 +595,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 		ctx,
 		client,
 		testBucketName,
-		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
+		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
@@ -649,7 +633,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 		ctx,
 		client,
 		testBucketName,
-		WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
+		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
 	)
 	s.Require().NoError(err)
 
@@ -677,7 +661,7 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 		ctx,
 		client,
 		testBucketName,
-		WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
+		ioStorage.WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
@@ -705,10 +689,10 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testReadFolderWithStartOffset),
-		WithStartOffset(startOffset),
-		WithSkipDirCheck(),
-		WithNestedDir(),
+		ioStorage.WithDir(testReadFolderWithStartOffset),
+		ioStorage.WithStartAfter(startOffset),
+		ioStorage.WithSkipDirCheck(),
+		ioStorage.WithNestedDir(),
 	)
 	s.Require().NoError(err)
 
@@ -751,9 +735,9 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 		ctx,
 		client,
 		testBucketName,
-		WithDirList(pathList),
-		WithValidator(validatorMock{}),
-		WithSkipDirCheck(),
+		ioStorage.WithDirList(pathList),
+		ioStorage.WithValidator(validatorMock{}),
+		ioStorage.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -796,8 +780,8 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 		ctx,
 		client,
 		testBucketName,
-		WithFileList(pathList),
-		WithValidator(validatorMock{}),
+		ioStorage.WithFileList(pathList),
+		ioStorage.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -835,7 +819,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 		ctx,
 		client,
 		testBucketName,
-		WithDir(testFolderMixedBackups),
+		ioStorage.WithDir(testFolderMixedBackups),
 	)
 	s.Require().NoError(err)
 
@@ -873,9 +857,9 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 func filterList(list []string) (asbList, asbxList []string) {
 	for i := range list {
 		switch filepath.Ext(list[i]) {
-		case ".asb":
+		case util.FileExtAsb:
 			asbList = append(asbList, list[i])
-		case ".asbx":
+		case util.FileExtAsbx:
 			asbxList = append(asbxList, list[i])
 		}
 	}

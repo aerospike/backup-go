@@ -26,7 +26,8 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
-	"github.com/aerospike/backup-go/io/local"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -145,9 +146,9 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithValidator(asbx.NewValidator()),
-		local.WithRemoveFiles(),
-		local.WithDir(backupDir),
+		ioStorage.WithValidator(asbx.NewValidator()),
+		ioStorage.WithRemoveFiles(),
+		ioStorage.WithDir(backupDir),
 	)
 	s.Require().NoError(err)
 
@@ -199,9 +200,9 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithValidator(asbx.NewValidator()),
-		local.WithRemoveFiles(),
-		local.WithDir(backupDir),
+		ioStorage.WithValidator(asbx.NewValidator()),
+		ioStorage.WithRemoveFiles(),
+		ioStorage.WithDir(backupDir),
 	)
 	s.Require().NoError(err)
 

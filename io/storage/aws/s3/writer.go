@@ -21,9 +21,9 @@ import (
 	"io"
 	"os"
 	"path"
-	"strings"
 	"sync/atomic"
 
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -34,7 +34,7 @@ const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part
 // Writer represents a s3 storage writer.
 type Writer struct {
 	// Optional parameters.
-	options
+	ioStorage.Options
 
 	client *s3.Client
 	// bucketName contains name of the bucket to read from.
@@ -55,20 +55,20 @@ func NewWriter(
 	ctx context.Context,
 	client *s3.Client,
 	bucketName string,
-	opts ...Opt,
+	opts ...ioStorage.Opt,
 ) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {
-		opt(&w.options)
+		opt(&w.Options)
 	}
 
-	if len(w.pathList) != 1 {
+	if len(w.PathList) != 1 {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if w.isDir {
-		w.prefix = cleanPath(w.pathList[0])
+	if w.IsDir {
+		w.prefix = ioStorage.CleanPath(w.PathList[0], true)
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -79,14 +79,14 @@ func NewWriter(
 		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)
 	}
 
-	if w.isDir && !w.skipDirCheck {
+	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, client, bucketName, w.prefix)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if the directory is empty: %w", err)
 		}
 
-		if !isEmpty && !w.isRemovingFiles {
+		if !isEmpty && !w.IsRemovingFiles {
 			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 		}
 	}
@@ -94,7 +94,7 @@ func NewWriter(
 	w.client = client
 	w.bucketName = bucketName
 
-	if w.isRemovingFiles {
+	if w.IsRemovingFiles {
 		err = w.RemoveFiles(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to delete files under prefix %s: %w", w.prefix, err)
@@ -107,12 +107,12 @@ func NewWriter(
 // NewWriter returns a new S3 writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.isDir {
+	if !w.IsDir {
 		if !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 		// If we use backup to single file, we overwrite the file name.
-		filename = w.pathList[0]
+		filename = w.PathList[0]
 	}
 
 	fullPath := path.Join(w.prefix, filename)
@@ -250,12 +250,12 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	// Remove file.
-	if !w.isDir {
+	if !w.IsDir {
 		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 			Bucket: aws.String(w.bucketName),
-			Key:    aws.String(w.pathList[0]),
+			Key:    aws.String(w.PathList[0]),
 		}); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", w.pathList[0], err)
+			return fmt.Errorf("failed to delete object %s: %w", w.PathList[0], err)
 		}
 
 		return nil
@@ -274,13 +274,13 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || isDirectory(w.prefix, *p.Key) && !w.withNestedDir {
+			if p.Key == nil || ioStorage.IsDirectory(w.prefix, *p.Key) && !w.WithNestedDir {
 				continue
 			}
 
 			// If validator is set, remove only valid files.
-			if w.validator != nil {
-				if err = w.validator.Run(*p.Key); err != nil {
+			if w.Validator != nil {
+				if err = w.Validator.Run(*p.Key); err != nil {
 					continue
 				}
 			}
@@ -301,25 +301,4 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func isDirectory(prefix, fileName string) bool {
-	// If file name ends with / it is 100% dir.
-	if strings.HasSuffix(fileName, "/") {
-		return true
-	}
-
-	// If we look inside some folder.
-	if strings.HasPrefix(fileName, prefix) {
-		// fix prefix if it doesn't have /
-		if !strings.HasSuffix(prefix, "/") {
-			prefix += "/"
-		}
-
-		clean := strings.TrimPrefix(fileName, prefix)
-
-		return strings.Contains(clean, "/")
-	}
-	// All other variants.
-	return strings.Contains(fileName, "/")
 }

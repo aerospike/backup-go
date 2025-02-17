@@ -21,8 +21,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/azure/blob"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/azure/blob"
 )
 
 const (
@@ -87,8 +88,8 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		ctx,
 		client,
 		containerName,
-		blob.WithDir(folderName),
-		blob.WithRemoveFiles(),
+		ioStorage.WithDir(folderName),
+		ioStorage.WithRemoveFiles(),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -133,8 +134,8 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		ctx,
 		client,
 		containerName,
-		blob.WithDir(folderName),
-		blob.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(folderName),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
 		log.Fatal(err)

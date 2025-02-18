@@ -402,7 +402,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 // processMessage serves h.bodyQueue. When a message is received, we try to parse it
 // and send it to h.resultChan, also ack messages is created for this message and sent to h.ackQueue.
 func (h *ConnectionHandler) processMessage(ctx context.Context) {
-	// On exit from this function, we close this channel to send signal for the next goroutine toi stop.
+	// On exit from this function, we close this channel to send signal for the next goroutine to stop.
 	defer close(h.ackQueue)
 
 	for {

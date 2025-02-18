@@ -59,13 +59,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	// Create expected scan policy with the filter expression
-	expectedPolicy := &a.ScanPolicy{}
-	expectedPolicy.FilterExpression = noMrtSetExpression()
-
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		expectedPolicy, // Use the policy with the expected filter expression
+		newExpectedPolicy(), // Use the policy with the expected filter expression
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -93,6 +89,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }
+
 func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	namespace := "test"
 	set := ""
@@ -117,13 +114,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	// Create expected scan policy with the filter expression
-	expectedPolicy := &a.ScanPolicy{}
-	expectedPolicy.FilterExpression = noMrtSetExpression()
-
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		expectedPolicy,
+		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -161,13 +154,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	close(mockResults)
 
-	// Create expected scan policy with the filter expression
-	expectedPolicy := &a.ScanPolicy{}
-	expectedPolicy.FilterExpression = noMrtSetExpression()
-
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		expectedPolicy,
+		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -199,13 +188,9 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 	namespace := "test"
 	set := ""
 
-	// Create expected scan policy with the filter expression
-	expectedPolicy := &a.ScanPolicy{}
-	expectedPolicy.FilterExpression = noMrtSetExpression()
-
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		expectedPolicy,
+		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -433,4 +418,11 @@ func setFieldValue(target any, fieldName string, value any) {
 	rf := rv.FieldByName(fieldName)
 
 	reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
+}
+
+func newExpectedPolicy() *a.ScanPolicy {
+	expectedPolicy := &a.ScanPolicy{}
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
+	return expectedPolicy
 }

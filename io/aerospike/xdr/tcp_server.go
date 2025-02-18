@@ -188,6 +188,7 @@ func (s *TCPServer) reportMetrics(ctx context.Context) {
 			s.logger.Debug("active connections", slog.Int64("number", int64(conNum)))
 
 		case <-ctx.Done():
+			s.logger.Warn("connection metrics stopped")
 			return
 		}
 	}
@@ -358,7 +359,7 @@ func (h *ConnectionHandler) Start(ctx context.Context) {
 // handleMessages processes incoming messages
 func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 	parser := NewParser(h.conn)
-	// On exit from this function, we close this channel to send signal for the next goroutine toi stop.
+	// On exit from this function, we close this channel to send signal for the next goroutine to stop.
 	defer close(h.bodyQueue)
 
 	for {

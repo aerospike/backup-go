@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,14 +86,14 @@ func TestRecordReader(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start to read messages.
-	var counter int
+	var counter atomic.Uint64
 	go func() {
 		for {
 			token, err := r.Read()
 			switch {
 			case err == nil:
 				require.Equal(t, testKeyString, token.Key.String())
-				counter++
+				counter.Add(1)
 				continue
 			case errors.Is(err, io.EOF):
 				return
@@ -123,5 +124,5 @@ func TestRecordReader(t *testing.T) {
 
 	r.Close()
 
-	require.Equal(t, 3, counter)
+	require.Equal(t, uint64(3), counter.Load())
 }

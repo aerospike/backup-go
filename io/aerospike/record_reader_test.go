@@ -61,7 +61,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		newExpectedPolicy(), // Use the policy with the expected filter expression
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -116,7 +116,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -156,7 +156,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -190,7 +190,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -247,9 +247,13 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	policy := a.NewScanPolicy()
 	policy.MaxRecords = 10
 
+	expectedPolicy := a.NewScanPolicy()
+	expectedPolicy.MaxRecords = 10
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		policy,
+		expectedPolicy,
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -277,7 +281,6 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }
-
 func (suite *readersTestSuite) TestSIndexReader() {
 	namespace := "test"
 	mockSIndexGetter := mocks.NewMocksindexGetter(suite.T())
@@ -415,4 +418,11 @@ func setFieldValue(target any, fieldName string, value any) {
 	rf := rv.FieldByName(fieldName)
 
 	reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
+}
+
+func newExpectedPolicy() *a.ScanPolicy {
+	expectedPolicy := &a.ScanPolicy{}
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
+	return expectedPolicy
 }

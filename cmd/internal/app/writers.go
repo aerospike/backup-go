@@ -21,6 +21,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/aws/s3"
 	"github.com/aerospike/backup-go/io/storage/azure/blob"
@@ -35,7 +36,7 @@ func newWriter(
 ) (backup.Writer, error) {
 	directory, outputFile := getDirectoryOutputFile(params)
 	shouldClearTarget, continueBackup := getShouldCleanContinue(params)
-	opts := newWriterOpts(directory, outputFile, shouldClearTarget, continueBackup)
+	opts := newWriterOpts(directory, outputFile, shouldClearTarget, continueBackup, params.isXDR())
 
 	switch {
 	case params.AwsS3.Region != "":
@@ -81,6 +82,7 @@ func getShouldCleanContinue(params *ASBackupParams) (shouldClearTarget, continue
 func newWriterOpts(
 	directory, outputFile string,
 	shouldClearTarget, continueBackup bool,
+	isXDR bool,
 ) []ioStorage.Opt {
 	opts := make([]ioStorage.Opt, 0)
 
@@ -100,7 +102,11 @@ func newWriterOpts(
 		opts = append(opts, ioStorage.WithSkipDirCheck())
 	}
 
-	opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
+	if isXDR {
+		opts = append(opts, ioStorage.WithValidator(asbx.NewValidator()))
+	} else {
+		opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
+	}
 
 	return opts
 }

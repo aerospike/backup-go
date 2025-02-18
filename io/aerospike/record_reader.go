@@ -267,29 +267,27 @@ func (r *RecordReader) isScanStarted() bool {
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
-	expressions := make([]*a.Expression, 0)
+	expressions := []*a.Expression{noMrtSetExpression()}
 
 	if currentExpression != nil {
 		expressions = append(expressions, currentExpression)
 	}
 
-	exp := timeBoundExpression(bounds)
-	if exp != nil {
+	if exp := timeBoundExpression(bounds); exp != nil {
 		expressions = append(expressions, exp)
 	}
 
-	exp = noTTLExpression(noTTLOnly)
-	if exp != nil {
+	if exp := noTTLExpression(noTTLOnly); exp != nil {
 		expressions = append(expressions, exp)
 	}
 
-	switch {
-	case len(expressions) > 1:
-		return a.ExpAnd(expressions...)
-	case len(expressions) == 1:
+	switch len(expressions) {
+	case 0:
+		return nil
+	case 1:
 		return expressions[0]
 	default:
-		return nil
+		return a.ExpAnd(expressions...)
 	}
 }
 
@@ -318,4 +316,10 @@ func noTTLExpression(noTTLOnly bool) *a.Expression {
 	}
 	// Unexpired records has TTL = -1.
 	return a.ExpEq(a.ExpTTL(), a.ExpIntVal(-1))
+}
+
+// noMrtSetExpression returns expression that filters <ERO~MRT sets from scan results.
+func noMrtSetExpression() *a.Expression {
+	// where set != "<ERO~MRT"
+	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))
 }

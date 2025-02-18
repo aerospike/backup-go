@@ -30,9 +30,9 @@ packages:
     config:
       dir: ./pkg/secret-agent/connection/mocks
       outpkg: mocks
-  github.com/aerospike/backup-go/io/local:
+  github.com/aerospike/backup-go/io/storage:
     config:
-      dir: ./io/local/mocks
+      dir: ./io/storage/mocks
       outpkg: mocks
       exclude:
         - Opt

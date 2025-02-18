@@ -24,7 +24,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/util"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
-	"github.com/aerospike/backup-go/io/storage/local/mocks"
+	"github.com/aerospike/backup-go/io/storage/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"

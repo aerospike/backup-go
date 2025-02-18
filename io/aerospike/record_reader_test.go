@@ -59,9 +59,13 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
+	// Create expected scan policy with the filter expression
+	expectedPolicy := &a.ScanPolicy{}
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		expectedPolicy, // Use the policy with the expected filter expression
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -89,7 +93,6 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }
-
 func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	namespace := "test"
 	set := ""
@@ -114,9 +117,13 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
+	// Create expected scan policy with the filter expression
+	expectedPolicy := &a.ScanPolicy{}
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		expectedPolicy,
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -154,9 +161,13 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	close(mockResults)
 
+	// Create expected scan policy with the filter expression
+	expectedPolicy := &a.ScanPolicy{}
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		expectedPolicy,
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -188,9 +199,13 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 	namespace := "test"
 	set := ""
 
+	// Create expected scan policy with the filter expression
+	expectedPolicy := &a.ScanPolicy{}
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		&a.ScanPolicy{},
+		expectedPolicy,
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -247,9 +262,13 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	policy := a.NewScanPolicy()
 	policy.MaxRecords = 10
 
+	expectedPolicy := a.NewScanPolicy()
+	expectedPolicy.MaxRecords = 10
+	expectedPolicy.FilterExpression = noMrtSetExpression()
+
 	mockScanner := mocks.NewMockscanner(suite.T())
 	mockScanner.EXPECT().ScanPartitions(
-		policy,
+		expectedPolicy,
 		a.NewPartitionFilterByRange(0, 4096),
 		namespace,
 		set,
@@ -277,7 +296,6 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	suite.Equal(expectedRecToken, v)
 	mockScanner.AssertExpectations(suite.T())
 }
-
 func (suite *readersTestSuite) TestSIndexReader() {
 	namespace := "test"
 	mockSIndexGetter := mocks.NewMocksindexGetter(suite.T())

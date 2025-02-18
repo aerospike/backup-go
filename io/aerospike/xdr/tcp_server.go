@@ -139,6 +139,10 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 	// Start connection acceptor
 	go s.acceptConnections(ctx)
 
+	if s.logger.Enabled(ctx, slog.LevelDebug) {
+		go s.reportMetrics(ctx)
+	}
+
 	s.logger.Info("server started",
 		slog.String("address", s.config.Address),
 		slog.Bool("tls", s.config.TLSConfig != nil))
@@ -171,6 +175,22 @@ func (s *TCPServer) Stop() error {
 // GetActiveConnections method for monitoring current state.
 func (s *TCPServer) GetActiveConnections() int32 {
 	return s.activeConnections.Load()
+}
+
+func (s *TCPServer) reportMetrics(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			conNum := s.GetActiveConnections()
+			s.logger.Debug("active connections", slog.Int64("number", int64(conNum)))
+
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // acceptConnections serves connections, not more than maxConnections.
@@ -217,7 +237,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 				s.logger.Debug("accepted new connection",
 					slog.String("address", conn.RemoteAddr().String()))
 			} else {
-				s.logger.Info("connection pool is full, rejecting TCP connection",
+				s.logger.Error("connection pool is full, rejecting TCP connection",
 					slog.String("address", conn.RemoteAddr().String()))
 
 				if err = conn.Close(); err != nil {
@@ -308,36 +328,38 @@ func (h *ConnectionHandler) Start(ctx context.Context) {
 	go func() {
 		defer h.wg.Done()
 		h.handleMessages(ctx)
+		h.logger.Debug("message handler closed")
 	}()
 
 	go func() {
 		defer h.wg.Done()
 		h.processMessage(ctx)
+		h.logger.Debug("message processor closed")
 	}()
 
 	go func() {
 		defer h.wg.Done()
 		h.handleAcknowledgments(ctx)
+		h.logger.Debug("ack handler closed")
+		// After we gracefully closed all channels and stopped goroutines,
+		// we can cancel context to stop h.timeNow serving goroutine.
+		h.cancel()
 	}()
 
-	// Wait and clean up when all routines exit.
 	h.wg.Wait()
-	h.cleanup()
-}
-
-// cleanup closes communication channels for current handler and closes connection itself.
-func (h *ConnectionHandler) cleanup() {
-	close(h.ackQueue)
-	close(h.bodyQueue)
-
+	// When all routines finished we close the connection.
 	if err := h.conn.Close(); err != nil {
 		h.logger.Warn("failed to close connection", slog.Any("error", err))
 	}
+
+	h.logger.Debug("connection closed")
 }
 
 // handleMessages processes incoming messages
 func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 	parser := NewParser(h.conn)
+	// On exit from this function, we close this channel to send signal for the next goroutine toi stop.
+	defer close(h.bodyQueue)
 
 	for {
 		select {
@@ -358,8 +380,8 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 			case err == nil:
 				// ok.
 			case errors.Is(err, io.EOF):
-				// do nothing, wait for the next message.
-				continue
+				// Exit if there is no message. Aerospike will open new connection if needed.
+				return
 			case os.IsTimeout(errors.Unwrap(err)):
 				// If timeout reached and the connection is closed, do nothing.
 				return
@@ -379,11 +401,17 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 // processMessage serves h.bodyQueue. When a message is received, we try to parse it
 // and send it to h.resultChan, also ack messages is created for this message and sent to h.ackQueue.
 func (h *ConnectionHandler) processMessage(ctx context.Context) {
+	// On exit from this function, we close this channel to send signal for the next goroutine toi stop.
+	defer close(h.ackQueue)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case message := <-h.bodyQueue:
+		case message, ok := <-h.bodyQueue:
+			if !ok {
+				return
+			}
 			// Parse message.
 			aMsg, err := ParseAerospikeMessage(message)
 			if err != nil {
@@ -433,7 +461,10 @@ func (h *ConnectionHandler) handleAcknowledgments(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case ack := <-h.ackQueue:
+		case ack, ok := <-h.ackQueue:
+			if !ok {
+				return
+			}
 			// Process each received ack message.
 			if err := h.sendAck(ack); err != nil {
 				h.logger.Error("failed to send ack", slog.Any("error", err))

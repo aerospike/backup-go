@@ -269,6 +269,8 @@ func (r *RecordReader) isScanStarted() bool {
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
 	expressions := make([]*a.Expression, 0)
 
+	expressions = append(expressions, noMrtSetExpression())
+
 	if currentExpression != nil {
 		expressions = append(expressions, currentExpression)
 	}
@@ -318,4 +320,8 @@ func noTTLExpression(noTTLOnly bool) *a.Expression {
 	}
 	// Unexpired records has TTL = -1.
 	return a.ExpEq(a.ExpTTL(), a.ExpIntVal(-1))
+}
+
+func noMrtSetExpression() *a.Expression {
+	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))
 }

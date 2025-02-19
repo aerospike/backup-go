@@ -44,6 +44,10 @@ type Options struct {
 	// UploadConcurrency defines the max number of concurrent uploads to be performed to upload the file.
 	// Each concurrent upload will create a buffer of size BlockSize.
 	UploadConcurrency int
+
+	// StorageClass specifies the type of storage class.
+	// Supported values depend on the cloud provider being used.
+	StorageClass string
 }
 
 type Opt func(*Options)
@@ -135,5 +139,11 @@ func WithSorting() Opt {
 func WithUploadConcurrency(v int) Opt {
 	return func(r *Options) {
 		r.UploadConcurrency = v
+	}
+}
+
+func WithStorageClass(storageClass string) Opt {
+	return func(r *Options) {
+		r.StorageClass = storageClass
 	}
 }

@@ -118,8 +118,9 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	fullPath := path.Join(w.prefix, filename)
 
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket: &w.bucketName,
-		Key:    &fullPath,
+		Bucket:       &w.bucketName,
+		Key:          &fullPath,
+		StorageClass: types.StorageClass(w.StorageClass),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)

@@ -24,6 +24,7 @@ func (m *mockReader) SetObjectsToStream(list []string) {
 
 // TestPreSort verifies the PreSort function's behavior for sorting backup files
 func TestPreSort(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		inputFiles  []string
@@ -52,6 +53,7 @@ func TestPreSort(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			r := new(mockReader)
 
@@ -72,6 +74,7 @@ func TestPreSort(t *testing.T) {
 
 // TestCleanPath verifies the CleanPath function's behavior for different input paths
 func TestCleanPath(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		path     string
@@ -112,6 +115,7 @@ func TestCleanPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := CleanPath(tt.path, tt.isS3)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -120,6 +124,7 @@ func TestCleanPath(t *testing.T) {
 
 // TestIsDirectory verifies the IsDirectory function's behavior for different file paths
 func TestIsDirectory(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		prefix   string
@@ -160,6 +165,7 @@ func TestIsDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := IsDirectory(tt.prefix, tt.fileName)
 			assert.Equal(t, tt.expected, result)
 		})

@@ -79,7 +79,9 @@ func TestRecordReader(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		// Level: slog.LevelDebug,
+	}))
 	ic := newInfoMock(t)
 
 	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(), logger)

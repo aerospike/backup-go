@@ -34,13 +34,18 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/aerospike/backup-go/tests"
-	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
 )
 
 const (
 	// got this from writing and reading back a.HLLAddOp(hllpol, "hll", []a.Value{a.NewIntegerValue(1)}, 4, 12)
 	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+)
+
+const (
+	aerospikeHost          = "127.0.0.1"
+	aerospikePort          = 3000
+	aerospikeLoginPassword = "admin"
 )
 
 // testBins is a collection of all supported bin types
@@ -84,56 +89,13 @@ type backupRestoreTestSuite struct {
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
-	testutils.Image = "aerospike/aerospike-server-enterprise:8.0.0.2"
-
-	clusterSize := 1
-	err := testutils.Start(clusterSize)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
 	aeroClientPolicy := a.NewClientPolicy()
-	aeroClientPolicy.User = suite.aerospikeUser
-	aeroClientPolicy.Password = suite.aerospikePassword
-
-	asc, aerr := a.NewClientWithPolicy(
-		aeroClientPolicy,
-		suite.aerospikeIP,
-		suite.aerospikePort,
-	)
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-		return
-	}
-	defer asc.Close()
-
-	privs := []a.Privilege{
-		{Code: a.Read},
-		{Code: a.Write},
-		{Code: a.Truncate},
-		{Code: a.UserAdmin},
-		{Code: a.SIndexAdmin},
-		{Code: a.UDFAdmin},
-	}
-
-	aerr = asc.CreateRole(nil, "testBackup", privs, nil, 0, 0)
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
-
-	aerr = asc.CreateUser(nil, "backupTester", "changeme", []string{"testBackup"})
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
-
-	asc.Close()
-
-	aeroClientPolicy.User = "backupTester"
-	aeroClientPolicy.Password = "changeme"
+	aeroClientPolicy.User = aerospikeLoginPassword
+	aeroClientPolicy.Password = aerospikeLoginPassword
 	testAeroClient, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
-		suite.aerospikeIP,
-		suite.aerospikePort,
+		aerospikeHost,
+		aerospikePort,
 	)
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
@@ -153,25 +115,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 }
 
 func (suite *backupRestoreTestSuite) TearDownSuite() {
-	defer func() {
-		err := testutils.Stop()
-		if err != nil {
-			suite.FailNow(err.Error())
-		}
-	}()
-
-	asc := suite.Aeroclient
-	defer asc.Close()
-
-	aerr := asc.DropRole(nil, "testBackup")
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
-
-	aerr = asc.DropUser(nil, "backupTester")
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
+	suite.Aeroclient.Close()
 }
 
 func (suite *backupRestoreTestSuite) SetupTest(records []*a.Record) {
@@ -397,7 +341,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetReadRecords())
+	// Replaced condition, because parallel tests creates records in same namespace.
+	suite.Require().True(uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
 	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
 
@@ -427,9 +372,13 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = rh.Wait(ctx)
 	suite.Nil(err)
 
-	suite.Require().EqualValues(uint64(len(expectedRecs)), statsRestore.GetReadRecords())
-	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsInserted())
+	// Replaced condition, because parallel tests creates records in same namespace.
+	suite.Require().True(uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
+	suite.Require().True(uint64(len(expectedRecs)) <= statsRestore.GetRecordsInserted())
+
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
+
+	suite.Require().True(uint32(8) <= statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
 	suite.Require().Less(statsRestore.GetTotalBytesRead(), dirSize) // restore size doesn't include asb control characters
@@ -761,7 +710,7 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 
 func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
 	bCfg := backup.NewDefaultBackupConfig()
-	bCfg.NodeList = []string{fmt.Sprintf("%s:%d", suite.aerospikeIP, suite.aerospikePort)}
+	bCfg.NodeList = []string{fmt.Sprintf("%s:%d", aerospikeHost, aerospikePort)}
 
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}
@@ -835,10 +784,10 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 
 func TestBackupRestoreTestSuite(t *testing.T) {
 	ts := backupRestoreTestSuite{
-		aerospikeIP:       testutils.IP,
-		aerospikePort:     testutils.PortStart,
-		aerospikePassword: testutils.Password,
-		aerospikeUser:     testutils.User,
+		aerospikeIP:       aerospikeHost,
+		aerospikePort:     aerospikePort,
+		aerospikePassword: aerospikeLoginPassword,
+		aerospikeUser:     aerospikeLoginPassword,
 		namespace:         "test",
 		set:               "",
 	}

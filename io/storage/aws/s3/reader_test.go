@@ -201,6 +201,7 @@ func removeTestData(ctx context.Context, client *s3.Client) error {
 }
 
 func (s *AwsSuite) TestReader_WithStartAfter() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -240,6 +241,7 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 }
 
 func (s *AwsSuite) TestReader_StreamPathList() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -289,6 +291,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesList() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -337,6 +340,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 }
 
 func (s *AwsSuite) TestReader_WithSorting() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -387,6 +391,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)

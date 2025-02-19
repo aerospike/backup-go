@@ -246,7 +246,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 func newBackupClient(aerospikeClient *a.Client) (*Client, error) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		// Uncomment for test debugging.
-		Level: slog.LevelDebug,
+		// Level: slog.LevelDebug,
 	}))
 
 	backupClient, err := NewClient(

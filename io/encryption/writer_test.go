@@ -24,6 +24,7 @@ import (
 )
 
 func TestEncryptedWriterAndReader(t *testing.T) {
+	t.Parallel()
 	buf := new(bytes.Buffer)
 	key := generateKey(t)
 
@@ -53,6 +54,7 @@ func TestEncryptedWriterAndReader(t *testing.T) {
 }
 
 func TestNegative(t *testing.T) {
+	t.Parallel()
 	buf := new(bytes.Buffer)
 	encryptedWriter, _ := NewWriter(&writeCloserBuffer{buf}, generateKey(t))
 

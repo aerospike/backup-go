@@ -23,6 +23,8 @@ import (
 )
 
 func TestValidateStorages(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		awsS3      *models.AwsS3
@@ -156,6 +158,7 @@ func TestValidateStorages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateStorages(tt.awsS3, tt.gcpStorage, tt.azureBlob)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -167,6 +170,8 @@ func TestValidateStorages(t *testing.T) {
 }
 
 func TestValidateBackupParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		backupParams *models.Backup
@@ -386,6 +391,7 @@ func TestValidateBackupParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateBackupParams(tt.backupParams, tt.commonParams)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -398,6 +404,8 @@ func TestValidateBackupParams(t *testing.T) {
 }
 
 func TestValidatePartitionFilters(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name             string
 		partitionFilters []*aerospike.PartitionFilter
@@ -460,6 +468,7 @@ func TestValidatePartitionFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validatePartitionFilters(tt.partitionFilters)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -471,6 +480,8 @@ func TestValidatePartitionFilters(t *testing.T) {
 }
 
 func TestValidateCommonParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		commonParams *models.Common
@@ -551,6 +562,7 @@ func TestValidateCommonParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateCommonParams(tt.commonParams)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -563,6 +575,8 @@ func TestValidateCommonParams(t *testing.T) {
 }
 
 func TestValidateRestoreParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		restoreParams *models.Restore
@@ -645,6 +659,7 @@ func TestValidateRestoreParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateRestoreParams(tt.restoreParams, tt.commonParams)
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
@@ -656,6 +671,8 @@ func TestValidateRestoreParams(t *testing.T) {
 }
 
 func Test_validateBackupXDRParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		params  *models.BackupXDR
@@ -785,6 +802,7 @@ func Test_validateBackupXDRParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateBackupXDRParams(tt.params)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
@@ -796,6 +814,8 @@ func Test_validateBackupXDRParams(t *testing.T) {
 }
 
 func TestValidateBackup(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		params  *ASBackupParams
@@ -917,6 +937,7 @@ func TestValidateBackup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateBackup(tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -931,6 +952,8 @@ func TestValidateBackup(t *testing.T) {
 }
 
 func TestValidateRestore(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		params  *ASRestoreParams
@@ -1055,6 +1078,7 @@ func TestValidateRestore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateRestore(tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)

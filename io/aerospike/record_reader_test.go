@@ -34,6 +34,8 @@ type readersTestSuite struct {
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReader() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -91,6 +93,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -145,6 +149,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -185,6 +191,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -219,6 +227,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 }
 
 func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -282,6 +292,8 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	mockScanner.AssertExpectations(suite.T())
 }
 func (suite *readersTestSuite) TestSIndexReader() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	mockSIndexGetter := mocks.NewMocksindexGetter(suite.T())
 	mockSIndexes := []*models.SIndex{
@@ -339,6 +351,8 @@ func (suite *readersTestSuite) TestSIndexReader() {
 }
 
 func (suite *readersTestSuite) TestUDFReader() {
+	suite.T().Parallel()
+
 	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
 	mockUDFs := []*models.UDF{
 		{
@@ -377,6 +391,8 @@ func (suite *readersTestSuite) TestUDFReader() {
 }
 
 func (suite *readersTestSuite) TestUDFReaderReadFailed() {
+	suite.T().Parallel()
+
 	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
 	mockUDFGetter.EXPECT().GetUDFs().Return(
 		nil,
@@ -392,6 +408,7 @@ func (suite *readersTestSuite) TestUDFReaderReadFailed() {
 }
 
 func TestReaders(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(readersTestSuite))
 }
 

@@ -7,50 +7,120 @@ on:
   pull_request:
     branches:
       - main
-  
+
 jobs:
   tests:
     runs-on: ubuntu-latest
+
+    services:
+      # Aerospike service container
+      aerospike:
+        image: aerospike/aerospike-server-enterprise:8.0.0.3
+        ports:
+          - 3000:3000
+          - 3001:3001
+          - 3002:3002
+
+      # Minio service container
+      minio:
+        image: quay.io/minio/minio
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadminpassword
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadminpassword
+        ports:
+          - 9000:9000
+          - 9001:9001
+        options: >-
+          --name minio
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+        volumes:
+          - /tmp/data:/data
+        args:
+          - server
+          - /data
+          - --console-address
+          - ":9001"
+
+      # Fake GCS server
+      fake-gcs-server:
+        image: fsouza/fake-gcs-server
+        ports:
+          - 4443:4443
+        options: >-
+          --health-cmd "curl -f http://localhost:4443 || exit 1" 
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+        args:
+          - -scheme
+          - http
+          - -public-host
+          - 127.0.0.1:4443
+
+      # Azurite
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - 5000:10000
+        options: >-
+          --health-cmd "nc -z localhost 10000 || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+        args:
+          - azurite-blob
+          - --blobHost
+          - 0.0.0.0
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Get go version from go.mod
-      run: |
-        echo "GO_VERSION=$(grep '^go ' go.mod | cut -d " " -f 2)" >> $GITHUB_ENV
-    - uses: actions/setup-go@v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    - name: Set up Aerospike Server
-      run: |
-        docker run -d --name aerospike-server -p 3000-3002:3000-3002 \
-        aerospike/aerospike-server-enterprise:8.0.0.3
-    - name: Set up Minio
-      run: |
-        docker run -d \
-        -p 9000:9000 \
-        -p 9001:9001 \
-        --name minio \
-        -e "MINIO_ROOT_USER=minioadmin" \
-        -e "MINIO_ROOT_PASSWORD=minioadminpassword" \
-        -e "MINIO_ACCESS_KEY=minioadmin" \
-        -e "MINIO_SECRET_KEY=minioadminpassword" \
-        quay.io/minio/minio server /data --console-address ":9001" \
-        && until (curl -I http://127.0.0.1:9000/minio/health/live | grep "OK"); do echo "Waiting for MinIO server to be ready..."; sleep 3; done \
-        && docker exec minio sh -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && mc mb myminio/backup && mc mb myminio/asbackup \
-        && mc anonymous set upload myminio/backup && mc anonymous set download myminio/backup && mc anonymous set public myminio/backup \
-        && mc anonymous set upload myminio/asbackup && mc anonymous set download myminio/asbackup && mc anonymous set public myminio/asbackup"
-    - name: Set up Google Cloud Storage API emulator
-      run: |
-        docker run -d --name fake-gcs-server -p 4443:4443 fsouza/fake-gcs-server \
-        -scheme http -public-host 127.0.0.1:4443
-    - name: Set up Azurit
-      run: |
-        docker run -d --name azurit -p 5000:10000 mcr.microsoft.com/azure-storage/azurite azurite-blob --blobHost 0.0.0.0
-    - name: Test with coverage 
-      run: |
-        make coverage
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        token: ${{secrets.CODECOV_TOKEN}}
-        files: coverage.cov
-        verbose: false
+      - uses: actions/checkout@v4
+
+      - name: Get go version from go.mod
+        run: |
+          echo "GO_VERSION=$(grep '^go ' go.mod | cut -d " " -f 2)" >> $GITHUB_ENV
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Configure Minio
+        run: |
+          # Wait for Minio to be fully ready (healthcheck should ensure this already)
+          sleep 2
+          # Configure buckets and permissions
+          docker exec minio mc alias set myminio http://localhost:9000 minioadmin minioadminpassword
+          docker exec minio mc mb myminio/backup --ignore-existing || true
+          docker exec minio mc mb myminio/asbackup --ignore-existing || true
+          docker exec minio mc anonymous set upload myminio/backup
+          docker exec minio mc anonymous set download myminio/backup
+          docker exec minio mc anonymous set public myminio/backup
+          docker exec minio mc anonymous set upload myminio/asbackup
+          docker exec minio mc anonymous set download myminio/asbackup
+          docker exec minio mc anonymous set public myminio/asbackup
+
+      - name: Run tests with coverage
+        run: |
+          # Set environment variables to connect to service containers
+          export AEROSPIKE_HOST=localhost
+          export MINIO_ENDPOINT=http://localhost:9000
+          export GCS_ENDPOINT=http://localhost:4443
+          export AZURE_ENDPOINT=http://localhost:5000
+          
+          # Run tests with parallelism
+          go test -race -timeout=5m -count=1 -parallel $(nproc) ./... -coverprofile to_filter.cov -coverpkg ./...
+          grep -v "test\|mocks" to_filter.cov > coverage.cov
+          rm -f to_filter.cov
+          go tool cover -func coverage.cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}
+          files: coverage.cov
+          verbose: false

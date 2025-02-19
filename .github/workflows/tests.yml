@@ -56,8 +56,6 @@ jobs:
 
       createbucket:
         image: quay.io/minio/mc
-        volumes:
-          - ./conf/service/config.yml:/root/config.yml
         options: >-
           --name mc
           --entrypoint sh

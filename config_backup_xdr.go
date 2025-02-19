@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
@@ -60,12 +61,12 @@ type ConfigBackupXDR struct {
 	Rewind string
 	// TLS config for secure XDR connection.
 	TLSConfig *tls.Config
-	// Timeout in milliseconds for TCP read operations.
+	// Timeout for TCP read operations.
 	// Used by TCP server for XDR.
-	ReadTimeoutMilliseconds int64
-	// Timeout in milliseconds for TCP writes operations.
+	ReadTimeout time.Duration
+	// Timeout for TCP writes operations.
 	// Used by TCP server for XDR.
-	WriteTimeoutMilliseconds int64
+	WriteTimeout time.Duration
 	// Results queue size.
 	// Used by TCP server for XDR.
 	ResultQueueSize int
@@ -77,11 +78,11 @@ type ConfigBackupXDR struct {
 	MaxConnections int
 	// How often a backup client will send info commands to check aerospike cluster stats.
 	// To measure recovery state and lag.
-	InfoPolingPeriodMilliseconds int64
+	InfoPolingPeriod time.Duration
 	// Timeout for starting TCP server for XDR.
 	// If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
 	// This situation can occur if the LocalAddress and LocalPort options are misconfigured.
-	StartTimeoutMilliseconds int64
+	StartTimeout time.Duration
 	// Retry policy for info commands.
 	InfoRetryPolicy *models.RetryPolicy
 }
@@ -124,12 +125,12 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("namespace must not be empty")
 	}
 
-	if c.ReadTimeoutMilliseconds < 0 {
-		return fmt.Errorf("read timeout must not be negative, got %d", c.ReadTimeoutMilliseconds)
+	if c.ReadTimeout < 0 {
+		return fmt.Errorf("read timeout must not be negative, got %d", c.ReadTimeout)
 	}
 
-	if c.WriteTimeoutMilliseconds < 0 {
-		return fmt.Errorf("write timeout must not be negative, got %d", c.WriteTimeoutMilliseconds)
+	if c.WriteTimeout < 0 {
+		return fmt.Errorf("write timeout must not be negative, got %d", c.WriteTimeout)
 	}
 
 	if c.ResultQueueSize < 0 {
@@ -144,8 +145,8 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("max connections must not be less than 1, got %d", c.MaxConnections)
 	}
 
-	if c.InfoPolingPeriodMilliseconds < 1 {
-		return fmt.Errorf("info poling period must not be less than 1, got %d", c.InfoPolingPeriodMilliseconds)
+	if c.InfoPolingPeriod < 1 {
+		return fmt.Errorf("info poling period must not be less than 1, got %d", c.InfoPolingPeriod)
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

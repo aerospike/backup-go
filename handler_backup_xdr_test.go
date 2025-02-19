@@ -41,16 +41,16 @@ const (
 	testASPort          = 3000
 	testASRewind        = "all"
 
-	testBackupDir           = "xdr_backup"
-	testBackupDirLimit      = "xdr_backup_limit"
-	testParallel            = 8
-	testXDRHost             = "172.17.0.1"
-	testXDRPort             = 8066
-	testXDRPortFileLimit    = 8067
-	testTimeoutMilliseconds = 10000
-	testAckQueueSize        = 256
-	testResultQueueSize     = 256
-	testMaxConnections      = 100
+	testBackupDir        = "xdr_backup"
+	testBackupDirLimit   = "xdr_backup_limit"
+	testParallel         = 8
+	testXDRHost          = "172.17.0.1"
+	testXDRPort          = 8066
+	testXDRPortFileLimit = 8067
+	testTimeout          = 10000 * time.Millisecond
+	testAckQueueSize     = 256
+	testResultQueueSize  = 256
+	testMaxConnections   = 100
 )
 
 type handlerBackupXDRTestSuite struct {
@@ -155,26 +155,26 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 	ip := a.NewInfoPolicy()
 
 	backupCfg := &ConfigBackupXDR{
-		InfoPolicy:                   ip,
-		EncryptionPolicy:             nil,
-		CompressionPolicy:            nil,
-		SecretAgentConfig:            nil,
-		EncoderType:                  EncoderTypeASBX,
-		FileLimit:                    0,
-		ParallelWrite:                testParallel,
-		DC:                           testDCXDR,
-		LocalAddress:                 testXDRHost,
-		LocalPort:                    testXDRPort,
-		Namespace:                    testASNamespace,
-		Rewind:                       testASRewind,
-		TLSConfig:                    nil,
-		ReadTimeoutMilliseconds:      testTimeoutMilliseconds,
-		WriteTimeoutMilliseconds:     testTimeoutMilliseconds,
-		ResultQueueSize:              testAckQueueSize,
-		AckQueueSize:                 testResultQueueSize,
-		MaxConnections:               testMaxConnections,
-		InfoPolingPeriodMilliseconds: 10,
-		StartTimeoutMilliseconds:     testTimeoutMilliseconds,
+		InfoPolicy:        ip,
+		EncryptionPolicy:  nil,
+		CompressionPolicy: nil,
+		SecretAgentConfig: nil,
+		EncoderType:       EncoderTypeASBX,
+		FileLimit:         0,
+		ParallelWrite:     testParallel,
+		DC:                testDCXDR,
+		LocalAddress:      testXDRHost,
+		LocalPort:         testXDRPort,
+		Namespace:         testASNamespace,
+		Rewind:            testASRewind,
+		TLSConfig:         nil,
+		ReadTimeout:       testTimeout,
+		WriteTimeout:      testTimeout,
+		ResultQueueSize:   testAckQueueSize,
+		AckQueueSize:      testResultQueueSize,
+		MaxConnections:    testMaxConnections,
+		InfoPolingPeriod:  10,
+		StartTimeout:      testTimeout,
 	}
 
 	backupHandler, err := bc.BackupXDR(ctx, backupCfg, writers)
@@ -209,26 +209,26 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 	ip := a.NewInfoPolicy()
 
 	backupCfg := &ConfigBackupXDR{
-		InfoPolicy:                   ip,
-		EncryptionPolicy:             nil,
-		CompressionPolicy:            nil,
-		SecretAgentConfig:            nil,
-		EncoderType:                  EncoderTypeASBX,
-		FileLimit:                    1000,
-		ParallelWrite:                testParallel,
-		DC:                           testDCFileLimit,
-		LocalAddress:                 testXDRHost,
-		LocalPort:                    testXDRPortFileLimit,
-		Namespace:                    testASNamespace,
-		Rewind:                       testASRewind,
-		TLSConfig:                    nil,
-		ReadTimeoutMilliseconds:      testTimeoutMilliseconds,
-		WriteTimeoutMilliseconds:     testTimeoutMilliseconds,
-		ResultQueueSize:              testAckQueueSize,
-		AckQueueSize:                 testResultQueueSize,
-		MaxConnections:               testMaxConnections,
-		InfoPolingPeriodMilliseconds: 10,
-		StartTimeoutMilliseconds:     testTimeoutMilliseconds,
+		InfoPolicy:        ip,
+		EncryptionPolicy:  nil,
+		CompressionPolicy: nil,
+		SecretAgentConfig: nil,
+		EncoderType:       EncoderTypeASBX,
+		FileLimit:         1000,
+		ParallelWrite:     testParallel,
+		DC:                testDCFileLimit,
+		LocalAddress:      testXDRHost,
+		LocalPort:         testXDRPortFileLimit,
+		Namespace:         testASNamespace,
+		Rewind:            testASRewind,
+		TLSConfig:         nil,
+		ReadTimeout:       testTimeout,
+		WriteTimeout:      testTimeout,
+		ResultQueueSize:   testAckQueueSize,
+		AckQueueSize:      testResultQueueSize,
+		MaxConnections:    testMaxConnections,
+		InfoPolingPeriod:  10,
+		StartTimeout:      testTimeout,
 	}
 
 	backupHandler, err := bc.BackupXDR(ctx, backupCfg, writers)

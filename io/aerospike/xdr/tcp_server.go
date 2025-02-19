@@ -30,16 +30,23 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+const (
+	defaultAddress        = ":8080"
+	defaultTimeout        = 1 * time.Second
+	defaultQueueSize      = 256
+	defaultMaxConnections = 100
+)
+
 // TCPConfig contains tcp server config params.
 type TCPConfig struct {
 	// TCP server address.
 	Address string
 	// TLS config for secure connection.
 	TLSConfig *tls.Config
-	// Timeout in milliseconds for read operations.
-	ReadTimeoutMilliseconds int64
-	// Timeout in milliseconds for write operations.
-	WriteTimeoutMilliseconds int64
+	// Timeout for read operations.
+	ReadTimeout time.Duration
+	// Timeout for write operations.
+	WriteTimeout time.Duration
 	// Results queue size.
 	ResultQueueSize int
 	// Ack messages queue size.
@@ -52,33 +59,33 @@ type TCPConfig struct {
 func NewTCPConfig(
 	address string,
 	tlsConfig *tls.Config,
-	readTimeoutMilliseconds int64,
-	writeTimeoutMilliseconds int64,
+	readTimeout time.Duration,
+	writeTimeout time.Duration,
 	resultQueueSize int,
 	ackQueueSize int,
 	maxConnections int,
 ) *TCPConfig {
 	return &TCPConfig{
-		Address:                  address,
-		TLSConfig:                tlsConfig,
-		ReadTimeoutMilliseconds:  readTimeoutMilliseconds,
-		WriteTimeoutMilliseconds: writeTimeoutMilliseconds,
-		ResultQueueSize:          resultQueueSize,
-		AckQueueSize:             ackQueueSize,
-		MaxConnections:           maxConnections,
+		Address:         address,
+		TLSConfig:       tlsConfig,
+		ReadTimeout:     readTimeout,
+		WriteTimeout:    writeTimeout,
+		ResultQueueSize: resultQueueSize,
+		AckQueueSize:    ackQueueSize,
+		MaxConnections:  maxConnections,
 	}
 }
 
 // NewDefaultTCPConfig returns default TCP Server config.
 func NewDefaultTCPConfig() *TCPConfig {
 	return NewTCPConfig(
-		":8080",
+		defaultAddress,
 		nil,
-		1000,
-		1000,
-		256,
-		256,
-		100,
+		defaultTimeout,
+		defaultTimeout,
+		defaultQueueSize,
+		defaultQueueSize,
+		defaultMaxConnections,
 	)
 }
 
@@ -223,8 +230,8 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 						conn,
 						s.resultChan,
 						s.config.AckQueueSize,
-						s.config.ReadTimeoutMilliseconds,
-						s.config.WriteTimeoutMilliseconds,
+						s.config.ReadTimeout,
+						s.config.WriteTimeout,
 						s.logger,
 						metrics,
 					)
@@ -281,16 +288,16 @@ func NewConnectionHandler(
 	conn net.Conn,
 	resultChan chan *models.ASBXToken,
 	ackQueueSize int,
-	readTimeout int64,
-	writeTimeout int64,
+	readTimeout time.Duration,
+	writeTimeout time.Duration,
 	logger *slog.Logger,
 	metrics *metricsCollector,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,
 		resultChan:       resultChan,
-		readTimeoutNano:  readTimeout * 1_000_000,
-		writeTimeoutNano: writeTimeout * 1_000_000,
+		readTimeoutNano:  readTimeout.Nanoseconds(),
+		writeTimeoutNano: writeTimeout.Milliseconds(),
 		timeNow:          time.Now().UnixNano(),
 		bodyQueue:        make(chan []byte, ackQueueSize),
 		ackQueue:         make(chan []byte, ackQueueSize),

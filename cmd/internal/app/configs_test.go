@@ -698,12 +698,12 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				assert.Equal(t, int64(1000), cfg.FileLimit)
 				assert.Equal(t, 4, cfg.ParallelWrite)
 				assert.Equal(t, "1h", cfg.Rewind)
-				assert.Equal(t, int64(5000), cfg.ReadTimeoutMilliseconds)
-				assert.Equal(t, int64(5000), cfg.WriteTimeoutMilliseconds)
+				assert.Equal(t, int64(5000), cfg.ReadTimeout)
+				assert.Equal(t, int64(5000), cfg.WriteTimeout)
 				assert.Equal(t, 1000, cfg.ResultQueueSize)
 				assert.Equal(t, 1000, cfg.AckQueueSize)
 				assert.Equal(t, 100, cfg.MaxConnections)
-				assert.Equal(t, int64(1000), cfg.InfoPolingPeriodMilliseconds)
+				assert.Equal(t, int64(1000), cfg.InfoPolingPeriod)
 			},
 		},
 		{
@@ -762,12 +762,12 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, int64(0), cfg.FileLimit)
 				assert.Equal(t, runtime.NumCPU(), cfg.ParallelWrite)
-				assert.Equal(t, int64(0), cfg.ReadTimeoutMilliseconds)
-				assert.Equal(t, int64(0), cfg.WriteTimeoutMilliseconds)
+				assert.Equal(t, int64(0), cfg.ReadTimeout)
+				assert.Equal(t, int64(0), cfg.WriteTimeout)
 				assert.Equal(t, 0, cfg.ResultQueueSize)
 				assert.Equal(t, 0, cfg.AckQueueSize)
 				assert.Equal(t, 0, cfg.MaxConnections)
-				assert.Equal(t, int64(0), cfg.InfoPolingPeriodMilliseconds)
+				assert.Equal(t, int64(0), cfg.InfoPolingPeriod)
 			},
 		},
 	}

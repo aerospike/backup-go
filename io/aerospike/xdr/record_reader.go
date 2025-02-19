@@ -238,7 +238,10 @@ func (r *RecordReader) serve() {
 				continue // Or brake?
 			}
 
-			r.logger.Debug("got stats", slog.Any("stats", stats))
+			r.logger.Debug("got stats", slog.Any("stats", stats),
+				slog.String("dc", r.config.dc),
+				slog.String("namespace", r.config.namespace),
+			)
 
 			if stats.RecoveriesPending != 0 {
 				// Recovery in progress.
@@ -253,7 +256,7 @@ func (r *RecordReader) serve() {
 					break // Or return?
 				}
 
-				r.logger.Debug("mrt blocked")
+				r.logger.Debug("mrt blocked", slog.String("namespace", r.config.namespace))
 				r.mrtWritesStopped.Store(true)
 			}
 
@@ -267,7 +270,7 @@ func (r *RecordReader) serve() {
 					r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
 				}
 
-				r.logger.Debug("mrt unblocked")
+				r.logger.Debug("mrt unblocked", slog.String("namespace", r.config.namespace))
 				r.mrtWritesStopped.Store(false)
 				// Stop.
 				r.Close()

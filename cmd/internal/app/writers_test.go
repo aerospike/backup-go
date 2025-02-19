@@ -40,7 +40,7 @@ const (
 	testGcpEndpoint = "http://127.0.0.1:4443/storage/v1/b"
 	testGcpType     = "gcp-storage"
 
-	testAzureEndpoint    = "http://127.0.0.1:5000/devstoreaccount1"
+	testAzureEndpoint    = "http://127.0.0.1:10000/devstoreaccount1"
 	testAzureAccountName = "devstoreaccount1"
 	testAzureAccountKey  = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
 	testAzureType        = "azure-blob"

@@ -39,10 +39,12 @@ func (m *mockWriteCloser) Close() error {
 }
 
 func Test_SizedTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(sizedTestSuite))
 }
 
 func (suite *sizedTestSuite) Test_writeCloserSized() {
+	suite.T().Parallel()
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
@@ -93,6 +95,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 }
 
 func (suite *sizedTestSuite) Test_writeCloserSized_ErrLimit() {
+	suite.T().Parallel()
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 

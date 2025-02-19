@@ -26,14 +26,12 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type readersTestSuite struct {
-	suite.Suite
-}
+func TestAerospikeRecordReader(t *testing.T) {
+	t.Parallel()
 
-func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	namespace := "test"
 	set := ""
 
@@ -59,7 +57,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	mockScanner := mocks.NewMockscanner(suite.T())
+	mockScanner := mocks.NewMockscanner(t)
 	mockScanner.EXPECT().ScanPartitions(
 		newExpectedPolicy(), // Use the policy with the expected filter expression
 		a.NewPartitionFilterByRange(0, 4096),
@@ -81,16 +79,18 @@ func (suite *readersTestSuite) TestAerospikeRecordReader() {
 		},
 		slog.Default(),
 	)
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	v, err := reader.Read()
-	suite.Nil(err)
+	require.Nil(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
-	suite.Equal(expectedRecToken, v)
-	mockScanner.AssertExpectations(suite.T())
+	require.Equal(t, expectedRecToken, v)
+	mockScanner.AssertExpectations(t)
 }
 
-func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
+func TestAerospikeRecordReaderRecordResError(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -114,7 +114,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 	mockResults <- mockRes
 	setFieldValue(mockRecordSet, "records", mockResults)
 
-	mockScanner := mocks.NewMockscanner(suite.T())
+	mockScanner := mocks.NewMockscanner(t)
 	mockScanner.EXPECT().ScanPartitions(
 		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
@@ -136,15 +136,17 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderRecordResError() {
 		},
 		slog.Default(),
 	)
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	v, err := reader.Read()
-	suite.NotNil(err)
-	suite.Nil(v)
-	mockScanner.AssertExpectations(suite.T())
+	require.NotNil(t, err)
+	require.Nil(t, v)
+	mockScanner.AssertExpectations(t)
 }
 
-func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
+func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -154,7 +156,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 
 	close(mockResults)
 
-	mockScanner := mocks.NewMockscanner(suite.T())
+	mockScanner := mocks.NewMockscanner(t)
 	mockScanner.EXPECT().ScanPartitions(
 		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
@@ -176,19 +178,21 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderClosedChannel() {
 		},
 		slog.Default(),
 	)
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	v, err := reader.Read()
-	suite.Equal(io.EOF, err)
-	suite.Nil(v)
-	mockScanner.AssertExpectations(suite.T())
+	require.Equal(t, io.EOF, err)
+	require.Nil(t, v)
+	mockScanner.AssertExpectations(t)
 }
 
-func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
+func TestAerospikeRecordReaderReadFailed(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 
-	mockScanner := mocks.NewMockscanner(suite.T())
+	mockScanner := mocks.NewMockscanner(t)
 	mockScanner.EXPECT().ScanPartitions(
 		newExpectedPolicy(),
 		a.NewPartitionFilterByRange(0, 4096),
@@ -210,15 +214,17 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderReadFailed() {
 		},
 		slog.Default(),
 	)
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	v, err := reader.Read()
-	suite.NotNil(err)
-	suite.Nil(v)
-	mockScanner.AssertExpectations(suite.T())
+	require.NotNil(t, err)
+	require.Nil(t, v)
+	mockScanner.AssertExpectations(t)
 }
 
-func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
+func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -251,7 +257,7 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 	expectedPolicy.MaxRecords = 10
 	expectedPolicy.FilterExpression = noMrtSetExpression()
 
-	mockScanner := mocks.NewMockscanner(suite.T())
+	mockScanner := mocks.NewMockscanner(t)
 	mockScanner.EXPECT().ScanPartitions(
 		expectedPolicy,
 		a.NewPartitionFilterByRange(0, 4096),
@@ -273,17 +279,19 @@ func (suite *readersTestSuite) TestAerospikeRecordReaderWithPolicy() {
 		},
 		slog.Default(),
 	)
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	v, err := reader.Read()
-	suite.Nil(err)
+	require.Nil(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
-	suite.Equal(expectedRecToken, v)
-	mockScanner.AssertExpectations(suite.T())
+	require.Equal(t, expectedRecToken, v)
+	mockScanner.AssertExpectations(t)
 }
-func (suite *readersTestSuite) TestSIndexReader() {
+func TestSIndexReader(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
-	mockSIndexGetter := mocks.NewMocksindexGetter(suite.T())
+	mockSIndexGetter := mocks.NewMocksindexGetter(t)
 	mockSIndexes := []*models.SIndex{
 		{
 			Namespace: namespace,
@@ -297,7 +305,7 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	)
 
 	reader := NewSIndexReader(mockSIndexGetter, namespace, slog.Default())
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	expectedSIndexTokens := make([]*models.Token, 0, len(mockSIndexes))
 	for _, sindex := range mockSIndexes {
@@ -305,41 +313,43 @@ func (suite *readersTestSuite) TestSIndexReader() {
 	}
 
 	v, err := reader.Read()
-	suite.Nil(err)
-	suite.Equal(v, expectedSIndexTokens[0])
+	require.Nil(t, err)
+	require.Equal(t, v, expectedSIndexTokens[0])
 
 	v, err = reader.Read()
-	suite.Nil(err)
-	suite.Equal(v, expectedSIndexTokens[1])
+	require.Nil(t, err)
+	require.Equal(t, v, expectedSIndexTokens[1])
 
 	v, err = reader.Read()
-	suite.Equal(err, io.EOF)
-	suite.Nil(v)
+	require.Equal(t, err, io.EOF)
+	require.Nil(t, v)
 
 	reader.Close()
 
-	mockSIndexGetter.AssertExpectations(suite.T())
+	mockSIndexGetter.AssertExpectations(t)
 
 	// negative GetSindexes fails
 
-	mockSIndexGetter = mocks.NewMocksindexGetter(suite.T())
+	mockSIndexGetter = mocks.NewMocksindexGetter(t)
 	mockSIndexGetter.EXPECT().GetSIndexes(namespace).Return(
 		nil,
 		fmt.Errorf("error"),
 	)
 
 	reader = NewSIndexReader(mockSIndexGetter, namespace, slog.Default())
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	v, err = reader.Read()
-	suite.NotNil(err)
-	suite.Nil(v)
+	require.NotNil(t, err)
+	require.Nil(t, v)
 
-	mockSIndexGetter.AssertExpectations(suite.T())
+	mockSIndexGetter.AssertExpectations(t)
 }
 
-func (suite *readersTestSuite) TestUDFReader() {
-	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
+func TestUDFReader(t *testing.T) {
+	t.Parallel()
+
+	mockUDFGetter := mocks.NewMockudfGetter(t)
 	mockUDFs := []*models.UDF{
 		{
 			Name: "udf1",
@@ -354,7 +364,7 @@ func (suite *readersTestSuite) TestUDFReader() {
 	)
 
 	reader := NewUDFReader(mockUDFGetter, slog.Default())
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	expectedUDFTokens := make([]*models.Token, 0, len(mockUDFs))
 	for _, udf := range mockUDFs {
@@ -362,37 +372,35 @@ func (suite *readersTestSuite) TestUDFReader() {
 	}
 
 	v, err := reader.Read()
-	suite.Nil(err)
-	suite.Equal(v, expectedUDFTokens[0])
+	require.Nil(t, err)
+	require.Equal(t, v, expectedUDFTokens[0])
 
 	v, err = reader.Read()
-	suite.Nil(err)
-	suite.Equal(v, expectedUDFTokens[1])
+	require.Nil(t, err)
+	require.Equal(t, v, expectedUDFTokens[1])
 
 	v, err = reader.Read()
-	suite.Equal(err, io.EOF)
-	suite.Nil(v)
+	require.Equal(t, err, io.EOF)
+	require.Nil(t, v)
 
 	reader.Close()
 }
 
-func (suite *readersTestSuite) TestUDFReaderReadFailed() {
-	mockUDFGetter := mocks.NewMockudfGetter(suite.T())
+func TestUDFReaderReadFailed(t *testing.T) {
+	t.Parallel()
+
+	mockUDFGetter := mocks.NewMockudfGetter(t)
 	mockUDFGetter.EXPECT().GetUDFs().Return(
 		nil,
 		fmt.Errorf("error"),
 	)
 
 	reader := NewUDFReader(mockUDFGetter, slog.Default())
-	suite.NotNil(reader)
+	require.NotNil(t, reader)
 
 	v, err := reader.Read()
-	suite.NotNil(err)
-	suite.Nil(v)
-}
-
-func TestReaders(t *testing.T) {
-	suite.Run(t, new(readersTestSuite))
+	require.NotNil(t, err)
+	require.Nil(t, v)
 }
 
 // setFieldValue is a hack to set the value of an unexported struct field

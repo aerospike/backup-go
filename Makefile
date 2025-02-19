@@ -2,13 +2,15 @@ VERSION := dev
 COMMIT := $(shell git rev-parse --short HEAD)
 LDFLAGS := -ldflags "-X 'main.appVersion=$(VERSION)' -X 'main.commitHash=$(COMMIT)'"
 
+NPROC = $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+
 .PHONY: test
 test:
-	go test -v ./...
+	go test -parallel $(NPROC) -timeout=5m -count=1 -v ./...
 
 .PHONY: coverage
 coverage:
-	go test ./... -coverprofile to_filter.cov -coverpkg ./...
+	go test -parallel $(NPROC) -timeout=5m -count=1 ./... -coverprofile to_filter.cov -coverpkg ./...
 	grep -v "test\|mocks" to_filter.cov > coverage.cov
 	rm -f to_filter.cov
 	go tool cover -func coverage.cov

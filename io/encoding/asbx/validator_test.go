@@ -22,6 +22,7 @@ import (
 )
 
 func TestValidator_Run(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		fileName string
@@ -68,6 +69,7 @@ func TestValidator_Run(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			v := NewValidator()
 			err := v.Run(tt.fileName)
 

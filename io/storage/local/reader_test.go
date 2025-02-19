@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -27,17 +28,15 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
-type readerTestSuite struct {
-	suite.Suite
-}
-
-func (s *readerTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
-	dir := s.T().TempDir()
-	err := createTmpFile(dir, "file3.txt")
-	require.NoError(s.T(), err)
+func TestCheckRestoreDirectory_Negative_EmptyDir(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestCheckRestoreDirectory_Negative_EmptyDir")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
+	err = createTmpFile(dir, "file3.txt")
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -53,24 +52,23 @@ func (s *readerTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 		ioStorage.WithDir(dir),
 		ioStorage.WithSkipDirCheck(),
 	)
-	s.NoError(err)
+	require.NoError(t, err)
 	err = reader.checkRestoreDirectory(dir)
-	s.Error(err)
+	require.ErrorContains(t, err, "is empty")
 }
 
-func TestCheckRestoreDirectory(t *testing.T) {
-	suite.Run(t, new(readerTestSuite))
-}
+func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_StreamFiles_OK")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
 
-func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
-	dir := s.T().TempDir()
-
-	err := createTmpFile(dir, "file1.asb")
-	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "file1.asb")
+	require.NoError(t, err)
 	err = createTmpFile(dir, "file2.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "file3.txt")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -81,7 +79,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 	})
 	ctx := context.Background()
 	streamingReader, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -93,20 +91,23 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(2, counter)
+				require.Equal(t, 2, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }
 
-func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
-	dir := s.T().TempDir()
-	err := createTmpFile(dir, "file1.asb")
-	require.NoError(s.T(), err)
+func TestDirectoryReader_StreamFiles_OneFile(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_StreamFiles_OneFile")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
+	err = createTmpFile(dir, "file1.asb")
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -117,7 +118,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 	})
 	ctx := context.Background()
 	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -129,18 +130,21 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(1, counter)
+				require.Equal(t, 1, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }
 
-func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
-	dir := s.T().TempDir()
+func TestDirectoryReader_StreamFiles_ErrEmptyDir(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_StreamFiles_ErrEmptyDir")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -150,14 +154,17 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	_, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
-	s.Require().ErrorContains(err, "is empty")
+	_, err = NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithDir(dir))
+	require.ErrorContains(t, err, "is empty")
 }
 
-func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
-	dir := s.T().TempDir()
-	err := createTmpFile(dir, "file1.asb")
-	require.NoError(s.T(), err)
+func TestDirectoryReader_StreamFiles_ErrNoSuchFile(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_StreamFiles_ErrNoSuchFile")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
+	err = createTmpFile(dir, "file1.asb")
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -173,7 +180,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 		ioStorage.WithDir("file1.asb"),
 		ioStorage.WithSkipDirCheck(),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -185,20 +192,22 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(2, counter)
+				require.Equal(t, 2, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.ErrorContains(s.T(), err, "no such file or directory")
+			require.ErrorContains(t, err, "no such file or directory")
 			return
 		}
 	}
 }
 
-func (s *readerTestSuite) TestDirectoryReader_GetType() {
-	dir := s.T().TempDir()
-
+func TestDirectoryReader_GetType(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_GetType")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
@@ -213,9 +222,9 @@ func (s *readerTestSuite) TestDirectoryReader_GetType() {
 		ioStorage.WithDir(dir),
 		ioStorage.WithSkipDirCheck(),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
-	s.Equal(localType, r.GetType())
+	require.Equal(t, localType, r.GetType())
 }
 
 func createTmpFile(dir, fileName string) error {
@@ -239,19 +248,22 @@ func createTempNestedDir(rootPath, nestedDir string) error {
 	return nil
 }
 
-func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
+func TestDirectoryReader_OpenFile(t *testing.T) {
+	t.Parallel()
 	const fileName = "oneFile.asb"
 
-	dir := s.T().TempDir()
-	err := createTmpFile(dir, fileName)
-	require.NoError(s.T(), err)
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_OpenFile")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
+	err = createTmpFile(dir, fileName)
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 
 	path := filepath.Join(dir, fileName)
 	ctx := context.Background()
 	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -263,27 +275,30 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(1, counter)
+				require.Equal(t, 1, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }
 
-func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
-	dir := s.T().TempDir()
-	err := createTmpFile(dir, "oneFile.asb")
-	require.NoError(s.T(), err)
+func TestDirectoryReader_OpenFileErr(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_OpenFileErr")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
+	err = createTmpFile(dir, "oneFile.asb")
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 
 	path := filepath.Join(dir, "error")
 	ctx := context.Background()
 	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -295,29 +310,32 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(0, counter)
+				require.Equal(t, 0, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.ErrorContains(s.T(), err, "no such file or directory")
+			require.ErrorContains(t, err, "no such file or directory")
 		}
 	}
 }
 
-func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
-	dir := s.T().TempDir()
+func TestDirectoryReader_StreamFiles_Nested_OK(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_StreamFiles_Nested_OK")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
 
-	err := createTempNestedDir(dir, "nested1")
-	require.NoError(s.T(), err)
+	err = createTempNestedDir(dir, "nested1")
+	require.NoError(t, err)
 	err = createTmpFile(dir, "nested1/file1.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTempNestedDir(dir, "nested2")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "nested2/file2.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "file3.txt")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -333,7 +351,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 		ioStorage.WithDir(dir),
 		ioStorage.WithNestedDir(),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -345,29 +363,32 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(2, counter)
+				require.Equal(t, 2, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }
 
-func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
-	dir := s.T().TempDir()
+func TestDirectoryReader_StreamFilesList(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_StreamFilesList")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
 
-	err := createTempNestedDir(dir, "nested1")
-	require.NoError(s.T(), err)
+	err = createTempNestedDir(dir, "nested1")
+	require.NoError(t, err)
 	err = createTmpFile(dir, "nested1/file1.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTempNestedDir(dir, "nested2")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "nested2/file2.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "file3.txt")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -389,7 +410,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 		ioStorage.WithValidator(mockValidator),
 		ioStorage.WithFileList(pathList),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -401,29 +422,30 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(2, counter)
+				require.Equal(t, 2, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }
 
-func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
-	dir := s.T().TempDir()
+func TestDirectoryReader_StreamPathList(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestDirectoryReader_StreamPathList")
 
 	err := createTempNestedDir(dir, "nested1")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "nested1/file1.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTempNestedDir(dir, "nested2")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "nested2/file2.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "nested1/file3.asb")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
 	mockValidator := new(mocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
@@ -445,7 +467,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 		ioStorage.WithValidator(mockValidator),
 		ioStorage.WithDirList(pathList),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -457,34 +479,37 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(3, counter)
+				require.Equal(t, 3, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }
 
-func (s *readerTestSuite) TestReader_WithSorting() {
-	dir := s.T().TempDir()
+func TestReader_WithSorting(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestReader_WithSorting")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
 
 	expResult := []string{"0_file_1.asbx", "0_file_2.asbx", "0_file_3.asbx"}
 
-	err := createTmpFile(dir, "0_file_3.asbx")
-	require.NoError(s.T(), err)
+	err = createTmpFile(dir, "0_file_3.asbx")
+	require.NoError(t, err)
 	err = createTmpFile(dir, "0_file_1.asbx")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	err = createTmpFile(dir, "0_file_2.asbx")
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 	ctx := context.Background()
 	r, err := NewReader(
 		ctx,
 		ioStorage.WithDir(dir),
 		ioStorage.WithSorting(),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
@@ -496,25 +521,28 @@ func (s *readerTestSuite) TestReader_WithSorting() {
 		case f, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Equal(expResult, result)
+				require.Equal(t, expResult, result)
 				return
 			}
 			result = append(result, f.Name)
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }
 
-func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
-	dir := s.T().TempDir()
+func TestReader_StreamFilesPreloaded(t *testing.T) {
+	t.Parallel()
+	dir := path.Join(t.TempDir(), "TestReader_StreamFilesPreloaded")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
 	ctx := context.Background()
 
 	expResult := []string{"file3.asb", "0_file_2.asbx", "file1.asb", "file2.asb", "0_file_1.asbx"}
 
 	for i := range expResult {
 		err := createTmpFile(dir, expResult[i])
-		require.NoError(s.T(), err)
+		require.NoError(t, err)
 	}
 
 	mockValidator := new(mocks.Mockvalidator)
@@ -530,10 +558,10 @@ func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
 		ioStorage.WithDir(dir),
 		ioStorage.WithValidator(mockValidator),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	list, err := r.ListObjects(ctx, dir)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	_, asbxList := filterList(list)
 	r.SetObjectsToStream(asbxList)
 
@@ -547,12 +575,12 @@ func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
 		case _, ok := <-readerChan:
 			// if chan closed, we're done.
 			if !ok {
-				s.Require().Equal(2, counter)
+				require.Equal(t, 2, counter)
 				return
 			}
 			counter++
 		case err = <-errorChan:
-			require.NoError(s.T(), err)
+			require.NoError(t, err)
 		}
 	}
 }

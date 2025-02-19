@@ -36,6 +36,7 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
+	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
@@ -66,6 +67,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
+	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -87,6 +89,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
+	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -113,6 +116,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
+	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -126,6 +130,7 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
+	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	var recExpr int64 = 10
@@ -154,6 +159,7 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
+	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	sindex := &models.SIndex{
@@ -175,6 +181,7 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
+	suite.T().Parallel()
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
 	encoder := NewEncoder[*models.Token]("test", false)
@@ -187,10 +194,12 @@ func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 }
 
 func TestASBEncoderTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(asbEncoderTestSuite))
 }
 
 func Test_escapeASBS(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		s string
 	}
@@ -216,6 +225,7 @@ func Test_escapeASBS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := escapeASB(tt.args.s); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("escapeASB() = %v, want %v", got, tt.want)
 			}
@@ -224,6 +234,7 @@ func Test_escapeASBS(t *testing.T) {
 }
 
 func Test__SIndexToASB(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		sindex *models.SIndex
 	}
@@ -288,6 +299,7 @@ func Test__SIndexToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := sindexToASB(tt.args.sindex, w)
 			if (err != nil) != tt.wantErr {
@@ -305,6 +317,7 @@ func Test__SIndexToASB(t *testing.T) {
 }
 
 func Test_binToASB(t *testing.T) {
+	t.Parallel()
 	geoJSONStr := `{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [0,0]]]}`
 	type args struct {
 		v any
@@ -503,6 +516,7 @@ func Test_binToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dst := &bytes.Buffer{}
 			n, err := binToASB(tt.args.k, false, tt.args.v, dst)
 			if (err != nil) != tt.wantErr {
@@ -521,6 +535,7 @@ func Test_binToASB(t *testing.T) {
 }
 
 func Test_boolToASB(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		b bool
 	}
@@ -546,6 +561,7 @@ func Test_boolToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := boolToASB(tt.args.b)
 			assert.Equal(t, tt.want, got)
 		})
@@ -553,6 +569,7 @@ func Test_boolToASB(t *testing.T) {
 }
 
 func Test_binsToASB(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		bins a.BinMap
 	}
@@ -584,6 +601,7 @@ func Test_binsToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dst := &bytes.Buffer{}
 			n, err := binsToASB(false, tt.args.bins, dst)
 			if (err != nil) != tt.wantErr {
@@ -610,6 +628,7 @@ func sortBinOutput(s string) []byte {
 }
 
 func Test_userKeyToASB(t *testing.T) {
+	t.Parallel()
 	encVal := base64Encode([]byte("hello"))
 	type args struct {
 		userKey a.Value
@@ -672,6 +691,7 @@ func Test_userKeyToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dst := &bytes.Buffer{}
 			n, err := userKeyToASB(tt.args.userKey, dst)
 			if (err != nil) != tt.wantErr {
@@ -690,6 +710,7 @@ func Test_userKeyToASB(t *testing.T) {
 }
 
 func Test_keyToASB(t *testing.T) {
+	t.Parallel()
 	NoSetKey, _ := a.NewKey("ns", "", 1)
 	stringKey, _ := a.NewKey("ns", "set", "hello")
 	escKey, _ := a.NewKey("\\n s", "set\n", "hello")
@@ -726,6 +747,7 @@ func Test_keyToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dst := &bytes.Buffer{}
 			n, err := keyToASB(tt.args.k, dst)
 			if (err != nil) != tt.wantErr {
@@ -744,6 +766,7 @@ func Test_keyToASB(t *testing.T) {
 }
 
 func Test_recordToASB(t *testing.T) {
+	t.Parallel()
 	var recExpr int64 = 10
 	key, _ := a.NewKey("test", "demo", "1234")
 	escKey, _ := a.NewKey("test\n", "de mo", "1234")
@@ -796,6 +819,7 @@ func Test_recordToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dst := &bytes.Buffer{}
 			n, err := recordToASB(false, tt.args.r, dst)
 			if (err != nil) != tt.wantErr {
@@ -816,6 +840,7 @@ func Test_recordToASB(t *testing.T) {
 }
 
 func Test_writeRecordHeaderGeneration(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		generation uint32
 	}
@@ -837,6 +862,7 @@ func Test_writeRecordHeaderGeneration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRecordHeaderGeneration(tt.args.generation, w)
 			if (err != nil) != tt.wantErr {
@@ -854,6 +880,7 @@ func Test_writeRecordHeaderGeneration(t *testing.T) {
 }
 
 func Test_writeRecordHeaderExpiration(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		expiration int64
 	}
@@ -875,6 +902,7 @@ func Test_writeRecordHeaderExpiration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRecordHeaderExpiration(tt.args.expiration, w)
 			if (err != nil) != tt.wantErr {
@@ -892,6 +920,7 @@ func Test_writeRecordHeaderExpiration(t *testing.T) {
 }
 
 func Test_writeRecordHeaderBinCount(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		binCount int
 	}
@@ -913,6 +942,7 @@ func Test_writeRecordHeaderBinCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRecordHeaderBinCount(tt.args.binCount, w)
 			if (err != nil) != tt.wantErr {
@@ -930,6 +960,7 @@ func Test_writeRecordHeaderBinCount(t *testing.T) {
 }
 
 func Test_writeBinInt(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name string
 		v    int64
@@ -962,6 +993,7 @@ func Test_writeBinInt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeBinInt(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -979,6 +1011,7 @@ func Test_writeBinInt(t *testing.T) {
 }
 
 func Test_writeBinFloat(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name string
 		v    float64
@@ -1011,6 +1044,7 @@ func Test_writeBinFloat(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeBinFloat(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1028,6 +1062,7 @@ func Test_writeBinFloat(t *testing.T) {
 }
 
 func Test_writeBinString(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name string
 		v    string
@@ -1060,6 +1095,7 @@ func Test_writeBinString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeBinString(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1077,6 +1113,7 @@ func Test_writeBinString(t *testing.T) {
 }
 
 func Test_writeBinBytes(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name string
 		v    []byte
@@ -1113,6 +1150,7 @@ func Test_writeBinBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeBinBytes(tt.args.name, false, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1130,6 +1168,7 @@ func Test_writeBinBytes(t *testing.T) {
 }
 
 func Test_writeBinHLL(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name string
 		v    a.HLLValue
@@ -1166,6 +1205,7 @@ func Test_writeBinHLL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeBinHLL(tt.args.name, false, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1183,6 +1223,7 @@ func Test_writeBinHLL(t *testing.T) {
 }
 
 func Test_writeBinGeoJSON(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name string
 		v    a.GeoJSONValue
@@ -1223,6 +1264,7 @@ func Test_writeBinGeoJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeBinGeoJSON(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1240,6 +1282,7 @@ func Test_writeBinGeoJSON(t *testing.T) {
 }
 
 func Test_writeBinNil(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name string
 	}
@@ -1269,6 +1312,7 @@ func Test_writeBinNil(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeBinNil(tt.args.name, w)
 			if (err != nil) != tt.wantErr {
@@ -1286,6 +1330,7 @@ func Test_writeBinNil(t *testing.T) {
 }
 
 func Test_writeRecordNamespace(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		namespace string
 	}
@@ -1315,6 +1360,7 @@ func Test_writeRecordNamespace(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRecordNamespace(tt.args.namespace, w)
 			if (err != nil) != tt.wantErr {
@@ -1332,6 +1378,7 @@ func Test_writeRecordNamespace(t *testing.T) {
 }
 
 func Test_writeRecordDigest(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		digest []byte
 	}
@@ -1353,6 +1400,7 @@ func Test_writeRecordDigest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRecordDigest(tt.args.digest, w)
 			if (err != nil) != tt.wantErr {
@@ -1370,6 +1418,7 @@ func Test_writeRecordDigest(t *testing.T) {
 }
 
 func Test_writeRecordSet(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		setName string
 	}
@@ -1399,6 +1448,7 @@ func Test_writeRecordSet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRecordSet(tt.args.setName, w)
 			if (err != nil) != tt.wantErr {
@@ -1416,6 +1466,7 @@ func Test_writeRecordSet(t *testing.T) {
 }
 
 func Test_writeUserKeyInt(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		v int64
 	}
@@ -1437,6 +1488,7 @@ func Test_writeUserKeyInt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeUserKeyInt(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1454,6 +1506,7 @@ func Test_writeUserKeyInt(t *testing.T) {
 }
 
 func Test_writeUserKeyFloat(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		v float64
 	}
@@ -1475,6 +1528,7 @@ func Test_writeUserKeyFloat(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeUserKeyFloat(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1492,6 +1546,7 @@ func Test_writeUserKeyFloat(t *testing.T) {
 }
 
 func Test_writeUserKeyString(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		v string
 	}
@@ -1513,6 +1568,7 @@ func Test_writeUserKeyString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeUserKeyString(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1530,6 +1586,7 @@ func Test_writeUserKeyString(t *testing.T) {
 }
 
 func Test_writeUserKeyBytes(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		v []byte
 	}
@@ -1551,6 +1608,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeUserKeyBytes(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
@@ -1625,6 +1683,7 @@ func genKey() *a.Key {
 }
 
 func Test_writeVersionText(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		asbVersion string
 	}
@@ -1646,6 +1705,7 @@ func Test_writeVersionText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			writeVersionText(tt.args.asbVersion, w)
 			if gotW := w.String(); gotW != tt.wantW {
@@ -1656,6 +1716,7 @@ func Test_writeVersionText(t *testing.T) {
 }
 
 func Test_writeNamespaceMetaText(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		namespace string
 	}
@@ -1685,6 +1746,7 @@ func Test_writeNamespaceMetaText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			writeNamespaceMetaText(tt.args.namespace, w)
 			if gotW := w.String(); gotW != tt.wantW {
@@ -1695,6 +1757,7 @@ func Test_writeNamespaceMetaText(t *testing.T) {
 }
 
 func Test_writeFirstMetaText(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		wantW   string
@@ -1709,6 +1772,7 @@ func Test_writeFirstMetaText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			writeFirstMetaText(w)
 			if gotW := w.String(); gotW != tt.wantW {
@@ -1719,6 +1783,7 @@ func Test_writeFirstMetaText(t *testing.T) {
 }
 
 func Test_blobBinToASB(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		name      string
 		val       []byte
@@ -1741,6 +1806,7 @@ func Test_blobBinToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := blobBinToASB(tt.args.val, tt.args.bytesType, tt.args.name); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("blobBinToASB() = %s, want %s", got, tt.want)
 			}
@@ -1749,6 +1815,7 @@ func Test_blobBinToASB(t *testing.T) {
 }
 
 func Test_writeRawListBin(t *testing.T) {
+	t.Parallel()
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
@@ -1787,6 +1854,7 @@ func Test_writeRawListBin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRawListBin(tt.args.cdt, tt.args.name, false, w)
 			if (err != nil) != tt.wantErr {
@@ -1804,6 +1872,7 @@ func Test_writeRawListBin(t *testing.T) {
 }
 
 func Test_writeRawMapBin(t *testing.T) {
+	t.Parallel()
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
@@ -1842,6 +1911,7 @@ func Test_writeRawMapBin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, false, w)
 			if (err != nil) != tt.wantErr {
@@ -1859,6 +1929,7 @@ func Test_writeRawMapBin(t *testing.T) {
 }
 
 func Test_writeRawBlobBin(t *testing.T) {
+	t.Parallel()
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
@@ -1910,6 +1981,7 @@ func Test_writeRawBlobBin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := writeRawBlobBin(tt.args.cdt, tt.args.name, false, w)
 			if (err != nil) != tt.wantErr {
@@ -1927,6 +1999,7 @@ func Test_writeRawBlobBin(t *testing.T) {
 }
 
 func Test_udfToASB(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		udf *models.UDF
 	}
@@ -1964,6 +2037,7 @@ func Test_udfToASB(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := &bytes.Buffer{}
 			got, err := udfToASB(tt.args.udf, w)
 			if (err != nil) != tt.wantErr {

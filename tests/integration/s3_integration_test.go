@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	backupDir  = "/"
-	backupFile = "/backup_folder/backup_file.txt"
+	testBackupDir  = "/"
+	testBackupFile = "/backup_folder/backup_file.txt"
 )
 
 type writeReadTestSuite struct {
@@ -125,7 +125,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		ioStorage.WithDir(backupDir),
+		ioStorage.WithDir(testBackupDir),
 		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
@@ -157,7 +157,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		ioStorage.WithDir(backupDir),
+		ioStorage.WithDir(testBackupDir),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 
@@ -169,7 +169,7 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		ioStorage.WithDir(backupDir),
+		ioStorage.WithDir(testBackupDir),
 		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)
@@ -198,7 +198,7 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 		ctx,
 		client,
 		"backup",
-		ioStorage.WithFile(backupFile),
+		ioStorage.WithFile(testBackupFile),
 		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
@@ -233,7 +233,7 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		ioStorage.WithFile(backupFile),
+		ioStorage.WithFile(testBackupFile),
 		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)

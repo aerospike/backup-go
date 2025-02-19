@@ -17,62 +17,58 @@ package local
 import (
 	"context"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
 	ioStorage "github.com/aerospike/backup-go/io/storage"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type writerTestSuite struct {
-	suite.Suite
-}
-
-func (suite *writerTestSuite) Test_openBackupFile() {
-	tmpDir := suite.T().TempDir()
+func Test_openBackupFile(t *testing.T) {
+	t.Parallel()
+	tmpDir := path.Join(t.TempDir(), "Test_openBackupFile")
 	ctx := context.Background()
 
 	factory, err := NewWriter(ctx, ioStorage.WithRemoveFiles(), ioStorage.WithDir(tmpDir))
-	suite.NoError(err)
+	require.NoError(t, err)
 
 	w, err := factory.NewWriter(context.Background(), "test")
-	suite.NoError(err)
-	suite.NotNil(w)
+	require.NoError(t, err)
+	require.NotNil(t, w)
 
 	err = w.Close()
-	suite.NoError(err)
+	require.NoError(t, err)
 
 	w, err = os.Open(filepath.Join(tmpDir, "test"))
-	suite.NoError(err)
-	suite.NotNil(w)
+	require.NoError(t, err)
+	require.NotNil(t, w)
 
 	err = w.Close()
-	suite.NoError(err)
+	require.NoError(t, err)
 }
 
-func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive() {
-	dir := suite.T().TempDir()
-	err := createDirIfNotExist(dir, true)
-	suite.NoError(err)
+func TestPrepareBackupDirectory_Positive(t *testing.T) {
+	t.Parallel()
+	tmpDir := path.Join(t.TempDir(), "TestPrepareBackupDirectory_Positive")
+	err := createDirIfNotExist(tmpDir, true)
+	require.NoError(t, err)
 }
 
-func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
-	dir := suite.T().TempDir()
-	dir += "/test"
-	err := createDirIfNotExist(dir, true)
-	suite.NoError(err)
-	suite.DirExists(dir)
+func TestPrepareBackupDirectory_Positive_CreateDir(t *testing.T) {
+	t.Parallel()
+	tmpDir := path.Join(t.TempDir(), "TestPrepareBackupDirectory_Positive_CreateDir")
+	err := createDirIfNotExist(tmpDir, true)
+	require.NoError(t, err)
+	require.DirExists(t, tmpDir)
 }
 
-func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
-	tmpDir := suite.T().TempDir()
+func TestDirectoryWriter_GetType(t *testing.T) {
+	t.Parallel()
+	tmpDir := path.Join(t.TempDir(), "Test_openBackupFile")
 	ctx := context.Background()
 	w, err := NewWriter(ctx, ioStorage.WithRemoveFiles(), ioStorage.WithDir(tmpDir))
-	suite.NoError(err)
+	require.NoError(t, err)
 
-	suite.Equal(localType, w.GetType())
-}
-
-func Test_backupDirectoryTestSuite(t *testing.T) {
-	suite.Run(t, new(writerTestSuite))
+	require.Equal(t, localType, w.GetType())
 }

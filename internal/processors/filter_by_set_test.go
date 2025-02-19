@@ -24,6 +24,7 @@ import (
 )
 
 func TestSetFilter(t *testing.T) {
+	t.Parallel()
 	type test struct {
 		token            *models.Token
 		setFilter        *filterBySet[*models.Token]
@@ -91,6 +92,7 @@ func TestSetFilter(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			resToken, resErr := tc.setFilter.Process(tc.token)
 			if tc.shouldBeFiltered {
 				assert.Nil(t, resToken)

@@ -57,7 +57,7 @@ jobs:
       createbucket:
         image: quay.io/minio/mc
         options: >-
-          --name minio
+          --name mc
           --entrypoint sh
           quay.io/minio/mc
           -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && mc mb myminio/backup && mc mb myminio/asbackup \

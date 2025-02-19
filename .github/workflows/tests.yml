@@ -26,6 +26,12 @@ jobs:
         image: fsouza/fake-gcs-server:latest
         ports:
           - 4443:4443
+        options: >-
+          --health-cmd "curl -f http://localhost:4443 || exit 1" 
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+          --entrypoint "-scheme http -public-host 127.0.0.1:4443"
 
       # Azurite
       azurite:
@@ -63,7 +69,7 @@ jobs:
       - name: Test with coverage
         run: |
           make coverage
-          
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:

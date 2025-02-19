@@ -54,6 +54,18 @@ jobs:
           quay.io/minio/minio
           -c "minio server /data --console-address \":9001\""
 
+      createbucket:
+        image: quay.io/minio/mc
+        volumes:
+          - ./conf/service/config.yml:/root/config.yml
+        options: >-
+          --name mc
+          --entrypoint sh
+          quay.io/minio/mc
+          -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && mc mb myminio/backup && mc mb myminio/asbackup \
+             && mc anonymous set upload myminio/backup && mc anonymous set download myminio/backup && mc anonymous set public myminio/backup \
+             && mc anonymous set upload myminio/asbackup && mc anonymous set download myminio/asbackup && mc anonymous set public myminio/asbackup"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -65,20 +77,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-
-      # Create MinIO buckets after MinIO is healthy
-      - name: Create MinIO buckets
-        run: |
-         docker run --rm --network host quay.io/minio/mc \
-           /bin/sh -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && \
-             mc mb myminio/backup && \
-             mc mb myminio/asbackup && \
-             mc anonymous set upload myminio/backup && \
-             mc anonymous set download myminio/backup && \
-             mc anonymous set public myminio/backup && \
-             mc anonymous set upload myminio/asbackup && \
-             mc anonymous set download myminio/asbackup && \
-             mc anonymous set public myminio/asbackup"
 
       - name: Test with coverage
         run: |

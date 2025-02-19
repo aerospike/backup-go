@@ -1411,8 +1411,8 @@ func Test_parseUDF(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Parallel()
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseUDF(tt.args.udfMap)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseUDF() error = %v, wantErr %v", err, tt.wantErr)

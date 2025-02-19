@@ -93,8 +93,8 @@ func TestNewCLTime(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Parallel()
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := NewCLTime(tt.args.seconds); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewCLTime() = %v, want %v", got, tt.want)
 			}

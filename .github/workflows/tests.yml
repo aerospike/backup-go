@@ -51,6 +51,7 @@ jobs:
         options: >-
           --name minio
           --entrypoint sh
+          quay.io/minio/minio
           -c "minio server /data --console-address ':9001'"
 
     steps:

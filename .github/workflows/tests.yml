@@ -28,7 +28,7 @@ jobs:
         ports:
           - 4443:4443
         options: >-
-          fsouza/fake-gcs-server -scheme http -public-host 0.0.0.0:4443
+          --entrypoint "/bin/fake-gcs-server -data /data -scheme http -public-host 127.0.0.1:4443"
 
       # Azurite
       azurite:

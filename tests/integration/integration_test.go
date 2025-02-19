@@ -34,7 +34,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/aerospike/backup-go/tests"
-	"github.com/aerospike/tools-common-go/testutils"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -93,41 +92,6 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	aeroClientPolicy := a.NewClientPolicy()
 	aeroClientPolicy.User = aerospikeLoginPassword
 	aeroClientPolicy.Password = aerospikeLoginPassword
-
-	asc, aerr := a.NewClientWithPolicy(
-		aeroClientPolicy,
-		aerospikeHost,
-		aerospikePort,
-	)
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-		return
-	}
-	defer asc.Close()
-
-	privs := []a.Privilege{
-		{Code: a.Read},
-		{Code: a.Write},
-		{Code: a.Truncate},
-		{Code: a.UserAdmin},
-		{Code: a.SIndexAdmin},
-		{Code: a.UDFAdmin},
-	}
-
-	aerr = asc.CreateRole(nil, "testBackup", privs, nil, 0, 0)
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
-
-	aerr = asc.CreateUser(nil, "backupTester", "changeme", []string{"testBackup"})
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
-
-	asc.Close()
-
-	aeroClientPolicy.User = "backupTester"
-	aeroClientPolicy.Password = "changeme"
 	testAeroClient, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
 		aerospikeHost,
@@ -151,25 +115,8 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 }
 
 func (suite *backupRestoreTestSuite) TearDownSuite() {
-	defer func() {
-		err := testutils.Stop()
-		if err != nil {
-			suite.FailNow(err.Error())
-		}
-	}()
-
 	asc := suite.Aeroclient
 	defer asc.Close()
-
-	aerr := asc.DropRole(nil, "testBackup")
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
-
-	aerr = asc.DropUser(nil, "backupTester")
-	if aerr != nil {
-		suite.FailNow(aerr.Error())
-	}
 }
 
 func (suite *backupRestoreTestSuite) SetupTest(records []*a.Record) {

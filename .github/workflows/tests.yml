@@ -29,6 +29,7 @@ jobs:
           - 4443:4443
         options: >-
           --entrypoint sh
+          fsouza/fake-gcs-server
           -c "/bin/fake-gcs-server -data /data -scheme http -public-host 127.0.0.1:4443"
 
       # Azurite

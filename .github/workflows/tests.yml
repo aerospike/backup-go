@@ -21,9 +21,9 @@ jobs:
           - 3001:3001
           - 3002:3002
 
-      # Minio service container
+      # Minio service container - using prebuilt image
       minio:
-        image: quay.io/minio/minio:latest
+        image: bitnami/minio:latest  # Using Bitnami image which has simpler defaults
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadminpassword
@@ -36,31 +36,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
-          --command server /data --console-address \":9001\"
 
-      # Fake GCS server
+      # Fake GCS server - simplified
       fake-gcs-server:
         image: fsouza/fake-gcs-server:latest
         ports:
           - 4443:4443
-        options: >-
-          --health-cmd "curl -f http://localhost:4443 || exit 1" 
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
-          --command "-scheme http -public-host 127.0.0.1:4443"
 
-      # Azurite
+      # Azurite - simplified
       azurite:
         image: mcr.microsoft.com/azure-storage/azurite:latest
         ports:
           - 5000:10000
-        options: >-
-          --health-cmd "nc -z localhost 10000 || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
-          --command "azurite-blob --blobHost 0.0.0.0"
 
     steps:
       - uses: actions/checkout@v4
@@ -74,20 +61,33 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      # Set up containers that need special configuration
+      - name: Set up Fake GCS Server
+        run: |
+          # Configure fake-gcs-server if needed
+          curl -X POST http://localhost:4443/storage/v1/b \
+            -H "Content-Type: application/json" \
+            -d '{"name":"backup"}'
+          curl -X POST http://localhost:4443/storage/v1/b \
+            -H "Content-Type: application/json" \
+            -d '{"name":"asbackup"}'
+
       - name: Configure Minio
         run: |
-          # Wait for Minio to be fully ready (healthcheck should ensure this already)
-          sleep 2
+          # Install Minio client
+          wget https://dl.min.io/client/mc/release/linux-amd64/mc -O /tmp/mc
+          chmod +x /tmp/mc
+          
           # Configure buckets and permissions
-          docker exec minio mc alias set myminio http://localhost:9000 minioadmin minioadminpassword
-          docker exec minio mc mb myminio/backup --ignore-existing || true
-          docker exec minio mc mb myminio/asbackup --ignore-existing || true
-          docker exec minio mc anonymous set upload myminio/backup
-          docker exec minio mc anonymous set download myminio/backup
-          docker exec minio mc anonymous set public myminio/backup
-          docker exec minio mc anonymous set upload myminio/asbackup
-          docker exec minio mc anonymous set download myminio/asbackup
-          docker exec minio mc anonymous set public myminio/asbackup
+          /tmp/mc alias set myminio http://localhost:9000 minioadmin minioadminpassword
+          /tmp/mc mb myminio/backup --ignore-existing || true
+          /tmp/mc mb myminio/asbackup --ignore-existing || true
+          /tmp/mc anonymous set upload myminio/backup
+          /tmp/mc anonymous set download myminio/backup
+          /tmp/mc anonymous set public myminio/backup
+          /tmp/mc anonymous set upload myminio/asbackup
+          /tmp/mc anonymous set download myminio/asbackup
+          /tmp/mc anonymous set public myminio/asbackup
 
       - name: Run tests with coverage
         run: |

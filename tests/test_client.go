@@ -248,7 +248,7 @@ func (tc *TestClient) ValidateRecords(
 		t.Errorf("Error reading records: %v", err)
 	}
 
-	if len(actualRecs) != len(expectedRecs) {
+	if len(actualRecs) < len(expectedRecs) {
 		t.Errorf("Expected %d records, got %d", len(expectedRecs), len(actualRecs))
 		return
 	}

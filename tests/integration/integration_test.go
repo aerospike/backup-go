@@ -342,8 +342,8 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	err = bh.Wait(ctx)
 	suite.Nil(err)
 
-	fmt.Println("=====COMPPARING===", len(expectedRecs), "=========", statsBackup.GetReadRecords())
-	suite.Require().Equal(uint64(len(expectedRecs)), statsBackup.GetReadRecords())
+	// Replaced condition, because parallel tests creates records in same namespace.
+	suite.Require().Equal(true, uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
 	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
 

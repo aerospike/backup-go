@@ -27,6 +27,9 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+// After that delay, we start to poll stats from db.
+const statsPollingDelay = 3 * time.Second
+
 // RecordReaderConfig represents the configuration for getting Aerospike records trough XDR.
 type RecordReaderConfig struct {
 	// dc name that will be created for xdr.
@@ -224,8 +227,7 @@ func (r *RecordReader) serve() {
 	defer ticker.Stop()
 	defer r.Close()
 
-	// TODO: replace it with something. When we will decide how to delay stats check.
-	time.Sleep(3 * time.Second)
+	time.Sleep(statsPollingDelay)
 
 	for {
 		select {

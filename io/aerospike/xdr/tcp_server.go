@@ -297,7 +297,7 @@ func NewConnectionHandler(
 		conn:             conn,
 		resultChan:       resultChan,
 		readTimeoutNano:  readTimeout.Nanoseconds(),
-		writeTimeoutNano: writeTimeout.Milliseconds(),
+		writeTimeoutNano: writeTimeout.Nanoseconds(),
 		timeNow:          time.Now().UnixNano(),
 		bodyQueue:        make(chan []byte, ackQueueSize),
 		ackQueue:         make(chan []byte, ackQueueSize),

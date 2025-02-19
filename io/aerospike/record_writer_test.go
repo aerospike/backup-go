@@ -32,10 +32,13 @@ type writersTestSuite struct {
 }
 
 func TestWriters(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(writersTestSuite))
 }
 
 func (suite *writersTestSuite) TestRestoreWriterRecord() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -70,6 +73,8 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 }
 
 func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 	key, _ := a.NewKey(namespace, set, "key")
@@ -95,6 +100,8 @@ func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
 }
 
 func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -129,6 +136,8 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 }
 
 func (suite *writersTestSuite) TestSingleRecordWriterRetry() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 	key, _ := a.NewKey(namespace, set, "key")
@@ -169,6 +178,8 @@ func (suite *writersTestSuite) TestSingleRecordWriterRetry() {
 }
 
 func (suite *writersTestSuite) TestBatchRecordWriterRetry() {
+	suite.T().Parallel()
+
 	namespace := "test"
 	set := ""
 	key, _ := a.NewKey(namespace, set, "key")

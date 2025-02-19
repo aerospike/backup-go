@@ -19,6 +19,7 @@ import (
 )
 
 func TestMergeMultipleChannels(t *testing.T) {
+	t.Parallel()
 	ch1 := make(chan int)
 	ch2 := make(chan int)
 	ch3 := make(chan int)
@@ -46,6 +47,7 @@ func TestMergeMultipleChannels(t *testing.T) {
 }
 
 func TestMergeNoChannels(t *testing.T) {
+	t.Parallel()
 	resultChan := MergeChannels([]<-chan int{}) // Merge with no channels
 
 	if _, ok := <-resultChan; ok {
@@ -54,6 +56,7 @@ func TestMergeNoChannels(t *testing.T) {
 }
 
 func TestMergeOneChannel(t *testing.T) {
+	t.Parallel()
 	ch1 := make(chan int)
 	go func() {
 		ch1 <- 10

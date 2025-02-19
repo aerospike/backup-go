@@ -289,6 +289,7 @@ func (mock validatorMock) Run(fileName string) error {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesOk() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -328,6 +329,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 }
 
 func (s *GCPSuite) TestReader_WithSorting() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -373,6 +375,7 @@ func (s *GCPSuite) TestReader_WithSorting() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesEmpty() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -393,6 +396,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesMixed() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -432,6 +436,7 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 }
 
 func (s *GCPSuite) TestReader_GetType() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -454,6 +459,7 @@ func (s *GCPSuite) TestReader_GetType() {
 }
 
 func (s *GCPSuite) TestWriter_WriteEmptyDir() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -483,6 +489,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 }
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -501,6 +508,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 }
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -531,6 +539,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 }
 
 func (s *GCPSuite) TestWriter_WriteMixedDir() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -561,6 +570,7 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 }
 
 func (s *GCPSuite) TestWriter_GetType() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -583,6 +593,7 @@ func (s *GCPSuite) TestWriter_GetType() {
 }
 
 func (s *GCPSuite) TestReader_OpenFileOk() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -621,6 +632,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 }
 
 func (s *GCPSuite) TestReader_OpenFileErr() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -649,6 +661,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 }
 
 func (s *GCPSuite) TestWriter_WriteSingleFile() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -675,6 +688,7 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 }
 
 func (s *GCPSuite) TestReader_WithStartOffset() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -718,6 +732,7 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 }
 
 func (s *GCPSuite) TestReader_StreamPathList() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -763,6 +778,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesList() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -807,6 +823,7 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
+	s.T().Parallel()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,

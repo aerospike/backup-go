@@ -32,7 +32,6 @@ const (
 	testPayloadB64 = "FhABEAAAAAAAAgAnjQAAAAAAAAUAAQAAAAsAc291cmNlLW5zMQAAABUE/+Ptyjj06wW9zx0AnxOmq45xJzsAAAAFAXNldDEAAAAKAgEAAAAAAAADCQAAAAkOAAAAbcndaZgAAAAUAgMAAWF6enp6enp6enp6enp6eno="
 	testKeyString  = "source-ns1:::ff e3 ed ca 38 f4 eb 05 bd cf 1d 00 9f 13 a6 ab 8e 71 27 3b"
 	testFileName   = "source-ns1_1.asbx"
-	testFileNumber = 1
 )
 
 func testToken() (*models.ASBXToken, error) {
@@ -55,6 +54,7 @@ func testToken() (*models.ASBXToken, error) {
 }
 
 func TestEncoder_Decoder(t *testing.T) {
+	t.Parallel()
 	// Encode.
 	content := make([]byte, 0)
 	enc := NewEncoder[*models.ASBXToken](testNamespace)
@@ -86,6 +86,7 @@ func TestEncoder_Decoder(t *testing.T) {
 }
 
 func TestDecoder_ErrorHeader(t *testing.T) {
+	t.Parallel()
 	content := make([]byte, 0)
 
 	reader := bytes.NewReader(content)
@@ -94,6 +95,7 @@ func TestDecoder_ErrorHeader(t *testing.T) {
 }
 
 func TestDecoder_ErrorToken(t *testing.T) {
+	t.Parallel()
 	enc := NewEncoder[*models.ASBXToken](testNamespace)
 
 	fileName := enc.GenerateFilename("", "")

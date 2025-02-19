@@ -29,6 +29,7 @@ type writerTestSuite struct {
 }
 
 func (suite *writerTestSuite) Test_openBackupFile() {
+	suite.T().Parallel()
 	tmpDir := suite.T().TempDir()
 	ctx := context.Background()
 
@@ -51,12 +52,14 @@ func (suite *writerTestSuite) Test_openBackupFile() {
 }
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive() {
+	suite.T().Parallel()
 	dir := suite.T().TempDir()
 	err := createDirIfNotExist(dir, true)
 	suite.NoError(err)
 }
 
 func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
+	suite.T().Parallel()
 	dir := suite.T().TempDir()
 	dir += "/test"
 	err := createDirIfNotExist(dir, true)
@@ -65,6 +68,7 @@ func (suite *writerTestSuite) TestPrepareBackupDirectory_Positive_CreateDir() {
 }
 
 func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
+	suite.T().Parallel()
 	tmpDir := suite.T().TempDir()
 	ctx := context.Background()
 	w, err := NewWriter(ctx, ioStorage.WithRemoveFiles(), ioStorage.WithDir(tmpDir))
@@ -74,5 +78,6 @@ func (suite *writerTestSuite) TestDirectoryWriter_GetType() {
 }
 
 func Test_backupDirectoryTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(writerTestSuite))
 }

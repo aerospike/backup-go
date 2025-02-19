@@ -59,10 +59,12 @@ func (s *readerTestSuite) TestCheckRestoreDirectory_Negative_EmptyDir() {
 }
 
 func TestCheckRestoreDirectory(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(readerTestSuite))
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 
 	err := createTmpFile(dir, "file1.asb")
@@ -104,6 +106,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OK() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 	err := createTmpFile(dir, "file1.asb")
 	require.NoError(s.T(), err)
@@ -140,6 +143,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_OneFile() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 
 	mockValidator := new(mocks.Mockvalidator)
@@ -155,6 +159,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrEmptyDir() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 	err := createTmpFile(dir, "file1.asb")
 	require.NoError(s.T(), err)
@@ -197,6 +202,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_ErrNoSuchFile() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_GetType() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 
 	mockValidator := new(mocks.Mockvalidator)
@@ -240,6 +246,7 @@ func createTempNestedDir(rootPath, nestedDir string) error {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
+	s.T().Parallel()
 	const fileName = "oneFile.asb"
 
 	dir := s.T().TempDir()
@@ -274,6 +281,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFile() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 	err := createTmpFile(dir, "oneFile.asb")
 	require.NoError(s.T(), err)
@@ -306,6 +314,7 @@ func (s *readerTestSuite) TestDirectoryReader_OpenFileErr() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 
 	err := createTempNestedDir(dir, "nested1")
@@ -356,6 +365,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFiles_Nested_OK() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 
 	err := createTempNestedDir(dir, "nested1")
@@ -412,6 +422,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamFilesList() {
 }
 
 func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 
 	err := createTempNestedDir(dir, "nested1")
@@ -468,6 +479,7 @@ func (s *readerTestSuite) TestDirectoryReader_StreamPathList() {
 }
 
 func (s *readerTestSuite) TestReader_WithSorting() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 
 	expResult := []string{"0_file_1.asbx", "0_file_2.asbx", "0_file_3.asbx"}
@@ -507,6 +519,7 @@ func (s *readerTestSuite) TestReader_WithSorting() {
 }
 
 func (s *readerTestSuite) TestReader_StreamFilesPreloaded() {
+	s.T().Parallel()
 	dir := s.T().TempDir()
 	ctx := context.Background()
 

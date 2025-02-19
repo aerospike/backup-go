@@ -115,8 +115,7 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 }
 
 func (suite *backupRestoreTestSuite) TearDownSuite() {
-	asc := suite.Aeroclient
-	defer asc.Close()
+	suite.Aeroclient.Close()
 }
 
 func (suite *backupRestoreTestSuite) SetupTest(records []*a.Record) {
@@ -343,7 +342,7 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Nil(err)
 
 	// Replaced condition, because parallel tests creates records in same namespace.
-	suite.Require().Equal(true, uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
+	suite.Require().True(uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
 	suite.Require().Equal(uint32(8), statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsBackup.GetUDFs())
 
@@ -374,9 +373,11 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 	suite.Nil(err)
 
 	// Replaced condition, because parallel tests creates records in same namespace.
-	suite.Require().Equal(true, uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
+	suite.Require().True(uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
 	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsInserted())
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
+	// Replaced condition, because parallel tests creates records in same namespace.
+	suite.Require().True(uint32(8) <= statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())
 	suite.Require().Less(statsRestore.GetTotalBytesRead(), dirSize) // restore size doesn't include asb control characters

@@ -30,7 +30,6 @@ type readersTestSuite struct {
 }
 
 func TestReaders(t *testing.T) {
-
 	suite.Run(t, new(readersTestSuite))
 }
 

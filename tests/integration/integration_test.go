@@ -43,6 +43,11 @@ const (
 	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 )
 
+const (
+	aerospikeHost = "127.0.0.1"
+	aerospikePort = 3000
+)
+
 // testBins is a collection of all supported bin types
 // useful for testing backup and restore
 var testBins = a.BinMap{
@@ -84,22 +89,14 @@ type backupRestoreTestSuite struct {
 }
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
-	testutils.Image = "aerospike/aerospike-server-enterprise:8.0.0.2"
-
-	clusterSize := 1
-	err := testutils.Start(clusterSize)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
 	aeroClientPolicy := a.NewClientPolicy()
 	aeroClientPolicy.User = suite.aerospikeUser
 	aeroClientPolicy.Password = suite.aerospikePassword
 
 	asc, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
-		suite.aerospikeIP,
-		suite.aerospikePort,
+		aerospikeHost,
+		aerospikePort,
 	)
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
@@ -132,8 +129,8 @@ func (suite *backupRestoreTestSuite) SetupSuite() {
 	aeroClientPolicy.Password = "changeme"
 	testAeroClient, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
-		suite.aerospikeIP,
-		suite.aerospikePort,
+		aerospikeHost,
+		aerospikePort,
 	)
 	if aerr != nil {
 		suite.FailNow(aerr.Error())
@@ -761,7 +758,7 @@ func (suite *backupRestoreTestSuite) TestBackupParallelNodes() {
 
 func (suite *backupRestoreTestSuite) TestBackupParallelNodesList() {
 	bCfg := backup.NewDefaultBackupConfig()
-	bCfg.NodeList = []string{fmt.Sprintf("%s:%d", suite.aerospikeIP, suite.aerospikePort)}
+	bCfg.NodeList = []string{fmt.Sprintf("%s:%d", aerospikeHost, aerospikePort)}
 
 	ctx := context.Background()
 	dst := byteReadWriterFactory{buffer: bytes.NewBuffer([]byte{})}

@@ -10,7 +10,7 @@ test:
 
 .PHONY: coverage
 coverage:
-	go test -parallel $(NPROC) -timeout=5m -count=1 -json ./... -coverprofile to_filter.cov -coverpkg ./...
+	go test -parallel $(NPROC) -timeout=5m -count=1 ./... -coverprofile to_filter.cov -coverpkg ./...
 	grep -v "test\|mocks" to_filter.cov > coverage.cov
 	rm -f to_filter.cov
 	go tool cover -func coverage.cov

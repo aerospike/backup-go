@@ -23,12 +23,10 @@ jobs:
 
       # Minio service container
       minio:
-        image: quay.io/minio/minio
+        image: quay.io/minio/minio:latest
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadminpassword
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadminpassword
         ports:
           - 9000:9000
           - 9001:9001
@@ -38,17 +36,11 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
-        volumes:
-          - /tmp/data:/data
-        args:
-          - server
-          - /data
-          - --console-address
-          - ":9001"
+          --command server /data --console-address \":9001\"
 
       # Fake GCS server
       fake-gcs-server:
-        image: fsouza/fake-gcs-server
+        image: fsouza/fake-gcs-server:latest
         ports:
           - 4443:4443
         options: >-
@@ -56,15 +48,11 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
-        args:
-          - -scheme
-          - http
-          - -public-host
-          - 127.0.0.1:4443
+          --command "-scheme http -public-host 127.0.0.1:4443"
 
       # Azurite
       azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
+        image: mcr.microsoft.com/azure-storage/azurite:latest
         ports:
           - 5000:10000
         options: >-
@@ -72,10 +60,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
-        args:
-          - azurite-blob
-          - --blobHost
-          - 0.0.0.0
+          --command "azurite-blob --blobHost 0.0.0.0"
 
     steps:
       - uses: actions/checkout@v4
@@ -113,10 +98,7 @@ jobs:
           export AZURE_ENDPOINT=http://localhost:5000
           
           # Run tests with parallelism
-          go test -race -timeout=5m -count=1 -parallel $(nproc) ./... -coverprofile to_filter.cov -coverpkg ./...
-          grep -v "test\|mocks" to_filter.cov > coverage.cov
-          rm -f to_filter.cov
-          go tool cover -func coverage.cov
+          go test -race -timeout=5m -count=1 -parallel $(nproc) -coverprofile=coverage.cov -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

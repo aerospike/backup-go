@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	testServiceAddress            = "http://127.0.0.1:4443/storage/v1/b"
+	testServiceAddress            = "https://127.0.0.1:4443/storage/v1/b"
 	testProjectID                 = "test-project"
 	testBucketName                = "test-bucket"
 	testReadFolderEmpty           = "folder_read_empty/"

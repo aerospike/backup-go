@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/io/aerospike/xdr"
@@ -68,15 +67,12 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 	tcpConfig := xdr.NewTCPConfig(
 		localTCPAddr,
 		rr.xdrConfig.TLSConfig,
-		rr.xdrConfig.ReadTimeoutMilliseconds,
-		rr.xdrConfig.WriteTimeoutMilliseconds,
+		rr.xdrConfig.ReadTimeout,
+		rr.xdrConfig.WriteTimeout,
 		rr.xdrConfig.ResultQueueSize,
 		rr.xdrConfig.AckQueueSize,
 		rr.xdrConfig.MaxConnections,
 	)
-
-	infoPolingPeriod := time.Duration(rr.xdrConfig.InfoPolingPeriodMilliseconds) * time.Millisecond
-	startTimeout := time.Duration(rr.xdrConfig.StartTimeoutMilliseconds) * time.Millisecond
 
 	return xdr.NewRecordReaderConfig(
 		rr.xdrConfig.DC,
@@ -84,8 +80,8 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 		rr.xdrConfig.Rewind,
 		localHostPort,
 		tcpConfig,
-		infoPolingPeriod,
-		startTimeout,
+		rr.xdrConfig.InfoPolingPeriod,
+		rr.xdrConfig.StartTimeout,
 	)
 }
 

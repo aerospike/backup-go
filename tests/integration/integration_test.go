@@ -374,9 +374,10 @@ func runBackupRestoreDirectory(suite *backupRestoreTestSuite,
 
 	// Replaced condition, because parallel tests creates records in same namespace.
 	suite.Require().True(uint64(len(expectedRecs)) <= statsBackup.GetReadRecords())
-	suite.Require().Equal(uint64(len(expectedRecs)), statsRestore.GetRecordsInserted())
+	suite.Require().True(uint64(len(expectedRecs)) <= statsRestore.GetRecordsInserted())
+
 	suite.Require().Equal(uint32(8), statsRestore.GetSIndexes())
-	// Replaced condition, because parallel tests creates records in same namespace.
+
 	suite.Require().True(uint32(8) <= statsBackup.GetSIndexes())
 	suite.Require().Equal(uint32(3), statsRestore.GetUDFs())
 	suite.Require().Equal(uint64(0), statsRestore.GetRecordsExpired())

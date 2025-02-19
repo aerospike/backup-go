@@ -37,7 +37,7 @@ const (
 	testS3Profile  = "minio"
 	testS3Type     = "s3"
 
-	testGcpEndpoint = "https://127.0.0.1:4443/storage/v1/b"
+	testGcpEndpoint = "http://127.0.0.1:4443/storage/v1/b"
 	testGcpType     = "gcp-storage"
 
 	testAzureEndpoint    = "http://127.0.0.1:5000/devstoreaccount1"

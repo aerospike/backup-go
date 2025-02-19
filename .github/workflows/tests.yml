@@ -21,11 +21,14 @@ jobs:
           - 3001:3001
           - 3002:3002
 
+
       # Fake GCS server
       fake-gcs-server:
         image: fsouza/fake-gcs-server
         ports:
           - 4443:4443
+        options: >-
+          fsouza/fake-gcs-server -scheme http -public-host 127.0.0.1:4443
 
       # Azurite
       azurite:

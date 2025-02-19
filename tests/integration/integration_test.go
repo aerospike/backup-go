@@ -44,8 +44,9 @@ const (
 )
 
 const (
-	aerospikeHost = "127.0.0.1"
-	aerospikePort = 3000
+	aerospikeHost          = "127.0.0.1"
+	aerospikePort          = 3000
+	aerospikeLoginPassword = "admin"
 )
 
 // testBins is a collection of all supported bin types
@@ -90,8 +91,8 @@ type backupRestoreTestSuite struct {
 
 func (suite *backupRestoreTestSuite) SetupSuite() {
 	aeroClientPolicy := a.NewClientPolicy()
-	aeroClientPolicy.User = suite.aerospikeUser
-	aeroClientPolicy.Password = suite.aerospikePassword
+	aeroClientPolicy.User = aerospikeLoginPassword
+	aeroClientPolicy.Password = aerospikeLoginPassword
 
 	asc, aerr := a.NewClientWithPolicy(
 		aeroClientPolicy,
@@ -832,10 +833,10 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) []*a.Record {
 
 func TestBackupRestoreTestSuite(t *testing.T) {
 	ts := backupRestoreTestSuite{
-		aerospikeIP:       testutils.IP,
-		aerospikePort:     testutils.PortStart,
-		aerospikePassword: testutils.Password,
-		aerospikeUser:     testutils.User,
+		aerospikeIP:       aerospikeHost,
+		aerospikePort:     aerospikePort,
+		aerospikePassword: aerospikeLoginPassword,
+		aerospikeUser:     aerospikeLoginPassword,
 		namespace:         "test",
 		set:               "",
 	}

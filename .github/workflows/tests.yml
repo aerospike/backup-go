@@ -21,20 +21,19 @@ jobs:
           - 3001:3001
           - 3002:3002
 
-
       # Fake GCS server
       fake-gcs-server:
-        image: fsouza/fake-gcs-server
+        image: fsouza/fake-gcs-server:1.52.2
         ports:
           - 4443:4443
         options: >-
           --entrypoint sh
-          fsouza/fake-gcs-server
+          fsouza/fake-gcs-server:1.52.2
           -c "/bin/fake-gcs-server -data /data -scheme http -public-host 127.0.0.1:4443"
 
       # Azurite
       azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
+        image: mcr.microsoft.com/azure-storage/azurite:3.33.0
         ports:
           - 5000:10000
     steps:

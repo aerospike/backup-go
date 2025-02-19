@@ -23,6 +23,8 @@ import (
 )
 
 func TestValidateStorages(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		awsS3      *models.AwsS3
@@ -167,6 +169,8 @@ func TestValidateStorages(t *testing.T) {
 }
 
 func TestValidateBackupParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		backupParams *models.Backup
@@ -398,6 +402,8 @@ func TestValidateBackupParams(t *testing.T) {
 }
 
 func TestValidatePartitionFilters(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name             string
 		partitionFilters []*aerospike.PartitionFilter
@@ -471,6 +477,8 @@ func TestValidatePartitionFilters(t *testing.T) {
 }
 
 func TestValidateCommonParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		commonParams *models.Common
@@ -563,6 +571,8 @@ func TestValidateCommonParams(t *testing.T) {
 }
 
 func TestValidateRestoreParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		restoreParams *models.Restore
@@ -656,6 +666,8 @@ func TestValidateRestoreParams(t *testing.T) {
 }
 
 func Test_validateBackupXDRParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		params  *models.BackupXDR
@@ -796,6 +808,8 @@ func Test_validateBackupXDRParams(t *testing.T) {
 }
 
 func TestValidateBackup(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		params  *ASBackupParams
@@ -931,6 +945,8 @@ func TestValidateBackup(t *testing.T) {
 }
 
 func TestValidateRestore(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		params  *ASRestoreParams

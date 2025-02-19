@@ -30,10 +30,12 @@ type readersTestSuite struct {
 }
 
 func TestReaders(t *testing.T) {
+
 	suite.Run(t, new(readersTestSuite))
 }
 
 func (suite *readersTestSuite) TestReadWorker() {
+	suite.T().Parallel()
 	mockReader := mocks.NewMockdataReader[string](suite.T())
 
 	readCalls := 0
@@ -65,6 +67,7 @@ func (suite *readersTestSuite) TestReadWorker() {
 }
 
 func (suite *readersTestSuite) TestReadWorkerClose() {
+	suite.T().Parallel()
 	mockReader := mocks.NewMockdataReader[string](suite.T())
 	mockReader.EXPECT().Read().Return("hi", nil)
 	mockReader.EXPECT().Close()

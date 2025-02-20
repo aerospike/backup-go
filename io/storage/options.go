@@ -14,6 +14,11 @@
 
 package storage
 
+import (
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+)
+
 type validator interface {
 	Run(fileName string) error
 }
@@ -142,8 +147,9 @@ func WithUploadConcurrency(v int) Opt {
 	}
 }
 
-func WithStorageClass(storageClass string) Opt {
+// WithStorageClass sets the storage class for S3/Azure/etc.
+func WithStorageClass[T string | types.StorageClass | blob.AccessTier](class T) Opt {
 	return func(r *Options) {
-		r.StorageClass = storageClass
+		r.StorageClass = string(class) // Safe conversion
 	}
 }

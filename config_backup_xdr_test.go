@@ -292,6 +292,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 				MaxConnections:   1,
 				ParallelWrite:    1,
 				InfoPolingPeriod: 1,
+				EncoderType:      EncoderTypeASBX,
 			},
 			wantErr: false,
 		},

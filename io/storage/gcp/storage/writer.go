@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
@@ -115,6 +116,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	sw.ContentType = fileType
 	sw.ChunkSize = defaultChunkSize
 	sw.StorageClass = w.StorageClass
+	slog.Info("Use storage class", "class", w.StorageClass)
 
 	return sw, nil
 }

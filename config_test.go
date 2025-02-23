@@ -76,6 +76,10 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.SetList = append(config.SetList, models.MonitorRecordsSetName)
 	assert.ErrorContains(t, config.validate(), "mrt monitor set is not allowed")
+	config = NewDefaultBackupConfig()
+	
+	config.EncoderType = EncoderTypeASBX
+	assert.ErrorContains(t, config.validate(), "encoder type")
 }
 
 func TestRestoreConfig_validate(t *testing.T) {

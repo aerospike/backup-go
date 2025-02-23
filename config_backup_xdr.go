@@ -165,6 +165,10 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("invalid info retry policy: %w", err)
 	}
 
+	if c.EncoderType != EncoderTypeASBX {
+		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
+	}
+
 	return nil
 }
 

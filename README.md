@@ -89,9 +89,9 @@ func main() {
     }
 
     // Wait for completion.
-	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
-	// You can use different context here, and if it is canceled
-	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
+    // Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
+    // You can use different context here, and if it is canceled
+    // backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
     if err = backupHandler.Wait(ctx); err != nil {
         log.Printf("Backup failed: %v", err)
     }

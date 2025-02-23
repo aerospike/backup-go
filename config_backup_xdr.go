@@ -87,7 +87,9 @@ type ConfigBackupXDR struct {
 	InfoRetryPolicy *models.RetryPolicy
 }
 
-//nolint:gocyclo // validate func is long func with a lot of checks.
+// validate validates the ConfigBackupXDR.
+//
+//nolint:gocyclo // contains a long list of validations
 func (c *ConfigBackupXDR) validate() error {
 	if err := validateRewind(c.Rewind); err != nil {
 		return err

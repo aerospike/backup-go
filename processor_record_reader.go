@@ -38,7 +38,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 	logger *slog.Logger
 }
 
-// newRecordReaderProcessor returns new record reader processor.
+// newRecordReaderProcessor returns a new record reader processor.
 func newRecordReaderProcessor[T models.TokenConstraint](
 	xdrConfig *ConfigBackupXDR,
 	aerospikeClient AerospikeClient,
@@ -85,7 +85,8 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 	)
 }
 
-// newReadWorkersXDR returns XDR reader worker. XDR reader worker will always use *models.ASBXToken.
+// newReadWorkersXDR returns an XDR reader worker. The XDR reader worker will always
+// use *models.ASBXToken.
 func (rr *recordReaderProcessor[T]) newReadWorkersXDR(ctx context.Context,
 ) ([]pipeline.Worker[*models.ASBXToken], error) {
 	// For xdr we will have 1 worker always.

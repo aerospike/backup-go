@@ -32,21 +32,21 @@ type State struct {
 	// Global backup context.
 	ctx context.Context
 
-	// Counter to count how many times State instance was initialized.
-	// Is used to create suffix for backup files.
+	// Counter tracks the number of times the State instance has been initialized.
+	// This is used to generate a unique suffix for backup files.
 	Counter int
-	// RecordsStateChan communication channel to save current filter state.
+	// RecordsStateChan is a channel for communicating serialized partition filter
+	// states.
 	RecordsStateChan chan models.PartitionFilterSerialized
-	// RecordStates store states of all filters.
+	// RecordStates stores the current states of all partition filters.
 	RecordStates map[int]models.PartitionFilterSerialized
 
 	RecordStatesSaved map[int]models.PartitionFilterSerialized
 	// SaveCommandChan command to save current state for worker.
 	SaveCommandChan chan int
-	// Mutex for RecordStates operations.
-	// Ordinary mutex is used, because we must not allow any writings when we read state.
+	// Mutex for synchronizing operations on record states.
 	mu sync.Mutex
-	// File to save state to.
+	// FileName specifies the file path where the backup state is persisted.
 	FileName string
 
 	// writer is used to create a state file.
@@ -55,9 +55,9 @@ type State struct {
 	logger *slog.Logger
 }
 
-// NewState returns new state instance depending on config.
-// If we continue back up, the state will be loaded from a state file,
-// if it is the first operation, new state instance will be returned.
+// NewState creates and returns a State instance. If continuing a previous
+// backup, the state is loaded from the specified state file. Otherwise, a
+// new State instance is created.
 func NewState(
 	ctx context.Context,
 	config *ConfigBackup,
@@ -77,7 +77,7 @@ func NewState(
 	return nil, nil
 }
 
-// newState creates status service from parameters, for backup operations.
+// newState creates a new State instance for backup operations.
 func newState(
 	ctx context.Context,
 	config *ConfigBackup,
@@ -102,7 +102,8 @@ func newState(
 	return s
 }
 
-// newStateFromFile creates a status service from the file, to continue operations.
+// newStateFromFile creates a new State instance, initializing it with data
+// loaded from the specified file. This allows for resuming a previous backup operation.
 func newStateFromFile(
 	ctx context.Context,
 	config *ConfigBackup,

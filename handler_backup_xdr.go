@@ -49,7 +49,7 @@ type HandlerBackupXDR struct {
 	wg sync.WaitGroup
 }
 
-// newHandlerBackupXDR returns new xdr backup handler.
+// newHandlerBackupXDR returns a new xdr backup handler.
 func newBackupXDRHandler(
 	ctx context.Context,
 	config *ConfigBackupXDR,

@@ -142,12 +142,12 @@ func NewDefaultBackupConfig() *ConfigBackup {
 	}
 }
 
-// isParalleledByNodes checks if backup is parallel by nodes.
+// isParalleledByNodes determines whether the backup is parallelized by nodes.
 func (c *ConfigBackup) isParalleledByNodes() bool {
 	return c.ParallelNodes || len(c.NodeList) > 0
 }
 
-// isDefaultPartitionFilter checks if default filter is set.
+// isDefaultPartitionFilter checks if the default filter is set.
 func (c *ConfigBackup) isDefaultPartitionFilter() bool {
 	return len(c.PartitionFilters) == 1 &&
 		c.PartitionFilters[0].Begin == 0 &&
@@ -155,7 +155,7 @@ func (c *ConfigBackup) isDefaultPartitionFilter() bool {
 		c.PartitionFilters[0].Digest == nil
 }
 
-// isStateFirstRun checks if it is first run of backup with a state file.
+// isStateFirstRun checks if it is the first run of the backup with a state file.
 func (c *ConfigBackup) isStateFirstRun() bool {
 	return c.StateFile != "" && !c.Continue
 }
@@ -170,7 +170,9 @@ func (c *ConfigBackup) isFullBackup() bool {
 	return c.ModAfter == nil && c.isDefaultPartitionFilter() && c.ScanPolicy.FilterExpression == nil
 }
 
-//nolint:gocyclo // validate func is long func with a lot of checks.
+// validate validates the ConfigBackup.
+//
+//nolint:gocyclo // contains a long list of validations
 func (c *ConfigBackup) validate() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)

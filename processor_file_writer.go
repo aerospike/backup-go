@@ -28,7 +28,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// fileWriterProcessor configure and creates file writers pipelines.
+// fileWriterProcessor configures and creates file writers pipelines.
 type fileWriterProcessor[T models.TokenConstraint] struct {
 	prefixGenerator func() string
 	suffixGenerator func() string
@@ -50,7 +50,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	logger *slog.Logger
 }
 
-// newFileWriterProcessor returns new file writer processor instance.
+// newFileWriterProcessor returns a new file writer processor instance.
 func newFileWriterProcessor[T models.TokenConstraint](
 	prefixGenerator func() string,
 	suffixGenerator func() string,
@@ -109,7 +109,7 @@ func (fw *fileWriterProcessor[T]) newWriteWorkers(writers []io.WriteCloser,
 	return writeWorkers
 }
 
-// newWriters returns slice of configured writers.
+// newWriters returns a slice of configured writers.
 func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteCloser, error) {
 	writers := make([]io.WriteCloser, fw.parallel)
 
@@ -127,7 +127,7 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	return writers, nil
 }
 
-// newWriter returns new configured writer.
+// newWriter returns a new configured writer.
 func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveCommandChan chan int, fileLimit int64,
 ) (io.WriteCloser, error) {
 	// TODO: check this part in ordinary scan with state saving feature.

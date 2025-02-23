@@ -204,7 +204,9 @@ reader, err := local.NewReader(
 )
 ```
 
-> [!NOTE] Some restore configurations are not available for `ASBX` format, including:
+> [!NOTE] 
+> Some restore configurations are not available for `ASBX` format, including:
+> 
 > - Changing namespace
 > - Set list filtering
 > - Bin list filtering

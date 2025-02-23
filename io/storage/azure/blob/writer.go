@@ -113,7 +113,17 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
 
-	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency), nil
+	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, stringToAccessTier(w.StorageClass)), nil
+}
+
+func stringToAccessTier(accessTier string) *blob.AccessTier {
+	if accessTier == "" {
+		return nil
+	}
+
+	t := blob.AccessTier(accessTier)
+
+	return &t
 }
 
 var _ io.WriteCloser = (*blobWriter)(nil)
@@ -128,7 +138,9 @@ type blobWriter struct {
 	uploadConcurrency int
 }
 
-func newBlobWriter(ctx context.Context, blobClient *blockblob.Client, uploadConcurrency int) io.WriteCloser {
+func newBlobWriter(
+	ctx context.Context, blobClient *blockblob.Client, uploadConcurrency int, tier *blob.AccessTier,
+) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
 
 	w := &blobWriter{
@@ -140,19 +152,20 @@ func newBlobWriter(ctx context.Context, blobClient *blockblob.Client, uploadConc
 		uploadConcurrency: uploadConcurrency,
 	}
 
-	go w.uploadStream()
+	go w.uploadStream(tier)
 
 	return w
 }
 
-func (w *blobWriter) uploadStream() {
+func (w *blobWriter) uploadStream(tier *blob.AccessTier) {
 	contentType := uploadStreamFileType
 	_, err := w.blobClient.UploadStream(w.ctx, w.pipeReader, &azblob.UploadStreamOptions{
 		BlockSize:   uploadStreamBlockSize,
 		Concurrency: w.uploadConcurrency,
 		HTTPHeaders: &blob.HTTPHeaders{
 			BlobContentType: &contentType,
-		}})
+		},
+		AccessTier: tier})
 	w.done <- err
 	close(w.done)
 }

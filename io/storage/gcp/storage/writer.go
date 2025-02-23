@@ -114,6 +114,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	sw := w.bucketHandle.Object(filename).NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = defaultChunkSize
+	sw.StorageClass = w.StorageClass
 
 	return sw, nil
 }

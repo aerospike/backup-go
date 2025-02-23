@@ -38,7 +38,7 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 				AckQueueSize:     100,
 				MaxConnections:   10,
 				InfoPolingPeriod: 1000,
-				EncoderType:      EncoderTypeASB,
+				EncoderType:      EncoderTypeASBX,
 			},
 			wantErr: false,
 		},

@@ -29,7 +29,7 @@ type reader interface {
 }
 
 // PreSort performs pre-processing of backup files by sorting them before reading.
-// It retrieves a list of objects from the specified path, sorts them according to
+// It retrieves a list of objects from the specified path, sorts them according to the
 // backup file naming conventions, and configures the reader to stream the sorted list.
 // Returns an error if listing objects fails or if the sorting operation fails.
 func PreSort(ctx context.Context, r reader, path string) error {
@@ -73,9 +73,10 @@ func CleanPath(path string, isS3 bool) string {
 
 // IsDirectory determines if a given file name represents a directory within the specified prefix.
 // It considers three cases:
-// 1. File name ends with "/" (definite directory)
-// 2. File name is within a prefix and contains "/" after the prefix
-// 3. File name contains "/" (general case)
+//  1. File name ends with "/" (definite directory)
+//  2. File name is within a prefix and contains "/" after the prefix
+//  3. File name contains "/" (general case)
+//
 // Returns true if the file name represents a directory, false otherwise.
 func IsDirectory(prefix, fileName string) bool {
 	// If file name ends with / it is 100% dir.

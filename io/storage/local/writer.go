@@ -228,7 +228,7 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil
 }
 
-// GetType return `localType` type of storage. Used in logging.
+// GetType returns the `localType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
 	return localType
 }

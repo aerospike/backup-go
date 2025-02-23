@@ -99,7 +99,7 @@ func NewWriter(
 	return w, nil
 }
 
-// NewWriter returns a new GCP storage writer to the specified path.
+// NewWriter returns a new GCP storage writer for the provided path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	// protection for single file backup.
 	if !w.IsDir {
@@ -166,7 +166,7 @@ func (w *Writer) RemoveFiles(
 	return nil
 }
 
-// GetType return `gcpStorageType` type of storage. Used in logging.
+// GetType returns the `gcpStorageType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
 	return gcpStorageType
 }

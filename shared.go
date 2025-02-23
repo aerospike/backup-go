@@ -43,8 +43,8 @@ func handlePanic(errors chan<- error, logger *slog.Logger) {
 
 func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 	// NOTE: order is important here
-	// if we close the errors chan before we handle the panic
-	// the panic will attempt to send on a closed channel
+	// if we close the errors chan before we handle the panic,
+	// the panic handler will attempt to send on a closed channel
 	defer close(errors)
 	defer handlePanic(errors, logger)
 

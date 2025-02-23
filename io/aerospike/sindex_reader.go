@@ -23,7 +23,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// sindexGetter is an interface for getting secondary indexes
+// sindexGetter is an interface for getting secondary indexes.
 //
 //go:generate mockery --name sindexGetter
 type sindexGetter interface {

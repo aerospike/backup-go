@@ -16,5 +16,5 @@ package storage
 
 import "errors"
 
-// ErrEmptyStorage describes common error for storages.
+// ErrEmptyStorage describes the empty storage error for the restore operation.
 var ErrEmptyStorage = errors.New("empty storage")

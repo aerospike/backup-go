@@ -26,7 +26,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// recordReaderProcessor configure and create record readers pipelines.
+// recordReaderProcessor configures and creates record readers pipelines.
 type recordReaderProcessor[T models.TokenConstraint] struct {
 	xdrConfig *ConfigBackupXDR
 	// add scanConfig in the future.

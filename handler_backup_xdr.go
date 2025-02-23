@@ -208,7 +208,7 @@ func (bh *HandlerBackupXDR) splitFunc(t *models.ASBXToken) int {
 	return id
 }
 
-// GetStats returns the stats of the backup job
+// GetStats returns the stats of the backup job.
 func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 	return bh.stats
 }

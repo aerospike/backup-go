@@ -28,7 +28,8 @@ const (
 	routeRuleModeSingle
 )
 
-// splitFunc function that processes T and returns the number of a channel to send a message to.
+// splitFunc is a function that processes T and returns the number of a channel to send
+// a message to.
 type splitFunc[T any] func(T) int
 
 // Route describes how workers will communicate through stages.
@@ -39,7 +40,7 @@ type Route[T any] struct {
 	output *RouteRule[T]
 }
 
-// NewSingleRoutes helper function, to initialize simple single mode routes.
+// NewSingleRoutes is a helper function, to initialize simple single mode routes.
 func NewSingleRoutes[T any](stagesNum int) []Route[T] {
 	result := make([]Route[T], 0, stagesNum)
 
@@ -54,7 +55,7 @@ func NewSingleRoutes[T any](stagesNum int) []Route[T] {
 	return result
 }
 
-// NewParallelRoutes helper function, to initialize parallel (sync) mode routes.
+// NewParallelRoutes is a helper function, to initialize parallel (sync) mode routes.
 func NewParallelRoutes[T any](stagesNum int) []Route[T] {
 	result := make([]Route[T], 0, stagesNum)
 
@@ -69,7 +70,7 @@ func NewParallelRoutes[T any](stagesNum int) []Route[T] {
 	return result
 }
 
-// NewSingleParallelRoutes helper function,
+// NewSingleParallelRoutes is a helper function,
 // to initialize routes that will have single mode between first and second stages and
 // parallel mode between second and third.
 func NewSingleParallelRoutes[T any](sf splitFunc[T]) []Route[T] {
@@ -99,16 +100,15 @@ func NewSingleParallelRoutes[T any](sf splitFunc[T]) []Route[T] {
 type RouteRule[T any] struct {
 	// mode can be single or parallel. Depending on that, one or more communication channels will be created.
 	mode routeRuleMode
-	// bufferSize is applied communication to channels.
+	// bufferSize specifies the buffer size for communication channels.
 	bufferSize int
 	// sf split function is used when previous and next step routes have different mode.
 	sf splitFunc[T]
-	// routedChan is a channel routed by splitFunction.
-	// If sf is set, we must close routedChan except worker chan.
+	// routedChan is the channel routed by splitFunction.
 	routedChan chan T
 }
 
-// NewRouteRuleSingle returns new route rule for single mode communication.
+// NewRouteRuleSingle returns a new route rule for single mode communication.
 func NewRouteRuleSingle[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] {
 	return &RouteRule[T]{
 		mode:       routeRuleModeSingle,
@@ -117,7 +117,7 @@ func NewRouteRuleSingle[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] {
 	}
 }
 
-// NewRouteRuleParallel returns new route rule for parallel mode communication.
+// NewRouteRuleParallel returns a new route rule for parallel mode communication.
 func NewRouteRuleParallel[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] {
 	return &RouteRule[T]{
 		mode:       routeRuleModeParallel,
@@ -130,7 +130,7 @@ func NewRouteRuleParallel[T any](bufferSize int, sf splitFunc[T]) *RouteRule[T] 
 // the router is placed between stages.
 type router[T any] struct{}
 
-// newRouter returns new router instance.
+// newRouter returns a new router instance.
 func newRouter[T any]() *router[T] {
 	return &router[T]{}
 }
@@ -201,7 +201,7 @@ func (r *router[T]) create(mode routeRuleMode, workersNumber, bufferSize int) []
 	return result
 }
 
-// connect set communication channels to workers.
+// connect sets communication channels to workers.
 func (r *router[T]) connect(st *stage[T], input, output []chan T) error {
 	st.SetSendChan(output)
 	// Set input and output channels.

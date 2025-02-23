@@ -39,7 +39,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Writer provides access to backup storage.
+// A Writer provides access to the backup storage.
 // Exported for integration tests.
 type Writer interface {
 	// NewWriter returns new writer for backup logic to use. Each call creates

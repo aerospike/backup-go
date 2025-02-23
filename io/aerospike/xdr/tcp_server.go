@@ -157,7 +157,7 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 	return s.resultChan, nil
 }
 
-// Stop close listener and all communication channels.
+// Stop closes the listener and all communication channels.
 func (s *TCPServer) Stop() error {
 	if !s.isActive.CompareAndSwap(true, false) {
 		return fmt.Errorf("server is not active")
@@ -179,7 +179,7 @@ func (s *TCPServer) Stop() error {
 	return nil
 }
 
-// GetActiveConnections method for monitoring current state.
+// GetActiveConnections returns the number of active connections.
 func (s *TCPServer) GetActiveConnections() int32 {
 	return s.activeConnections.Load()
 }
@@ -201,8 +201,8 @@ func (s *TCPServer) reportMetrics(ctx context.Context) {
 	}
 }
 
-// acceptConnections serves connections, not more than maxConnections.
-// All connections over pool will be rejected.
+// acceptConnections accepts new connections to the TCPServer.
+// It will reject new connections if the number of active connections is greater than MaxConnections.
 func (s *TCPServer) acceptConnections(ctx context.Context) {
 	metrics := mewMetricsCollector(ctx, s.logger)
 
@@ -257,7 +257,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 	}
 }
 
-// ConnectionHandler manages a single connection and its acknowledgment queue
+// ConnectionHandler manages a single connection and its acknowledgment queue.
 type ConnectionHandler struct {
 	conn net.Conn
 	// channel to send results.
@@ -282,8 +282,8 @@ type ConnectionHandler struct {
 	metrics *metricsCollector
 }
 
-// NewConnectionHandler returns new connection handler.
-// For each connection must be created a separate handler.
+// NewConnectionHandler returns a new connection handler.
+// A separate handler must be created for each connection.
 func NewConnectionHandler(
 	conn net.Conn,
 	resultChan chan *models.ASBXToken,
@@ -308,7 +308,7 @@ func NewConnectionHandler(
 	}
 }
 
-// Start launch goroutines to serve current connection.
+// Start launches goroutines to serve the current connection.
 func (h *ConnectionHandler) Start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	h.cancel = cancel
@@ -363,7 +363,7 @@ func (h *ConnectionHandler) Start(ctx context.Context) {
 	h.logger.Debug("connection closed")
 }
 
-// handleMessages processes incoming messages
+// handleMessages processes incoming messages.
 func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 	parser := NewParser(h.conn)
 	// On exit from this function, we close this channel to send signal for the next goroutine to stop.
@@ -462,8 +462,8 @@ func (h *ConnectionHandler) processMessage(ctx context.Context) {
 	}
 }
 
-// handleAcknowledgments manages the async sending of acks.
-// Receive messages from h.ackQueue and write them to connection.
+// handleAcknowledgments manages the async sending of XDR acks.
+// It receives messages from h.ackQueue and writes them to the connection socket.
 func (h *ConnectionHandler) handleAcknowledgments(ctx context.Context) {
 	for {
 		select {
@@ -485,7 +485,7 @@ func (h *ConnectionHandler) handleAcknowledgments(ctx context.Context) {
 	}
 }
 
-// sendAck updates connection deadline and writes an ack message to connection.
+// sendAck updates connection deadline and writes an ack message to the connection.
 func (h *ConnectionHandler) sendAck(ack []byte) error {
 	deadline := h.getDeadline(h.writeTimeoutNano)
 	if err := h.conn.SetWriteDeadline(time.Unix(0, deadline)); err != nil {
@@ -500,7 +500,7 @@ func (h *ConnectionHandler) sendAck(ack []byte) error {
 	return nil
 }
 
-// getDeadline loads current time from h.timeNow and add timeout value.
+// getDeadline loads current time from h.timeNow and adds timeout value.
 func (h *ConnectionHandler) getDeadline(timeout int64) int64 {
 	timeNow := atomic.LoadInt64(&h.timeNow)
 	return timeNow + timeout

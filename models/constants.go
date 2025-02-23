@@ -14,5 +14,5 @@
 
 package models
 
-// MonitorRecordsSetName global constant for MRT monitor set name
+// MonitorRecordsSetName represents the MRT monitor set name.
 const MonitorRecordsSetName = "<ERO~MRT"

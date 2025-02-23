@@ -71,8 +71,8 @@ func NewRecordReaderConfig(namespace string,
 	}
 }
 
-// scanner is an interface for scanning Aerospike records
-// the Aerospike go client satisfies this interface
+// scanner is an interface for scanning Aerospike records.
+// The Aerospike go client satisfies this interface.
 //
 //go:generate mockery --name scanner
 type scanner interface {
@@ -164,8 +164,7 @@ func (r *RecordReader) read() (*models.Token, error) {
 	return recToken, nil
 }
 
-// Close cancels the Aerospike scan used to read records
-// if it was started.
+// Close cancels the Aerospike scan used to read records if it was started.
 func (r *RecordReader) Close() {
 	if r.isScanStarted() {
 		r.scanResult.Close()
@@ -318,7 +317,7 @@ func noTTLExpression(noTTLOnly bool) *a.Expression {
 	return a.ExpEq(a.ExpTTL(), a.ExpIntVal(-1))
 }
 
-// noMrtSetExpression returns expression that filters <ERO~MRT sets from scan results.
+// noMrtSetExpression returns an expression that filters the monitor set records from the scan results.
 func noMrtSetExpression() *a.Expression {
 	// where set != "<ERO~MRT"
 	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))

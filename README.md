@@ -3,29 +3,39 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/aerospike/backup-go)](https://pkg.go.dev/github.com/aerospike/backup-go)
 [![codecov](https://codecov.io/gh/aerospike/backup-go/graph/badge.svg?token=S0gfl2zCcZ)](https://codecov.io/gh/aerospike/backup-go)
 
-A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data with support for both standard and MRT backups.
+A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data, with support for both standard and
+transactionally consistent backups.
+
+The repository includes the [asbackup](./cmd/asbackup) and [asrestore](./cmd/asrestore) CLI tools,
+built using this library. Refer to their respective README files for usage instructions.
+Binaries for various platforms are released alongside the library and can be found under
+[releases](https://github.com/aerospike/backup-go/releases).
 
 ## Features
 
 - Standard backup and restore operations
-- MRT (Multi Record Transactions) through XDR (Cross-Datacenter Replication) backup support
+- [Transactions](https://aerospike.com/docs/server/architecture/transactions-arch) through
+  [XDR](https://aerospike.com/docs/server/architecture/xdr) (Cross-Datacenter Replication) backup support
 - Flexible backup configurations including:
-    - Partition-based backups
-    - Node-based backups
-    - Incremental backups using modification time filters
-    - Compression (ZSTD)
-    - Encryption (AES-128/256)
-    - [Secret Agent](https://aerospike.com/docs/tools/secret-agent) integration
+  - Partition-based backups
+  - Node-based backups
+  - Incremental backups using modification time filters
+  - Compression (ZSTD)
+  - Encryption (AES-128/256)
+  - [Secret Agent](https://aerospike.com/docs/tools/secret-agent) integration
 - Multiple backup formats:
-    - ASB (Aerospike Backup) text format
-    - ASBX (Aerospike Backup XDR) binary format
+  - ASB (Aerospike Backup) text format
+  - ASBX (Aerospike Backup XDR) binary format
 - Configurable parallelism for both reading and writing
 - Support for backup file size limits and state preservation
 - Bandwidth and records-per-second rate limiting
 
 ## Design
 
-This Aerospike backup package is built around the [Aerospike Go client](https://github.com/aerospike/aerospike-client-go). The package uses a client structure to start backup and restore jobs. The client structure is thread safe, backup and restore jobs can be started in multiple goroutines. When the client is used to start backup and restore jobs, a handler is immediately returned that is used to check the job's status, errors, and wait for it to finish.
+This Aerospike backup package is built around the [Aerospike Go client](https://github.com/aerospike/aerospike-client-go).
+The package uses a client structure to start backup and restore jobs. The client structure is thread safe,
+backup and restore jobs can be started in multiple goroutines. When the client is used to start backup and restore
+jobs, a handler is immediately returned that is used to check the job's status, errors, and wait for it to finish.
 
 ### Key Components
 
@@ -36,6 +46,11 @@ This Aerospike backup package is built around the [Aerospike Go client](https://
 ## Usage
 
 ### Standard Backup
+
+The regular backup operation backs up data from an Aerospike database based on a user-defined
+configuration. First, a scan operation uses the configured scope to query the database and
+retrieve matching records. Then, a decoder converts the retrieved data into the `asb` format,
+which is subsequently stored by a supported writer.
 
 ```go
 package main
@@ -63,10 +78,10 @@ func main() {
 	    log.Fatal(err)
     }
 
-	ctx := context.Background()
+    ctx := context.Background()
 
     // Configure writers for backup.
-	// For backup to single file use local.WithFile(fileName).
+    // For backup to single file use local.WithFile(fileName).
     writers, err := local.NewWriter(
         ctx,
         ioStorage.WithRemoveFiles(),
@@ -88,10 +103,10 @@ func main() {
 	    log.Fatal(err)
     }
 
-    // Wait for completion.
-	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
-	// You can use different context here, and if it is canceled
-	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
+    // Wait for completion. 
+    // Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
+    // You can use different context here, and if it is canceled
+    // backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
     if err = backupHandler.Wait(ctx); err != nil {
         log.Printf("Backup failed: %v", err)
     }
@@ -99,6 +114,12 @@ func main() {
 ```
 
 ### XDR Backup
+
+Consider the XDR backup, which uses the Aerospike XDR protocol, when transactional
+consistency is critical. While the scan-based backup may be faster, the XDR backup provides
+greater data integrity in these scenarios.
+
+XDR backups are stored in the new `asbx` binary format.
 
 ```go
 func main() {
@@ -129,6 +150,9 @@ func main() {
 ```
 
 ### Restore
+
+The restore operation reads backup files in both `asb` and `asbx` formats and restores them using
+the configured backup client.
 
 ```go
 func main() {
@@ -171,9 +195,10 @@ func main() {
 }
 ```
 
-### Restoring XDR (ASBX) Backups
+#### Restoring XDR (ASBX) Backups
 
-When restoring ASBX format backups, files must be processed in the correct order. Use the sorting option:
+When restoring `ASBX` format backups, files must be processed in the correct order.
+To obtain the order, use the sorting option:
 
 ```go
 reader, err := local.NewReader(
@@ -184,15 +209,20 @@ reader, err := local.NewReader(
 )
 ```
 
-Note: Some restore configurations are not available for ASBX format, including:
-- Changing namespace
-- Set list filtering
-- Bin list filtering
-- No records/indexes/UDFs options
-- Batch writes control
-- Extra TTL
+> [!NOTE] 
+> Some restore configurations are not available for `ASBX` format, including:
+> 
+> - Changing namespace
+> - Set list filtering
+> - Bin list filtering
+> - No records/indexes/UDFs options
+> - Batch writes control
+> - Extra TTL
 
 ## Configuration Options
+
+<details>
+<summary>Backup Configuration</summary>
 
 ### Backup Configuration
 
@@ -303,6 +333,10 @@ type ConfigBackup struct {
     InfoRetryPolicy *models.RetryPolicy
 }
 ```
+</details>
+
+<details>
+<summary>XDR Backup Configuration</summary>
 
 ### XDR Backup Configuration
 
@@ -366,6 +400,10 @@ type ConfigBackupXDR struct {
     InfoRetryPolicy *models.RetryPolicy
 }
 ```
+</details>
+
+<details>
+<summary>Restore Configuration</summary>
 
 ### Restore Configuration
 
@@ -436,12 +474,13 @@ type ConfigRestore struct {
     InfoRetryPolicy *models.RetryPolicy
 }
 ```
+</details>
 
 ## Advanced Features
 
 ### Encryption
 
-The library supports AES-128 and AES-256 encryption with keys from:
+The library supports `AES-128` and `AES-256` encryption with keys from:
 - Files
 - Environment variables
 - Aerospike Secret Agent
@@ -501,7 +540,7 @@ backupCfg.PartitionFilters = []*aerospike.PartitionFilter{
 
 ## Prerequisites
 
-- Go v1.23+
+- Go v1.23.0+
 - [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v8
 - [Mockery](https://github.com/vektra/mockery) for test mocks
 

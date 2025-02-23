@@ -49,7 +49,7 @@ type HandlerBackupXDR struct {
 	wg sync.WaitGroup
 }
 
-// newHandlerBackupXDR returns new xdr backup handler.
+// newHandlerBackupXDR returns a new xdr backup handler.
 func newBackupXDRHandler(
 	ctx context.Context,
 	config *ConfigBackupXDR,
@@ -208,7 +208,7 @@ func (bh *HandlerBackupXDR) splitFunc(t *models.ASBXToken) int {
 	return id
 }
 
-// GetStats returns the stats of the backup job
+// GetStats returns the stats of the backup job.
 func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 	return bh.stats
 }

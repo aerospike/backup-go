@@ -255,7 +255,7 @@ func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
 	return result, nil
 }
 
-// SetObjectsToStream set objects to stream.
+// SetObjectsToStream sets objects to stream.
 func (r *Reader) SetObjectsToStream(list []string) {
 	r.objectsToStream = list
 }

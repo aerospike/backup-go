@@ -87,7 +87,9 @@ type ConfigBackupXDR struct {
 	InfoRetryPolicy *models.RetryPolicy
 }
 
-//nolint:gocyclo // validate func is long func with a lot of checks.
+// validate validates the ConfigBackupXDR.
+//
+//nolint:gocyclo // contains a long list of validations
 func (c *ConfigBackupXDR) validate() error {
 	if err := validateRewind(c.Rewind); err != nil {
 		return err
@@ -163,6 +165,10 @@ func (c *ConfigBackupXDR) validate() error {
 
 	if err := c.InfoRetryPolicy.Validate(); err != nil {
 		return fmt.Errorf("invalid info retry policy: %w", err)
+	}
+
+	if c.EncoderType != EncoderTypeASBX {
+		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
 	}
 
 	return nil

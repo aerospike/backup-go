@@ -94,7 +94,7 @@ func NewReader(
 }
 
 // StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
-// If error occurs, it will be sent to `errorsCh.`
+// If an error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
@@ -168,7 +168,7 @@ func (r *Reader) streamDirectory(
 	}
 }
 
-// openObject creates object readers and sends them readersCh.
+// openObject creates object readers and sends them to the readersCh.
 func (r *Reader) openObject(
 	ctx context.Context,
 	path string,
@@ -211,7 +211,7 @@ func (r *Reader) StreamFile(
 	r.openObject(ctx, filename, readersCh, errorsCh, false)
 }
 
-// GetType return `gcpStorageType` type of storage. Used in logging.
+// GetType returns the `gcpStorageType` type of storage. Used in logging.
 func (r *Reader) GetType() string {
 	return gcpStorageType
 }
@@ -259,7 +259,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	return fmt.Errorf("%s is empty", path)
 }
 
-// ListObjects list all object in the path.
+// ListObjects list all objects in the path.
 func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
 	if !strings.HasSuffix(path, "/") {
 		path += "/"
@@ -303,7 +303,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	return result, nil
 }
 
-// SetObjectsToStream set objects to stream.
+// SetObjectsToStream sets the objects to stream.
 func (r *Reader) SetObjectsToStream(list []string) {
 	r.objectsToStream = list
 }
@@ -315,7 +315,7 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 	}
 }
 
-// shouldSkip performs check, is we should skip files.
+// shouldSkip determines whether the file should be skipped.
 func (r *Reader) shouldSkip(path, fileName string) bool {
 	return ioStorage.IsDirectory(path, fileName) && !r.WithNestedDir
 }

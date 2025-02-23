@@ -81,8 +81,6 @@ func newReaderOpts(
 		// Append Validator only for directory.
 		if isXDR {
 			opts = append(opts, ioStorage.WithValidator(asbx.NewValidator()), ioStorage.WithSorting())
-			// ASBX restore supports only restore from directory.
-			return opts
 		} else {
 			opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
 		}

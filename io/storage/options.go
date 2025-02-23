@@ -19,16 +19,18 @@ type validator interface {
 }
 
 type Options struct {
-	// PathList contains list of files or directories.
+	// PathList contains a list of files or directories.
 	PathList []string
-	// IsDir flag describes what we have in path, file or directory.
+	// IsDir flag determines whether the path is a directory.
 	IsDir bool
-	// IsRemovingFiles flag describes should we remove everything from backup folder or not.
+	// IsRemovingFiles flag specifies whether to clear the backup folder.
 	IsRemovingFiles bool
-	// Validator contains files Validator that is applied to files if IsDir = true.
+	// Validator contains files Validator that is applied to files if IsDir is true.
 	Validator validator
-	// WithNestedDir describes if we should check for if an object is a directory for read/write operations.
-	// When we stream files or delete files in folder, we skip directories. This flag will avoid skipping.
+	// WithNestedDir determines whether the read/write operations should treat objects
+	// identified as directories like regular files.
+	// When we stream files or delete files in folder, we skip directories. Setting
+	// WithNestedDir to true disables this directory skipping behavior.
 	// Default: false
 	WithNestedDir bool
 	// StartAfter is an artificial parameter. Used to skip objects in the storage.
@@ -36,13 +38,13 @@ type Options struct {
 	// If it is set, then we compare the names received from the storage lexicographically,
 	// and if the name is less than the specified parameter, we skip this object.
 	StartAfter string
-	// SkipDirCheck, if true, backup directory won't be checked.
+	// SkipDirCheck, if true, the backup directory won't be checked.
 	SkipDirCheck bool
-	// SortFiles shows if we need to sort files before read.
+	// SortFiles determines whether we need to sort files before reading.
 	SortFiles bool
 
-	// UploadConcurrency defines the max number of concurrent uploads to be performed to upload the file.
-	// Each concurrent upload will create a buffer of size BlockSize.
+	// UploadConcurrency defines the max number of concurrent uploads to be performed to
+	// upload the file. Each concurrent upload will create a buffer of size BlockSize.
 	UploadConcurrency int
 
 	// StorageClass specifies the type of storage class.
@@ -52,7 +54,7 @@ type Options struct {
 
 type Opt func(*Options)
 
-// WithDir adds directory to reading/writing files from/to.
+// WithDir adds the directory to reading/writing files from/to.
 func WithDir(path string) Opt {
 	return func(r *Options) {
 		r.PathList = append(r.PathList, path)
@@ -60,7 +62,7 @@ func WithDir(path string) Opt {
 	}
 }
 
-// WithDirList adds a directory list to read files from.
+// WithDirList adds the directory list to read files from.
 // Is used only for Reader.
 func WithDirList(pathList []string) Opt {
 	return func(r *Options) {
@@ -69,7 +71,7 @@ func WithDirList(pathList []string) Opt {
 	}
 }
 
-// WithFile adds a file path to reading/writing from/to.
+// WithFile adds the file path to reading/writing from/to.
 func WithFile(path string) Opt {
 	return func(r *Options) {
 		r.PathList = append(r.PathList, path)
@@ -77,7 +79,7 @@ func WithFile(path string) Opt {
 	}
 }
 
-// WithFileList adds a file list to read from.
+// WithFileList adds the file list to read from.
 // Is used only for Reader.
 func WithFileList(pathList []string) Opt {
 	return func(r *Options) {
@@ -86,7 +88,7 @@ func WithFileList(pathList []string) Opt {
 	}
 }
 
-// WithValidator adds Validator to Reader, so files will be validated before reading.
+// WithValidator adds the Validator to Reader, so files will be validated before reading.
 // Is used only for Reader.
 func WithValidator(v validator) Opt {
 	return func(r *Options) {
@@ -134,7 +136,7 @@ func WithSorting() Opt {
 	}
 }
 
-// WithUploadConcurrency define max number of concurrent uploads to be performed to upload the file.
+// WithUploadConcurrency defines max number of concurrent uploads to be performed to upload the file.
 // Is used only for Azure Writer.
 func WithUploadConcurrency(v int) Opt {
 	return func(r *Options) {

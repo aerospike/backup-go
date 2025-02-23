@@ -36,18 +36,18 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.StringVarP(&f.Directory, "directory", "d",
 		"",
-		"The Directory that holds the backup files. Required.")
+		"The directory that holds the backup files. Required.")
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
 		false,
-		"Remove existing backup file (-o) or files (-d).")
+		"Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.")
 	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
 		262144000, // 250 MB
-		"Rotate backup files, when their size crosses the given\n"+
-			"value (in bytes) Only used when backing up to a Directory. 0 - no limit.")
+		"Rotate backup files when their size crosses the given\n"+
+			"value (in bytes). Only used when backing up to a directory.\n")
 	flagSet.IntVar(&f.ParallelWrite, "parallel-write",
 		0,
 		"Number of concurrent backup files writing.\n"+
-			"If not set the default value is automatically calculated and appears as the number of CPUs on your machine.")
+			"If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.")
 	flagSet.StringVar(&f.DC, "dc",
 		"dc",
 		"DC that will be created on source instance for xdr backup.\n"+
@@ -55,16 +55,16 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"digits 0-9, underscores (_), hyphens (-), and dollar signs ($). Max length is 31 bytes.")
 	flagSet.StringVar(&f.LocalAddress, "local-address",
 		"127.0.0.1",
-		"Local IP address on which XDR server listens on.")
+		"Local IP address that the XDR server listens on.")
 	flagSet.IntVar(&f.LocalPort, "local-port",
 		8080,
-		"Local port on which XDR server listens on.")
+		"Local port that the XDR server listens on.")
 	flagSet.StringVar(&f.Rewind, "rewind",
 		"all",
 		"Rewind is used to ship all existing records of a namespace.\n"+
 			"When rewinding a namespace, XDR will scan through the index and ship\n"+
 			"all the records for that namespace, partition by partition.\n"+
-			"Can be `all` or number of seconds.")
+			"Can be the string \"all\" or an integer number of seconds.")
 	flagSet.Int64Var(&f.ReadTimeoutMilliseconds, "read-timeout",
 		1000,
 		"Timeout in milliseconds for TCP read operations. Used by TCP server for XDR.")
@@ -82,18 +82,18 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		"Maximum number of concurrent TCP connections.")
 	flagSet.Int64Var(&f.InfoPolingPeriodMilliseconds, "info-poling-period",
 		1000,
-		"How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.\n"+
-			"To measure recovery state and lag.")
+		"How often (in milliseconds) a backup client sends info commands\n"+
+			"to check Aerospike cluster statistics on recovery rate and lag.")
 	flagSet.Int64Var(&f.InfoRetryIntervalMilliseconds, "info-retry-timeout", 1000,
-		"Set the initial timeout for a retry in milliseconds when info commands are sent."+
-			"This parameter is applied to stop xdr and unblock MRT writes requests.")
+		"Set the initial timeout for a retry in milliseconds when info commands are sent.\n"+
+			"This parameter is applied to stop-xdr and unblock-mrt requests.")
 	flagSet.Float64Var(&f.InfoRetriesMultiplier, "info-retry-multiplier",
 		1,
-		"Used to increase the delay between subsequent retry attempts.\n"+
+		"Increases the delay between subsequent retry attempts.\n"+
 			"The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.InfoMaxRetries, "info-max-retries", 3,
-		"How many times to retry to send info commands before failing. "+
-			"This parameter is applied to stop xdr and unblock MRT writes requests.")
+		"How many times to retry sending info commands before failing.\n"+
+			" This parameter is applied to stop-xdr and unblock-mrt requests.")
 	flagSet.Int64Var(&f.StartTimeoutMilliseconds, "start-timeout",
 		30000,
 		"Timeout for starting TCP server for XDR.\n"+
@@ -101,12 +101,13 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"This situation can occur if the --local-address and --local-port options are misconfigured.")
 	flagSet.BoolVar(&f.StopXDR, "stop-xdr",
 		false,
-		"Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, \n"+
-			"and database server still sends XDR events. Use this functionality to stop XDR after interrupted backup.")
+		"Stops XDR and removes XDR configuration from the database.\n"+
+			"Used if previous XDR backup was interrupted or failed, but the database server still sends XDR events.\n"+
+			"Use this functionality to stop XDR after an interrupted backup.")
 	flagSet.BoolVar(&f.UnblockMRT, "unblock-mrt",
 		false,
 		"Unblock MRT writes on the database.\n"+
-			"Use this functionality to unblock MRT writes after interrupted backup.")
+			"Use this functionality to unblock MRT writes after an interrupted backup.")
 
 	return flagSet
 }

@@ -129,14 +129,14 @@ func (r *RecordReader) startScanPaginated(localErrChan chan error) {
 	}
 }
 
-// streamPartitionPages reads the whole pageRecord and send it to resultChan.
+// streamPartitionPages reads the whole pageRecord and sends it to the resultChan.
 func (r *RecordReader) streamPartitionPages(
 	scanPolicy *a.ScanPolicy,
 	set string,
 ) (resultChan chan []*pageRecord, errChan chan error) {
 	scanPolicy.MaxRecords = r.config.pageSize
-	// resultChan must not be buffered, we send the whole pageRecord to resultChan.
-	// So if we make it buffered, we will consume a lot of RAM.
+	// resultChan must not be buffered, we send the whole pageRecord to the resultChan.
+	// Implementing buffering would result in substantial RAM consumption.
 	resultChan = make(chan []*pageRecord)
 	errChan = make(chan error)
 

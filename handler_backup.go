@@ -39,7 +39,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Writer provides access to backup storage.
+// A Writer provides access to the backup storage.
 // Exported for integration tests.
 type Writer interface {
 	// NewWriter returns new writer for backup logic to use. Each call creates
@@ -189,7 +189,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	return uint64(result), nil
 }
 
-// getEstimateSamples returns slice of samples and its content for estimate calculations.
+// getEstimateSamples returns a slice of samples and its content for estimate calculations.
 func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber int64,
 ) (samples []float64, samplesData []byte, err error) {
 	scanPolicy := *bh.config.ScanPolicy
@@ -326,7 +326,7 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 // configuration.
 func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, error) {
 	if bh.config.FileLimit > 0 {
-		// For saving state operation, we init writer with a communication channel.
+		// Init a writer with a communication channel, for saving state operation
 		if bh.config.isStateFirstRun() || bh.config.isStateContinue() {
 			return sized.NewWriter(ctx, n, bh.state.SaveCommandChan, bh.config.FileLimit, bh.newConfiguredWriter)
 		}
@@ -376,7 +376,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string) (io.
 	return zippedWriter, nil
 }
 
-// newCompressionWriter returns compression writer for compressing backup.
+// newCompressionWriter returns a compression writer for compressing backup.
 func newCompressionWriter(
 	policy *CompressionPolicy, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
@@ -391,7 +391,7 @@ func newCompressionWriter(
 	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
 }
 
-// newEncryptionWriter returns encryption writer for encrypting backup.
+// newEncryptionWriter returns an encryption writer for encrypting backup.
 func newEncryptionWriter(
 	policy *EncryptionPolicy, saConfig *SecretAgentConfig, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
@@ -436,7 +436,7 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 	return nil
 }
 
-// GetStats returns the stats of the backup job
+// GetStats returns the stats of the backup job.
 func (bh *BackupHandler) GetStats() *models.BackupStats {
 	return bh.stats
 }

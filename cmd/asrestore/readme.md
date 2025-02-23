@@ -11,10 +11,6 @@ Version artifacts are automatically built and uploaded under releases in GitHub.
 
 ## Supported flags
 ```
-The restore tool automatically identifies and restores ASB and ASBX backup files found in the specified folder.
-You can set restore mode manually with --mode flag. Flags that are incompatible with restore mode,
-are also incompatible in automatic mode (when mode is not set).
-
 Usage:
   asrestore [flags]
 
@@ -79,7 +75,7 @@ Restore Flags:
       --no-udfs                  Don't restore any UDFs.
                                  Incompatible with --mode=asbx.
   -w, --parallel int             The number of restore threads. Accepts values from 1-1024 inclusive.
-                                 If not set the default value is automatically calculated and appears as the number of CPUs on your machine.
+                                 If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
   -L, --records-per-second int   Limit total returned records per second (rps).
                                  Do not apply rps limit if records-per-second is zero.
       --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
@@ -151,7 +147,7 @@ Restore Flags:
                                   AEROSPIKE_MAX_ERROR_RATE.
                                   This base timeout value is also used as the interval multiplied by --retry-multiplier to increase
                                   the timeout value between retry attempts. (default 1000)
-      --retry-multiplier float    Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.
+      --retry-multiplier float    Increases the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.
                                   The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
       --retry-max-retries uint    Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.
                                   The default is 0, indicating no retries will be performed

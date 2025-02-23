@@ -20,10 +20,10 @@ import (
 	"sync"
 )
 
-// Worker is an interface for a pipeline item
-// Each worker has a send and receive channel
-// that connects it to the previous and next stage in the pipeline
-// The Run method starts the worker
+// Worker is an interface for a pipeline item.
+// Each worker has send and receive channels that connect it to the previous
+// and next stage in the pipeline.
+// The Run method starts the worker.
 //
 //go:generate mockery --name Worker
 type Worker[T any] interface {

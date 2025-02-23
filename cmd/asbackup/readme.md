@@ -83,12 +83,13 @@ Backup Flags:
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
                                  If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
-  -r, --remove-files                  Remove existing backup file (-o) or files (-d).
+  -r, --remove-files                  Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.
       --remove-artifacts              Remove existing backup file (-o) or files (-d) without performing a backup.
   -o, --output-file string            Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
   -q, --output-file-prefix string     When using directory parameter, prepend a prefix to the names of the generated files.
-  -F, --file-limit int                Rotate backup files, when their size crosses the given
-                                      value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
+  -F, --file-limit int                Rotate backup files when their size crosses the given
+                                      value (in bytes). Only used when backing up to a directory.
+                                       (default 262144000)
   -x, --no-bins                       Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.
                                       On restore all records, that don't contain bin data will be skipped.
       --no-ttl-only                   Only include records that have no ttl set (persistent records).
@@ -157,7 +158,7 @@ Backup Flags:
                                       Affects size if overlap on resuming backup after an error.
                                       Used only with --state-file-dst or --continue. (default 10000)
       --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.This parameter is applied to stop xdr and unblock MRT writes requests. (default 1000)
-      --info-retry-multiplier float   Used to increase the delay between subsequent retry attempts.
+      --info-retry-multiplier float   Increases the delay between subsequent retry attempts.
                                       The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber) (default 1)
       --info-max-retries uint         How many times to retry to send info commands before failing. This parameter is applied to stop xdr and unblock MRT writes requests. (default 3)
 
@@ -234,39 +235,43 @@ XDR Backup Flags:
 This sections replace Backup Flags section in main documentation.
 All other flags are valid for XDR backup.
   -n, --namespace string              The namespace to be backed up. Required.
-  -d, --directory string              The Directory that holds the backup files. Required.
-  -r, --remove-files                  Remove existing backup file (-o) or files (-d).
-  -F, --file-limit int                Rotate backup files, when their size crosses the given
-                                      value (in bytes) Only used when backing up to a Directory. 0 - no limit. (default 262144000)
+  -d, --directory string              The directory that holds the backup files. Required.
+  -r, --remove-files                  Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.
+  -F, --file-limit int                Rotate backup files when their size crosses the given
+                                      value (in bytes). Only used when backing up to a directory.
+                                       (default 262144000)
       --parallel-write int            Number of concurrent backup files writing.
-                                      If not set the default value is automatically calculated and appears as the number of CPUs on your machine.
+                                      If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
       --dc string                     DC that will be created on source instance for xdr backup.
                                       DC name can include only Latin lowercase and uppercase letters with no diacritical marks (a-z, A-Z),
                                       digits 0-9, underscores (_), hyphens (-), and dollar signs ($). Max length is 31 bytes. (default "dc")
-      --local-address string          Local IP address on which XDR server listens on. (default "127.0.0.1")
-      --local-port int                Local port on which XDR server listens on. (default 8080)
-      --rewind all                    Rewind is used to ship all existing records of a namespace.
+      --local-address string          Local IP address that the XDR server listens on. (default "127.0.0.1")
+      --local-port int                Local port that the XDR server listens on. (default 8080)
+      --rewind string                 Rewind is used to ship all existing records of a namespace.
                                       When rewinding a namespace, XDR will scan through the index and ship
                                       all the records for that namespace, partition by partition.
-                                      Can be all or number of seconds. (default "all")
+                                      Can be the string "all" or an integer number of seconds. (default "all")
       --read-timeout int              Timeout in milliseconds for TCP read operations. Used by TCP server for XDR. (default 1000)
       --write-timeout int             Timeout in milliseconds for TCP write operations. Used by TCP server for XDR. (default 1000)
       --results-queue-size int        Buffer for processing messages received from XDR. (default 256)
       --ack-queue-size int            Buffer for processing acknowledge messages sent to XDR. (default 256)
       --max-connections int           Maximum number of concurrent TCP connections. (default 100)
-      --info-poling-period int        How often (in milliseconds) a backup client will send info commands to check aerospike cluster stats.
-                                      To measure recovery state and lag. (default 1000)
-      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.This parameter is applied to stop xdr and unblock MRT writes requests. (default 1000)
-      --info-retry-multiplier float   Used to increase the delay between subsequent retry attempts.
+      --info-poling-period int        How often (in milliseconds) a backup client sends info commands
+                                      to check Aerospike cluster statistics on recovery rate and lag. (default 1000)
+      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.
+                                      This parameter is applied to stop-xdr and unblock-mrt requests. (default 1000)
+      --info-retry-multiplier float   Increases the delay between subsequent retry attempts.
                                       The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber) (default 1)
-      --info-max-retries uint         How many times to retry to send info commands before failing. This parameter is applied to stop xdr and unblock MRT writes requests. (default 3)
+      --info-max-retries uint         How many times to retry sending info commands before failing.
+                                       This parameter is applied to stop-xdr and unblock-mrt requests. (default 3)
       --start-timeout int             Timeout for starting TCP server for XDR.
                                       If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
                                       This situation can occur if the --local-address and --local-port options are misconfigured. (default 30000)
-      --stop-xdr                      Stop XDR and removes XDR config from database. Is used if previous XDR backup was interrupted or failed, 
-                                      and database server still sends XDR events. Use this functionality to stop XDR after interrupted backup.
+      --stop-xdr                      Stops XDR and removes XDR configuration from the database.
+                                      Used if previous XDR backup was interrupted or failed, but the database server still sends XDR events.
+                                      Use this functionality to stop XDR after an interrupted backup.
       --unblock-mrt                   Unblock MRT writes on the database.
-                                      Use this functionality to unblock MRT writes after interrupted backup.
+                                      Use this functionality to unblock MRT writes after an interrupted backup.
 ```
 
 ## Unsupported flags

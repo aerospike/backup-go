@@ -29,7 +29,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-// fileReaderProcessor configure and create file readers pipelines.
+// fileReaderProcessor configures and creates file readers pipelines.
 type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *ConfigRestore
@@ -103,7 +103,7 @@ func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline
 	return readWorkers
 }
 
-// wrapReader applies encryption and compression wrappers to the reader based on the configuration
+// wrapReader applies encryption and compression wrappers to the reader based on the configuration.
 func (fr *fileReaderProcessor[T]) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
 	r, err := newEncryptionReader(fr.config.EncryptionPolicy, fr.config.SecretAgentConfig, reader)
 	if err != nil {
@@ -118,7 +118,7 @@ func (fr *fileReaderProcessor[T]) wrapReader(reader io.ReadCloser) (io.ReadClose
 	return r, nil
 }
 
-// newCompressionReader returns compression reader for uncompressing backup.
+// newCompressionReader returns a compression reader for uncompressing backup.
 func newCompressionReader(
 	policy *CompressionPolicy, reader io.ReadCloser,
 ) (io.ReadCloser, error) {
@@ -134,7 +134,7 @@ func newCompressionReader(
 	return zstdDecoder.IOReadCloser(), nil
 }
 
-// newEncryptionReader returns encryption reader for decrypting backup.
+// newEncryptionReader returns an encryption reader for decrypting backup.
 func newEncryptionReader(
 	policy *EncryptionPolicy, saConfig *SecretAgentConfig, reader io.ReadCloser,
 ) (io.ReadCloser, error) {
@@ -158,8 +158,13 @@ func newEncryptionReader(
 // distributeFiles is only used for asbx restore, to follow the order of files.
 // To maintain XDR event order, files must be pre-sorted using util.SortBackupFiles.
 // Then they will be distributed to workers based on their prefixes, in suffix order.
-// Valid file name: <prefix>_<namespace>_<suffix>.asbx
-// Example: 4_source-ns1_47.asbx
+// Valid file name:
+//
+//	<prefix>_<namespace>_<suffix>.asbx
+//
+// Example:
+//
+//	4_source-ns1_47.asbx
 func distributeFiles(input chan models.File, output []chan models.File, errors chan<- error) {
 	if len(output) == 0 {
 		errors <- fmt.Errorf("failed to distibute files to 0 channels")

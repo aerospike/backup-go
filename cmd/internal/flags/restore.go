@@ -121,7 +121,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"the timeout value between retry attempts.")
 	flagSet.Float64Var(&f.RetryMultiplier, "retry-multiplier",
 		1,
-		"Used to increase the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.\n"+
+		"Increases the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.\n"+
 			"The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.RetryMaxRetries, "retry-max-retries",
 		0,

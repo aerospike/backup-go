@@ -32,7 +32,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
 		false,
-		"Remove existing backup file (-o) or files (-d).")
+		"Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.")
 	flagSet.BoolVar(&f.RemoveArtifacts, "remove-artifacts",
 		false,
 		"Remove existing backup file (-o) or files (-d) without performing a backup.")
@@ -45,8 +45,8 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
 		262144000, // 250 MB
-		"Rotate backup files, when their size crosses the given\n"+
-			"value (in bytes) Only used when backing up to a Directory. 0 - no limit.")
+		"Rotate backup files when their size crosses the given\n"+
+			"value (in bytes). Only used when backing up to a directory.\n")
 	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
 		false,
 		"Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.\n"+
@@ -151,7 +151,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"This parameter is applied to stop xdr and unblock MRT writes requests.")
 	flagSet.Float64Var(&f.InfoRetriesMultiplier, "info-retry-multiplier",
 		1,
-		"Used to increase the delay between subsequent retry attempts.\n"+
+		"Increases the delay between subsequent retry attempts.\n"+
 			"The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.InfoMaxRetries, "info-max-retries", 3,
 		"How many times to retry to send info commands before failing. "+

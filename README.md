@@ -501,7 +501,7 @@ backupCfg.PartitionFilters = []*aerospike.PartitionFilter{
 
 ## Prerequisites
 
-- Go v1.23+
+- Go v1.23.0+
 - [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v8
 - [Mockery](https://github.com/vektra/mockery) for test mocks
 

@@ -58,7 +58,7 @@ const (
 		"filter cannot be parallelized individually, so you may only achieve as much parallelism as there are\n" +
 		"partition filters. Accepts values from 1-1024 inclusive."
 	descParallelRestore = "The number of restore threads. Accepts values from 1-1024 inclusive.\n" +
-		"If not set the default value is automatically calculated and appears as the number of CPUs on your machine."
+		"If not set, the default value is automatically calculated and appears as the number of CPUs on your machine."
 
 	defaultTotalTimeoutBackup  = 0
 	defaultTotalTimeoutRestore = 10000

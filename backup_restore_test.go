@@ -829,7 +829,7 @@ func TestBackupRestoreDefault(t *testing.T) {
 func TestBackupRestoreDisableBatchWrites(t *testing.T) {
 	t.Parallel()
 	const setName = "testDisableBatchWrites"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()

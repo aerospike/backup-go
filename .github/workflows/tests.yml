@@ -37,33 +37,6 @@ jobs:
         ports:
           - 10000:10000
 
-      # MinIO service
-#      minio:
-#        image: quay.io/minio/minio
-#        ports:
-#          - 9000:9000
-#          - 9001:9001
-#        env:
-#          MINIO_ROOT_USER: minioadmin
-#          MINIO_ROOT_PASSWORD: minioadminpassword
-#          MINIO_ACCESS_KEY: minioadmin
-#          MINIO_SECRET_KEY: minioadminpassword
-#        options: >-
-#          --name minio
-#          --entrypoint sh
-#          quay.io/minio/minio
-#          -c "minio server /data --console-address \":9001\""
-#
-#      createbucket:
-#        image: quay.io/minio/mc
-#        options: >-
-#          --name mc
-#          --entrypoint sh
-#          quay.io/minio/mc
-#          -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && mc mb myminio/backup && mc mb myminio/asbackup \
-#             && mc anonymous set upload myminio/backup && mc anonymous set download myminio/backup && mc anonymous set public myminio/backup \
-#             && mc anonymous set upload myminio/asbackup && mc anonymous set download myminio/asbackup && mc anonymous set public myminio/asbackup"
-
     steps:
       - uses: actions/checkout@v4
 

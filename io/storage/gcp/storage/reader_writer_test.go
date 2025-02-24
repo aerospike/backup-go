@@ -16,11 +16,11 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -29,7 +29,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
@@ -52,6 +51,7 @@ const (
 	testWriteFolderMixedData     = "folder_write_mixed_data/"
 	testWriteFolderOneFile       = "folder_write_one_file/"
 	testFolderMixedBackups       = "folder_mixed_backup/"
+	testFolderTypeCheck          = "folder_type_check/"
 
 	testFolderNameTemplate    = "folder_%d/"
 	testFileNameTemplate      = "backup_%d.asb"
@@ -71,10 +71,12 @@ const (
 
 type GCPSuite struct {
 	suite.Suite
-	client *storage.Client
+	client  *storage.Client
+	suiteWg sync.WaitGroup
 }
 
 func (s *GCPSuite) SetupSuite() {
+	defer s.suiteWg.Done() // Signal that setup is complete
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress), option.WithoutAuthentication())
 	s.Require().NoError(err)
@@ -85,17 +87,16 @@ func (s *GCPSuite) SetupSuite() {
 }
 
 func (s *GCPSuite) TearDownSuite() {
-	ctx := context.Background()
-	err := removeTestData(ctx, s.client)
-	s.Require().NoError(err)
-
-	err = s.client.Close()
+	err := s.client.Close()
 	s.Require().NoError(err)
 }
 
 func TestGCPSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(GCPSuite))
+	// Add 1 to the WaitGroup - will be "Done" when SetupSuite completes
+	s := new(GCPSuite)
+	s.suiteWg.Add(1)
+	suite.Run(t, s)
 }
 
 //nolint:gocyclo //it is a test function for filling data. No need to split it.
@@ -124,6 +125,12 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 
 	// one file
 	folderName = fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)
+	sw = client.Bucket(testBucketName).Object(folderName).NewWriter(ctx)
+	if err := writeContent(sw, testFileContent); err != nil {
+		return err
+	}
+
+	folderName = fmt.Sprintf("%s%s", testFolderTypeCheck, testFileNameOneFile)
 	sw = client.Bucket(testBucketName).Object(folderName).NewWriter(ctx)
 	if err := writeContent(sw, testFileContent); err != nil {
 		return err
@@ -241,32 +248,6 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 	return nil
 }
 
-func removeTestData(ctx context.Context, client *storage.Client) error {
-	bucket := client.Bucket(testBucketName)
-	it := bucket.Objects(ctx, nil)
-	for {
-		// Iterate over bucket until we're done.
-		objAttrs, err := it.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if err := bucket.Object(objAttrs.Name).Delete(ctx); err != nil {
-			return err
-		}
-	}
-
-	if err := bucket.Delete(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func writeContent(sw *storage.Writer, content string) error {
 	if _, err := sw.Write([]byte(content)); err != nil {
 		return err
@@ -289,6 +270,9 @@ func (mock validatorMock) Run(fileName string) error {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesOk() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -328,6 +312,9 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 }
 
 func (s *GCPSuite) TestReader_WithSorting() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -373,6 +360,8 @@ func (s *GCPSuite) TestReader_WithSorting() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesEmpty() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -393,6 +382,8 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesMixed() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -432,6 +423,8 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 }
 
 func (s *GCPSuite) TestReader_GetType() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -454,6 +447,8 @@ func (s *GCPSuite) TestReader_GetType() {
 }
 
 func (s *GCPSuite) TestWriter_WriteEmptyDir() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -483,6 +478,8 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 }
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -501,6 +498,8 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 }
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -531,6 +530,8 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 }
 
 func (s *GCPSuite) TestWriter_WriteMixedDir() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -561,6 +562,8 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 }
 
 func (s *GCPSuite) TestWriter_GetType() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -573,7 +576,7 @@ func (s *GCPSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderWithData),
+		ioStorage.WithDir(testFolderTypeCheck),
 		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
@@ -583,6 +586,8 @@ func (s *GCPSuite) TestWriter_GetType() {
 }
 
 func (s *GCPSuite) TestReader_OpenFileOk() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -621,6 +626,8 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 }
 
 func (s *GCPSuite) TestReader_OpenFileErr() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -649,6 +656,8 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 }
 
 func (s *GCPSuite) TestWriter_WriteSingleFile() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -675,6 +684,8 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 }
 
 func (s *GCPSuite) TestReader_WithStartOffset() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -718,6 +729,8 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 }
 
 func (s *GCPSuite) TestReader_StreamPathList() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -763,6 +776,8 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesList() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -807,6 +822,8 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
 		ctx,
@@ -871,7 +888,9 @@ func readAll(r io.ReadCloser) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read data: %w", err)
 	}
-	defer r.Close()
+	if err := r.Close(); err != nil {
+		return "", fmt.Errorf("failed to close reader: %w", err)
+	}
 
 	return string(data), nil
 }

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/aerospike/backup-go/internal/util"
@@ -62,7 +63,8 @@ var testFoldersTimestamps = []string{"1732519290025", "1732519390025", "17325194
 
 type AwsSuite struct {
 	suite.Suite
-	client *s3.Client
+	client  *s3.Client
+	suiteWg sync.WaitGroup
 }
 
 func testClient(ctx context.Context) (*s3.Client, error) {
@@ -83,6 +85,7 @@ func testClient(ctx context.Context) (*s3.Client, error) {
 }
 
 func (s *AwsSuite) SetupSuite() {
+	defer s.suiteWg.Done() // Signal that setup is complete
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -92,14 +95,15 @@ func (s *AwsSuite) SetupSuite() {
 }
 
 func (s *AwsSuite) TearDownSuite() {
-	ctx := context.Background()
-	err := removeTestData(ctx, s.client)
-	s.Require().NoError(err)
+
 }
 
 func TestAWSSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(AwsSuite))
+	// Add 1 to the WaitGroup - will be "Done" when SetupSuite completes
+	s := new(AwsSuite)
+	s.suiteWg.Add(1)
+	suite.Run(t, s)
 }
 
 func fillTestData(ctx context.Context, client *s3.Client) error {
@@ -185,22 +189,9 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 	return nil
 }
 
-func removeTestData(ctx context.Context, client *s3.Client) error {
-	for i := range testFoldersTimestamps {
-		fileName := fmt.Sprintf("%s/%s/%s", testFolderStartAfter, testFoldersTimestamps[i], testFileNameMetadata)
-		_, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{
-			Bucket: aws.String(testBucket),
-			Key:    aws.String(fileName),
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (s *AwsSuite) TestReader_WithStartAfter() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -240,6 +231,8 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 }
 
 func (s *AwsSuite) TestReader_StreamPathList() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -289,6 +282,8 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesList() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -337,6 +332,8 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 }
 
 func (s *AwsSuite) TestReader_WithSorting() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -387,6 +384,8 @@ func (s *AwsSuite) TestReader_WithSorting() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -448,7 +447,9 @@ func readAll(r io.ReadCloser) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read data: %w", err)
 	}
-	defer r.Close()
+	if err := r.Close(); err != nil {
+		return "", fmt.Errorf("failed to close reader: %w", err)
+	}
 
 	return string(data), nil
 }

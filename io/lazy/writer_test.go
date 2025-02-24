@@ -27,6 +27,7 @@ import (
 const testFileName = "test"
 
 func TestLazyWriter(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	filePath := path.Join(t.TempDir(), testFileName)

@@ -24,6 +24,7 @@ import (
 )
 
 func TestNewFilterByType(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		noRecords  bool
@@ -70,6 +71,7 @@ func TestNewFilterByType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			processor := NewFilterByType[*models.Token](tt.noRecords, tt.noIndexes, tt.noUdf)
 			assert.IsType(t, tt.expectType, processor)
 		})
@@ -77,6 +79,7 @@ func TestNewFilterByType(t *testing.T) {
 }
 
 func TestFilterByTypeProcess(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		filter       *filterByType[*models.Token]
@@ -167,6 +170,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := tt.filter.Process(tt.token)
 
 			if tt.expectError {

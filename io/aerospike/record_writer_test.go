@@ -24,18 +24,12 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type writersTestSuite struct {
-	suite.Suite
-}
+func TestRestoreWriterRecord(t *testing.T) {
+	t.Parallel()
 
-func TestWriters(t *testing.T) {
-	suite.Run(t, new(writersTestSuite))
-}
-
-func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	namespace := "test"
 	set := ""
 
@@ -55,25 +49,27 @@ func (suite *writersTestSuite) TestRestoreWriterRecord() {
 	}
 
 	policy := &a.WritePolicy{}
-	mockDBWriter := mocks.NewMockdbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(t)
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	stats := models.NewRestoreStats()
 	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
-	suite.NotNil(writer)
+	require.NotNil(t, writer)
 
 	err := writer.writeRecord(&expRecord)
-	suite.Nil(err)
-	suite.Equal(1, int(stats.GetRecordsInserted()))
+	require.Nil(t, err)
+	require.Equal(t, 1, int(stats.GetRecordsInserted()))
 
-	mockDBWriter.AssertExpectations(suite.T())
+	mockDBWriter.AssertExpectations(t)
 }
 
-func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
+func TestRestoreWriterRecordFail(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 	key, _ := a.NewKey(namespace, set, "key")
-	mockDBWriter := mocks.NewMockdbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(t)
 	policy := &a.WritePolicy{}
 	stats := models.NewRestoreStats()
 	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
@@ -88,13 +84,15 @@ func (suite *writersTestSuite) TestRestoreWriterRecordFail() {
 	}
 	mockDBWriter.EXPECT().Put(policy, rec.Key, rec.Bins).Return(a.ErrInvalidParam)
 	err := writer.writeRecord(&rec)
-	suite.NotNil(err)
-	suite.Equal(0, int(stats.GetRecordsInserted()))
+	require.NotNil(t, err)
+	require.Equal(t, 0, int(stats.GetRecordsInserted()))
 
-	mockDBWriter.AssertExpectations(suite.T())
+	mockDBWriter.AssertExpectations(t)
 }
 
-func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
+func TestRestoreWriterWithPolicy(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 
@@ -115,24 +113,26 @@ func (suite *writersTestSuite) TestRestoreWriterWithPolicy() {
 
 	policy := a.NewWritePolicy(1, 0)
 
-	mockDBWriter := mocks.NewMockdbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(t)
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	stats := models.NewRestoreStats()
 	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
-	suite.NotNil(writer)
+	require.NotNil(t, writer)
 
 	err := writer.writeRecord(&expRecord)
 
-	suite.Nil(err)
-	suite.Equal(1, int(stats.GetRecordsInserted()))
+	require.Nil(t, err)
+	require.Equal(t, 1, int(stats.GetRecordsInserted()))
 }
 
-func (suite *writersTestSuite) TestSingleRecordWriterRetry() {
+func TestSingleRecordWriterRetry(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 	key, _ := a.NewKey(namespace, set, "key")
-	mockDBWriter := mocks.NewMockdbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(t)
 	policy := &a.WritePolicy{}
 	stats := models.NewRestoreStats()
 	retryPolicy := &models.RetryPolicy{
@@ -159,20 +159,22 @@ func (suite *writersTestSuite) TestSingleRecordWriterRetry() {
 		Return(nil).Once()
 
 	err := writer.writeRecord(&rec)
-	suite.Nil(err)
+	require.Nil(t, err)
 
 	err = writer.close()
-	suite.Nil(err)
-	suite.Equal(1, int(stats.GetRecordsInserted()))
+	require.Nil(t, err)
+	require.Equal(t, 1, int(stats.GetRecordsInserted()))
 
-	mockDBWriter.AssertExpectations(suite.T())
+	mockDBWriter.AssertExpectations(t)
 }
 
-func (suite *writersTestSuite) TestBatchRecordWriterRetry() {
+func TestBatchRecordWriterRetry(t *testing.T) {
+	t.Parallel()
+
 	namespace := "test"
 	set := ""
 	key, _ := a.NewKey(namespace, set, "key")
-	mockDBWriter := mocks.NewMockdbWriter(suite.T())
+	mockDBWriter := mocks.NewMockdbWriter(t)
 	policy := &a.WritePolicy{}
 	stats := models.NewRestoreStats()
 	retryPolicy := &models.RetryPolicy{
@@ -204,11 +206,11 @@ func (suite *writersTestSuite) TestBatchRecordWriterRetry() {
 		}).Return(nil).Once()
 
 	err := writer.writeRecord(&rec)
-	suite.Nil(err)
+	require.Nil(t, err)
 
 	err = writer.close()
-	suite.Nil(err)
-	suite.Equal(1, int(stats.GetRecordsInserted()))
+	require.Nil(t, err)
+	require.Equal(t, 1, int(stats.GetRecordsInserted()))
 
-	mockDBWriter.AssertExpectations(suite.T())
+	mockDBWriter.AssertExpectations(t)
 }

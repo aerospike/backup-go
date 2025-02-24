@@ -17,6 +17,7 @@ package util
 import "testing"
 
 func TestListToMap(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    []string
@@ -56,6 +57,7 @@ func TestListToMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := ListToMap(tt.input)
 
 			// Check if maps have the same length

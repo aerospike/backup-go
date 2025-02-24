@@ -31,6 +31,7 @@ import (
 )
 
 func TestASBReader_readHeader(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -87,6 +88,7 @@ func TestASBReader_readHeader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -105,6 +107,8 @@ func TestASBReader_readHeader(t *testing.T) {
 }
 
 func TestASBReader_readMetadata(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -216,6 +220,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -234,6 +239,8 @@ func TestASBReader_readMetadata(t *testing.T) {
 }
 
 func TestASBReader_readSIndex(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -487,6 +494,8 @@ func TestASBReader_readSIndex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if tt.name == "positive random 48" {
 				fmt.Println("test")
 			}
@@ -508,6 +517,8 @@ func TestASBReader_readSIndex(t *testing.T) {
 }
 
 func TestASBReader_readUDF(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -664,6 +675,8 @@ func TestASBReader_readUDF(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -682,6 +695,8 @@ func TestASBReader_readUDF(t *testing.T) {
 }
 
 func TestASBReader_readBin(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -1221,6 +1236,8 @@ func TestASBReader_readBin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if tt.name == "positive random 10" {
 				fmt.Println("test")
 			}
@@ -1243,6 +1260,8 @@ func TestASBReader_readBin(t *testing.T) {
 }
 
 func TestASBReader_readKey(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -1463,6 +1482,8 @@ func TestASBReader_readKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -1481,6 +1502,8 @@ func TestASBReader_readKey(t *testing.T) {
 }
 
 func TestASBReader_readRecord(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -1951,6 +1974,8 @@ func TestASBReader_readRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -1967,6 +1992,8 @@ func TestASBReader_readRecord(t *testing.T) {
 }
 
 func TestASBReader_readBinCount(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -2031,6 +2058,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -2049,6 +2077,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 }
 
 func TestASBReader_readExpiration(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -2103,6 +2132,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -2121,6 +2151,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 }
 
 func TestASBReader_readGeneration(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -2185,6 +2216,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -2203,6 +2235,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 }
 
 func TestASBReader_readSet(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -2247,6 +2280,7 @@ func TestASBReader_readSet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -2265,6 +2299,7 @@ func TestASBReader_readSet(t *testing.T) {
 }
 
 func TestASBReader_readDigest(t *testing.T) {
+	t.Parallel()
 	digest := []byte("12345678901234567890")
 	encodedDigest := base64.StdEncoding.EncodeToString(digest)
 
@@ -2312,6 +2347,7 @@ func TestASBReader_readDigest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -2330,6 +2366,7 @@ func TestASBReader_readDigest(t *testing.T) {
 }
 
 func Test_readBase64BytesDelimited(t *testing.T) {
+	t.Parallel()
 	str := "string"
 	encodedStr := base64.StdEncoding.EncodeToString([]byte(str))
 
@@ -2373,6 +2410,7 @@ func Test_readBase64BytesDelimited(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readBase64BytesDelimited(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readBase64BytesDelimited() error = %v, wantErr %v", err, tt.wantErr)
@@ -2386,6 +2424,7 @@ func Test_readBase64BytesDelimited(t *testing.T) {
 }
 
 func Test_readBase64BytesSized(t *testing.T) {
+	t.Parallel()
 	str := "string"
 	encodedStr := base64.StdEncoding.EncodeToString([]byte(str))
 
@@ -2438,6 +2477,7 @@ func Test_readBase64BytesSized(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readBase64BytesSized(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readBase64BytesSized() error = %v, wantErr %v", err, tt.wantErr)
@@ -2451,6 +2491,7 @@ func Test_readBase64BytesSized(t *testing.T) {
 }
 
 func Test_decodeBase64(t *testing.T) {
+	t.Parallel()
 	str := "string"
 	encodedStr := base64.StdEncoding.EncodeToString([]byte(str))
 
@@ -2482,6 +2523,7 @@ func Test_decodeBase64(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _decodeBase64(tt.args.src)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_decodeBase64() error = %v, wantErr %v", err, tt.wantErr)
@@ -2495,6 +2537,7 @@ func Test_decodeBase64(t *testing.T) {
 }
 
 func Test_readStringSized(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src       io.ByteScanner
 		sizeDelim byte
@@ -2553,6 +2596,7 @@ func Test_readStringSized(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readStringSized(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readString() error = %v, wantErr %v", err, tt.wantErr)
@@ -2566,6 +2610,7 @@ func Test_readStringSized(t *testing.T) {
 }
 
 func Test_readBytesSized(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src       io.ByteScanner
 		sizeDelim byte
@@ -2624,6 +2669,7 @@ func Test_readBytesSized(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readBytesSized(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readBytesSized() error = %v, wantErr %v", err, tt.wantErr)
@@ -2637,6 +2683,7 @@ func Test_readBytesSized(t *testing.T) {
 }
 
 func Test_readBool(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src io.ByteScanner
 	}
@@ -2681,6 +2728,7 @@ func Test_readBool(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readBool(tt.args.src)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readBool() error = %v, wantErr %v", err, tt.wantErr)
@@ -2694,6 +2742,7 @@ func Test_readBool(t *testing.T) {
 }
 
 func Test_readFloat(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src   io.ByteScanner
 		delim byte
@@ -2734,6 +2783,7 @@ func Test_readFloat(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readFloat(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readFloat() error = %v, wantErr %v", err, tt.wantErr)
@@ -2747,6 +2797,7 @@ func Test_readFloat(t *testing.T) {
 }
 
 func Test_readInteger(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src   io.ByteScanner
 		delim byte
@@ -2787,6 +2838,7 @@ func Test_readInteger(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readInteger(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readInteger() error = %v, wantErr %v", err, tt.wantErr)
@@ -2800,6 +2852,7 @@ func Test_readInteger(t *testing.T) {
 }
 
 func Test_readSize(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src   io.ByteScanner
 		delim byte
@@ -2858,6 +2911,7 @@ func Test_readSize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readSize(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readSize() error = %v, wantErr %v", err, tt.wantErr)
@@ -2871,6 +2925,7 @@ func Test_readSize(t *testing.T) {
 }
 
 func Test_readUntil(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src     io.ByteScanner
 		delim   byte
@@ -2925,6 +2980,7 @@ func Test_readUntil(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readUntil(tt.args.src, tt.args.delim, tt.args.escaped)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readUntil() error = %v, wantErr %v", err, tt.wantErr)
@@ -2938,6 +2994,7 @@ func Test_readUntil(t *testing.T) {
 }
 
 func Test_readUntilAny(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src     io.ByteScanner
 		delims  []byte
@@ -3062,6 +3119,7 @@ func Test_readUntilAny(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readUntilAny(tt.args.src, tt.args.delims, tt.args.escaped)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readUntilAny() error = %v, wantErr %v", err, tt.wantErr)
@@ -3075,6 +3133,7 @@ func Test_readUntilAny(t *testing.T) {
 }
 
 func Test_readNBytes(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src io.ByteReader
 		n   int
@@ -3115,6 +3174,7 @@ func Test_readNBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readNBytes(tt.args.src, tt.args.n)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readNBytes() error = %v, wantErr %v", err, tt.wantErr)
@@ -3128,6 +3188,7 @@ func Test_readNBytes(t *testing.T) {
 }
 
 func Test_expectChar(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src io.ByteReader
 		c   byte
@@ -3164,6 +3225,7 @@ func Test_expectChar(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if err := _expectChar(tt.args.src, tt.args.c); (err != nil) != tt.wantErr {
 				t.Errorf("_expectChar() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -3172,6 +3234,7 @@ func Test_expectChar(t *testing.T) {
 }
 
 func Test_expectAnyChar(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src   io.ByteReader
 		chars []byte
@@ -3224,6 +3287,7 @@ func Test_expectAnyChar(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if err := _expectAnyChar(tt.args.src, tt.args.chars); (err != nil) != tt.wantErr {
 				t.Errorf("_expectAnyChar() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -3232,6 +3296,7 @@ func Test_expectAnyChar(t *testing.T) {
 }
 
 func Test_expectToken(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src   io.ByteReader
 		token string
@@ -3268,6 +3333,7 @@ func Test_expectToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if err := _expectToken(tt.args.src, tt.args.token); (err != nil) != tt.wantErr {
 				t.Errorf("_expectToken() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -3276,6 +3342,7 @@ func Test_expectToken(t *testing.T) {
 }
 
 func Test_peek(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src io.ByteScanner
 	}
@@ -3304,6 +3371,7 @@ func Test_peek(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _peek(tt.args.src)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_peek() error = %v, wantErr %v", err, tt.wantErr)
@@ -3317,6 +3385,7 @@ func Test_peek(t *testing.T) {
 }
 
 func TestASBReader_readBins(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -3418,6 +3487,7 @@ func TestASBReader_readBins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -3436,6 +3506,7 @@ func TestASBReader_readBins(t *testing.T) {
 }
 
 func Test_readGeoJSON(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src       io.ByteScanner
 		sizeDelim byte
@@ -3467,6 +3538,7 @@ func Test_readGeoJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readGeoJSON(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readGeoJSON() error = %v, wantErr %v", err, tt.wantErr)
@@ -3480,6 +3552,7 @@ func Test_readGeoJSON(t *testing.T) {
 }
 
 func Test_readHLL(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src       io.ByteScanner
 		sizeDelim byte
@@ -3511,6 +3584,7 @@ func Test_readHLL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := _readHLL(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readHLL() error = %v, wantErr %v", err, tt.wantErr)
@@ -3524,6 +3598,7 @@ func Test_readHLL(t *testing.T) {
 }
 
 func TestASBReader_readGlobals(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		header              *header
 		metaData            *metaData
@@ -3621,6 +3696,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -3639,6 +3715,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 }
 
 func TestASBReader_NextToken(t *testing.T) {
+	t.Parallel()
 	digest := []byte("12345678901234567890")
 	encodedDigest := base64.StdEncoding.EncodeToString(digest)
 
@@ -3739,6 +3816,7 @@ func TestASBReader_NextToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			r := &Decoder[*models.Token]{
 				countingByteScanner: tt.fields.countingByteScanner,
 				header:              tt.fields.header,
@@ -3757,6 +3835,7 @@ func TestASBReader_NextToken(t *testing.T) {
 }
 
 func TestNewASBReader(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		src io.Reader
 	}
@@ -3818,6 +3897,7 @@ func TestNewASBReader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := NewDecoder[*models.Token](tt.args.src)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)

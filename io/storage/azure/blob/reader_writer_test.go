@@ -20,6 +20,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -34,7 +35,7 @@ const (
 	azuritAccountName = "devstoreaccount1"
 	azuritAccountKey  = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
 
-	testServiceAddress = "http://127.0.0.1:5000/devstoreaccount1"
+	testServiceAddress = "http://127.0.0.1:10000/devstoreaccount1"
 	testContainerName  = "test-container"
 
 	testReadFolderEmpty      = "folder_read_empty/"
@@ -72,10 +73,12 @@ const (
 
 type AzureSuite struct {
 	suite.Suite
-	client *azblob.Client
+	client  *azblob.Client
+	suiteWg sync.WaitGroup
 }
 
 func (s *AzureSuite) SetupSuite() {
+	defer s.suiteWg.Done() // Signal that setup is complete
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -88,14 +91,15 @@ func (s *AzureSuite) SetupSuite() {
 }
 
 func (s *AzureSuite) TearDownSuite() {
-	ctx := context.Background()
-	err := removeTestData(ctx, s.client)
-	s.Require().NoError(err)
+
 }
 
 func TestAzureSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(AzureSuite))
+	// Add 1 to the WaitGroup - will be "Done" when SetupSuite completes
+	s := new(AzureSuite)
+	s.suiteWg.Add(1)
+	suite.Run(t, s)
 }
 
 func fillTestData(ctx context.Context, client *azblob.Client) error {
@@ -201,14 +205,6 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 	return nil
 }
 
-func removeTestData(ctx context.Context, client *azblob.Client) error {
-	if _, err := client.DeleteContainer(ctx, testContainerName, nil); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 type validatorMock struct{}
 
 func (mock validatorMock) Run(fileName string) error {
@@ -219,6 +215,8 @@ func (mock validatorMock) Run(fileName string) error {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesOk() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -256,6 +254,8 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 }
 
 func (s *AzureSuite) TestReader_WithSorting() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -299,6 +299,8 @@ func (s *AzureSuite) TestReader_WithSorting() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesEmpty() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -316,6 +318,8 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesMixed() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -353,6 +357,8 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 }
 
 func (s *AzureSuite) TestReader_GetType() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -373,6 +379,8 @@ func (s *AzureSuite) TestReader_GetType() {
 }
 
 func (s *AzureSuite) TestReader_OpenFileOk() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -409,6 +417,8 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 }
 
 func (s *AzureSuite) TestReader_OpenFileErr() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -435,6 +445,8 @@ func (s *AzureSuite) TestReader_OpenFileErr() {
 }
 
 func (s *AzureSuite) TestWriter_WriteEmptyDir() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -462,6 +474,8 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 }
 
 func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -478,6 +492,8 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 }
 
 func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -506,6 +522,8 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 }
 
 func (s *AzureSuite) TestWriter_WriteMixedDir() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -534,6 +552,8 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 }
 
 func (s *AzureSuite) TestWriter_WriteSingleFile() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -558,6 +578,8 @@ func (s *AzureSuite) TestWriter_WriteSingleFile() {
 }
 
 func (s *AzureSuite) TestWriter_GetType() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -578,6 +600,8 @@ func (s *AzureSuite) TestWriter_GetType() {
 }
 
 func (s *AzureSuite) TestReader_WithMarker() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -620,6 +644,8 @@ func (s *AzureSuite) TestReader_WithMarker() {
 }
 
 func (s *AzureSuite) TestReader_StreamPathList() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -663,6 +689,8 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesList() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -705,6 +733,8 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
@@ -751,6 +781,8 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 }
 
 func (s *AzureSuite) TestIsSkippedByStartAfter() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
 	tests := []struct {
 		name       string
 		startAfter string
@@ -785,6 +817,7 @@ func (s *AzureSuite) TestIsSkippedByStartAfter() {
 
 	for _, tt := range tests {
 		s.T().Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := isSkippedByStartAfter(tt.startAfter, tt.fileName)
 			if result != tt.expected {
 				t.Errorf("expected %v, got %v", tt.expected, result)
@@ -810,7 +843,9 @@ func readAll(r io.ReadCloser) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read data: %w", err)
 	}
-	defer r.Close()
+	if err := r.Close(); err != nil {
+		return "", fmt.Errorf("failed to close reader: %w", err)
+	}
 
 	return string(data), nil
 }

@@ -60,7 +60,7 @@ type ConfigBackupXDR struct {
 	// Can be `all` or number of seconds.
 	Rewind string
 	// MaxThroughput number of records per second to ship using XDR. Must be in increments of 100.
-	// If 0, then aerospike will choose this value itself.
+	// If 0, the default server value will be used.
 	MaxThroughput int
 	// TLS config for secure XDR connection.
 	TLSConfig *tls.Config

@@ -69,7 +69,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		0,
 		"Number of records per second to ship using XDR."+
 			"The --max-throughput value should be in multiples of 100.\n"+
-			"If 0, then aerospike will choose this value itself")
+			"If 0, the default server value will be used.")
 	flagSet.Int64Var(&f.ReadTimeoutMilliseconds, "read-timeout",
 		1000,
 		"Timeout in milliseconds for TCP read operations. Used by TCP server for XDR.")

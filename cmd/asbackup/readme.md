@@ -255,7 +255,7 @@ All other flags are valid for XDR backup.
       --write-timeout int             Timeout in milliseconds for TCP write operations. Used by TCP server for XDR. (default 1000)
       --results-queue-size int        Buffer for processing messages received from XDR. (default 256)
       --ack-queue-size int            Buffer for processing acknowledge messages sent to XDR. (default 256)
-      --max-connections int           Maximum number of concurrent TCP connections. (default 100)
+      --max-connections int           Maximum number of concurrent TCP connections. (default 256)
       --info-poling-period int        How often (in milliseconds) a backup client sends info commands
                                       to check Aerospike cluster statistics on recovery rate and lag. (default 1000)
       --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.

@@ -89,7 +89,7 @@ func TestBackupXDR_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, int64(1000), result.WriteTimeoutMilliseconds, "The default value for write-timeout should be 1000")
 	assert.Equal(t, 256, result.ResultQueueSize, "The default value for results-queue-size should be 256")
 	assert.Equal(t, 256, result.AckQueueSize, "The default value for ack-queue-size should be 256")
-	assert.Equal(t, 100, result.MaxConnections, "The default value for max-connections should be 100")
+	assert.Equal(t, 256, result.MaxConnections, "The default value for max-connections should be 100")
 	assert.Equal(t, int64(1000), result.InfoPolingPeriodMilliseconds, "The default value for info-poling-period should be 1000")
 }
 

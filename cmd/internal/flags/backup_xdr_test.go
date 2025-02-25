@@ -41,7 +41,7 @@ func TestBackupXDR_NewFlagSet(t *testing.T) {
 		"--ack-queue-size", "512",
 		"--max-connections", "200",
 		"--info-poling-period", "2000",
-		"--stop-xdr", "true",
+		"--stop-xdr",
 		"--max-throughput", "1000",
 	}
 

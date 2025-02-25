@@ -12,11 +12,6 @@ type MockinfoCommander struct {
 	mock.Mock
 }
 
-func (_m *MockinfoCommander) SetMaxThroughput(dc, namespace string, throughput int) error {
-	// TODO implement me
-	panic("implement me")
-}
-
 type MockinfoCommander_Expecter struct {
 	mock *mock.Mock
 }
@@ -124,6 +119,54 @@ func (_c *MockinfoCommander_GetStats_Call) Return(_a0 asinfo.Stats, _a1 error) *
 }
 
 func (_c *MockinfoCommander_GetStats_Call) RunAndReturn(run func(string, string) (asinfo.Stats, error)) *MockinfoCommander_GetStats_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetMaxThroughput provides a mock function with given fields: dc, namespace, throughput
+func (_m *MockinfoCommander) SetMaxThroughput(dc string, namespace string, throughput int) error {
+	ret := _m.Called(dc, namespace, throughput)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetMaxThroughput")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, int) error); ok {
+		r0 = rf(dc, namespace, throughput)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockinfoCommander_SetMaxThroughput_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetMaxThroughput'
+type MockinfoCommander_SetMaxThroughput_Call struct {
+	*mock.Call
+}
+
+// SetMaxThroughput is a helper method to define mock.On call
+//   - dc string
+//   - namespace string
+//   - throughput int
+func (_e *MockinfoCommander_Expecter) SetMaxThroughput(dc interface{}, namespace interface{}, throughput interface{}) *MockinfoCommander_SetMaxThroughput_Call {
+	return &MockinfoCommander_SetMaxThroughput_Call{Call: _e.mock.On("SetMaxThroughput", dc, namespace, throughput)}
+}
+
+func (_c *MockinfoCommander_SetMaxThroughput_Call) Run(run func(dc string, namespace string, throughput int)) *MockinfoCommander_SetMaxThroughput_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockinfoCommander_SetMaxThroughput_Call) Return(_a0 error) *MockinfoCommander_SetMaxThroughput_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockinfoCommander_SetMaxThroughput_Call) RunAndReturn(run func(string, string, int) error) *MockinfoCommander_SetMaxThroughput_Call {
 	_c.Call.Return(run)
 	return _c
 }

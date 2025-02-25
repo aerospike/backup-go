@@ -48,6 +48,8 @@ type RecordReaderConfig struct {
 	infoPolingPeriod time.Duration
 	// Timeout for reading the first message after XDR start.
 	startTimeout time.Duration
+	// XDR max throughput number.
+	maxThroughput int
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -59,6 +61,7 @@ func NewRecordReaderConfig(
 	tcpConfig *TCPConfig,
 	infoPolingPeriod time.Duration,
 	startTimeout time.Duration,
+	maxThroughput int,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		dc:               dc,
@@ -68,6 +71,7 @@ func NewRecordReaderConfig(
 		tcpConfig:        tcpConfig,
 		infoPolingPeriod: infoPolingPeriod,
 		startTimeout:     startTimeout,
+		maxThroughput:    maxThroughput,
 	}
 }
 
@@ -78,6 +82,7 @@ type infoCommander interface {
 	GetStats(dc, namespace string) (asinfo.Stats, error)
 	BlockMRTWrites(namespace string) error
 	UnBlockMRTWrites(namespace string) error
+	SetMaxThroughput(dc, namespace string, throughput int) error
 }
 
 // RecordReader satisfies the pipeline DataReader interface.
@@ -204,6 +209,18 @@ func (r *RecordReader) start() error {
 		slog.String("namespace", r.config.namespace),
 		slog.String("rewind", r.config.rewind),
 	)
+
+	if r.config.maxThroughput > 0 {
+		if err := r.infoClient.SetMaxThroughput(r.config.dc, r.config.namespace, r.config.maxThroughput); err != nil {
+			return fmt.Errorf("failed to set max throughput: %w", err)
+		}
+
+		r.logger.Debug("max throughput set",
+			slog.Int("value", r.config.maxThroughput),
+			slog.String("dc", r.config.dc),
+			slog.String("namespace", r.config.namespace),
+		)
+	}
 
 	// Start TCP server.
 	results, err := r.tcpServer.Start(r.ctx)

@@ -43,6 +43,8 @@ const (
 
 	cmdSetsOfNamespace = "sets/%s"
 
+	cmdMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
+
 	cmdRespErrPrefix = "ERROR"
 )
 
@@ -385,6 +387,7 @@ func (ic *InfoClient) BlockMRTWrites(namespace string) error {
 		return ic.blockMRTWrites(namespace)
 	})
 }
+
 func (ic *InfoClient) blockMRTWrites(namespace string) error {
 	cmd := fmt.Sprintf(cmdBlockMRTWrites, namespace)
 
@@ -406,6 +409,7 @@ func (ic *InfoClient) UnBlockMRTWrites(namespace string) error {
 		return ic.unBlockMRTWrites(namespace)
 	})
 }
+
 func (ic *InfoClient) unBlockMRTWrites(namespace string) error {
 	cmd := fmt.Sprintf(cmdUnBlockMRTWrites, namespace)
 
@@ -416,6 +420,32 @@ func (ic *InfoClient) unBlockMRTWrites(namespace string) error {
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
 		return fmt.Errorf("failed to parse unblock mrt writes response: %w", err)
+	}
+
+	return nil
+}
+
+// SetMaxThroughput sets max throughput for xdr. The Value should be in multiples of 100.
+func (ic *InfoClient) SetMaxThroughput(dc, namespace string, throughput int) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.setMaxThroughput(dc, namespace, throughput)
+	})
+}
+
+func (ic *InfoClient) setMaxThroughput(dc, namespace string, throughput int) error {
+	if throughput%100 != 0 {
+		return fmt.Errorf("throughput must be a multiples of 100")
+	}
+
+	cmd := fmt.Sprintf(cmdMaxThroughput, dc, namespace, throughput)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to set max throughput: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse set max throughput response: %w", err)
 	}
 
 	return nil

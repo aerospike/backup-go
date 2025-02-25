@@ -59,6 +59,8 @@ type ConfigBackupXDR struct {
 	// all the records for that namespace, partition by partition.
 	// Can be `all` or number of seconds.
 	Rewind string
+	// MaxThroughput number for xdr.
+	MaxThroughput int
 	// TLS config for secure XDR connection.
 	TLSConfig *tls.Config
 	// Timeout for TCP read operations.
@@ -169,6 +171,10 @@ func (c *ConfigBackupXDR) validate() error {
 
 	if c.EncoderType != EncoderTypeASBX {
 		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
+	}
+
+	if c.MaxThroughput%100 != 0 {
+		return fmt.Errorf("max throughput must be a multiple of 100, got %d", c.MaxThroughput)
 	}
 
 	return nil

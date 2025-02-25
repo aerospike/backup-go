@@ -637,10 +637,11 @@ func TestMapBackupXDRConfig(t *testing.T) {
 			name: "Default configuration",
 			params: &ASBackupParams{
 				BackupXDRParams: &models.BackupXDR{
-					DC:           "dc1",
-					LocalAddress: "127.0.0.1",
-					LocalPort:    3004,
-					Namespace:    "test",
+					DC:            "dc1",
+					LocalAddress:  "127.0.0.1",
+					LocalPort:     3004,
+					Namespace:     "test",
+					MaxThroughput: 10,
 				},
 				Compression: testCompression(),
 				Encryption:  testEncryption(),
@@ -669,6 +670,8 @@ func TestMapBackupXDRConfig(t *testing.T) {
 				assert.Equal(t, "localhost", *cfg.SecretAgentConfig.Address)
 				assert.Equal(t, "tcp", *cfg.SecretAgentConfig.ConnectionType)
 				assert.Equal(t, 8080, *cfg.SecretAgentConfig.Port)
+
+				assert.Equal(t, 10, cfg.MaxThroughput)
 			},
 		},
 		{

@@ -12,6 +12,11 @@ type MockinfoCommander struct {
 	mock.Mock
 }
 
+func (_m *MockinfoCommander) SetMaxThroughput(dc, namespace string, throughput int) error {
+	// TODO implement me
+	panic("implement me")
+}
+
 type MockinfoCommander_Expecter struct {
 	mock *mock.Mock
 }

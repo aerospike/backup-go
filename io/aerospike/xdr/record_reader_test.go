@@ -55,6 +55,7 @@ func testRecordReaderConfig() *RecordReaderConfig {
 		testTCPConfig(),
 		testInfoPolingPeriod,
 		testStartTimeout,
+		0,
 	)
 }
 

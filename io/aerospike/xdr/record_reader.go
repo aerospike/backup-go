@@ -77,12 +77,11 @@ func NewRecordReaderConfig(
 
 // infoCommander interface for an info client.
 type infoCommander interface {
-	StartXDR(dc, hostPort, namespace, rewind string) error
+	StartXDR(dc, hostPort, namespace, rewind string, throughput int) error
 	StopXDR(dc string) error
 	GetStats(dc, namespace string) (asinfo.Stats, error)
 	BlockMRTWrites(namespace string) error
 	UnBlockMRTWrites(namespace string) error
-	SetMaxThroughput(dc, namespace string, throughput int) error
 }
 
 // RecordReader satisfies the pipeline DataReader interface.
@@ -199,6 +198,7 @@ func (r *RecordReader) start() error {
 		r.config.currentHostPort,
 		r.config.namespace,
 		r.config.rewind,
+		r.config.maxThroughput,
 	); err != nil {
 		return fmt.Errorf("failed to create xdr config: %w", err)
 	}
@@ -208,19 +208,8 @@ func (r *RecordReader) start() error {
 		slog.String("hostPort", r.config.currentHostPort),
 		slog.String("namespace", r.config.namespace),
 		slog.String("rewind", r.config.rewind),
+		slog.Int("throughput", r.config.maxThroughput),
 	)
-
-	if r.config.maxThroughput > 0 {
-		if err := r.infoClient.SetMaxThroughput(r.config.dc, r.config.namespace, r.config.maxThroughput); err != nil {
-			return fmt.Errorf("failed to set max throughput: %w", err)
-		}
-
-		r.logger.Debug("max throughput set",
-			slog.Int("value", r.config.maxThroughput),
-			slog.String("dc", r.config.dc),
-			slog.String("namespace", r.config.namespace),
-		)
-	}
 
 	// Start TCP server.
 	results, err := r.tcpServer.Start(r.ctx)

@@ -265,26 +265,55 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 }
 
 // StartXDR creates xdr config and starts replication.
-func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string) error {
-	return executeWithRetry(ic.retryPolicy, func() error {
-		return ic.startXDR(dc, hostPort, namespace, rewind)
-	})
-}
-
-func (ic *InfoClient) startXDR(dc, hostPort, namespace, rewind string) error {
-	if err := ic.createXDRDC(dc); err != nil {
-		return err
-	}
+func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string, throughput int) error {
 	// The Order of this operation is important. Don't move it if you don't know what you are doing!
-	if err := ic.createXDRConnector(dc); err != nil {
+	err := executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRDC(dc)
+		},
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := ic.createXDRNode(dc, hostPort); err != nil {
+	err = executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRConnector(dc)
+		},
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := ic.createXDRNamespace(dc, namespace, rewind); err != nil {
+	err = executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRNode(dc, hostPort)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	err = executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.setMaxThroughput(dc, namespace, throughput)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	err = executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRNamespace(dc, namespace, rewind)
+		},
+	)
+	if err != nil {
 		return err
 	}
 
@@ -425,16 +454,11 @@ func (ic *InfoClient) unBlockMRTWrites(namespace string) error {
 	return nil
 }
 
-// SetMaxThroughput sets max throughput for xdr. The Value should be in multiples of 100.
-func (ic *InfoClient) SetMaxThroughput(dc, namespace string, throughput int) error {
-	return executeWithRetry(ic.retryPolicy, func() error {
-		return ic.setMaxThroughput(dc, namespace, throughput)
-	})
-}
-
+// SetMaxThroughput sets max throughput for xdr. The Value should be in multiples of 100
 func (ic *InfoClient) setMaxThroughput(dc, namespace string, throughput int) error {
-	if throughput%100 != 0 {
-		return fmt.Errorf("throughput must be a multiples of 100")
+	// Do nothing.
+	if throughput == 0 {
+		return nil
 	}
 
 	cmd := fmt.Sprintf(cmdMaxThroughput, dc, namespace, throughput)

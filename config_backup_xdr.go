@@ -178,8 +178,8 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("max throughput must be a multiple of 100, got %d", c.MaxThroughput)
 	}
 
-	if c.MaxThroughput < 1 {
-		return fmt.Errorf("max throughput must be at least 1, got %d", c.MaxThroughput)
+	if c.MaxThroughput < 0 {
+		return fmt.Errorf("max throughput must not be negative, got %d", c.MaxThroughput)
 	}
 
 	return nil

@@ -55,13 +55,14 @@ func testRecordReaderConfig() *RecordReaderConfig {
 		testTCPConfig(),
 		testInfoPolingPeriod,
 		testStartTimeout,
+		0,
 	)
 }
 
 func newInfoMock(t *testing.T) infoCommander {
 	t.Helper()
 	ic := mocks.NewMockinfoCommander(t)
-	ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 	ic.On("GetStats", mock.Anything, mock.Anything).
 		Return(asinfo.Stats{

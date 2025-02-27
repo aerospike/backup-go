@@ -65,6 +65,11 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"When rewinding a namespace, XDR will scan through the index and ship\n"+
 			"all the records for that namespace, partition by partition.\n"+
 			"Can be the string \"all\" or an integer number of seconds.")
+	flagSet.IntVar(&f.MaxThroughput, "max-throughput",
+		0,
+		"Number of records per second to ship using XDR."+
+			"The --max-throughput value should be in multiples of 100.\n"+
+			"If 0, the default server value will be used.")
 	flagSet.Int64Var(&f.ReadTimeoutMilliseconds, "read-timeout",
 		1000,
 		"Timeout in milliseconds for TCP read operations. Used by TCP server for XDR.")

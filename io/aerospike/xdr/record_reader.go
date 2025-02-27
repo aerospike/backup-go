@@ -48,6 +48,8 @@ type RecordReaderConfig struct {
 	infoPolingPeriod time.Duration
 	// Timeout for reading the first message after XDR start.
 	startTimeout time.Duration
+	// XDR max throughput number.
+	maxThroughput int
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -59,6 +61,7 @@ func NewRecordReaderConfig(
 	tcpConfig *TCPConfig,
 	infoPolingPeriod time.Duration,
 	startTimeout time.Duration,
+	maxThroughput int,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		dc:               dc,
@@ -68,12 +71,13 @@ func NewRecordReaderConfig(
 		tcpConfig:        tcpConfig,
 		infoPolingPeriod: infoPolingPeriod,
 		startTimeout:     startTimeout,
+		maxThroughput:    maxThroughput,
 	}
 }
 
 // infoCommander interface for an info client.
 type infoCommander interface {
-	StartXDR(dc, hostPort, namespace, rewind string) error
+	StartXDR(dc, hostPort, namespace, rewind string, throughput int) error
 	StopXDR(dc string) error
 	GetStats(dc, namespace string) (asinfo.Stats, error)
 	BlockMRTWrites(namespace string) error
@@ -194,6 +198,7 @@ func (r *RecordReader) start() error {
 		r.config.currentHostPort,
 		r.config.namespace,
 		r.config.rewind,
+		r.config.maxThroughput,
 	); err != nil {
 		return fmt.Errorf("failed to create xdr config: %w", err)
 	}
@@ -203,6 +208,7 @@ func (r *RecordReader) start() error {
 		slog.String("hostPort", r.config.currentHostPort),
 		slog.String("namespace", r.config.namespace),
 		slog.String("rewind", r.config.rewind),
+		slog.Int("throughput", r.config.maxThroughput),
 	)
 
 	// Start TCP server.

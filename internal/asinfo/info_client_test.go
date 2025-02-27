@@ -1751,7 +1751,7 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 
 	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
-	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind)
+	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind, 0)
 	require.NoError(t, err)
 
 	_, err = ic.GetStats(testASDC, testASNamespace)
@@ -1889,7 +1889,7 @@ func TestInfoCommander_XDR(t *testing.T) {
 
 	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
-	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind)
+	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind, 0)
 	require.NoError(t, err)
 
 	_, err = ic.GetStats(testASDC, testASNamespace)

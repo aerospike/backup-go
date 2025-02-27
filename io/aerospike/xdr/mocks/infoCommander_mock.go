@@ -123,17 +123,17 @@ func (_c *MockinfoCommander_GetStats_Call) RunAndReturn(run func(string, string)
 	return _c
 }
 
-// StartXDR provides a mock function with given fields: dc, hostPort, namespace, rewind
-func (_m *MockinfoCommander) StartXDR(dc string, hostPort string, namespace string, rewind string) error {
-	ret := _m.Called(dc, hostPort, namespace, rewind)
+// StartXDR provides a mock function with given fields: dc, hostPort, namespace, rewind, throughput
+func (_m *MockinfoCommander) StartXDR(dc string, hostPort string, namespace string, rewind string, throughput int) error {
+	ret := _m.Called(dc, hostPort, namespace, rewind, throughput)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartXDR")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
-		r0 = rf(dc, hostPort, namespace, rewind)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, int) error); ok {
+		r0 = rf(dc, hostPort, namespace, rewind, throughput)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -151,13 +151,14 @@ type MockinfoCommander_StartXDR_Call struct {
 //   - hostPort string
 //   - namespace string
 //   - rewind string
-func (_e *MockinfoCommander_Expecter) StartXDR(dc interface{}, hostPort interface{}, namespace interface{}, rewind interface{}) *MockinfoCommander_StartXDR_Call {
-	return &MockinfoCommander_StartXDR_Call{Call: _e.mock.On("StartXDR", dc, hostPort, namespace, rewind)}
+//   - throughput int
+func (_e *MockinfoCommander_Expecter) StartXDR(dc interface{}, hostPort interface{}, namespace interface{}, rewind interface{}, throughput interface{}) *MockinfoCommander_StartXDR_Call {
+	return &MockinfoCommander_StartXDR_Call{Call: _e.mock.On("StartXDR", dc, hostPort, namespace, rewind, throughput)}
 }
 
-func (_c *MockinfoCommander_StartXDR_Call) Run(run func(dc string, hostPort string, namespace string, rewind string)) *MockinfoCommander_StartXDR_Call {
+func (_c *MockinfoCommander_StartXDR_Call) Run(run func(dc string, hostPort string, namespace string, rewind string, throughput int)) *MockinfoCommander_StartXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(int))
 	})
 	return _c
 }
@@ -167,7 +168,7 @@ func (_c *MockinfoCommander_StartXDR_Call) Return(_a0 error) *MockinfoCommander_
 	return _c
 }
 
-func (_c *MockinfoCommander_StartXDR_Call) RunAndReturn(run func(string, string, string, string) error) *MockinfoCommander_StartXDR_Call {
+func (_c *MockinfoCommander_StartXDR_Call) RunAndReturn(run func(string, string, string, string, int) error) *MockinfoCommander_StartXDR_Call {
 	_c.Call.Return(run)
 	return _c
 }

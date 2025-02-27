@@ -251,6 +251,8 @@ All other flags are valid for XDR backup.
                                       When rewinding a namespace, XDR will scan through the index and ship
                                       all the records for that namespace, partition by partition.
                                       Can be the string "all" or an integer number of seconds. (default "all")
+      --max-throughput int            Number of records per second to ship using XDR.The --max-throughput value should be in multiples of 100.
+                                      If 0, the default server value will be used.
       --read-timeout int              Timeout in milliseconds for TCP read operations. Used by TCP server for XDR. (default 1000)
       --write-timeout int             Timeout in milliseconds for TCP write operations. Used by TCP server for XDR. (default 1000)
       --results-queue-size int        Buffer for processing messages received from XDR. (default 256)

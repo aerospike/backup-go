@@ -18,9 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -45,6 +47,9 @@ type Reader struct {
 	// If objectsToStream is not set, we iterate through objects in storage and load them.
 	// If set, we load objects from this slice directly.
 	objectsToStream []string
+
+	// objectsToWarm is used to track the current number of restoring objects.
+	objectsToWarm map[string]struct{}
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -359,13 +364,22 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (bool
 	return false, nil
 }
 
-// warmStorage heat all directories in r.PathList.
+// warmStorage warms all directories in r.PathList.
 func (r *Reader) warmStorage(ctx context.Context) error {
 	for _, path := range r.PathList {
 		if err := r.warmDirectory(ctx, path); err != nil {
-			return fmt.Errorf("failed to heat directory %s: %w", path, err)
+			return fmt.Errorf("failed to warm directory %s: %w", path, err)
 		}
 	}
+
+	r.Logger.Info("objects to restore", slog.Int("number", len(r.objectsToWarm)))
+
+	// Start polling objects.
+	if err := r.checkWarm(ctx); err != nil {
+		return fmt.Errorf("failed to server directory warming: %w", err)
+	}
+
+	r.Logger.Info("storage warm up finished")
 
 	return nil
 }
@@ -391,6 +405,52 @@ func (r *Reader) warmDirectory(ctx context.Context, path string) error {
 	}
 
 	return nil
+}
+
+// checkWarm wait until all objects from r.objectsToWarm will be restored.
+func (r *Reader) checkWarm(ctx context.Context) error {
+	if len(r.objectsToWarm) == 0 {
+		return nil
+	}
+
+	for path := range r.objectsToWarm {
+		if err := r.pollWarmDirStatus(ctx, path); err != nil {
+			return fmt.Errorf("failed to poll die status %s: %w", path, err)
+		}
+	}
+
+	return nil
+}
+
+// pollWarmDirStatus polls the current status of directory that we are warming.
+func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	r.Logger.Info("start polling status", slog.String("object", path))
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			ok, err := r.checkObjectAvailability(ctx, path)
+			if err != nil {
+				return err
+			}
+
+			r.Logger.Debug("object status",
+				slog.String("object", path),
+				slog.Bool("ok", ok),
+			)
+
+			if !ok {
+				continue
+			}
+
+			return nil
+		}
+	}
 }
 
 func isSkippedByStartAfter(startAfter, fileName string) bool {

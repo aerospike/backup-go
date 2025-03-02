@@ -14,6 +14,8 @@
 
 package storage
 
+import "log/slog"
+
 type validator interface {
 	Run(fileName string) error
 }
@@ -53,6 +55,9 @@ type Options struct {
 
 	// RestoreTier tier name to restore archived files to.
 	RestoreTier string
+
+	// Logger contains logger.
+	Logger *slog.Logger
 }
 
 type Opt func(*Options)
@@ -160,5 +165,12 @@ func WithRestoreTier(tier string) Opt {
 	// TODO: we should map tiers to internal types
 	return func(r *Options) {
 		r.RestoreTier = tier
+	}
+}
+
+// WithLogger set logger.
+func WithLogger(logger *slog.Logger) Opt {
+	return func(r *Options) {
+		r.Logger = logger
 	}
 }

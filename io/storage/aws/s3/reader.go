@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -420,10 +421,14 @@ func (r *Reader) warmStorage(ctx context.Context) error {
 		}
 	}
 
+	r.Logger.Info("objects to restore", slog.Int("number", len(r.objectsToWarm)))
+
 	// Start polling objects.
-	if err := r.serverWarm(ctx); err != nil {
+	if err := r.checkWarm(ctx); err != nil {
 		return fmt.Errorf("failed to server directory warming: %w", err)
 	}
+
+	r.Logger.Info("storage warm up finished")
 
 	return nil
 }
@@ -451,8 +456,8 @@ func (r *Reader) warmDirectory(ctx context.Context, path string) error {
 	return nil
 }
 
-// serverWarm wait until all objects from r.objectsToWarm will be restored.
-func (r *Reader) serverWarm(ctx context.Context) error {
+// checkWarm wait until all objects from r.objectsToWarm will be restored.
+func (r *Reader) checkWarm(ctx context.Context) error {
 	if len(r.objectsToWarm) == 0 {
 		return nil
 	}
@@ -471,6 +476,8 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
+	r.Logger.Info("start polling status", slog.String("object", path))
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -481,11 +488,17 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 				return err
 			}
 
+			r.Logger.Debug("object status",
+				slog.String("object", path),
+				slog.Bool("ok", ok),
+			)
+
 			if !ok {
 				continue
 			}
 
-			// If ok.
+			// TODO: check if we should delete something from r.objectsToWarm
+
 			return nil
 		}
 	}

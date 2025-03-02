@@ -50,6 +50,9 @@ type Options struct {
 	// StorageClass specifies the type of storage class.
 	// Supported values depend on the cloud provider being used.
 	StorageClass string
+
+	// RestoreTier tier name to restore archived files to.
+	RestoreTier string
 }
 
 type Opt func(*Options)
@@ -148,5 +151,14 @@ func WithUploadConcurrency(v int) Opt {
 func WithStorageClass(class string) Opt {
 	return func(r *Options) {
 		r.StorageClass = class
+	}
+}
+
+// WithRestoreTier set restore tier for archived files.
+// If is set
+func WithRestoreTier(tier string) Opt {
+	// TODO: we should map tiers to internal types
+	return func(r *Options) {
+		r.RestoreTier = tier
 	}
 }

@@ -475,7 +475,7 @@ func (h *ConnectionHandler) handleAcknowledgments(ctx context.Context) {
 			}
 			// Process each received ack message.
 			if err := h.sendAck(ack); err != nil {
-				h.logger.Error("failed to send ack", slog.Any("error", err))
+				h.logger.Warn("failed to send ack", slog.Any("error", err))
 				// Close connection!
 				h.cancel()
 

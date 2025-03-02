@@ -24,6 +24,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 )
@@ -86,6 +87,12 @@ func NewReader(
 			if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
 				return nil, fmt.Errorf("failed to pre sort: %w", err)
 			}
+		}
+	}
+
+	if r.RestoreTier != "" {
+		if err := r.warmStorage(ctx); err != nil {
+			return nil, fmt.Errorf("failed to heat the storage: %w", err)
 		}
 	}
 
@@ -168,6 +175,17 @@ func (r *Reader) openObject(
 	errorsCh chan<- error,
 	skipNotFound bool,
 ) {
+	ok, err := r.checkObjectAvailability(ctx, path)
+	if err != nil {
+		errorsCh <- fmt.Errorf("failed to check object availability: %w", err)
+		return
+	}
+
+	if !ok {
+		errorsCh <- fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path)
+		return
+	}
+
 	resp, err := r.client.DownloadStream(ctx, r.containerName, path, nil)
 	if err != nil {
 		// Skip 404 not found error.
@@ -301,6 +319,78 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 	for i := range r.objectsToStream {
 		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
 	}
+}
+
+func (r *Reader) rehydrateObject(ctx context.Context, path string) error {
+	bClient := r.client.ServiceClient().
+		NewContainerClient(r.containerName).
+		NewBlobClient(path)
+
+	priority := blob.RehydratePriorityHigh
+
+	_, err := bClient.SetTier(
+		ctx,
+		blob.AccessTierHot,
+		&blob.SetTierOptions{
+			RehydratePriority: &priority,
+		})
+	if err != nil {
+		return fmt.Errorf("starting rehydration: %w", err)
+	}
+
+	return nil
+}
+
+// checkObjectAvailability check if an object is available for download.
+func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (bool, error) {
+	bClient := r.client.ServiceClient().
+		NewContainerClient(r.containerName).
+		NewBlobClient(path)
+
+	objProps, err := bClient.GetProperties(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to get container properties: %w", err)
+	}
+
+	if objProps.ArchiveStatus == nil || *objProps.ArchiveStatus != "" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// warmStorage heat all directories in r.PathList.
+func (r *Reader) warmStorage(ctx context.Context) error {
+	for _, path := range r.PathList {
+		if err := r.warmDirectory(ctx, path); err != nil {
+			return fmt.Errorf("failed to heat directory %s: %w", path, err)
+		}
+	}
+
+	return nil
+}
+
+// warmDirectory warms files in directory, and if they need to be restored, restore them.
+func (r *Reader) warmDirectory(ctx context.Context, path string) error {
+	objects, err := r.ListObjects(ctx, path)
+	if err != nil {
+		return fmt.Errorf("failed to list objects: %w", err)
+	}
+
+	for _, object := range objects {
+		ok, err := r.checkObjectAvailability(ctx, object)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			if err = r.rehydrateObject(ctx, object); err != nil {
+				return fmt.Errorf("failed to restore object: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func isSkippedByStartAfter(startAfter, fileName string) bool {

@@ -101,11 +101,20 @@ func NewReader(
 	}
 
 	if r.RestoreTier != "" {
+		r.Logger.Debug("start warming storage")
+
 		r.objectsToWarm = make(map[string]struct{})
 
-		if err := r.warmStorage(ctx); err != nil {
+		tier, err := parseAccessTier(r.RestoreTier)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
+		}
+
+		if err := r.warmStorage(ctx, tier); err != nil {
 			return nil, fmt.Errorf("failed to heat the storage: %w", err)
 		}
+
+		r.Logger.Debug("finish warming storage")
 	}
 
 	return r, nil
@@ -367,9 +376,8 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 }
 
 // restoreObject restoring an archived object.
-func (r *Reader) restoreObject(ctx context.Context, path string) error {
+func (r *Reader) restoreObject(ctx context.Context, path string, tier types.Tier) error {
 	days := int32(1) // Temporary restoration period (minimum 1 day)
-	tier := types.TierExpedited
 
 	_, err := r.client.RestoreObject(ctx, &s3.RestoreObjectInput{
 		Bucket: &r.bucketName,
@@ -414,9 +422,9 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (bool
 }
 
 // warmStorage warms all directories in r.PathList.
-func (r *Reader) warmStorage(ctx context.Context) error {
+func (r *Reader) warmStorage(ctx context.Context, tier types.Tier) error {
 	for _, path := range r.PathList {
-		if err := r.warmDirectory(ctx, path); err != nil {
+		if err := r.warmDirectory(ctx, path, tier); err != nil {
 			return fmt.Errorf("failed to warm directory %s: %w", path, err)
 		}
 	}
@@ -434,7 +442,7 @@ func (r *Reader) warmStorage(ctx context.Context) error {
 }
 
 // warmDirectory check files in directory, and if they need to be restored, restore them.
-func (r *Reader) warmDirectory(ctx context.Context, path string) error {
+func (r *Reader) warmDirectory(ctx context.Context, path string, tier types.Tier) error {
 	objects, err := r.ListObjects(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to list objects: %w", err)
@@ -447,7 +455,7 @@ func (r *Reader) warmDirectory(ctx context.Context, path string) error {
 		}
 
 		if !ok {
-			if err = r.restoreObject(ctx, object); err != nil {
+			if err = r.restoreObject(ctx, object, tier); err != nil {
 				return fmt.Errorf("failed to restore object: %w", err)
 			}
 		}
@@ -497,9 +505,24 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 				continue
 			}
 
-			// TODO: check if we should delete something from r.objectsToWarm
-
 			return nil
 		}
 	}
+}
+
+func parseAccessTier(tier string) (types.Tier, error) {
+	var result types.Tier
+	possible := result.Values()
+
+	for _, possibleTier := range possible {
+		if tier == string(possibleTier) {
+			result = possibleTier
+		}
+	}
+
+	if result == "" {
+		return "", fmt.Errorf("invalid access tier %s", tier)
+	}
+
+	return result, nil
 }

@@ -458,7 +458,8 @@ func (r *Reader) checkWarm(ctx context.Context) error {
 
 // pollWarmDirStatus polls the current status of directory that we are warming.
 func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
-	ticker := time.NewTicker(time.Second)
+	// TODO: expose this duration?
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	r.Logger.Info("start polling status", slog.String("object", path))

@@ -162,7 +162,6 @@ func WithStorageClass(class string) Opt {
 // WithRestoreTier set restore tier for archived files.
 // If is set
 func WithRestoreTier(tier string) Opt {
-	// TODO: we should map tiers to internal types
 	return func(r *Options) {
 		r.RestoreTier = tier
 	}

@@ -123,6 +123,10 @@ Restore Flags:
                                   and each record is uploaded individually.
                                   The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.
                                   Incompatible with --mode=asbx. (default 32)
+      --warm-up int               Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.
+                                  By default is calculated as (--max-async-batches + 1), as one connection per node is reserved
+                                  for tend operations and is not used for transactions.
+                                  Incompatible with --mode=asbx.
       --batch-size int            The max allowed number of records to simultaneously upload to Aerospike.
                                   Default is 128 with batch writes enabled. If you disable batch writes,
                                   this flag is superseded because each worker sends writes one by one.

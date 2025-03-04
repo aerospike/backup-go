@@ -122,7 +122,7 @@ func NewASBackup(
 		racks = params.BackupParams.PreferRacks
 	}
 
-	aerospikeClient, err := newAerospikeClient(params.ClientConfig, params.ClientPolicy, racks)
+	aerospikeClient, err := newAerospikeClient(params.ClientConfig, params.ClientPolicy, racks, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}

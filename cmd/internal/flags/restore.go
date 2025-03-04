@@ -88,6 +88,12 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"and each record is uploaded individually.\n"+
 			"The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.\n"+
 			"Incompatible with --mode=asbx.")
+	flagSet.IntVar(&f.WarmUp, "warm-up",
+		0,
+		"Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.\n"+
+			"By default is calculated as (--max-async-batches + 1), as one connection per node is reserved\n"+
+			"for tend operations and is not used for transactions.\n"+
+			"Incompatible with --mode=asbx.")
 	flagSet.IntVar(&f.BatchSize, "batch-size", 128,
 		"The max allowed number of records to simultaneously upload to Aerospike.\n"+
 			"Default is 128 with batch writes enabled. If you disable batch writes,\n"+

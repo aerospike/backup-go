@@ -589,6 +589,7 @@ func TestValidateRestoreParams(t *testing.T) {
 				InputFile:       "",
 				DirectoryList:   "",
 				ParentDirectory: "",
+				WarmUp:          10,
 			},
 			commonParams: &models.Common{
 				Directory: "some/directory",
@@ -654,6 +655,19 @@ func TestValidateRestoreParams(t *testing.T) {
 				Directory: "",
 			},
 			expectedError: "",
+		},
+		{
+			name: "Error - warm up",
+			restoreParams: &models.Restore{
+				InputFile:       "",
+				DirectoryList:   "",
+				ParentDirectory: "",
+				WarmUp:          -10,
+			},
+			commonParams: &models.Common{
+				Directory: "some/directory",
+			},
+			expectedError: "warm-up must be non-negative",
 		},
 	}
 

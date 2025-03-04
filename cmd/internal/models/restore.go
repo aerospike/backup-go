@@ -27,12 +27,15 @@ type Restore struct {
 	DisableBatchWrites bool
 	BatchSize          int
 	MaxAsyncBatches    int
-	ExtraTTL           int64
-	IgnoreRecordError  bool
-	Uniq               bool
-	Replace            bool
-	NoGeneration       bool
-	TimeOut            int64
+	// Must be not less than MaxAsyncBatches.
+	// Will be applied only for batch writes.
+	WarmUp            int
+	ExtraTTL          int64
+	IgnoreRecordError bool
+	Uniq              bool
+	Replace           bool
+	NoGeneration      bool
+	TimeOut           int64
 
 	RetryBaseTimeout int64
 	RetryMultiplier  float64

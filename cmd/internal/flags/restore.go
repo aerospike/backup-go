@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const defaultAsyncBatches = 32
+
 type Restore struct {
 	models.Restore
 }
@@ -81,12 +83,18 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"that batch writes are disabled.\n"+
 			"Incompatible with --mode=asbx.")
 	flagSet.IntVar(&f.MaxAsyncBatches, "max-async-batches",
-		32,
+		defaultAsyncBatches,
 		"To send data to Aerospike Database, asrestore creates write workers that work in parallel.\n"+
 			"This value is the number of workers that form batches and send them to the database.\n"+
 			"For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,\n"+
 			"and each record is uploaded individually.\n"+
 			"The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.\n"+
+			"Incompatible with --mode=asbx.")
+	flagSet.IntVar(&f.WarmUp, "warm-up",
+		defaultAsyncBatches+1,
+		"Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.\n"+
+			"At least must be same as (--max-async-batches + 1) or more, as one connection per node is reserved\n"+
+			"for tend operations and is not used for transactions.\n"+
 			"Incompatible with --mode=asbx.")
 	flagSet.IntVar(&f.BatchSize, "batch-size", 128,
 		"The max allowed number of records to simultaneously upload to Aerospike.\n"+

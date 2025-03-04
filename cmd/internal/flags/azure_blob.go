@@ -51,6 +51,9 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.ContainerName, "azure-container-name",
 		"",
 		"Azure container Name.")
+	flagSet.StringVar(&f.RestoreTier, "azure-restore-tier",
+		"",
+		"tier")
 
 	return flagSet
 }

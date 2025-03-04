@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -58,7 +59,9 @@ func TestNewLocalReader(t *testing.T) {
 	err := createTmpFileLocal(dir, testFileNameASBX)
 	require.NoError(t, err)
 
-	reader, err := newReader(ctx, params, nil, true)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	reader, err := newReader(ctx, params, nil, true, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
@@ -73,7 +76,7 @@ func TestNewLocalReader(t *testing.T) {
 		AzureBlob:    &models.AzureBlob{},
 	}
 
-	reader, err = newReader(ctx, params, nil, false)
+	reader, err = newReader(ctx, params, nil, false, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
@@ -85,7 +88,7 @@ func TestNewLocalReader(t *testing.T) {
 		GcpStorage:    &models.GcpStorage{},
 		AzureBlob:     &models.AzureBlob{},
 	}
-	reader, err = newReader(ctx, params, nil, false)
+	reader, err = newReader(ctx, params, nil, false, logger)
 	assert.Error(t, err)
 	assert.Nil(t, reader)
 }
@@ -130,7 +133,9 @@ func TestNewS3Reader(t *testing.T) {
 	err = createTmpFileS3(ctx, client, dir, testFileNameASBX)
 	require.NoError(t, err)
 
-	reader, err := newReader(ctx, params, nil, true)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	reader, err := newReader(ctx, params, nil, true, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
@@ -150,7 +155,7 @@ func TestNewS3Reader(t *testing.T) {
 		AzureBlob:  &models.AzureBlob{},
 	}
 
-	reader, err = newReader(ctx, params, nil, false)
+	reader, err = newReader(ctx, params, nil, false, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
@@ -196,7 +201,9 @@ func TestNewGcpReader(t *testing.T) {
 	err = createTmpFileGcp(ctx, client, dir, testFileNameASBX)
 	require.NoError(t, err)
 
-	reader, err := newReader(ctx, params, nil, true)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	reader, err := newReader(ctx, params, nil, true, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testGcpType, reader.GetType())
@@ -214,7 +221,7 @@ func TestNewGcpReader(t *testing.T) {
 		AzureBlob: &models.AzureBlob{},
 	}
 
-	reader, err = newReader(ctx, params, nil, false)
+	reader, err = newReader(ctx, params, nil, false, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testGcpType, reader.GetType())
@@ -262,7 +269,9 @@ func TestNewAzureReader(t *testing.T) {
 	err = createTmpFileAzure(ctx, client, dir, testFileNameASBX)
 	require.NoError(t, err)
 
-	reader, err := newReader(ctx, params, nil, true)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	reader, err := newReader(ctx, params, nil, true, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())
@@ -282,7 +291,7 @@ func TestNewAzureReader(t *testing.T) {
 		GcpStorage: &models.GcpStorage{},
 	}
 
-	reader, err = newReader(ctx, params, nil, false)
+	reader, err = newReader(ctx, params, nil, false, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())

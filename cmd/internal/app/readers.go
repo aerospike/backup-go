@@ -17,6 +17,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path"
 
 	"github.com/aerospike/backup-go"
@@ -35,6 +36,7 @@ func newReader(
 	params *ASRestoreParams,
 	sa *backup.SecretAgentConfig,
 	isXdr bool,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	directory, inputFile := params.CommonParams.Directory, params.RestoreParams.InputFile
 	parentDirectory, directoryList := params.RestoreParams.ParentDirectory, params.RestoreParams.DirectoryList
@@ -59,7 +61,7 @@ func newReader(
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
-		return newAzureReader(ctx, params.AzureBlob, opts)
+		return newAzureReader(ctx, params.AzureBlob, opts, logger)
 	default:
 		return newLocalReader(ctx, opts)
 	}
@@ -131,10 +133,15 @@ func newAzureReader(
 	ctx context.Context,
 	a *models.AzureBlob,
 	opts []ioStorage.Opt,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	client, err := newAzureClient(a)
 	if err != nil {
 		return nil, err
+	}
+
+	if a.RestoreTier != "" {
+		opts = append(opts, ioStorage.WithRestoreTier(a.RestoreTier), ioStorage.WithLogger(logger))
 	}
 
 	return blob.NewReader(ctx, client, a.ContainerName, opts...)

@@ -31,6 +31,8 @@ type AzureBlob struct {
 
 	Endpoint      string
 	ContainerName string
+
+	RestoreTier string
 }
 
 // LoadSecrets tries to load field values from secret agent.

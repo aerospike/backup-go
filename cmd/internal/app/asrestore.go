@@ -65,7 +65,7 @@ func NewASRestore(
 	// Initializations.
 	restoreConfig := initializeRestoreConfigs(params)
 
-	reader, xdrReader, err := initializeRestoreReader(ctx, params, restoreConfig.SecretAgentConfig)
+	reader, xdrReader, err := initializeRestoreReader(ctx, params, restoreConfig.SecretAgentConfig, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
@@ -219,25 +219,29 @@ func initializeRestoreConfigs(params *ASRestoreParams) *backup.ConfigRestore {
 	return mapRestoreConfig(params)
 }
 
-func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *backup.SecretAgentConfig,
+func initializeRestoreReader(
+	ctx context.Context,
+	params *ASRestoreParams,
+	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
 ) (reader, xdrReader backup.StreamingReader, err error) {
 	switch params.RestoreParams.Mode {
 	case models.RestoreModeASB:
-		reader, err = newReader(ctx, params, sa, false)
+		reader, err = newReader(ctx, params, sa, false, logger)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
 		}
 
 		return reader, nil, nil
 	case models.RestoreModeASBX:
-		xdrReader, err = newReader(ctx, params, sa, true)
+		xdrReader, err = newReader(ctx, params, sa, true, logger)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
 		}
 
 		return nil, xdrReader, nil
 	case models.RestoreModeAuto:
-		reader, err = newReader(ctx, params, sa, false)
+		reader, err = newReader(ctx, params, sa, false, logger)
 
 		switch {
 		case errors.Is(err, storage.ErrEmptyStorage):
@@ -247,7 +251,7 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		default:
 		}
 
-		xdrReader, err = newReader(ctx, params, sa, true)
+		xdrReader, err = newReader(ctx, params, sa, true, logger)
 
 		switch {
 		case errors.Is(err, storage.ErrEmptyStorage):

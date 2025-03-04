@@ -27,8 +27,8 @@ type Restore struct {
 	DisableBatchWrites bool
 	BatchSize          int
 	MaxAsyncBatches    int
-	// Must be not less than MaxAsyncBatches.
-	// Will be applied only for batch writes.
+	// For optimal performance, should be at least MaxAsyncBatches.
+	// This is applicable only to batch writes.
 	WarmUp            int
 	ExtraTTL          int64
 	IgnoreRecordError bool

@@ -70,11 +70,14 @@ func NewASRestore(
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
 
+	warmUp := getWarmUp(params.RestoreParams.WarmUp, params.RestoreParams.MaxAsyncBatches)
+	logger.Debug("warm up is set", slog.Int("value", warmUp))
+
 	aerospikeClient, err := newAerospikeClient(
 		params.ClientConfig,
 		params.ClientPolicy,
 		"",
-		params.RestoreParams.WarmUp,
+		warmUp,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
@@ -270,5 +273,14 @@ func initializeRestoreReader(ctx context.Context, params *ASRestoreParams, sa *b
 		return reader, xdrReader, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
+	}
+}
+
+func getWarmUp(warmUp, maxAsyncBatches int) int {
+	switch warmUp {
+	case 0:
+		return maxAsyncBatches + 1
+	default:
+		return warmUp
 	}
 }

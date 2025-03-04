@@ -124,7 +124,7 @@ Restore Flags:
                                   The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.
                                   Incompatible with --mode=asbx. (default 32)
       --warm-up int               Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.
-                                  At least must be same as (--max-async-batches + 1) or more, as one connection per node is reserved
+                                  By default is calculated as (--max-async-batches + 1), as one connection per node is reserved
                                   for tend operations and is not used for transactions.
                                   Incompatible with --mode=asbx. (default 33)
       --batch-size int            The max allowed number of records to simultaneously upload to Aerospike.

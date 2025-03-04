@@ -276,5 +276,9 @@ func validateRestoreParams(restoreParams *models.Restore, commonParams *models.C
 		return fmt.Errorf("must specify directory-list list")
 	}
 
+	if restoreParams.WarmUp < 0 {
+		return fmt.Errorf("warm-up must be non-negative")
+	}
+
 	return nil
 }

@@ -109,6 +109,7 @@ func newS3Client(ctx context.Context, a *models.AwsS3) (*s3.Client, error) {
 		}
 
 		o.UsePathStyle = true
+		o.DisableLogOutputChecksumValidationSkipped = true
 	})
 
 	return s3Client, nil

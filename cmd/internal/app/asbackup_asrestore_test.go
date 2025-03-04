@@ -205,3 +205,47 @@ func createRecords(cfg *client.AerospikeConfig, cp *models.ClientPolicy, namespa
 
 	return nil
 }
+
+func TestGetWarmUp(t *testing.T) {
+	tests := []struct {
+		name            string
+		warmUp          int
+		maxAsyncBatches int
+		expected        int
+	}{
+		{
+			name:            "Default case with zero warmUp",
+			warmUp:          0,
+			maxAsyncBatches: 10,
+			expected:        11,
+		},
+		{
+			name:            "Custom warmUp value",
+			warmUp:          5,
+			maxAsyncBatches: 10,
+			expected:        5,
+		},
+		{
+			name:            "Zero maxAsyncBatches with zero warmUp",
+			warmUp:          0,
+			maxAsyncBatches: 0,
+			expected:        1,
+		},
+		{
+			name:            "Large maxAsyncBatches with zero warmUp",
+			warmUp:          0,
+			maxAsyncBatches: 1000,
+			expected:        1001,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getWarmUp(tt.warmUp, tt.maxAsyncBatches)
+			if result != tt.expected {
+				t.Errorf("getWarmUp(%d, %d) = %d, want %d",
+					tt.warmUp, tt.maxAsyncBatches, result, tt.expected)
+			}
+		})
+	}
+}

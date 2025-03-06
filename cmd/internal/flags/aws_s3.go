@@ -48,6 +48,9 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.Endpoint, "s3-endpoint-override",
 		"",
 		"An alternate url endpoint to send S3 API calls to.")
+	flagSet.StringVar(&f.Tier, "s3-tier",
+		"",
+		"tier")
 
 	return flagSet
 }

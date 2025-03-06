@@ -27,6 +27,8 @@ type AwsS3 struct {
 	Endpoint        string
 	AccessKeyID     string
 	SecretAccessKey string
+
+	Tier string
 }
 
 // LoadSecrets tries to load field values from secret agent.

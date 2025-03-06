@@ -49,7 +49,7 @@ func newReader(
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
-		return newS3Reader(ctx, params.AwsS3, opts)
+		return newS3Reader(ctx, params.AwsS3, opts, logger)
 	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
@@ -107,10 +107,15 @@ func newS3Reader(
 	ctx context.Context,
 	a *models.AwsS3,
 	opts []ioStorage.Opt,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
 		return nil, err
+	}
+
+	if a.Tier != "" {
+		opts = append(opts, ioStorage.WithTier(a.Tier), ioStorage.WithLogger(logger))
 	}
 
 	return s3.NewReader(ctx, client, a.BucketName, opts...)
@@ -140,8 +145,8 @@ func newAzureReader(
 		return nil, err
 	}
 
-	if a.RestoreTier != "" {
-		opts = append(opts, ioStorage.WithRestoreTier(a.RestoreTier), ioStorage.WithLogger(logger))
+	if a.Tier != "" {
+		opts = append(opts, ioStorage.WithTier(a.Tier), ioStorage.WithLogger(logger))
 	}
 
 	return blob.NewReader(ctx, client, a.ContainerName, opts...)

@@ -159,9 +159,8 @@ func WithStorageClass(class string) Opt {
 	}
 }
 
-// WithRestoreTier set restore tier for archived files.
-// If is set
-func WithRestoreTier(tier string) Opt {
+// WithTier set storage tier for archived files.
+func WithTier(tier string) Opt {
 	return func(r *Options) {
 		r.RestoreTier = tier
 	}

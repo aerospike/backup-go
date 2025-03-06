@@ -96,6 +96,14 @@ func NewWriter(
 		}
 	}
 
+	if w.StorageClass != "" {
+		// validation.
+		_, err := parseAccessTier(w.StorageClass)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
+		}
+	}
+
 	return w, nil
 }
 

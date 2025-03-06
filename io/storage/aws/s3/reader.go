@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	ioStorage "github.com/aerospike/backup-go/io/storage"
@@ -32,7 +33,17 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-const s3type = "s3"
+const (
+	s3type               = "s3"
+	restoreValueOngoing  = "ongoing-request=\"true\""
+	restoreValueFinished = "ongoing-request=\"false\""
+)
+
+const (
+	objStatusAvailable = iota
+	objStatusArchived
+	objStatusRestoring
+)
 
 // Reader represents S3 storage reader.
 type Reader struct {
@@ -109,6 +120,8 @@ func NewReader(
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
 		}
+
+		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
 			return nil, fmt.Errorf("failed to heat the storage: %w", err)
@@ -207,13 +220,13 @@ func (r *Reader) openObject(
 	errorsCh chan<- error,
 	skipNotFound bool,
 ) {
-	ok, err := r.checkObjectAvailability(ctx, path)
+	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to check object availability: %w", err)
 		return
 	}
 
-	if !ok {
+	if state != objStatusAvailable {
 		errorsCh <- fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path)
 		return
 	}
@@ -388,8 +401,6 @@ func (r *Reader) restoreObject(ctx context.Context, path string, tier types.Tier
 			GlacierJobParameters: &types.GlacierJobParameters{
 				Tier: tier,
 			},
-			// TODO: check which tier we should use? Here or in GlacierJobParameters.Tier?
-			Tier: types.TierExpedited,
 		},
 	})
 	if err != nil {
@@ -403,22 +414,48 @@ func (r *Reader) restoreObject(ctx context.Context, path string, tier types.Tier
 }
 
 // checkObjectAvailability check if an object is available for download.
-func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (bool, error) {
+func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int, error) {
 	headOutput, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(r.bucketName),
 		Key:    aws.String(path),
 	})
 	if err != nil {
-		return false, fmt.Errorf("failed to get head object: %w", err)
+		return objStatusArchived, fmt.Errorf("failed to get head object: %w", err)
 	}
 
-	if headOutput.StorageClass != types.StorageClassGlacier &&
-		headOutput.StorageClass != types.StorageClassDeepArchive &&
-		headOutput.StorageClass != types.StorageClassGlacierIr {
-		return true, nil
+	r.Logger.Debug("check object availability",
+		slog.Any("headOutput", headOutput),
+	)
+
+	if headOutput.Restore != nil {
+		var exp string
+		if headOutput.Expiration != nil {
+			exp = *headOutput.Expiration
+		}
+
+		r.Logger.Debug("head out restore",
+			slog.String("value", *headOutput.Restore),
+			slog.String("expiration", exp),
+		)
+
+		switch {
+		case strings.Contains(*headOutput.Restore, restoreValueOngoing):
+			return objStatusRestoring, nil
+		case strings.Contains(*headOutput.Restore, restoreValueFinished):
+			// Means that object is already restored and will be accessible until headOutput.Expiration.
+			return objStatusAvailable, nil
+		default:
+			return objStatusArchived, nil
+		}
 	}
 
-	return false, nil
+	if headOutput.StorageClass == types.StorageClassGlacier ||
+		headOutput.StorageClass == types.StorageClassDeepArchive ||
+		headOutput.StorageClass == types.StorageClassGlacierIr {
+		return objStatusArchived, nil
+	}
+
+	return objStatusAvailable, nil
 }
 
 // warmStorage warms all directories in r.PathList.
@@ -449,15 +486,22 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier types.Tier
 	}
 
 	for _, object := range objects {
-		ok, err := r.checkObjectAvailability(ctx, object)
+		state, err := r.checkObjectAvailability(ctx, object)
 		if err != nil {
 			return err
 		}
 
-		if !ok {
+		switch state {
+		case objStatusArchived:
 			if err = r.restoreObject(ctx, object, tier); err != nil {
 				return fmt.Errorf("failed to restore object: %w", err)
 			}
+
+			r.objectsToWarm[object] = struct{}{}
+		case objStatusRestoring:
+			// Add for checking status.
+			r.objectsToWarm[object] = struct{}{}
+		default: // ok.
 		}
 	}
 
@@ -491,17 +535,17 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			ok, err := r.checkObjectAvailability(ctx, path)
+			state, err := r.checkObjectAvailability(ctx, path)
 			if err != nil {
 				return err
 			}
 
 			r.Logger.Debug("object status",
 				slog.String("object", path),
-				slog.Bool("ok", ok),
+				slog.Int("state", state),
 			)
 
-			if !ok {
+			if state != objStatusAvailable {
 				continue
 			}
 

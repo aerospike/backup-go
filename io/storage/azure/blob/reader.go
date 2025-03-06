@@ -111,6 +111,8 @@ func NewReader(
 			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
 		}
 
+		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
+
 		if err := r.warmStorage(ctx, tier); err != nil {
 			return nil, fmt.Errorf("failed to heat the storage: %w", err)
 		}
@@ -376,13 +378,12 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 	}
 
 	if objProps.AccessTier != nil && *objProps.AccessTier == string(blob.AccessTierArchive) {
-
 		if objProps.ArchiveStatus != nil {
 			// restoring
 			return objStatusRestoring, nil
 		}
-		return objStatusArchived, nil
 
+		return objStatusArchived, nil
 	}
 
 	return objStatusAvailable, nil
@@ -431,8 +432,7 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 		case objStatusRestoring:
 			// Add for checking status.
 			r.objectsToWarm[object] = struct{}{}
-		default:
-			// ok.
+		default: // ok.
 		}
 	}
 
@@ -504,7 +504,7 @@ func parseAccessTier(tier string) (blob.AccessTier, error) {
 	}
 
 	if result == blob.AccessTierArchive {
-		return "", fmt.Errorf("archive tier is not alowed")
+		return "", fmt.Errorf("archive tier is not allowed")
 	}
 
 	return result, nil

@@ -127,6 +127,10 @@ func newS3Writer(
 		return nil, err
 	}
 
+	if a.Tier != "" {
+		opts = append(opts, ioStorage.WithStorageClass(a.Tier))
+	}
+
 	return s3.NewWriter(ctx, client, a.BucketName, opts...)
 }
 

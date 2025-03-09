@@ -159,30 +159,30 @@ func WithUploadConcurrency(v int) Opt {
 }
 
 // WithStorageClass sets the storage class.
-// Is used only for S3.
+// Is applicable only for S3.
 func WithStorageClass(class string) Opt {
 	return func(r *Options) {
 		r.StorageClass = class
 	}
 }
 
-// WithAccessTier set access tier for archived files.
-// If is set for reader, archived files will be restored to specified tier.
-// If is set for writer, files will be saved to specified tier.
+// WithAccessTier sets the access tier for archived files.
+// For readers, archived files are restored to the specified tier.
+// For writers, files are saved to the specified tier.
 func WithAccessTier(tier string) Opt {
 	return func(r *Options) {
 		r.AccessTier = tier
 	}
 }
 
-// WithLogger set logger.
+// WithLogger sets the logger.
 func WithLogger(logger *slog.Logger) Opt {
 	return func(r *Options) {
 		r.Logger = logger
 	}
 }
 
-// WithWarmPollDuration set poll duration for requesting restore status.
+// WithWarmPollDuration sets the restore status polling interval.
 func WithWarmPollDuration(duration time.Duration) Opt {
 	return func(r *Options) {
 		r.PollWarmDuration = duration

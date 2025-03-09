@@ -55,7 +55,7 @@ type Reader struct {
 	objectsToStream []string
 
 	// objectsToWarm is used to track the current number of restoring objects.
-	objectsToWarm map[string]struct{}
+	objectsToWarm []string
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -70,6 +70,9 @@ func NewReader(
 	r := &Reader{
 		client: client,
 	}
+
+	// Set default val.
+	r.PollWarmDuration = time.Minute
 
 	for _, opt := range opts {
 		opt(&r.Options)
@@ -101,23 +104,23 @@ func NewReader(
 		}
 	}
 
-	if r.RestoreTier != "" {
-		r.Logger.Debug("start warming storage")
+	if r.AccessTier != "" {
+		r.logDebug("start warming storage")
 
-		r.objectsToWarm = make(map[string]struct{})
+		r.objectsToWarm = make([]string, 0)
 
-		tier, err := parseAccessTier(r.RestoreTier)
+		tier, err := parseAccessTier(r.AccessTier)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
 		}
 
-		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
+		r.logDebug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
 			return nil, fmt.Errorf("failed to heat the storage: %w", err)
 		}
 
-		r.Logger.Debug("finish warming storage")
+		r.logDebug("finish warming storage")
 	}
 
 	return r, nil
@@ -346,7 +349,7 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 }
 
 func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.AccessTier) error {
-	r.Logger.Debug("starting rehydration", slog.String("path", path))
+	r.logDebug("starting rehydration", slog.String("path", path))
 	bClient := r.client.ServiceClient().
 		NewContainerClient(r.containerName).
 		NewBlobClient(path)
@@ -397,14 +400,14 @@ func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 		}
 	}
 
-	r.Logger.Info("objects to restore", slog.Int("number", len(r.objectsToWarm)))
+	r.logInfo("objects to restore", slog.Int("number", len(r.objectsToWarm)))
 
 	// Start polling objects.
 	if err := r.checkWarm(ctx); err != nil {
 		return fmt.Errorf("failed to server directory warming: %w", err)
 	}
 
-	r.Logger.Info("storage warm up finished")
+	r.logInfo("storage warm up finished")
 
 	return nil
 }
@@ -428,10 +431,10 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 				return fmt.Errorf("failed to restore object: %w", err)
 			}
 
-			r.objectsToWarm[object] = struct{}{}
+			r.objectsToWarm = append(r.objectsToWarm, path)
 		case objStatusRestoring:
 			// Add for checking status.
-			r.objectsToWarm[object] = struct{}{}
+			r.objectsToWarm = append(r.objectsToWarm, path)
 		default: // ok.
 		}
 	}
@@ -442,14 +445,14 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 // checkWarm wait until all objects from r.objectsToWarm will be restored.
 func (r *Reader) checkWarm(ctx context.Context) error {
 	if len(r.objectsToWarm) == 0 {
-		r.Logger.Info("no objects to poll")
+		r.logInfo("no objects to poll")
 
 		return nil
 	}
 
-	for path := range r.objectsToWarm {
-		if err := r.pollWarmDirStatus(ctx, path); err != nil {
-			return fmt.Errorf("failed to poll die status %s: %w", path, err)
+	for i := range r.objectsToWarm {
+		if err := r.pollWarmDirStatus(ctx, r.objectsToWarm[i]); err != nil {
+			return fmt.Errorf("failed to poll die status %s: %w", r.objectsToWarm[i], err)
 		}
 	}
 
@@ -458,11 +461,10 @@ func (r *Reader) checkWarm(ctx context.Context) error {
 
 // pollWarmDirStatus polls the current status of directory that we are warming.
 func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
-	// TODO: expose this duration?
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(r.PollWarmDuration)
 	defer ticker.Stop()
 
-	r.Logger.Info("start polling status", slog.String("object", path))
+	r.logInfo("start polling status", slog.String("object", path))
 
 	for {
 		select {
@@ -474,7 +476,7 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 				return err
 			}
 
-			r.Logger.Debug("object status",
+			r.logDebug("object status",
 				slog.String("object", path),
 				slog.Int("state", state),
 			)
@@ -485,6 +487,18 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 
 			return nil
 		}
+	}
+}
+
+func (r *Reader) logInfo(msg string, args ...any) {
+	if r.Logger != nil {
+		r.Logger.Info(msg, args...)
+	}
+}
+
+func (r *Reader) logDebug(msg string, args ...any) {
+	if r.Logger != nil {
+		r.Logger.Debug(msg, args...)
 	}
 }
 

@@ -14,7 +14,10 @@
 
 package storage
 
-import "log/slog"
+import (
+	"log/slog"
+	"time"
+)
 
 type validator interface {
 	Run(fileName string) error
@@ -53,11 +56,14 @@ type Options struct {
 	// Supported values depend on the cloud provider being used.
 	StorageClass string
 
-	// RestoreTier tier name to restore archived files to.
-	RestoreTier string
+	// The access tier that will be applied to back up files.
+	AccessTier string
 
 	// Logger contains logger.
 	Logger *slog.Logger
+
+	// How often restore status will be polled from cloud provider.
+	PollWarmDuration time.Duration
 }
 
 type Opt func(*Options)
@@ -152,17 +158,20 @@ func WithUploadConcurrency(v int) Opt {
 	}
 }
 
-// WithStorageClass sets the storage class for S3/Azure/etc.
+// WithStorageClass sets the storage class.
+// Is used only for S3.
 func WithStorageClass(class string) Opt {
 	return func(r *Options) {
 		r.StorageClass = class
 	}
 }
 
-// WithTier set storage tier for archived files.
-func WithTier(tier string) Opt {
+// WithAccessTier set access tier for archived files.
+// If is set for reader, archived files will be restored to specified tier.
+// If is set for writer, files will be saved to specified tier.
+func WithAccessTier(tier string) Opt {
 	return func(r *Options) {
-		r.RestoreTier = tier
+		r.AccessTier = tier
 	}
 }
 
@@ -170,5 +179,12 @@ func WithTier(tier string) Opt {
 func WithLogger(logger *slog.Logger) Opt {
 	return func(r *Options) {
 		r.Logger = logger
+	}
+}
+
+// WithWarmPollDuration set poll duration for requesting restore status.
+func WithWarmPollDuration(duration time.Duration) Opt {
+	return func(r *Options) {
+		r.PollWarmDuration = duration
 	}
 }

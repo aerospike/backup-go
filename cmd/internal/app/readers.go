@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path"
+	"time"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -114,8 +115,13 @@ func newS3Reader(
 		return nil, err
 	}
 
-	if a.Tier != "" {
-		opts = append(opts, ioStorage.WithTier(a.Tier), ioStorage.WithLogger(logger))
+	if a.AccessTier != "" {
+		opts = append(
+			opts,
+			ioStorage.WithAccessTier(a.AccessTier),
+			ioStorage.WithLogger(logger),
+			ioStorage.WithWarmPollDuration(time.Duration(a.RestorePollDuration)*time.Millisecond),
+		)
 	}
 
 	return s3.NewReader(ctx, client, a.BucketName, opts...)
@@ -145,8 +151,13 @@ func newAzureReader(
 		return nil, err
 	}
 
-	if a.Tier != "" {
-		opts = append(opts, ioStorage.WithTier(a.Tier), ioStorage.WithLogger(logger))
+	if a.AccessTier != "" {
+		opts = append(
+			opts,
+			ioStorage.WithAccessTier(a.AccessTier),
+			ioStorage.WithLogger(logger),
+			ioStorage.WithWarmPollDuration(time.Duration(a.RestorePollDuration)*time.Millisecond),
+		)
 	}
 
 	return blob.NewReader(ctx, client, a.ContainerName, opts...)

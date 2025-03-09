@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//nolint:dupl //This file is not a duplication of aws_s3.
 package models
 
 import (
@@ -32,7 +33,8 @@ type AzureBlob struct {
 	Endpoint      string
 	ContainerName string
 
-	Tier string
+	AccessTier          string
+	RestorePollDuration int64
 }
 
 // LoadSecrets tries to load field values from secret agent.
@@ -72,6 +74,11 @@ func (a *AzureBlob) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	a.ContainerName, err = backup.ParseSecret(cfg, a.ContainerName)
 	if err != nil {
 		return fmt.Errorf("failed to load container name from secret agent: %w", err)
+	}
+
+	a.AccessTier, err = backup.ParseSecret(cfg, a.AccessTier)
+	if err != nil {
+		return fmt.Errorf("failed to load access tier key from secret agent: %w", err)
 	}
 
 	return nil

@@ -20,11 +20,14 @@ import (
 )
 
 type AwsS3 struct {
+	operation int
 	models.AwsS3
 }
 
-func NewAwsS3() *AwsS3 {
-	return &AwsS3{}
+func NewAwsS3(operation int) *AwsS3 {
+	return &AwsS3{
+		operation: operation,
+	}
 }
 
 func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
@@ -48,9 +51,20 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.Endpoint, "s3-endpoint-override",
 		"",
 		"An alternate url endpoint to send S3 API calls to.")
-	flagSet.StringVar(&f.Tier, "s3-tier",
-		"",
-		"tier")
+
+	switch f.operation {
+	case OperationBackup:
+		flagSet.StringVar(&f.StorageClass, "s3-storage-class",
+			"",
+			"Apply storage class to backup files.")
+	case OperationRestore:
+		flagSet.StringVar(&f.AccessTier, "s3-tier",
+			"",
+			"If is set, tool will try to restore archived files with selected tier.")
+		flagSet.Int64Var(&f.RestorePollDuration, "s3-restore-poll-duration",
+			60000,
+			"Time in milliseconds, how often files status will be checked on restore from archive.")
+	}
 
 	return flagSet
 }

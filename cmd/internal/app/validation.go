@@ -126,6 +126,14 @@ func validateRestore(params *ASRestoreParams) error {
 		return err
 	}
 
+	if params.AwsS3.RestorePollDuration < 1 {
+		return fmt.Errorf("restore poll duration can't be less than 1")
+	}
+
+	if params.AzureBlob.RestorePollDuration < 1 {
+		return fmt.Errorf("rehydrate poll duration can't be less than 1")
+	}
+
 	return nil
 }
 

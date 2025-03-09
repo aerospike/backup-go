@@ -62,9 +62,9 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		flagsCompression:  flags.NewCompression(flags.OperationRestore),
 		flagsEncryption:   flags.NewEncryption(flags.OperationRestore),
 		flagsSecretAgent:  flags.NewSecretAgent(),
-		flagsAws:          flags.NewAwsS3(),
+		flagsAws:          flags.NewAwsS3(flags.OperationBackup),
 		flagsGcp:          flags.NewGcpStorage(),
-		flagsAzure:        flags.NewAzureBlob(),
+		flagsAzure:        flags.NewAzureBlob(flags.OperationBackup),
 	}
 
 	rootCmd := &cobra.Command{

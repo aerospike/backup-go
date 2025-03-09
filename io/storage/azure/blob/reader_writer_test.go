@@ -24,9 +24,11 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/aerospike/backup-go/internal/util"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -821,6 +823,55 @@ func (s *AzureSuite) TestIsSkippedByStartAfter() {
 			result := isSkippedByStartAfter(tt.startAfter, tt.fileName)
 			if result != tt.expected {
 				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestParseAccessTier(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		tier          string
+		expectedTier  blob.AccessTier
+		expectedError error
+	}{
+		{
+			name:          "valid hot tier",
+			tier:          string(blob.AccessTierHot),
+			expectedTier:  blob.AccessTierHot,
+			expectedError: nil,
+		},
+		{
+			name:          "valid cool tier",
+			tier:          string(blob.AccessTierCool),
+			expectedTier:  blob.AccessTierCool,
+			expectedError: nil,
+		},
+		{
+			name:          "invalid tier",
+			tier:          "invalid",
+			expectedTier:  "",
+			expectedError: fmt.Errorf("invalid access tier invalid"),
+		},
+		{
+			name:          "archive tier not allowed",
+			tier:          string(blob.AccessTierArchive),
+			expectedTier:  "",
+			expectedError: fmt.Errorf("archive tier is not allowed"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tier, err := parseAccessTier(tt.tier)
+
+			if tt.expectedError != nil {
+				assert.EqualError(t, err, tt.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedTier, tier)
 			}
 		})
 	}

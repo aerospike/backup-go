@@ -21,7 +21,7 @@ import (
 
 const (
 	descAccessTierBackup  = "Azure access tier is applied to created backup files."
-	descAccessTierRestore = "If is set, tool will try to rehydrate archived files with selected tier."
+	descAccessTierRestore = "If is set, tool will try to rehydrate archived files to the specified tier."
 )
 
 type AzureBlob struct {
@@ -75,7 +75,8 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	if f.operation == OperationRestore {
 		flagSet.Int64Var(&f.RestorePollDuration, "azure-rehydrate-poll-duration",
 			60000,
-			"Time in milliseconds, how often files status will be checked on rehydration from archive.")
+			"How often (in milliseconds) a backup client checks object status when restoring an archived object.",
+		)
 	}
 
 	return flagSet

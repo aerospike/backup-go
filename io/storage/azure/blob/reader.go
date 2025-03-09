@@ -72,7 +72,8 @@ func NewReader(
 	}
 
 	// Set default val.
-	r.PollWarmDuration = time.Minute
+	r.PollWarmDuration = ioStorage.DefaultPollWarmDuration
+	r.Logger = slog.New(slog.NewTextHandler(nil, nil))
 
 	for _, opt := range opts {
 		opt(&r.Options)
@@ -105,7 +106,7 @@ func NewReader(
 	}
 
 	if r.AccessTier != "" {
-		r.logDebug("start warming storage")
+		r.Logger.Debug("start warming storage")
 
 		r.objectsToWarm = make([]string, 0)
 
@@ -114,13 +115,13 @@ func NewReader(
 			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
 		}
 
-		r.logDebug("parsed tier", slog.String("value", string(tier)))
+		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
 			return nil, fmt.Errorf("failed to heat the storage: %w", err)
 		}
 
-		r.logDebug("finish warming storage")
+		r.Logger.Debug("finish warming storage")
 	}
 
 	return r, nil
@@ -349,7 +350,7 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 }
 
 func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.AccessTier) error {
-	r.logDebug("starting rehydration", slog.String("path", path))
+	r.Logger.Debug("starting rehydration", slog.String("path", path))
 	bClient := r.client.ServiceClient().
 		NewContainerClient(r.containerName).
 		NewBlobClient(path)
@@ -400,14 +401,14 @@ func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 		}
 	}
 
-	r.logInfo("objects to restore", slog.Int("number", len(r.objectsToWarm)))
+	r.Logger.Info("objects to restore", slog.Int("number", len(r.objectsToWarm)))
 
 	// Start polling objects.
 	if err := r.checkWarm(ctx); err != nil {
 		return fmt.Errorf("failed to server directory warming: %w", err)
 	}
 
-	r.logInfo("storage warm up finished")
+	r.Logger.Info("storage warm up finished")
 
 	return nil
 }
@@ -416,7 +417,7 @@ func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.AccessTier) error {
 	objects, err := r.ListObjects(ctx, path)
 	if err != nil {
-		return fmt.Errorf("failed to list objects: %w", err)
+		return err
 	}
 
 	for _, object := range objects {
@@ -445,14 +446,14 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 // checkWarm wait until all objects from r.objectsToWarm will be restored.
 func (r *Reader) checkWarm(ctx context.Context) error {
 	if len(r.objectsToWarm) == 0 {
-		r.logInfo("no objects to poll")
+		r.Logger.Info("no objects to poll")
 
 		return nil
 	}
 
 	for i := range r.objectsToWarm {
 		if err := r.pollWarmDirStatus(ctx, r.objectsToWarm[i]); err != nil {
-			return fmt.Errorf("failed to poll die status %s: %w", r.objectsToWarm[i], err)
+			return fmt.Errorf("failed to poll dir status %s: %w", r.objectsToWarm[i], err)
 		}
 	}
 
@@ -464,7 +465,7 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 	ticker := time.NewTicker(r.PollWarmDuration)
 	defer ticker.Stop()
 
-	r.logInfo("start polling status", slog.String("object", path))
+	r.Logger.Info("start polling status", slog.String("object", path))
 
 	for {
 		select {
@@ -476,7 +477,7 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 				return err
 			}
 
-			r.logDebug("object status",
+			r.Logger.Debug("object status",
 				slog.String("object", path),
 				slog.Int("state", state),
 			)
@@ -490,18 +491,6 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 	}
 }
 
-func (r *Reader) logInfo(msg string, args ...any) {
-	if r.Logger != nil {
-		r.Logger.Info(msg, args...)
-	}
-}
-
-func (r *Reader) logDebug(msg string, args ...any) {
-	if r.Logger != nil {
-		r.Logger.Debug(msg, args...)
-	}
-}
-
 func parseAccessTier(tier string) (blob.AccessTier, error) {
 	var result blob.AccessTier
 
@@ -510,18 +499,18 @@ func parseAccessTier(tier string) (blob.AccessTier, error) {
 	for _, possibleTier := range possible {
 		if tier == string(possibleTier) {
 			result = possibleTier
+			break
 		}
 	}
 
-	if result == "" {
-		return "", fmt.Errorf("invalid access tier %s", tier)
-	}
-
-	if result == blob.AccessTierArchive {
+	switch result {
+	case blob.AccessTierArchive:
 		return "", fmt.Errorf("archive tier is not allowed")
+	case "":
+		return "", fmt.Errorf("invalid access tier %s", tier)
+	default:
+		return result, nil
 	}
-
-	return result, nil
 }
 
 func isSkippedByStartAfter(startAfter, fileName string) bool {

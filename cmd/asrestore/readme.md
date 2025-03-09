@@ -197,8 +197,8 @@ Any AWS parameter can be retrieved from Secret Agent.
       --s3-access-key-id string        S3 access key id. If not set, profile auth info will be used.
       --s3-secret-access-key string    S3 secret access key. If not set, profile auth info will be used.
       --s3-endpoint-override string    An alternate url endpoint to send S3 API calls to.
-      --s3-tier string                 If is set, tool will try to restore archived files with selected tier.
-      --s3-restore-poll-duration int   Time in milliseconds, how often files status will be checked on restore from archive. (default 60000)
+      --s3-tier string                 If is set, tool will try to restore archived files to the specified tier.
+      --s3-restore-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
 
 GCP Flags:
 For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
@@ -223,8 +223,8 @@ Any Azure parameter can be retrieved from Secret Agent.
       --azure-client-secret string          Azure client secret for Azure Active Directory authorization.
       --azure-endpoint string               Azure endpoint.
       --azure-container-name string         Azure container Name.
-      --azure-access-tier string            If is set, tool will try to rehydrate archived files with selected tier.
-      --azure-rehydrate-poll-duration int   Time in milliseconds, how often files status will be checked on rehydration from archive. (default 60000)
+      --azure-access-tier string            If is set, tool will try to rehydrate archived files to the specified tier.
+      --azure-rehydrate-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
 ```
 
 ## Unsupported flags

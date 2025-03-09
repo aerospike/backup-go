@@ -79,7 +79,8 @@ func NewReader(
 	r := &Reader{}
 
 	// Set default val.
-	r.PollWarmDuration = time.Minute
+	r.PollWarmDuration = ioStorage.DefaultPollWarmDuration
+	r.Logger = slog.New(slog.NewTextHandler(nil, nil))
 
 	for _, opt := range opts {
 		opt(&r.Options)
@@ -115,7 +116,7 @@ func NewReader(
 	}
 
 	if r.AccessTier != "" {
-		r.logDebug("start warming storage")
+		r.Logger.Debug("start warming storage")
 
 		r.objectsToWarm = make([]string, 0)
 
@@ -124,13 +125,13 @@ func NewReader(
 			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
 		}
 
-		r.logDebug("parsed tier", slog.String("value", string(tier)))
+		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
 			return nil, fmt.Errorf("failed to heat the storage: %w", err)
 		}
 
-		r.logDebug("finish warming storage")
+		r.Logger.Debug("finish warming storage")
 	}
 
 	return r, nil
@@ -399,8 +400,7 @@ func (r *Reader) restoreObject(ctx context.Context, path string, tier types.Tier
 		Bucket: &r.bucketName,
 		Key:    &path,
 		RestoreRequest: &types.RestoreRequest{
-			Days:        &days,
-			Description: nil,
+			Days: &days,
 			GlacierJobParameters: &types.GlacierJobParameters{
 				Tier: tier,
 			},
@@ -423,7 +423,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 		return objStatusArchived, fmt.Errorf("failed to get head object: %w", err)
 	}
 
-	r.logDebug("check object availability",
+	r.Logger.Debug("check object availability",
 		slog.Any("headOutput", headOutput),
 	)
 
@@ -433,7 +433,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 			exp = *headOutput.Expiration
 		}
 
-		r.logDebug("head out restore",
+		r.Logger.Debug("head out restore",
 			slog.String("value", *headOutput.Restore),
 			slog.String("expiration", exp),
 		)
@@ -466,14 +466,14 @@ func (r *Reader) warmStorage(ctx context.Context, tier types.Tier) error {
 		}
 	}
 
-	r.logInfo("objects to restore", slog.Int("number", len(r.objectsToWarm)))
+	r.Logger.Info("objects to restore", slog.Int("number", len(r.objectsToWarm)))
 
 	// Start polling objects.
 	if err := r.checkWarm(ctx); err != nil {
 		return fmt.Errorf("failed to server directory warming: %w", err)
 	}
 
-	r.logInfo("storage warm up finished")
+	r.Logger.Info("storage warm up finished")
 
 	return nil
 }
@@ -482,7 +482,7 @@ func (r *Reader) warmStorage(ctx context.Context, tier types.Tier) error {
 func (r *Reader) warmDirectory(ctx context.Context, path string, tier types.Tier) error {
 	objects, err := r.ListObjects(ctx, path)
 	if err != nil {
-		return fmt.Errorf("failed to list objects: %w", err)
+		return err
 	}
 
 	for _, object := range objects {
@@ -516,7 +516,7 @@ func (r *Reader) checkWarm(ctx context.Context) error {
 
 	for i := range r.objectsToWarm {
 		if err := r.pollWarmDirStatus(ctx, r.objectsToWarm[i]); err != nil {
-			return fmt.Errorf("failed to poll die status %s: %w", r.objectsToWarm[i], err)
+			return fmt.Errorf("failed to poll dir status %s: %w", r.objectsToWarm[i], err)
 		}
 	}
 
@@ -528,7 +528,7 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 	ticker := time.NewTicker(r.PollWarmDuration)
 	defer ticker.Stop()
 
-	r.logInfo("start polling status", slog.String("object", path))
+	r.Logger.Info("start polling status", slog.String("object", path))
 
 	for {
 		select {
@@ -540,7 +540,7 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 				return err
 			}
 
-			r.logDebug("object status",
+			r.Logger.Debug("object status",
 				slog.String("object", path),
 				slog.Int("state", state),
 			)
@@ -554,18 +554,6 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 	}
 }
 
-func (r *Reader) logInfo(msg string, args ...any) {
-	if r.Logger != nil {
-		r.Logger.Info(msg, args...)
-	}
-}
-
-func (r *Reader) logDebug(msg string, args ...any) {
-	if r.Logger != nil {
-		r.Logger.Debug(msg, args...)
-	}
-}
-
 func parseAccessTier(tier string) (types.Tier, error) {
 	var result types.Tier
 	possible := result.Values()
@@ -573,6 +561,7 @@ func parseAccessTier(tier string) (types.Tier, error) {
 	for _, possibleTier := range possible {
 		if tier == string(possibleTier) {
 			result = possibleTier
+			break
 		}
 	}
 

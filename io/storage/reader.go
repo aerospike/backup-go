@@ -18,9 +18,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aerospike/backup-go/internal/util"
 )
+
+const DefaultPollWarmDuration = time.Minute
 
 // reader interface defines methods for listing and streaming objects
 type reader interface {

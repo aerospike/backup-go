@@ -80,7 +80,7 @@ func NewReader(
 
 	// Set default val.
 	r.PollWarmDuration = ioStorage.DefaultPollWarmDuration
-	r.Logger = slog.New(slog.NewTextHandler(nil, nil))
+	r.Logger = slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.Level(1024)}))
 
 	for _, opt := range opts {
 		opt(&r.Options)

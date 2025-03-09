@@ -23,6 +23,8 @@ import (
 	"github.com/aerospike/backup-go/internal/util"
 )
 
+// DefaultPollWarmDuration Poll warm duration is corresponding for delay between requests to cloud providers,
+// to get file status during files restore.
 const DefaultPollWarmDuration = time.Minute
 
 // reader interface defines methods for listing and streaming objects

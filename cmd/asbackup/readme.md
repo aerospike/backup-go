@@ -230,7 +230,7 @@ Any Azure parameter can be retrieved from Secret Agent.
 ```
 
 ## XDR backup. 
-For XDR backup client starts TCP server and accepts connections from the database.
+For XDR backup the client starts a TCP server and accepts connections from the database.
 
 ```
 Usage:

@@ -119,7 +119,7 @@ Consider the XDR backup, which uses the Aerospike XDR protocol, when transaction
 consistency is critical. While the scan-based backup may be faster, the XDR backup provides
 greater data integrity in these scenarios.
 
-For XDR backup client starts TCP server and accepts connections from the database.
+For XDR backup the client starts a TCP server and accepts connections from the database.
 
 XDR backups are stored in the new `asbx` binary format.
 

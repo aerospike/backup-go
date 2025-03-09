@@ -432,10 +432,10 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 				return fmt.Errorf("failed to restore object: %w", err)
 			}
 
-			r.objectsToWarm = append(r.objectsToWarm, path)
+			r.objectsToWarm = append(r.objectsToWarm, object)
 		case objStatusRestoring:
 			// Add for checking status.
-			r.objectsToWarm = append(r.objectsToWarm, path)
+			r.objectsToWarm = append(r.objectsToWarm, object)
 		default: // ok.
 		}
 	}

@@ -420,7 +420,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 		Key:    aws.String(path),
 	})
 	if err != nil {
-		return objStatusArchived, fmt.Errorf("failed to get head object: %w", err)
+		return objStatusArchived, fmt.Errorf("failed to get head object %s %s: %w", r.bucketName, path, err)
 	}
 
 	r.Logger.Debug("check object availability",
@@ -497,10 +497,10 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier types.Tier
 				return fmt.Errorf("failed to restore object: %w", err)
 			}
 			// Add to checking queue.
-			r.objectsToWarm = append(r.objectsToWarm, path)
+			r.objectsToWarm = append(r.objectsToWarm, object)
 		case objStatusRestoring:
 			// Add for checking status.
-			r.objectsToWarm = append(r.objectsToWarm, path)
+			r.objectsToWarm = append(r.objectsToWarm, object)
 		default: // ok.
 		}
 	}

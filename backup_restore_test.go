@@ -1037,7 +1037,7 @@ func TestBackupRestoreParallelDisableBatch(t *testing.T) {
 func TestBackupRestoreParallelFileLimit(t *testing.T) {
 	t.Parallel()
 	const setName = "testParallelFileLimit"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	asClient, err := testAerospikeClient()

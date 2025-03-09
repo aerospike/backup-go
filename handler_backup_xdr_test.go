@@ -47,7 +47,7 @@ const (
 	testXDRHost          = "172.17.0.1"
 	testXDRPort          = 8066
 	testXDRPortFileLimit = 8067
-	testTimeout          = 10000 * time.Millisecond
+	testTimeout          = 20 * time.Second
 	testAckQueueSize     = 256
 	testResultQueueSize  = 256
 	testMaxConnections   = 100

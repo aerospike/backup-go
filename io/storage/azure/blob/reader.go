@@ -29,6 +29,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const azureBlobType = "azure-blob"
@@ -492,6 +494,9 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 }
 
 func parseAccessTier(tier string) (blob.AccessTier, error) {
+	// To correct case: Tier
+	tier = cases.Title(language.English).String(tier)
+
 	var result blob.AccessTier
 
 	possible := blob.PossibleAccessTierValues()

@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 	"sync/atomic"
 
 	ioStorage "github.com/aerospike/backup-go/io/storage"
@@ -43,6 +44,8 @@ type Writer struct {
 	prefix string
 	// Sync for running backup to one file.
 	called atomic.Bool
+
+	storageClass types.StorageClass
 }
 
 // NewWriter creates a new writer for S3 storage directory/file writes.
@@ -101,6 +104,16 @@ func NewWriter(
 		}
 	}
 
+	if w.StorageClass != "" {
+		// validation.
+		class, err := parseStorageClass(w.StorageClass)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse storage class: %w", err)
+		}
+
+		w.storageClass = class
+	}
+
 	return w, nil
 }
 
@@ -120,7 +133,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:       &w.bucketName,
 		Key:          &fullPath,
-		StorageClass: types.StorageClass(w.StorageClass),
+		StorageClass: w.storageClass,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
@@ -302,4 +315,25 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func parseStorageClass(class string) (types.StorageClass, error) {
+	// To correct case: CLASS
+	class = strings.ToUpper(class)
+
+	var result types.StorageClass
+	possible := result.Values()
+
+	for _, possibleClass := range possible {
+		if class == string(possibleClass) {
+			result = possibleClass
+			break
+		}
+	}
+
+	if result == "" {
+		return "", fmt.Errorf("invalid storage class %s", class)
+	}
+
+	return result, nil
 }

@@ -31,6 +31,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -555,6 +557,9 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 }
 
 func parseAccessTier(tier string) (types.Tier, error) {
+	// To correct case: Tier
+	tier = cases.Title(language.English).String(tier)
+
 	var result types.Tier
 	possible := result.Values()
 

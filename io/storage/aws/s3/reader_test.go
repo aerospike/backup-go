@@ -30,6 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -452,4 +454,107 @@ func readAll(r io.ReadCloser) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func TestParseStorageClass(t *testing.T) {
+	tests := []struct {
+		name          string
+		class         string
+		expected      types.StorageClass
+		expectedError error
+	}{
+		{
+			name:          "standard storage class",
+			class:         "STANDARD",
+			expected:      types.StorageClassStandard,
+			expectedError: nil,
+		},
+		{
+			name:          "reduced redundancy storage class",
+			class:         "REDUCED_REDUNDANCY",
+			expected:      types.StorageClassReducedRedundancy,
+			expectedError: nil,
+		},
+		{
+			name:          "glacier storage class",
+			class:         "GLACIER",
+			expected:      types.StorageClassGlacier,
+			expectedError: nil,
+		},
+		{
+			name:          "standard ia storage class",
+			class:         "STANDARD_IA",
+			expected:      types.StorageClassStandardIa,
+			expectedError: nil,
+		},
+		{
+			name:          "onezone ia storage class",
+			class:         "ONEZONE_IA",
+			expected:      types.StorageClassOnezoneIa,
+			expectedError: nil,
+		},
+		{
+			name:          "intelligent tiering storage class",
+			class:         "INTELLIGENT_TIERING",
+			expected:      types.StorageClassIntelligentTiering,
+			expectedError: nil,
+		},
+		{
+			name:          "deep archive storage class",
+			class:         "DEEP_ARCHIVE",
+			expected:      types.StorageClassDeepArchive,
+			expectedError: nil,
+		},
+		{
+			name:          "outposts storage class",
+			class:         "OUTPOSTS",
+			expected:      types.StorageClassOutposts,
+			expectedError: nil,
+		},
+		{
+			name:          "glacier ir storage class",
+			class:         "GLACIER_IR",
+			expected:      types.StorageClassGlacierIr,
+			expectedError: nil,
+		},
+		{
+			name:          "lower case input",
+			class:         "standard",
+			expected:      types.StorageClassStandard,
+			expectedError: nil,
+		},
+		{
+			name:          "mixed case input",
+			class:         "StAnDaRd",
+			expected:      types.StorageClassStandard,
+			expectedError: nil,
+		},
+		{
+			name:          "empty input",
+			class:         "",
+			expected:      "",
+			expectedError: fmt.Errorf("invalid storage class "),
+		},
+		{
+			name:          "invalid storage class",
+			class:         "INVALID_STORAGE_CLASS",
+			expected:      "",
+			expectedError: fmt.Errorf("invalid storage class INVALID_STORAGE_CLASS"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := parseStorageClass(tc.class)
+
+			if tc.expectedError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedError.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tc.expected, result)
+		})
+	}
 }

@@ -852,7 +852,7 @@ func TestParseAccessTier(t *testing.T) {
 			name:          "invalid tier",
 			tier:          "invalid",
 			expectedTier:  "",
-			expectedError: fmt.Errorf("invalid access tier invalid"),
+			expectedError: fmt.Errorf("invalid access tier Invalid"),
 		},
 		{
 			name:          "archive tier not allowed",

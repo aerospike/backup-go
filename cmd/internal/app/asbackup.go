@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -147,6 +148,13 @@ func NewASBackup(
 		// Stop xdr.
 		if params.isStopXDR() {
 			logger.Info("stopping XDR on the database")
+
+			// Check before stopping if DC exists.
+			_, err = infoClient.GetStats(backupXDRConfig.DC, backupXDRConfig.Namespace)
+			if err != nil && strings.Contains(err.Error(), "DC not found") {
+				logger.Info("DC not found")
+				return nil, nil
+			}
 
 			if err = infoClient.StopXDR(backupXDRConfig.DC); err != nil {
 				return nil, fmt.Errorf("failed to stop XDR: %w", err)

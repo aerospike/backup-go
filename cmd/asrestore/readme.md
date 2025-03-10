@@ -198,6 +198,7 @@ Any AWS parameter can be retrieved from Secret Agent.
       --s3-secret-access-key string    S3 secret access key. If not set, profile auth info will be used.
       --s3-endpoint-override string    An alternate url endpoint to send S3 API calls to.
       --s3-tier string                 If is set, tool will try to restore archived files to the specified tier.
+                                       Tiers are: Standard, Bulk, Expedited.
       --s3-restore-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
 
 GCP Flags:
@@ -224,6 +225,7 @@ Any Azure parameter can be retrieved from Secret Agent.
       --azure-endpoint string               Azure endpoint.
       --azure-container-name string         Azure container Name.
       --azure-access-tier string            If is set, tool will try to rehydrate archived files to the specified tier.
+                                            Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
       --azure-rehydrate-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
 ```
 

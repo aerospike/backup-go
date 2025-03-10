@@ -70,7 +70,8 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 		"Azure container Name.")
 	flagSet.StringVar(&f.AccessTier, "azure-access-tier",
 		"",
-		descAccessTier)
+		descAccessTier+
+			"\nTiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.")
 
 	if f.operation == OperationRestore {
 		flagSet.Int64Var(&f.RestorePollDuration, "azure-rehydrate-poll-duration",

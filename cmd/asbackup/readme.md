@@ -201,7 +201,18 @@ Any AWS parameter can be retrieved from Secret Agent.
       --s3-access-key-id string       S3 access key id. If not set, profile auth info will be used.
       --s3-secret-access-key string   S3 secret access key. If not set, profile auth info will be used.
       --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
-      --s3-storage-class string       Apply storage class to backup files.
+      --s3-storage-class string       Apply storage class to backup files. Storage classes are:
+                                      STANDARD,
+                                      REDUCED_REDUNDANCY,
+                                      STANDARD_IA,
+                                      ONEZONE_IA,
+                                      INTELLIGENT_TIERING,
+                                      GLACIER,
+                                      DEEP_ARCHIVE,
+                                      OUTPOSTS,
+                                      GLACIER_IR,
+                                      SNOW,
+                                      EXPRESS_ONEZONE.
 
 GCP Flags:
 For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
@@ -227,6 +238,7 @@ Any Azure parameter can be retrieved from Secret Agent.
       --azure-endpoint string         Azure endpoint.
       --azure-container-name string   Azure container Name.
       --azure-access-tier string      Azure access tier is applied to created backup files.
+                                      Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
 ```
 
 ## XDR backup. 

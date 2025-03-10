@@ -56,11 +56,23 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	case OperationBackup:
 		flagSet.StringVar(&f.StorageClass, "s3-storage-class",
 			"",
-			"Apply storage class to backup files.")
+			"Apply storage class to backup files. Storage classes are:\n"+
+				"STANDARD,\n"+
+				"REDUCED_REDUNDANCY,\n"+
+				"STANDARD_IA,\n"+
+				"ONEZONE_IA,\n"+
+				"INTELLIGENT_TIERING,\n"+
+				"GLACIER,\n"+
+				"DEEP_ARCHIVE,\n"+
+				"OUTPOSTS,\n"+
+				"GLACIER_IR,\n"+
+				"SNOW,\n"+
+				"EXPRESS_ONEZONE.")
 	case OperationRestore:
 		flagSet.StringVar(&f.AccessTier, "s3-tier",
 			"",
-			"If is set, tool will try to restore archived files to the specified tier.")
+			"If is set, tool will try to restore archived files to the specified tier.\n"+
+				"Tiers are: Standard, Bulk, Expedited.")
 		flagSet.Int64Var(&f.RestorePollDuration, "s3-restore-poll-duration",
 			60000,
 			"How often (in milliseconds) a backup client checks object status when restoring an archived object.",

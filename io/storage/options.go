@@ -14,6 +14,11 @@
 
 package storage
 
+import (
+	"log/slog"
+	"time"
+)
+
 type validator interface {
 	Run(fileName string) error
 }
@@ -50,6 +55,15 @@ type Options struct {
 	// StorageClass specifies the type of storage class.
 	// Supported values depend on the cloud provider being used.
 	StorageClass string
+
+	// The access tier that will be applied to back up files.
+	AccessTier string
+
+	// Logger contains logger.
+	Logger *slog.Logger
+
+	// How often restore status will be polled from cloud provider.
+	PollWarmDuration time.Duration
 }
 
 type Opt func(*Options)
@@ -144,9 +158,33 @@ func WithUploadConcurrency(v int) Opt {
 	}
 }
 
-// WithStorageClass sets the storage class for S3/Azure/etc.
+// WithStorageClass sets the storage class.
+// Is applicable only for S3.
 func WithStorageClass(class string) Opt {
 	return func(r *Options) {
 		r.StorageClass = class
+	}
+}
+
+// WithAccessTier sets the access tier for archived files.
+// For readers, archived files are restored to the specified tier.
+// For writers, files are saved to the specified tier.
+func WithAccessTier(tier string) Opt {
+	return func(r *Options) {
+		r.AccessTier = tier
+	}
+}
+
+// WithLogger sets the logger.
+func WithLogger(logger *slog.Logger) Opt {
+	return func(r *Options) {
+		r.Logger = logger
+	}
+}
+
+// WithWarmPollDuration sets the restore status polling interval.
+func WithWarmPollDuration(duration time.Duration) Opt {
+	return func(r *Options) {
+		r.PollWarmDuration = duration
 	}
 }

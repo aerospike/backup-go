@@ -112,7 +112,7 @@ func NewASBackup(
 		}
 	}
 
-	reader, err := initializeBackupReader(ctx, params, secretAgent)
+	reader, err := initializeBackupReader(ctx, params, secretAgent, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,10 @@ func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *bac
 	return backupConfig, backupXDRConfig, nil
 }
 
-func initializeBackupReader(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
+func initializeBackupReader(
+	ctx context.Context, params *ASBackupParams,
+	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	if params.BackupParams == nil {
 		return nil, nil
@@ -232,7 +235,7 @@ func initializeBackupReader(ctx context.Context, params *ASBackupParams, sa *bac
 		CommonParams: &models.Common{},
 	}
 
-	reader, err := newReader(ctx, restoreParams, sa, false)
+	reader, err := newReader(ctx, restoreParams, sa, false, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}

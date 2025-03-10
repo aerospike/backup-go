@@ -22,7 +22,7 @@ import (
 
 func TestAzureBlob_NewFlagSet(t *testing.T) {
 	t.Parallel()
-	azureBlob := NewAzureBlob()
+	azureBlob := NewAzureBlob(OperationRestore)
 
 	flagSet := azureBlob.NewFlagSet()
 
@@ -34,6 +34,8 @@ func TestAzureBlob_NewFlagSet(t *testing.T) {
 		"--azure-client-secret", "client-secret",
 		"--azure-endpoint", "https://custom-endpoint.com",
 		"--azure-container-name", "my-container",
+		"--azure-access-tier", "Standard",
+		"--azure-rehydrate-poll-duration", "1000",
 	}
 
 	err := flagSet.Parse(args)
@@ -48,11 +50,13 @@ func TestAzureBlob_NewFlagSet(t *testing.T) {
 	assert.Equal(t, "client-secret", result.ClientSecret, "The azure-client-secret flag should be parsed correctly")
 	assert.Equal(t, "https://custom-endpoint.com", result.Endpoint, "The azure-endpoint flag should be parsed correctly")
 	assert.Equal(t, "my-container", result.ContainerName, "The azure-container-name flag should be parsed correctly")
+	assert.Equal(t, "Standard", result.AccessTier, "The azure-access-tier flag should be parsed correctly")
+	assert.Equal(t, int64(1000), result.RestorePollDuration, "The azure-rehydrate-poll-duration flag should be parsed correctly")
 }
 
 func TestAzureBlob_NewFlagSet_DefaultValues(t *testing.T) {
 	t.Parallel()
-	azureBlob := NewAzureBlob()
+	azureBlob := NewAzureBlob(OperationRestore)
 
 	flagSet := azureBlob.NewFlagSet()
 
@@ -68,4 +72,6 @@ func TestAzureBlob_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.ClientSecret, "The default value for azure-client-secret should be an empty string")
 	assert.Equal(t, "", result.Endpoint, "The default value for azure-endpoint should be an empty string")
 	assert.Equal(t, "", result.ContainerName, "The default value for azure-container-name should be an empty string")
+	assert.Equal(t, "", result.AccessTier, "The default value for azure-access-tier should be an empty string")
+	assert.Equal(t, int64(60000), result.RestorePollDuration, "The default value for azure-rehydrate-poll-duration should be an empty string")
 }

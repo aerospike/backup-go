@@ -44,6 +44,8 @@ type Writer struct {
 	prefix string
 	// Sync for running backup to one file.
 	called atomic.Bool
+
+	tier *blob.AccessTier
 }
 
 func NewWriter(
@@ -96,6 +98,16 @@ func NewWriter(
 		}
 	}
 
+	if w.AccessTier != "" {
+		// validation.
+		tier, err := parseAccessTier(w.AccessTier)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse access tier: %w", err)
+		}
+
+		w.tier = &tier
+	}
+
 	return w, nil
 }
 
@@ -113,17 +125,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
 
-	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, stringToAccessTier(w.StorageClass)), nil
-}
-
-func stringToAccessTier(accessTier string) *blob.AccessTier {
-	if accessTier == "" {
-		return nil
-	}
-
-	t := blob.AccessTier(accessTier)
-
-	return &t
+	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier), nil
 }
 
 var _ io.WriteCloser = (*blobWriter)(nil)

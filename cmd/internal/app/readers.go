@@ -17,7 +17,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path"
+	"time"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -35,6 +37,7 @@ func newReader(
 	params *ASRestoreParams,
 	sa *backup.SecretAgentConfig,
 	isXdr bool,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	directory, inputFile := params.CommonParams.Directory, params.RestoreParams.InputFile
 	parentDirectory, directoryList := params.RestoreParams.ParentDirectory, params.RestoreParams.DirectoryList
@@ -47,7 +50,7 @@ func newReader(
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
-		return newS3Reader(ctx, params.AwsS3, opts)
+		return newS3Reader(ctx, params.AwsS3, opts, logger)
 	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
@@ -59,7 +62,7 @@ func newReader(
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
-		return newAzureReader(ctx, params.AzureBlob, opts)
+		return newAzureReader(ctx, params.AzureBlob, opts, logger)
 	default:
 		return newLocalReader(ctx, opts)
 	}
@@ -105,10 +108,20 @@ func newS3Reader(
 	ctx context.Context,
 	a *models.AwsS3,
 	opts []ioStorage.Opt,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
 		return nil, err
+	}
+
+	if a.AccessTier != "" {
+		opts = append(
+			opts,
+			ioStorage.WithAccessTier(a.AccessTier),
+			ioStorage.WithLogger(logger),
+			ioStorage.WithWarmPollDuration(time.Duration(a.RestorePollDuration)*time.Millisecond),
+		)
 	}
 
 	return s3.NewReader(ctx, client, a.BucketName, opts...)
@@ -131,10 +144,20 @@ func newAzureReader(
 	ctx context.Context,
 	a *models.AzureBlob,
 	opts []ioStorage.Opt,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	client, err := newAzureClient(a)
 	if err != nil {
 		return nil, err
+	}
+
+	if a.AccessTier != "" {
+		opts = append(
+			opts,
+			ioStorage.WithAccessTier(a.AccessTier),
+			ioStorage.WithLogger(logger),
+			ioStorage.WithWarmPollDuration(time.Duration(a.RestorePollDuration)*time.Millisecond),
+		)
 	}
 
 	return blob.NewReader(ctx, client, a.ContainerName, opts...)

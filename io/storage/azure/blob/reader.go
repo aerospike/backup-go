@@ -18,17 +18,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
 )
 
 const azureBlobType = "azure-blob"
+
+const (
+	objStatusAvailable = iota
+	objStatusArchived
+	objStatusRestoring
+)
 
 // Reader represents GCP storage reader.
 type Reader struct {
@@ -44,6 +53,9 @@ type Reader struct {
 	// If objectsToStream is not set, we iterate through objects in storage and load them.
 	// If set, we load objects from this slice directly.
 	objectsToStream []string
+
+	// objectsToWarm is used to track the current number of restoring objects.
+	objectsToWarm []string
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -58,6 +70,10 @@ func NewReader(
 	r := &Reader{
 		client: client,
 	}
+
+	// Set default val.
+	r.PollWarmDuration = ioStorage.DefaultPollWarmDuration
+	r.Logger = slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.Level(1024)}))
 
 	for _, opt := range opts {
 		opt(&r.Options)
@@ -87,6 +103,25 @@ func NewReader(
 				return nil, fmt.Errorf("failed to pre sort: %w", err)
 			}
 		}
+	}
+
+	if r.AccessTier != "" {
+		r.Logger.Debug("start warming storage")
+
+		r.objectsToWarm = make([]string, 0)
+
+		tier, err := parseAccessTier(r.AccessTier)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
+		}
+
+		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
+
+		if err := r.warmStorage(ctx, tier); err != nil {
+			return nil, fmt.Errorf("failed to heat the storage: %w", err)
+		}
+
+		r.Logger.Debug("finish warming storage")
 	}
 
 	return r, nil
@@ -168,6 +203,17 @@ func (r *Reader) openObject(
 	errorsCh chan<- error,
 	skipNotFound bool,
 ) {
+	state, err := r.checkObjectAvailability(ctx, path)
+	if err != nil {
+		errorsCh <- fmt.Errorf("failed to check object availability: %w", err)
+		return
+	}
+
+	if state != objStatusAvailable {
+		errorsCh <- fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path)
+		return
+	}
+
 	resp, err := r.client.DownloadStream(ctx, r.containerName, path, nil)
 	if err != nil {
 		// Skip 404 not found error.
@@ -300,6 +346,170 @@ func (r *Reader) SetObjectsToStream(list []string) {
 func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
 	for i := range r.objectsToStream {
 		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
+	}
+}
+
+func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.AccessTier) error {
+	r.Logger.Debug("starting rehydration", slog.String("path", path))
+	bClient := r.client.ServiceClient().
+		NewContainerClient(r.containerName).
+		NewBlobClient(path)
+
+	priority := blob.RehydratePriorityHigh
+
+	_, err := bClient.SetTier(
+		ctx,
+		tier,
+		&blob.SetTierOptions{
+			RehydratePriority: &priority,
+		})
+	if err != nil {
+		return fmt.Errorf("starting rehydration: %w", err)
+	}
+
+	return nil
+}
+
+// checkObjectAvailability check if an object is available for download.
+func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int, error) {
+	bClient := r.client.ServiceClient().
+		NewContainerClient(r.containerName).
+		NewBlobClient(path)
+
+	objProps, err := bClient.GetProperties(ctx, nil)
+	if err != nil {
+		return objStatusArchived, fmt.Errorf("failed to get container properties: %w", err)
+	}
+
+	if objProps.AccessTier != nil && *objProps.AccessTier == string(blob.AccessTierArchive) {
+		if objProps.ArchiveStatus != nil {
+			// restoring
+			return objStatusRestoring, nil
+		}
+
+		return objStatusArchived, nil
+	}
+
+	return objStatusAvailable, nil
+}
+
+// warmStorage warms all directories in r.PathList.
+func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
+	for _, path := range r.PathList {
+		if err := r.warmDirectory(ctx, path, tier); err != nil {
+			return fmt.Errorf("failed to warm directory %s: %w", path, err)
+		}
+	}
+
+	r.Logger.Info("objects to restore", slog.Int("number", len(r.objectsToWarm)))
+
+	// Start polling objects.
+	if err := r.checkWarm(ctx); err != nil {
+		return fmt.Errorf("failed to server directory warming: %w", err)
+	}
+
+	r.Logger.Info("storage warm up finished")
+
+	return nil
+}
+
+// warmDirectory warms files in directory, and if they need to be restored, restore them.
+func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.AccessTier) error {
+	objects, err := r.ListObjects(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	for _, object := range objects {
+		state, err := r.checkObjectAvailability(ctx, object)
+		if err != nil {
+			return err
+		}
+
+		switch state {
+		case objStatusArchived:
+			if err = r.rehydrateObject(ctx, object, tier); err != nil {
+				return fmt.Errorf("failed to restore object: %w", err)
+			}
+
+			r.objectsToWarm = append(r.objectsToWarm, object)
+		case objStatusRestoring:
+			// Add for checking status.
+			r.objectsToWarm = append(r.objectsToWarm, object)
+		default: // ok.
+		}
+	}
+
+	return nil
+}
+
+// checkWarm wait until all objects from r.objectsToWarm will be restored.
+func (r *Reader) checkWarm(ctx context.Context) error {
+	if len(r.objectsToWarm) == 0 {
+		r.Logger.Info("no objects to poll")
+
+		return nil
+	}
+
+	for i := range r.objectsToWarm {
+		if err := r.pollWarmDirStatus(ctx, r.objectsToWarm[i]); err != nil {
+			return fmt.Errorf("failed to poll dir status %s: %w", r.objectsToWarm[i], err)
+		}
+	}
+
+	return nil
+}
+
+// pollWarmDirStatus polls the current status of directory that we are warming.
+func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
+	ticker := time.NewTicker(r.PollWarmDuration)
+	defer ticker.Stop()
+
+	r.Logger.Info("start polling status", slog.String("object", path))
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			state, err := r.checkObjectAvailability(ctx, path)
+			if err != nil {
+				return err
+			}
+
+			r.Logger.Debug("object status",
+				slog.String("object", path),
+				slog.Int("state", state),
+			)
+
+			if state != objStatusAvailable {
+				continue
+			}
+
+			return nil
+		}
+	}
+}
+
+func parseAccessTier(tier string) (blob.AccessTier, error) {
+	var result blob.AccessTier
+
+	possible := blob.PossibleAccessTierValues()
+
+	for _, possibleTier := range possible {
+		if tier == string(possibleTier) {
+			result = possibleTier
+			break
+		}
+	}
+
+	switch result {
+	case blob.AccessTierArchive:
+		return "", fmt.Errorf("archive tier is not allowed")
+	case "":
+		return "", fmt.Errorf("invalid access tier %s", tier)
+	default:
+		return result, nil
 	}
 }
 

@@ -115,9 +115,13 @@ func Test_BackupRestore(t *testing.T) {
 		},
 		Encryption:  &models.Encryption{},
 		SecretAgent: &models.SecretAgent{},
-		AwsS3:       &models.AwsS3{},
-		GcpStorage:  &models.GcpStorage{},
-		AzureBlob:   &models.AzureBlob{},
+		AwsS3: &models.AwsS3{
+			RestorePollDuration: 1000,
+		},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob: &models.AzureBlob{
+			RestorePollDuration: 1000,
+		},
 	}
 
 	asr, err := NewASRestore(ctx, asrParams, logger)

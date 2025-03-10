@@ -19,16 +19,33 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	descAccessTierBackup  = "Azure access tier is applied to created backup files."
+	descAccessTierRestore = "If is set, tool will try to rehydrate archived files to the specified tier."
+)
+
 type AzureBlob struct {
+	operation int
 	models.AzureBlob
 }
 
-func NewAzureBlob() *AzureBlob {
-	return &AzureBlob{}
+func NewAzureBlob(operation int) *AzureBlob {
+	return &AzureBlob{
+		operation: operation,
+	}
 }
 
 func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
+
+	var descAccessTier string
+
+	switch f.operation {
+	case OperationBackup:
+		descAccessTier = descAccessTierBackup
+	case OperationRestore:
+		descAccessTier = descAccessTierRestore
+	}
 
 	flagSet.StringVar(&f.AccountName, "azure-account-name",
 		"",
@@ -51,6 +68,17 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.ContainerName, "azure-container-name",
 		"",
 		"Azure container Name.")
+	flagSet.StringVar(&f.AccessTier, "azure-access-tier",
+		"",
+		descAccessTier+
+			"\nTiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.")
+
+	if f.operation == OperationRestore {
+		flagSet.Int64Var(&f.RestorePollDuration, "azure-rehydrate-poll-duration",
+			60000,
+			"How often (in milliseconds) a backup client checks object status when restoring an archived object.",
+		)
+	}
 
 	return flagSet
 }

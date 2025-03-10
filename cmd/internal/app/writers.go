@@ -127,6 +127,10 @@ func newS3Writer(
 		return nil, err
 	}
 
+	if a.StorageClass != "" {
+		opts = append(opts, ioStorage.WithStorageClass(a.StorageClass))
+	}
+
 	return s3.NewWriter(ctx, client, a.BucketName, opts...)
 }
 
@@ -151,6 +155,10 @@ func newAzureWriter(
 	client, err := newAzureClient(a)
 	if err != nil {
 		return nil, err
+	}
+
+	if a.AccessTier != "" {
+		opts = append(opts, ioStorage.WithAccessTier(a.AccessTier))
 	}
 
 	return blob.NewWriter(ctx, client, a.ContainerName, opts...)

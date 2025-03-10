@@ -195,12 +195,15 @@ For S3 storage bucket name is mandatory, and is set with --s3-bucket-name flag.
 So --directory path will only contain folder name.
 --s3-endpoint-override is used in case you want to use minio, instead of AWS.
 Any AWS parameter can be retrieved from Secret Agent.
-      --s3-bucket-name string         Existing S3 bucket name
-      --s3-region string              The S3 region that the bucket(s) exist in.
-      --s3-profile string             The S3 profile to use for credentials.
-      --s3-access-key-id string       S3 access key id. If not set, profile auth info will be used.
-      --s3-secret-access-key string   S3 secret access key. If not set, profile auth info will be used.
-      --s3-endpoint-override string   An alternate url endpoint to send S3 API calls to.
+      --s3-bucket-name string          Existing S3 bucket name
+      --s3-region string               The S3 region that the bucket(s) exist in.
+      --s3-profile string              The S3 profile to use for credentials.
+      --s3-access-key-id string        S3 access key id. If not set, profile auth info will be used.
+      --s3-secret-access-key string    S3 secret access key. If not set, profile auth info will be used.
+      --s3-endpoint-override string    An alternate url endpoint to send S3 API calls to.
+      --s3-tier string                 If is set, tool will try to restore archived files to the specified tier.
+                                       Tiers are: Standard, Bulk, Expedited.
+      --s3-restore-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
 
 GCP Flags:
 For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
@@ -218,13 +221,16 @@ Flag --azure-endpoint is optional, and is used for tests with Azurit or any othe
 For authentication you can use --azure-account-name and --azure-account-key, or 
 --azure-tenant-id, --azure-client-id and azure-client-secret.
 Any Azure parameter can be retrieved from Secret Agent.
-      --azure-account-name string     Azure account name for account name, key authorization.
-      --azure-account-key string      Azure account key for account name, key authorization.
-      --azure-tenant-id string        Azure tenant ID for Azure Active Directory authorization.
-      --azure-client-id string        Azure client ID for Azure Active Directory authorization.
-      --azure-client-secret string    Azure client secret for Azure Active Directory authorization.
-      --azure-endpoint string         Azure endpoint.
-      --azure-container-name string   Azure container Name.
+      --azure-account-name string           Azure account name for account name, key authorization.
+      --azure-account-key string            Azure account key for account name, key authorization.
+      --azure-tenant-id string              Azure tenant ID for Azure Active Directory authorization.
+      --azure-client-id string              Azure client ID for Azure Active Directory authorization.
+      --azure-client-secret string          Azure client secret for Azure Active Directory authorization.
+      --azure-endpoint string               Azure endpoint.
+      --azure-container-name string         Azure container Name.
+      --azure-access-tier string            If is set, tool will try to rehydrate archived files to the specified tier.
+                                            Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
+      --azure-rehydrate-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
 ```
 
 ## Unsupported flags

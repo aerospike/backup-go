@@ -18,9 +18,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aerospike/backup-go/internal/util"
 )
+
+// DefaultPollWarmDuration is the interval between requests to cloud providers,
+// to get file status during files restore.
+const DefaultPollWarmDuration = time.Minute
 
 // reader interface defines methods for listing and streaming objects
 type reader interface {

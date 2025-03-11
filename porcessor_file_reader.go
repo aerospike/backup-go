@@ -65,14 +65,14 @@ func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline
 	// Start lazy file reading.
 	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh)
 
-	fn := func(r io.ReadCloser) Decoder[T] {
+	fn := func(fileNumber uint64, r io.ReadCloser) Decoder[T] {
 		reader, err := fr.wrapReader(r)
 		if err != nil {
 			fr.errorsCh <- err
 			return nil
 		}
 
-		d, err := NewDecoder[T](fr.config.EncoderType, reader)
+		d, err := NewDecoder[T](fr.config.EncoderType, fileNumber, reader)
 		if err != nil {
 			fr.errorsCh <- err
 			return nil

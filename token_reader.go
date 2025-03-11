@@ -16,8 +16,11 @@ package backup
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
+	"strings"
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -29,7 +32,7 @@ type tokenReader[T models.TokenConstraint] struct {
 	readersCh     <-chan models.File
 	decoder       Decoder[T]
 	logger        *slog.Logger
-	newDecoderFn  func(io.ReadCloser) Decoder[T]
+	newDecoderFn  func(uint64, io.ReadCloser) Decoder[T]
 	currentReader io.Closer
 }
 
@@ -37,7 +40,7 @@ type tokenReader[T models.TokenConstraint] struct {
 func newTokenReader[T models.TokenConstraint](
 	readersCh <-chan models.File,
 	logger *slog.Logger,
-	newDecoderFn func(io.ReadCloser) Decoder[T],
+	newDecoderFn func(uint64, io.ReadCloser) Decoder[T],
 ) *tokenReader[T] {
 	return &tokenReader[T]{
 		readersCh:    readersCh,
@@ -75,9 +78,15 @@ func (tr *tokenReader[T]) Read() (T, error) {
 				return nil, io.EOF
 			}
 
+			num, err := getFileNumber(file.Name)
+			if err != nil {
+				return nil, err
+			}
+
 			// Assign the new reader
 			tr.currentReader = file.Reader
-			tr.decoder = tr.newDecoderFn(file.Reader)
+
+			tr.decoder = tr.newDecoderFn(num, file.Reader)
 		}
 	}
 }
@@ -101,4 +110,20 @@ func newTokenWorker[T models.TokenConstraint](processor pipeline.DataProcessor[T
 	return []pipeline.Worker[T]{
 		pipeline.NewProcessorWorker[T](processor),
 	}
+}
+
+func getFileNumber(filename string) (uint64, error) {
+	name := strings.TrimSuffix(filename, ".asbx")
+	parts := strings.SplitN(name, "_", 3)
+
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("invalid file name %q", filename)
+	}
+
+	num, err := strconv.ParseUint(parts[2], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse file number %q: %w", filename, err)
+	}
+
+	return num, nil
 }

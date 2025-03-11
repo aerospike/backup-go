@@ -66,14 +66,13 @@ type Decoder[T models.TokenConstraint] interface {
 }
 
 // NewDecoder returns a new Decoder according to `EncoderType`.
-func NewDecoder[T models.TokenConstraint](eType EncoderType, src io.Reader) (Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](eType EncoderType, fileNumber uint64, src io.Reader) (Decoder[T], error) {
 	switch eType {
 	// As at the moment only one `ASB` Decoder supported, we use such construction.
 	case EncoderTypeASB:
 		return asb.NewDecoder[T](src)
 	case EncoderTypeASBX:
-		// TODO: pass file number.
-		return asbx.NewDecoder[T](src)
+		return asbx.NewDecoder[T](fileNumber, src)
 	default:
 		return asb.NewDecoder[T](src)
 	}

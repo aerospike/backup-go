@@ -185,11 +185,11 @@ func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
 	encoder := NewEncoder[*models.Token]("test", false)
-	firstHeader := encoder.GetHeader()
+	firstHeader := encoder.GetHeader(0)
 	suite.Assert().Equal(expected, string(firstHeader))
 
 	secondExpected := "Version 3.1\n# namespace test\n"
-	secondHeader := encoder.GetHeader()
+	secondHeader := encoder.GetHeader(0)
 	suite.Assert().Equal(secondExpected, string(secondHeader))
 }
 

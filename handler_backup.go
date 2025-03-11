@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
@@ -163,7 +164,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	}
 
 	// Calculate headers size.
-	header := bh.encoder.GetHeader()
+	header := bh.encoder.GetHeader(0)
 	headerSize := len(header) * bh.config.ParallelWrite
 
 	// Calculate records size.
@@ -366,7 +367,12 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string) (io.
 		return nil, err
 	}
 
-	_, err = zippedWriter.Write(bh.encoder.GetHeader())
+	num, err := util.GetFileNumber(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = zippedWriter.Write(bh.encoder.GetHeader(num))
 	if err != nil {
 		return nil, err
 	}

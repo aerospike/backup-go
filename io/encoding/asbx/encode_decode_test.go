@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 )
@@ -65,7 +66,10 @@ func TestEncoder_Decoder(t *testing.T) {
 	fileName := enc.GenerateFilename("", "")
 	require.Equal(t, testFileName, fileName)
 
-	h := enc.GetHeader()
+	num, err := util.GetFileNumber(fileName)
+	require.NoError(t, err)
+
+	h := enc.GetHeader(num)
 	content = append(content, h...)
 
 	et, err := enc.EncodeToken(token)
@@ -102,7 +106,10 @@ func TestDecoder_ErrorToken(t *testing.T) {
 	require.Equal(t, testFileName, fileName)
 
 	content := make([]byte, 0)
-	h := enc.GetHeader()
+	num, err := util.GetFileNumber(fileName)
+	require.NoError(t, err)
+
+	h := enc.GetHeader(num)
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)
@@ -117,7 +124,7 @@ func TestDecoder_ErrorFileNumber(t *testing.T) {
 	enc := NewEncoder[*models.ASBXToken](testNamespace)
 
 	content := make([]byte, 0)
-	h := enc.GetHeader()
+	h := enc.GetHeader(0)
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)

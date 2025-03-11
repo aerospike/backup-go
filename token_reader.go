@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 )
@@ -78,9 +79,16 @@ func (tr *tokenReader[T]) Read() (T, error) {
 				return nil, io.EOF
 			}
 
-			num, err := getFileNumber(file.Name)
-			if err != nil {
-				return nil, err
+			var (
+				num uint64
+				err error
+			)
+			// Validate only .asbx files.
+			if strings.HasSuffix(file.Name, util.FileExtAsbx) {
+				num, err = getFileNumber(file.Name)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			// Assign the new reader
@@ -113,7 +121,7 @@ func newTokenWorker[T models.TokenConstraint](processor pipeline.DataProcessor[T
 }
 
 func getFileNumber(filename string) (uint64, error) {
-	name := strings.TrimSuffix(filename, ".asbx")
+	name := strings.TrimSuffix(filename, util.FileExtAsbx)
 	parts := strings.SplitN(name, "_", 3)
 
 	if len(parts) != 3 {

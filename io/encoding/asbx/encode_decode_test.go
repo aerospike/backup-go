@@ -74,7 +74,7 @@ func TestEncoder_Decoder(t *testing.T) {
 
 	// Decode.
 	reader := bytes.NewReader(content)
-	dec, err := NewDecoder[*models.ASBXToken](0, reader)
+	dec, err := NewDecoder[*models.ASBXToken](1, reader)
 	require.NoError(t, err)
 
 	nt, err := dec.NextToken()
@@ -106,7 +106,7 @@ func TestDecoder_ErrorToken(t *testing.T) {
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)
-	dec, err := NewDecoder[*models.ASBXToken](0, reader)
+	dec, err := NewDecoder[*models.ASBXToken](1, reader)
 	require.NoError(t, err)
 
 	_, err = dec.NextToken()

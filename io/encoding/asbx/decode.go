@@ -33,7 +33,7 @@ type Decoder[T models.TokenConstraint] struct {
 }
 
 // NewDecoder creates a new Decoder that reads from the provided io.Reader.
-func NewDecoder[T models.TokenConstraint](r io.Reader) (*Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](fileNumber uint64, r io.Reader) (*Decoder[T], error) {
 	d := &Decoder[T]{
 		reader: r,
 	}
@@ -42,10 +42,9 @@ func NewDecoder[T models.TokenConstraint](r io.Reader) (*Decoder[T], error) {
 		return nil, fmt.Errorf("error reading asbx header: %w", err)
 	}
 
-	// TODO: make oreder check
-	// if d.fileNumber != fileNumber {
-	// 	return nil, fmt.Errorf("file number mismatch got %d, want %d", fileNumber, d.fileNumber)
-	// }
+	if d.fileNumber != fileNumber {
+		return nil, fmt.Errorf("file number mismatch got %d, want %d", fileNumber, d.fileNumber)
+	}
 
 	return d, nil
 }

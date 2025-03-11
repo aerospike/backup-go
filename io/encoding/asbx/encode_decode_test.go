@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +32,7 @@ const (
 	testDigestB64  = "/+Ptyjj06wW9zx0AnxOmq45xJzs="
 	testPayloadB64 = "FhABEAAAAAAAAgAnjQAAAAAAAAUAAQAAAAsAc291cmNlLW5zMQAAABUE/+Ptyjj06wW9zx0AnxOmq45xJzsAAAAFAXNldDEAAAAKAgEAAAAAAAADCQAAAAkOAAAAbcndaZgAAAAUAgMAAWF6enp6enp6enp6enp6eno="
 	testKeyString  = "source-ns1:::ff e3 ed ca 38 f4 eb 05 bd cf 1d 00 9f 13 a6 ab 8e 71 27 3b"
-	testFileName   = "source-ns1_1.asbx"
+	testFileName   = "0_source-ns1_1.asbx"
 )
 
 func testToken() (*models.ASBXToken, error) {
@@ -62,10 +63,13 @@ func TestEncoder_Decoder(t *testing.T) {
 	token, err := testToken()
 	require.NoError(t, err)
 
-	fileName := enc.GenerateFilename("", "")
+	fileName := enc.GenerateFilename("0_", "")
 	require.Equal(t, testFileName, fileName)
 
-	h := enc.GetHeader()
+	num, err := util.GetFileNumber(fileName)
+	require.NoError(t, err)
+
+	h := enc.GetHeader(num)
 	content = append(content, h...)
 
 	et, err := enc.EncodeToken(token)
@@ -74,7 +78,7 @@ func TestEncoder_Decoder(t *testing.T) {
 
 	// Decode.
 	reader := bytes.NewReader(content)
-	dec, err := NewDecoder[*models.ASBXToken](reader)
+	dec, err := NewDecoder[*models.ASBXToken](1, reader)
 	require.NoError(t, err)
 
 	nt, err := dec.NextToken()
@@ -90,7 +94,7 @@ func TestDecoder_ErrorHeader(t *testing.T) {
 	content := make([]byte, 0)
 
 	reader := bytes.NewReader(content)
-	_, err := NewDecoder[*models.ASBXToken](reader)
+	_, err := NewDecoder[*models.ASBXToken](0, reader)
 	require.ErrorIs(t, err, io.EOF)
 }
 
@@ -98,30 +102,32 @@ func TestDecoder_ErrorToken(t *testing.T) {
 	t.Parallel()
 	enc := NewEncoder[*models.ASBXToken](testNamespace)
 
-	fileName := enc.GenerateFilename("", "")
+	fileName := enc.GenerateFilename("0_", "")
 	require.Equal(t, testFileName, fileName)
 
 	content := make([]byte, 0)
-	h := enc.GetHeader()
+	num, err := util.GetFileNumber(fileName)
+	require.NoError(t, err)
+
+	h := enc.GetHeader(num)
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)
-	dec, err := NewDecoder[*models.ASBXToken](reader)
+	dec, err := NewDecoder[*models.ASBXToken](1, reader)
 	require.NoError(t, err)
 
 	_, err = dec.NextToken()
 	require.ErrorIs(t, err, io.EOF)
 }
 
-//
-// func TestDecoder_ErrorFileNumber(t *testing.T) {
-// 	enc := NewEncoder[*models.ASBXToken](testNamespace)
-//
-// 	content := make([]byte, 0)
-// 	h := enc.GetHeader()
-// 	content = append(content, h...)
-//
-// 	reader := bytes.NewReader(content)
-// 	_, err := NewDecoder[*models.ASBXToken](reader)
-// 	require.Equal(t, "file number mismatch got 1, want 0", err.Error())
-// }
+func TestDecoder_ErrorFileNumber(t *testing.T) {
+	enc := NewEncoder[*models.ASBXToken](testNamespace)
+
+	content := make([]byte, 0)
+	h := enc.GetHeader(0)
+	content = append(content, h...)
+
+	reader := bytes.NewReader(content)
+	_, err := NewDecoder[*models.ASBXToken](1, reader)
+	require.Equal(t, "file number mismatch got 1, want 0", err.Error())
+}

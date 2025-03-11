@@ -19,6 +19,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 )
@@ -29,7 +30,7 @@ type tokenReader[T models.TokenConstraint] struct {
 	readersCh     <-chan models.File
 	decoder       Decoder[T]
 	logger        *slog.Logger
-	newDecoderFn  func(io.ReadCloser) Decoder[T]
+	newDecoderFn  func(uint64, io.ReadCloser) Decoder[T]
 	currentReader io.Closer
 }
 
@@ -37,7 +38,7 @@ type tokenReader[T models.TokenConstraint] struct {
 func newTokenReader[T models.TokenConstraint](
 	readersCh <-chan models.File,
 	logger *slog.Logger,
-	newDecoderFn func(io.ReadCloser) Decoder[T],
+	newDecoderFn func(uint64, io.ReadCloser) Decoder[T],
 ) *tokenReader[T] {
 	return &tokenReader[T]{
 		readersCh:    readersCh,
@@ -75,9 +76,20 @@ func (tr *tokenReader[T]) Read() (T, error) {
 				return nil, io.EOF
 			}
 
+			var (
+				num uint64
+				err error
+			)
+			// Validate only .asbx files.
+			num, err = util.GetFileNumber(file.Name)
+			if err != nil {
+				return nil, err
+			}
+
 			// Assign the new reader
 			tr.currentReader = file.Reader
-			tr.decoder = tr.newDecoderFn(file.Reader)
+
+			tr.decoder = tr.newDecoderFn(num, file.Reader)
 		}
 	}
 }

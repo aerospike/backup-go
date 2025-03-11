@@ -67,6 +67,65 @@ func (_c *MockStreamingReader_GetType_Call) RunAndReturn(run func() string) *Moc
 	return _c
 }
 
+// ListObjects provides a mock function with given fields: ctx, path
+func (_m *MockStreamingReader) ListObjects(ctx context.Context, path string) ([]string, error) {
+	ret := _m.Called(ctx, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListObjects")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, path)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, path)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockStreamingReader_ListObjects_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListObjects'
+type MockStreamingReader_ListObjects_Call struct {
+	*mock.Call
+}
+
+// ListObjects is a helper method to define mock.On call
+//   - ctx context.Context
+//   - path string
+func (_e *MockStreamingReader_Expecter) ListObjects(ctx interface{}, path interface{}) *MockStreamingReader_ListObjects_Call {
+	return &MockStreamingReader_ListObjects_Call{Call: _e.mock.On("ListObjects", ctx, path)}
+}
+
+func (_c *MockStreamingReader_ListObjects_Call) Run(run func(ctx context.Context, path string)) *MockStreamingReader_ListObjects_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockStreamingReader_ListObjects_Call) Return(_a0 []string, _a1 error) *MockStreamingReader_ListObjects_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockStreamingReader_ListObjects_Call) RunAndReturn(run func(context.Context, string) ([]string, error)) *MockStreamingReader_ListObjects_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StreamFile provides a mock function with given fields: ctx, filename, readersCh, errorsCh
 func (_m *MockStreamingReader) StreamFile(ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
 	_m.Called(ctx, filename, readersCh, errorsCh)

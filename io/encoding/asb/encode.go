@@ -100,7 +100,7 @@ func (e *Encoder[T]) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (in
 	return sindexToASB(sindex, buff)
 }
 
-func (e *Encoder[T]) GetHeader() []byte {
+func (e *Encoder[T]) GetHeader(_ uint64) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 256))
 

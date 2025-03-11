@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/counter"
 	"github.com/aerospike/backup-go/io/lazy"
 	"github.com/aerospike/backup-go/io/sized"
@@ -130,7 +131,6 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 // newWriter returns a new configured writer.
 func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveCommandChan chan int, fileLimit int64,
 ) (io.WriteCloser, error) {
-	// TODO: check this part in ordinary scan with state saving feature.
 	if fileLimit > 0 {
 		return sized.NewWriter(ctx, n, saveCommandChan, fileLimit, fw.configureWriter)
 	}
@@ -165,8 +165,13 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix st
 		return nil, fmt.Errorf("failed to set compression: %w", err)
 	}
 
+	num, err := util.GetFileNumber(filename)
+	if err != nil {
+		return nil, err
+	}
+
 	// Write file header.
-	_, err = compressedWriter.Write(fw.encoder.GetHeader())
+	_, err = compressedWriter.Write(fw.encoder.GetHeader(num))
 	if err != nil {
 		return nil, fmt.Errorf("failed to write header: %w", err)
 	}

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/counter"
@@ -139,7 +140,8 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveComm
 }
 
 // configureWriter returns configured writer.
-func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix string) (io.WriteCloser, error) {
+func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix string, sizeCounter *atomic.Uint64,
+) (io.WriteCloser, error) {
 	// Generate file name.
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 
@@ -153,7 +155,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix st
 	encryptedWriter, err := newEncryptionWriter(
 		fw.encryptionPolicy,
 		fw.secretAgentConfig,
-		counter.NewWriter(storageWriter, &fw.stats.BytesWritten),
+		counter.NewWriter(storageWriter, &fw.stats.BytesWritten, sizeCounter),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set encryption: %w", err)

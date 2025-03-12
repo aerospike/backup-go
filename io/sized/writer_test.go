@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -48,7 +49,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
-	open := func(_ context.Context, _ string) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer: &bytes.Buffer{},
@@ -70,6 +71,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	defer wcs.Close()
 
 	n, err := wcs.Write([]byte("test"))
+	wcs.sizeCounter.Add(4)
 	suite.NoError(err)
 	suite.Equal(4, n)
 
@@ -79,10 +81,12 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 
 	// cross the limit here
 	n, err = wcs.Write([]byte("0123456789"))
+	wcs.sizeCounter.Add(10)
 	suite.NoError(err)
 	suite.Equal(10, n)
 
 	n, err = wcs.Write([]byte("test1"))
+	wcs.sizeCounter.Add(5)
 	suite.NoError(err)
 	suite.Equal(5, n)
 
@@ -99,7 +103,7 @@ func (suite *sizedTestSuite) Test_writeCloserSized_ErrLimit() {
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
-	open := func(_ context.Context, _ string) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer: &bytes.Buffer{},

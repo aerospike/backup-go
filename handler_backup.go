@@ -338,7 +338,8 @@ func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, 
 	return lazy.NewWriter(ctx, n, bh.newConfiguredWriter)
 }
 
-func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string) (io.WriteCloser, error) {
+func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string, sizeCounter *atomic.Uint64,
+) (io.WriteCloser, error) {
 	suffix := ""
 	if bh.state != nil {
 		suffix = bh.state.getFileSuffix()
@@ -351,7 +352,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string) (io.
 		return nil, err
 	}
 
-	countingWriter := counter.NewWriter(storageWriter, &bh.stats.BytesWritten)
+	countingWriter := counter.NewWriter(storageWriter, &bh.stats.BytesWritten, sizeCounter)
 
 	encryptedWriter, err := newEncryptionWriter(
 		bh.config.EncryptionPolicy,

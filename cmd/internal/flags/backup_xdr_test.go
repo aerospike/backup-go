@@ -52,7 +52,7 @@ func TestBackupXDR_NewFlagSet(t *testing.T) {
 
 	assert.Equal(t, "test-ns", result.Namespace, "The namespace flag should be parsed correctly")
 	assert.Equal(t, "/backup/dir", result.Directory, "The directory flag should be parsed correctly")
-	assert.Equal(t, int64(5000), result.FileLimit, "The file-limit flag should be parsed correctly")
+	assert.Equal(t, uint64(5000), result.FileLimit, "The file-limit flag should be parsed correctly")
 	assert.Equal(t, 8, result.ParallelWrite, "The parallel-write flag should be parsed correctly")
 	assert.Equal(t, "dc1", result.DC, "The dc flag should be parsed correctly")
 	assert.Equal(t, "192.168.1.1", result.LocalAddress, "The local-address flag should be parsed correctly")
@@ -81,7 +81,7 @@ func TestBackupXDR_NewFlagSet_DefaultValues(t *testing.T) {
 
 	assert.Equal(t, "", result.Namespace, "The default value for namespace should be an empty string")
 	assert.Equal(t, "", result.Directory, "The default value for directory should be an empty string")
-	assert.Equal(t, int64(262144000), result.FileLimit, "The default value for file-limit should be 250MB")
+	assert.Equal(t, uint64(262144000), result.FileLimit, "The default value for file-limit should be 250MB")
 	assert.Equal(t, 0, result.ParallelWrite, "The default value for parallel-write should be 0")
 	assert.Equal(t, "dc", result.DC, "The default value for dc should be 'dc'")
 	assert.Equal(t, "127.0.0.1", result.LocalAddress, "The default value for local-address should be '127.0.0.1'")

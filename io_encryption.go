@@ -96,7 +96,7 @@ func parsePK(block []byte) (*rsa.PrivateKey, error) {
 		return pkcs1Key, nil
 	}
 
-	return nil, fmt.Errorf("failed to parse RSA private key: %w (PKCS8), %v (PKCS1)", err8, err1)
+	return nil, fmt.Errorf("failed to parse RSA private key: %w (PKCS8), %w (PKCS1)", err8, err1)
 }
 
 // readPemFromFile reads the key from the file.

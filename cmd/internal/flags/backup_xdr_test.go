@@ -115,7 +115,7 @@ func TestBackupXDR_NewFlagSet_ShortFlags(t *testing.T) {
 
 	assert.Equal(t, "test-ns", result.Namespace, "The namespace short flag should be parsed correctly")
 	assert.Equal(t, "/backup/dir", result.Directory, "The directory short flag should be parsed correctly")
-	assert.Equal(t, int64(5000), result.FileLimit, "The file-limit short flag should be parsed correctly")
+	assert.Equal(t, uint64(5000), result.FileLimit, "The file-limit short flag should be parsed correctly")
 }
 
 func TestBackupXDR_NewFlagSet_InvalidValues(t *testing.T) {

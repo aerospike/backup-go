@@ -40,7 +40,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
 		false,
 		"Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.")
-	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
+	flagSet.Uint64VarP(&f.FileLimit, "file-limit", "F",
 		262144000, // 250 MB
 		"Rotate backup files when their size crosses the given\n"+
 			"value (in bytes). Only used when backing up to a directory.\n")

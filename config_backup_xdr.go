@@ -43,7 +43,7 @@ type ConfigBackupXDR struct {
 	EncoderType EncoderType
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
-	FileLimit int64
+	FileLimit uint64
 	// ParallelWrite is the number of concurrent backup files writing.
 	ParallelWrite int
 	// DC name of dc that will be created on source instance.
@@ -96,10 +96,6 @@ type ConfigBackupXDR struct {
 func (c *ConfigBackupXDR) validate() error {
 	if err := validateRewind(c.Rewind); err != nil {
 		return err
-	}
-
-	if c.FileLimit < 0 {
-		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
 	}
 
 	if c.DC == "" {

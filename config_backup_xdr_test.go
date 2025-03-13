@@ -56,20 +56,6 @@ func TestConfigBackupXDR_validate(t *testing.T) {
 			errMsg:  "rewind must be a positive number or 'all', got: invalid",
 		},
 		{
-			name: "negative file limit",
-			config: ConfigBackupXDR{
-				DC:             "dc1",
-				LocalAddress:   "127.0.0.1",
-				LocalPort:      3000,
-				Namespace:      "test",
-				Rewind:         "all",
-				FileLimit:      -1,
-				MaxConnections: 1,
-			},
-			wantErr: true,
-			errMsg:  "filelimit value must not be negative, got -1",
-		},
-		{
 			name: "invalid parallel write - too low",
 			config: ConfigBackupXDR{
 				DC:             "dc1",

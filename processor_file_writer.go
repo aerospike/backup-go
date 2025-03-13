@@ -46,7 +46,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 
 	saveCommandChan chan int
 
-	fileLimit int64
+	fileLimit uint64
 	parallel  int
 
 	logger *slog.Logger
@@ -65,7 +65,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	state *State,
 	stats *models.BackupStats,
 	limiter *rate.Limiter,
-	fileLimit int64,
+	fileLimit uint64,
 	parallel int,
 	logger *slog.Logger,
 ) *fileWriterProcessor[T] {
@@ -130,7 +130,7 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 }
 
 // newWriter returns a new configured writer.
-func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveCommandChan chan int, fileLimit int64,
+func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveCommandChan chan int, fileLimit uint64,
 ) (io.WriteCloser, error) {
 	if fileLimit > 0 {
 		return sized.NewWriter(ctx, n, saveCommandChan, fileLimit, fw.configureWriter)

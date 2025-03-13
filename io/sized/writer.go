@@ -29,7 +29,7 @@ type Writer struct {
 	writer io.WriteCloser
 	open   func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error)
 
-	limit int64
+	limit uint64
 	// Number of writer, for saving state.
 	n               int
 	saveCommandChan chan int
@@ -39,12 +39,8 @@ type Writer struct {
 
 // NewWriter creates a new Writer with a size limit.
 // limit must be greater than 0.
-func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit int64,
+func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit uint64,
 	open func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error)) (*Writer, error) {
-	if limit <= 0 {
-		return nil, fmt.Errorf("limit must be greater than 0, got %d", limit)
-	}
-
 	return &Writer{
 		ctx:             ctx,
 		limit:           limit,
@@ -55,7 +51,7 @@ func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit int64
 }
 
 func (f *Writer) Write(p []byte) (n int, err error) {
-	if f.sizeCounter.Load() >= uint64(f.limit) {
+	if f.sizeCounter.Load() >= f.limit {
 		err = f.writer.Close()
 		if err != nil {
 			return 0, fmt.Errorf("failed to close writer: %w", err)

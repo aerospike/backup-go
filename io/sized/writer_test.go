@@ -21,7 +21,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -96,28 +95,4 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 
 	suite.Equal("test0123456789", writer1.Writer.(*bytes.Buffer).String())
 	suite.Equal("test1", writer2.Writer.(*bytes.Buffer).String())
-}
-
-func (suite *sizedTestSuite) Test_writeCloserSized_ErrLimit() {
-	suite.T().Parallel()
-	var writer1 *mockWriteCloser
-	var writer2 *mockWriteCloser
-
-	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
-		if writer1 == nil {
-			writer1 = &mockWriteCloser{
-				Writer: &bytes.Buffer{},
-			}
-
-			return writer1, nil
-		}
-		writer2 = &mockWriteCloser{
-			Writer: &bytes.Buffer{},
-		}
-
-		return writer2, nil
-	}
-
-	_, err := NewWriter(context.Background(), 1, nil, -1, open)
-	require.ErrorContains(suite.T(), err, "limit must be greater than 0")
 }

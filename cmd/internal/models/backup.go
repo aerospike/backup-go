@@ -19,7 +19,7 @@ type Backup struct {
 	RemoveFiles         bool
 	ModifiedBefore      string
 	ModifiedAfter       string
-	FileLimit           int64
+	FileLimit           uint64
 	AfterDigest         string
 	MaxRecords          int64
 	NoBins              bool

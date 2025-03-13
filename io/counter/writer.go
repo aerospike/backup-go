@@ -24,8 +24,8 @@ import (
 type Writer struct {
 	writer io.WriteCloser
 	total  *atomic.Uint64
-	// The Counter is used for each file separately.
-	// It is reseted every time we create a new file.
+	// This counter is used per backup file.
+	// It is reset every time a new file is created.
 	fileSize *atomic.Uint64
 }
 

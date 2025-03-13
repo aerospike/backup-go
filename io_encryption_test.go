@@ -15,11 +15,16 @@
 package backup
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -165,5 +170,121 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 		} else {
 			require.NoError(t, err, fmt.Sprintf("case %d", i))
 		}
+	}
+}
+
+func Test_parsePK(t *testing.T) {
+	t.Parallel()
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err, "failed to generate test RSA key")
+
+	pkcs1Bytes := x509.MarshalPKCS1PrivateKey(rsaKey)
+
+	pkcs8RSABytes, err := x509.MarshalPKCS8PrivateKey(rsaKey)
+	require.NoError(t, err, "failed to marshal RSA key to PKCS8")
+
+	tests := []struct {
+		name     string
+		block    []byte
+		wantErr  bool
+		errCheck func(err error) bool
+	}{
+		{
+			name:    "valid PKCS8 RSA key",
+			block:   pkcs8RSABytes,
+			wantErr: false,
+		},
+		{
+			name:    "valid PKCS1 RSA key",
+			block:   pkcs1Bytes,
+			wantErr: false,
+		},
+		{
+			name:    "invalid data",
+			block:   []byte("not a valid key"),
+			wantErr: true,
+			errCheck: func(err error) bool {
+				return err != nil
+			},
+		},
+		{
+			name:    "nil input",
+			block:   nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parsePK(tt.block)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errCheck != nil {
+					assert.True(t, tt.errCheck(err), "error doesn't match expected condition")
+				}
+				assert.Nil(t, got)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, got)
+				// Verify it's a valid RSA key by checking basic properties
+				assert.True(t, got.N.BitLen() > 0)
+				assert.NotNil(t, got.D)
+			}
+		})
+	}
+}
+
+func Test_parsePK_WithPEM(t *testing.T) {
+	t.Parallel()
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	pkcs1PEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(rsaKey),
+	})
+
+	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(rsaKey)
+	require.NoError(t, err)
+	pkcs8PEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: pkcs8Bytes,
+	})
+
+	tests := []struct {
+		name    string
+		pemData []byte
+		wantErr bool
+	}{
+		{
+			name:    "PKCS1 PEM",
+			pemData: pkcs1PEM,
+			wantErr: false,
+		},
+		{
+			name:    "PKCS8 PEM",
+			pemData: pkcs8PEM,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			block, _ := pem.Decode(tt.pemData)
+			require.NotNil(t, block, "failed to decode PEM")
+
+			got, err := parsePK(block.Bytes)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, got)
+			}
+		})
 	}
 }

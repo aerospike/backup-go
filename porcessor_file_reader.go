@@ -142,7 +142,7 @@ func newEncryptionReader(
 		return reader, nil
 	}
 
-	privateKey, err := ReadPrivateKey(policy, saConfig)
+	privateKey, err := readPrivateKey(policy, saConfig)
 	if err != nil {
 		return nil, err
 	}

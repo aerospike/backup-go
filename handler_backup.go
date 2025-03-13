@@ -406,7 +406,7 @@ func newEncryptionWriter(
 		return writer, nil
 	}
 
-	privateKey, err := ReadPrivateKey(policy, saConfig)
+	privateKey, err := readPrivateKey(policy, saConfig)
 	if err != nil {
 		return nil, err
 	}

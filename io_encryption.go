@@ -25,11 +25,11 @@ import (
 
 const pemTemplate = "-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----"
 
-// ReadPrivateKey parses and loads a private key according to the EncryptionPolicy
+// readPrivateKey parses and loads a private key according to the EncryptionPolicy
 // configuration. It can load the private key from a file, env variable or Secret Agent.
 // A valid agent parameter is required to load the key from Aerospike Secret Agent.
 // Pass in nil for any other option.
-func ReadPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([]byte, error) {
+func readPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([]byte, error) {
 	var (
 		pemData []byte
 		err     error

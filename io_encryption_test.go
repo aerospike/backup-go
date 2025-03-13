@@ -164,7 +164,7 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 	}
 
 	for i, tt := range testCases {
-		_, err = ReadPrivateKey(tt.encPolicy, tt.saConfig)
+		_, err = readPrivateKey(tt.encPolicy, tt.saConfig)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
 		} else {

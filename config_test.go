@@ -57,10 +57,6 @@ func TestBackupConfig_validate(t *testing.T) {
 	assert.ErrorContains(t, config.validate(), "bandwidth")
 	config = NewDefaultBackupConfig()
 
-	config.FileLimit = -1
-	assert.ErrorContains(t, config.validate(), "filelimit")
-	config = NewDefaultBackupConfig()
-
 	config.CompressionPolicy = NewCompressionPolicy(CompressZSTD, -2)
 	assert.ErrorContains(t, config.validate(), "compression")
 	config = NewDefaultBackupConfig()

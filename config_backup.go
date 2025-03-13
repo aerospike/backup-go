@@ -100,7 +100,7 @@ type ConfigBackup struct {
 	Bandwidth int
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
-	FileLimit int64
+	FileLimit uint64
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	// Results in smaller backup files.
 	Compact bool
@@ -202,10 +202,6 @@ func (c *ConfigBackup) validate() error {
 
 	if c.Bandwidth < 0 {
 		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
-	}
-
-	if c.FileLimit < 0 {
-		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
 	}
 
 	if c.StateFile != "" && c.PageSize == 0 {

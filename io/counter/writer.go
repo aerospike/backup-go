@@ -23,19 +23,27 @@ import (
 // We need it to get actual number of bytes written, after compression and encryption.
 type Writer struct {
 	writer io.WriteCloser
-	count  *atomic.Uint64
+	total  *atomic.Uint64
+	// This counter is used per backup file.
+	// It is reset every time a new file is created.
+	fileSize *atomic.Uint64
 }
 
-func NewWriter(w io.WriteCloser, count *atomic.Uint64) *Writer {
+func NewWriter(w io.WriteCloser, total, fileSize *atomic.Uint64) *Writer {
 	return &Writer{
-		writer: w,
-		count:  count,
+		writer:   w,
+		total:    total,
+		fileSize: fileSize,
 	}
 }
 
 func (cw *Writer) Write(p []byte) (n int, err error) {
 	n, err = cw.writer.Write(p)
-	cw.count.Add(uint64(n))
+	cw.total.Add(uint64(n))
+
+	if cw.fileSize != nil {
+		cw.fileSize.Add(uint64(n))
+	}
 
 	return n, err
 }

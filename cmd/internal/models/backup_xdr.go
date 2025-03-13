@@ -18,7 +18,7 @@ import "crypto/tls"
 
 type BackupXDR struct {
 	Directory                    string
-	FileLimit                    int64
+	FileLimit                    uint64
 	RemoveFiles                  bool
 	ParallelWrite                int
 	DC                           string

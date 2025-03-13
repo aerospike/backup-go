@@ -19,6 +19,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -77,7 +78,7 @@ func readPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([
 	return sum256[:], nil
 }
 
-// parsePK parse private key from PKCS8 or PKCS1.
+// parsePK parses a private key from PKCS8 or PKCS1.
 func parsePK(block []byte) (*rsa.PrivateKey, error) {
 	// Try a PKCS8 format first.
 	privateKey, err8 := x509.ParsePKCS8PrivateKey(block)
@@ -96,7 +97,7 @@ func parsePK(block []byte) (*rsa.PrivateKey, error) {
 		return pkcs1Key, nil
 	}
 
-	return nil, fmt.Errorf("failed to parse RSA private key: %w (PKCS8), %w (PKCS1)", err8, err1)
+	return nil, errors.Join(err8, err1)
 }
 
 // readPemFromFile reads the key from the file.

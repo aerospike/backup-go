@@ -149,14 +149,7 @@ func NewASBackup(
 		if params.isStopXDR() {
 			logger.Info("stopping XDR on the database")
 
-			// Check before stopping if DC exists.
-			_, err = infoClient.GetStats(backupXDRConfig.DC, backupXDRConfig.Namespace)
-			if err != nil && strings.Contains(err.Error(), "DC not found") {
-				logger.Info("DC not found")
-				return nil, nil
-			}
-
-			if err = infoClient.StopXDR(backupXDRConfig.DC); err != nil {
+			if err = stopXDR(infoClient, backupXDRConfig.DC, backupXDRConfig.Namespace); err != nil {
 				return nil, fmt.Errorf("failed to stop XDR: %w", err)
 			}
 
@@ -167,7 +160,7 @@ func NewASBackup(
 		if params.isUnblockMRT() {
 			logger.Info("enabling MRT writes on the database")
 
-			if err = infoClient.UnBlockMRTWrites(backupXDRConfig.Namespace); err != nil {
+			if err = unblockMrt(infoClient, backupXDRConfig.Namespace); err != nil {
 				return nil, fmt.Errorf("failed to enable MRT writes: %w", err)
 			}
 
@@ -331,4 +324,38 @@ func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backu
 	default:
 		return nil
 	}
+}
+
+func stopXDR(infoClient *asinfo.InfoClient, dc, namespace string) error {
+	nodes := infoClient.GetNodesNames()
+
+	for _, node := range nodes {
+		// Check before stopping if DC exists.
+		_, err := infoClient.GetStats(node, dc, namespace)
+		if err != nil {
+			if strings.Contains(err.Error(), "DC not found") {
+				continue
+			}
+
+			return fmt.Errorf("failed to get stats for node %s: %w", node, err)
+		}
+
+		if err = infoClient.StopXDR(node, dc); err != nil {
+			return fmt.Errorf("failed to stop XDR on node %s: %w", node, err)
+		}
+	}
+
+	return nil
+}
+
+func unblockMrt(infoClient *asinfo.InfoClient, namespace string) error {
+	nodes := infoClient.GetNodesNames()
+
+	for _, node := range nodes {
+		if err := infoClient.UnBlockMRTWrites(node, namespace); err != nil {
+			return fmt.Errorf("failed to unblock mrts on node %s: %w", node, err)
+		}
+	}
+
+	return nil
 }

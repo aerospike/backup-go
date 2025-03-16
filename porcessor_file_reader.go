@@ -62,7 +62,7 @@ func newFileReaderProcessor[T models.TokenConstraint](
 }
 
 func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline.Worker[T] {
-	// Start lazy file reading.
+	// Run lazy file reading.
 	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh)
 
 	fn := func(fileNumber uint64, r io.ReadCloser) Decoder[T] {

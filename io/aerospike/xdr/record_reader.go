@@ -19,11 +19,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
-	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -77,18 +77,20 @@ func NewRecordReaderConfig(
 
 // infoCommander interface for an info client.
 type infoCommander interface {
-	StartXDR(dc, hostPort, namespace, rewind string, throughput int) error
-	StopXDR(dc string) error
-	GetStats(dc, namespace string) (asinfo.Stats, error)
-	BlockMRTWrites(namespace string) error
-	UnBlockMRTWrites(namespace string) error
+	StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int) error
+	StopXDR(nodeName, dc string) error
+	GetStats(nodeName, dc, namespace string) (asinfo.Stats, error)
+	BlockMRTWrites(nodeName, namespace string) error
+	UnBlockMRTWrites(nodeName, namespace string) error
+	GetNodesNames() []string
 }
 
 // RecordReader satisfies the pipeline DataReader interface.
 // It reads receives records from an Aerospike database through XDR protocol
 // and returns them as *models.ASBXToken.
 type RecordReader struct {
-	ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
 	// Info client to start and stop XDR, also to get current state.
 	infoClient infoCommander
 	// Records reader config.
@@ -97,12 +99,10 @@ type RecordReader struct {
 	tcpServer *TCPServer
 	// Received results will be placed here.
 	results chan *models.ASBXToken
-	// Time when recovery finished.
-	checkpoint int64
 	// To check if the reader is running.
 	isRunning atomic.Bool
-	// To check if mrt is stopped.
-	mrtWritesStopped atomic.Bool
+
+	errorsCh chan error
 
 	logger *slog.Logger
 }
@@ -115,12 +115,15 @@ func NewRecordReader(
 	logger *slog.Logger,
 ) (*RecordReader, error) {
 	tcpSrv := NewTCPServer(config.tcpConfig, logger)
+	ctx, cancel := context.WithCancel(ctx)
 
 	rr := &RecordReader{
 		ctx:        ctx,
+		cancel:     cancel,
 		infoClient: infoClient,
 		config:     config,
 		tcpServer:  tcpSrv,
+		errorsCh:   make(chan error),
 		logger:     logger,
 	}
 
@@ -145,21 +148,26 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 
 			return models.NewASBXToken(res.Key, res.Payload), nil
 		case <-time.After(r.config.startTimeout):
+			r.logger.Debug("timed out xdr read")
 			r.Close()
 
 			return nil, fmt.Errorf("xdr scan timed out after: %s", r.config.startTimeout)
 		}
 	}
 
-	res, ok := <-r.results
-	if !ok {
-		r.logger.Debug("xdr scan finished")
-		return nil, io.EOF
+	select {
+	case res, ok := <-r.results:
+		if !ok {
+			r.logger.Debug("xdr scan finished")
+			return nil, io.EOF
+		}
+
+		t := models.NewASBXToken(res.Key, res.Payload)
+
+		return t, nil
+	case err := <-r.errorsCh:
+		return nil, err
 	}
-
-	t := models.NewASBXToken(res.Key, res.Payload)
-
-	return t, nil
 }
 
 // Close cancels the Aerospike scan used to read records.
@@ -171,19 +179,6 @@ func (r *RecordReader) Close() {
 
 	r.logger.Debug("closing aerospike xdr record reader")
 
-	if err := r.infoClient.StopXDR(r.config.dc); err != nil {
-		r.logger.Error("failed to remove xdr config", slog.Any("error", err))
-	}
-
-	// If mrt was stopped.
-	if r.mrtWritesStopped.Load() {
-		if err := r.infoClient.UnBlockMRTWrites(r.config.namespace); err != nil {
-			r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
-		}
-		// Only after successful unblocking.
-		r.mrtWritesStopped.Store(false)
-	}
-
 	if err := r.tcpServer.Stop(); err != nil {
 		r.logger.Error("failed to stop tcp server", slog.Any("error", err))
 	}
@@ -192,30 +187,13 @@ func (r *RecordReader) Close() {
 }
 
 func (r *RecordReader) start() error {
-	// Create XDR config.
-	if err := r.infoClient.StartXDR(
-		r.config.dc,
-		r.config.currentHostPort,
-		r.config.namespace,
-		r.config.rewind,
-		r.config.maxThroughput,
-	); err != nil {
-		return fmt.Errorf("failed to create xdr config: %w", err)
-	}
-
-	r.logger.Debug("created xdr config",
-		slog.String("dc", r.config.dc),
-		slog.String("hostPort", r.config.currentHostPort),
-		slog.String("namespace", r.config.namespace),
-		slog.String("rewind", r.config.rewind),
-		slog.Int("throughput", r.config.maxThroughput),
-	)
-
-	// Start TCP server.
+	// Run TCP server.
 	results, err := r.tcpServer.Start(r.ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start xdr: %w", err)
 	}
+
+	go r.serve()
 
 	r.isRunning.Store(true)
 
@@ -223,68 +201,48 @@ func (r *RecordReader) start() error {
 
 	r.logger.Debug("started xdr tcp server")
 
-	go r.serve()
-
 	return nil
 }
 
 func (r *RecordReader) serve() {
-	ticker := time.NewTicker(r.config.infoPolingPeriod)
-	defer ticker.Stop()
-	defer r.Close()
+	nodes := r.infoClient.GetNodesNames()
 
-	time.Sleep(statsPollingDelay)
+	if len(nodes) == 0 {
+		r.logger.Error("no nodes found")
+		r.Close()
 
-	for {
-		select {
-		case <-r.ctx.Done():
-			return
-		case <-ticker.C:
-			stats, err := r.infoClient.GetStats(r.config.dc, r.config.namespace)
-			if err != nil {
-				r.logger.Error("failed to get xdr stats", slog.Any("error", err))
-				continue // Or brake?
-			}
+		return
+	}
 
-			r.logger.Debug("got stats", slog.Any("stats", stats),
-				slog.String("dc", r.config.dc),
-				slog.String("namespace", r.config.namespace),
-			)
+	var wg sync.WaitGroup
 
-			if stats.RecoveriesPending != 0 {
-				// Recovery in progress.
-				continue
-			}
-			// set once.
-			if r.checkpoint == 0 {
-				r.checkpoint = time.Now().Unix()
-				// Stop MRT writes in this checkpoint.
-				if err = r.infoClient.BlockMRTWrites(r.config.namespace); err != nil {
-					r.logger.Error("failed to block mrt writes", slog.Any("error", err))
-					break // Or return?
-				}
+	for _, node := range nodes {
+		wg.Add(1)
 
-				r.logger.Debug("mrt blocked", slog.String("namespace", r.config.namespace))
-				r.mrtWritesStopped.Store(true)
-			}
+		n := node
+		nr := NewNodeReader(
+			r.ctx,
+			n,
+			r.infoClient,
+			r.config,
+			r.logger,
+		)
 
-			// Convert lag from citrus leaf epoch.
-			clLag := cltime.NewCLTime(stats.Lag)
-			unixLag := clLag.Unix()
+		go func() {
+			defer wg.Done()
 
-			if r.checkpoint-unixLag < 0 || stats.Lag == 0 {
-				// Start MRT writes.
-				if err = r.infoClient.UnBlockMRTWrites(r.config.namespace); err != nil {
-					r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
-				}
+			if err := nr.Run(); err != nil {
+				r.errorsCh <- fmt.Errorf("failed to start node reader for node %s: %w", node, err)
 
-				r.logger.Debug("mrt unblocked", slog.String("namespace", r.config.namespace))
-				r.mrtWritesStopped.Store(false)
-				// Stop.
-				r.Close()
+				// If one of the routine failed, we shut other.
+				r.cancel()
 
 				return
 			}
-		}
+		}()
 	}
+
+	wg.Wait()
+
+	r.Close()
 }

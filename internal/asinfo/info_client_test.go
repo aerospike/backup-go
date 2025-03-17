@@ -1751,13 +1751,15 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 
 	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
-	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind, 0)
+	nodes := ic.GetNodesNames()
+
+	err := ic.StartXDR(nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0)
 	require.NoError(t, err)
 
-	_, err = ic.GetStats(testASDC, testASNamespace)
+	_, err = ic.GetStats(nodes[0], testASDC, testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.StopXDR(testASDC)
+	err = ic.StopXDR(nodes[0], testASDC)
 	require.NoError(t, err)
 }
 
@@ -1770,10 +1772,11 @@ func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
 	require.NoError(t, aerr)
 
 	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	// TODO: reconfigure database, to allow MRT writes. Then enable this test.
-	_ = ic.BlockMRTWrites(testASNamespace)
+	nodes := ic.GetNodesNames()
 
-	_ = ic.UnBlockMRTWrites(testASNamespace)
+	_ = ic.BlockMRTWrites(nodes[0], testASNamespace)
+
+	_ = ic.UnBlockMRTWrites(nodes[0], testASNamespace)
 }
 
 func TestInfoCommander_parseResultResponse(t *testing.T) {
@@ -1888,14 +1891,15 @@ func TestInfoCommander_XDR(t *testing.T) {
 	require.NoError(t, aerr)
 
 	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	nodes := ic.GetNodesNames()
 
-	err := ic.StartXDR(testASDC, testXDRHostPort, testASNamespace, testASRewind, 0)
+	err := ic.StartXDR(nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0)
 	require.NoError(t, err)
 
-	_, err = ic.GetStats(testASDC, testASNamespace)
+	_, err = ic.GetStats(nodes[0], testASDC, testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.StopXDR(testASDC)
+	err = ic.StopXDR(nodes[0], testASDC)
 	require.NoError(t, err)
 }
 

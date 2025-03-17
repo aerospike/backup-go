@@ -144,6 +144,20 @@ func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
 	return result, err
 }
 
+func (ic *InfoClient) requestByNode(nodeName string, names ...string) (map[string]string, error) {
+	node, err := ic.cluster.GetNodeByName(nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := node.RequestInfo(ic.policy, names...)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
 	var (
 		version AerospikeVersion
@@ -265,12 +279,12 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 }
 
 // StartXDR creates xdr config and starts replication.
-func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string, throughput int) error {
+func (ic *InfoClient) StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int) error {
 	// The Order of this operation is important. Don't move it if you don't know what you are doing!
 	err := executeWithRetry(
 		ic.retryPolicy,
 		func() error {
-			return ic.createXDRDC(dc)
+			return ic.createXDRDC(nodeName, dc)
 		},
 	)
 	if err != nil {
@@ -280,7 +294,7 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string, throughpu
 	err = executeWithRetry(
 		ic.retryPolicy,
 		func() error {
-			return ic.createXDRConnector(dc)
+			return ic.createXDRConnector(nodeName, dc)
 		},
 	)
 	if err != nil {
@@ -290,7 +304,7 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string, throughpu
 	err = executeWithRetry(
 		ic.retryPolicy,
 		func() error {
-			return ic.createXDRNode(dc, hostPort)
+			return ic.createXDRNode(nodeName, dc, hostPort)
 		},
 	)
 	if err != nil {
@@ -300,7 +314,7 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string, throughpu
 	err = executeWithRetry(
 		ic.retryPolicy,
 		func() error {
-			return ic.setMaxThroughput(dc, namespace, throughput)
+			return ic.setMaxThroughput(nodeName, dc, namespace, throughput)
 		},
 	)
 	if err != nil {
@@ -310,7 +324,7 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string, throughpu
 	err = executeWithRetry(
 		ic.retryPolicy,
 		func() error {
-			return ic.createXDRNamespace(dc, namespace, rewind)
+			return ic.createXDRNamespace(nodeName, dc, namespace, rewind)
 		},
 	)
 	if err != nil {
@@ -321,24 +335,24 @@ func (ic *InfoClient) StartXDR(dc, hostPort, namespace, rewind string, throughpu
 }
 
 // StopXDR disable replication and remove xdr config.
-func (ic *InfoClient) StopXDR(dc string) error {
+func (ic *InfoClient) StopXDR(nodeName, dc string) error {
 	return executeWithRetry(ic.retryPolicy, func() error {
-		return ic.stopXDR(dc)
+		return ic.stopXDR(nodeName, dc)
 	})
 }
 
-func (ic *InfoClient) stopXDR(dc string) error {
-	if err := ic.deleteXDRDC(dc); err != nil {
+func (ic *InfoClient) stopXDR(nodeName, dc string) error {
+	if err := ic.deleteXDRDC(nodeName, dc); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (ic *InfoClient) createXDRDC(dc string) error {
+func (ic *InfoClient) createXDRDC(nodeName, dc string) error {
 	cmd := fmt.Sprintf(cmdCreateXDRDC, dc)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create xdr dc: %w", err)
 	}
@@ -350,10 +364,10 @@ func (ic *InfoClient) createXDRDC(dc string) error {
 	return nil
 }
 
-func (ic *InfoClient) createXDRConnector(dc string) error {
+func (ic *InfoClient) createXDRConnector(nodeName, dc string) error {
 	cmd := fmt.Sprintf(cmdCreateConnector, dc)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create xdr connector: %w", err)
 	}
@@ -365,10 +379,10 @@ func (ic *InfoClient) createXDRConnector(dc string) error {
 	return nil
 }
 
-func (ic *InfoClient) createXDRNode(dc, hostPort string) error {
+func (ic *InfoClient) createXDRNode(nodeName, dc, hostPort string) error {
 	cmd := fmt.Sprintf(cmdCreateXDRNode, dc, hostPort)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create xdr node: %w", err)
 	}
@@ -380,10 +394,10 @@ func (ic *InfoClient) createXDRNode(dc, hostPort string) error {
 	return nil
 }
 
-func (ic *InfoClient) createXDRNamespace(dc, namespace, rewind string) error {
+func (ic *InfoClient) createXDRNamespace(nodeName, dc, namespace, rewind string) error {
 	cmd := fmt.Sprintf(cmdCreateXDRNamespace, dc, namespace, rewind)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create xdr namesapce: %w", err)
 	}
@@ -395,10 +409,10 @@ func (ic *InfoClient) createXDRNamespace(dc, namespace, rewind string) error {
 	return nil
 }
 
-func (ic *InfoClient) deleteXDRDC(dc string) error {
+func (ic *InfoClient) deleteXDRDC(nodeName, dc string) error {
 	cmd := fmt.Sprintf(cmdDeleteXDRDC, dc)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to remove xdr dc: %w", err)
 	}
@@ -411,16 +425,16 @@ func (ic *InfoClient) deleteXDRDC(dc string) error {
 }
 
 // BlockMRTWrites blocks MRT writes on cluster.
-func (ic *InfoClient) BlockMRTWrites(namespace string) error {
+func (ic *InfoClient) BlockMRTWrites(nodeName, namespace string) error {
 	return executeWithRetry(ic.retryPolicy, func() error {
-		return ic.blockMRTWrites(namespace)
+		return ic.blockMRTWrites(nodeName, namespace)
 	})
 }
 
-func (ic *InfoClient) blockMRTWrites(namespace string) error {
+func (ic *InfoClient) blockMRTWrites(nodeName, namespace string) error {
 	cmd := fmt.Sprintf(cmdBlockMRTWrites, namespace)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to block mrt writes: %w", err)
 	}
@@ -433,16 +447,16 @@ func (ic *InfoClient) blockMRTWrites(namespace string) error {
 }
 
 // UnBlockMRTWrites unblocks MRT writes on cluster.
-func (ic *InfoClient) UnBlockMRTWrites(namespace string) error {
+func (ic *InfoClient) UnBlockMRTWrites(nodeName, namespace string) error {
 	return executeWithRetry(ic.retryPolicy, func() error {
-		return ic.unBlockMRTWrites(namespace)
+		return ic.unBlockMRTWrites(nodeName, namespace)
 	})
 }
 
-func (ic *InfoClient) unBlockMRTWrites(namespace string) error {
+func (ic *InfoClient) unBlockMRTWrites(nodeName, namespace string) error {
 	cmd := fmt.Sprintf(cmdUnBlockMRTWrites, namespace)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to unblock mrt writes: %w", err)
 	}
@@ -454,8 +468,22 @@ func (ic *InfoClient) unBlockMRTWrites(namespace string) error {
 	return nil
 }
 
+// GetNodesNames return list of active nodes names.
+func (ic *InfoClient) GetNodesNames() []string {
+	nodes := ic.cluster.GetNodes()
+	result := make([]string, 0, len(nodes))
+
+	for _, node := range nodes {
+		if node.IsActive() {
+			result = append(result, node.GetName())
+		}
+	}
+
+	return result
+}
+
 // SetMaxThroughput sets max throughput for xdr. The Value should be in multiples of 100
-func (ic *InfoClient) setMaxThroughput(dc, namespace string, throughput int) error {
+func (ic *InfoClient) setMaxThroughput(nodeName, dc, namespace string, throughput int) error {
 	// Do nothing.
 	if throughput == 0 {
 		return nil
@@ -463,7 +491,7 @@ func (ic *InfoClient) setMaxThroughput(dc, namespace string, throughput int) err
 
 	cmd := fmt.Sprintf(cmdMaxThroughput, dc, namespace, throughput)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to set max throughput: %w", err)
 	}
@@ -521,10 +549,10 @@ type Stats struct {
 
 // GetStats requests node statistics like recoveries, lag, etc.
 // returns Stats struct.
-func (ic *InfoClient) GetStats(dc, namespace string) (Stats, error) {
+func (ic *InfoClient) GetStats(nodeName, dc, namespace string) (Stats, error) {
 	cmd := fmt.Sprintf(cmdGetStats, dc, namespace)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return Stats{}, fmt.Errorf("failed to get stats: %w", err)
 	}

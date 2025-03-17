@@ -145,6 +145,7 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 
 			return models.NewASBXToken(res.Key, res.Payload), nil
 		case <-time.After(r.config.startTimeout):
+			r.logger.Debug("timed out xdr read")
 			r.Close()
 
 			return nil, fmt.Errorf("xdr scan timed out after: %s", r.config.startTimeout)
@@ -198,6 +199,13 @@ func (r *RecordReader) start() error {
 
 func (r *RecordReader) serve() {
 	nodes := r.infoClient.GetNodesNames()
+
+	if len(nodes) == 0 {
+		r.logger.Error("no nodes found")
+		r.Close()
+
+		return
+	}
 
 	var wg sync.WaitGroup
 

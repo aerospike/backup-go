@@ -102,6 +102,8 @@ type RecordReader struct {
 	// To check if the reader is running.
 	isRunning atomic.Bool
 
+	errorsCh chan error
+
 	logger *slog.Logger
 }
 
@@ -121,6 +123,7 @@ func NewRecordReader(
 		infoClient: infoClient,
 		config:     config,
 		tcpServer:  tcpSrv,
+		errorsCh:   make(chan error),
 		logger:     logger,
 	}
 
@@ -152,15 +155,19 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 		}
 	}
 
-	res, ok := <-r.results
-	if !ok {
-		r.logger.Debug("xdr scan finished")
-		return nil, io.EOF
+	select {
+	case res, ok := <-r.results:
+		if !ok {
+			r.logger.Debug("xdr scan finished")
+			return nil, io.EOF
+		}
+
+		t := models.NewASBXToken(res.Key, res.Payload)
+
+		return t, nil
+	case err := <-r.errorsCh:
+		return nil, err
 	}
-
-	t := models.NewASBXToken(res.Key, res.Payload)
-
-	return t, nil
 }
 
 // Close cancels the Aerospike scan used to read records.
@@ -225,7 +232,8 @@ func (r *RecordReader) serve() {
 			defer wg.Done()
 
 			if err := nr.Run(); err != nil {
-				r.logger.Error("failed to start node reader for node %s: %w", node, err)
+				r.errorsCh <- fmt.Errorf("failed to start node reader for node %s: %w", node, err)
+
 				// If one of the routine failed, we shut other.
 				r.cancel()
 

@@ -329,17 +329,14 @@ func getSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backu
 
 func stopXDR(infoClient *asinfo.InfoClient, dc, namespace string) error {
 	nodes := infoClient.GetNodesNames()
-	errs := make([]error, 0, len(nodes))
+
+	var errs []error
 
 	for _, node := range nodes {
 		// Check before stopping if DC exists.
 		_, err := infoClient.GetStats(node, dc, namespace)
-		if err != nil {
-			if strings.Contains(err.Error(), "DC not found") {
-				continue
-			}
-
-			errs = append(errs, fmt.Errorf("failed to get stats for node %s: %w", node, err))
+		if err != nil && strings.Contains(err.Error(), "DC not found") {
+			continue
 		}
 
 		if err = infoClient.StopXDR(node, dc); err != nil {
@@ -356,7 +353,8 @@ func stopXDR(infoClient *asinfo.InfoClient, dc, namespace string) error {
 
 func unblockMrt(infoClient *asinfo.InfoClient, namespace string) error {
 	nodes := infoClient.GetNodesNames()
-	errs := make([]error, 0, len(nodes))
+
+	var errs []error
 
 	for _, node := range nodes {
 		if err := infoClient.UnBlockMRTWrites(node, namespace); err != nil {

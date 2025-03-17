@@ -42,6 +42,7 @@ const (
 	cmdUnBlockMRTWrites = "set-config:context=namespace;id=%s;disable-mrt-writes=false"
 
 	cmdSetsOfNamespace = "sets/%s"
+	cmdNamespaceInfo   = "namespace/%s"
 
 	cmdMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
 
@@ -262,7 +263,15 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 				continue
 			}
 
-			recordCountForNode, err := getRecordCountForNode(node, ic.policy, namespace, sets)
+			var recordCountForNode uint64
+
+			switch {
+			case len(sets) == 0:
+				recordCountForNode, err = getRecordCountForNamespace(node, ic.policy, namespace)
+			default:
+				recordCountForNode, err = getRecordCountForNode(node, ic.policy, namespace, sets)
+			}
+
 			if err != nil {
 				return err
 			}
@@ -911,6 +920,33 @@ func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace stri
 	}
 
 	return recordsNumber, nil
+}
+
+func getRecordCountForNamespace(node infoGetter, policy *a.InfoPolicy, namespace string) (uint64, error) {
+	cmd := fmt.Sprintf(cmdNamespaceInfo, namespace)
+
+	response, aerr := node.RequestInfo(policy, cmd)
+	if aerr != nil {
+		return 0, fmt.Errorf("failed to get record count: %w", aerr)
+	}
+
+	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse record info request: %w", err)
+	}
+
+	for i := range resultMap {
+		if val, ok := resultMap[i]["objects"]; ok {
+			result, err := strconv.ParseUint(val, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse objects count: %w", err)
+			}
+
+			return result, nil
+		}
+	}
+
+	return 0, fmt.Errorf("failed to parse record info request")
 }
 
 func contains(s []string, str string) bool {

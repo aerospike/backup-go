@@ -471,7 +471,7 @@ func (ic *InfoClient) unBlockMRTWrites(nodeName, namespace string) error {
 // GetNodesNames return list of active nodes names.
 func (ic *InfoClient) GetNodesNames() []string {
 	nodes := ic.cluster.GetNodes()
-	result := make([]string, 0)
+	result := make([]string, 0, len(nodes))
 
 	for _, node := range nodes {
 		if node.IsActive() {

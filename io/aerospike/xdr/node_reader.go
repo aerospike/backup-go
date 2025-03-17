@@ -34,7 +34,6 @@ func NewNodeReader(
 	config *RecordReaderConfig,
 	logger *slog.Logger,
 ) *NodeReader {
-
 	logger = logger.With(
 		slog.String("node", nodeName),
 		slog.String("dc", config.dc),
@@ -91,6 +90,7 @@ func (r *NodeReader) serve() {
 				r.logger.Warn("failed to get xdr stats",
 					slog.Any("error", err),
 				)
+
 				continue
 			}
 
@@ -110,7 +110,8 @@ func (r *NodeReader) serve() {
 					r.logger.Error("failed to block mrt writes",
 						slog.Any("error", err),
 					)
-					break // Or return?
+
+					return
 				}
 
 				r.logger.Debug("mrt blocked")

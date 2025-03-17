@@ -89,7 +89,8 @@ type infoCommander interface {
 // It reads receives records from an Aerospike database through XDR protocol
 // and returns them as *models.ASBXToken.
 type RecordReader struct {
-	ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
 	// Info client to start and stop XDR, also to get current state.
 	infoClient infoCommander
 	// Records reader config.
@@ -98,12 +99,8 @@ type RecordReader struct {
 	tcpServer *TCPServer
 	// Received results will be placed here.
 	results chan *models.ASBXToken
-	// Time when recovery finished.
-	checkpoint int64
 	// To check if the reader is running.
 	isRunning atomic.Bool
-	// To check if mrt is stopped.
-	mrtWritesStopped atomic.Bool
 
 	logger *slog.Logger
 }
@@ -116,9 +113,11 @@ func NewRecordReader(
 	logger *slog.Logger,
 ) (*RecordReader, error) {
 	tcpSrv := NewTCPServer(config.tcpConfig, logger)
+	ctx, cancel := context.WithCancel(ctx)
 
 	rr := &RecordReader{
 		ctx:        ctx,
+		cancel:     cancel,
 		infoClient: infoClient,
 		config:     config,
 		tcpServer:  tcpSrv,
@@ -202,14 +201,12 @@ func (r *RecordReader) serve() {
 
 	var wg sync.WaitGroup
 
-	ctx, cancel := context.WithCancel(r.ctx)
-
 	for _, node := range nodes {
 		wg.Add(1)
 
 		n := node
 		nr := NewNodeReader(
-			ctx,
+			r.ctx,
 			n,
 			r.infoClient,
 			r.config,
@@ -221,11 +218,12 @@ func (r *RecordReader) serve() {
 
 			if err := nr.Run(); err != nil {
 				r.logger.Error("failed to start node reader for node %s: %w", node, err)
-				cancel()
+				// If one of the routine failed, we shut other.
+				r.cancel()
+
 				return
 			}
 		}()
-
 	}
 
 	wg.Wait()

@@ -20,17 +20,17 @@ func (_m *MockinfoCommander) EXPECT() *MockinfoCommander_Expecter {
 	return &MockinfoCommander_Expecter{mock: &_m.Mock}
 }
 
-// BlockMRTWrites provides a mock function with given fields: namespace
-func (_m *MockinfoCommander) BlockMRTWrites(namespace string) error {
-	ret := _m.Called(namespace)
+// BlockMRTWrites provides a mock function with given fields: nodeName, namespace
+func (_m *MockinfoCommander) BlockMRTWrites(nodeName string, namespace string) error {
+	ret := _m.Called(nodeName, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BlockMRTWrites")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(namespace)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(nodeName, namespace)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -44,14 +44,15 @@ type MockinfoCommander_BlockMRTWrites_Call struct {
 }
 
 // BlockMRTWrites is a helper method to define mock.On call
+//   - nodeName string
 //   - namespace string
-func (_e *MockinfoCommander_Expecter) BlockMRTWrites(namespace interface{}) *MockinfoCommander_BlockMRTWrites_Call {
-	return &MockinfoCommander_BlockMRTWrites_Call{Call: _e.mock.On("BlockMRTWrites", namespace)}
+func (_e *MockinfoCommander_Expecter) BlockMRTWrites(nodeName interface{}, namespace interface{}) *MockinfoCommander_BlockMRTWrites_Call {
+	return &MockinfoCommander_BlockMRTWrites_Call{Call: _e.mock.On("BlockMRTWrites", nodeName, namespace)}
 }
 
-func (_c *MockinfoCommander_BlockMRTWrites_Call) Run(run func(namespace string)) *MockinfoCommander_BlockMRTWrites_Call {
+func (_c *MockinfoCommander_BlockMRTWrites_Call) Run(run func(nodeName string, namespace string)) *MockinfoCommander_BlockMRTWrites_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
@@ -61,14 +62,61 @@ func (_c *MockinfoCommander_BlockMRTWrites_Call) Return(_a0 error) *MockinfoComm
 	return _c
 }
 
-func (_c *MockinfoCommander_BlockMRTWrites_Call) RunAndReturn(run func(string) error) *MockinfoCommander_BlockMRTWrites_Call {
+func (_c *MockinfoCommander_BlockMRTWrites_Call) RunAndReturn(run func(string, string) error) *MockinfoCommander_BlockMRTWrites_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetStats provides a mock function with given fields: dc, namespace
-func (_m *MockinfoCommander) GetStats(dc string, namespace string) (asinfo.Stats, error) {
-	ret := _m.Called(dc, namespace)
+// GetNodesNames provides a mock function with given fields:
+func (_m *MockinfoCommander) GetNodesNames() []string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNodesNames")
+	}
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func() []string); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	return r0
+}
+
+// MockinfoCommander_GetNodesNames_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNodesNames'
+type MockinfoCommander_GetNodesNames_Call struct {
+	*mock.Call
+}
+
+// GetNodesNames is a helper method to define mock.On call
+func (_e *MockinfoCommander_Expecter) GetNodesNames() *MockinfoCommander_GetNodesNames_Call {
+	return &MockinfoCommander_GetNodesNames_Call{Call: _e.mock.On("GetNodesNames")}
+}
+
+func (_c *MockinfoCommander_GetNodesNames_Call) Run(run func()) *MockinfoCommander_GetNodesNames_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockinfoCommander_GetNodesNames_Call) Return(_a0 []string) *MockinfoCommander_GetNodesNames_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockinfoCommander_GetNodesNames_Call) RunAndReturn(run func() []string) *MockinfoCommander_GetNodesNames_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetStats provides a mock function with given fields: nodeName, dc, namespace
+func (_m *MockinfoCommander) GetStats(nodeName string, dc string, namespace string) (asinfo.Stats, error) {
+	ret := _m.Called(nodeName, dc, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetStats")
@@ -76,17 +124,17 @@ func (_m *MockinfoCommander) GetStats(dc string, namespace string) (asinfo.Stats
 
 	var r0 asinfo.Stats
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string) (asinfo.Stats, error)); ok {
-		return rf(dc, namespace)
+	if rf, ok := ret.Get(0).(func(string, string, string) (asinfo.Stats, error)); ok {
+		return rf(nodeName, dc, namespace)
 	}
-	if rf, ok := ret.Get(0).(func(string, string) asinfo.Stats); ok {
-		r0 = rf(dc, namespace)
+	if rf, ok := ret.Get(0).(func(string, string, string) asinfo.Stats); ok {
+		r0 = rf(nodeName, dc, namespace)
 	} else {
 		r0 = ret.Get(0).(asinfo.Stats)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(dc, namespace)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(nodeName, dc, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -100,15 +148,16 @@ type MockinfoCommander_GetStats_Call struct {
 }
 
 // GetStats is a helper method to define mock.On call
+//   - nodeName string
 //   - dc string
 //   - namespace string
-func (_e *MockinfoCommander_Expecter) GetStats(dc interface{}, namespace interface{}) *MockinfoCommander_GetStats_Call {
-	return &MockinfoCommander_GetStats_Call{Call: _e.mock.On("GetStats", dc, namespace)}
+func (_e *MockinfoCommander_Expecter) GetStats(nodeName interface{}, dc interface{}, namespace interface{}) *MockinfoCommander_GetStats_Call {
+	return &MockinfoCommander_GetStats_Call{Call: _e.mock.On("GetStats", nodeName, dc, namespace)}
 }
 
-func (_c *MockinfoCommander_GetStats_Call) Run(run func(dc string, namespace string)) *MockinfoCommander_GetStats_Call {
+func (_c *MockinfoCommander_GetStats_Call) Run(run func(nodeName string, dc string, namespace string)) *MockinfoCommander_GetStats_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(string), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -118,22 +167,22 @@ func (_c *MockinfoCommander_GetStats_Call) Return(_a0 asinfo.Stats, _a1 error) *
 	return _c
 }
 
-func (_c *MockinfoCommander_GetStats_Call) RunAndReturn(run func(string, string) (asinfo.Stats, error)) *MockinfoCommander_GetStats_Call {
+func (_c *MockinfoCommander_GetStats_Call) RunAndReturn(run func(string, string, string) (asinfo.Stats, error)) *MockinfoCommander_GetStats_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// StartXDR provides a mock function with given fields: dc, hostPort, namespace, rewind, throughput
-func (_m *MockinfoCommander) StartXDR(dc string, hostPort string, namespace string, rewind string, throughput int) error {
-	ret := _m.Called(dc, hostPort, namespace, rewind, throughput)
+// StartXDR provides a mock function with given fields: nodeName, dc, hostPort, namespace, rewind, throughput
+func (_m *MockinfoCommander) StartXDR(nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int) error {
+	ret := _m.Called(nodeName, dc, hostPort, namespace, rewind, throughput)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartXDR")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, int) error); ok {
-		r0 = rf(dc, hostPort, namespace, rewind, throughput)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string, int) error); ok {
+		r0 = rf(nodeName, dc, hostPort, namespace, rewind, throughput)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -147,18 +196,19 @@ type MockinfoCommander_StartXDR_Call struct {
 }
 
 // StartXDR is a helper method to define mock.On call
+//   - nodeName string
 //   - dc string
 //   - hostPort string
 //   - namespace string
 //   - rewind string
 //   - throughput int
-func (_e *MockinfoCommander_Expecter) StartXDR(dc interface{}, hostPort interface{}, namespace interface{}, rewind interface{}, throughput interface{}) *MockinfoCommander_StartXDR_Call {
-	return &MockinfoCommander_StartXDR_Call{Call: _e.mock.On("StartXDR", dc, hostPort, namespace, rewind, throughput)}
+func (_e *MockinfoCommander_Expecter) StartXDR(nodeName interface{}, dc interface{}, hostPort interface{}, namespace interface{}, rewind interface{}, throughput interface{}) *MockinfoCommander_StartXDR_Call {
+	return &MockinfoCommander_StartXDR_Call{Call: _e.mock.On("StartXDR", nodeName, dc, hostPort, namespace, rewind, throughput)}
 }
 
-func (_c *MockinfoCommander_StartXDR_Call) Run(run func(dc string, hostPort string, namespace string, rewind string, throughput int)) *MockinfoCommander_StartXDR_Call {
+func (_c *MockinfoCommander_StartXDR_Call) Run(run func(nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int)) *MockinfoCommander_StartXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(int))
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(int))
 	})
 	return _c
 }
@@ -168,22 +218,22 @@ func (_c *MockinfoCommander_StartXDR_Call) Return(_a0 error) *MockinfoCommander_
 	return _c
 }
 
-func (_c *MockinfoCommander_StartXDR_Call) RunAndReturn(run func(string, string, string, string, int) error) *MockinfoCommander_StartXDR_Call {
+func (_c *MockinfoCommander_StartXDR_Call) RunAndReturn(run func(string, string, string, string, string, int) error) *MockinfoCommander_StartXDR_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// StopXDR provides a mock function with given fields: dc
-func (_m *MockinfoCommander) StopXDR(dc string) error {
-	ret := _m.Called(dc)
+// StopXDR provides a mock function with given fields: nodeName, dc
+func (_m *MockinfoCommander) StopXDR(nodeName string, dc string) error {
+	ret := _m.Called(nodeName, dc)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StopXDR")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(dc)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(nodeName, dc)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -197,14 +247,15 @@ type MockinfoCommander_StopXDR_Call struct {
 }
 
 // StopXDR is a helper method to define mock.On call
+//   - nodeName string
 //   - dc string
-func (_e *MockinfoCommander_Expecter) StopXDR(dc interface{}) *MockinfoCommander_StopXDR_Call {
-	return &MockinfoCommander_StopXDR_Call{Call: _e.mock.On("StopXDR", dc)}
+func (_e *MockinfoCommander_Expecter) StopXDR(nodeName interface{}, dc interface{}) *MockinfoCommander_StopXDR_Call {
+	return &MockinfoCommander_StopXDR_Call{Call: _e.mock.On("StopXDR", nodeName, dc)}
 }
 
-func (_c *MockinfoCommander_StopXDR_Call) Run(run func(dc string)) *MockinfoCommander_StopXDR_Call {
+func (_c *MockinfoCommander_StopXDR_Call) Run(run func(nodeName string, dc string)) *MockinfoCommander_StopXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
@@ -214,22 +265,22 @@ func (_c *MockinfoCommander_StopXDR_Call) Return(_a0 error) *MockinfoCommander_S
 	return _c
 }
 
-func (_c *MockinfoCommander_StopXDR_Call) RunAndReturn(run func(string) error) *MockinfoCommander_StopXDR_Call {
+func (_c *MockinfoCommander_StopXDR_Call) RunAndReturn(run func(string, string) error) *MockinfoCommander_StopXDR_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// UnBlockMRTWrites provides a mock function with given fields: namespace
-func (_m *MockinfoCommander) UnBlockMRTWrites(namespace string) error {
-	ret := _m.Called(namespace)
+// UnBlockMRTWrites provides a mock function with given fields: nodeName, namespace
+func (_m *MockinfoCommander) UnBlockMRTWrites(nodeName string, namespace string) error {
+	ret := _m.Called(nodeName, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UnBlockMRTWrites")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(namespace)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(nodeName, namespace)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -243,14 +294,15 @@ type MockinfoCommander_UnBlockMRTWrites_Call struct {
 }
 
 // UnBlockMRTWrites is a helper method to define mock.On call
+//   - nodeName string
 //   - namespace string
-func (_e *MockinfoCommander_Expecter) UnBlockMRTWrites(namespace interface{}) *MockinfoCommander_UnBlockMRTWrites_Call {
-	return &MockinfoCommander_UnBlockMRTWrites_Call{Call: _e.mock.On("UnBlockMRTWrites", namespace)}
+func (_e *MockinfoCommander_Expecter) UnBlockMRTWrites(nodeName interface{}, namespace interface{}) *MockinfoCommander_UnBlockMRTWrites_Call {
+	return &MockinfoCommander_UnBlockMRTWrites_Call{Call: _e.mock.On("UnBlockMRTWrites", nodeName, namespace)}
 }
 
-func (_c *MockinfoCommander_UnBlockMRTWrites_Call) Run(run func(namespace string)) *MockinfoCommander_UnBlockMRTWrites_Call {
+func (_c *MockinfoCommander_UnBlockMRTWrites_Call) Run(run func(nodeName string, namespace string)) *MockinfoCommander_UnBlockMRTWrites_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
@@ -260,7 +312,7 @@ func (_c *MockinfoCommander_UnBlockMRTWrites_Call) Return(_a0 error) *MockinfoCo
 	return _c
 }
 
-func (_c *MockinfoCommander_UnBlockMRTWrites_Call) RunAndReturn(run func(string) error) *MockinfoCommander_UnBlockMRTWrites_Call {
+func (_c *MockinfoCommander_UnBlockMRTWrites_Call) RunAndReturn(run func(string, string) error) *MockinfoCommander_UnBlockMRTWrites_Call {
 	_c.Call.Return(run)
 	return _c
 }

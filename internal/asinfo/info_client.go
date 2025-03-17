@@ -472,6 +472,7 @@ func (ic *InfoClient) unBlockMRTWrites(nodeName, namespace string) error {
 func (ic *InfoClient) GetNodesNames() []string {
 	nodes := ic.cluster.GetNodes()
 	result := make([]string, 0)
+
 	for _, node := range nodes {
 		if node.IsActive() {
 			result = append(result, node.GetName())
@@ -548,10 +549,10 @@ type Stats struct {
 
 // GetStats requests node statistics like recoveries, lag, etc.
 // returns Stats struct.
-func (ic *InfoClient) GetStats(node, dc, namespace string) (Stats, error) {
+func (ic *InfoClient) GetStats(nodeName, dc, namespace string) (Stats, error) {
 	cmd := fmt.Sprintf(cmdGetStats, dc, namespace)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
 		return Stats{}, fmt.Errorf("failed to get stats: %w", err)
 	}

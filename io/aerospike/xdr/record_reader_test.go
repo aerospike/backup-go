@@ -62,15 +62,17 @@ func testRecordReaderConfig() *RecordReaderConfig {
 func newInfoMock(t *testing.T) infoCommander {
 	t.Helper()
 	ic := mocks.NewMockinfoCommander(t)
-	ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
-	ic.On("GetStats", mock.Anything, mock.Anything).
+	ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything).
 		Return(asinfo.Stats{
 			Recoveries:        0,
 			RecoveriesPending: 1,
 			Lag:               0,
 		}, nil)
-	ic.On("StopXDR", mock.Anything).
+	ic.On("StopXDR", mock.Anything, mock.Anything).
+		Return(nil)
+	ic.On("GetNodesNames").
 		Return(nil)
 
 	return ic

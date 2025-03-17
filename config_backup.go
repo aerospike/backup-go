@@ -106,7 +106,7 @@ type ConfigBackup struct {
 	Compact bool
 	// Only include records that have no ttl set (persistent records).
 	NoTTLOnly bool
-	// nodeName of a state file that will be saved in backup directory.
+	// Name of a state file that will be saved in backup directory.
 	// Works only with FileLimit parameter.
 	// As we reach FileLimit and close file, the current state will be saved.
 	// Works only for default and/or partition backup.

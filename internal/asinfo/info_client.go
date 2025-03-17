@@ -267,7 +267,7 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 
 			switch {
 			case len(sets) == 0:
-				recordCountForNode, err = getRecordCountForNamespace(node, ic.policy, namespace)
+				recordCountForNode, err = getRecordCountForNodeNamespace(node, ic.policy, namespace)
 			default:
 				recordCountForNode, err = getRecordCountForNode(node, ic.policy, namespace, sets)
 			}
@@ -922,7 +922,7 @@ func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace stri
 	return recordsNumber, nil
 }
 
-func getRecordCountForNamespace(node infoGetter, policy *a.InfoPolicy, namespace string) (uint64, error) {
+func getRecordCountForNodeNamespace(node infoGetter, policy *a.InfoPolicy, namespace string) (uint64, error) {
 	cmd := fmt.Sprintf(cmdNamespaceInfo, namespace)
 
 	response, aerr := node.RequestInfo(policy, cmd)

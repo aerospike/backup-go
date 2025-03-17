@@ -397,7 +397,7 @@ const (
 
 // NewAerospikeKey returns new aerospike key from fields that we receive from
 func NewAerospikeKey(fields []*Field) (*aerospike.Key, error) {
-	// Set name can be empty, so mandatory is only 3 fields.
+	// Set name can be empty, so only 3 fields are mandatory.
 	if len(fields) < 3 {
 		return nil, fmt.Errorf("not enough fields data %d", len(fields))
 	}

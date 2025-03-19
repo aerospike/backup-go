@@ -48,6 +48,10 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			return nil
 		}
 
+		if aerr.IsInDoubt() {
+			p.stats.IncrErrorsInDoubt()
+		}
+
 		switch {
 		case isNilOrAcceptableError(aerr):
 			switch {

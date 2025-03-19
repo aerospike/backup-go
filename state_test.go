@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asb"
@@ -89,6 +90,10 @@ func TestState(t *testing.T) {
 		require.NoError(t, err)
 		state.RecordsStateChan <- pfs
 	}
+
+	// Create a state file.
+	state.SaveCommandChan <- 1
+	time.Sleep(1 * time.Second)
 
 	// Check that file exists.
 	_, err = os.Stat(tempFile)

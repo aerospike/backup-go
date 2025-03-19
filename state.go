@@ -170,9 +170,7 @@ func (s *State) dump(n int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if n > -1 {
-		s.RecordStatesSaved[n] = s.RecordStates[n]
-	}
+	s.RecordStatesSaved[n] = s.RecordStates[n]
 
 	if err = enc.Encode(s); err != nil {
 		return fmt.Errorf("failed to encode state data: %w", err)
@@ -202,7 +200,7 @@ func (s *State) initState(pf []*a.PartitionFilter) error {
 	// Do not move this Unlock() to defer!
 	s.mu.Unlock()
 
-	return s.dump(-1)
+	return nil
 }
 
 func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {

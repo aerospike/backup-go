@@ -1424,9 +1424,9 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	backupCfg.ParallelWrite = 10
 
 	backupCfg.StateFile = testStateFile
-	backupCfg.FileLimit = 100000
+	backupCfg.FileLimit = 10
 	backupCfg.Bandwidth = 1000000
-	backupCfg.PageSize = 100
+	backupCfg.PageSize = 1
 	backupCfg.PipelinesMode = pipeline.ModeParallel
 
 	backupClient, err := NewClient(asClient, WithID("test_client"))

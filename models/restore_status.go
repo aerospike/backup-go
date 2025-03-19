@@ -40,6 +40,13 @@ type RestoreStats struct {
 	recordsInserted atomic.Uint64
 	// Total number of bytes read from source.
 	TotalBytesRead atomic.Uint64
+	// The number of errors in doubt while restoring.
+	// (IsInDoubt signifies that the write operation may have gone through on the server
+	// but the client is not able to confirm that due an error.)
+	// Non zero value indicates that there are might be unexpected side effects during restore, like
+	// * Generation counter greater than expected for some records.
+	// * Fresher records counter greater than expected.
+	errorsInDoubt atomic.Uint64
 }
 
 // NewRestoreStats returns new restore stats.
@@ -63,6 +70,10 @@ func (rs *RestoreStats) GetRecordsFresher() uint64 {
 
 func (rs *RestoreStats) IncrRecordsFresher() {
 	rs.recordsFresher.Add(1)
+}
+
+func (rs *RestoreStats) IncrErrorsInDoubt() {
+	rs.errorsInDoubt.Add(1)
 }
 
 func (rs *RestoreStats) GetRecordsExisted() uint64 {
@@ -93,6 +104,10 @@ func (rs *RestoreStats) IncrRecordsIgnored() {
 	rs.RecordsIgnored.Add(1)
 }
 
+func (rs *RestoreStats) GetErrorsInDoubt() uint64 {
+	return rs.errorsInDoubt.Load()
+}
+
 // SumRestoreStats combines multiple RestoreStats.
 func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
 	result := &RestoreStats{}
@@ -111,6 +126,7 @@ func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
 		result.recordsExisted.Add(stat.GetRecordsExisted())
 		result.recordsFresher.Add(stat.GetRecordsFresher())
 		result.recordsInserted.Add(stat.GetRecordsInserted())
+		result.errorsInDoubt.Add(stat.GetErrorsInDoubt())
 	}
 
 	return result

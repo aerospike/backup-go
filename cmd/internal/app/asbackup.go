@@ -114,9 +114,9 @@ func NewASBackup(
 		}
 	}
 
-	reader, err := initializeBackupReader(ctx, params, secretAgent, logger)
+	reader, err := initializeStateReader(ctx, params, secretAgent, logger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize state reader: %w", err)
 	}
 
 	var racks string
@@ -216,33 +216,36 @@ func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *bac
 	return backupConfig, backupXDRConfig, nil
 }
 
-func initializeBackupReader(
-	ctx context.Context, params *ASBackupParams,
+// initializeStateReader initialize reader for a state file.
+func initializeStateReader(
+	ctx context.Context,
+	params *ASBackupParams,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
-	if params.BackupParams == nil {
+	if params.BackupParams == nil ||
+		!params.BackupParams.ShouldSaveState() ||
+		params.BackupParams.StateFileDst != "" {
 		return nil, nil
 	}
 
-	if !params.BackupParams.ShouldSaveState() {
-		return nil, nil
+	stateFile := params.BackupParams.StateFileDst
+	if params.BackupParams.Continue != "" {
+		stateFile = params.BackupParams.Continue
 	}
 
-	// Fill params to load a state file.
 	restoreParams := &ASRestoreParams{
-		RestoreParams: &models.Restore{
-			InputFile: params.BackupParams.StateFileDst,
+		CommonParams: &models.Common{
+			Directory: params.CommonParams.Directory,
 		},
-		CommonParams: &models.Common{},
+		RestoreParams: &models.Restore{
+			InputFile: stateFile,
+		},
 	}
 
-	reader, err := newReader(ctx, restoreParams, sa, false, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create reader: %w", err)
-	}
+	logger.Debug("loading state file", slog.String("path", stateFile))
 
-	return reader, nil
+	return newReader(ctx, restoreParams, sa, false, logger)
 }
 
 func initializeBackupWriter(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,

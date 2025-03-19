@@ -189,6 +189,7 @@ func (s *State) dump(n int) error {
 
 func (s *State) initState(pf []*a.PartitionFilter) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	for i := range pf {
 		pfs, err := models.NewPartitionFilterSerialized(pf[i])
@@ -199,8 +200,6 @@ func (s *State) initState(pf []*a.PartitionFilter) error {
 		s.RecordStates[i] = pfs
 		s.RecordStatesSaved[i] = pfs
 	}
-	// Do not move this Unlock() to defer!
-	s.mu.Unlock()
 
 	return nil
 }

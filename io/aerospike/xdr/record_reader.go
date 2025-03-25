@@ -272,12 +272,9 @@ func (r *RecordReader) watchNodes(nodeReaders []*NodeReader) {
 				for _, node := range nodeReaders {
 					err := node.BlockMrt()
 					if err != nil {
-						r.errorsCh <- fmt.Errorf("failed to block mrt for node %s: %w", node.nodeName, err)
-
-						// If one of the routine failed, we shut other.
-						r.cancel()
-
-						return
+						r.logger.Error("failed to block mrt for node",
+							slog.String("node", node.nodeName),
+							slog.Any("error", err))
 					}
 				}
 

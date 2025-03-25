@@ -176,12 +176,11 @@ func (r *NodeReader) close() {
 }
 
 func (r *NodeReader) BlockMrt() error {
+	r.mrtWritesStopped.Store(true)
 	// Stop MRT writes in this checkpoint.
 	if err := r.infoClient.BlockMRTWrites(r.nodeName, r.config.namespace); err != nil {
 		return fmt.Errorf("failed to block mrt writes: %w", err)
 	}
-
-	r.mrtWritesStopped.Store(true)
 
 	return nil
 }

@@ -96,6 +96,8 @@ func (r *NodeReader) serve() {
 	defer ticker.Stop()
 	defer r.close()
 
+	var stateSent bool
+
 	time.Sleep(statsPollingDelay)
 
 	for {
@@ -122,7 +124,11 @@ func (r *NodeReader) serve() {
 			}
 
 			// Recovery finished.
-			r.nodesRecovered <- struct{}{}
+			if !stateSent {
+				r.nodesRecovered <- struct{}{}
+
+				stateSent = true
+			}
 
 			if !r.mrtWritesStopped.Load() {
 				// Wait for all the nodes.

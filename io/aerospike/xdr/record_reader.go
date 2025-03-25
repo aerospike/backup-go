@@ -279,6 +279,8 @@ func (r *RecordReader) watchNodes(nodeReaders []*NodeReader) {
 				}
 
 				r.logger.Debug("all mrt blocked")
+
+				return
 			}
 		}
 	}

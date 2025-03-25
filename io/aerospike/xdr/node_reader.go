@@ -38,6 +38,8 @@ type NodeReader struct {
 	// To check if mrt is stopped.
 	mrtWritesStopped atomic.Bool
 
+	nodesRecovered chan struct{}
+
 	logger *slog.Logger
 }
 
@@ -46,6 +48,7 @@ func NewNodeReader(
 	nodeName string,
 	infoClient infoCommander,
 	config *RecordReaderConfig,
+	nodesRecovered chan struct{},
 	logger *slog.Logger,
 ) *NodeReader {
 	logger = logger.With(
@@ -55,11 +58,12 @@ func NewNodeReader(
 	)
 
 	return &NodeReader{
-		nodeName:   nodeName,
-		ctx:        ctx,
-		infoClient: infoClient,
-		config:     config,
-		logger:     logger,
+		nodeName:       nodeName,
+		ctx:            ctx,
+		infoClient:     infoClient,
+		config:         config,
+		nodesRecovered: nodesRecovered,
+		logger:         logger,
 	}
 }
 
@@ -116,20 +120,18 @@ func (r *NodeReader) serve() {
 				// Recovery in progress.
 				continue
 			}
+
+			// Recovery finished.
+			r.nodesRecovered <- struct{}{}
+
+			if !r.mrtWritesStopped.Load() {
+				// Wait for all the nodes.
+				continue
+			}
+
 			// set once.
 			if r.checkpoint == 0 {
 				r.checkpoint = time.Now().Unix()
-				// Stop MRT writes in this checkpoint.
-				if err = r.infoClient.BlockMRTWrites(r.nodeName, r.config.namespace); err != nil {
-					r.logger.Error("failed to block mrt writes",
-						slog.Any("error", err),
-					)
-
-					return
-				}
-
-				r.logger.Debug("mrt blocked")
-				r.mrtWritesStopped.Store(true)
 			}
 
 			// Convert lag from citrus leaf epoch.
@@ -146,6 +148,7 @@ func (r *NodeReader) serve() {
 				r.logger.Debug("mrt unblocked")
 				r.mrtWritesStopped.Store(false)
 
+				// Correct exit from routine.
 				return
 			}
 		}
@@ -170,4 +173,15 @@ func (r *NodeReader) close() {
 	}
 
 	r.logger.Debug("closed aerospike node record reader")
+}
+
+func (r *NodeReader) BlockMrt() error {
+	// Stop MRT writes in this checkpoint.
+	if err := r.infoClient.BlockMRTWrites(r.nodeName, r.config.namespace); err != nil {
+		return fmt.Errorf("failed to block mrt writes: %w", err)
+	}
+
+	r.mrtWritesStopped.Store(true)
+
+	return nil
 }

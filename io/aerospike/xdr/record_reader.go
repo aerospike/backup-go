@@ -104,6 +104,8 @@ type RecordReader struct {
 
 	errorsCh chan error
 
+	nodesRecovered chan struct{}
+
 	logger *slog.Logger
 }
 
@@ -118,13 +120,14 @@ func NewRecordReader(
 	ctx, cancel := context.WithCancel(ctx)
 
 	rr := &RecordReader{
-		ctx:        ctx,
-		cancel:     cancel,
-		infoClient: infoClient,
-		config:     config,
-		tcpServer:  tcpSrv,
-		errorsCh:   make(chan error),
-		logger:     logger,
+		ctx:            ctx,
+		cancel:         cancel,
+		infoClient:     infoClient,
+		config:         config,
+		tcpServer:      tcpSrv,
+		errorsCh:       make(chan error),
+		nodesRecovered: make(chan struct{}),
+		logger:         logger,
 	}
 
 	return rr, nil
@@ -216,6 +219,8 @@ func (r *RecordReader) serve() {
 
 	var wg sync.WaitGroup
 
+	nodeReaders := make([]*NodeReader, 0, len(nodes))
+
 	for _, node := range nodes {
 		wg.Add(1)
 
@@ -225,8 +230,11 @@ func (r *RecordReader) serve() {
 			n,
 			r.infoClient,
 			r.config,
+			r.nodesRecovered,
 			r.logger,
 		)
+
+		nodeReaders = append(nodeReaders, nr)
 
 		go func() {
 			defer wg.Done()
@@ -242,7 +250,38 @@ func (r *RecordReader) serve() {
 		}()
 	}
 
+	go r.watchNodes(nodeReaders)
+
 	wg.Wait()
 
 	r.Close()
+}
+
+func (r *RecordReader) watchNodes(nodeReaders []*NodeReader) {
+	var nodesCounter int
+
+	for {
+		select {
+		case <-r.ctx.Done():
+			return
+		case <-r.nodesRecovered:
+			nodesCounter++
+
+			if nodesCounter == len(nodeReaders) {
+				// Block mrts on all nodes.
+				for _, node := range nodeReaders {
+					err := node.BlockMrt()
+					if err != nil {
+						r.logger.Error("failed to block mrt for node",
+							slog.String("node", node.nodeName),
+							slog.Any("error", err))
+					}
+				}
+
+				r.logger.Debug("all mrt blocked")
+
+				return
+			}
+		}
+	}
 }

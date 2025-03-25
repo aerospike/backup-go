@@ -34,7 +34,7 @@ const (
 	defaultAddress        = ":8080"
 	defaultTimeout        = 1 * time.Second
 	defaultQueueSize      = 256
-	defaultMaxConnections = 100
+	defaultMaxConnections = 4096
 )
 
 // TCPConfig contains tcp server config params.

@@ -83,7 +83,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		256,
 		"Buffer for processing acknowledge messages sent to XDR.")
 	flagSet.IntVar(&f.MaxConnections, "max-connections",
-		256,
+		4096,
 		"Maximum number of concurrent TCP connections.")
 	flagSet.Int64Var(&f.InfoPolingPeriodMilliseconds, "info-poling-period",
 		1000,

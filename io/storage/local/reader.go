@@ -234,7 +234,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 }
 
 // ListObjects list all object in the path.
-func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
+func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
 	result := make([]string, 0)
 
 	fileInfo, err := os.ReadDir(path)
@@ -243,13 +243,29 @@ func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
 	}
 
 	for i := range fileInfo {
+		fullPath := filepath.Join(path, fileInfo[i].Name())
+
+		if fileInfo[i].IsDir() {
+			// If WithNestedDir is true, recursively list files in subdirectories
+			if r.WithNestedDir {
+				subDirFiles, err := r.ListObjects(ctx, fullPath)
+				if err != nil {
+					return nil, err
+				}
+
+				result = append(result, subDirFiles...)
+			}
+
+			continue
+		}
+
 		if r.Validator != nil {
 			if err = r.Validator.Run(fileInfo[i].Name()); err != nil {
 				continue
 			}
 		}
 
-		result = append(result, fileInfo[i].Name())
+		result = append(result, fullPath)
 	}
 
 	return result, nil

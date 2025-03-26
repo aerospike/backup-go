@@ -29,7 +29,9 @@ const DefaultPollWarmDuration = time.Minute
 
 // reader interface defines methods for listing and streaming objects
 type reader interface {
+	// ListObjects return list of filenames in given path. Result contains full path, from the root.
 	ListObjects(ctx context.Context, path string) ([]string, error)
+	// SetObjectsToStream sets elements that would be returned by StreamFiles method.
 	SetObjectsToStream(list []string)
 }
 

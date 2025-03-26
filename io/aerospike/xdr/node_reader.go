@@ -115,6 +115,10 @@ func (r *NodeReader) serve() {
 		case <-ticker.C:
 			stats, err := r.getStats()
 			if err != nil {
+				r.logger.Error("failed to get stats",
+					slog.Any("err", err),
+				)
+
 				return
 			}
 

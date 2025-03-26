@@ -336,8 +336,6 @@ func SetRecordExistsActionBit(action aerospike.RecordExistsAction, message []byt
 	message[info3Pos+LenProtoHeader] &= ^byte(MsgInfo3ReplaceOnly)
 	message[info2Pos+LenProtoHeader] &= ^byte(MsgInfo2CreateOnly)
 
-	message[info2Pos+LenProtoHeader] |= MsgInfo2CreateOnly
-
 	switch action {
 	case aerospike.UPDATE:
 		// default NONE

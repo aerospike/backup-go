@@ -108,6 +108,7 @@ type RecordReader struct {
 
 	nodesRecovered chan struct{}
 	activeNodes    []*NodeReader
+	anMu           sync.RWMutex
 
 	logger *slog.Logger
 }
@@ -248,7 +249,9 @@ func (r *RecordReader) createNodeReaders(nodes []string, wg *sync.WaitGroup) {
 			r.logger,
 		)
 
+		r.anMu.Lock()
 		r.activeNodes = append(r.activeNodes, nr)
+		r.anMu.Unlock()
 
 		go func() {
 			defer wg.Done()
@@ -276,8 +279,10 @@ func (r *RecordReader) watchNodes() {
 		case <-r.nodesRecovered:
 			nodesCounter++
 
+			r.anMu.RLock()
+
 			if nodesCounter == len(r.activeNodes) {
-				// Block mrts on all nodes.
+				// Block MRT writes on all nodes.
 				for _, node := range r.activeNodes {
 					err := node.BlockMrt()
 					if err != nil {
@@ -291,6 +296,8 @@ func (r *RecordReader) watchNodes() {
 
 				return
 			}
+
+			r.anMu.RUnlock()
 		}
 	}
 }
@@ -314,6 +321,8 @@ func (r *RecordReader) watchCluster(nodes []string, wg *sync.WaitGroup) {
 
 			diff := util.Diff(nodes, curNodes)
 			if len(diff) > 0 {
+				r.logger.Debug("new nodes detected", slog.Any("nodes", diff))
+
 				r.createNodeReaders(diff, wg)
 			}
 		}

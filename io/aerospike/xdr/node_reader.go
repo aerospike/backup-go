@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aerospike/backup-go/internal/asinfo"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 )
 
@@ -111,44 +112,13 @@ func (r *NodeReader) serve() {
 		case <-r.ctx.Done():
 			return
 		case <-ticker.C:
-			stats, err := r.infoClient.GetStats(r.nodeName, r.config.dc, r.config.namespace)
+			stats, err := r.getStats(&startRetries)
+			if err != nil {
+				return
+			}
 
-			switch {
-			case err == nil:
-			// OK.
-			case strings.Contains(err.Error(), "ERROR:2:DC not found"):
-				// restart xdr.
-				if err := r.infoClient.StartXDR(
-					r.nodeName,
-					r.config.dc,
-					r.config.currentHostPort,
-					r.config.namespace,
-					r.config.rewind,
-					r.config.maxThroughput,
-				); err != nil {
-					if startRetries >= defaultStartRetries {
-						// Retries reached exit.
-						r.logger.Error("failed to recreate xdr config for node, shut down",
-							slog.Int("try", startRetries),
-							slog.String("node", r.nodeName),
-							slog.Any("error", err))
-
-						return
-					}
-
-					r.logger.Warn("failed to recreate xdr config for node",
-						slog.Int("try", startRetries),
-						slog.String("node", r.nodeName),
-						slog.Any("error", err))
-
-					startRetries++
-
-					continue
-				}
-			default:
-				r.logger.Warn("failed to get xdr stats",
-					slog.Any("error", err),
-				)
+			if stats == nil {
+				continue
 			}
 
 			r.logger.Debug("got stats",
@@ -226,4 +196,50 @@ func (r *NodeReader) BlockMrt() error {
 	}
 
 	return nil
+}
+
+func (r *NodeReader) getStats(startRetries *int) (*asinfo.Stats, error) {
+	stats, err := r.infoClient.GetStats(r.nodeName, r.config.dc, r.config.namespace)
+	if err == nil {
+		return &stats, nil
+	}
+
+	if strings.Contains(err.Error(), "ERROR:2:DC not found") {
+		// Only attempt restart if we haven't exceeded retry limit
+		if *startRetries >= defaultStartRetries {
+			r.logger.Error("failed to recreate xdr config for node, shut down",
+				slog.Int("try", *startRetries),
+				slog.String("node", r.nodeName),
+				slog.Any("error", err))
+
+			return nil, err
+		}
+
+		// Try to restart XDR
+		if err := r.infoClient.StartXDR(
+			r.nodeName,
+			r.config.dc,
+			r.config.currentHostPort,
+			r.config.namespace,
+			r.config.rewind,
+			r.config.maxThroughput,
+		); err != nil {
+			r.logger.Warn("failed to recreate xdr config for node",
+				slog.Int("try", *startRetries),
+				slog.String("node", r.nodeName),
+				slog.Any("error", err))
+
+			*startRetries++
+
+			return nil, nil
+		}
+
+		// XDR restarted successfully, but we still need to return nil,nil to signal caller to retry
+		return nil, nil
+	}
+
+	// Any other error
+	r.logger.Warn("failed to get xdr stats", slog.Any("error", err))
+
+	return nil, err
 }

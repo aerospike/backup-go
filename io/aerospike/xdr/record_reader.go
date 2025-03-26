@@ -128,7 +128,7 @@ func NewRecordReader(
 		infoClient:     infoClient,
 		config:         config,
 		tcpServer:      tcpSrv,
-		errorsCh:       make(chan error),
+		errorsCh:       make(chan error, defaultQueueSize),
 		nodesRecovered: make(chan struct{}),
 		logger:         logger,
 	}

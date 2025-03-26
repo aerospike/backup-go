@@ -18,11 +18,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 )
+
+const defaultStartRetries = 3
 
 // NodeReader track each node.
 type NodeReader struct {
@@ -96,7 +99,10 @@ func (r *NodeReader) serve() {
 	defer ticker.Stop()
 	defer r.close()
 
-	var stateSent bool
+	var (
+		stateSent    bool
+		startRetries int
+	)
 
 	time.Sleep(statsPollingDelay)
 
@@ -106,12 +112,43 @@ func (r *NodeReader) serve() {
 			return
 		case <-ticker.C:
 			stats, err := r.infoClient.GetStats(r.nodeName, r.config.dc, r.config.namespace)
-			if err != nil {
+
+			switch {
+			case err == nil:
+			// OK.
+			case strings.Contains(err.Error(), "ERROR:2:DC not found"):
+				// restart xdr.
+				if err := r.infoClient.StartXDR(
+					r.nodeName,
+					r.config.dc,
+					r.config.currentHostPort,
+					r.config.namespace,
+					r.config.rewind,
+					r.config.maxThroughput,
+				); err != nil {
+					if startRetries >= defaultStartRetries {
+						// Retries reached exit.
+						r.logger.Error("failed to recreate xdr config for node, shut down",
+							slog.Int("try", startRetries),
+							slog.String("node", r.nodeName),
+							slog.Any("error", err))
+
+						return
+					}
+
+					r.logger.Warn("failed to recreate xdr config for node",
+						slog.Int("try", startRetries),
+						slog.String("node", r.nodeName),
+						slog.Any("error", err))
+
+					startRetries++
+
+					continue
+				}
+			default:
 				r.logger.Warn("failed to get xdr stats",
 					slog.Any("error", err),
 				)
-
-				continue
 			}
 
 			r.logger.Debug("got stats",

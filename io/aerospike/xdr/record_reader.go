@@ -19,11 +19,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -105,6 +107,7 @@ type RecordReader struct {
 	errorsCh chan error
 
 	nodesRecovered chan struct{}
+	activeNodes    []*NodeReader
 
 	logger *slog.Logger
 }
@@ -219,8 +222,19 @@ func (r *RecordReader) serve() {
 
 	var wg sync.WaitGroup
 
-	nodeReaders := make([]*NodeReader, 0, len(nodes))
+	r.activeNodes = make([]*NodeReader, 0, len(nodes))
 
+	r.createNodeReaders(nodes, &wg)
+	go r.watchCluster(nodes, &wg)
+	go r.watchNodes()
+
+	wg.Wait()
+
+	r.Close()
+}
+
+// createNodeReaders creates node readers for nodes list.
+func (r *RecordReader) createNodeReaders(nodes []string, wg *sync.WaitGroup) {
 	for _, node := range nodes {
 		wg.Add(1)
 
@@ -234,7 +248,7 @@ func (r *RecordReader) serve() {
 			r.logger,
 		)
 
-		nodeReaders = append(nodeReaders, nr)
+		r.activeNodes = append(r.activeNodes, nr)
 
 		go func() {
 			defer wg.Done()
@@ -249,15 +263,10 @@ func (r *RecordReader) serve() {
 			}
 		}()
 	}
-
-	go r.watchNodes(nodeReaders)
-
-	wg.Wait()
-
-	r.Close()
 }
 
-func (r *RecordReader) watchNodes(nodeReaders []*NodeReader) {
+// watchNodes monitor nodes state and block mrt when all nodes exit recovery mode.
+func (r *RecordReader) watchNodes() {
 	var nodesCounter int
 
 	for {
@@ -267,9 +276,9 @@ func (r *RecordReader) watchNodes(nodeReaders []*NodeReader) {
 		case <-r.nodesRecovered:
 			nodesCounter++
 
-			if nodesCounter == len(nodeReaders) {
+			if nodesCounter == len(r.activeNodes) {
 				// Block mrts on all nodes.
-				for _, node := range nodeReaders {
+				for _, node := range r.activeNodes {
 					err := node.BlockMrt()
 					if err != nil {
 						r.logger.Error("failed to block mrt for node",
@@ -281,6 +290,31 @@ func (r *RecordReader) watchNodes(nodeReaders []*NodeReader) {
 				r.logger.Debug("all mrt blocked")
 
 				return
+			}
+		}
+	}
+}
+
+// watchCluster monitor cluster, and if new node was added, we start new node reader for it.
+func (r *RecordReader) watchCluster(nodes []string, wg *sync.WaitGroup) {
+	ticker := time.NewTicker(r.config.infoPolingPeriod)
+	defer ticker.Stop()
+
+	time.Sleep(statsPollingDelay)
+
+	for {
+		select {
+		case <-r.ctx.Done():
+			return
+		case <-ticker.C:
+			curNodes := r.infoClient.GetNodesNames()
+			if slices.Equal(nodes, curNodes) {
+				continue
+			}
+
+			diff := util.Diff(curNodes, nodes)
+			if len(diff) > 0 {
+				r.createNodeReaders(diff, wg)
 			}
 		}
 	}

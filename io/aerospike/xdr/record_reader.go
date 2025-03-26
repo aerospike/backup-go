@@ -312,7 +312,7 @@ func (r *RecordReader) watchCluster(nodes []string, wg *sync.WaitGroup) {
 				continue
 			}
 
-			diff := util.Diff(curNodes, nodes)
+			diff := util.Diff(nodes, curNodes)
 			if len(diff) > 0 {
 				r.createNodeReaders(diff, wg)
 			}

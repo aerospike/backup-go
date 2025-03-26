@@ -176,15 +176,5 @@ func (c *ConfigRestore) isValidForASBX() error {
 		return fmt.Errorf("extra ttl value is not supported for ASBX")
 	}
 
-	if c.WritePolicy != nil {
-		if c.WritePolicy.RecordExistsAction == a.REPLACE {
-			return fmt.Errorf("replace exists action is not supported for ASBX")
-		}
-
-		if c.WritePolicy.RecordExistsAction == a.CREATE_ONLY {
-			return fmt.Errorf("unique is not supported for ASBX")
-		}
-	}
-
 	return nil
 }

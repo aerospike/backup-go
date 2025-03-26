@@ -37,7 +37,8 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 		attempt uint
 	)
 
-	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, xdr.LenProtoHeader, t.Payload)
+	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, t.Payload)
+	t.Payload = xdr.SetRecordExistsActionBit(p.writePolicy.RecordExistsAction, t.Payload)
 
 	for attemptsLeft(p.retryPolicy, attempt) {
 		aerr = p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)

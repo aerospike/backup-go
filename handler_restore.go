@@ -61,6 +61,8 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
+	pl *pipeline.Pipeline[T]
+
 	errors chan error
 }
 
@@ -150,6 +152,9 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		return err
 	}
 
+	// Assign, so we can get pl stats.
+	rh.pl = pl
+
 	return pl.Run(ctx)
 }
 
@@ -207,4 +212,9 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	case err := <-rh.errors:
 		return err
 	}
+}
+
+// GetMetrics returns the metrics of the backup job.
+func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
+	return models.NewMetrics(rh.pl.GetMetrics())
 }

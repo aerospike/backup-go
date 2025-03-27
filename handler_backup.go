@@ -78,6 +78,8 @@ type BackupHandler struct {
 	state *State
 	// For graceful shutdown.
 	wg sync.WaitGroup
+
+	recordHandler *backupRecordsHandler
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -200,8 +202,8 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	scanPolicy.RawCDT = true
 
 	nodes := bh.aerospikeClient.GetNodes()
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
-	readerConfig := handler.recordReaderConfigForNode(nodes, &scanPolicy)
+	bh.recordHandler = newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
+	readerConfig := bh.recordHandler.recordReaderConfigForNode(nodes, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 	// Timestamp processor.
@@ -260,9 +262,9 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
 
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
+	bh.recordHandler = newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
 
-	bh.stats.TotalRecords, err = handler.countRecords(ctx, bh.infoClient)
+	bh.stats.TotalRecords, err = bh.recordHandler.countRecords(ctx, bh.infoClient)
 	if err != nil {
 		return err
 	}
@@ -275,7 +277,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		}
 	}
 
-	return handler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
+	return bh.recordHandler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
 }
 
 func (bh *BackupHandler) makeWriteWorkers(
@@ -544,4 +546,9 @@ func (bh *BackupHandler) backupUDFs(
 	}
 
 	return udfPipeline.Run(ctx)
+}
+
+// GetMetrics returns the metrics of the backup job.
+func (bh *BackupHandler) GetMetrics() *models.Metrics {
+	return bh.recordHandler.GetMetrics()
 }

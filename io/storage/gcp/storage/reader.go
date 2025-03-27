@@ -196,18 +196,6 @@ func (r *Reader) openObject(
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
-	// This condition will be true, only if we initialized reader for directory and then want to read
-	// a specific file. It is used for state file and by asb service. So it must be initialized with only
-	// one path.
-	if r.IsDir {
-		if len(r.PathList) != 1 {
-			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
-			return
-		}
-
-		filename = filepath.Join(r.PathList[0], filename)
-	}
-
 	r.openObject(ctx, filename, readersCh, errorsCh, false)
 }
 

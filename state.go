@@ -97,6 +97,7 @@ func newState(
 		writer:            writer,
 		logger:            logger,
 	}
+
 	// Run watcher on initialization.
 	go s.serve()
 	go s.serveRecords()
@@ -182,7 +183,7 @@ func (s *State) dump(n int) error {
 		return fmt.Errorf("failed to close state file: %w", err)
 	}
 
-	s.logger.Debug("state file dumped", slog.Time("saved at", time.Now()))
+	s.logger.Debug("state file dumped", slog.String("path", s.FileName), slog.Time("saved at", time.Now()))
 
 	return nil
 }

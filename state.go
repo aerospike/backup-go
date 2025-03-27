@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -93,7 +94,7 @@ func newState(
 		RecordStates:      make(map[int]models.PartitionFilterSerialized),
 		RecordStatesSaved: make(map[int]models.PartitionFilterSerialized),
 		SaveCommandChan:   make(chan int),
-		FileName:          config.StateFile,
+		FileName:          filepath.Base(config.StateFile),
 		writer:            writer,
 		logger:            logger,
 	}

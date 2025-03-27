@@ -96,12 +96,10 @@ Restore Flags:
                                   --directory-list /path/to/dir1/,/path/to/dir2'
                                   Incompatible with --mode=asbx.
   -u, --unique                    Skip modifying records that already exist in the namespace.
-                                  Incompatible with --mode=asbx.
   -r, --replace                   Fully replace records that already exist in the namespace.
                                   This option still performs a generation check by default and needs to be combined with the -g option
                                   if you do not want to perform a generation check.
                                   This option is mutually exclusive with --unique.
-                                  Incompatible with --mode=asbx.
   -g, --no-generation             Don't check the generation of records that already exist in the namespace.
       --ignore-record-error       Ignore errors specific to records, not UDFs or indexes. The errors are:
                                   AEROSPIKE_RECORD_TOO_BIG,

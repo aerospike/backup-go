@@ -1372,6 +1372,7 @@ func TestBackupContinuation(t *testing.T) {
 	require.NoError(t, err)
 
 	testFolder := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
+	stateFile := path.Join(testFolder, testStateFile)
 
 	for i := 0; i < 5; i++ {
 		randomNumber := rand.Intn(7-3+1) + 3
@@ -1381,11 +1382,11 @@ func TestBackupContinuation(t *testing.T) {
 			cancel()
 		}()
 
-		first, err := runFirstBackup(ctx, asClient, setName, testFolder, testStateFile, i)
+		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile, i)
 		require.NoError(t, err)
 
 		ctx = context.Background()
-		second, err := runContinueBackup(ctx, asClient, setName, testFolder, testStateFile, i)
+		second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile, i)
 		require.NoError(t, err)
 
 		t.Log("first:", first, "second:", second)

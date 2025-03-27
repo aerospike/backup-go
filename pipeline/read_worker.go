@@ -75,7 +75,7 @@ func (w *readWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// GetStats returns stats of received and sent messages.
-func (w *readWorker[T]) GetStats() (int, int) {
+// GetMetrics returns stats of received and sent messages.
+func (w *readWorker[T]) GetMetrics() (iת, out int) {
 	return 0, len(w.send)
 }

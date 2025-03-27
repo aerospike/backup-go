@@ -84,7 +84,7 @@ func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 	}
 }
 
-// GetStats returns stats of received and sent messages.
-func (w *ProcessorWorker[T]) GetStats() (int, int) {
+// GetMetrics returns stats of received and sent messages.
+func (w *ProcessorWorker[T]) GetMetrics() (in, out int) {
 	return len(w.receive), len(w.send)
 }

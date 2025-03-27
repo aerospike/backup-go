@@ -47,6 +47,8 @@ type HandlerBackupXDR struct {
 	errors chan error
 	// For graceful shutdown.
 	wg sync.WaitGroup
+
+	pl *pipeline.Pipeline[*models.ASBXToken]
 }
 
 // newHandlerBackupXDR returns a new xdr backup handler.
@@ -163,6 +165,9 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 		return fmt.Errorf("failed to create pipeline: %w", err)
 	}
 
+	// Assign, so we can get pl stats.
+	bh.pl = pl
+
 	return pl.Run(ctx)
 }
 
@@ -211,4 +216,9 @@ func (bh *HandlerBackupXDR) splitFunc(t *models.ASBXToken) int {
 // GetStats returns the stats of the backup job.
 func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 	return bh.stats
+}
+
+// GetMetrics returns the metrics of the backup job.
+func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
+	return models.NewMetrics(bh.pl.GetMetrics())
 }

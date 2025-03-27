@@ -38,6 +38,7 @@ type backupRecordsHandler struct {
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
 	state           *State
+	pl              *pipeline.Pipeline[*models.Token]
 }
 
 func newBackupRecordsHandler(
@@ -85,6 +86,9 @@ func (bh *backupRecordsHandler) run(
 	if err != nil {
 		return fmt.Errorf("failed to create new pipeline: %w", err)
 	}
+
+	// Assign, so we can get pl stats.
+	bh.pl = pl
 
 	return pl.Run(ctx)
 }
@@ -332,4 +336,9 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		bh.config.NoTTLOnly,
 		bh.config.PageSize,
 	)
+}
+
+// GetMetrics returns the metrics of the backup job.
+func (bh *backupRecordsHandler) GetMetrics() *models.Metrics {
+	return models.NewMetrics(bh.pl.GetMetrics())
 }

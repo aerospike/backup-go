@@ -30,7 +30,7 @@ type Worker[T any] interface {
 	SetSendChan(chan<- T)
 	SetReceiveChan(<-chan T)
 	Run(context.Context) error
-	GetStats() (int, int)
+	GetMetrics() (int, int)
 }
 
 // Pipeline runs a series of workers in parallel.
@@ -138,10 +138,10 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	return nil
 }
 
-// GetStats returns stats: reader, writer.
-func (dp *Pipeline[T]) GetStats() (int, int) {
-	_, readOut := dp.stages[0].GetStats()
-	writeIn, _ := dp.stages[2].GetStats()
+// GetMetrics returns stats: reader, writer.
+func (dp *Pipeline[T]) GetMetrics() (in, out int) {
+	_, readOut := dp.stages[0].GetMetrics()
+	writeIn, _ := dp.stages[2].GetMetrics()
 
 	return readOut, writeIn
 }
@@ -217,10 +217,11 @@ func (s *stage[T]) Run(ctx context.Context) error {
 	return nil
 }
 
-func (s *stage[T]) GetStats() (int, int) {
+func (s *stage[T]) GetMetrics() (in, out int) {
 	var sumIn, sumOut int
+
 	for _, w := range s.workers {
-		in, out := w.GetStats()
+		in, out := w.GetMetrics()
 		sumIn += in
 		sumOut += out
 	}

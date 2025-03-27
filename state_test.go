@@ -49,7 +49,7 @@ func TestState(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := NewDefaultBackupConfig()
-	cfg.StateFile = testStateFile
+	cfg.StateFile = tempFile
 	cfg.PageSize = 100000
 	cfg.PipelinesMode = pipeline.ModeParallel
 	cfg.PartitionFilters = testFilters

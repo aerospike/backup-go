@@ -16,6 +16,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -160,18 +161,6 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	// This condition will be true, only if we initialized reader for directory and then want to read
-	// a specific file. It is used for state file and by asb service. So it must be initialized with only
-	// one path.
-	if r.IsDir {
-		if len(r.PathList) != 1 {
-			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
-			return
-		}
-
-		filename = filepath.Join(r.PathList[0], filename)
-	}
-
 	reader, err := os.Open(filename)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)
@@ -234,22 +223,42 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 }
 
 // ListObjects list all object in the path.
-func (r *Reader) ListObjects(_ context.Context, path string) ([]string, error) {
+func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
 	result := make([]string, 0)
 
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) && r.SkipDirCheck {
+			return nil, nil // Path doesn't exist, no error returned
+		}
+
 		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
 	}
 
 	for i := range fileInfo {
+		fullPath := filepath.Join(path, fileInfo[i].Name())
+
+		if fileInfo[i].IsDir() {
+			// If WithNestedDir is true, recursively list files in subdirectories
+			if r.WithNestedDir {
+				subDirFiles, err := r.ListObjects(ctx, fullPath)
+				if err != nil {
+					return nil, err
+				}
+
+				result = append(result, subDirFiles...)
+			}
+
+			continue
+		}
+
 		if r.Validator != nil {
 			if err = r.Validator.Run(fileInfo[i].Name()); err != nil {
 				continue
 			}
 		}
 
-		result = append(result, fileInfo[i].Name())
+		result = append(result, fullPath)
 	}
 
 	return result, nil

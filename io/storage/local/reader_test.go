@@ -260,9 +260,8 @@ func TestDirectoryReader_OpenFile(t *testing.T) {
 
 	mockValidator := new(mocks.Mockvalidator)
 
-	path := filepath.Join(dir, fileName)
 	ctx := context.Background()
-	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(filepath.Join(dir, fileName)))
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
@@ -295,9 +294,8 @@ func TestDirectoryReader_OpenFileErr(t *testing.T) {
 
 	mockValidator := new(mocks.Mockvalidator)
 
-	path := filepath.Join(dir, "error")
 	ctx := context.Background()
-	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(path))
+	r, err := NewReader(ctx, ioStorage.WithValidator(mockValidator), ioStorage.WithFile(filepath.Join(dir, "error")))
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
@@ -595,4 +593,52 @@ func filterList(list []string) (asbList, asbxList []string) {
 		}
 	}
 	return asbList, asbxList
+}
+
+func TestReader_ListObjectsWithNestedDir(t *testing.T) {
+	dir := path.Join(t.TempDir(), "TestReader_ListObjectsWithNestedDir")
+	err := os.MkdirAll(dir, os.ModePerm)
+	require.NoError(t, err)
+
+	// Create nested directory structure
+	err = createTempNestedDir(dir, "nested1")
+	require.NoError(t, err)
+	err = createTmpFile(dir, "nested1/file1.asb")
+	require.NoError(t, err)
+	err = createTempNestedDir(dir, "nested2")
+	require.NoError(t, err)
+	err = createTempNestedDir(dir, "nested2/second_level")
+	require.NoError(t, err)
+	err = createTmpFile(dir, "nested2/second_level/file2.asb")
+	require.NoError(t, err)
+	err = createTmpFile(dir, "file3.asb")
+	require.NoError(t, err)
+
+	r, err := NewReader(
+		context.Background(),
+		ioStorage.WithDir(dir),
+		ioStorage.WithNestedDir(),
+	)
+	require.NoError(t, err)
+
+	list, err := r.ListObjects(context.Background(), dir)
+	require.NoError(t, err)
+	require.Len(t, list, 3)
+	require.Contains(t, list, filepath.Join(dir, "nested1", "file1.asb"))
+	require.Contains(t, list, filepath.Join(dir, "nested2", "second_level", "file2.asb"))
+	require.Contains(t, list, filepath.Join(dir, "file3.asb"))
+}
+
+func TestReader_ListObjectsUnexistingDir(t *testing.T) {
+	r, err := NewReader(
+		context.Background(),
+		ioStorage.WithDir("some folder"),
+		ioStorage.WithNestedDir(),
+		ioStorage.WithSkipDirCheck(),
+	)
+	require.NoError(t, err)
+
+	listObjects, err := r.ListObjects(context.Background(), "subfolder")
+	require.NoError(t, err)
+	require.Empty(t, listObjects)
 }

@@ -1371,9 +1371,12 @@ func TestBackupContinuation(t *testing.T) {
 	err = writeRecords(asClient, batch)
 	require.NoError(t, err)
 
-	testFolder := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
-
 	for i := 0; i < 5; i++ {
+		testFolder := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
+		err = os.MkdirAll(testFolder, os.ModePerm)
+		require.NoError(t, err)
+		stateFile := path.Join(testFolder, testStateFile)
+
 		randomNumber := rand.Intn(7-3+1) + 3
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
@@ -1381,11 +1384,11 @@ func TestBackupContinuation(t *testing.T) {
 			cancel()
 		}()
 
-		first, err := runFirstBackup(ctx, asClient, setName, testFolder, testStateFile, i)
+		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
 
 		ctx = context.Background()
-		second, err := runContinueBackup(ctx, asClient, setName, testFolder, testStateFile, i)
+		second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
 
 		t.Log("first:", first, "second:", second)
@@ -1394,15 +1397,13 @@ func TestBackupContinuation(t *testing.T) {
 	}
 }
 
-func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string, i int,
+func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string,
 ) (uint64, error) {
-	bFolder := fmt.Sprintf("%s_%d", testFolder, i)
-
 	writers, err := local.NewWriter(
 		ctx,
 		ioStorage.WithValidator(asb.NewValidator()),
 		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithDir(bFolder),
+		ioStorage.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err
@@ -1410,7 +1411,7 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 
 	readers, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(bFolder),
+		ioStorage.WithDir(testFolder),
 		ioStorage.WithSkipDirCheck(),
 	)
 	if err != nil {
@@ -1448,15 +1449,13 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	return backupHandler.GetStats().GetReadRecords(), nil
 }
 
-func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string, i int,
+func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string,
 ) (uint64, error) {
-	bFolder := fmt.Sprintf("%s_%d", testFolder, i)
-
 	writers, err := local.NewWriter(
 		ctx,
 		ioStorage.WithValidator(asb.NewValidator()),
 		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithDir(bFolder),
+		ioStorage.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err
@@ -1464,7 +1463,7 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 
 	readers, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(bFolder),
+		ioStorage.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err

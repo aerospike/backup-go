@@ -16,6 +16,7 @@ package app
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -61,7 +62,7 @@ func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 	c.OutputFilePrefix = params.BackupParams.OutputFilePrefix
 
 	if params.BackupParams.Continue != "" {
-		c.StateFile = params.BackupParams.Continue
+		c.StateFile = path.Join(params.CommonParams.Directory, params.BackupParams.Continue)
 		c.Continue = true
 		c.PipelinesMode = pipeline.ModeParallel
 		c.PageSize = params.BackupParams.ScanPageSize

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -93,10 +94,11 @@ func newState(
 		RecordStates:      make(map[int]models.PartitionFilterSerialized),
 		RecordStatesSaved: make(map[int]models.PartitionFilterSerialized),
 		SaveCommandChan:   make(chan int),
-		FileName:          config.StateFile,
+		FileName:          filepath.Base(config.StateFile),
 		writer:            writer,
 		logger:            logger,
 	}
+
 	// Run watcher on initialization.
 	go s.serve()
 	go s.serveRecords()
@@ -182,7 +184,7 @@ func (s *State) dump(n int) error {
 		return fmt.Errorf("failed to close state file: %w", err)
 	}
 
-	s.logger.Debug("state file dumped", slog.Time("saved at", time.Now()))
+	s.logger.Debug("state file dumped", slog.String("path", s.FileName), slog.Time("saved at", time.Now()))
 
 	return nil
 }

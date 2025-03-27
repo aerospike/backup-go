@@ -30,6 +30,7 @@ type Worker[T any] interface {
 	SetSendChan(chan<- T)
 	SetReceiveChan(<-chan T)
 	Run(context.Context) error
+	GetStats() (int, int)
 }
 
 // Pipeline runs a series of workers in parallel.
@@ -137,6 +138,14 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	return nil
 }
 
+// GetStats returns stats: reader, writer.
+func (dp *Pipeline[T]) GetStats() (int, int) {
+	_, readOut := dp.stages[0].GetStats()
+	writeIn, _ := dp.stages[2].GetStats()
+
+	return readOut, writeIn
+}
+
 // stage contains pipeline stages, that contains workers.
 // router manages communication between stages.
 // After stage finishes, we close send channel, to send stop signal for workers.
@@ -206,4 +215,15 @@ func (s *stage[T]) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *stage[T]) GetStats() (int, int) {
+	var sumIn, sumOut int
+	for _, w := range s.workers {
+		in, out := w.GetStats()
+		sumIn += in
+		sumOut += out
+	}
+
+	return sumIn, sumOut
 }

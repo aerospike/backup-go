@@ -20,7 +20,7 @@ type Metrics struct {
 	PipelineWriteQueueSize int
 }
 
-// NewMetrics return metrics object with filled values.
+// NewMetrics returns a new Metrics with the provided values.
 func NewMetrics(pr, pw int) *Metrics {
 	return &Metrics{
 		PipelineReadQueueSize:  pr,

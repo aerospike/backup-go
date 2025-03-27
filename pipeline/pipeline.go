@@ -140,8 +140,12 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 
 // GetMetrics returns stats: reader, writer.
 func (dp *Pipeline[T]) GetMetrics() (in, out int) {
+	if len(dp.stages) == 0 {
+		return 0, 0
+	}
+
 	_, readOut := dp.stages[0].GetMetrics()
-	writeIn, _ := dp.stages[2].GetMetrics()
+	writeIn, _ := dp.stages[len(dp.stages)-1].GetMetrics()
 
 	return readOut, writeIn
 }

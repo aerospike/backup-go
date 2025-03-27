@@ -31,6 +31,9 @@ const (
 	LenProtoHeader   = 8
 
 	MaxProtoBody = 128 * 1024 * 1024
+
+	info2Pos = 2
+	info3Pos = 3
 )
 
 const (
@@ -69,6 +72,25 @@ const (
 	_ = 1 << 6 // 64
 	// MsgInfo2RespondAllOps - All bin ops (read, write, or modify) require a response, in request order
 	MsgInfo2RespondAllOps // 128
+)
+
+const (
+	// MsgInfo3Last - This is the last of a multi-part message
+	MsgInfo3Last = 1 << iota // 1
+	// MsgInfo3CommitLevelMaster - "Fire and forget" replica writes
+	MsgInfo3CommitLevelMaster // 2
+	// MsgInfo3PartitionDone - In query response, partition is done
+	MsgInfo3PartitionDone // 4
+	// MsgInfo3UpdateOnly - Update existing record only, do not create new record
+	MsgInfo3UpdateOnly // 8
+	// MsgInfo3CreateOrReplace - Completely replace existing record, or create new record
+	MsgInfo3CreateOrReplace // 16
+	// MsgInfo3ReplaceOnly - Completely replace existing record, do not create new record
+	MsgInfo3ReplaceOnly // 32
+	// MsgInfo3ScReadType no doc.
+	MsgInfo3ScReadType // 64
+	// MsgInfo3ScReadRelax no doc.
+	MsgInfo3ScReadRelax // 128
 )
 
 const (
@@ -289,16 +311,42 @@ func ResetXDRBit(message []byte) []byte {
 }
 
 // SetGenerationBit set info2 field to 8, which means apply write if new generation >= old.
-func SetGenerationBit(policy aerospike.GenerationPolicy, offset int, message []byte) []byte {
-	info2pos := 2
-	info2pos += offset
+func SetGenerationBit(policy aerospike.GenerationPolicy, message []byte) []byte {
+	// Clean all bits.
+	message[info2Pos+LenProtoHeader] &= ^byte(MsgInfo2GenerationGt)
+	message[info2Pos+LenProtoHeader] &= ^byte(MsgInfo2Generation)
 
 	switch policy {
-	case aerospike.EXPECT_GEN_GT:
-		message[info2pos] |= MsgInfo2GenerationGt
-	default:
+	case aerospike.NONE:
 		// default NONE
-		message[info2pos] &= ^byte(MsgInfo2GenerationGt)
+	case aerospike.EXPECT_GEN_GT:
+		message[info2Pos+LenProtoHeader] |= MsgInfo2GenerationGt
+	case aerospike.EXPECT_GEN_EQUAL:
+		message[info2Pos+LenProtoHeader] |= MsgInfo2Generation
+	}
+
+	return message
+}
+
+// SetRecordExistsActionBit set info3 field.
+func SetRecordExistsActionBit(action aerospike.RecordExistsAction, message []byte) []byte {
+	// Clean all bits.
+	message[info3Pos+LenProtoHeader] &= ^byte(MsgInfo3UpdateOnly)
+	message[info3Pos+LenProtoHeader] &= ^byte(MsgInfo3CreateOrReplace)
+	message[info3Pos+LenProtoHeader] &= ^byte(MsgInfo3ReplaceOnly)
+	message[info2Pos+LenProtoHeader] &= ^byte(MsgInfo2CreateOnly)
+
+	switch action {
+	case aerospike.UPDATE:
+		// default NONE
+	case aerospike.CREATE_ONLY:
+		message[info2Pos+LenProtoHeader] |= MsgInfo2CreateOnly
+	case aerospike.REPLACE:
+		message[info3Pos+LenProtoHeader] |= MsgInfo3CreateOrReplace
+	case aerospike.REPLACE_ONLY:
+		message[info3Pos+LenProtoHeader] |= MsgInfo3ReplaceOnly
+	case aerospike.UPDATE_ONLY:
+		message[info3Pos+LenProtoHeader] |= MsgInfo3UpdateOnly
 	}
 
 	return message

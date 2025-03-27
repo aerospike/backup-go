@@ -78,6 +78,7 @@ func printRestoreReport(asbStats *bModels.RestoreStats) {
 	fmt.Println()
 
 	printMetric("Inserted Records", asbStats.GetRecordsInserted())
+	printMetric("In Doubt Errors", asbStats.GetErrorsInDoubt())
 
 	if asbStats.GetTotalBytesRead() > 0 {
 		// At the moment, we don't count the size of records.

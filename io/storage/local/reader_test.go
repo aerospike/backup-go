@@ -628,3 +628,17 @@ func TestReader_ListObjectsWithNestedDir(t *testing.T) {
 	require.Contains(t, list, filepath.Join(dir, "nested2", "second_level", "file2.asb"))
 	require.Contains(t, list, filepath.Join(dir, "file3.asb"))
 }
+
+func TestReader_ListObjectsUnexistingDir(t *testing.T) {
+	r, err := NewReader(
+		context.Background(),
+		ioStorage.WithDir("some folder"),
+		ioStorage.WithNestedDir(),
+		ioStorage.WithSkipDirCheck(),
+	)
+	require.NoError(t, err)
+
+	listObjects, err := r.ListObjects(context.Background(), "subfolder")
+	require.NoError(t, err)
+	require.Empty(t, listObjects)
+}

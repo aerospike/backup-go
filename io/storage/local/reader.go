@@ -16,6 +16,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -239,6 +240,10 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) && r.SkipDirCheck {
+			return nil, nil // Path doesn't exist, no error returned
+		}
+
 		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
 	}
 

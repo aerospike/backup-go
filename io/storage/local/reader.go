@@ -161,18 +161,6 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	// This condition will be true, only if we initialized reader for directory and then want to read
-	// a specific file. It is used for state file and by asb service. So it must be initialized with only
-	// one path.
-	if r.IsDir {
-		if len(r.PathList) != 1 {
-			errorsCh <- fmt.Errorf("reader must be initialized with only one path")
-			return
-		}
-
-		filename = filepath.Join(r.PathList[0], filename)
-	}
-
 	reader, err := os.Open(filename)
 	if err != nil {
 		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)

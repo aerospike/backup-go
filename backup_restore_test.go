@@ -1384,11 +1384,11 @@ func TestBackupContinuation(t *testing.T) {
 			cancel()
 		}()
 
-		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile, i)
+		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
 
 		ctx = context.Background()
-		second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile, i)
+		second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
 
 		t.Log("first:", first, "second:", second)
@@ -1397,7 +1397,7 @@ func TestBackupContinuation(t *testing.T) {
 	}
 }
 
-func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string, i int,
+func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string,
 ) (uint64, error) {
 	writers, err := local.NewWriter(
 		ctx,
@@ -1449,7 +1449,7 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	return backupHandler.GetStats().GetReadRecords(), nil
 }
 
-func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string, i int,
+func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string,
 ) (uint64, error) {
 	writers, err := local.NewWriter(
 		ctx,

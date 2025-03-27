@@ -116,7 +116,7 @@ func (r *NodeReader) serve() {
 			stats, err := r.getStats()
 			if err != nil {
 				r.logger.Error("failed to get stats",
-					slog.Any("err", err),
+					slog.Any("error", err),
 				)
 
 				return
@@ -131,7 +131,7 @@ func (r *NodeReader) serve() {
 				continue
 			}
 
-			// Recovery finished. Notify the reader, so he can stop MRT.
+			// Recovery finished. Notify the reader to stop MRT writes.
 			if !stateSent {
 				r.nodesRecovered <- struct{}{}
 
@@ -200,9 +200,23 @@ func (r *NodeReader) BlockMrt() error {
 }
 
 func (r *NodeReader) getStats() (*asinfo.Stats, error) {
-	var errChain error
+	var (
+		errChain error
+		delay    time.Duration
+	)
+
+	handleError := func(err error, description string) {
+		if !errors.Is(errChain, err) {
+			errChain = errors.Join(errChain,
+				fmt.Errorf("%s: %w", description, err))
+		}
+
+		delay += time.Second
+	}
 
 	for retries := 0; retries < getStatsAttempts; retries++ {
+		time.Sleep(delay)
+
 		stats, err := r.infoClient.GetStats(r.nodeName, r.config.dc, r.config.namespace)
 
 		switch {
@@ -218,22 +232,11 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 				r.config.rewind,
 				r.config.maxThroughput,
 			); err != nil {
-				errChain = errors.Join(errChain, fmt.Errorf("failed to restart xdr for node %s: %w", r.nodeName, err))
-				// Add a delay before retrying.
-				time.Sleep(time.Duration(retries+1) * time.Second)
-
-				continue
+				handleError(err, "failed to restart xdr")
 			}
-
-			// XDR restarted successfully, now try to get stats again
-			continue
+		default:
+			handleError(err, "failed to get stats")
 		}
-
-		errChain = errors.Join(errChain, fmt.Errorf("failed to get stats for node %s: %w", r.nodeName, err))
-		// Add a delay before retrying.
-		time.Sleep(time.Duration(retries+1) * time.Second)
-
-		continue
 	}
 
 	return nil, fmt.Errorf("failed to get stats for node %s after %d attempts: %w",

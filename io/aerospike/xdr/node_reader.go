@@ -223,6 +223,7 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 		case err == nil:
 			return &stats, nil
 		case strings.Contains(err.Error(), errDcNotFound):
+			r.logger.Warn("failed to get stats, try to restart XDR", slog.Any("error", err))
 			// Try to restart XDR.
 			if err = r.infoClient.StartXDR(
 				r.nodeName,

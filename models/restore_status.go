@@ -49,6 +49,13 @@ type RestoreStats struct {
 	errorsInDoubt atomic.Uint64
 }
 
+// NewRestoreStats returns new restore stats.
+func NewRestoreStats() *RestoreStats {
+	return &RestoreStats{
+		commonStats: &commonStats{},
+	}
+}
+
 func (rs *RestoreStats) GetRecordsExpired() uint64 {
 	return rs.RecordsExpired.Load()
 }

@@ -21,10 +21,17 @@ import (
 // BackupStats stores the status of a backup job.
 // Stats are updated in realtime by backup jobs.
 type BackupStats struct {
-	commonStats
+	*commonStats
 	fileCount atomic.Uint64
 	// total number of records in database
 	TotalRecords uint64
+}
+
+// NewBackupStats returns new backup stats.
+func NewBackupStats() *BackupStats {
+	return &BackupStats{
+		commonStats: &commonStats{},
+	}
 }
 
 // IncFiles increments by one the number of files per backup.

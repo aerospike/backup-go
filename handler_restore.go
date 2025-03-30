@@ -63,7 +63,7 @@ type RestoreHandler struct {
 	errors  chan error
 	id      string
 
-	stats models.RestoreStats
+	stats *models.RestoreStats
 }
 
 // newRestoreHandler creates a new RestoreHandler.
@@ -88,6 +88,7 @@ func newRestoreHandler(
 		logger:          logger,
 		reader:          reader,
 		limiter:         makeBandwidthLimiter(config.Bandwidth),
+		stats:           models.NewRestoreStats(),
 	}
 }
 
@@ -164,7 +165,7 @@ func (rh *RestoreHandler) restoreFromReaders(
 
 // GetStats returns the stats of the restore job.
 func (rh *RestoreHandler) GetStats() *models.RestoreStats {
-	return &rh.stats
+	return rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
@@ -201,7 +202,7 @@ func (rh *RestoreHandler) runRestorePipeline(ctx context.Context, readers []pipe
 		writer := aerospike.NewRestoreWriter(
 			rh.aerospikeClient,
 			rh.config.WritePolicy,
-			&rh.stats,
+			rh.stats,
 			rh.logger,
 			useBatchWrites,
 			rh.config.BatchSize,
@@ -209,7 +210,7 @@ func (rh *RestoreHandler) runRestorePipeline(ctx context.Context, readers []pipe
 			rh.config.IgnoreRecordError,
 		)
 
-		statsWriter := newWriterWithTokenStats(writer, &rh.stats, rh.logger)
+		statsWriter := newWriterWithTokenStats(writer, rh.stats, rh.logger)
 		writeWorkers[i] = pipeline.NewWriteWorker[*models.Token](statsWriter, rh.limiter)
 	}
 

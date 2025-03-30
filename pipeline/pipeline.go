@@ -224,10 +224,28 @@ func (s *stage[T]) Run(ctx context.Context) error {
 func (s *stage[T]) GetMetrics() (in, out int) {
 	var sumIn, sumOut int
 
-	for _, w := range s.workers {
+	if len(s.workers) == 0 {
+		return 0, 0
+	}
+
+	for i, w := range s.workers {
 		in, out := w.GetMetrics()
-		sumIn += in
-		sumOut += out
+
+		// Save first state for single workers.
+		if i == 0 {
+			sumIn += in
+			sumOut += out
+		}
+
+		// If workers are connected in a single mode,
+		// we will have only one channel for all workers.
+		if s.route.input.mode != routeRuleModeSingle {
+			sumIn += in
+		}
+
+		if s.route.output.mode != routeRuleModeSingle {
+			sumOut += out
+		}
 	}
 
 	return sumIn, sumOut

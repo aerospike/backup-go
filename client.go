@@ -258,6 +258,7 @@ func (c *Client) BackupXDR(
 type Restorer interface {
 	GetStats() *models.RestoreStats
 	Wait(ctx context.Context) error
+	GetMetrics() *models.Metrics
 }
 
 // Restore starts a restore operation that reads data from given readers.

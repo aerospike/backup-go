@@ -21,43 +21,43 @@ import (
 
 // **** Processor Worker ****
 
-// DataProcessor is an interface for processing data
+// DataProcessor is an interface for processing data.
 //
 //go:generate mockery --name DataProcessor
 type DataProcessor[T any] interface {
 	Process(T) (T, error)
 }
 
-// ProcessorWorker implements the pipeline.Worker interface
-// It wraps a DataProcessor and processes data with it
+// ProcessorWorker implements the pipeline.Worker interface.
+// It wraps a DataProcessor and processes data with it.
 type ProcessorWorker[T any] struct {
 	processor DataProcessor[T]
 	receive   <-chan T
 	send      chan<- T
 }
 
-// NewProcessorWorker creates a new ProcessorWorker
+// NewProcessorWorker creates a new ProcessorWorker.
 func NewProcessorWorker[T any](processor DataProcessor[T]) *ProcessorWorker[T] {
 	return &ProcessorWorker[T]{
 		processor: processor,
 	}
 }
 
-// SetReceiveChan sets receive channel for the ProcessorWorker
+// SetReceiveChan sets receive channel for the ProcessorWorker.
 func (w *ProcessorWorker[T]) SetReceiveChan(c <-chan T) {
 	w.receive = c
 }
 
-// SetSendChan sets the send channel for the ProcessorWorker
+// SetSendChan sets the send channel for the ProcessorWorker.
 func (w *ProcessorWorker[T]) SetSendChan(c chan<- T) {
 	w.send = c
 }
 
 // ErrFilteredOut is returned by a processor when a token
-// should be filtered out of the pipeline
+// should be filtered out of the pipeline.
 var ErrFilteredOut = errors.New("filtered out")
 
-// Run starts the ProcessorWorker
+// Run starts the ProcessorWorker.
 func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 	for {
 		select {
@@ -82,4 +82,9 @@ func (w *ProcessorWorker[T]) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// GetMetrics returns stats of received and sent messages.
+func (w *ProcessorWorker[T]) GetMetrics() (in, out int) {
+	return len(w.receive), len(w.send)
 }

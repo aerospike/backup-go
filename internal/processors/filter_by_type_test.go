@@ -24,6 +24,7 @@ import (
 )
 
 func TestNewFilterByType(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		noRecords  bool
@@ -43,50 +44,52 @@ func TestNewFilterByType(t *testing.T) {
 			noRecords:  true,
 			noIndexes:  false,
 			noUdf:      false,
-			expectType: &filterByType{},
+			expectType: &filterByType[*models.Token]{},
 		},
 		{
 			name:       "Only noIndexes filter applied",
 			noRecords:  false,
 			noIndexes:  true,
 			noUdf:      false,
-			expectType: &filterByType{},
+			expectType: &filterByType[*models.Token]{},
 		},
 		{
 			name:       "Only noUdf filter applied",
 			noRecords:  false,
 			noIndexes:  false,
 			noUdf:      true,
-			expectType: &filterByType{},
+			expectType: &filterByType[*models.Token]{},
 		},
 		{
 			name:       "All filters applied",
 			noRecords:  true,
 			noIndexes:  true,
 			noUdf:      true,
-			expectType: &filterByType{},
+			expectType: &filterByType[*models.Token]{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := NewFilterByType(tt.noRecords, tt.noIndexes, tt.noUdf)
+			t.Parallel()
+			processor := NewFilterByType[*models.Token](tt.noRecords, tt.noIndexes, tt.noUdf)
 			assert.IsType(t, tt.expectType, processor)
 		})
 	}
 }
 
 func TestFilterByTypeProcess(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
-		filter       *filterByType
+		filter       *filterByType[*models.Token]
 		token        *models.Token
 		expectError  bool
 		errorMessage string
 	}{
 		{
 			name: "Filter out record token with noRecords flag",
-			filter: &filterByType{
+			filter: &filterByType[*models.Token]{
 				noRecords: true,
 				noIndexes: false,
 				noUdf:     false,
@@ -99,7 +102,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Allow record token with noRecords flag off",
-			filter: &filterByType{
+			filter: &filterByType[*models.Token]{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
@@ -109,7 +112,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Filter out sIndex token with noIndexes flag",
-			filter: &filterByType{
+			filter: &filterByType[*models.Token]{
 				noRecords: false,
 				noIndexes: true,
 				noUdf:     false,
@@ -122,7 +125,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Allow sIndex token with noIndexes flag off",
-			filter: &filterByType{
+			filter: &filterByType[*models.Token]{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
@@ -132,7 +135,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Filter out UDF token with noUdf flag",
-			filter: &filterByType{
+			filter: &filterByType[*models.Token]{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     true,
@@ -145,7 +148,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Allow UDF token with noUdf flag off",
-			filter: &filterByType{
+			filter: &filterByType[*models.Token]{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
@@ -155,7 +158,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "No filtering applied",
-			filter: &filterByType{
+			filter: &filterByType[*models.Token]{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
@@ -167,6 +170,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := tt.filter.Process(tt.token)
 
 			if tt.expectError {

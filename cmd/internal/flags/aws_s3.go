@@ -20,11 +20,14 @@ import (
 )
 
 type AwsS3 struct {
+	operation int
 	models.AwsS3
 }
 
-func NewAwsS3() *AwsS3 {
-	return &AwsS3{}
+func NewAwsS3(operation int) *AwsS3 {
+	return &AwsS3{
+		operation: operation,
+	}
 }
 
 func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
@@ -48,6 +51,33 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.Endpoint, "s3-endpoint-override",
 		"",
 		"An alternate url endpoint to send S3 API calls to.")
+
+	switch f.operation {
+	case OperationBackup:
+		flagSet.StringVar(&f.StorageClass, "s3-storage-class",
+			"",
+			"Apply storage class to backup files. Storage classes are:\n"+
+				"STANDARD,\n"+
+				"REDUCED_REDUNDANCY,\n"+
+				"STANDARD_IA,\n"+
+				"ONEZONE_IA,\n"+
+				"INTELLIGENT_TIERING,\n"+
+				"GLACIER,\n"+
+				"DEEP_ARCHIVE,\n"+
+				"OUTPOSTS,\n"+
+				"GLACIER_IR,\n"+
+				"SNOW,\n"+
+				"EXPRESS_ONEZONE.")
+	case OperationRestore:
+		flagSet.StringVar(&f.AccessTier, "s3-tier",
+			"",
+			"If is set, tool will try to restore archived files to the specified tier.\n"+
+				"Tiers are: Standard, Bulk, Expedited.")
+		flagSet.Int64Var(&f.RestorePollDuration, "s3-restore-poll-duration",
+			60000,
+			"How often (in milliseconds) a backup client checks object status when restoring an archived object.",
+		)
+	}
 
 	return flagSet
 }

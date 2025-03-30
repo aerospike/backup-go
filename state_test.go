@@ -20,11 +20,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/local"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,21 +49,23 @@ func TestState(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := NewDefaultBackupConfig()
-	cfg.StateFile = testStateFile
+	cfg.StateFile = tempFile
 	cfg.PageSize = 100000
-	cfg.SyncPipelines = true
+	cfg.PipelinesMode = pipeline.ModeParallel
 	cfg.PartitionFilters = testFilters
 
 	reader, err := local.NewReader(
-		local.WithDir(testDir),
+		ctx,
+		ioStorage.WithDir(testDir),
+		ioStorage.WithSkipDirCheck(),
 	)
 	require.NoError(t, err)
 
 	writer, err := local.NewWriter(
 		ctx,
-		local.WithValidator(asb.NewValidator()),
-		local.WithSkipDirCheck(),
-		local.WithDir(testDir),
+		ioStorage.WithValidator(asb.NewValidator()),
+		ioStorage.WithSkipDirCheck(),
+		ioStorage.WithDir(testDir),
 	)
 	require.NoError(t, err)
 
@@ -85,6 +90,10 @@ func TestState(t *testing.T) {
 		require.NoError(t, err)
 		state.RecordsStateChan <- pfs
 	}
+
+	// Create a state file.
+	state.SaveCommandChan <- 1
+	time.Sleep(1 * time.Second)
 
 	// Check that file exists.
 	_, err = os.Stat(tempFile)

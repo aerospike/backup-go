@@ -95,9 +95,9 @@ func confidenceInterval(stats estimateStats, sampleSize int) (low, high float64)
 }
 
 func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, error) {
-	// We create io.WriteCloser from samplesData to calculate a compress ratio.
+	// Create an io.WriteCloser from samplesData to calculate the compress ratio.
 	bytesWriter := util.NewBytesWriteCloser([]byte{})
-	// Create compression writer the same way as on backup.
+	// Create a compression writer similarly to the backup.
 	encodedWriter, err := newCompressionWriter(policy, bytesWriter)
 	if err != nil {
 		return 0, err

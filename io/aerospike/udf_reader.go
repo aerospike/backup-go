@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// udfGetter is an interface for getting UDFs
+// udfGetter is an interface for getting UDFs.
 //
 //go:generate mockery --name udfGetter
 type udfGetter interface {

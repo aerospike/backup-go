@@ -43,4 +43,6 @@ type dbWriter interface {
 	) (*aerospike.RegisterTask, aerospike.Error)
 
 	BatchOperate(policy *aerospike.BatchPolicy, records []aerospike.BatchRecordIfc) aerospike.Error
+
+	PutPayload(policy *aerospike.WritePolicy, key *aerospike.Key, payload []byte) aerospike.Error
 }

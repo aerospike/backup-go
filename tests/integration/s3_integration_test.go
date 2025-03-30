@@ -9,8 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	s3Storasge "github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	s3Storasge "github.com/aerospike/backup-go/io/storage/aws/s3"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
@@ -18,8 +20,8 @@ import (
 )
 
 const (
-	backupDir  = "/"
-	backupFile = "/backup_folder/backup_file.txt"
+	testBackupDir  = "/"
+	testBackupFile = "/backup_folder/backup_file.txt"
 )
 
 type writeReadTestSuite struct {
@@ -123,8 +125,8 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		s3Storasge.WithDir(backupDir),
-		s3Storasge.WithRemoveFiles(),
+		ioStorage.WithDir(testBackupDir),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -155,7 +157,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		s3Storasge.WithDir(backupDir),
+		ioStorage.WithDir(testBackupDir),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 
@@ -167,22 +169,22 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		s3Storasge.WithDir(backupDir),
-		s3Storasge.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(testBackupDir),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go reader.StreamFiles(context.Background(), readerChan, errorChan)
 
 	select {
 	case r := <-readerChan:
-		buffer, err := io.ReadAll(r)
+		buffer, err := io.ReadAll(r.Reader)
 		if err != nil {
 			s.FailNow("failed to read", err)
 		}
-		_ = r.Close()
+		_ = r.Reader.Close()
 		return buffer
 	case err = <-errorChan:
 		require.NoError(s.T(), err)
@@ -196,8 +198,8 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 		ctx,
 		client,
 		"backup",
-		s3Storasge.WithFile(backupFile),
-		s3Storasge.WithRemoveFiles(),
+		ioStorage.WithFile(testBackupFile),
+		ioStorage.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -231,22 +233,22 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		s3Storasge.WithFile(backupFile),
-		s3Storasge.WithValidator(asb.NewValidator()),
+		ioStorage.WithFile(testBackupFile),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)
 
-	readerChan := make(chan io.ReadCloser)
+	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go reader.StreamFiles(context.Background(), readerChan, errorChan)
 
 	select {
 	case r := <-readerChan:
-		buffer, err := io.ReadAll(r)
+		buffer, err := io.ReadAll(r.Reader)
 		if err != nil {
 			s.FailNow("failed to read", err)
 		}
-		_ = r.Close()
+		_ = r.Reader.Close()
 		return buffer
 	case err = <-errorChan:
 		require.NoError(s.T(), err)

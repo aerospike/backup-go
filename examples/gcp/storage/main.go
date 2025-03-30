@@ -22,7 +22,8 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	gcpStorage "github.com/aerospike/backup-go/io/gcp/storage"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	gcpStorage "github.com/aerospike/backup-go/io/storage/gcp/storage"
 )
 
 const (
@@ -61,7 +62,7 @@ func initBackupClient() *backup.Client {
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	return backupClient
@@ -70,7 +71,7 @@ func initBackupClient() *backup.Client {
 func runBackup(ctx context.Context, c *backup.Client) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// For backup to single file use gcpStorage.WithFile(fileName)
@@ -78,11 +79,11 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		ctx,
 		client,
 		bucketName,
-		gcpStorage.WithDir(folderName),
-		gcpStorage.WithRemoveFiles(),
+		ioStorage.WithDir(folderName),
+		ioStorage.WithRemoveFiles(),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	backupCfg := backup.NewDefaultBackupConfig()
@@ -94,7 +95,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 
 	backupHandler, err := c.Backup(ctx, backupCfg, writers, nil)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// use backupHandler.Wait() to wait for the job to finish or fail.
@@ -111,7 +112,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 func runRestore(ctx context.Context, c *backup.Client) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// For restore from single file use gcpStorage.WithFile(fileName)
@@ -119,11 +120,11 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		ctx,
 		client,
 		bucketName,
-		gcpStorage.WithDir(folderName),
-		gcpStorage.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(folderName),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	source := dbNameSource
@@ -140,7 +141,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 
 	restoreHandler, err := c.Restore(ctx, restoreCfg, readers)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// use restoreHandler.Wait() to wait for the job to finish or fail.

@@ -44,7 +44,7 @@ func NewPartitionFilterByDigest(namespace, digest string) (*a.PartitionFilter, e
 	return pf, nil
 }
 
-// NewPartitionFilterAfterDigest returns partition filter to scan call records after digest.
+// NewPartitionFilterAfterDigest returns a partition filter to scan records after the digest.
 func NewPartitionFilterAfterDigest(namespace, digest string) (*a.PartitionFilter, error) {
 	key, err := newKeyByDigest(namespace, digest)
 	if err != nil {
@@ -67,7 +67,7 @@ func NewPartitionFilterAll() *a.PartitionFilter {
 	return a.NewPartitionFilterByRange(0, MaxPartitions)
 }
 
-// splitPartitions splits partition to groups.
+// splitPartitions splits the partitions to groups.
 func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
 	if numWorkers < 1 || numWorkers < len(partitionFilters) {
 		return nil, fmt.Errorf("numWorkers is less than partitionFilters, cannot split partitionFilters")
@@ -154,7 +154,7 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	return result, nil
 }
 
-// splitPartitionRange splits one range filter to numWorkers
+// splitPartitionRange splits one range filter to numWorkers.
 func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) []*a.PartitionFilter {
 	result := make([]*a.PartitionFilter, numWorkers)
 	for j := 0; j < numWorkers; j++ {

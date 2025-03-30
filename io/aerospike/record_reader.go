@@ -71,8 +71,8 @@ func NewRecordReaderConfig(namespace string,
 	}
 }
 
-// scanner is an interface for scanning Aerospike records
-// the Aerospike go client satisfies this interface
+// scanner is an interface for scanning Aerospike records.
+// The Aerospike go client satisfies this interface.
 //
 //go:generate mockery --name scanner
 type scanner interface {
@@ -94,7 +94,7 @@ type scanner interface {
 
 // RecordReader satisfies the pipeline DataReader interface.
 // It reads records from an Aerospike database and returns them as
-// *models.Record.
+// *models.Token.
 type RecordReader struct {
 	ctx        context.Context
 	client     scanner
@@ -164,8 +164,7 @@ func (r *RecordReader) read() (*models.Token, error) {
 	return recToken, nil
 }
 
-// Close cancels the Aerospike scan used to read records
-// if it was started.
+// Close cancels the Aerospike scan used to read records if it was started.
 func (r *RecordReader) Close() {
 	if r.isScanStarted() {
 		r.scanResult.Close()
@@ -267,29 +266,27 @@ func (r *RecordReader) isScanStarted() bool {
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
-	expressions := make([]*a.Expression, 0)
+	expressions := []*a.Expression{noMrtSetExpression()}
 
 	if currentExpression != nil {
 		expressions = append(expressions, currentExpression)
 	}
 
-	exp := timeBoundExpression(bounds)
-	if exp != nil {
+	if exp := timeBoundExpression(bounds); exp != nil {
 		expressions = append(expressions, exp)
 	}
 
-	exp = noTTLExpression(noTTLOnly)
-	if exp != nil {
+	if exp := noTTLExpression(noTTLOnly); exp != nil {
 		expressions = append(expressions, exp)
 	}
 
-	switch {
-	case len(expressions) > 1:
-		return a.ExpAnd(expressions...)
-	case len(expressions) == 1:
+	switch len(expressions) {
+	case 0:
+		return nil
+	case 1:
 		return expressions[0]
 	default:
-		return nil
+		return a.ExpAnd(expressions...)
 	}
 }
 
@@ -318,4 +315,10 @@ func noTTLExpression(noTTLOnly bool) *a.Expression {
 	}
 	// Unexpired records has TTL = -1.
 	return a.ExpEq(a.ExpTTL(), a.ExpIntVal(-1))
+}
+
+// noMrtSetExpression returns an expression that filters the monitor set records from the scan results.
+func noMrtSetExpression() *a.Expression {
+	// where set != "<ERO~MRT"
+	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))
 }

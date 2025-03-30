@@ -43,8 +43,8 @@ func handlePanic(errors chan<- error, logger *slog.Logger) {
 
 func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 	// NOTE: order is important here
-	// if we close the errors chan before we handle the panic
-	// the panic will attempt to send on a closed channel
+	// if we close the errors chan before we handle the panic,
+	// the panic handler will attempt to send on a closed channel
 	defer close(errors)
 	defer handlePanic(errors, logger)
 
@@ -81,7 +81,7 @@ func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {
 }
 
 // filterNodes iterates over the nodes and selects only those nodes that are in nodesList.
-// Return slice of filtered []*a.Node.
+// Returns a slice of filtered *a.Node.
 func filterNodes(nodesList []string, nodes []*a.Node) []*a.Node {
 	if len(nodesList) == 0 {
 		return nodes

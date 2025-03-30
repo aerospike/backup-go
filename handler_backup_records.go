@@ -33,15 +33,16 @@ import (
 )
 
 type backupRecordsHandler struct {
-	config          *BackupConfig
+	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
 	state           *State
+	pl              *pipeline.Pipeline[*models.Token]
 }
 
 func newBackupRecordsHandler(
-	config *BackupConfig,
+	config *ConfigBackup,
 	ac AerospikeClient,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
@@ -71,16 +72,23 @@ func (bh *backupRecordsHandler) run(
 	}
 
 	composeProcessor := newTokenWorker(processors.NewComposeProcessor(
-		processors.NewRecordCounter(recordsReadTotal),
-		processors.NewVoidTimeSetter(bh.logger),
+		processors.NewRecordCounter[*models.Token](recordsReadTotal),
+		processors.NewVoidTimeSetter[*models.Token](bh.logger),
 		processors.NewTPSLimiter[*models.Token](
 			ctx, bh.config.RecordsPerSecond),
 	), bh.config.ParallelRead)
 
-	pl, err := pipeline.NewPipeline(bh.config.SyncPipelines, readWorkers, composeProcessor, writers)
+	pl, err := pipeline.NewPipeline(
+		bh.config.PipelinesMode, nil,
+		readWorkers,
+		composeProcessor,
+		writers)
 	if err != nil {
 		return fmt.Errorf("failed to create new pipeline: %w", err)
 	}
+
+	// Assign, so we can get pl stats.
+	bh.pl = pl
 
 	return pl.Run(ctx)
 }
@@ -328,4 +336,9 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		bh.config.NoTTLOnly,
 		bh.config.PageSize,
 	)
+}
+
+// GetMetrics returns the metrics of the backup job.
+func (bh *backupRecordsHandler) GetMetrics() *models.Metrics {
+	return models.NewMetrics(bh.pl.GetMetrics())
 }

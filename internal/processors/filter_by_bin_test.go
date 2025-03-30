@@ -26,9 +26,10 @@ import (
 )
 
 func TestFilterBin_NonRecordToken(t *testing.T) {
+	t.Parallel()
 	skipped := &atomic.Uint64{}
 	binList := []string{"bin1", "bin2"}
-	processor := processors.NewFilterByBin(binList, skipped)
+	processor := processors.NewFilterByBin[*models.Token](binList, skipped)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -42,9 +43,10 @@ func TestFilterBin_NonRecordToken(t *testing.T) {
 }
 
 func TestFilterBin_RecordWithNoBins(t *testing.T) {
+	t.Parallel()
 	skipped := &atomic.Uint64{}
 	binList := []string{"bin1", "bin2"}
-	processor := processors.NewFilterByBin(binList, skipped)
+	processor := processors.NewFilterByBin[*models.Token](binList, skipped)
 
 	token := &models.Token{
 		Type: models.TokenTypeRecord,
@@ -63,9 +65,10 @@ func TestFilterBin_RecordWithNoBins(t *testing.T) {
 }
 
 func TestFilterBin_RecordWithBinsToKeep(t *testing.T) {
+	t.Parallel()
 	skipped := &atomic.Uint64{}
 	binList := []string{"bin1", "bin2"}
-	processor := processors.NewFilterByBin(binList, skipped)
+	processor := processors.NewFilterByBin[*models.Token](binList, skipped)
 
 	token := &models.Token{
 		Type: models.TokenTypeRecord,
@@ -92,9 +95,10 @@ func TestFilterBin_RecordWithBinsToKeep(t *testing.T) {
 }
 
 func TestFilterBin_RecordWithAllBinsRemoved(t *testing.T) {
+	t.Parallel()
 	skipped := &atomic.Uint64{}
 	binList := []string{"bin1", "bin2"}
-	processor := processors.NewFilterByBin(binList, skipped)
+	processor := processors.NewFilterByBin[*models.Token](binList, skipped)
 
 	token := &models.Token{
 		Type: models.TokenTypeRecord,

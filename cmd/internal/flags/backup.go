@@ -32,7 +32,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.BoolVarP(&f.RemoveFiles, "remove-files", "r",
 		false,
-		"Remove existing backup file (-o) or files (-d).")
+		"Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.")
 	flagSet.BoolVar(&f.RemoveArtifacts, "remove-artifacts",
 		false,
 		"Remove existing backup file (-o) or files (-d) without performing a backup.")
@@ -43,10 +43,10 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"",
 		"When using directory parameter, prepend a prefix to the names of the generated files.")
 
-	flagSet.Int64VarP(&f.FileLimit, "file-limit", "F",
+	flagSet.Uint64VarP(&f.FileLimit, "file-limit", "F",
 		262144000, // 250 MB
-		"Rotate backup files, when their size crosses the given\n"+
-			"value (in bytes) Only used when backing up to a Directory. 0 - no limit.")
+		"Rotate backup files when their size crosses the given\n"+
+			"value (in bytes). Only used when backing up to a directory.\n")
 	flagSet.BoolVarP(&f.NoBins, "no-bins", "x",
 		false,
 		"Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.\n"+
@@ -146,6 +146,16 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"Number of records will be read on one iteration for continuation backup.\n"+
 			"Affects size if overlap on resuming backup after an error.\n"+
 			"Used only with --state-file-dst or --continue.")
+	flagSet.Int64Var(&f.InfoRetryIntervalMilliseconds, "info-retry-timeout", 1000,
+		"Set the initial timeout for a retry in milliseconds when info commands are sent."+
+			"This parameter is applied to stop xdr and unblock MRT writes requests.")
+	flagSet.Float64Var(&f.InfoRetriesMultiplier, "info-retry-multiplier",
+		1,
+		"Increases the delay between subsequent retry attempts.\n"+
+			"The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber)")
+	flagSet.UintVar(&f.InfoMaxRetries, "info-max-retries", 3,
+		"How many times to retry to send info commands before failing. "+
+			"This parameter is applied to stop xdr and unblock MRT writes requests.")
 
 	return flagSet
 }

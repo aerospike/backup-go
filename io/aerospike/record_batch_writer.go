@@ -110,7 +110,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 	var (
 		attempt uint
-		err     a.Error
+		aerr    a.Error
 	)
 
 	rw.logger.Debug("Starting batch operation",
@@ -126,19 +126,23 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			slog.Int("bufferSize", len(rw.operationBuffer)),
 		)
 
-		err = rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
+		aerr = rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
+
+		if aerr != nil && aerr.IsInDoubt() {
+			rw.stats.IncrErrorsInDoubt()
+		}
 
 		switch {
-		case isNilOrAcceptableError(err),
-			rw.ignoreRecordError && shouldIgnore(err):
+		case isNilOrAcceptableError(aerr),
+			rw.ignoreRecordError && shouldIgnore(aerr):
 			rw.operationBuffer, opErr = rw.processAndFilterOperations()
 
 			if len(rw.operationBuffer) == 0 {
 				rw.logger.Debug("All operations succeeded")
 				return nil
 			}
-		case !shouldRetry(err):
-			return fmt.Errorf("non-retryable error on restore: %w", err)
+		case !shouldRetry(aerr):
+			return fmt.Errorf("non-retryable error on restore: %w", aerr)
 		}
 
 		attempt++
@@ -148,7 +152,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		}
 
 		rw.logger.Debug("Retryable error occurred",
-			slog.Any("error", err),
+			slog.Any("error", aerr),
 			slog.Int("remainingOperations", len(rw.operationBuffer)),
 		)
 
@@ -159,10 +163,10 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("attempts", attempt),
 		slog.Int("failedOperations", len(rw.operationBuffer)),
 		slog.Any("operationError", opErr),
-		slog.Any("lastError", err),
+		slog.Any("lastError", aerr),
 	)
 
-	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), err)
+	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), aerr)
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {

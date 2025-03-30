@@ -34,7 +34,7 @@ type CompressionPolicy struct {
 	Level int `yaml:"level,omitempty" json:"level,omitempty"`
 }
 
-// NewCompressionPolicy returns new compression policy for backup/restore operations.
+// NewCompressionPolicy returns a new compression policy for backup/restore operations.
 func NewCompressionPolicy(mode string, level int) *CompressionPolicy {
 	return &CompressionPolicy{
 		Mode:  mode,

@@ -19,7 +19,7 @@ type Backup struct {
 	RemoveFiles         bool
 	ModifiedBefore      string
 	ModifiedAfter       string
-	FileLimit           int64
+	FileLimit           uint64
 	AfterDigest         string
 	MaxRecords          int64
 	NoBins              bool
@@ -38,6 +38,10 @@ type Backup struct {
 	Continue            string
 	ScanPageSize        int64
 	OutputFilePrefix    string
+
+	InfoMaxRetries                uint
+	InfoRetriesMultiplier         float64
+	InfoRetryIntervalMilliseconds int64
 }
 
 // ShouldClearTarget check if we should clean target directory.

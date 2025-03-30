@@ -19,6 +19,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,11 +28,12 @@ import (
 const testFileName = "test"
 
 func TestLazyWriter(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	filePath := path.Join(t.TempDir(), testFileName)
 
-	openFunc := func(_ context.Context) (io.WriteCloser, error) {
+	openFunc := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
 		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 		if err != nil {
 			return nil, err
@@ -39,7 +41,7 @@ func TestLazyWriter(t *testing.T) {
 		return file, nil
 	}
 
-	writer, err := NewWriter(ctx, openFunc)
+	writer, err := NewWriter(ctx, 1, openFunc)
 	require.NoError(t, err)
 
 	// Check that file not exist.

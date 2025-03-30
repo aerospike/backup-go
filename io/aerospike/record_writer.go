@@ -78,6 +78,10 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return nil
 		}
 
+		if aerr.IsInDoubt() {
+			rw.stats.IncrErrorsInDoubt()
+		}
+
 		switch {
 		case isNilOrAcceptableError(aerr):
 			switch {

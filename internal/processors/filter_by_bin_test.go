@@ -87,7 +87,7 @@ func TestFilterBin_RecordWithBinsToKeep(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, expectedBins, result.Record.Record.Bins)
+	assert.Equal(t, expectedBins, result.Record.Bins)
 	assert.Equal(t, uint64(0), skipped.Load())
 }
 

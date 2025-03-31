@@ -279,7 +279,9 @@ func (r *RecordReader) watchNodes() {
 			return
 		case <-r.nodesRecovered:
 			nodesCounter++
+
 			r.logger.Debug("node recovered")
+
 			r.anMu.RLock()
 
 			if nodesCounter == len(r.activeNodes) {

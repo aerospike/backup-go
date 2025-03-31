@@ -279,10 +279,11 @@ func (r *RecordReader) watchNodes() {
 			return
 		case <-r.nodesRecovered:
 			nodesCounter++
-
+			r.logger.Debug("node recovered")
 			r.anMu.RLock()
 
 			if nodesCounter == len(r.activeNodes) {
+				r.logger.Debug("starting mrt block")
 				// Block MRT writes on all nodes.
 				for _, node := range r.activeNodes {
 					err := node.BlockMrt()

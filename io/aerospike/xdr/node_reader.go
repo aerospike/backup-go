@@ -47,6 +47,7 @@ type NodeReader struct {
 	mrtWritesStopped atomic.Bool
 
 	nodesRecovered chan struct{}
+	isRecovered    atomic.Bool
 
 	logger *slog.Logger
 }
@@ -134,6 +135,7 @@ func (r *NodeReader) serve() {
 			// Recovery finished. Notify the reader to stop MRT writes.
 			if !stateSent {
 				r.nodesRecovered <- struct{}{}
+				r.isRecovered.Store(true)
 
 				stateSent = true
 			}
@@ -171,6 +173,11 @@ func (r *NodeReader) serve() {
 
 func (r *NodeReader) close() {
 	r.logger.Debug("closing aerospike node record reader")
+
+	// If we close because of error, we must remove it from observer.
+	if !r.isRecovered.Load() {
+		r.nodesRecovered <- struct{}{}
+	}
 
 	if err := r.infoClient.StopXDR(r.nodeName, r.config.dc); err != nil {
 		r.logger.Error("failed to remove xdr config",

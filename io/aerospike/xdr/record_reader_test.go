@@ -72,8 +72,6 @@ func newInfoMock(t *testing.T) infoCommander {
 		}, nil)
 	ic.On("GetNodesNames").
 		Return([]string{"node1"})
-	ic.On("StopXDR", mock.Anything, mock.Anything).
-		Return(nil)
 
 	return ic
 }

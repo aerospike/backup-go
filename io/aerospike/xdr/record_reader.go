@@ -179,6 +179,7 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 
 // Close cancels the Aerospike scan used to read records.
 func (r *RecordReader) Close() {
+	r.cancel()
 	// If not running, do nothing.
 	if !r.isRunning.CompareAndSwap(true, false) {
 		return
@@ -319,9 +320,13 @@ func (r *RecordReader) watchCluster(nodes []string, wg *sync.WaitGroup) {
 				continue
 			}
 
-			diff := util.Diff(nodes, curNodes)
+			diff := util.Diff(curNodes, nodes)
 			if len(diff) > 0 {
-				r.logger.Debug("new nodes detected", slog.Any("nodes", diff))
+				r.logger.Debug("new nodes detected",
+					slog.Any("diff", diff),
+					slog.Any("nodes", nodes),
+					slog.Any("curNodes", curNodes),
+				)
 
 				r.createNodeReaders(diff, wg)
 			}

@@ -828,6 +828,50 @@ func (s *AzureSuite) TestIsSkippedByStartAfter() {
 	}
 }
 
+func (s *AzureSuite) TestWriter_WithAccessTier() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	// Test folder and file names
+	testFolder := "tier_test_folder/"
+	testFileName := "tier_test_file.txt"
+	fullPath := fmt.Sprintf("%s%s", testFolder, testFileName)
+
+	// Create a writer with Cool tier
+	writer, err := NewWriter(
+		ctx,
+		client,
+		testContainerName,
+		ioStorage.WithDir(testFolder),
+		ioStorage.WithAccessTier(string(blob.AccessTierCool)),
+	)
+	s.Require().NoError(err)
+
+	// Write a test file
+	w, err := writer.NewWriter(ctx, testFileName)
+	s.Require().NoError(err)
+	testContent := "test content for tier validation"
+	n, err := w.Write([]byte(testContent))
+	s.Require().NoError(err)
+	s.Equal(len(testContent), n)
+	err = w.Close()
+	s.Require().NoError(err)
+
+	// Get the blob properties to verify the tier
+	blobClient := client.ServiceClient().NewContainerClient(testContainerName).NewBlobClient(fullPath)
+	props, err := blobClient.GetProperties(ctx, nil)
+	s.Require().NoError(err)
+
+	// Verify the access tier
+	s.Require().NotNil(props.AccessTier)
+	s.Equal(string(blob.AccessTierCool), *props.AccessTier)
+}
+
 func TestParseAccessTier(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

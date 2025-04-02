@@ -59,7 +59,6 @@ func NewRestoreWriter[T models.TokenConstraint](
 	logger.Debug("created new restore writer",
 		slog.Bool("useBatchWrites", useBatchWrites),
 		slog.Int("batchSize", batchSize),
-		slog.Any("retryPolicy", *retryPolicy),
 		slog.Bool("ignoreRecordError", ignoreRecordError),
 	)
 

@@ -230,7 +230,7 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 		case err == nil:
 			return &stats, nil
 		case strings.Contains(err.Error(), errDcNotFound):
-			r.logger.Warn("failed to get stats, try to restart XDR", slog.Any("error", err))
+			r.logger.Warn("failed to get stats, try to restart xdr", slog.Any("error", err))
 			// Try to restart XDR.
 			if err = r.infoClient.StartXDR(
 				r.nodeName,
@@ -242,6 +242,8 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 			); err != nil {
 				handleError(err, "failed to restart xdr")
 			}
+			// After successful restart of XDR we should wait, until xdr will restart.
+			time.Sleep(statsPollingDelay)
 		default:
 			handleError(err, "failed to get stats")
 		}

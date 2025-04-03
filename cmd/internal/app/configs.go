@@ -197,7 +197,8 @@ func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
 	c.SecretAgentConfig = mapSecretAgentConfig(params.SecretAgent)
 	c.RetryPolicy = mapRetryPolicy(
 		params.RestoreParams.RetryBaseTimeout,
-		params.RestoreParams.RetryMultiplier, params.RestoreParams.RetryMaxRetries,
+		params.RestoreParams.RetryMultiplier,
+		params.RestoreParams.RetryMaxRetries,
 	)
 
 	return c

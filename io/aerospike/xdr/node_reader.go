@@ -76,6 +76,7 @@ func (r *NodeReader) Run() error {
 		r.config.namespace,
 		r.config.rewind,
 		r.config.maxThroughput,
+		r.config.xdrForward,
 	); err != nil {
 		return fmt.Errorf("failed to create xdr config for node %s: %w", r.nodeName, err)
 	}

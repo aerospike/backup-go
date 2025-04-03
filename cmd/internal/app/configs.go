@@ -161,6 +161,7 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 			params.BackupXDRParams.InfoMaxRetries,
 		),
 		MaxThroughput: params.BackupXDRParams.MaxThroughput,
+		Forward:       params.BackupXDRParams.Forward,
 	}
 
 	return c

@@ -88,6 +88,10 @@ type ConfigBackupXDR struct {
 	StartTimeout time.Duration
 	// Retry policy for info commands.
 	InfoRetryPolicy *models.RetryPolicy
+	// By default XDR writes that originated from another XDR are not forwarded to the specified destination
+	// datacenters. Setting this parameter to true sends writes that originated from another XDR to the specified
+	// destination datacenters.
+	Forward bool
 }
 
 // validate validates the ConfigBackupXDR.

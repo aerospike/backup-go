@@ -83,6 +83,7 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 		rr.xdrConfig.InfoPolingPeriod,
 		rr.xdrConfig.StartTimeout,
 		rr.xdrConfig.MaxThroughput,
+		rr.xdrConfig.Forward,
 	)
 }
 

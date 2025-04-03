@@ -44,7 +44,8 @@ const (
 	cmdSetsOfNamespace = "sets/%s"
 	cmdNamespaceInfo   = "namespace/%s"
 
-	cmdMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
+	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
+	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 
 	cmdRespErrPrefix = "ERROR"
 )
@@ -288,7 +289,7 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 }
 
 // StartXDR creates xdr config and starts replication.
-func (ic *InfoClient) StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int) error {
+func (ic *InfoClient) StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error {
 	// The Order of this operation is important. Don't move it if you don't know what you are doing!
 	err := executeWithRetry(
 		ic.retryPolicy,
@@ -338,6 +339,18 @@ func (ic *InfoClient) StartXDR(nodeName, dc, hostPort, namespace, rewind string,
 	)
 	if err != nil {
 		return err
+	}
+
+	if forward {
+		err = executeWithRetry(
+			ic.retryPolicy,
+			func() error {
+				return ic.setXDRForward(nodeName, dc, namespace, forward)
+			},
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -498,7 +511,7 @@ func (ic *InfoClient) setMaxThroughput(nodeName, dc, namespace string, throughpu
 		return nil
 	}
 
-	cmd := fmt.Sprintf(cmdMaxThroughput, dc, namespace, throughput)
+	cmd := fmt.Sprintf(cmdSetXDRMaxThroughput, dc, namespace, throughput)
 
 	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
@@ -507,6 +520,23 @@ func (ic *InfoClient) setMaxThroughput(nodeName, dc, namespace string, throughpu
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
 		return fmt.Errorf("failed to parse set max throughput response: %w", err)
+	}
+
+	return nil
+}
+
+// setXDRForward setting this parameter to true sends writes,
+// that originated from another XDR to the specified destination datacenters.
+func (ic *InfoClient) setXDRForward(nodeName, dc, namespace string, forward bool) error {
+	cmd := fmt.Sprintf(cmdSetXDRForward, dc, namespace, forward)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to set xdr forward: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse set xdr forward response: %w", err)
 	}
 
 	return nil

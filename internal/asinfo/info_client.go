@@ -291,64 +291,58 @@ func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, e
 // StartXDR creates xdr config and starts replication.
 func (ic *InfoClient) StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error {
 	// The Order of this operation is important. Don't move it if you don't know what you are doing!
-	err := executeWithRetry(
+	if err := executeWithRetry(
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRDC(nodeName, dc)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
-	err = executeWithRetry(
+	if err := executeWithRetry(
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRConnector(nodeName, dc)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
-	err = executeWithRetry(
+	if err := executeWithRetry(
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRNode(nodeName, dc, hostPort)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
-	err = executeWithRetry(
+	if err := executeWithRetry(
 		ic.retryPolicy,
 		func() error {
 			return ic.setMaxThroughput(nodeName, dc, namespace, throughput)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
-	err = executeWithRetry(
+	if err := executeWithRetry(
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRNamespace(nodeName, dc, namespace, rewind)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
 	if forward {
-		err = executeWithRetry(
+		if err := executeWithRetry(
 			ic.retryPolicy,
 			func() error {
 				return ic.setXDRForward(nodeName, dc, namespace, forward)
 			},
-		)
-		if err != nil {
+		); err != nil {
 			return err
 		}
 	}

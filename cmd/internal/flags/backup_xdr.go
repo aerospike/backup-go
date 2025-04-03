@@ -53,6 +53,11 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 		"DC that will be created on source instance for xdr backup.\n"+
 			"DC name can include only Latin lowercase and uppercase letters with no diacritical marks (a-z, A-Z),\n"+
 			"digits 0-9, underscores (_), hyphens (-), and dollar signs ($). Max length is 31 bytes.")
+	flagSet.BoolVar(&f.Forward, "forward",
+		false,
+		"By default XDR writes that originated from another XDR are not forwarded to the specified\n"+
+			"destination datacenters. Setting this parameter to true sends writes that originated from another XDR\n"+
+			"to the specified destination datacenters.")
 	flagSet.StringVar(&f.LocalAddress, "local-address",
 		"127.0.0.1",
 		"Local IP address that the XDR server listens on.")

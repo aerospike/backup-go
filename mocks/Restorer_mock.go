@@ -22,6 +22,53 @@ func (_m *MockRestorer) EXPECT() *MockRestorer_Expecter {
 	return &MockRestorer_Expecter{mock: &_m.Mock}
 }
 
+// GetMetrics provides a mock function with given fields:
+func (_m *MockRestorer) GetMetrics() *models.Metrics {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMetrics")
+	}
+
+	var r0 *models.Metrics
+	if rf, ok := ret.Get(0).(func() *models.Metrics); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Metrics)
+		}
+	}
+
+	return r0
+}
+
+// MockRestorer_GetMetrics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMetrics'
+type MockRestorer_GetMetrics_Call struct {
+	*mock.Call
+}
+
+// GetMetrics is a helper method to define mock.On call
+func (_e *MockRestorer_Expecter) GetMetrics() *MockRestorer_GetMetrics_Call {
+	return &MockRestorer_GetMetrics_Call{Call: _e.mock.On("GetMetrics")}
+}
+
+func (_c *MockRestorer_GetMetrics_Call) Run(run func()) *MockRestorer_GetMetrics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockRestorer_GetMetrics_Call) Return(_a0 *models.Metrics) *MockRestorer_GetMetrics_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRestorer_GetMetrics_Call) RunAndReturn(run func() *models.Metrics) *MockRestorer_GetMetrics_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetStats provides a mock function with given fields:
 func (_m *MockRestorer) GetStats() *models.RestoreStats {
 	ret := _m.Called()

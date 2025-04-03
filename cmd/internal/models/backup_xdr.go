@@ -43,4 +43,6 @@ type BackupXDR struct {
 	InfoMaxRetries                uint
 	InfoRetriesMultiplier         float64
 	InfoRetryIntervalMilliseconds int64
+
+	Forward bool
 }

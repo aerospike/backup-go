@@ -50,6 +50,8 @@ type RecordReaderConfig struct {
 	startTimeout time.Duration
 	// XDR max throughput number.
 	maxThroughput int
+	// XDR xdrForward config.
+	xdrForward bool
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -62,6 +64,7 @@ func NewRecordReaderConfig(
 	infoPolingPeriod time.Duration,
 	startTimeout time.Duration,
 	maxThroughput int,
+	xdrForward bool,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		dc:               dc,
@@ -72,12 +75,13 @@ func NewRecordReaderConfig(
 		infoPolingPeriod: infoPolingPeriod,
 		startTimeout:     startTimeout,
 		maxThroughput:    maxThroughput,
+		xdrForward:       xdrForward,
 	}
 }
 
 // infoCommander interface for an info client.
 type infoCommander interface {
-	StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int) error
+	StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
 	StopXDR(nodeName, dc string) error
 	GetStats(nodeName, dc, namespace string) (asinfo.Stats, error)
 	BlockMRTWrites(nodeName, namespace string) error

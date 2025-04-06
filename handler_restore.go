@@ -48,7 +48,6 @@ type StreamingReader interface {
 
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler[T models.TokenConstraint] struct {
-	id string
 	// Global backup context for a whole restore process.
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -61,9 +60,10 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
-	errors  chan error
-
 	pl *pipeline.Pipeline[T]
+
+	id     string
+	errors chan error
 }
 
 // newRestoreHandler creates a new RestoreHandler.

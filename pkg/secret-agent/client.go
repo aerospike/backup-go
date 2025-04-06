@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//nolint:stylecheck,revive // We want to use package name with underscore.
+//nolint:revive // We want to use package name with underscore.
 package secret_agent
 
 import (

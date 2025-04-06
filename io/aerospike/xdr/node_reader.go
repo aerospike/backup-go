@@ -240,6 +240,7 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 				r.config.namespace,
 				r.config.rewind,
 				r.config.maxThroughput,
+				r.config.xdrForward,
 			); err != nil {
 				handleError(err, "failed to restart xdr")
 			}

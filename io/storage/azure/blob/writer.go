@@ -98,9 +98,9 @@ func NewWriter(
 		}
 	}
 
-	if w.AccessTier != "" {
+	if w.StorageClass != "" {
 		// validation.
-		tier, err := parseAccessTier(w.AccessTier)
+		tier, err := parseAccessTier(w.StorageClass)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse access tier: %w", err)
 		}

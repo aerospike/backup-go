@@ -159,7 +159,7 @@ func WithUploadConcurrency(v int) Opt {
 }
 
 // WithStorageClass sets the storage class.
-// Is applicable only for S3.
+// For writers, files are saved to the specified class (in case of Azure it will be tier).
 func WithStorageClass(class string) Opt {
 	return func(r *Options) {
 		r.StorageClass = class
@@ -168,7 +168,6 @@ func WithStorageClass(class string) Opt {
 
 // WithAccessTier sets the access tier for archived files.
 // For readers, archived files are restored to the specified tier.
-// For writers, files are saved to the specified tier.
 func WithAccessTier(tier string) Opt {
 	return func(r *Options) {
 		r.AccessTier = tier

@@ -86,8 +86,8 @@ func (s *writeReadTestSuite) TestWriteRead() {
 	written := s.write("ns1.asb", size, times, s3Client)
 	read := s.read(s3Client)
 
-	s.Assertions.Equal(size*times, len(read))
-	s.Assertions.Equal(written, read)
+	s.Equal(size*times, len(read))
+	s.Equal(written, read)
 }
 
 func (s *writeReadTestSuite) TestWriteReadSingleFile() {
@@ -104,8 +104,8 @@ func (s *writeReadTestSuite) TestWriteReadSingleFile() {
 	written := s.writeSingleFile("ns1.asb", size, times, s3Client)
 	read := s.readSingleFile(s3Client)
 
-	s.Assertions.Equal(size*times, len(read))
-	s.Assertions.Equal(written, read)
+	s.Equal(size*times, len(read))
+	s.Equal(written, read)
 }
 
 func randomBytes(n int) []byte {
@@ -143,7 +143,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 			s.FailNow("failed to write", err)
 		}
 
-		s.Assertions.Equal(len(bytes), n)
+		s.Equal(len(bytes), n)
 		allBytesWritten = append(allBytesWritten, bytes...)
 	}
 
@@ -216,7 +216,7 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 			s.FailNow("failed to write", err)
 		}
 
-		s.Assertions.Equal(len(bytes), n)
+		s.Equal(len(bytes), n)
 		allBytesWritten = append(allBytesWritten, bytes...)
 	}
 

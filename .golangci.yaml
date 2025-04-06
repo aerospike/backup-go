@@ -1,83 +1,95 @@
-linters-settings:
-  goconst:
-    min-len: 2
-    min-occurrences: 3
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-  govet:
-    enable:
-      - shadow
-  nolintlint:
-    require-explanation: true
-    require-specific: true
-  gocyclo:
-    min-complexity: 21
-  gosec:
-    excludes:
-      - G115
-
+version: "2"
+run:
+  issues-exit-code: 1
 linters:
-  disable-all: true
+  default: none
   enable:
-    - gci
     - bodyclose
-    - unused
     - dogsled
     - dupl
     - errcheck
     - goconst
     - gocritic
-    - gofmt
-    - goimports
     - gocyclo
     - gosec
-    - gosimple
     - govet
     - ineffassign
+    - lll
     - misspell
-    - nolintlint
     - nakedret
-    - prealloc # pre-allocate slices with define size if the slice size is known in advance
+    - nolintlint
+    - prealloc
     - predeclared
     - revive
     - staticcheck
-    - stylecheck
     - thelper
     - tparallel
-    - typecheck
     - unconvert
     - unparam
+    - unused
     - whitespace
-    - lll
-    - wsl # While space linter
-
-run:
-  issues-exit-code: 1
-
-# Test exclusion examples
-issues:
-  exclude-dirs:
-    - main
-  exclude-rules:
-    - text: 'shadow: declaration of "(err|ctx)" shadows declaration at' # Allow idiomatic shadowing of err and ctx
-      linters: 
-      - govet
-    - text: 'exported: type name will be used as backup.(BackupStats|BackupHandler|BackupConfig|BackupToDirectoryConfig|BackupToDirectoryStats|BackupToDirectoryHandler) by other packages, and that stutters' # Allow stuttering for backup types
-      linters: 
-      - revive
-    - path: '(.+)test\.go'
-      linters:
-      - govet # Test code field alignment for sake of space is not a concern
-      - dupl
-      - goconst # Many test cases are small and have repeated strings that don't need to be constants
-      - wsl # Test code should be allowed to cuddle if statements, generated tests do this
-      - lll # Test data is often long and can make less sense when wrapped
-    - path: '(.+)test\.go'
-      text: importShadow
-    - path: '(.+)test\.go' # Test code doesn't need crypto strength random numbers
-      text: 'G404: Use of weak random number generator'
+    - wsl
+  settings:
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 21
+    gosec:
+      excludes:
+        - G115
+    govet:
+      enable:
+        - shadow
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - govet
+        text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
+      - linters:
+          - revive
+        text: 'exported: type name will be used as backup.(BackupStats|BackupHandler|BackupConfig|BackupToDirectoryConfig|BackupToDirectoryStats|BackupToDirectoryHandler) by other packages, and that stutters'
+      - linters:
+          - dupl
+          - goconst
+          - govet
+          - lll
+          - wsl
+        path: (.+)test\.go
+      - path: (.+)test\.go
+        text: importShadow
+      - path: (.+)test\.go
+        text: 'G404: Use of weak random number generator'
+    paths:
+      - main
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - main
+      - third_party$
+      - builtin$
+      - examples$

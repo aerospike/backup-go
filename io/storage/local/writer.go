@@ -187,7 +187,7 @@ type bufferedFile struct {
 }
 
 func (bf *bufferedFile) Close() error {
-	err := bf.Writer.Flush()
+	err := bf.Flush()
 	if err != nil {
 		return err
 	}

@@ -61,9 +61,9 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
-	pl *pipeline.Pipeline[T]
+	errors  chan error
 
-	errors chan error
+	pl *pipeline.Pipeline[T]
 }
 
 // newRestoreHandler creates a new RestoreHandler.

@@ -7,7 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0
-	github.com/aerospike/aerospike-client-go/v8 v8.2.0
+	github.com/aerospike/aerospike-client-go/v8 v8.0.2-0.20250403154023-f6182b5eb230
 	github.com/aerospike/tools-common-go v0.2.1-0.20250130070321-acda09110e14
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.9

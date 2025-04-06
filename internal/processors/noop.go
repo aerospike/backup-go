@@ -16,15 +16,12 @@ package processors
 
 import (
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 )
 
 // noopProcessor is a no-op implementation of a processor.
-type noopProcessor[T any] struct{}
+type noopProcessor[T models.TokenConstraint] struct{}
 
 // Process just passes the token through for noopProcessor.
 func (n *noopProcessor[T]) Process(token T) (T, error) {
 	return token, nil
 }
-
-type TokenProcessor = pipeline.DataProcessor[*models.Token]

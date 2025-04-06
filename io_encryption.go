@@ -19,17 +19,18 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 )
 
 const pemTemplate = "-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----"
 
-// ReadPrivateKey parses and loads a private key according to the EncryptionPolicy
+// readPrivateKey parses and loads a private key according to the EncryptionPolicy
 // configuration. It can load the private key from a file, env variable or Secret Agent.
 // A valid agent parameter is required to load the key from Aerospike Secret Agent.
 // Pass in nil for any other option.
-func ReadPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([]byte, error) {
+func readPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([]byte, error) {
 	var (
 		pemData []byte
 		err     error
@@ -59,12 +60,11 @@ func ReadPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([
 		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 
-	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	key, err := parsePK(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 
-	key := privateKey.(*rsa.PrivateKey)
 	// Originally asbackup converts the key to the PKCS1 format
 	decodedKey := x509.MarshalPKCS1PrivateKey(key)
 
@@ -76,6 +76,28 @@ func ReadPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([
 	}
 
 	return sum256[:], nil
+}
+
+// parsePK parses a private key from PKCS8 or PKCS1.
+func parsePK(block []byte) (*rsa.PrivateKey, error) {
+	// Try a PKCS8 format first.
+	privateKey, err8 := x509.ParsePKCS8PrivateKey(block)
+	if err8 == nil {
+		rsaKey, ok := privateKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("expected RSA private key, got %T", privateKey)
+		}
+
+		return rsaKey, nil
+	}
+
+	// Try a PKCS1 format (which is always RSA).
+	pkcs1Key, err1 := x509.ParsePKCS1PrivateKey(block)
+	if err1 == nil {
+		return pkcs1Key, nil
+	}
+
+	return nil, errors.Join(err8, err1)
 }
 
 // readPemFromFile reads the key from the file.

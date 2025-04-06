@@ -125,7 +125,11 @@ func isSecret(secret string) bool {
 	return strings.HasPrefix(secret, secretPrefix)
 }
 
-// ParseSecret check if string contains secret and tries to load secret from secret agent.
+// ParseSecret checks if the provided string contains a secret key and attempts
+// to retrieve the actual secret value from a secret agent, if configured.
+//
+// If the input string does not contain a secret key it is returned as is,
+// without any modification.
 func ParseSecret(config *SecretAgentConfig, secret string) (string, error) {
 	// If value doesn't contain the secret, we return it as is.
 	if !isSecret(secret) {

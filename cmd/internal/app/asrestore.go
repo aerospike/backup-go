@@ -16,11 +16,15 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/io/storage"
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -28,62 +32,53 @@ const idRestore = "asrestore-cli"
 
 type ASRestore struct {
 	backupClient  *backup.Client
-	restoreConfig *backup.RestoreConfig
+	restoreConfig *backup.ConfigRestore
 	reader        backup.StreamingReader
+	xdrReader     backup.StreamingReader
+	// Restore Mode: auto, asb, asbx
+	mode string
+}
+
+type ASRestoreParams struct {
+	ClientConfig  *client.AerospikeConfig
+	ClientPolicy  *models.ClientPolicy
+	RestoreParams *models.Restore
+	CommonParams  *models.Common
+	Compression   *models.Compression
+	Encryption    *models.Encryption
+	SecretAgent   *models.SecretAgent
+	AwsS3         *models.AwsS3
+	GcpStorage    *models.GcpStorage
+	AzureBlob     *models.AzureBlob
 }
 
 func NewASRestore(
 	ctx context.Context,
-	clientConfig *client.AerospikeConfig,
-	clientPolicy *models.ClientPolicy,
-	restoreParams *models.Restore,
-	commonParams *models.Common,
-	compression *models.Compression,
-	encryption *models.Encryption,
-	secretAgent *models.SecretAgent,
-	awsS3 *models.AwsS3,
-	gcpStorage *models.GcpStorage,
-	azureBlob *models.AzureBlob,
+	params *ASRestoreParams,
 	logger *slog.Logger,
 ) (*ASRestore, error) {
-	if err := validateStorages(awsS3, gcpStorage, azureBlob); err != nil {
+	// Validations.
+	if err := validateRestore(params); err != nil {
 		return nil, err
 	}
 
-	if err := validateCommonParams(commonParams); err != nil {
-		return nil, err
-	}
+	// Initializations.
+	restoreConfig := initializeRestoreConfigs(params)
 
-	if err := validateRestoreParams(restoreParams, commonParams); err != nil {
-		return nil, err
-	}
-
-	restoreConfig, err := mapRestoreConfig(
-		restoreParams,
-		commonParams,
-		compression,
-		encryption,
-		secretAgent,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create restore config: %w", err)
-	}
-
-	reader, err := getReader(
-		ctx,
-		restoreParams,
-		commonParams,
-		awsS3,
-		gcpStorage,
-		azureBlob,
-		nil,
-		restoreConfig.SecretAgentConfig,
-	)
+	reader, xdrReader, err := initializeRestoreReader(ctx, params, restoreConfig.SecretAgentConfig, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup reader: %w", err)
 	}
 
-	aerospikeClient, err := newAerospikeClient(clientConfig, clientPolicy, "")
+	warmUp := getWarmUp(params.RestoreParams.WarmUp, params.RestoreParams.MaxAsyncBatches)
+	logger.Debug("warm up is set", slog.Int("value", warmUp))
+
+	aerospikeClient, err := newAerospikeClient(
+		params.ClientConfig,
+		params.ClientPolicy,
+		"",
+		warmUp,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
@@ -97,6 +92,8 @@ func NewASRestore(
 		backupClient:  backupClient,
 		restoreConfig: restoreConfig,
 		reader:        reader,
+		xdrReader:     xdrReader,
+		mode:          params.RestoreParams.Mode,
 	}, nil
 }
 
@@ -105,16 +102,189 @@ func (r *ASRestore) Run(ctx context.Context) error {
 		return nil
 	}
 
-	h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
-	if err != nil {
-		return fmt.Errorf("failed to start restore: %w", err)
-	}
+	switch r.mode {
+	case models.RestoreModeASB:
+		r.restoreConfig.EncoderType = backup.EncoderTypeASB
 
-	if err := h.Wait(ctx); err != nil {
-		return fmt.Errorf("failed to restore: %w", err)
-	}
+		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
+		if err != nil {
+			return fmt.Errorf("failed to start asb restore: %w", err)
+		}
 
-	printRestoreReport(h.GetStats())
+		if err = h.Wait(ctx); err != nil {
+			return fmt.Errorf("failed to asb restore: %w", err)
+		}
+
+		printRestoreReport(h.GetStats())
+	case models.RestoreModeASBX:
+		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
+
+		hXdr, err := r.backupClient.Restore(ctx, r.restoreConfig, r.xdrReader)
+		if err != nil {
+			return fmt.Errorf("failed to start asbx restore: %w", err)
+		}
+
+		if err = hXdr.Wait(ctx); err != nil {
+			return fmt.Errorf("failed to asbx restore: %w", err)
+		}
+
+		printRestoreReport(hXdr.GetStats())
+	case models.RestoreModeAuto:
+		// If one of restore operations fails, we cancel another.
+		ctx, cancel := context.WithCancel(ctx)
+
+		var (
+			wg              sync.WaitGroup
+			xdrStats, stats *bModels.RestoreStats
+		)
+
+		errChan := make(chan error, 2)
+
+		if r.reader != nil {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				restoreCfg := *r.restoreConfig
+				restoreCfg.EncoderType = backup.EncoderTypeASB
+
+				h, err := r.backupClient.Restore(ctx, &restoreCfg, r.reader)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to start asb restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				if err = h.Wait(ctx); err != nil {
+					errChan <- fmt.Errorf("failed to asb restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				stats = h.GetStats()
+			}()
+		}
+
+		if r.xdrReader != nil {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				restoreXdrCfg := *r.restoreConfig
+				restoreXdrCfg.EncoderType = backup.EncoderTypeASBX
+
+				hXdr, err := r.backupClient.Restore(ctx, &restoreXdrCfg, r.xdrReader)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to start asbx restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				if err = hXdr.Wait(ctx); err != nil {
+					errChan <- fmt.Errorf("failed to asbx restore: %w", err)
+
+					cancel()
+
+					return
+				}
+
+				xdrStats = hXdr.GetStats()
+			}()
+		}
+
+		wg.Wait()
+		close(errChan)
+
+		// Return the first error encountered
+		for err := range errChan {
+			if err != nil {
+				cancel()
+				return err
+			}
+		}
+
+		restStats := bModels.SumRestoreStats(xdrStats, stats)
+		printRestoreReport(restStats)
+
+		// To prevent context leaking.
+		cancel()
+	default:
+		return fmt.Errorf("invalid mode: %s", r.mode)
+	}
 
 	return nil
+}
+
+func initializeRestoreConfigs(params *ASRestoreParams) *backup.ConfigRestore {
+	return mapRestoreConfig(params)
+}
+
+func initializeRestoreReader(
+	ctx context.Context,
+	params *ASRestoreParams,
+	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
+) (reader, xdrReader backup.StreamingReader, err error) {
+	switch params.RestoreParams.Mode {
+	case models.RestoreModeASB:
+		reader, err = newReader(ctx, params, sa, false, logger)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
+		}
+
+		return reader, nil, nil
+	case models.RestoreModeASBX:
+		xdrReader, err = newReader(ctx, params, sa, true, logger)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
+		}
+
+		return nil, xdrReader, nil
+	case models.RestoreModeAuto:
+		reader, err = newReader(ctx, params, sa, false, logger)
+
+		switch {
+		case errors.Is(err, storage.ErrEmptyStorage):
+			reader = nil
+		case err != nil:
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
+		default:
+		}
+
+		xdrReader, err = newReader(ctx, params, sa, true, logger)
+
+		switch {
+		case errors.Is(err, storage.ErrEmptyStorage):
+			xdrReader = nil
+		case err != nil:
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
+		default:
+		}
+
+		// If both readers are nil return an error, as no files were found.
+		if reader == nil && xdrReader == nil {
+			return nil, nil, err
+		}
+
+		return reader, xdrReader, nil
+	default:
+		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
+	}
+}
+
+func getWarmUp(warmUp, maxAsyncBatches int) int {
+	switch warmUp {
+	case 0:
+		return maxAsyncBatches + 1
+	default:
+		return warmUp
+	}
 }

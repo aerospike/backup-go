@@ -17,13 +17,14 @@ package processors
 import (
 	"context"
 
+	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
 	"golang.org/x/time/rate"
 )
 
 // tpsLimiter is a type representing a Token Per Second limiter.
 // it does not allow processing more than tps amount of tokens per second.
-type tpsLimiter[T any] struct {
+type tpsLimiter[T models.TokenConstraint] struct {
 	ctx     context.Context
 	limiter *rate.Limiter
 	tps     int
@@ -31,7 +32,7 @@ type tpsLimiter[T any] struct {
 
 // NewTPSLimiter Create a new TPS limiter.
 // n — allowed  number of tokens per second, n = 0 means no limit.
-func NewTPSLimiter[T any](ctx context.Context, n int) pipeline.DataProcessor[T] {
+func NewTPSLimiter[T models.TokenConstraint](ctx context.Context, n int) pipeline.DataProcessor[T] {
 	if n == 0 {
 		return &noopProcessor[T]{}
 	}

@@ -21,8 +21,9 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
-	s3Storasge "github.com/aerospike/backup-go/io/aws/s3"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	s3Storasge "github.com/aerospike/backup-go/io/storage/aws/s3"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -62,7 +63,7 @@ func initBackupClient() *backup.Client {
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	return backupClient
@@ -76,18 +77,18 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		"http://localhost:9000",
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	writers, err := s3Storasge.NewWriter(
 		ctx,
 		s3Client,
 		"backup",
-		s3Storasge.WithDir(backupFolder),
-		s3Storasge.WithRemoveFiles(),
+		ioStorage.WithDir(backupFolder),
+		ioStorage.WithRemoveFiles(),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	backupCfg := backup.NewDefaultBackupConfig()
@@ -99,7 +100,7 @@ func runBackup(ctx context.Context, c *backup.Client) {
 
 	backupHandler, err := c.Backup(ctx, backupCfg, writers, nil)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
@@ -121,18 +122,18 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		"http://localhost:9000",
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	reader, err := s3Storasge.NewReader(
 		ctx,
 		s3Client,
 		"backup",
-		s3Storasge.WithDir(backupFolder),
-		s3Storasge.WithValidator(asb.NewValidator()),
+		ioStorage.WithDir(backupFolder),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	source := dbNameSource
@@ -149,7 +150,7 @@ func runRestore(ctx context.Context, c *backup.Client) {
 
 	restoreHandler, err := c.Restore(ctx, restoreCfg, reader)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.

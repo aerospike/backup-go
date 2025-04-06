@@ -20,16 +20,17 @@ import (
 	"sync"
 )
 
-// Worker is an interface for a pipeline item
-// Each worker has a send and receive channel
-// that connects it to the previous and next stage in the pipeline
-// The Run method starts the worker
+// Worker is an interface for a pipeline item.
+// Each worker has send and receive channels that connect it to the previous
+// and next stage in the pipeline.
+// The Run method starts the worker.
 //
 //go:generate mockery --name Worker
 type Worker[T any] interface {
 	SetSendChan(chan<- T)
 	SetReceiveChan(<-chan T)
 	Run(context.Context) error
+	GetMetrics() (int, int)
 }
 
 // Pipeline runs a series of workers in parallel.
@@ -40,60 +41,62 @@ type Worker[T any] interface {
 // workers should not close the send channel, the pipeline stages handle that.
 // Pipelines can be chained together by using them as workers.
 type Pipeline[T any] struct {
-	receive <-chan T
-	send    chan<- T
-	stages  []*stage[T]
-	// For synced pipeline we must create same number of workers for each stage.
-	// Then we will initialize communication channels strait from worker to worker through stages.
-	isSynced bool
+	stages []*stage[T]
 }
-
-var _ Worker[any] = (*Pipeline[any])(nil)
 
 const channelSize = 256
 
+type Mode int
+
+const (
+	// ModeSingle default pipeline mode,
+	// when all workers from each stage linked to the other stage workers with one channel.
+	ModeSingle Mode = iota
+	// ModeParallel advanced pipeline mode,
+	// when each worker in one stage linked to each worker f another stage with one channel.
+	ModeParallel
+	// ModeSingleParallel advanced pipeline mode,
+	// When first stage with second stage is linked in single mode, and second and last stages linked in parallel.
+	// SplitFunction must be set, for using this mode.
+	ModeSingleParallel
+)
+
 // NewPipeline creates a new DataPipeline.
-func NewPipeline[T any](isSynced bool, workGroups ...[]Worker[T]) (*Pipeline[T], error) {
+func NewPipeline[T any](mode Mode, sf splitFunc[T], workGroups ...[]Worker[T]) (*Pipeline[T], error) {
 	if len(workGroups) == 0 {
 		return nil, fmt.Errorf("workGroups is empty")
 	}
 
 	stages := make([]*stage[T], len(workGroups))
 
-	// Check that all working groups have same number of workers.
-	if isSynced {
-		firstLen := len(workGroups[0])
-		for i := range workGroups {
-			if len(workGroups[i]) != firstLen {
-				return nil, fmt.Errorf("all workers groups must be same length in sync mode")
-			}
+	var routes []Route[T]
+
+	switch mode {
+	case ModeSingle:
+		routes = NewSingleRoutes[T](len(workGroups))
+	case ModeParallel:
+		routes = NewParallelRoutes[T](len(workGroups))
+	case ModeSingleParallel:
+		// This will create only 3 routes, for 3 stages!
+		// For MRT backup, so we should check if user knows what he is doing.
+		routes = NewSingleParallelRoutes[T](sf)
+		if len(routes) != len(workGroups) {
+			return nil, fmt.Errorf("this pipeline mode supports only 3 working groups, got %d", len(workGroups))
 		}
 	}
 
 	for i, workers := range workGroups {
-		stages[i] = newStage(isSynced, workers...)
+		stages[i] = newStage(routes[i], workers...)
+	}
+
+	r := newRouter[T]()
+	if err := r.apply(stages); err != nil {
+		return nil, err
 	}
 
 	return &Pipeline[T]{
-		stages:   stages,
-		isSynced: isSynced,
+		stages: stages,
 	}, nil
-}
-
-// SetReceiveChan sets the receive channel for the pipeline.
-// The receive channel is used as the input to the first stage.
-// This satisfies the Worker interface so that pipelines can be chained together.
-// Usually users will not need to call this method.
-func (dp *Pipeline[T]) SetReceiveChan(c <-chan T) {
-	dp.receive = c
-}
-
-// SetSendChan sets the send channel for the pipeline.
-// The send channel is used as the output from the last stage.
-// This satisfies the Worker interface so that pipelines can be chained together.
-// Usually users will not need to call this method.
-func (dp *Pipeline[T]) SetSendChan(c chan<- T) {
-	dp.send = c
 }
 
 // Run starts the pipeline.
@@ -108,52 +111,6 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	defer cancel()
 
 	errors := make(chan error, len(dp.stages))
-
-	var (
-		lastSend []<-chan T
-		// To initialize pipeline workers correctly, we need to create empty channels for first and last stages.
-		emptySendChans    []chan<- T
-		emptyReceiveChans []<-chan T
-	)
-
-	for _, s := range dp.stages {
-		sendChans := make([]chan<- T, 0, len(s.workers))
-		receiveChans := make([]<-chan T, 0, len(s.workers))
-
-		emptySendChans = make([]chan<- T, 0, len(s.workers))
-		emptyReceiveChans = make([]<-chan T, 0, len(s.workers))
-
-		if dp.isSynced {
-			for i := 0; i < len(s.workers); i++ {
-				// For synced mode, we don't add buffer to channels, not to lose any data.
-				send := make(chan T)
-				sendChans = append(sendChans, send)
-				receiveChans = append(receiveChans, send)
-
-				empty := make(chan T)
-				emptySendChans = append(emptySendChans, empty)
-				emptyReceiveChans = append(emptyReceiveChans, empty)
-			}
-		} else {
-			send := make(chan T, channelSize)
-			sendChans = append(sendChans, send)
-			receiveChans = append(receiveChans, send)
-
-			emptySendChans = append(emptySendChans, dp.send)
-			emptyReceiveChans = append(emptyReceiveChans, dp.receive)
-		}
-
-		s.SetSendChan(sendChans)
-
-		s.SetReceiveChan(lastSend)
-
-		lastSend = receiveChans
-	}
-
-	// set the receive and send channels for first
-	// and last stages to the pipeline's receive and send channels
-	dp.stages[0].SetReceiveChan(emptyReceiveChans)
-	dp.stages[len(dp.stages)-1].SetSendChan(emptySendChans)
 
 	wg := &sync.WaitGroup{}
 	for _, s := range dp.stages {
@@ -181,26 +138,37 @@ func (dp *Pipeline[T]) Run(ctx context.Context) error {
 	return nil
 }
 
+// GetMetrics returns stats: reader, writer.
+func (dp *Pipeline[T]) GetMetrics() (in, out int) {
+	if len(dp.stages) == 0 {
+		return 0, 0
+	}
+
+	_, readOut := dp.stages[0].GetMetrics()
+	writeIn, _ := dp.stages[len(dp.stages)-1].GetMetrics()
+
+	return readOut, writeIn
+}
+
+// stage contains pipeline stages, that contains workers.
+// router manages communication between stages.
+// After stage finishes, we close send channel, to send stop signal for workers.
 type stage[T any] struct {
-	receive []<-chan T
-	send    []chan<- T
+	// Is used to stop workers.
+	send    []chan T
 	workers []Worker[T]
-	// if synced, we distribute communication channels through workers.
-	isSynced bool
+	// Communication routes.
+	route Route[T]
 }
 
-func (s *stage[T]) SetReceiveChan(c []<-chan T) {
-	s.receive = c
-}
-
-func (s *stage[T]) SetSendChan(c []chan<- T) {
+func (s *stage[T]) SetSendChan(c []chan T) {
 	s.send = c
 }
 
-func newStage[T any](isSynced bool, workers ...Worker[T]) *stage[T] {
+func newStage[T any](route Route[T], workers ...Worker[T]) *stage[T] {
 	s := stage[T]{
-		workers:  workers,
-		isSynced: isSynced,
+		workers: workers,
+		route:   route,
 	}
 
 	return &s
@@ -209,19 +177,6 @@ func newStage[T any](isSynced bool, workers ...Worker[T]) *stage[T] {
 func (s *stage[T]) Run(ctx context.Context) error {
 	if len(s.workers) == 0 {
 		return nil
-	}
-
-	for i, w := range s.workers {
-		if s.isSynced {
-			// If it is not sync mode, there will be 1 channel in each slice.
-			w.SetReceiveChan(s.receive[i])
-			w.SetSendChan(s.send[i])
-
-			continue
-		}
-		// Else we distribute all channels to workers.
-		w.SetReceiveChan(s.receive[0])
-		w.SetSendChan(s.send[0])
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -247,8 +202,12 @@ func (s *stage[T]) Run(ctx context.Context) error {
 
 	wg.Wait()
 
-	for i := range s.send {
-		if s.send[i] != nil {
+	// Closing channels in different ways for split and normal modes.
+	switch {
+	case s.route.output.sf != nil:
+		close(s.route.output.routedChan)
+	default:
+		for i := range s.send {
 			close(s.send[i])
 		}
 	}
@@ -260,4 +219,34 @@ func (s *stage[T]) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *stage[T]) GetMetrics() (in, out int) {
+	var sumIn, sumOut int
+
+	if len(s.workers) == 0 {
+		return 0, 0
+	}
+
+	for i, w := range s.workers {
+		in, out := w.GetMetrics()
+
+		// Save first state for single workers.
+		if i == 0 {
+			sumIn += in
+			sumOut += out
+		}
+
+		// If workers are connected in a single mode,
+		// we will have only one channel for all workers.
+		if s.route.input.mode != routeRuleModeSingle {
+			sumIn += in
+		}
+
+		if s.route.output.mode != routeRuleModeSingle {
+			sumOut += out
+		}
+	}
+
+	return sumIn, sumOut
 }

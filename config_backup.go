@@ -19,10 +19,12 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
-// BackupConfig contains configuration for the backup operation.
-type BackupConfig struct {
+// ConfigBackup contains configuration for the backup operation.
+type ConfigBackup struct {
 	// InfoPolicy applies to Aerospike Info requests made during backup and
 	// restore. If nil, the Aerospike client's default policy will be used.
 	InfoPolicy *a.InfoPolicy
@@ -98,7 +100,7 @@ type BackupConfig struct {
 	Bandwidth int
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
-	FileLimit int64
+	FileLimit uint64
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	// Results in smaller backup files.
 	Compact bool
@@ -121,14 +123,16 @@ type BackupConfig struct {
 	PageSize int64
 	// If set to true, the same number of workers will be created for each stage of the pipeline.
 	// Each worker will be connected to the next stage worker with a separate unbuffered channel.
-	SyncPipelines bool
+	PipelinesMode pipeline.Mode
 	// When using directory parameter, prepend a prefix to the names of the generated files.
 	OutputFilePrefix string
+	// Retry policy for info commands.
+	InfoRetryPolicy *models.RetryPolicy
 }
 
-// NewDefaultBackupConfig returns a new BackupConfig with default values.
-func NewDefaultBackupConfig() *BackupConfig {
-	return &BackupConfig{
+// NewDefaultBackupConfig returns a new ConfigBackup with default values.
+func NewDefaultBackupConfig() *ConfigBackup {
+	return &ConfigBackup{
 		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
 		ParallelRead:     1,
 		ParallelWrite:    1,
@@ -138,36 +142,38 @@ func NewDefaultBackupConfig() *BackupConfig {
 	}
 }
 
-// isParalleledByNodes checks if backup is parallel by nodes.
-func (c *BackupConfig) isParalleledByNodes() bool {
+// isParalleledByNodes determines whether the backup is parallelized by nodes.
+func (c *ConfigBackup) isParalleledByNodes() bool {
 	return c.ParallelNodes || len(c.NodeList) > 0
 }
 
-// isDefaultPartitionFilter checks if default filter is set.
-func (c *BackupConfig) isDefaultPartitionFilter() bool {
+// isDefaultPartitionFilter checks if the default filter is set.
+func (c *ConfigBackup) isDefaultPartitionFilter() bool {
 	return len(c.PartitionFilters) == 1 &&
 		c.PartitionFilters[0].Begin == 0 &&
 		c.PartitionFilters[0].Count == MaxPartitions &&
 		c.PartitionFilters[0].Digest == nil
 }
 
-// isStateFirstRun checks if it is first run of backup with a state file.
-func (c *BackupConfig) isStateFirstRun() bool {
+// isStateFirstRun checks if it is the first run of the backup with a state file.
+func (c *ConfigBackup) isStateFirstRun() bool {
 	return c.StateFile != "" && !c.Continue
 }
 
 // isStateContinueRun checks if we continue backup from a state file.
-func (c *BackupConfig) isStateContinue() bool {
+func (c *ConfigBackup) isStateContinue() bool {
 	return c.StateFile != "" && c.Continue
 }
 
-func (c *BackupConfig) isFullBackup() bool {
+func (c *ConfigBackup) isFullBackup() bool {
 	// full backup doesn't have a lower bound.
 	return c.ModAfter == nil && c.isDefaultPartitionFilter() && c.ScanPolicy.FilterExpression == nil
 }
 
-//nolint:gocyclo // validate func is long func with a lot of checks.
-func (c *BackupConfig) validate() error {
+// validate validates the ConfigBackup.
+//
+//nolint:gocyclo // contains a long list of validations
+func (c *ConfigBackup) validate() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
 	}
@@ -198,10 +204,6 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
 	}
 
-	if c.FileLimit < 0 {
-		return fmt.Errorf("filelimit value must not be negative, got %d", c.FileLimit)
-	}
-
 	if c.StateFile != "" && c.PageSize == 0 {
 		return fmt.Errorf("page size must be set if saving state to state file is enabled")
 	}
@@ -214,8 +216,8 @@ func (c *BackupConfig) validate() error {
 		return fmt.Errorf("state file must be set if continue is enabled")
 	}
 
-	if c.StateFile != "" && !c.SyncPipelines {
-		return fmt.Errorf("sync pipelines must be enabled if stage file is set")
+	if c.StateFile != "" && c.PipelinesMode != pipeline.ModeParallel {
+		return fmt.Errorf("parallel pipelines must be enabled if stage file is set")
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {
@@ -228,6 +230,20 @@ func (c *BackupConfig) validate() error {
 
 	if err := c.SecretAgentConfig.validate(); err != nil {
 		return fmt.Errorf("secret agent invalid: %w", err)
+	}
+
+	for i := range c.SetList {
+		if c.SetList[i] == models.MonitorRecordsSetName {
+			return fmt.Errorf("mrt monitor set is not allowed for backup")
+		}
+	}
+
+	if err := c.InfoRetryPolicy.Validate(); err != nil {
+		return fmt.Errorf("invalid info retry policy: %w", err)
+	}
+
+	if c.EncoderType != EncoderTypeASB {
+		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
 	}
 
 	return nil

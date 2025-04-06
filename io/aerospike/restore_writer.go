@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"time"
@@ -24,7 +25,6 @@ import (
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 )
 
@@ -33,18 +33,19 @@ type recordWriter interface {
 	close() error
 }
 
-// restoreWriter satisfies the DataWriter interface.
+// RestoreWriter satisfies the DataWriter interface.
 // It writes the types from the models package to an Aerospike client
 // It is used to restore data from a backup.
-type restoreWriter struct {
+type RestoreWriter[T models.TokenConstraint] struct {
 	sindexWriter
 	udfWriter
 	recordWriter
+	payloadWriter
 	logger *slog.Logger
 }
 
-// NewRestoreWriter creates a new restoreWriter.
-func NewRestoreWriter(
+// NewRestoreWriter creates a new RestoreWriter.
+func NewRestoreWriter[T models.TokenConstraint](
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -53,11 +54,15 @@ func NewRestoreWriter(
 	batchSize int,
 	retryPolicy *models.RetryPolicy,
 	ignoreRecordError bool,
-) pipeline.DataWriter[*models.Token] {
+) *RestoreWriter[T] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
-	logger.Debug("created new restore writer")
+	logger.Debug("created new restore writer",
+		slog.Bool("useBatchWrites", useBatchWrites),
+		slog.Int("batchSize", batchSize),
+		slog.Bool("ignoreRecordError", ignoreRecordError),
+	)
 
-	return &restoreWriter{
+	return &RestoreWriter[T]{
 		sindexWriter: sindexWriter{
 			asc:         asc,
 			writePolicy: writePolicy,
@@ -78,6 +83,13 @@ func NewRestoreWriter(
 			retryPolicy,
 			ignoreRecordError,
 		),
+		payloadWriter: payloadWriter{
+			asc,
+			writePolicy,
+			stats,
+			retryPolicy,
+			ignoreRecordError,
+		},
 		logger: logger,
 	}
 }
@@ -114,14 +126,26 @@ func newRecordWriter(
 }
 
 // Write writes the types from the models package to an Aerospike DB.
-func (rw *restoreWriter) Write(data *models.Token) (int, error) {
-	switch data.Type {
+func (rw *RestoreWriter[T]) Write(data T) (int, error) {
+	switch v := any(data).(type) {
+	case *models.ASBXToken:
+		// Logic for ASBXToken
+		return rw.writeASBXToken(v)
+	case *models.Token:
+		return rw.writeToken(v)
+	default:
+		return 0, fmt.Errorf("unsupported type: %T", data)
+	}
+}
+
+func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
+	switch token.Type {
 	case models.TokenTypeRecord:
-		return int(data.Size), rw.writeRecord(data.Record)
+		return int(token.Size), rw.writeRecord(token.Record)
 	case models.TokenTypeUDF:
-		return int(data.Size), rw.writeUDF(data.UDF)
+		return int(token.Size), rw.writeUDF(token.UDF)
 	case models.TokenTypeSIndex:
-		return int(data.Size), rw.writeSecondaryIndex(data.SIndex)
+		return int(token.Size), rw.writeSecondaryIndex(token.SIndex)
 	case models.TokenTypeInvalid:
 		return 0, errors.New("invalid token")
 	default:
@@ -129,8 +153,12 @@ func (rw *restoreWriter) Write(data *models.Token) (int, error) {
 	}
 }
 
+func (rw *RestoreWriter[T]) writeASBXToken(token *models.ASBXToken) (int, error) {
+	return len(token.Payload), rw.writePayload(token)
+}
+
 // Close satisfies the DataWriter interface.
-func (rw *restoreWriter) Close() error {
+func (rw *RestoreWriter[T]) Close() error {
 	rw.logger.Debug("close restore writer")
 	return rw.close()
 }
@@ -177,5 +205,6 @@ func shouldIgnore(err a.Error) bool {
 		atypes.FAIL_FORBIDDEN,
 		atypes.BIN_TYPE_ERROR,
 		atypes.BIN_NOT_FOUND,
+		atypes.KEY_NOT_FOUND_ERROR,
 	)
 }

@@ -15,24 +15,30 @@
 package processors
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
-type recordCounter struct {
+type recordCounter[T models.TokenConstraint] struct {
 	counter *atomic.Uint64
 }
 
-func NewRecordCounter(counter *atomic.Uint64) TokenProcessor {
-	return &recordCounter{
+func NewRecordCounter[T models.TokenConstraint](counter *atomic.Uint64) pipeline.DataProcessor[T] {
+	return &recordCounter[T]{
 		counter: counter,
 	}
 }
 
-func (c recordCounter) Process(token *models.Token) (*models.Token, error) {
+func (c recordCounter[T]) Process(token T) (T, error) {
+	t, ok := any(token).(*models.Token)
+	if !ok {
+		return nil, fmt.Errorf("unsupported token type %T for record counter", token)
+	}
 	// if the token is not a record, we don't need to process it
-	if token.Type != models.TokenTypeRecord {
+	if t.Type != models.TokenTypeRecord {
 		return token, nil
 	}
 

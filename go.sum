@@ -46,8 +46,8 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapp
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0/go.mod h1:otE2jQekW/PqXk1Awf5lmfokJx4uwuqcj1ab5SpGeW0=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/aerospike/aerospike-client-go/v8 v8.2.0 h1:6w3X+w5LnmBvQ1X1m4zJH40IWgxZxfMfGhEZxuQlCYo=
-github.com/aerospike/aerospike-client-go/v8 v8.2.0/go.mod h1:JmVOIqacquBd0ZjlZ5Dz6bRMSC3LrZCCNojZ/9NS4R0=
+github.com/aerospike/aerospike-client-go/v8 v8.0.2-0.20250403154023-f6182b5eb230 h1:vKHfK/6lWoia3JQfAlMc0g77EitsM4mgq81MaSfHcDI=
+github.com/aerospike/aerospike-client-go/v8 v8.0.2-0.20250403154023-f6182b5eb230/go.mod h1:H6CzKDoHxBj1yY/oQPci1bUIbEx2ATQtJ2GtZ+N64Wg=
 github.com/aerospike/tools-common-go v0.2.1-0.20250130070321-acda09110e14 h1:rHS7ABctGIJEw+vxtHNDdKxxYo6iF3BCMD4XDIvQzOo=
 github.com/aerospike/tools-common-go v0.2.1-0.20250130070321-acda09110e14/go.mod h1:sAbVIRJS7Wn9UY7DwI59wDfRjOZUAcR6sACLCSNYWgc=
 github.com/aws/aws-sdk-go-v2 v1.36.3 h1:mJoei2CxPutQVxaATCzDUjcZEjVRdpsiiXi2o38yqWM=

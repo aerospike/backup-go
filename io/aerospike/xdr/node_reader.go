@@ -16,12 +16,20 @@ package xdr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/aerospike/backup-go/internal/asinfo"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
+)
+
+const (
+	errDcNotFound    = "DC not found"
+	getStatsAttempts = 5
 )
 
 // NodeReader track each node.
@@ -39,6 +47,7 @@ type NodeReader struct {
 	mrtWritesStopped atomic.Bool
 
 	nodesRecovered chan struct{}
+	isRecovered    atomic.Bool
 
 	logger *slog.Logger
 }
@@ -106,13 +115,13 @@ func (r *NodeReader) serve() {
 		case <-r.ctx.Done():
 			return
 		case <-ticker.C:
-			stats, err := r.infoClient.GetStats(r.nodeName, r.config.dc, r.config.namespace)
+			stats, err := r.getStats()
 			if err != nil {
-				r.logger.Warn("failed to get xdr stats",
+				r.logger.Error("failed to get stats",
 					slog.Any("error", err),
 				)
 
-				continue
+				return
 			}
 
 			r.logger.Debug("got stats",
@@ -124,9 +133,10 @@ func (r *NodeReader) serve() {
 				continue
 			}
 
-			// Recovery finished.
+			// Recovery finished. Notify the reader to stop MRT writes.
 			if !stateSent {
 				r.nodesRecovered <- struct{}{}
+				r.isRecovered.Store(true)
 
 				stateSent = true
 			}
@@ -136,7 +146,7 @@ func (r *NodeReader) serve() {
 				continue
 			}
 
-			// set once.
+			// Set once.
 			if r.checkpoint == 0 {
 				r.checkpoint = time.Now().Unix()
 			}
@@ -165,6 +175,11 @@ func (r *NodeReader) serve() {
 func (r *NodeReader) close() {
 	r.logger.Debug("closing aerospike node record reader")
 
+	// If we close because of error, we must remove it from observer.
+	if !r.isRecovered.Load() {
+		r.nodesRecovered <- struct{}{}
+	}
+
 	if err := r.infoClient.StopXDR(r.nodeName, r.config.dc); err != nil {
 		r.logger.Error("failed to remove xdr config",
 			slog.Any("error", err))
@@ -190,4 +205,51 @@ func (r *NodeReader) BlockMrt() error {
 	}
 
 	return nil
+}
+
+func (r *NodeReader) getStats() (*asinfo.Stats, error) {
+	var (
+		errChain error
+		delay    time.Duration
+	)
+
+	handleError := func(err error, description string) {
+		if !errors.Is(errChain, err) {
+			errChain = errors.Join(errChain,
+				fmt.Errorf("%s: %w", description, err))
+		}
+
+		delay += time.Second
+	}
+
+	for retries := 0; retries < getStatsAttempts; retries++ {
+		time.Sleep(delay)
+
+		stats, err := r.infoClient.GetStats(r.nodeName, r.config.dc, r.config.namespace)
+
+		switch {
+		case err == nil:
+			return &stats, nil
+		case strings.Contains(err.Error(), errDcNotFound):
+			r.logger.Warn("failed to get stats, try to restart xdr", slog.Any("error", err))
+			// Try to restart XDR.
+			if err = r.infoClient.StartXDR(
+				r.nodeName,
+				r.config.dc,
+				r.config.currentHostPort,
+				r.config.namespace,
+				r.config.rewind,
+				r.config.maxThroughput,
+			); err != nil {
+				handleError(err, "failed to restart xdr")
+			}
+			// After successful restart of XDR we should wait, until xdr will restart.
+			time.Sleep(statsPollingDelay)
+		default:
+			handleError(err, "failed to get stats")
+		}
+	}
+
+	return nil, fmt.Errorf("failed to get stats for node %s after %d attempts: %w",
+		r.nodeName, getStatsAttempts, errChain)
 }

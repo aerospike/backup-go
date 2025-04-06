@@ -56,7 +56,11 @@ func NewRestoreWriter[T models.TokenConstraint](
 	ignoreRecordError bool,
 ) *RestoreWriter[T] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
-	logger.Debug("created new restore writer")
+	logger.Debug("created new restore writer",
+		slog.Bool("useBatchWrites", useBatchWrites),
+		slog.Int("batchSize", batchSize),
+		slog.Bool("ignoreRecordError", ignoreRecordError),
+	)
 
 	return &RestoreWriter[T]{
 		sindexWriter: sindexWriter{

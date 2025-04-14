@@ -44,7 +44,7 @@ type Pipeline[T any] struct {
 	stages []*stage[T]
 }
 
-const channelSize = 256
+const channelSize = 10_000
 
 type Mode int
 

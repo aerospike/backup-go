@@ -33,7 +33,7 @@ import (
 const (
 	defaultAddress        = ":8080"
 	defaultTimeout        = 1 * time.Second
-	defaultQueueSize      = 10_000
+	defaultQueueSize      = 256
 	defaultMaxConnections = 4096
 )
 

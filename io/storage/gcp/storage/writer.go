@@ -28,7 +28,7 @@ import (
 
 const (
 	fileType         = "application/octet-stream"
-	defaultChunkSize = 5 * 1024 * 1024
+	defaultChunkSize = 50 * 1024 * 1024
 )
 
 // Writer represents a GCP storage writer.

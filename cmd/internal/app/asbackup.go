@@ -100,7 +100,7 @@ func NewASBackup(
 
 	secretAgent := getSecretAgent(backupConfig, backupXDRConfig)
 
-	// We don't need writer for estimates.
+	// We don't need a writer for estimates.
 	var writer backup.Writer
 	if params.SkipWriterInit() {
 		writer, err = initializeBackupWriter(ctx, params, secretAgent)

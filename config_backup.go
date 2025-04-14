@@ -75,6 +75,9 @@ type ConfigBackup struct {
 	// The list of backup bin names
 	// (optional, given an empty list, all bins will be backed up)
 	BinList []string
+	// The list of rack ids
+	// (optional, given an empty list, all racks will be backed up)
+	RackList []int
 	// ParallelNodes specifies how to perform scan.
 	// If set to true, we launch parallel workers for nodes; otherwise workers run in parallel for partitions.
 	// Excludes PartitionFilters param.
@@ -144,7 +147,7 @@ func NewDefaultBackupConfig() *ConfigBackup {
 
 // isParalleledByNodes determines whether the backup is parallelized by nodes.
 func (c *ConfigBackup) isParalleledByNodes() bool {
-	return c.ParallelNodes || len(c.NodeList) > 0
+	return c.ParallelNodes || len(c.NodeList) > 0 || len(c.RackList) > 0
 }
 
 // isDefaultPartitionFilter checks if the default filter is set.
@@ -186,8 +189,8 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if (c.ParallelNodes || len(c.NodeList) != 0) && !c.isDefaultPartitionFilter() {
-		return fmt.Errorf("parallel by nodes and partitions and the same time not allowed")
+	if (c.ParallelNodes || len(c.NodeList) != 0 || len(c.RackList) != 0) && !c.isDefaultPartitionFilter() {
+		return fmt.Errorf("parallel by nodes, racks and/or partitions and the same time not allowed")
 	}
 
 	if !c.isDefaultPartitionFilter() {

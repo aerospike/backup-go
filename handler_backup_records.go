@@ -35,6 +35,7 @@ import (
 type backupRecordsHandler struct {
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
+	infoClient      *asinfo.InfoClient
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
 	state           *State
@@ -44,6 +45,7 @@ type backupRecordsHandler struct {
 func newBackupRecordsHandler(
 	config *ConfigBackup,
 	ac AerospikeClient,
+	infoClient *asinfo.InfoClient,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
 	state *State,
@@ -53,6 +55,7 @@ func newBackupRecordsHandler(
 	h := &backupRecordsHandler{
 		config:          config,
 		aerospikeClient: ac,
+		infoClient:      infoClient,
 		logger:          logger,
 		scanLimiter:     scanLimiter,
 		state:           state,
@@ -172,8 +175,10 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Co
 
 func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context, scanPolicy *a.ScanPolicy,
 ) (uint64, error) {
-	nodes := bh.aerospikeClient.GetNodes()
-	nodes = filterNodes(bh.config.NodeList, nodes)
+	nodes, err := bh.getNodes()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get nodes: %w", err)
+	}
 
 	var count uint64
 
@@ -257,9 +262,11 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForPartition(
 func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipeline.Worker[*models.Token], error) {
-	nodes := bh.aerospikeClient.GetNodes()
-	// If bh.config.NodeList is not empty we filter nodes.
-	nodes = filterNodes(bh.config.NodeList, nodes)
+	nodes, err := bh.getNodes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get nodes: %w", err)
+	}
+
 	// As we can have nodes < workers, we can't distribute a small number of nodes to a large number of workers.
 	// So we set workers = nodes.
 	if len(nodes) < n {
@@ -268,7 +275,7 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 
 	nodesGroups, err := splitNodes(nodes, n)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to split nodes: %w", err)
 	}
 
 	readWorkers := make([]pipeline.Worker[*models.Token], n)
@@ -292,6 +299,29 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 	}
 
 	return readWorkers, nil
+}
+
+func (bh *backupRecordsHandler) getNodes() ([]*a.Node, error) {
+	if len(bh.config.RackList) > 0 {
+		nodeList := make([]string, 0)
+
+		for _, rack := range bh.config.RackList {
+			nodes, err := bh.infoClient.GetRackNodes(rack)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get rack nodes: %w", err)
+			}
+
+			nodeList = append(nodeList, nodes...)
+		}
+
+		bh.config.NodeList = nodeList
+	}
+
+	nodes := bh.aerospikeClient.GetNodes()
+	// If bh.config.NodeList is not empty we filter nodes.
+	nodes = filterNodes(bh.config.NodeList, nodes)
+
+	return nodes, nil
 }
 
 func (bh *backupRecordsHandler) recordReaderConfigForPartitions(

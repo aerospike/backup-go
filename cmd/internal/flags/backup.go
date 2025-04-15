@@ -110,10 +110,11 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"",
 		"<rack id 1>[,<rack id 2>[,...]]\n"+
 			"A list of Aerospike Database rack IDs to prefer when reading records for a backup.")
-	flagSet.StringVar(&f.PreferRacks, "rack-list",
+	flagSet.StringVar(&f.RackList, "rack-list",
 		"",
 		"<rack id 1>[,<rack id 2>[,...]]\n"+
-			"A list of Aerospike Database rack IDs to backup.")
+			"A list of Aerospike Database rack IDs to backup.\n"+
+			"Unlike --prefer-racks, only specified racks will be backed up.")
 	flagSet.Int64VarP(&f.MaxRecords, "max-records", "M",
 		0,
 		"The number of records approximately to back up. 0 - all records")

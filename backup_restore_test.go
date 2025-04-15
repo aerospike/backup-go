@@ -668,6 +668,54 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 }
 
+func TestBackupRestoreRackList(t *testing.T) {
+	t.Parallel()
+	const setName = "testRackList"
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	asClient, err := testAerospikeClient()
+	require.NoError(t, err)
+	defer asClient.Close()
+
+	backupConfig := NewDefaultBackupConfig()
+	backupConfig.RackList = []int{0}
+	backupConfig.SetList = []string{setName}
+	restoreConfig := NewDefaultRestoreConfig()
+
+	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	require.NoError(t, err)
+	err = writeRecords(asClient, records)
+	require.NoError(t, err)
+
+	directory := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
+
+	bStat, rStat, err := runBackupRestoreLocal(ctx, asClient, directory, backupConfig, restoreConfig)
+	require.NoError(t, err)
+	require.Equal(t, bStat.GetReadRecords(), rStat.GetRecordsInserted())
+
+	// Validate records.
+	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
+	require.NoError(t, err)
+
+	require.Equal(t, dbRecords.Len(), len(records))
+	for _, expRec := range records {
+		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
+		if !ok {
+			t.Errorf("expected record not found: %v", expRec.Key)
+			return
+		}
+		require.Equal(t, expRec.Bins, actual.Bins)
+	}
+
+	// Validate stats.
+	require.Equal(t, uint64(0), rStat.GetRecordsExpired())
+	require.Equal(t, uint64(0), rStat.GetRecordsSkipped())
+	require.Equal(t, uint64(0), rStat.GetRecordsFresher())
+	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
+	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
+}
+
 func TestBackupRestorePartitionList(t *testing.T) {
 	t.Parallel()
 	const setName = "testPartList"

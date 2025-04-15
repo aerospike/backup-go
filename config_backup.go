@@ -75,7 +75,7 @@ type ConfigBackup struct {
 	// The list of backup bin names
 	// (optional, given an empty list, all bins will be backed up)
 	BinList []string
-	// The list of rack ids
+	// The list of rack ids.
 	// (optional, given an empty list, all racks will be backed up)
 	RackList []int
 	// ParallelNodes specifies how to perform scan.

@@ -171,6 +171,10 @@ func validateStorages(
 
 //nolint:gocyclo // It is a long validation function.
 func validateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
+	if backupParams == nil || commonParams == nil {
+		return fmt.Errorf("params can't be nil")
+	}
+
 	if commonParams.Directory != "" && backupParams.OutputFile != "" {
 		return fmt.Errorf("only one of output-file and directory may be configured at the same time")
 	}
@@ -208,6 +212,10 @@ func validateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 
 	if !backupParams.Estimate && backupParams.OutputFile == "" && commonParams.Directory == "" {
 		return fmt.Errorf("must specify either output-file or directory")
+	}
+
+	if backupParams.NodeList != "" && backupParams.RackList != "" {
+		return fmt.Errorf("must specify either rack-list or node-list")
 	}
 
 	return nil

@@ -387,6 +387,18 @@ func TestValidateBackupParams(t *testing.T) {
 			wantErr:     true,
 			expectedErr: "only one of output-file and directory may be configured at the same time",
 		},
+		{
+			name: "Both node-list and rack-list configured",
+			backupParams: &models.Backup{
+				NodeList: "1,2",
+				RackList: "3,4",
+			},
+			commonParams: &models.Common{
+				Directory: "backup-dir",
+			},
+			wantErr:     true,
+			expectedErr: "must specify either rack-list or node-list",
+		},
 	}
 
 	for _, tt := range tests {

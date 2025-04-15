@@ -32,10 +32,15 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+type infoGetter interface {
+	GetRecordCount(namespace string, sets []string) (uint64, error)
+	GetRackNodes(rackID int) ([]string, error)
+}
+
 type backupRecordsHandler struct {
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
-	infoClient      *asinfo.InfoClient
+	infoClient      infoGetter
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
 	state           *State
@@ -45,7 +50,7 @@ type backupRecordsHandler struct {
 func newBackupRecordsHandler(
 	config *ConfigBackup,
 	ac AerospikeClient,
-	infoClient *asinfo.InfoClient,
+	infoClient infoGetter,
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
 	state *State,
@@ -302,6 +307,8 @@ func (bh *backupRecordsHandler) makeAerospikeReadWorkersForNodes(
 }
 
 func (bh *backupRecordsHandler) getNodes() ([]*a.Node, error) {
+	nodesToFilter := bh.config.NodeList
+
 	if len(bh.config.RackList) > 0 {
 		nodeList := make([]string, 0)
 
@@ -314,12 +321,12 @@ func (bh *backupRecordsHandler) getNodes() ([]*a.Node, error) {
 			nodeList = append(nodeList, nodes...)
 		}
 
-		bh.config.NodeList = nodeList
+		nodesToFilter = nodeList
 	}
 
 	nodes := bh.aerospikeClient.GetNodes()
 	// If bh.config.NodeList is not empty we filter nodes.
-	nodes = filterNodes(bh.config.NodeList, nodes)
+	nodes = filterNodes(nodesToFilter, nodes)
 
 	return nodes, nil
 }

@@ -202,7 +202,14 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	scanPolicy.RawCDT = true
 
 	nodes := bh.aerospikeClient.GetNodes()
-	bh.recordHandler = newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
+	bh.recordHandler = newBackupRecordsHandler(
+		bh.config,
+		bh.aerospikeClient,
+		bh.infoClient,
+		bh.logger,
+		bh.scanLimiter,
+		bh.state,
+	)
 	readerConfig := bh.recordHandler.recordReaderConfigForNode(nodes, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
@@ -262,7 +269,14 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
 
-	bh.recordHandler = newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
+	bh.recordHandler = newBackupRecordsHandler(
+		bh.config,
+		bh.aerospikeClient,
+		bh.infoClient,
+		bh.logger,
+		bh.scanLimiter,
+		bh.state,
+	)
 
 	bh.stats.TotalRecords, err = bh.recordHandler.countRecords(ctx, bh.infoClient)
 	if err != nil {

@@ -17,6 +17,7 @@ package asinfo
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -1925,4 +1926,21 @@ func TestInfoCommander_GetSets(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Greater(t, len(result), 1)
+}
+
+func TestInfoCommander_getRackNodes(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	res, err := ic.getRackNodes(0)
+	require.NoError(t, err)
+
+	fmt.Println(res)
 }

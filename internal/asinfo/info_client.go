@@ -46,6 +46,8 @@ const (
 
 	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
+	cmdRack                = "racks"
+	cmdReplicaMaster       = "replicas-master"
 
 	cmdRespErrPrefix = "ERROR"
 )
@@ -570,6 +572,59 @@ func (ic *InfoClient) GetSetsList(namespace string) ([]string, error) {
 	}
 
 	return sets, nil
+}
+
+// GetRackNodes returns list of nodes by rack id.
+func (ic *InfoClient) GetRackNodes(rackID int) ([]string, error) {
+	var (
+		result []string
+		err    error
+	)
+
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		result, err = ic.getRackNodes(rackID)
+		if err != nil {
+			return err
+		}
+
+		return err
+	})
+
+	return result, err
+}
+
+// getRackNodes returns list of nodes for a rack.
+func (ic *InfoClient) getRackNodes(rackID int) ([]string, error) {
+	resp, err := ic.GetInfo(cmdRack)
+	if err != nil {
+		return nil, fmt.Errorf("failed get reacks info: %w", err)
+	}
+
+	result, err := parseResultResponse(cmdRack, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info response: %w", err)
+	}
+
+	resultMap, err := parseInfoResponse(result, ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info: %w", err)
+	}
+
+	var nodes []string
+
+	for _, v := range resultMap {
+		for n, m := range v {
+			if strings.HasPrefix(fmt.Sprintf("rack_%d", rackID), n) {
+				nodes = strings.Split(m, ",")
+			}
+		}
+	}
+
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("failed to find nodes for rack %d", rackID)
+	}
+
+	return nodes, nil
 }
 
 // Stats represent a result of get stats command.

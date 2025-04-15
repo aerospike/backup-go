@@ -50,7 +50,7 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.ParallelNodes = true
 	config.PartitionFilters = []*a.PartitionFilter{NewPartitionFilterByID(1)}
-	assert.ErrorContains(t, config.validate(), "parallel by nodes and partitions")
+	assert.ErrorContains(t, config.validate(), "parallel by nodes, racks and/or and after digest/partition")
 	config = NewDefaultBackupConfig()
 
 	config.Bandwidth = -1

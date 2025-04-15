@@ -38,6 +38,7 @@ type Backup struct {
 	Continue            string
 	ScanPageSize        int64
 	OutputFilePrefix    string
+	RackList            string
 
 	InfoMaxRetries                uint
 	InfoRetriesMultiplier         float64

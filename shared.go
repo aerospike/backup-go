@@ -105,6 +105,12 @@ func filterNodes(nodesList []string, nodes []*a.Node) []*a.Node {
 		if ok {
 			filteredNodes = append(filteredNodes, nodes[i])
 		}
+
+		// If nodeList contains node names instead of address.
+		_, ok = nodesMap[nodes[i].GetName()]
+		if ok {
+			filteredNodes = append(filteredNodes, nodes[i])
+		}
 	}
 
 	return filteredNodes

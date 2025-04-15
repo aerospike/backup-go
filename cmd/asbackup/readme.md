@@ -87,7 +87,7 @@ Backup Flags:
       --remove-artifacts              Remove existing backup file (-o) or files (-d) without performing a backup.
   -o, --output-file string            Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
   -q, --output-file-prefix string     When using directory parameter, prepend a prefix to the names of the generated files.
-  -F, --file-limit int                Rotate backup files when their size crosses the given
+  -F, --file-limit uint               Rotate backup files when their size crosses the given
                                       value (in bytes). Only used when backing up to a directory.
                                        (default 262144000)
   -x, --no-bins                       Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.
@@ -137,6 +137,9 @@ Backup Flags:
                                       
       --prefer-racks string           <rack id 1>[,<rack id 2>[,...]]
                                       A list of Aerospike Database rack IDs to prefer when reading records for a backup.
+      --rack-list string              <rack id 1>[,<rack id 2>[,...]]
+                                      A list of Aerospike Database rack IDs to backup.
+                                      Unlike --prefer-racks, only specified racks will be backed up.
   -M, --max-records int               The number of records approximately to back up. 0 - all records
       --sleep-between-retries int     The amount of milliseconds to sleep between retries after an error.
                                       This field is ignored when --max-retries is zero. (default 5)

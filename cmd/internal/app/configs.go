@@ -61,6 +61,15 @@ func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 	c.NoTTLOnly = params.BackupParams.NoTTLOnly
 	c.OutputFilePrefix = params.BackupParams.OutputFilePrefix
 
+	if params.BackupParams.RackList != "" {
+		list, err := parseRacks(params.BackupParams.RackList)
+		if err != nil {
+			return nil, err
+		}
+
+		c.RackList = list
+	}
+
 	if params.BackupParams.Continue != "" {
 		c.StateFile = path.Join(params.CommonParams.Directory, params.BackupParams.Continue)
 		c.Continue = true

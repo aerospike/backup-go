@@ -397,7 +397,7 @@ func TestValidateBackupParams(t *testing.T) {
 				Directory: "backup-dir",
 			},
 			wantErr:     true,
-			expectedErr: "must specify either rack-list or node-list",
+			expectedErr: "specify either rack-list or node-list, but not both",
 		},
 	}
 

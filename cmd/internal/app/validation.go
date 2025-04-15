@@ -215,7 +215,7 @@ func validateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 	}
 
 	if backupParams.NodeList != "" && backupParams.RackList != "" {
-		return fmt.Errorf("must specify either rack-list or node-list")
+		return fmt.Errorf("specify either rack-list or node-list, but not both")
 	}
 
 	return nil

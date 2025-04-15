@@ -189,14 +189,8 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if (c.ParallelNodes || len(c.NodeList) != 0 || len(c.RackList) != 0) && !c.isDefaultPartitionFilter() {
-		return fmt.Errorf("parallel by nodes, racks and/or partitions and the same time not allowed")
-	}
-
-	if !c.isDefaultPartitionFilter() {
-		if c.isParalleledByNodes() {
-			return fmt.Errorf("parallel by nodes/node list and after digest/partition filter at the same time not allowed")
-		}
+	if c.isParalleledByNodes() && !c.isDefaultPartitionFilter() {
+		return fmt.Errorf("parallel by nodes, racks and/or and after digest/partition and the same time not allowed")
 	}
 
 	if c.RecordsPerSecond < 0 {

@@ -21,6 +21,7 @@ import (
 )
 
 func TestApp_NewFlagSet(t *testing.T) {
+	t.Parallel()
 	// Create a new App object
 	app := NewApp()
 
@@ -44,6 +45,7 @@ func TestApp_NewFlagSet(t *testing.T) {
 }
 
 func TestApp_NewFlagSet_DefaultValues(t *testing.T) {
+	t.Parallel()
 	// Create a new App object
 	app := NewApp()
 

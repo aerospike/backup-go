@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/processors"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
@@ -38,7 +40,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Writer provides access to backup storage.
+// A Writer provides access to the backup storage.
 // Exported for integration tests.
 type Writer interface {
 	// NewWriter returns new writer for backup logic to use. Each call creates
@@ -59,8 +61,8 @@ type BackupHandler struct {
 	cancel context.CancelFunc
 
 	writer          Writer
-	encoder         Encoder
-	config          *BackupConfig
+	encoder         Encoder[*models.Token]
+	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 
 	logger                 *slog.Logger
@@ -74,12 +76,16 @@ type BackupHandler struct {
 	stats *models.BackupStats
 	// Backup state for continuation.
 	state *State
+	// For graceful shutdown.
+	wg sync.WaitGroup
+
+	recordHandler *backupRecordsHandler
 }
 
 // newBackupHandler creates a new BackupHandler.
 func newBackupHandler(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	ac AerospikeClient,
 	logger *slog.Logger,
 	writer Writer,
@@ -130,9 +136,9 @@ func newBackupHandler(
 		logger:                 logger,
 		writer:                 writer,
 		firstFileHeaderWritten: &atomic.Bool{},
-		encoder:                NewEncoder(config.EncoderType, config.Namespace, config.Compact),
+		encoder:                NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact),
 		limiter:                limiter,
-		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy),
+		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy, config.InfoRetryPolicy),
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  models.NewBackupStats(),
@@ -142,10 +148,12 @@ func newBackupHandler(
 // run runs the backup job.
 // currently this should only be run once.
 func (bh *BackupHandler) run() {
+	bh.wg.Add(1)
 	bh.errors = make(chan error, 1)
 	bh.stats.Start()
 
 	go doWork(bh.errors, bh.logger, func() error {
+		defer bh.wg.Done()
 		return bh.backupSync(bh.ctx)
 	})
 }
@@ -158,7 +166,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	}
 
 	// Calculate headers size.
-	header := bh.encoder.GetHeader()
+	header := bh.encoder.GetHeader(0)
 	headerSize := len(header) * bh.config.ParallelWrite
 
 	// Calculate records size.
@@ -184,7 +192,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	return uint64(result), nil
 }
 
-// getEstimateSamples returns slice of samples and its content for estimate calculations.
+// getEstimateSamples returns a slice of samples and its content for estimate calculations.
 func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber int64,
 ) (samples []float64, samplesData []byte, err error) {
 	scanPolicy := *bh.config.ScanPolicy
@@ -194,12 +202,19 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	scanPolicy.RawCDT = true
 
 	nodes := bh.aerospikeClient.GetNodes()
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
-	readerConfig := handler.recordReaderConfigForNode(nodes, &scanPolicy)
+	bh.recordHandler = newBackupRecordsHandler(
+		bh.config,
+		bh.aerospikeClient,
+		bh.infoClient,
+		bh.logger,
+		bh.scanLimiter,
+		bh.state,
+	)
+	readerConfig := bh.recordHandler.recordReaderConfigForNode(nodes, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 	// Timestamp processor.
-	tsProcessor := processors.NewVoidTimeSetter(bh.logger)
+	tsProcessor := processors.NewVoidTimeSetter[*models.Token](bh.logger)
 
 	for {
 		t, err := recordReader.Read()
@@ -254,9 +269,16 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 
 	writeWorkers := bh.makeWriteWorkers(backupWriters)
 
-	handler := newBackupRecordsHandler(bh.config, bh.aerospikeClient, bh.logger, bh.scanLimiter, bh.state)
+	bh.recordHandler = newBackupRecordsHandler(
+		bh.config,
+		bh.aerospikeClient,
+		bh.infoClient,
+		bh.logger,
+		bh.scanLimiter,
+		bh.state,
+	)
 
-	bh.stats.TotalRecords, err = handler.countRecords(ctx, bh.infoClient)
+	bh.stats.TotalRecords, err = bh.recordHandler.countRecords(ctx, bh.infoClient)
 	if err != nil {
 		return err
 	}
@@ -269,7 +291,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		}
 	}
 
-	return handler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
+	return bh.recordHandler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
 }
 
 func (bh *BackupHandler) makeWriteWorkers(
@@ -321,7 +343,7 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 // configuration.
 func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, error) {
 	if bh.config.FileLimit > 0 {
-		// For saving state operation, we init writer with a communication channel.
+		// Init a writer with a communication channel, for saving state operation
 		if bh.config.isStateFirstRun() || bh.config.isStateContinue() {
 			return sized.NewWriter(ctx, n, bh.state.SaveCommandChan, bh.config.FileLimit, bh.newConfiguredWriter)
 		}
@@ -329,10 +351,11 @@ func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, 
 		return sized.NewWriter(ctx, n, nil, bh.config.FileLimit, bh.newConfiguredWriter)
 	}
 
-	return lazy.NewWriter(ctx, bh.newConfiguredWriter)
+	return lazy.NewWriter(ctx, n, bh.newConfiguredWriter)
 }
 
-func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteCloser, error) {
+func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string, sizeCounter *atomic.Uint64,
+) (io.WriteCloser, error) {
 	suffix := ""
 	if bh.state != nil {
 		suffix = bh.state.getFileSuffix()
@@ -345,7 +368,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 		return nil, err
 	}
 
-	countingWriter := counter.NewWriter(storageWriter, &bh.stats.BytesWritten)
+	countingWriter := counter.NewWriter(storageWriter, &bh.stats.BytesWritten, sizeCounter)
 
 	encryptedWriter, err := newEncryptionWriter(
 		bh.config.EncryptionPolicy,
@@ -361,7 +384,12 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 		return nil, err
 	}
 
-	_, err = zippedWriter.Write(bh.encoder.GetHeader())
+	num, err := util.GetFileNumber(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = zippedWriter.Write(bh.encoder.GetHeader(num))
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +399,7 @@ func (bh *BackupHandler) newConfiguredWriter(ctx context.Context) (io.WriteClose
 	return zippedWriter, nil
 }
 
-// newCompressionWriter returns compression writer for compressing backup.
+// newCompressionWriter returns a compression writer for compressing backup.
 func newCompressionWriter(
 	policy *CompressionPolicy, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
@@ -386,7 +414,7 @@ func newCompressionWriter(
 	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
 }
 
-// newEncryptionWriter returns encryption writer for encrypting backup.
+// newEncryptionWriter returns an encryption writer for encrypting backup.
 func newEncryptionWriter(
 	policy *EncryptionPolicy, saConfig *SecretAgentConfig, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
@@ -394,7 +422,7 @@ func newEncryptionWriter(
 		return writer, nil
 	}
 
-	privateKey, err := ReadPrivateKey(policy, saConfig)
+	privateKey, err := readPrivateKey(policy, saConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -431,7 +459,7 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 	return nil
 }
 
-// GetStats returns the stats of the backup job
+// GetStats returns the stats of the backup job.
 func (bh *BackupHandler) GetStats() *models.BackupStats {
 	return bh.stats
 }
@@ -444,11 +472,18 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 	select {
 	case <-bh.ctx.Done():
-		// Wait for global context.
+		// When global context is done, wait until all routine finish their work properly.
+		// Global context - is context that was passed to Backup() method.
+		bh.wg.Wait()
+
 		return bh.ctx.Err()
 	case <-ctx.Done():
-		// Process local context.
+		// When local context is done, we cancel global context.
+		// Then wait until all routines finish their work properly.
+		// Local context - is context that was passed to Wait() method.
 		bh.cancel()
+		bh.wg.Wait()
+
 		return ctx.Err()
 	case err := <-bh.errors:
 		return err
@@ -480,7 +515,7 @@ func (bh *BackupHandler) backupSIndexes(
 	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
 
 	sindexPipeline, err := pipeline.NewPipeline[*models.Token](
-		bh.config.SyncPipelines,
+		bh.config.PipelinesMode, nil,
 		[]pipeline.Worker[*models.Token]{sindexReadWorker},
 		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
 	)
@@ -516,7 +551,7 @@ func (bh *BackupHandler) backupUDFs(
 	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
 
 	udfPipeline, err := pipeline.NewPipeline[*models.Token](
-		bh.config.SyncPipelines,
+		bh.config.PipelinesMode, nil,
 		[]pipeline.Worker[*models.Token]{udfReadWorker},
 		[]pipeline.Worker[*models.Token]{udfWriteWorker},
 	)
@@ -525,4 +560,9 @@ func (bh *BackupHandler) backupUDFs(
 	}
 
 	return udfPipeline.Run(ctx)
+}
+
+// GetMetrics returns the metrics of the backup job.
+func (bh *BackupHandler) GetMetrics() *models.Metrics {
+	return bh.recordHandler.GetMetrics()
 }

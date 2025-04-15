@@ -21,6 +21,7 @@ import (
 )
 
 func TestNow(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	// Set the getNow function to return a static time for testing
 	getNow = func() time.Time {
@@ -38,6 +39,7 @@ func TestNow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := Now(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Now() = %v, want %v", got, tt.want)
 			}
@@ -46,6 +48,7 @@ func TestNow(t *testing.T) {
 }
 
 func TestCLTime_Unix(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		Seconds int64
 	}
@@ -62,6 +65,7 @@ func TestCLTime_Unix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			c := &CLTime{
 				Seconds: tt.fields.Seconds,
 			}
@@ -73,6 +77,7 @@ func TestCLTime_Unix(t *testing.T) {
 }
 
 func TestNewCLTime(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		seconds int64
 	}
@@ -89,6 +94,7 @@ func TestNewCLTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := NewCLTime(tt.args.seconds); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewCLTime() = %v, want %v", got, tt.want)
 			}

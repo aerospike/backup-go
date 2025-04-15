@@ -17,6 +17,7 @@ package asinfo
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -26,7 +27,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testASLoginPassword = "admin"
+	testASNamespace     = "test"
+	testASDC            = "DC1"
+	testASHost          = "127.0.0.1"
+	testASPort          = 3000
+	testASRewind        = "all"
+	testXDRHostPort     = "127.0.0.1:3003"
+	testSetInfo         = "info_set"
+)
+
 func Test_parseAerospikeVersion(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		versionStr string
 	}
@@ -107,6 +120,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseAerospikeVersion(tt.args.versionStr)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseAerospikeVersion() error = %v, wantErr %v", err, tt.wantErr)
@@ -120,6 +134,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 }
 
 func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		Major int
 		Minor int
@@ -249,6 +264,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			av := AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
@@ -262,6 +278,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 }
 
 func Test_buildSindexCmd(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		namespace string
 		getCtx    bool
@@ -290,6 +307,7 @@ func Test_buildSindexCmd(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := buildSindexCmd(tt.args.namespace, tt.args.getCtx); got != tt.want {
 				t.Errorf("buildSindexCmd() = %v, want %v", got, tt.want)
 			}
@@ -298,6 +316,7 @@ func Test_buildSindexCmd(t *testing.T) {
 }
 
 func Test_parseSIndex(t *testing.T) {
+	t.Parallel()
 	cdtCtx, err := a.CDTContextToBase64([]*a.CDTContext{a.CtxListValue(a.NewValue([]byte("hi")))})
 	if err != nil {
 		panic(err)
@@ -773,6 +792,7 @@ func Test_parseSIndex(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseSIndex(tt.args.sindexMap)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndex() error = %v, wantErr %v", err, tt.wantErr)
@@ -786,6 +806,7 @@ func Test_parseSIndex(t *testing.T) {
 }
 
 func Test_parseInfoResponse(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		resp    string
 		objSep  string
@@ -941,6 +962,7 @@ func Test_parseInfoResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseInfoResponse(tt.args.resp, tt.args.objSep, tt.args.pairSep, tt.args.kvSep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseInfoResponse() error = %v, wantErr %v", err, tt.wantErr)
@@ -961,6 +983,7 @@ func newMockInfoGetter(t *testing.T, arg string, resp map[string]string, err a.E
 }
 
 func Test_getAerospikeVersion(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		node   infoGetter
 		policy *a.InfoPolicy
@@ -1003,6 +1026,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := getAerospikeVersion(tt.args.node, tt.args.policy)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getAerospikeVersion() error = %v, wantErr %v", err, tt.wantErr)
@@ -1016,6 +1040,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 }
 
 func Test_getSIndexes(t *testing.T) {
+	t.Parallel()
 	mockInfoGetterNoCtx := mocks.NewMockinfoGetter(t)
 	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "build").Return(
 		map[string]string{"build": "5.6.0.0"},
@@ -1107,6 +1132,7 @@ func Test_getSIndexes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := getSIndexes(tt.args.conn, tt.args.namespace, tt.args.policy)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getSIndexes() error = %v, wantErr %v", err, tt.wantErr)
@@ -1120,6 +1146,7 @@ func Test_getSIndexes(t *testing.T) {
 }
 
 func Test_parseSIndexResponse(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		sindexInfoResp string
 	}
@@ -1217,6 +1244,7 @@ func Test_parseSIndexResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseSIndexes(tt.args.sindexInfoResp)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndexResponse() error = %v, wantErr %v", err, tt.wantErr)
@@ -1230,6 +1258,7 @@ func Test_parseSIndexResponse(t *testing.T) {
 }
 
 func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
+	t.Parallel()
 	type fields struct {
 		Major int
 		Minor int
@@ -1295,6 +1324,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			av := AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
@@ -1308,6 +1338,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 }
 
 func Test_parseUDF(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		udfMap infoMap
 	}
@@ -1382,6 +1413,7 @@ func Test_parseUDF(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseUDF(tt.args.udfMap)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseUDF() error = %v, wantErr %v", err, tt.wantErr)
@@ -1395,6 +1427,7 @@ func Test_parseUDF(t *testing.T) {
 }
 
 func Test_parseUDFResponse(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		udfInfoResp string
 	}
@@ -1438,6 +1471,7 @@ func Test_parseUDFResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseUDFResponse(tt.args.udfInfoResp)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseUDFResponse() error = %v, wantErr %v", err, tt.wantErr)
@@ -1451,6 +1485,7 @@ func Test_parseUDFResponse(t *testing.T) {
 }
 
 func Test_getUDF(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		node   infoGetter
 		policy *a.InfoPolicy
@@ -1497,6 +1532,7 @@ func Test_getUDF(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := getUDF(tt.args.node, tt.args.name, tt.args.policy)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getUDF() error = %v, wantErr %v", err, tt.wantErr)
@@ -1510,6 +1546,7 @@ func Test_getUDF(t *testing.T) {
 }
 
 func Test_getUDFs(t *testing.T) {
+	t.Parallel()
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
 	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "udf-list").Return(map[string]string{
 		"udf-list": "filename=test1.lua;filename=test2.lua;",
@@ -1587,6 +1624,7 @@ func Test_getUDFs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := getUDFs(tt.args.node, tt.args.policy)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getUDFs() error = %v, wantErr %v", err, tt.wantErr)
@@ -1600,6 +1638,7 @@ func Test_getUDFs(t *testing.T) {
 }
 
 func TestGetRecordCount(t *testing.T) {
+	t.Parallel()
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
 	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), "sets/myNamespace").Return(map[string]string{
 		"sets/myNamespace": "set=mySet:objects=2",
@@ -1658,6 +1697,7 @@ func TestGetRecordCount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := getRecordCountForNode(tt.args.node, nil, "myNamespace", tt.args.sets)
 			if err != nil && !errors.Is(err, tt.err) {
 				t.Errorf("GetRecordCount() error = %v, wantErr %v", err, tt.err)
@@ -1671,6 +1711,7 @@ func TestGetRecordCount(t *testing.T) {
 }
 
 func Test_parseInfoObject(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		obj    string
 		result infoMap
@@ -1698,4 +1739,208 @@ func Test_parseInfoObject(t *testing.T) {
 		require.Equal(t, tt.result, result)
 		require.Equal(t, tt.err, err)
 	}
+}
+
+func TestInfoCommander_EnableDisableXDR(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	nodes := ic.GetNodesNames()
+
+	err := ic.StartXDR(nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, true)
+	require.NoError(t, err)
+
+	_, err = ic.GetStats(nodes[0], testASDC, testASNamespace)
+	require.NoError(t, err)
+
+	err = ic.StopXDR(nodes[0], testASDC)
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
+	t.Parallel()
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	nodes := ic.GetNodesNames()
+
+	_ = ic.BlockMRTWrites(nodes[0], testASNamespace)
+
+	_ = ic.UnBlockMRTWrites(nodes[0], testASNamespace)
+}
+
+func TestInfoCommander_parseResultResponse(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		cmd      string
+		input    map[string]string
+		expected string
+		errMsg   string
+	}{
+		{
+			name:     "Command exists with successful response",
+			cmd:      "testCommand",
+			input:    map[string]string{"testCommand": "success"},
+			expected: "success",
+			errMsg:   "",
+		},
+		{
+			name:     "Command exists with failure response",
+			cmd:      "testCommand",
+			input:    map[string]string{"testCommand": "ERROR: command failed"},
+			expected: "",
+			errMsg:   "command testCommand failed: ERROR: command failed",
+		},
+		{
+			name:     "Command not found in map",
+			cmd:      "missingCommand",
+			input:    map[string]string{"testCommand": "success"},
+			expected: "",
+			errMsg:   "no response for command missingCommand",
+		},
+		{
+			name:     "Empty response map",
+			cmd:      "testCommand",
+			input:    map[string]string{},
+			expected: "",
+			errMsg:   "no response for command testCommand",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := parseResultResponse(tt.cmd, tt.input)
+			if result != tt.expected {
+				t.Errorf("expected result %v, got %v", tt.expected, result)
+			}
+			if err != nil {
+				if err.Error() != tt.errMsg {
+					t.Errorf("expected error message %v, got %v", tt.errMsg, err)
+				}
+			} else if tt.errMsg != "" {
+				t.Errorf("expected error message %v, got nil", tt.errMsg)
+			}
+		})
+	}
+}
+
+func TestInfoCommander_GetSIndexes(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	_, err := ic.GetSIndexes(testASNamespace)
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_GetUDFs(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	_, err := ic.GetUDFs()
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_GetRecordCount(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	_, err := ic.GetRecordCount(testASNamespace, nil)
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_XDR(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	nodes := ic.GetNodesNames()
+
+	err := ic.StartXDR(nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, false)
+	require.NoError(t, err)
+
+	_, err = ic.GetStats(nodes[0], testASDC, testASNamespace)
+	require.NoError(t, err)
+
+	err = ic.StopXDR(nodes[0], testASDC)
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_GetSets(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	wp := a.NewWritePolicy(0, 0)
+	k, aerr := a.NewKey(testASNamespace, testSetInfo, "get-sets")
+	require.NoError(t, aerr)
+	b := a.NewBin("bin", "value")
+	aerr = client.PutBins(wp, k, b)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	result, err := ic.GetSetsList(testASNamespace)
+	require.NoError(t, err)
+
+	require.Greater(t, len(result), 1)
+}
+
+func TestInfoCommander_getRackNodes(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	res, err := ic.getRackNodes(0)
+	require.NoError(t, err)
+
+	fmt.Println(res)
 }

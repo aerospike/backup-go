@@ -21,7 +21,8 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/local"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/local"
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ctx := context.Background()
@@ -40,20 +41,21 @@ func main() {
 	// For backup to single file use local.WithFile(fileName)
 	writers, err := local.NewWriter(
 		ctx,
-		local.WithRemoveFiles(),
-		local.WithDir("backups_folder"),
+		ioStorage.WithRemoveFiles(),
+		ioStorage.WithDir("backups_folder"),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	backupCfg := backup.NewDefaultBackupConfig()
 	backupCfg.Namespace = "test"
-	backupCfg.ParallelRead = 5
+	backupCfg.ParallelRead = 10
+	backupCfg.ParallelWrite = 10
 
 	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
@@ -69,16 +71,17 @@ func main() {
 
 	// For restore from single file use local.WithFile(fileName)
 	reader, err := local.NewReader(
-		local.WithDir("backups_folder"),
-		local.WithValidator(asb.NewValidator()),
+		ctx,
+		ioStorage.WithDir("backups_folder"),
+		ioStorage.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, reader)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.

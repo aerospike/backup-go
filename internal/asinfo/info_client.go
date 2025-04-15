@@ -18,12 +18,38 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
+)
+
+const (
+	cmdCreateXDRDC        = "set-config:context=xdr;dc=%s;action=create"
+	cmdCreateConnector    = "set-config:context=xdr;dc=%s;connector=true"
+	cmdCreateXDRNode      = "set-config:context=xdr;dc=%s;node-address-port=%s;action=add"
+	cmdCreateXDRNamespace = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
+
+	cmdDeleteXDRDC = "set-config:context=xdr;dc=%s;action=delete"
+
+	cmdGetStats = "get-stats:context=xdr;dc=%s;namespace=%s"
+
+	cmdBlockMRTWrites   = "set-config:context=namespace;id=%s;disable-mrt-writes=true"
+	cmdUnBlockMRTWrites = "set-config:context=namespace;id=%s;disable-mrt-writes=false"
+
+	cmdSetsOfNamespace = "sets/%s"
+	cmdNamespaceInfo   = "namespace/%s"
+
+	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
+	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
+	cmdRack                = "racks"
+	cmdReplicaMaster       = "replicas-master"
+
+	cmdRespErrPrefix = "ERROR"
 )
 
 var (
@@ -40,6 +66,10 @@ type AerospikeVersion struct {
 var (
 	AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
 	AerospikeVersionSupportsBatchWrites   = AerospikeVersion{6, 0, 0}
+)
+
+var (
+	ErrReplicationFactorZero = errors.New("replication factor is zero")
 )
 
 func (av AerospikeVersion) String() string {
@@ -83,93 +113,590 @@ type aerospikeClient interface {
 }
 
 type InfoClient struct {
-	policy  *a.InfoPolicy
-	cluster *a.Cluster
+	policy      *a.InfoPolicy
+	cluster     *a.Cluster
+	retryPolicy *models.RetryPolicy
 }
 
-func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy) *InfoClient {
+func NewInfoClientFromAerospike(aeroClient aerospikeClient, policy *a.InfoPolicy, retryPolicy *models.RetryPolicy,
+) *InfoClient {
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
 	return &InfoClient{
-		cluster: aeroClient.Cluster(),
-		policy:  policy,
+		cluster:     aeroClient.Cluster(),
+		policy:      policy,
+		retryPolicy: retryPolicy,
 	}
 }
 
 func (ic *InfoClient) GetInfo(names ...string) (map[string]string, error) {
-	node, err := ic.cluster.GetRandomNode()
+	var result map[string]string
+
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		node, err := ic.cluster.GetRandomNode()
+		if err != nil {
+			return err
+		}
+
+		result, err = node.RequestInfo(ic.policy, names...)
+
+		return err
+	})
+
+	return result, err
+}
+
+func (ic *InfoClient) requestByNode(nodeName string, names ...string) (map[string]string, error) {
+	node, err := ic.cluster.GetNodeByName(nodeName)
 	if err != nil {
 		return nil, err
 	}
 
-	return node.RequestInfo(ic.policy, names...)
+	result, err := node.RequestInfo(ic.policy, names...)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (ic *InfoClient) GetVersion() (AerospikeVersion, error) {
-	node, err := ic.cluster.GetRandomNode()
-	if err != nil {
-		return AerospikeVersion{}, err
-	}
+	var (
+		version AerospikeVersion
+		err     error
+	)
 
-	return getAerospikeVersion(node, ic.policy)
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr.Unwrap()
+		}
+
+		version, err = getAerospikeVersion(node, ic.policy)
+
+		return err
+	})
+
+	return version, err
 }
 
 func (ic *InfoClient) GetSIndexes(namespace string) ([]*models.SIndex, error) {
-	node, err := ic.cluster.GetRandomNode()
-	if err != nil {
-		return nil, err
-	}
+	var (
+		indexes []*models.SIndex
+		err     error
+	)
 
-	return getSIndexes(node, namespace, ic.policy)
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr.Unwrap()
+		}
+
+		indexes, err = getSIndexes(node, namespace, ic.policy)
+
+		return err
+	})
+
+	return indexes, err
 }
 
 func (ic *InfoClient) GetUDFs() ([]*models.UDF, error) {
-	node, err := ic.cluster.GetRandomNode()
-	if err != nil {
-		return nil, err
-	}
+	var (
+		udfs []*models.UDF
+		err  error
+	)
 
-	return getUDFs(node, ic.policy)
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr.Unwrap()
+		}
+
+		udfs, err = getUDFs(node, ic.policy)
+
+		return err
+	})
+
+	return udfs, err
 }
 
 func (ic *InfoClient) SupportsBatchWrite() (bool, error) {
-	version, err := ic.GetVersion()
-	if err != nil {
-		return false, fmt.Errorf("failed to get aerospike version: %w", err)
-	}
+	var supports bool
 
-	return version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		version, err := ic.GetVersion()
+		if err != nil {
+			return fmt.Errorf("failed to get aerospike version: %w", err)
+		}
+
+		supports = version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites)
+
+		return nil
+	})
+
+	return supports, err
 }
 
 // GetRecordCount counts number of records in given namespace and sets.
 func (ic *InfoClient) GetRecordCount(namespace string, sets []string) (uint64, error) {
-	node, aerr := ic.cluster.GetRandomNode()
-	if aerr != nil {
-		return 0, aerr
+	var count uint64
+
+	err := executeWithRetry(ic.retryPolicy, func() error {
+		node, aerr := ic.cluster.GetRandomNode()
+		if aerr != nil {
+			return aerr
+		}
+
+		effectiveReplicationFactor, err := getEffectiveReplicationFactor(node, ic.policy, namespace)
+		if err != nil {
+			return err
+		}
+
+		// If a database not started yet, it can respond with 0.
+		if effectiveReplicationFactor == 0 {
+			return ErrReplicationFactorZero
+		}
+
+		var recordsNumber uint64
+
+		for _, node := range ic.cluster.GetNodes() {
+			if !node.IsActive() {
+				continue
+			}
+
+			var recordCountForNode uint64
+
+			switch {
+			case len(sets) == 0:
+				recordCountForNode, err = getRecordCountForNodeNamespace(node, ic.policy, namespace)
+			default:
+				recordCountForNode, err = getRecordCountForNode(node, ic.policy, namespace, sets)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			recordsNumber += recordCountForNode
+		}
+
+		count = recordsNumber / uint64(effectiveReplicationFactor)
+
+		return nil
+	})
+
+	return count, err
+}
+
+// StartXDR creates xdr config and starts replication.
+func (ic *InfoClient) StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error {
+	// The Order of this operation is important. Don't move it if you don't know what you are doing!
+	if err := executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRDC(nodeName, dc)
+		},
+	); err != nil {
+		return err
 	}
 
-	effectiveReplicationFactor, err := getEffectiveReplicationFactor(node, ic.policy, namespace)
+	if err := executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRConnector(nodeName, dc)
+		},
+	); err != nil {
+		return err
+	}
+
+	if err := executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRNode(nodeName, dc, hostPort)
+		},
+	); err != nil {
+		return err
+	}
+
+	if err := executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.setMaxThroughput(nodeName, dc, namespace, throughput)
+		},
+	); err != nil {
+		return err
+	}
+
+	if err := executeWithRetry(
+		ic.retryPolicy,
+		func() error {
+			return ic.createXDRNamespace(nodeName, dc, namespace, rewind)
+		},
+	); err != nil {
+		return err
+	}
+
+	if forward {
+		if err := executeWithRetry(
+			ic.retryPolicy,
+			func() error {
+				return ic.setXDRForward(nodeName, dc, namespace, forward)
+			},
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// StopXDR disable replication and remove xdr config.
+func (ic *InfoClient) StopXDR(nodeName, dc string) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.stopXDR(nodeName, dc)
+	})
+}
+
+func (ic *InfoClient) stopXDR(nodeName, dc string) error {
+	if err := ic.deleteXDRDC(nodeName, dc); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) createXDRDC(nodeName, dc string) error {
+	cmd := fmt.Sprintf(cmdCreateXDRDC, dc)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("failed to create xdr dc: %w", err)
 	}
 
-	var recordsNumber uint64
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr dc response: %w", err)
+	}
 
-	for _, node := range ic.cluster.GetNodes() {
-		if !node.IsActive() {
+	return nil
+}
+
+func (ic *InfoClient) createXDRConnector(nodeName, dc string) error {
+	cmd := fmt.Sprintf(cmdCreateConnector, dc)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create xdr connector: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr connector response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) createXDRNode(nodeName, dc, hostPort string) error {
+	cmd := fmt.Sprintf(cmdCreateXDRNode, dc, hostPort)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create xdr node: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr node response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) createXDRNamespace(nodeName, dc, namespace, rewind string) error {
+	cmd := fmt.Sprintf(cmdCreateXDRNamespace, dc, namespace, rewind)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create xdr namesapce: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse create xdr namesapce response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) deleteXDRDC(nodeName, dc string) error {
+	cmd := fmt.Sprintf(cmdDeleteXDRDC, dc)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to remove xdr dc: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse remove xdr dc response: %w", err)
+	}
+
+	return nil
+}
+
+// BlockMRTWrites blocks MRT writes on cluster.
+func (ic *InfoClient) BlockMRTWrites(nodeName, namespace string) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.blockMRTWrites(nodeName, namespace)
+	})
+}
+
+func (ic *InfoClient) blockMRTWrites(nodeName, namespace string) error {
+	cmd := fmt.Sprintf(cmdBlockMRTWrites, namespace)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to block mrt writes: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse block mrt writes response: %w", err)
+	}
+
+	return nil
+}
+
+// UnBlockMRTWrites unblocks MRT writes on cluster.
+func (ic *InfoClient) UnBlockMRTWrites(nodeName, namespace string) error {
+	return executeWithRetry(ic.retryPolicy, func() error {
+		return ic.unBlockMRTWrites(nodeName, namespace)
+	})
+}
+
+func (ic *InfoClient) unBlockMRTWrites(nodeName, namespace string) error {
+	cmd := fmt.Sprintf(cmdUnBlockMRTWrites, namespace)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to unblock mrt writes: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse unblock mrt writes response: %w", err)
+	}
+
+	return nil
+}
+
+// GetNodesNames return list of active nodes names.
+func (ic *InfoClient) GetNodesNames() []string {
+	nodes := ic.cluster.GetNodes()
+	result := make([]string, 0, len(nodes))
+
+	for _, node := range nodes {
+		if node.IsActive() {
+			result = append(result, node.GetName())
+		}
+	}
+
+	return result
+}
+
+// SetMaxThroughput sets max throughput for xdr. The Value should be in multiples of 100
+func (ic *InfoClient) setMaxThroughput(nodeName, dc, namespace string, throughput int) error {
+	// Do nothing.
+	if throughput == 0 {
+		return nil
+	}
+
+	cmd := fmt.Sprintf(cmdSetXDRMaxThroughput, dc, namespace, throughput)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to set max throughput: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse set max throughput response: %w", err)
+	}
+
+	return nil
+}
+
+// setXDRForward setting this parameter to true sends writes,
+// that originated from another XDR to the specified destination datacenters.
+func (ic *InfoClient) setXDRForward(nodeName, dc, namespace string, forward bool) error {
+	cmd := fmt.Sprintf(cmdSetXDRForward, dc, namespace, forward)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to set xdr forward: %w", err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse set xdr forward response: %w", err)
+	}
+
+	return nil
+}
+
+func (ic *InfoClient) GetSetsList(namespace string) ([]string, error) {
+	cmd := fmt.Sprintf(cmdSetsOfNamespace, namespace)
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed get sets: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info response: %w", err)
+	}
+
+	resultMap, err := parseInfoResponse(result, ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info: %w", err)
+	}
+
+	sets := make([]string, 0)
+
+	for _, rec := range resultMap {
+		val, ok := rec["set"]
+		if !ok {
 			continue
 		}
 
-		recordCountForNode, err := getRecordCountForNode(node, ic.policy, namespace, sets)
-		if err != nil {
-			return 0, err
+		if val == models.MonitorRecordsSetName {
+			continue
 		}
 
-		recordsNumber += recordCountForNode
+		sets = append(sets, val)
 	}
 
-	return recordsNumber / uint64(effectiveReplicationFactor), nil
+	return sets, nil
+}
+
+// GetRackNodes returns list of nodes by rack id.
+func (ic *InfoClient) GetRackNodes(rackID int) ([]string, error) {
+	var (
+		result []string
+		err    error
+	)
+
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		result, err = ic.getRackNodes(rackID)
+		if err != nil {
+			return err
+		}
+
+		return err
+	})
+
+	return result, err
+}
+
+// getRackNodes returns list of nodes for a rack.
+func (ic *InfoClient) getRackNodes(rackID int) ([]string, error) {
+	resp, err := ic.GetInfo(cmdRack)
+	if err != nil {
+		return nil, fmt.Errorf("failed get reacks info: %w", err)
+	}
+
+	result, err := parseResultResponse(cmdRack, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info response: %w", err)
+	}
+
+	resultMap, err := parseInfoResponse(result, ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sets info: %w", err)
+	}
+
+	var nodes []string
+
+	for _, v := range resultMap {
+		for n, m := range v {
+			if strings.HasPrefix(fmt.Sprintf("rack_%d", rackID), n) {
+				nodes = strings.Split(m, ",")
+			}
+		}
+	}
+
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("failed to find nodes for rack %d", rackID)
+	}
+
+	return nodes, nil
+}
+
+// Stats represent a result of get stats command.
+// In the future, other fields can be added.
+type Stats struct {
+	Lag               int64
+	Recoveries        int64
+	RecoveriesPending int64
+}
+
+// GetStats requests node statistics like recoveries, lag, etc.
+// returns Stats struct.
+func (ic *InfoClient) GetStats(nodeName, dc, namespace string) (Stats, error) {
+	cmd := fmt.Sprintf(cmdGetStats, dc, namespace)
+
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return Stats{}, fmt.Errorf("failed to get stats: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return Stats{}, fmt.Errorf("failed to parse get stats response: %w", err)
+	}
+
+	resultMap, err := parseInfoResponse(result, ";", ":", "=")
+	if err != nil {
+		return Stats{}, fmt.Errorf("failed to parse to map get stats response: %w", err)
+	}
+
+	var stats Stats
+
+	for i := range resultMap {
+		if val, ok := resultMap[i]["lag"]; ok {
+			stats.Lag, err = strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return Stats{}, fmt.Errorf("failed to parse lag: %w", err)
+			}
+		}
+
+		if val, ok := resultMap[i]["recoveries"]; ok {
+			stats.Recoveries, err = strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return Stats{}, fmt.Errorf("failed to parse recoveries: %w", err)
+			}
+		}
+
+		if val, ok := resultMap[i]["recoveries_pending"]; ok {
+			stats.RecoveriesPending, err = strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return Stats{}, fmt.Errorf("failed to parse recoveries_pending: %w", err)
+			}
+		}
+	}
+
+	return stats, nil
 }
 
 // ***** Utility functions *****
+
+func parseResultResponse(cmd string, result map[string]string) (string, error) {
+	v, ok := result[cmd]
+	if !ok {
+		return "", fmt.Errorf("no response for command %s", cmd)
+	}
+
+	if strings.Contains(v, cmdRespErrPrefix) {
+		return "", fmt.Errorf("command %s failed: %s", cmd, v)
+	}
+
+	return v, nil
+}
 
 func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext
@@ -431,7 +958,7 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 }
 
 func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace string, sets []string) (uint64, error) {
-	cmd := fmt.Sprintf("sets/%s", namespace)
+	cmd := fmt.Sprintf(cmdSetsOfNamespace, namespace)
 
 	response, aerr := node.RequestInfo(policy, cmd)
 	if aerr != nil {
@@ -451,6 +978,11 @@ func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace stri
 			return 0, fmt.Errorf("set name missing in response %s", response[cmd])
 		}
 
+		// Skip MRT monitor records.
+		if setName == models.MonitorRecordsSetName {
+			continue
+		}
+
 		if len(sets) == 0 || contains(sets, setName) {
 			objectCount, ok := setInfo["objects"]
 			if !ok {
@@ -467,6 +999,33 @@ func getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace stri
 	}
 
 	return recordsNumber, nil
+}
+
+func getRecordCountForNodeNamespace(node infoGetter, policy *a.InfoPolicy, namespace string) (uint64, error) {
+	cmd := fmt.Sprintf(cmdNamespaceInfo, namespace)
+
+	response, aerr := node.RequestInfo(policy, cmd)
+	if aerr != nil {
+		return 0, fmt.Errorf("failed to get record count: %w", aerr)
+	}
+
+	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse record info request: %w", err)
+	}
+
+	for i := range resultMap {
+		if val, ok := resultMap[i]["objects"]; ok {
+			result, err := strconv.ParseUint(val, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse objects count: %w", err)
+			}
+
+			return result, nil
+		}
+	}
+
+	return 0, fmt.Errorf("failed to parse record info request")
 }
 
 func contains(s []string, str string) bool {
@@ -643,4 +1202,27 @@ func parseUDFListResponse(resp string) ([]infoMap, error) {
 // example resp: type=LUA;content=LS0gQSB2ZXJ5IHNpbXBsZSBhcml0
 func parseUDFGetResponse(resp string) (infoMap, error) {
 	return parseInfoObject(resp, ";", "=")
+}
+
+func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
+	if policy == nil {
+		return fmt.Errorf("retry policy cannot be nil")
+	}
+
+	var err error
+	for i := range policy.MaxRetries {
+		err = command()
+		if err == nil {
+			return nil
+		}
+
+		duration := time.Duration(float64(policy.BaseTimeout) * math.Pow(policy.Multiplier, float64(i)))
+		time.Sleep(duration)
+	}
+
+	if err != nil {
+		return fmt.Errorf("after %d attempts: %w", policy.MaxRetries, err)
+	}
+
+	return nil
 }

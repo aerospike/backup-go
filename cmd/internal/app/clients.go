@@ -35,7 +35,11 @@ import (
 
 const maxRack = 1000000
 
-func newAerospikeClient(cfg *client.AerospikeConfig, cp *models.ClientPolicy, racks string,
+func newAerospikeClient(
+	cfg *client.AerospikeConfig,
+	cp *models.ClientPolicy,
+	racks string,
+	warmUp int,
 ) (*aerospike.Client, error) {
 	if len(cfg.Seeds) < 1 {
 		return nil, fmt.Errorf("at least one seed must be provided")
@@ -63,6 +67,13 @@ func newAerospikeClient(cfg *client.AerospikeConfig, cp *models.ClientPolicy, ra
 	asClient, err := aerospike.NewClientWithPolicyAndHost(p, toHosts(cfg.Seeds)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aerospike client: %w", err)
+	}
+
+	if warmUp > 0 {
+		_, err = asClient.WarmUp(warmUp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to warm up Aerospike client: %w", err)
+		}
 	}
 
 	return asClient, nil
@@ -98,6 +109,7 @@ func newS3Client(ctx context.Context, a *models.AwsS3) (*s3.Client, error) {
 		}
 
 		o.UsePathStyle = true
+		o.DisableLogOutputChecksumValidationSkipped = true
 	})
 
 	return s3Client, nil

@@ -47,16 +47,17 @@ func newSingleRecordWriter(
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
-	writePolicy := rw.writePolicy
+	// To prevent data race, we must create copy of value.
+	writePolicy := *rw.writePolicy
 	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {
 		setGenerationPolicy := *rw.writePolicy
 		setGenerationPolicy.Generation = record.Generation
-		writePolicy = &setGenerationPolicy
+		writePolicy = setGenerationPolicy
 	}
 
 	writePolicy.Expiration = record.Expiration
 
-	err := rw.executeWrite(writePolicy, record)
+	err := rw.executeWrite(&writePolicy, record)
 	if err != nil {
 		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), err)
 	}
@@ -72,6 +73,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 
 	for attemptsLeft(rw.retryPolicy, attempt) {
 		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
+
 		if aerr == nil {
 			rw.stats.IncrRecordsInserted()
 

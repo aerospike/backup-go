@@ -35,67 +35,96 @@ const (
 	testStateFile = "state"
 )
 
-// Test_BackupRestore one test for both so we can restore from just backed up files.
+// Test_BackupRestore one test for both so we can restore from just backed-up files.
 func Test_BackupRestore(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	dir := t.TempDir()
-
 	hostPort := client.NewDefaultHostTLSPort()
-	clientCfg := &client.AerospikeConfig{
-		Seeds: client.HostTLSPortSlice{
-			hostPort,
+
+	asbParams := &ASBackupParams{
+		ClientConfig: &client.AerospikeConfig{
+			Seeds: client.HostTLSPortSlice{
+				hostPort,
+			},
+			User:     testASLoginPassword,
+			Password: testASLoginPassword,
 		},
-		User:     testASLoginPassword,
-		Password: testASLoginPassword,
+		ClientPolicy: &models.ClientPolicy{
+			Timeout:      1000,
+			IdleTimeout:  1000,
+			LoginTimeout: 1000,
+		},
+		BackupParams: &models.Backup{
+			InfoMaxRetries:                3,
+			InfoRetriesMultiplier:         1,
+			InfoRetryIntervalMilliseconds: 1000,
+		},
+		CommonParams: &models.Common{
+			Directory: dir,
+			Namespace: testNamespace,
+			Parallel:  1,
+		},
+		Compression: &models.Compression{
+			Mode: backup.CompressNone,
+		},
+		Encryption:  &models.Encryption{},
+		SecretAgent: &models.SecretAgent{},
+		AwsS3:       &models.AwsS3{},
+		GcpStorage:  &models.GcpStorage{},
+		AzureBlob:   &models.AzureBlob{},
 	}
 
-	clientPolicy := &models.ClientPolicy{
-		Timeout:      1000,
-		IdleTimeout:  1000,
-		LoginTimeout: 1000,
-	}
-
-	bParams := &models.Backup{}
-
-	cParams := &models.Common{
-		Directory: dir,
-		Namespace: testNamespace,
-		Parallel:  1,
-	}
-
-	comp := &models.Compression{
-		Mode: backup.CompressNone,
-	}
-
-	enc := &models.Encryption{}
-
-	sa := &models.SecretAgent{}
-
-	aws := &models.AwsS3{}
-
-	gcp := &models.GcpStorage{}
-
-	azure := &models.AzureBlob{}
-
-	err := createRecords(clientCfg, clientPolicy, testNamespace, testSet)
+	err := createRecords(asbParams.ClientConfig, asbParams.ClientPolicy, testNamespace, testSet)
 	require.NoError(t, err)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	asb, err := NewASBackup(ctx, clientCfg, clientPolicy, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asb, err := NewASBackup(ctx, asbParams, logger)
 	require.NoError(t, err)
 
 	err = asb.Run(ctx)
 	require.NoError(t, err)
 
-	rParams := &models.Restore{
-		BatchSize:       1,
-		MaxAsyncBatches: 1,
+	asrParams := &ASRestoreParams{
+		ClientConfig: &client.AerospikeConfig{
+			Seeds: client.HostTLSPortSlice{
+				hostPort,
+			},
+			User:     testASLoginPassword,
+			Password: testASLoginPassword,
+		},
+		ClientPolicy: &models.ClientPolicy{
+			Timeout:      1000,
+			IdleTimeout:  1000,
+			LoginTimeout: 1000,
+		},
+		RestoreParams: &models.Restore{
+			BatchSize:       1,
+			MaxAsyncBatches: 1,
+			Mode:            models.RestoreModeASB,
+		},
+		CommonParams: &models.Common{
+			Directory: dir,
+			Namespace: testNamespace,
+			Parallel:  1,
+		},
+		Compression: &models.Compression{
+			Mode: backup.CompressNone,
+		},
+		Encryption:  &models.Encryption{},
+		SecretAgent: &models.SecretAgent{},
+		AwsS3: &models.AwsS3{
+			RestorePollDuration: 1000,
+		},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob: &models.AzureBlob{
+			RestorePollDuration: 1000,
+		},
 	}
 
-	asr, err := NewASRestore(ctx, clientCfg, clientPolicy, rParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asr, err := NewASRestore(ctx, asrParams, logger)
 	require.NoError(t, err)
 
 	err = asr.Run(ctx)
@@ -107,54 +136,50 @@ func Test_BackupWithState(t *testing.T) {
 
 	ctx := context.Background()
 	dir := t.TempDir()
-
 	hostPort := client.NewDefaultHostTLSPort()
-	clientCfg := &client.AerospikeConfig{
-		Seeds: client.HostTLSPortSlice{
-			hostPort,
+
+	asbParams := &ASBackupParams{
+		ClientConfig: &client.AerospikeConfig{
+			Seeds: client.HostTLSPortSlice{
+				hostPort,
+			},
+			User:     testASLoginPassword,
+			Password: testASLoginPassword,
 		},
-		User:     testASLoginPassword,
-		Password: testASLoginPassword,
+		ClientPolicy: &models.ClientPolicy{
+			Timeout:      1000,
+			IdleTimeout:  1000,
+			LoginTimeout: 1000,
+		},
+		BackupParams: &models.Backup{
+			StateFileDst:                  testStateFile,
+			ScanPageSize:                  10,
+			FileLimit:                     100000,
+			InfoMaxRetries:                3,
+			InfoRetriesMultiplier:         1,
+			InfoRetryIntervalMilliseconds: 1000,
+		},
+		CommonParams: &models.Common{
+			Directory: dir,
+			Namespace: testNamespace,
+			Parallel:  1,
+		},
+		Compression: &models.Compression{
+			Mode: backup.CompressNone,
+		},
+		Encryption:  &models.Encryption{},
+		SecretAgent: &models.SecretAgent{},
+		AwsS3:       &models.AwsS3{},
+		GcpStorage:  &models.GcpStorage{},
+		AzureBlob:   &models.AzureBlob{},
 	}
 
-	clientPolicy := &models.ClientPolicy{
-		Timeout:      1000,
-		IdleTimeout:  1000,
-		LoginTimeout: 1000,
-	}
-
-	bParams := &models.Backup{
-		StateFileDst: testStateFile,
-		ScanPageSize: 10,
-		FileLimit:    100000,
-	}
-
-	cParams := &models.Common{
-		Directory: dir,
-		Namespace: testNamespace,
-		Parallel:  1,
-	}
-
-	comp := &models.Compression{
-		Mode: backup.CompressNone,
-	}
-
-	enc := &models.Encryption{}
-
-	sa := &models.SecretAgent{}
-
-	aws := &models.AwsS3{}
-
-	gcp := &models.GcpStorage{}
-
-	azure := &models.AzureBlob{}
-
-	err := createRecords(clientCfg, clientPolicy, testNamespace, testSet)
+	err := createRecords(asbParams.ClientConfig, asbParams.ClientPolicy, testNamespace, testSet)
 	require.NoError(t, err)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	asb, err := NewASBackup(ctx, clientCfg, clientPolicy, bParams, cParams, comp, enc, sa, aws, gcp, azure, logger)
+	asb, err := NewASBackup(ctx, asbParams, logger)
 	require.NoError(t, err)
 
 	err = asb.Run(ctx)
@@ -162,7 +187,7 @@ func Test_BackupWithState(t *testing.T) {
 }
 
 func createRecords(cfg *client.AerospikeConfig, cp *models.ClientPolicy, namespace, set string) error {
-	client, err := newAerospikeClient(cfg, cp, "")
+	client, err := newAerospikeClient(cfg, cp, "", 0)
 	if err != nil {
 		return fmt.Errorf("failed to create aerospike client: %w", err)
 	}
@@ -183,4 +208,48 @@ func createRecords(cfg *client.AerospikeConfig, cp *models.ClientPolicy, namespa
 	}
 
 	return nil
+}
+
+func TestGetWarmUp(t *testing.T) {
+	tests := []struct {
+		name            string
+		warmUp          int
+		maxAsyncBatches int
+		expected        int
+	}{
+		{
+			name:            "Default case with zero warmUp",
+			warmUp:          0,
+			maxAsyncBatches: 10,
+			expected:        11,
+		},
+		{
+			name:            "Custom warmUp value",
+			warmUp:          5,
+			maxAsyncBatches: 10,
+			expected:        5,
+		},
+		{
+			name:            "Zero maxAsyncBatches with zero warmUp",
+			warmUp:          0,
+			maxAsyncBatches: 0,
+			expected:        1,
+		},
+		{
+			name:            "Large maxAsyncBatches with zero warmUp",
+			warmUp:          0,
+			maxAsyncBatches: 1000,
+			expected:        1001,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getWarmUp(tt.warmUp, tt.maxAsyncBatches)
+			if result != tt.expected {
+				t.Errorf("getWarmUp(%d, %d) = %d, want %d",
+					tt.warmUp, tt.maxAsyncBatches, result, tt.expected)
+			}
+		})
+	}
 }

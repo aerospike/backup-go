@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync/atomic"
 )
 
 // Writer wraps an io.WriteCloser and adds a size limit.
@@ -26,22 +27,20 @@ import (
 type Writer struct {
 	ctx    context.Context // stored internally to be used by the Write method
 	writer io.WriteCloser
-	open   func(context.Context) (io.WriteCloser, error)
-	size   int64
-	limit  int64
+	open   func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error)
+
+	limit uint64
 	// Number of writer, for saving state.
 	n               int
 	saveCommandChan chan int
+	// File size counter.
+	sizeCounter atomic.Uint64
 }
 
 // NewWriter creates a new Writer with a size limit.
 // limit must be greater than 0.
-func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit int64,
-	open func(context.Context) (io.WriteCloser, error)) (*Writer, error) {
-	if limit <= 0 {
-		return nil, fmt.Errorf("limit must be greater than 0, got %d", limit)
-	}
-
+func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit uint64,
+	open func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error)) (*Writer, error) {
 	return &Writer{
 		ctx:             ctx,
 		limit:           limit,
@@ -52,7 +51,7 @@ func NewWriter(ctx context.Context, n int, saveCommandChan chan int, limit int64
 }
 
 func (f *Writer) Write(p []byte) (n int, err error) {
-	if f.size >= f.limit {
+	if f.sizeCounter.Load() >= f.limit {
 		err = f.writer.Close()
 		if err != nil {
 			return 0, fmt.Errorf("failed to close writer: %w", err)
@@ -62,19 +61,20 @@ func (f *Writer) Write(p []byte) (n int, err error) {
 			f.saveCommandChan <- f.n
 		}
 
-		f.size = 0
 		f.writer = nil
 	}
 
 	if f.writer == nil {
-		f.writer, err = f.open(f.ctx)
+		// reset counter.
+		f.sizeCounter.Store(0)
+
+		f.writer, err = f.open(f.ctx, fmt.Sprintf("%d_", f.n), &f.sizeCounter)
 		if err != nil {
 			return 0, fmt.Errorf("failed to open writer: %w", err)
 		}
 	}
 
 	n, err = f.writer.Write(p)
-	f.size += int64(n)
 
 	return n, err
 }

@@ -35,6 +35,7 @@ func TestRestore_NewFlagSet(t *testing.T) {
 		"--extra-ttl", "3600",
 		"--directory-list", "dir1,dir2",
 		"--parent-directory", "parent-dir",
+		"--warm-up", "10",
 	}
 
 	err := flagSet.Parse(args)
@@ -50,6 +51,7 @@ func TestRestore_NewFlagSet(t *testing.T) {
 	assert.Equal(t, int64(3600), result.ExtraTTL, "The extra-ttl flag should be parsed correctly")
 	assert.Equal(t, "dir1,dir2", result.DirectoryList, "The directory-list flag should be parsed correctly")
 	assert.Equal(t, "parent-dir", result.ParentDirectory, "The parent-directory flag should be parsed correctly")
+	assert.Equal(t, 10, result.WarmUp, "The warm-up flag should be parsed correctly")
 }
 
 func TestRestore_NewFlagSet_DefaultValues(t *testing.T) {
@@ -72,4 +74,5 @@ func TestRestore_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, int64(0), result.ExtraTTL, "The default value for extra-ttl should be 0")
 	assert.Equal(t, "", result.DirectoryList, "The directory-list flag should be an empty string")
 	assert.Equal(t, "", result.ParentDirectory, "The parent-directory flag should be an empty string")
+	assert.Equal(t, 0, result.WarmUp, "The warm-up flag should be 0")
 }

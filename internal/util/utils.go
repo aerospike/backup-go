@@ -14,6 +14,12 @@
 
 package util
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 func ListToMap(slice []string) map[string]bool {
 	result := make(map[string]bool, len(slice))
 
@@ -22,4 +28,26 @@ func ListToMap(slice []string) map[string]bool {
 	}
 
 	return result
+}
+
+// GetFileNumber returns file number from name.
+func GetFileNumber(filename string) (uint64, error) {
+	// Skip non asbx files.
+	if !strings.HasSuffix(filename, FileExtAsbx) {
+		return 0, nil
+	}
+
+	name := strings.TrimSuffix(filename, FileExtAsbx)
+	parts := strings.SplitN(name, "_", 3)
+
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("invalid file name %q", filename)
+	}
+
+	num, err := strconv.ParseUint(parts[2], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse file number %q: %w", filename, err)
+	}
+
+	return num, nil
 }

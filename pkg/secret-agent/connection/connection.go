@@ -53,7 +53,7 @@ func Get(
 
 // Write forms and executes a request to the secret agent.
 func Write(conn connector, timeout time.Duration, resource, secretKey string) error {
-	// Setting writing timout.
+	// Setting writing timeout.
 	deadline := time.Now().Add(timeout)
 	if err := conn.SetWriteDeadline(deadline); err != nil {
 		return fmt.Errorf("failed to set write deadline: %w", err)
@@ -86,7 +86,7 @@ func Write(conn connector, timeout time.Duration, resource, secretKey string) er
 
 // Read reads and parse response from secret agent.
 func Read(conn connector, timeout time.Duration) (string, error) {
-	// Setting reading timout.
+	// Setting reading timeout.
 	deadline := time.Now().Add(timeout)
 	if err := conn.SetReadDeadline(deadline); err != nil {
 		return "", fmt.Errorf("failed to set read deadline: %w", err)

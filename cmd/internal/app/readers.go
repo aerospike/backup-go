@@ -17,136 +17,124 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path"
+	"time"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/aerospike/backup-go/io/aws/s3"
-	"github.com/aerospike/backup-go/io/azure/blob"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/gcp/storage"
-	"github.com/aerospike/backup-go/io/local"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/aws/s3"
+	"github.com/aerospike/backup-go/io/storage/azure/blob"
+	"github.com/aerospike/backup-go/io/storage/gcp/storage"
+	"github.com/aerospike/backup-go/io/storage/local"
 )
 
-func getReader(
+func newReader(
 	ctx context.Context,
-	restoreParams *models.Restore,
-	commonParams *models.Common,
-	awsS3 *models.AwsS3,
-	gcpStorage *models.GcpStorage,
-	azureBlob *models.AzureBlob,
-	backupParams *models.Backup,
-	secretAgent *backup.SecretAgentConfig,
+	params *ASRestoreParams,
+	sa *backup.SecretAgentConfig,
+	isXdr bool,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
+	directory, inputFile := params.CommonParams.Directory, params.RestoreParams.InputFile
+	parentDirectory, directoryList := params.RestoreParams.ParentDirectory, params.RestoreParams.DirectoryList
+
+	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr)
+
 	switch {
-	case awsS3.Region != "":
-		if err := awsS3.LoadSecrets(secretAgent); err != nil {
+	case params.AwsS3 != nil && params.AwsS3.Region != "":
+		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
-		return newS3Reader(ctx, awsS3, restoreParams, commonParams, backupParams)
-	case gcpStorage.BucketName != "":
-		if err := gcpStorage.LoadSecrets(secretAgent); err != nil {
+		return newS3Reader(ctx, params.AwsS3, opts, logger)
+	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
+		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
 		}
 
-		return newGcpReader(ctx, gcpStorage, restoreParams, commonParams, backupParams)
-	case azureBlob.ContainerName != "":
-		if err := azureBlob.LoadSecrets(secretAgent); err != nil {
+		return newGcpReader(ctx, params.GcpStorage, opts)
+	case params.AzureBlob != nil && params.AzureBlob.ContainerName != "":
+		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
-		return newAzureReader(ctx, azureBlob, restoreParams, commonParams, backupParams)
+		return newAzureReader(ctx, params.AzureBlob, opts, logger)
 	default:
-		return newLocalReader(restoreParams, commonParams, backupParams)
+		return newLocalReader(ctx, opts)
 	}
 }
 
-func newLocalReader(r *models.Restore, c *models.Common, b *models.Backup) (backup.StreamingReader, error) {
-	opts := make([]local.Opt, 0)
+func newReaderOpts(
+	directory,
+	inputFile,
+	parentDirectory,
+	directoryList string,
+	isXDR bool,
+) []ioStorage.Opt {
+	opts := make([]ioStorage.Opt, 0)
 
 	// As we validate this fields in validation function, we can switch here.
 	switch {
-	case c.Directory != "":
-		opts = append(opts, local.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
-			opts = append(opts, local.WithValidator(asb.NewValidator()))
+	case directory != "":
+		opts = append(opts, ioStorage.WithDir(directory))
+		// Append Validator only for directory.
+		if isXDR {
+			opts = append(opts, ioStorage.WithValidator(asbx.NewValidator()), ioStorage.WithSorting())
+		} else {
+			opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
 		}
-	case r.InputFile != "":
-		opts = append(opts, local.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
-		opts = append(opts, local.WithDirList(dirList))
+	case inputFile != "":
+		opts = append(opts, ioStorage.WithFile(inputFile))
+	case directoryList != "":
+		dirList := prepareDirectoryList(parentDirectory, directoryList)
+		opts = append(opts, ioStorage.WithDirList(dirList))
 	}
 
-	return local.NewReader(opts...)
+	return opts
 }
 
-//nolint:dupl // This code is not duplicated, it is a different initialization.
+func newLocalReader(
+	ctx context.Context,
+	opts []ioStorage.Opt,
+) (backup.StreamingReader, error) {
+	return local.NewReader(ctx, opts...)
+}
+
 func newS3Reader(
 	ctx context.Context,
 	a *models.AwsS3,
-	r *models.Restore,
-	c *models.Common,
-	b *models.Backup,
+	opts []ioStorage.Opt,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	client, err := newS3Client(ctx, a)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := make([]s3.Opt, 0)
-
-	// As we validate this fields in validation function, we can switch here.
-	switch {
-	case c.Directory != "":
-		opts = append(opts, s3.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
-			opts = append(opts, s3.WithValidator(asb.NewValidator()))
-		}
-	case r.InputFile != "":
-		opts = append(opts, s3.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
-		opts = append(opts, s3.WithDirList(dirList))
+	if a.AccessTier != "" {
+		opts = append(
+			opts,
+			ioStorage.WithAccessTier(a.AccessTier),
+			ioStorage.WithLogger(logger),
+			ioStorage.WithWarmPollDuration(time.Duration(a.RestorePollDuration)*time.Millisecond),
+		)
 	}
 
 	return s3.NewReader(ctx, client, a.BucketName, opts...)
 }
 
-//nolint:dupl // This code is not duplicated, it is a different initialization.
 func newGcpReader(
 	ctx context.Context,
 	g *models.GcpStorage,
-	r *models.Restore,
-	c *models.Common,
-	b *models.Backup,
+	opts []ioStorage.Opt,
 ) (backup.StreamingReader, error) {
 	client, err := newGcpClient(ctx, g)
 	if err != nil {
 		return nil, err
-	}
-
-	opts := make([]storage.Opt, 0)
-
-	// As we validate this fields in validation function, we can switch here.
-	switch {
-	case c.Directory != "":
-		opts = append(opts, storage.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
-			opts = append(opts, storage.WithValidator(asb.NewValidator()))
-		}
-	case r.InputFile != "":
-		opts = append(opts, storage.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
-		opts = append(opts, storage.WithDirList(dirList))
 	}
 
 	return storage.NewReader(ctx, client, g.BucketName, opts...)
@@ -155,31 +143,21 @@ func newGcpReader(
 func newAzureReader(
 	ctx context.Context,
 	a *models.AzureBlob,
-	r *models.Restore,
-	c *models.Common,
-	b *models.Backup,
+	opts []ioStorage.Opt,
+	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
 	client, err := newAzureClient(a)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := make([]blob.Opt, 0)
-
-	// As we validate this fields in validation function, we can switch here.
-	switch {
-	case c.Directory != "":
-		opts = append(opts, blob.WithDir(c.Directory))
-		// Append Validator only if backup params are not set.
-		// That means we don't need to check that we are saving a state file.
-		if b == nil {
-			opts = append(opts, blob.WithValidator(asb.NewValidator()))
-		}
-	case r.InputFile != "":
-		opts = append(opts, blob.WithFile(r.InputFile))
-	case r.DirectoryList != "":
-		dirList := prepareDirectoryList(r.ParentDirectory, r.DirectoryList)
-		opts = append(opts, blob.WithDirList(dirList))
+	if a.AccessTier != "" {
+		opts = append(
+			opts,
+			ioStorage.WithAccessTier(a.AccessTier),
+			ioStorage.WithLogger(logger),
+			ioStorage.WithWarmPollDuration(time.Duration(a.RestorePollDuration)*time.Millisecond),
+		)
 	}
 
 	return blob.NewReader(ctx, client, a.ContainerName, opts...)

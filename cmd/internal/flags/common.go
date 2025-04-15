@@ -15,8 +15,6 @@
 package flags
 
 import (
-	"runtime"
-
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/spf13/pflag"
 )
@@ -28,28 +26,31 @@ const (
 	OperationRestore
 
 	descNamespaceBackup  = "The namespace to be backed up. Required."
-	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns"
+	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns\n" +
+		"Restoring to different namespace is incompatible with --mode=asbx."
 
 	descSetListBackup = "The set(s) to be backed up. Accepts comma-separated values with no spaces: 'set1,set2,set3'\n" +
 		"If multiple sets are being backed up, filter-exp cannot be used.\n" +
 		"If empty, include all sets."
 	descSetListRestore = "Only restore the given sets from the backup.\n" +
-		"Default: restore all sets."
+		"Default: restore all sets.\n" +
+		"Incompatible with --mode=asbx."
 
 	descBinListBackup = "Only include the given bins in the backup.\n" +
 		"Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'\n" +
 		"If empty include all bins."
 	descBinListRestore = "Only restore the given bins in the backup.\n" +
-		"If empty, include all bins.\n"
+		"If empty, include all bins.\n" +
+		"Incompatible with --mode=asbx."
 
 	descNoRecordsBackup  = "Don't back up any records."
-	descNoRecordsRestore = "Don't restore any records."
+	descNoRecordsRestore = "Don't restore any records.\nIncompatible with --mode=asbx."
 
 	descNoIndexesBackup  = "Don't back up any indexes."
-	descNoIndexesRestore = "Don't restore any secondary indexes."
+	descNoIndexesRestore = "Don't restore any secondary indexes.\nIncompatible with --mode=asbx."
 
 	descNoUDFsBackup  = "Don't back up any UDFs."
-	descNoUDFsRestore = "Don't restore any UDFs."
+	descNoUDFsRestore = "Don't restore any UDFs.\nIncompatible with --mode=asbx."
 
 	descParallelBackup = "Maximum number of scan calls to run in parallel.\n" +
 		"If only one partition range is given, or the entire namespace is being backed up, the range\n" +
@@ -57,7 +58,7 @@ const (
 		"filter cannot be parallelized individually, so you may only achieve as much parallelism as there are\n" +
 		"partition filters. Accepts values from 1-1024 inclusive."
 	descParallelRestore = "The number of restore threads. Accepts values from 1-1024 inclusive.\n" +
-		"The default value is automatically calculated and appears as the number of CPUs on your machine."
+		"If not set, the default value is automatically calculated and appears as the number of CPUs on your machine."
 
 	defaultTotalTimeoutBackup  = 0
 	defaultTotalTimeoutRestore = 10000
@@ -102,7 +103,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		descNoUDFs = descNoUDFsRestore
 		descParallel = descParallelRestore
 		defaultTotalTimeout = defaultTotalTimeoutRestore
-		defaultParallel = runtime.NumCPU()
+		defaultParallel = 0
 	}
 
 	flagSet.StringVarP(&f.Directory, "directory", "d",

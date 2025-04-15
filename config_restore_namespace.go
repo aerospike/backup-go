@@ -28,6 +28,10 @@ type RestoreNamespaceConfig struct {
 
 // validate validates the restore namespace configuration.
 func (n *RestoreNamespaceConfig) validate() error {
+	if n == nil {
+		return nil
+	}
+
 	if n.Source == nil {
 		return fmt.Errorf("source namespace is not specified")
 	}

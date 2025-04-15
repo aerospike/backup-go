@@ -16,7 +16,9 @@ package app
 
 import (
 	"fmt"
+	"path"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +27,7 @@ import (
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	bModels "github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 var (
@@ -38,56 +41,55 @@ var (
 	expDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2}$`)
 )
 
-func mapBackupConfig(
-	backupParams *models.Backup,
-	commonParams *models.Common,
-	compression *models.Compression,
-	encryption *models.Encryption,
-	secretAgent *models.SecretAgent,
-) (*backup.BackupConfig, error) {
-	if commonParams.Namespace == "" {
-		return nil, fmt.Errorf("namespace is required")
-	}
-
+func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 	c := backup.NewDefaultBackupConfig()
-	c.Namespace = commonParams.Namespace
-	c.SetList = splitByComma(commonParams.SetList)
-	c.BinList = splitByComma(commonParams.BinList)
-	c.NoRecords = commonParams.NoRecords
-	c.NoIndexes = commonParams.NoIndexes
-	c.RecordsPerSecond = commonParams.RecordsPerSecond
-	c.FileLimit = backupParams.FileLimit
-	c.NoUDFs = commonParams.NoUDFs
+	c.Namespace = params.CommonParams.Namespace
+	c.SetList = splitByComma(params.CommonParams.SetList)
+	c.BinList = splitByComma(params.CommonParams.BinList)
+	c.NoRecords = params.CommonParams.NoRecords
+	c.NoIndexes = params.CommonParams.NoIndexes
+	c.RecordsPerSecond = params.CommonParams.RecordsPerSecond
+	c.FileLimit = params.BackupParams.FileLimit
+	c.NoUDFs = params.CommonParams.NoUDFs
 	// The original backup tools have a single parallelism configuration property.
 	// We may consider splitting the configuration in the future.
-	c.ParallelWrite = commonParams.Parallel
-	c.ParallelRead = commonParams.Parallel
+	c.ParallelWrite = params.CommonParams.Parallel
+	c.ParallelRead = params.CommonParams.Parallel
 	// As we set --nice in MiB we must convert it to bytes
-	c.Bandwidth = commonParams.Nice * 1024 * 1024
-	c.Compact = backupParams.Compact
-	c.NoTTLOnly = backupParams.NoTTLOnly
-	c.OutputFilePrefix = backupParams.OutputFilePrefix
+	c.Bandwidth = params.CommonParams.Nice * 1024 * 1024
+	c.Compact = params.BackupParams.Compact
+	c.NoTTLOnly = params.BackupParams.NoTTLOnly
+	c.OutputFilePrefix = params.BackupParams.OutputFilePrefix
 
-	if backupParams.Continue != "" {
-		c.StateFile = backupParams.Continue
-		c.Continue = true
-		c.SyncPipelines = true
-		c.PageSize = backupParams.ScanPageSize
+	if params.BackupParams.RackList != "" {
+		list, err := parseRacks(params.BackupParams.RackList)
+		if err != nil {
+			return nil, err
+		}
+
+		c.RackList = list
 	}
 
-	if backupParams.StateFileDst != "" {
-		c.StateFile = backupParams.StateFileDst
-		c.SyncPipelines = true
-		c.PageSize = backupParams.ScanPageSize
+	if params.BackupParams.Continue != "" {
+		c.StateFile = path.Join(params.CommonParams.Directory, params.BackupParams.Continue)
+		c.Continue = true
+		c.PipelinesMode = pipeline.ModeParallel
+		c.PageSize = params.BackupParams.ScanPageSize
+	}
+
+	if params.BackupParams.StateFileDst != "" {
+		c.StateFile = params.BackupParams.StateFileDst
+		c.PipelinesMode = pipeline.ModeParallel
+		c.PageSize = params.BackupParams.ScanPageSize
 	}
 
 	// Overwrite partitions if we use nodes.
-	if backupParams.ParallelNodes || backupParams.NodeList != "" {
-		c.ParallelNodes = backupParams.ParallelNodes
-		c.NodeList = splitByComma(backupParams.NodeList)
+	if params.BackupParams.ParallelNodes || params.BackupParams.NodeList != "" {
+		c.ParallelNodes = params.BackupParams.ParallelNodes
+		c.NodeList = splitByComma(params.BackupParams.NodeList)
 	}
 
-	pf, err := mapPartitionFilter(backupParams, commonParams)
+	pf, err := mapPartitionFilter(params.BackupParams, params.CommonParams)
 	if err != nil {
 		return nil, err
 	}
@@ -98,18 +100,18 @@ func mapBackupConfig(
 
 	c.PartitionFilters = pf
 
-	sp, err := mapScanPolicy(backupParams, commonParams)
+	sp, err := mapScanPolicy(params.BackupParams, params.CommonParams)
 	if err != nil {
 		return nil, err
 	}
 
 	c.ScanPolicy = sp
-	c.CompressionPolicy = mapCompressionPolicy(compression)
-	c.EncryptionPolicy = mapEncryptionPolicy(encryption)
-	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
+	c.CompressionPolicy = mapCompressionPolicy(params.Compression)
+	c.EncryptionPolicy = mapEncryptionPolicy(params.Encryption)
+	c.SecretAgentConfig = mapSecretAgentConfig(params.SecretAgent)
 
-	if backupParams.ModifiedBefore != "" {
-		modBeforeTime, err := parseLocalTimeToUTC(backupParams.ModifiedBefore)
+	if params.BackupParams.ModifiedBefore != "" {
+		modBeforeTime, err := parseLocalTimeToUTC(params.BackupParams.ModifiedBefore)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified before date: %w", err)
 		}
@@ -117,8 +119,8 @@ func mapBackupConfig(
 		c.ModBefore = &modBeforeTime
 	}
 
-	if backupParams.ModifiedAfter != "" {
-		modAfterTime, err := parseLocalTimeToUTC(backupParams.ModifiedAfter)
+	if params.BackupParams.ModifiedAfter != "" {
+		modAfterTime, err := parseLocalTimeToUTC(params.BackupParams.ModifiedAfter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse modified after date: %w", err)
 		}
@@ -126,45 +128,89 @@ func mapBackupConfig(
 		c.ModAfter = &modAfterTime
 	}
 
+	c.InfoRetryPolicy = mapRetryPolicy(
+		params.BackupParams.InfoRetryIntervalMilliseconds,
+		params.BackupParams.InfoRetriesMultiplier,
+		params.BackupParams.InfoMaxRetries,
+	)
+
 	return c, nil
 }
 
-func mapRestoreConfig(
-	restoreParams *models.Restore,
-	commonParams *models.Common,
-	compression *models.Compression,
-	encryption *models.Encryption,
-	secretAgent *models.SecretAgent,
-) (*backup.RestoreConfig, error) {
-	if commonParams.Namespace == "" {
-		return nil, fmt.Errorf("namespace is required")
+func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
+	parallelWrite := runtime.NumCPU()
+	if params.BackupXDRParams.ParallelWrite > 0 {
+		parallelWrite = params.BackupXDRParams.ParallelWrite
+	}
+
+	c := &backup.ConfigBackupXDR{
+		InfoPolicy:        aerospike.NewInfoPolicy(),
+		EncryptionPolicy:  mapEncryptionPolicy(params.Encryption),
+		CompressionPolicy: mapCompressionPolicy(params.Compression),
+		SecretAgentConfig: mapSecretAgentConfig(params.SecretAgent),
+		EncoderType:       backup.EncoderTypeASBX,
+		FileLimit:         params.BackupXDRParams.FileLimit,
+		ParallelWrite:     parallelWrite,
+		DC:                params.BackupXDRParams.DC,
+		LocalAddress:      params.BackupXDRParams.LocalAddress,
+		LocalPort:         params.BackupXDRParams.LocalPort,
+		Namespace:         params.BackupXDRParams.Namespace,
+		Rewind:            params.BackupXDRParams.Rewind,
+		TLSConfig:         nil,
+		ReadTimeout:       time.Duration(params.BackupXDRParams.ReadTimeoutMilliseconds) * time.Millisecond,
+		WriteTimeout:      time.Duration(params.BackupXDRParams.WriteTimeoutMilliseconds) * time.Millisecond,
+		ResultQueueSize:   params.BackupXDRParams.ResultQueueSize,
+		AckQueueSize:      params.BackupXDRParams.AckQueueSize,
+		MaxConnections:    params.BackupXDRParams.MaxConnections,
+		InfoPolingPeriod:  time.Duration(params.BackupXDRParams.InfoPolingPeriodMilliseconds) * time.Millisecond,
+		StartTimeout:      time.Duration(params.BackupXDRParams.StartTimeoutMilliseconds) * time.Millisecond,
+		InfoRetryPolicy: mapRetryPolicy(
+			params.BackupXDRParams.InfoRetryIntervalMilliseconds,
+			params.BackupXDRParams.InfoRetriesMultiplier,
+			params.BackupXDRParams.InfoMaxRetries,
+		),
+		MaxThroughput: params.BackupXDRParams.MaxThroughput,
+		Forward:       params.BackupXDRParams.Forward,
+	}
+
+	return c
+}
+
+func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
+	parallel := runtime.NumCPU()
+	if params.CommonParams.Parallel > 0 {
+		parallel = params.CommonParams.Parallel
 	}
 
 	c := backup.NewDefaultRestoreConfig()
-	c.Namespace = mapRestoreNamespace(commonParams.Namespace)
-	c.SetList = splitByComma(commonParams.SetList)
-	c.BinList = splitByComma(commonParams.BinList)
-	c.NoRecords = commonParams.NoRecords
-	c.NoIndexes = commonParams.NoIndexes
-	c.NoUDFs = commonParams.NoUDFs
-	c.RecordsPerSecond = commonParams.RecordsPerSecond
-	c.Parallel = commonParams.Parallel
-	c.WritePolicy = mapWritePolicy(restoreParams, commonParams)
-	c.InfoPolicy = mapInfoPolicy(restoreParams.TimeOut)
+	c.Namespace = mapRestoreNamespace(params.CommonParams.Namespace)
+	c.SetList = splitByComma(params.CommonParams.SetList)
+	c.BinList = splitByComma(params.CommonParams.BinList)
+	c.NoRecords = params.CommonParams.NoRecords
+	c.NoIndexes = params.CommonParams.NoIndexes
+	c.NoUDFs = params.CommonParams.NoUDFs
+	c.RecordsPerSecond = params.CommonParams.RecordsPerSecond
+	c.Parallel = parallel
+	c.WritePolicy = mapWritePolicy(params.RestoreParams, params.CommonParams)
+	c.InfoPolicy = mapInfoPolicy(params.RestoreParams.TimeOut)
 	// As we set --nice in MiB we must convert it to bytes
-	c.Bandwidth = commonParams.Nice * 1024 * 1024
-	c.ExtraTTL = restoreParams.ExtraTTL
-	c.IgnoreRecordError = restoreParams.IgnoreRecordError
-	c.DisableBatchWrites = restoreParams.DisableBatchWrites
-	c.BatchSize = restoreParams.BatchSize
-	c.MaxAsyncBatches = restoreParams.MaxAsyncBatches
+	c.Bandwidth = params.CommonParams.Nice * 1024 * 1024
+	c.ExtraTTL = params.RestoreParams.ExtraTTL
+	c.IgnoreRecordError = params.RestoreParams.IgnoreRecordError
+	c.DisableBatchWrites = params.RestoreParams.DisableBatchWrites
+	c.BatchSize = params.RestoreParams.BatchSize
+	c.MaxAsyncBatches = params.RestoreParams.MaxAsyncBatches
 
-	c.CompressionPolicy = mapCompressionPolicy(compression)
-	c.EncryptionPolicy = mapEncryptionPolicy(encryption)
-	c.SecretAgentConfig = mapSecretAgentConfig(secretAgent)
-	c.RetryPolicy = mapRetryPolicy(restoreParams)
+	c.CompressionPolicy = mapCompressionPolicy(params.Compression)
+	c.EncryptionPolicy = mapEncryptionPolicy(params.Encryption)
+	c.SecretAgentConfig = mapSecretAgentConfig(params.SecretAgent)
+	c.RetryPolicy = mapRetryPolicy(
+		params.RestoreParams.RetryBaseTimeout,
+		params.RestoreParams.RetryMultiplier,
+		params.RestoreParams.RetryMaxRetries,
+	)
 
-	return c, nil
+	return c
 }
 
 func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
@@ -188,6 +234,10 @@ func mapRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
 }
 
 func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
+	if c == nil {
+		return nil
+	}
+
 	if c.Mode == "" {
 		return nil
 	}
@@ -196,6 +246,10 @@ func mapCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
 }
 
 func mapEncryptionPolicy(e *models.Encryption) *backup.EncryptionPolicy {
+	if e == nil {
+		return nil
+	}
+
 	if e.Mode == "" {
 		return nil
 	}
@@ -220,6 +274,10 @@ func mapEncryptionPolicy(e *models.Encryption) *backup.EncryptionPolicy {
 }
 
 func mapSecretAgentConfig(s *models.SecretAgent) *backup.SecretAgentConfig {
+	if s == nil {
+		return nil
+	}
+
 	if s.Address == "" {
 		return nil
 	}
@@ -280,6 +338,11 @@ func mapScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, e
 
 func mapWritePolicy(r *models.Restore, c *models.Common) *aerospike.WritePolicy {
 	p := aerospike.NewWritePolicy(0, 0)
+
+	if c == nil {
+		return p
+	}
+
 	p.SendKey = true
 	p.MaxRetries = c.MaxRetries
 	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
@@ -312,11 +375,11 @@ func mapInfoPolicy(timeOut int64) *aerospike.InfoPolicy {
 	return p
 }
 
-func mapRetryPolicy(r *models.Restore) *bModels.RetryPolicy {
+func mapRetryPolicy(retryBaseTimeout int64, retryMultiplier float64, retryMaxRetries uint) *bModels.RetryPolicy {
 	return bModels.NewRetryPolicy(
-		time.Duration(r.RetryBaseTimeout)*time.Millisecond,
-		r.RetryMultiplier,
-		r.RetryMaxRetries,
+		time.Duration(retryBaseTimeout)*time.Millisecond,
+		retryMultiplier,
+		retryMaxRetries,
 	)
 }
 

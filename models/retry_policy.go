@@ -14,7 +14,10 @@
 
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // RetryPolicy defines the configuration for retry attempts in case of failures.
 type RetryPolicy struct {
@@ -37,4 +40,30 @@ func NewRetryPolicy(baseTimeout time.Duration, multiplier float64, maxRetries ui
 		Multiplier:  multiplier,
 		MaxRetries:  maxRetries,
 	}
+}
+
+// NewDefaultRetryPolicy returns a new RetryPolicy with default values.
+func NewDefaultRetryPolicy() *RetryPolicy {
+	return NewRetryPolicy(1000*time.Millisecond, 1, 3)
+}
+
+// Validate checks retry policy values.
+func (p *RetryPolicy) Validate() error {
+	if p == nil {
+		return nil
+	}
+
+	if p.BaseTimeout < 0 {
+		return fmt.Errorf("base timeout must be non-negative")
+	}
+
+	if p.Multiplier < 1 {
+		return fmt.Errorf("multiplier must be greater than 0")
+	}
+
+	if p.MaxRetries < 1 {
+		return fmt.Errorf("max retries must be greater than 0")
+	}
+
+	return nil
 }

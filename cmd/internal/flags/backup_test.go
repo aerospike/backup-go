@@ -42,6 +42,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 		"--node-list", "node1,node2",
 		"--no-ttl-only",
 		"--prefer-racks", "1,2,3,4",
+		"--rack-list", "1,2,3,4",
 		"--partition-list", "4000,1-236,EjRWeJq83vEjRRI0VniavN7xI0U=",
 	}
 
@@ -51,7 +52,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 	result := backup.GetBackup()
 
 	assert.Equal(t, "backup-file.bak", result.OutputFile, "The output-file flag should be parsed correctly")
-	assert.Equal(t, int64(5000), result.FileLimit, "The file-limit flag should be parsed correctly")
+	assert.Equal(t, uint64(5000), result.FileLimit, "The file-limit flag should be parsed correctly")
 	assert.Equal(t, "some-digest", result.AfterDigest, "The after-digest flag should be parsed correctly")
 	assert.Equal(t, "2023-09-01_12:00:00", result.ModifiedBefore, "The modified-before flag should be parsed correctly")
 	assert.Equal(t, "2023-09-02_12:00:00", result.ModifiedAfter, "The modified-after flag should be parsed correctly")
@@ -65,6 +66,7 @@ func TestBackup_NewFlagSet(t *testing.T) {
 	assert.Equal(t, "node1,node2", result.NodeList, "The node-list flag should be parsed correctly")
 	assert.Equal(t, true, result.NoTTLOnly, "The no-ttl-only flag should be parsed correctly")
 	assert.Equal(t, "1,2,3,4", result.PreferRacks, "The prefer-racks flag should be parsed correctly")
+	assert.Equal(t, "1,2,3,4", result.RackList, "The rack-list flag should be parsed correctly")
 	assert.Equal(t, "4000,1-236,EjRWeJq83vEjRRI0VniavN7xI0U=", result.PartitionList, "The partition-list flag should be parsed correctly")
 }
 
@@ -80,7 +82,7 @@ func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
 	result := backup.GetBackup()
 
 	assert.Equal(t, "", result.OutputFile, "The default value for output-file should be an empty string")
-	assert.Equal(t, int64(262144000), result.FileLimit, "The default value for file-limit should be 0")
+	assert.Equal(t, uint64(262144000), result.FileLimit, "The default value for file-limit should be 0")
 	assert.Equal(t, "", result.AfterDigest, "The default value for after-digest should be an empty string")
 	assert.Equal(t, "", result.ModifiedBefore, "The default value for modified-before should be an empty string")
 	assert.Equal(t, "", result.ModifiedAfter, "The default value for modified-after should be an empty string")
@@ -91,8 +93,9 @@ func TestBackup_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, false, result.ParallelNodes, "The default value for parallel-nodes should be false")
 	assert.Equal(t, false, result.RemoveArtifacts, "The default value for remove-artifacts should be false")
 	assert.Equal(t, false, result.Compact, "The default value for compact should be false")
-	assert.Equal(t, "", result.NodeList, "The default value for node-list should be empty")
+	assert.Equal(t, "", result.NodeList, "The default value for node-list should be empty string")
 	assert.Equal(t, false, result.NoTTLOnly, "The default value for no-ttl-only should be false")
-	assert.Equal(t, "", result.PreferRacks, "The default value for prefer-racks should be false")
+	assert.Equal(t, "", result.PreferRacks, "The default value for prefer-racks should be empty string")
+	assert.Equal(t, "", result.RackList, "The default value for rack list should be empty string")
 	assert.Equal(t, "", result.PartitionList, "The default value for partition-list should be empty string")
 }

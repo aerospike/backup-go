@@ -50,3 +50,20 @@ func (b *BackupStats) IsEmpty() bool {
 		b.GetSIndexes() == 0 &&
 		b.GetReadRecords() == 0
 }
+
+// SumBackupStats combines multiple BackupStats.
+func SumBackupStats(stats ...*BackupStats) *BackupStats {
+	result := NewBackupStats()
+
+	for _, stat := range stats {
+		if stat == nil {
+			continue
+		}
+
+		result.commonStats = sumCommonStats(result.commonStats, stat.commonStats)
+		result.fileCount.Add(stat.GetFileCount())
+		result.TotalRecords += stat.TotalRecords
+	}
+
+	return result
+}

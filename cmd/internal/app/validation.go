@@ -22,6 +22,125 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/models"
 )
 
+func validateBackup(params *ASBackupParams) error {
+	if params.BackupParams != nil && params.CommonParams != nil {
+		if params.BackupParams.OutputFile == "" && params.CommonParams.Directory == "" && !params.BackupParams.Estimate {
+			return fmt.Errorf("output file or directory required")
+		}
+
+		if err := validateBackupParams(params.BackupParams, params.CommonParams); err != nil {
+			return err
+		}
+
+		if err := validateCommonParams(params.CommonParams); err != nil {
+			return err
+		}
+	}
+
+	if params.BackupXDRParams != nil {
+		if err := validateBackupXDRParams(params.BackupXDRParams); err != nil {
+			return err
+		}
+	}
+
+	if err := validateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateBackupXDRParams(params *models.BackupXDR) error {
+	if params.ReadTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr read timeout can't be negative")
+	}
+
+	if params.WriteTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr write timeout can't be negative")
+	}
+
+	if params.InfoPolingPeriodMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info poling period can't be negative")
+	}
+
+	if params.StartTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr start timeout can't be negative")
+	}
+
+	if params.ResultQueueSize < 0 {
+		return fmt.Errorf("backup xdr result queue size can't be negative")
+	}
+
+	if params.AckQueueSize < 0 {
+		return fmt.Errorf("backup xdr ack queue size can't be negative")
+	}
+
+	if params.MaxConnections < 1 {
+		return fmt.Errorf("backup xdr max connections can't be less than 1")
+	}
+
+	if params.ParallelWrite < 0 {
+		return fmt.Errorf("backup xdr parallel write can't be negative")
+	}
+
+	if params.FileLimit < 1 {
+		return fmt.Errorf("backup xdr file limit can't be less than 1")
+	}
+
+	if params.InfoRetryIntervalMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info retry interval can't be negative")
+	}
+
+	if params.InfoRetriesMultiplier < 0 {
+		return fmt.Errorf("backup xdr info retries multiplier can't be negative")
+	}
+
+	return nil
+}
+
+func validateRestore(params *ASRestoreParams) error {
+	if params.RestoreParams != nil && params.CommonParams != nil {
+		switch params.RestoreParams.Mode {
+		case models.RestoreModeAuto, models.RestoreModeASB, models.RestoreModeASBX:
+			// ok.
+		default:
+			return fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
+		}
+
+		if params.RestoreParams.InputFile == "" &&
+			params.CommonParams.Directory == "" &&
+			params.RestoreParams.DirectoryList == "" {
+			return fmt.Errorf("input file or directory required")
+		}
+
+		if err := validateRestoreParams(params.RestoreParams, params.CommonParams); err != nil {
+			return err
+		}
+
+		if err := validateCommonParams(params.CommonParams); err != nil {
+			return err
+		}
+	}
+
+	if err := validateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
+		return err
+	}
+
+	if params.AwsS3 != nil {
+		if params.AwsS3.RestorePollDuration < 1 {
+			return fmt.Errorf("restore poll duration can't be less than 1")
+		}
+	}
+
+	if params.AzureBlob != nil {
+		if params.AzureBlob.RestorePollDuration < 1 {
+			return fmt.Errorf("rehydrate poll duration can't be less than 1")
+		}
+	}
+
+	return nil
+}
+
 func validateStorages(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
@@ -29,17 +148,17 @@ func validateStorages(
 ) error {
 	var count int
 
-	if awsS3.Region != "" || awsS3.Profile != "" || awsS3.Endpoint != "" {
+	if awsS3 != nil && (awsS3.Region != "" || awsS3.Profile != "" || awsS3.Endpoint != "") {
 		count++
 	}
 
-	if gcpStorage.BucketName != "" || gcpStorage.KeyFile != "" || gcpStorage.Endpoint != "" {
+	if gcpStorage != nil && (gcpStorage.BucketName != "" || gcpStorage.KeyFile != "" || gcpStorage.Endpoint != "") {
 		count++
 	}
 
-	if azureBlob.ContainerName != "" || azureBlob.AccountName != "" || azureBlob.AccountKey != "" ||
+	if azureBlob != nil && (azureBlob.ContainerName != "" || azureBlob.AccountName != "" || azureBlob.AccountKey != "" ||
 		azureBlob.Endpoint != "" || azureBlob.TenantID != "" || azureBlob.ClientID != "" ||
-		azureBlob.ClientSecret != "" {
+		azureBlob.ClientSecret != "") {
 		count++
 	}
 
@@ -52,6 +171,10 @@ func validateStorages(
 
 //nolint:gocyclo // It is a long validation function.
 func validateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
+	if backupParams == nil || commonParams == nil {
+		return fmt.Errorf("params can't be nil")
+	}
+
 	if commonParams.Directory != "" && backupParams.OutputFile != "" {
 		return fmt.Errorf("only one of output-file and directory may be configured at the same time")
 	}
@@ -91,16 +214,28 @@ func validateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 		return fmt.Errorf("must specify either output-file or directory")
 	}
 
+	if backupParams.NodeList != "" && backupParams.RackList != "" {
+		return fmt.Errorf("specify either rack-list or node-list, but not both")
+	}
+
 	return nil
 }
 
 func validateCommonParams(commonParams *models.Common) error {
+	if commonParams.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+
 	if commonParams.TotalTimeout < 0 {
 		return fmt.Errorf("total-timeout must be non-negative")
 	}
 
 	if commonParams.SocketTimeout < 0 {
 		return fmt.Errorf("socket-timeout must be non-negative")
+	}
+
+	if commonParams.Parallel < 0 {
+		return fmt.Errorf("parallel must be non-negative")
 	}
 
 	return nil
@@ -159,6 +294,10 @@ func validateRestoreParams(restoreParams *models.Restore, commonParams *models.C
 
 	if restoreParams.ParentDirectory != "" && restoreParams.DirectoryList == "" {
 		return fmt.Errorf("must specify directory-list list")
+	}
+
+	if restoreParams.WarmUp < 0 {
+		return fmt.Errorf("warm-up must be non-negative")
 	}
 
 	return nil

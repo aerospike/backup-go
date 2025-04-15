@@ -90,3 +90,8 @@ func (w *writeWorker[T]) Run(ctx context.Context) (err error) {
 		}
 	}
 }
+
+// GetMetrics returns stats of received and sent messages.
+func (w *writeWorker[T]) GetMetrics() (in, out int) {
+	return len(w.receive), 0
+}

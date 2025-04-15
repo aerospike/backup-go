@@ -18,6 +18,7 @@ import (
 	"io"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -27,26 +28,29 @@ type EncoderType int
 const (
 	// EncoderTypeASB matches ASB Encoder with id 0.
 	EncoderTypeASB EncoderType = iota
+	EncoderTypeASBX
 )
 
 // Encoder is an interface for encoding the types from the models package.
 // It is used to support different data formats.
 //
 //go:generate mockery --name Encoder
-type Encoder interface {
-	EncodeToken(*models.Token) ([]byte, error)
-	GetHeader() []byte
+type Encoder[T models.TokenConstraint] interface {
+	EncodeToken(T) ([]byte, error)
+	GetHeader(uint64) []byte
 	GenerateFilename(prefix, suffix string) string
 }
 
 // NewEncoder returns a new Encoder according to `EncoderType`.
-func NewEncoder(eType EncoderType, namespace string, compact bool) Encoder {
+func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, compact bool) Encoder[T] {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewEncoder(namespace, compact)
+		return asb.NewEncoder[T](namespace, compact)
+	case EncoderTypeASBX:
+		return asbx.NewEncoder[T](namespace)
 	default:
-		return asb.NewEncoder(namespace, compact)
+		return asb.NewEncoder[T](namespace, compact)
 	}
 }
 
@@ -57,17 +61,19 @@ func NewEncoder(eType EncoderType, namespace string, compact bool) Encoder {
 // e.g. *models.Record, *models.UDF and *models.SecondaryIndex
 //
 //go:generate mockery --name Decoder
-type Decoder interface {
-	NextToken() (*models.Token, error)
+type Decoder[T models.TokenConstraint] interface {
+	NextToken() (T, error)
 }
 
 // NewDecoder returns a new Decoder according to `EncoderType`.
-func NewDecoder(eType EncoderType, src io.Reader) (Decoder, error) {
+func NewDecoder[T models.TokenConstraint](eType EncoderType, fileNumber uint64, src io.Reader) (Decoder[T], error) {
 	switch eType {
 	// As at the moment only one `ASB` Decoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewDecoder(src)
+		return asb.NewDecoder[T](src)
+	case EncoderTypeASBX:
+		return asbx.NewDecoder[T](fileNumber, src)
 	default:
-		return asb.NewDecoder(src)
+		return asb.NewDecoder[T](src)
 	}
 }

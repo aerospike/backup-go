@@ -21,6 +21,61 @@ func (_m *MockWorker[T]) EXPECT() *MockWorker_Expecter[T] {
 	return &MockWorker_Expecter[T]{mock: &_m.Mock}
 }
 
+// GetMetrics provides a mock function with given fields:
+func (_m *MockWorker[T]) GetMetrics() (int, int) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMetrics")
+	}
+
+	var r0 int
+	var r1 int
+	if rf, ok := ret.Get(0).(func() (int, int)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func() int); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	return r0, r1
+}
+
+// MockWorker_GetMetrics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMetrics'
+type MockWorker_GetMetrics_Call[T interface{}] struct {
+	*mock.Call
+}
+
+// GetMetrics is a helper method to define mock.On call
+func (_e *MockWorker_Expecter[T]) GetMetrics() *MockWorker_GetMetrics_Call[T] {
+	return &MockWorker_GetMetrics_Call[T]{Call: _e.mock.On("GetMetrics")}
+}
+
+func (_c *MockWorker_GetMetrics_Call[T]) Run(run func()) *MockWorker_GetMetrics_Call[T] {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockWorker_GetMetrics_Call[T]) Return(_a0 int, _a1 int) *MockWorker_GetMetrics_Call[T] {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockWorker_GetMetrics_Call[T]) RunAndReturn(run func() (int, int)) *MockWorker_GetMetrics_Call[T] {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Run provides a mock function with given fields: _a0
 func (_m *MockWorker[T]) Run(_a0 context.Context) error {
 	ret := _m.Called(_a0)

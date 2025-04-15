@@ -15,43 +15,47 @@
 package backup
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipeline"
 )
 
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
-type tokenReader struct {
-	readersCh     <-chan io.ReadCloser
-	decoder       Decoder
+type tokenReader[T models.TokenConstraint] struct {
+	readersCh     <-chan models.File
+	decoder       Decoder[T]
 	logger        *slog.Logger
-	newDecoderFn  func(io.ReadCloser) Decoder
+	newDecoderFn  func(uint64, io.ReadCloser) Decoder[T]
 	currentReader io.Closer
 }
 
 // newTokenReader creates a new tokenReader.
-func newTokenReader(
-	readersCh <-chan io.ReadCloser,
+func newTokenReader[T models.TokenConstraint](
+	readersCh <-chan models.File,
 	logger *slog.Logger,
-	newDecoderFn func(io.ReadCloser) Decoder,
-) *tokenReader {
-	return &tokenReader{
+	newDecoderFn func(uint64, io.ReadCloser) Decoder[T],
+) *tokenReader[T] {
+	return &tokenReader[T]{
 		readersCh:    readersCh,
 		newDecoderFn: newDecoderFn,
 		logger:       logger,
 	}
 }
 
-func (tr *tokenReader) Read() (*models.Token, error) {
+func (tr *tokenReader[T]) Read() (T, error) {
 	for {
 		if tr.decoder != nil {
 			token, err := tr.decoder.NextToken()
-			switch err {
-			case nil:
+
+			switch {
+			case err == nil:
 				return token, nil
-			case io.EOF:
+			case errors.Is(err, io.EOF):
 				// Current decoder has finished, close the current reader
 				if tr.currentReader != nil {
 					_ = tr.currentReader.Close()
@@ -66,21 +70,47 @@ func (tr *tokenReader) Read() (*models.Token, error) {
 
 		if tr.decoder == nil {
 			// We need a new decoder
-			reader, ok := <-tr.readersCh
+			file, ok := <-tr.readersCh
 			if !ok {
 				// Channel is closed, return EOF
 				return nil, io.EOF
 			}
 
+			var (
+				num uint64
+				err error
+			)
+			// Validate only .asbx files.
+			num, err = util.GetFileNumber(file.Name)
+			if err != nil {
+				return nil, err
+			}
+
 			// Assign the new reader
-			tr.currentReader = reader
-			tr.decoder = tr.newDecoderFn(reader)
+			tr.currentReader = file.Reader
+
+			tr.decoder = tr.newDecoderFn(num, file.Reader)
 		}
 	}
 }
 
 // Close satisfies the DataReader interface
 // but is a no-op for the tokenReader.
-func (tr *tokenReader) Close() {
+func (tr *tokenReader[T]) Close() {
 	tr.logger.Debug("closed token reader")
+}
+
+func newTokenWorker[T models.TokenConstraint](processor pipeline.DataProcessor[T], parallel int) []pipeline.Worker[T] {
+	if parallel > 0 {
+		workers := make([]pipeline.Worker[T], 0, parallel)
+		for i := 0; i < parallel; i++ {
+			workers = append(workers, pipeline.NewProcessorWorker[T](processor))
+		}
+
+		return workers
+	}
+
+	return []pipeline.Worker[T]{
+		pipeline.NewProcessorWorker[T](processor),
+	}
 }

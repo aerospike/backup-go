@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -32,21 +33,21 @@ type State struct {
 	// Global backup context.
 	ctx context.Context
 
-	// Counter to count how many times State instance was initialized.
-	// Is used to create suffix for backup files.
+	// Counter tracks the number of times the State instance has been initialized.
+	// This is used to generate a unique suffix for backup files.
 	Counter int
-	// RecordsStateChan communication channel to save current filter state.
+	// RecordsStateChan is a channel for communicating serialized partition filter
+	// states.
 	RecordsStateChan chan models.PartitionFilterSerialized
-	// RecordStates store states of all filters.
+	// RecordStates stores the current states of all partition filters.
 	RecordStates map[int]models.PartitionFilterSerialized
 
 	RecordStatesSaved map[int]models.PartitionFilterSerialized
 	// SaveCommandChan command to save current state for worker.
 	SaveCommandChan chan int
-	// Mutex for RecordStates operations.
-	// Ordinary mutex is used, because we must not allow any writings when we read state.
+	// Mutex for synchronizing operations on record states.
 	mu sync.Mutex
-	// File to save state to.
+	// FileName specifies the file path where the backup state is persisted.
 	FileName string
 
 	// writer is used to create a state file.
@@ -55,16 +56,18 @@ type State struct {
 	logger *slog.Logger
 }
 
-// NewState returns new state instance depending on config.
-// If we continue back up, the state will be loaded from a state file,
-// if it is the first operation, new state instance will be returned.
+// NewState creates and returns a State instance. If continuing a previous
+// backup, the state is loaded from the specified state file. Otherwise, a
+// new State instance is created.
 func NewState(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	reader StreamingReader,
 	writer Writer,
 	logger *slog.Logger,
 ) (*State, error) {
+	logger.Debug("Initializing state", slog.String("path", config.StateFile))
+
 	switch {
 	case config.isStateFirstRun():
 		logger.Debug("initializing new state")
@@ -77,10 +80,10 @@ func NewState(
 	return nil, nil
 }
 
-// newState creates status service from parameters, for backup operations.
+// newState creates a new State instance for backup operations.
 func newState(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	writer Writer,
 	logger *slog.Logger,
 ) *State {
@@ -91,10 +94,11 @@ func newState(
 		RecordStates:      make(map[int]models.PartitionFilterSerialized),
 		RecordStatesSaved: make(map[int]models.PartitionFilterSerialized),
 		SaveCommandChan:   make(chan int),
-		FileName:          config.StateFile,
+		FileName:          filepath.Base(config.StateFile),
 		writer:            writer,
 		logger:            logger,
 	}
+
 	// Run watcher on initialization.
 	go s.serve()
 	go s.serveRecords()
@@ -102,10 +106,11 @@ func newState(
 	return s
 }
 
-// newStateFromFile creates a status service from the file, to continue operations.
+// newStateFromFile creates a new State instance, initializing it with data
+// loaded from the specified file. This allows for resuming a previous backup operation.
 func newStateFromFile(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	reader StreamingReader,
 	writer Writer,
 	logger *slog.Logger,
@@ -169,9 +174,7 @@ func (s *State) dump(n int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if n > -1 {
-		s.RecordStatesSaved[n] = s.RecordStates[n]
-	}
+	s.RecordStatesSaved[n] = s.RecordStates[n]
 
 	if err = enc.Encode(s); err != nil {
 		return fmt.Errorf("failed to encode state data: %w", err)
@@ -181,13 +184,14 @@ func (s *State) dump(n int) error {
 		return fmt.Errorf("failed to close state file: %w", err)
 	}
 
-	s.logger.Debug("state file dumped", slog.Time("saved at", time.Now()))
+	s.logger.Debug("state file dumped", slog.String("path", s.FileName), slog.Time("saved at", time.Now()))
 
 	return nil
 }
 
 func (s *State) initState(pf []*a.PartitionFilter) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	for i := range pf {
 		pfs, err := models.NewPartitionFilterSerialized(pf[i])
@@ -198,10 +202,8 @@ func (s *State) initState(pf []*a.PartitionFilter) error {
 		s.RecordStates[i] = pfs
 		s.RecordStatesSaved[i] = pfs
 	}
-	// Do not move this Unlock() to defer!
-	s.mu.Unlock()
 
-	return s.dump(-1)
+	return nil
 }
 
 func (s *State) loadPartitionFilters() ([]*a.PartitionFilter, error) {
@@ -248,7 +250,7 @@ func (s *State) getFileSuffix() string {
 }
 
 func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.ReadCloser, error) {
-	readCh := make(chan io.ReadCloser)
+	readCh := make(chan models.File)
 	errCh := make(chan error)
 
 	go reader.StreamFile(ctx, fileName, readCh, errCh)
@@ -259,6 +261,6 @@ func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.
 	case err := <-errCh:
 		return nil, err
 	case file := <-readCh:
-		return file, nil
+		return file.Reader, nil
 	}
 }

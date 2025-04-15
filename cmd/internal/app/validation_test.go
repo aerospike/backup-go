@@ -23,6 +23,8 @@ import (
 )
 
 func TestValidateStorages(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		awsS3      *models.AwsS3
@@ -122,10 +124,41 @@ func TestValidateStorages(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:       "Azure Blob with client credentials",
+			awsS3:      &models.AwsS3{},
+			gcpStorage: &models.GcpStorage{},
+			azureBlob: &models.AzureBlob{
+				TenantID:     "tenant-id",
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Only endpoints configured",
+			awsS3: &models.AwsS3{
+				Endpoint: "custom-endpoint",
+			},
+			gcpStorage: &models.GcpStorage{},
+			azureBlob:  &models.AzureBlob{},
+			wantErr:    false,
+		},
+		{
+			name: "Multiple providers with only endpoints",
+			awsS3: &models.AwsS3{
+				Endpoint: "aws-endpoint",
+			},
+			gcpStorage: &models.GcpStorage{
+				Endpoint: "gcp-endpoint",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateStorages(tt.awsS3, tt.gcpStorage, tt.azureBlob)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -137,6 +170,8 @@ func TestValidateStorages(t *testing.T) {
 }
 
 func TestValidateBackupParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		backupParams *models.Backup
@@ -274,10 +309,101 @@ func TestValidateBackupParams(t *testing.T) {
 			wantErr:      true,
 			expectedErr:  "saving states and calculating estimates is not possible in parallel node mode",
 		},
+		{
+			name: "Continue with valid state file",
+			backupParams: &models.Backup{
+				Continue:   "state.json",
+				OutputFile: "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "NodeList with parallel nodes",
+			backupParams: &models.Backup{
+				NodeList:      "node1,node2",
+				ParallelNodes: true,
+				OutputFile:    "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "FilterExpression with valid expression",
+			backupParams: &models.Backup{
+				FilterExpression: "age > 25",
+				OutputFile:       "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "Modified time filters",
+			backupParams: &models.Backup{
+				ModifiedAfter:  "2024-01-01",
+				ModifiedBefore: "2024-12-31",
+				OutputFile:     "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "NoTTLOnly flag",
+			backupParams: &models.Backup{
+				NoTTLOnly:  true,
+				OutputFile: "output.asb",
+			},
+			commonParams: &models.Common{},
+			wantErr:      false,
+		},
+		{
+			name: "Estimate with FilterExpression",
+			backupParams: &models.Backup{
+				Estimate:         true,
+				FilterExpression: "age > 25",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "estimate with any filter is not allowed",
+		},
+		{
+			name: "Estimate with ModifiedAfter",
+			backupParams: &models.Backup{
+				Estimate:      true,
+				ModifiedAfter: "2024-01-01",
+			},
+			commonParams: &models.Common{},
+			wantErr:      true,
+			expectedErr:  "estimate with any filter is not allowed",
+		},
+		{
+			name: "Both directory and output file configured",
+			backupParams: &models.Backup{
+				OutputFile: "output.asb",
+			},
+			commonParams: &models.Common{
+				Directory: "backup-dir",
+			},
+			wantErr:     true,
+			expectedErr: "only one of output-file and directory may be configured at the same time",
+		},
+		{
+			name: "Both node-list and rack-list configured",
+			backupParams: &models.Backup{
+				NodeList: "1,2",
+				RackList: "3,4",
+			},
+			commonParams: &models.Common{
+				Directory: "backup-dir",
+			},
+			wantErr:     true,
+			expectedErr: "specify either rack-list or node-list, but not both",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateBackupParams(tt.backupParams, tt.commonParams)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -290,6 +416,8 @@ func TestValidateBackupParams(t *testing.T) {
 }
 
 func TestValidatePartitionFilters(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name             string
 		partitionFilters []*aerospike.PartitionFilter
@@ -352,6 +480,7 @@ func TestValidatePartitionFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validatePartitionFilters(tt.partitionFilters)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -363,6 +492,8 @@ func TestValidatePartitionFilters(t *testing.T) {
 }
 
 func TestValidateCommonParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		commonParams *models.Common
@@ -374,6 +505,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  1000,
 				SocketTimeout: 500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     false,
 			expectedErr: "",
@@ -383,6 +515,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  -1,
 				SocketTimeout: 500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "total-timeout must be non-negative",
@@ -392,6 +525,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  1000,
 				SocketTimeout: -1,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "socket-timeout must be non-negative",
@@ -401,6 +535,7 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  -1000,
 				SocketTimeout: -500,
+				Namespace:     testNamespace,
 			},
 			wantErr:     true,
 			expectedErr: "total-timeout must be non-negative",
@@ -410,6 +545,27 @@ func TestValidateCommonParams(t *testing.T) {
 			commonParams: &models.Common{
 				TotalTimeout:  0,
 				SocketTimeout: 0,
+				Namespace:     testNamespace,
+			},
+			wantErr:     false,
+			expectedErr: "",
+		},
+		{
+			name: "Missing namespace",
+			commonParams: &models.Common{
+				TotalTimeout:  1000,
+				SocketTimeout: 500,
+				Namespace:     "",
+			},
+			wantErr:     true,
+			expectedErr: "namespace is required",
+		},
+		{
+			name: "Valid namespace with all timeouts",
+			commonParams: &models.Common{
+				TotalTimeout:  1000,
+				SocketTimeout: 500,
+				Namespace:     "test-ns",
 			},
 			wantErr:     false,
 			expectedErr: "",
@@ -418,6 +574,7 @@ func TestValidateCommonParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateCommonParams(tt.commonParams)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
@@ -430,6 +587,8 @@ func TestValidateCommonParams(t *testing.T) {
 }
 
 func TestValidateRestoreParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		restoreParams *models.Restore
@@ -442,6 +601,7 @@ func TestValidateRestoreParams(t *testing.T) {
 				InputFile:       "",
 				DirectoryList:   "",
 				ParentDirectory: "",
+				WarmUp:          10,
 			},
 			commonParams: &models.Common{
 				Directory: "some/directory",
@@ -508,15 +668,451 @@ func TestValidateRestoreParams(t *testing.T) {
 			},
 			expectedError: "",
 		},
+		{
+			name: "Error - warm up",
+			restoreParams: &models.Restore{
+				InputFile:       "",
+				DirectoryList:   "",
+				ParentDirectory: "",
+				WarmUp:          -10,
+			},
+			commonParams: &models.Common{
+				Directory: "some/directory",
+			},
+			expectedError: "warm-up must be non-negative",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateRestoreParams(tt.restoreParams, tt.commonParams)
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
 			} else {
 				assert.EqualError(t, err, tt.expectedError)
+			}
+		})
+	}
+}
+
+func Test_validateBackupXDRParams(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		params  *models.BackupXDR
+		wantErr string
+	}{
+		{
+			name: "valid params",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:      1000,
+				WriteTimeoutMilliseconds:     1000,
+				InfoPolingPeriodMilliseconds: 1000,
+				StartTimeoutMilliseconds:     1000,
+				ResultQueueSize:              100,
+				AckQueueSize:                 100,
+				MaxConnections:               10,
+				ParallelWrite:                5,
+				FileLimit:                    1000,
+			},
+			wantErr: "",
+		},
+		{
+			name: "negative read timeout",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds: -1,
+			},
+			wantErr: "backup xdr read timeout can't be negative",
+		},
+		{
+			name: "negative write timeout",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:  0,
+				WriteTimeoutMilliseconds: -1,
+			},
+			wantErr: "backup xdr write timeout can't be negative",
+		},
+		{
+			name: "negative info polling period",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: -1,
+			},
+			wantErr: "backup xdr info poling period can't be negative",
+		},
+		{
+			name: "negative start timeout",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     -1,
+			},
+			wantErr: "backup xdr start timeout can't be negative",
+		},
+		{
+			name: "negative result queue size",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              -1,
+			},
+			wantErr: "backup xdr result queue size can't be negative",
+		},
+		{
+			name: "negative ack queue size",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              0,
+				AckQueueSize:                 -1,
+			},
+			wantErr: "backup xdr ack queue size can't be negative",
+		},
+		{
+			name: "invalid max connections",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              0,
+				AckQueueSize:                 0,
+				MaxConnections:               0,
+			},
+			wantErr: "backup xdr max connections can't be less than 1",
+		},
+		{
+			name: "invalid file limit",
+			params: &models.BackupXDR{
+				ReadTimeoutMilliseconds:      0,
+				WriteTimeoutMilliseconds:     0,
+				InfoPolingPeriodMilliseconds: 0,
+				StartTimeoutMilliseconds:     0,
+				ResultQueueSize:              0,
+				AckQueueSize:                 0,
+				MaxConnections:               1,
+				ParallelWrite:                1,
+				FileLimit:                    0,
+			},
+			wantErr: "backup xdr file limit can't be less than 1",
+		},
+		{
+			name: "negative info retry interval",
+			params: &models.BackupXDR{
+				MaxConnections:                1,
+				ParallelWrite:                 1,
+				FileLimit:                     1,
+				InfoRetryIntervalMilliseconds: -1,
+			},
+			wantErr: "backup xdr info retry interval can't be negative",
+		},
+		{
+			name: "negative info retries multiplier",
+			params: &models.BackupXDR{
+				MaxConnections:        1,
+				ParallelWrite:         1,
+				FileLimit:             1,
+				InfoRetriesMultiplier: -1,
+			},
+			wantErr: "backup xdr info retries multiplier can't be negative",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateBackupXDRParams(tt.params)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateBackup(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		params  *ASBackupParams
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "Valid backup configuration with output file",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{
+					OutputFile: "backup.asb",
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid backup configuration with directory",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{},
+				CommonParams: &models.Common{
+					Directory: "backup-dir",
+					Namespace: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid backup configuration with estimate",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{
+					Estimate:        true,
+					EstimateSamples: 100,
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid backup configuration with BackupXDR",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					MaxConnections: 10,
+					FileLimit:      1000,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing output file and directory",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: true,
+			errMsg:  "output file or directory required",
+		},
+		{
+			name: "Invalid backup params - both output file and directory",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{
+					OutputFile: "backup.asb",
+				},
+				CommonParams: &models.Common{
+					Directory: "backup-dir",
+					Namespace: "test",
+				},
+			},
+			wantErr: true,
+			errMsg:  "only one of output-file and directory may be configured at the same time",
+		},
+		{
+			name: "Invalid common params - missing namespace",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{
+					OutputFile: "backup.asb",
+				},
+				CommonParams: &models.Common{},
+			},
+			wantErr: true,
+			errMsg:  "namespace is required",
+		},
+		{
+			name: "Invalid BackupXDR params",
+			params: &ASBackupParams{
+				BackupXDRParams: &models.BackupXDR{
+					MaxConnections: 0, // Invalid: must be >= 1
+				},
+			},
+			wantErr: true,
+			errMsg:  "backup xdr max connections can't be less than 1",
+		},
+		{
+			name: "Multiple cloud storage providers configured",
+			params: &ASBackupParams{
+				BackupParams: &models.Backup{
+					OutputFile: "backup.asb",
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+				AwsS3: &models.AwsS3{
+					Region: "us-west-2",
+				},
+				GcpStorage: &models.GcpStorage{
+					BucketName: "my-bucket",
+				},
+			},
+			wantErr: true,
+			errMsg:  "only one cloud provider can be configured",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateBackup(tt.params)
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Equal(t, tt.errMsg, err.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateRestore(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		params  *ASRestoreParams
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "Valid restore configuration with input file",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					InputFile: "backup.asb",
+					Mode:      models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid restore configuration with directory",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					Mode: models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Directory: "restore-dir",
+					Namespace: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid restore configuration with directory list",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					DirectoryList:   "dir1,dir2",
+					ParentDirectory: "parent",
+					Mode:            models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid restore mode",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					InputFile: "backup.asb",
+					Mode:      "invalid-mode",
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid restore mode: invalid-mode",
+		},
+		{
+			name: "Missing input source",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					Mode: models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+			},
+			wantErr: true,
+			errMsg:  "input file or directory required",
+		},
+		{
+			name: "Invalid restore params - both input file and directory",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					InputFile: "backup.asb",
+					Mode:      models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Directory: "restore-dir",
+					Namespace: "test",
+				},
+			},
+			wantErr: true,
+			errMsg:  "only one of directory and input-file may be configured at the same time",
+		},
+		{
+			name: "Invalid common params - missing namespace",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					InputFile: "backup.asb",
+					Mode:      models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{},
+			},
+			wantErr: true,
+			errMsg:  "namespace is required",
+		},
+		{
+			name: "Multiple cloud storage providers configured",
+			params: &ASRestoreParams{
+				RestoreParams: &models.Restore{
+					InputFile: "backup.asb",
+					Mode:      models.RestoreModeASB,
+				},
+				CommonParams: &models.Common{
+					Namespace: "test",
+				},
+				AwsS3: &models.AwsS3{
+					Region: "us-west-2",
+				},
+				AzureBlob: &models.AzureBlob{
+					ContainerName: "my-container",
+				},
+			},
+			wantErr: true,
+			errMsg:  "only one cloud provider can be configured",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateRestore(tt.params)
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Equal(t, tt.errMsg, err.Error())
+				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

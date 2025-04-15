@@ -24,6 +24,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/models"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -58,6 +59,7 @@ type AerospikeClient interface {
 	) (*a.Recordset, a.Error)
 	Close()
 	GetNodes() []*a.Node
+	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
 }
 
 // Client is the main entry point for the backup package.
@@ -105,6 +107,7 @@ type Client struct {
 type ClientOpt func(*Client)
 
 // WithID sets the ID for the [Client].
+// This ID is used for logging purposes.
 func WithID(id string) ClientOpt {
 	return func(c *Client) {
 		c.id = id
@@ -198,7 +201,7 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 //   - reader is used only for reading a state file for continuation operations.
 func (c *Client) Backup(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	writer Writer,
 	reader StreamingReader,
 ) (*BackupHandler, error) {
@@ -224,6 +227,40 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
+// BackupXDR starts an xdr backup operation that writes data to a provided writer.
+//   - ctx can be used to cancel the backup operation.
+//   - config is the configuration for the xdr backup operation.
+//   - writer creates new writers for the backup operation.
+func (c *Client) BackupXDR(
+	ctx context.Context,
+	config *ConfigBackupXDR,
+	writer Writer,
+) (*HandlerBackupXDR, error) {
+	if config == nil {
+		return nil, fmt.Errorf("xdr backup config required")
+	}
+
+	// copy the policies so we don't modify the original
+	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+
+	if err := config.validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
+	}
+
+	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
+
+	handler.run()
+
+	return handler, nil
+}
+
+// Restorer represents restore handler interface.
+type Restorer interface {
+	GetStats() *models.RestoreStats
+	Wait(ctx context.Context) error
+	GetMetrics() *models.Metrics
+}
+
 // Restore starts a restore operation that reads data from given readers.
 // The backup data may be in a single file or multiple files.
 //   - ctx can be used to cancel the restore operation.
@@ -231,9 +268,9 @@ func (c *Client) Backup(
 //   - streamingReader provides readers with access to backup data.
 func (c *Client) Restore(
 	ctx context.Context,
-	config *RestoreConfig,
+	config *ConfigRestore,
 	streamingReader StreamingReader,
-) (*RestoreHandler, error) {
+) (Restorer, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")
 	}
@@ -246,10 +283,24 @@ func (c *Client) Restore(
 		return nil, fmt.Errorf("failed to validate restore config: %w", err)
 	}
 
-	handler := newRestoreHandler(ctx, config, c.aerospikeClient, c.logger, streamingReader)
-	handler.startAsync()
+	switch config.EncoderType {
+	case EncoderTypeASB:
+		handler := newRestoreHandler[*models.Token](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler.run()
 
-	return handler, nil
+		return handler, nil
+	case EncoderTypeASBX:
+		if err := config.isValidForASBX(); err != nil {
+			return nil, fmt.Errorf("failed to validate restore config: %w", err)
+		}
+
+		handler := newRestoreHandler[*models.ASBXToken](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler.run()
+
+		return handler, nil
+	default:
+		return nil, fmt.Errorf("unknown encoder type: %d", config.EncoderType)
+	}
 }
 
 // AerospikeClient returns the underlying aerospike client.
@@ -263,7 +314,7 @@ func (c *Client) AerospikeClient() AerospikeClient {
 //   - estimateSamples is number of records to be scanned for calculations.
 func (c *Client) Estimate(
 	ctx context.Context,
-	config *BackupConfig,
+	config *ConfigBackup,
 	estimateSamples int64) (uint64, error) {
 	if config == nil {
 		return 0, fmt.Errorf("backup config required")

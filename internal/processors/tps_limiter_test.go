@@ -18,9 +18,12 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/aerospike/backup-go/models"
 )
 
 func TestTPSLimiter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		tps  int
@@ -33,12 +36,14 @@ func TestTPSLimiter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			limiter := NewTPSLimiter[int](context.Background(), tt.tps)
+			t.Parallel()
+			limiter := NewTPSLimiter[*models.Token](context.Background(), tt.tps)
 
 			start := time.Now()
 			for i := 0; i < tt.runs; i++ {
-				got, err := limiter.Process(i)
-				if got != i {
+				token := models.NewRecordToken(nil, 1, nil)
+				got, err := limiter.Process(token)
+				if got != token {
 					t.Fatalf("Process() = %v, want %v", got, i)
 				}
 				if err != nil {

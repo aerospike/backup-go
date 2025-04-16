@@ -400,69 +400,6 @@ func TestMapPartitionFilter_NoFilters(t *testing.T) {
 	assert.Equal(t, backup.NewPartitionFilterAll(), filters[0])
 }
 
-func TestParsePartitionFilterByRange_Valid(t *testing.T) {
-	t.Parallel()
-	filter := "100-200"
-	parsedFilter, err := parsePartitionFilterByRange(filter)
-	assert.NoError(t, err)
-	assert.NotNil(t, parsedFilter)
-}
-
-func TestParsePartitionFilterByRange_InvalidRange(t *testing.T) {
-	t.Parallel()
-	filter := "invalid-range"
-	parsedFilter, err := parsePartitionFilterByRange(filter)
-	assert.Error(t, err)
-	assert.Nil(t, parsedFilter)
-	assert.Contains(t, err.Error(), "invalid partition filter")
-}
-
-func TestParsePartitionFilterByID_Valid(t *testing.T) {
-	t.Parallel()
-	filter := "1234"
-	parsedFilter, err := parsePartitionFilterByID(filter)
-	assert.NoError(t, err)
-	assert.NotNil(t, parsedFilter)
-}
-
-func TestParsePartitionFilterByID_InvalidID(t *testing.T) {
-	t.Parallel()
-	filter := "invalid-id"
-	parsedFilter, err := parsePartitionFilterByID(filter)
-	assert.Error(t, err)
-	assert.Nil(t, parsedFilter)
-	assert.Contains(t, err.Error(), "invalid partition filter")
-}
-
-func TestParsePartitionFilterByDigest_Valid(t *testing.T) {
-	t.Parallel()
-	namespace := "test-namespace"
-	filter := "EjRWeJq83vEjRRI0VniavN7xI0U=" // Base64-encoded digest
-	parsedFilter, err := parsePartitionFilterByDigest(namespace, filter)
-	assert.NoError(t, err)
-	assert.NotNil(t, parsedFilter)
-}
-
-func TestParsePartitionFilterByDigest_InvalidDigest(t *testing.T) {
-	t.Parallel()
-	namespace := "test-namespace"
-	filter := "invalid-digest"
-	parsedFilter, err := parsePartitionFilterByDigest(namespace, filter)
-	assert.Error(t, err)
-	assert.Nil(t, parsedFilter)
-	assert.Contains(t, err.Error(), "failed to decode after-digest")
-}
-
-func TestParsePartitionFilter_InvalidFilter(t *testing.T) {
-	t.Parallel()
-	namespace := "test-namespace"
-	filter := "invalid-filter"
-	parsedFilter, err := parsePartitionFilter(namespace, filter)
-	assert.Error(t, err)
-	assert.Nil(t, parsedFilter)
-	assert.Contains(t, err.Error(), "failed to parse partition filter")
-}
-
 func TestMapRestoreConfig_PartialConfig(t *testing.T) {
 	t.Parallel()
 

@@ -16,8 +16,18 @@ package backup
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+)
+
+var (
+	//nolint:lll // The regexp is long.
+	expPartitionRange  = regexp.MustCompile(`^([0-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-5])\-([1-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-6])$`)
+	expPartitionID     = regexp.MustCompile(`^(409[0-6]|40[0-8]\d|[123]?\d{1,3}|0)$`)
+	expPartitionDigest = regexp.MustCompile(`^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`)
 )
 
 // NewPartitionFilterByRange returns a partition range with boundaries specified by the provided values.
@@ -169,4 +179,81 @@ func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) []
 	}
 
 	return result
+}
+
+// ParsePartitionFilterListString parses comma separated values to slice of partition filters.
+// Example: "0-1000,1000-1000,2222,EjRWeJq83vEjRRI0VniavN7xI0U="
+// Namespace can be empty, must be set only for partition by digest.
+func ParsePartitionFilterListString(namespace, filters string) ([]*a.PartitionFilter, error) {
+	if filters == "" {
+		return nil, fmt.Errorf("empty filters")
+	}
+
+	filterSlice := strings.Split(filters, ",")
+	partitionFilters := make([]*a.PartitionFilter, 0, len(filterSlice))
+
+	for i := range filterSlice {
+		partitionFilter, err := ParsePartitionFilterString(namespace, filterSlice[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse partition filter, filter: %s, err: %v", filterSlice[i], err)
+		}
+
+		partitionFilters = append(partitionFilters, partitionFilter)
+	}
+
+	return partitionFilters, nil
+}
+
+// ParsePartitionFilterString check inputs from string with regexp.
+// Parse values and returns *aerospike.PartitionFilter or error.
+// Namespace can be empty, must be set only for partition by digest.
+func ParsePartitionFilterString(namespace, filter string) (*a.PartitionFilter, error) {
+	// Range 0-4096
+	if expPartitionRange.MatchString(filter) {
+		return parsePartitionFilterByRange(filter)
+	}
+
+	// Id 1456
+	if expPartitionID.MatchString(filter) {
+		return parsePartitionFilterByID(filter)
+	}
+
+	// Digest (base64 string)
+	if expPartitionDigest.MatchString(filter) {
+		return parsePartitionFilterByDigest(namespace, filter)
+	}
+
+	return nil, fmt.Errorf("failed to parse partition filter: %s", filter)
+}
+
+func parsePartitionFilterByRange(filter string) (*a.PartitionFilter, error) {
+	bounds := strings.Split(filter, "-")
+	if len(bounds) != 2 {
+		return nil, fmt.Errorf("invalid partition filter: %s", filter)
+	}
+
+	begin, err := strconv.Atoi(bounds[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid partition filter %s begin value: %w", filter, err)
+	}
+
+	count, err := strconv.Atoi(bounds[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid partition filter %s count value: %w", filter, err)
+	}
+
+	return NewPartitionFilterByRange(begin, count), nil
+}
+
+func parsePartitionFilterByID(filter string) (*a.PartitionFilter, error) {
+	id, err := strconv.Atoi(filter)
+	if err != nil {
+		return nil, fmt.Errorf("invalid partition filter %s id value: %w", filter, err)
+	}
+
+	return NewPartitionFilterByID(id), nil
+}
+
+func parsePartitionFilterByDigest(namespace, filter string) (*a.PartitionFilter, error) {
+	return NewPartitionFilterByDigest(namespace, filter)
 }

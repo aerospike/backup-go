@@ -82,7 +82,7 @@ type BackupHandler struct {
 
 	recordHandler *backupRecordsHandler
 
-	metrics *metrics.RPSCollector
+	rpsCollector *metrics.RPSCollector
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -145,7 +145,7 @@ func newBackupHandler(
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  models.NewBackupStats(),
-		metrics:                metrics.NewRPSCollector(ctx, logger),
+		rpsCollector:           metrics.NewRPSCollector(ctx, logger),
 	}, nil
 }
 
@@ -213,7 +213,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 		bh.logger,
 		bh.scanLimiter,
 		bh.state,
-		bh.metrics,
+		bh.rpsCollector,
 	)
 	readerConfig := bh.recordHandler.recordReaderConfigForNode(nodes, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
@@ -281,7 +281,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		bh.logger,
 		bh.scanLimiter,
 		bh.state,
-		bh.metrics,
+		bh.rpsCollector,
 	)
 
 	bh.stats.TotalRecords, err = bh.recordHandler.countRecords(ctx, bh.infoClient)
@@ -568,7 +568,7 @@ func (bh *BackupHandler) backupUDFs(
 	return udfPipeline.Run(ctx)
 }
 
-// GetMetrics returns the metrics of the backup job.
+// GetMetrics returns the rpsCollector of the backup job.
 func (bh *BackupHandler) GetMetrics() *models.Metrics {
 	return bh.recordHandler.GetMetrics()
 }

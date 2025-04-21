@@ -61,8 +61,8 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
-	pl      *pipeline.Pipeline[T]
-	metrics *metrics.RPSCollector
+	pl           *pipeline.Pipeline[T]
+	rpsCollector *metrics.RPSCollector
 
 	id     string
 	errors chan error
@@ -95,14 +95,14 @@ func newRestoreHandler[T models.TokenConstraint](
 	)
 
 	stats := models.NewRestoreStats()
-	metrics := metrics.NewRPSCollector(ctx, logger)
+	rpsCollector := metrics.NewRPSCollector(ctx, logger)
 
 	writeProcessor := newRecordWriterProcessor[T](
 		aerospikeClient,
 		config,
 		stats,
 		makeBandwidthLimiter(config.Bandwidth),
-		metrics,
+		rpsCollector,
 		logger,
 	)
 
@@ -117,7 +117,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		logger:         logger,
 		limiter:        makeBandwidthLimiter(config.Bandwidth),
 		errors:         errorsCh,
-		metrics:        metrics,
+		rpsCollector:   rpsCollector,
 	}
 }
 
@@ -219,8 +219,8 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	}
 }
 
-// GetMetrics returns the metrics of the backup job.
+// GetMetrics returns the rpsCollector of the backup job.
 func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 	pr, pw := rh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, rh.metrics)
+	return models.NewMetrics(pr, pw, rh.rpsCollector)
 }

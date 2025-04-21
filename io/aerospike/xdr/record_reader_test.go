@@ -40,7 +40,7 @@ const (
 )
 
 func testTCPConfig() *TCPConfig {
-	cfg := NewDefaultTCPConfig()
+	cfg := newDefaultTCPConfig()
 	// Remap address, as 8080 is used by another test.
 	cfg.Address = testCurrentHost
 	return cfg

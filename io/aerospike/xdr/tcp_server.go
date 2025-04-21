@@ -81,8 +81,8 @@ func NewTCPConfig(
 	}
 }
 
-// NewDefaultTCPConfig returns default TCP Server config.
-func NewDefaultTCPConfig() *TCPConfig {
+// newDefaultTCPConfig returns default TCP Server config.
+func newDefaultTCPConfig() *TCPConfig {
 	return NewTCPConfig(
 		defaultAddress,
 		nil,
@@ -91,7 +91,7 @@ func NewDefaultTCPConfig() *TCPConfig {
 		defaultQueueSize,
 		defaultQueueSize,
 		defaultMaxConnections,
-		nil,
+		metrics.NewRPSCollector(context.Background(), slog.Default()),
 	)
 }
 

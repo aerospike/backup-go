@@ -16,9 +16,10 @@ package asb
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"math/rand"
+	mRand "math/rand"
 	"reflect"
 	"sort"
 	"strings"
@@ -1626,6 +1627,25 @@ func Test_writeUserKeyBytes(t *testing.T) {
 }
 
 // **** Benchmarks ****
+//
+// The benchmarks in this section are designed to measure the performance of various
+// encoding operations, with a particular focus on the optimized base64Encode function.
+//
+// The base64Encode function was optimized to reduce allocations by using a sync.Pool
+// to reuse byte slices. This optimization is expected to significantly reduce the
+// number of allocations made by the function, especially when it's called frequently.
+//
+// To run all benchmarks:
+//
+//	go test -bench=. -benchmem ./io/encoding/asb/
+//
+// To compare benchmark results before and after optimization, save the results to files:
+//
+//	go test -bench=. -benchmem ./io/encoding/asb/ > before.txt
+//	# make changes
+//	go test -bench=. -benchmem ./io/encoding/asb/ > after.txt
+//	# compare results
+//	benchstat before.txt after.txt
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
@@ -1656,11 +1676,64 @@ func BenchmarkEncodeRecord(b *testing.B) {
 	}
 }
 
+// base64EncodeUnoptimized is the original implementation of base64Encode
+// before optimization. It's used for benchmarking comparison.
+func base64EncodeUnoptimized(v []byte) []byte {
+	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(v)))
+	base64.StdEncoding.Encode(encoded, v)
+	return encoded
+}
+
+func BenchmarkBase64EncodeComparison(b *testing.B) {
+	benchmarkSizes := []int{64, 256, 1024, 4096, 16384}
+
+	for _, size := range benchmarkSizes {
+		// Test the optimized version
+		b.Run(fmt.Sprintf("optimized-size-%d", size), func(b *testing.B) {
+			data := make([]byte, size)
+			_, err := rand.Read(data)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				encoded := base64Encode(data)
+				if len(encoded) == 0 {
+					b.Fatal("encoded data is empty")
+				}
+				returnBase64Buffer(encoded)
+			}
+		})
+
+		// Test the unoptimized version
+		b.Run(fmt.Sprintf("unoptimized-size-%d", size), func(b *testing.B) {
+			data := make([]byte, size)
+			_, err := rand.Read(data)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				encoded := base64EncodeUnoptimized(data)
+				if len(encoded) == 0 {
+					b.Fatal("encoded data is empty")
+				}
+			}
+		})
+	}
+}
+
 func genKey() *a.Key {
 	var key *a.Key
 	var err error
 
-	i := rand.Intn(3)
+	i := mRand.Intn(3)
 
 	userKeys := []any{1, "string", []byte("bytes")}
 	userKey := userKeys[i%len(userKeys)]

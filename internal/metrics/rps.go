@@ -59,12 +59,14 @@ func NewRPSCollector(ctx context.Context, logger *slog.Logger) *RPSCollector {
 func (mc *RPSCollector) report() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case t := <-ticker.C:
 			count := mc.requestCount.Swap(0)
 			elapsed := t.Sub(mc.lastTime).Seconds()
 			rps := float64(count) / elapsed
+
 			mc.resultMu.Lock()
 			mc.lastResult = rps
 			mc.resultMu.Unlock()

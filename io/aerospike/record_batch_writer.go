@@ -119,10 +119,10 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		aerr    a.Error
 	)
 
-	// rw.logger.Debug("Starting batch operation",
-	// 	slog.Int("bufferSize", len(rw.operationBuffer)),
-	// 	slog.Any("retryPolicy", rw.retryPolicy),
-	// )
+	rw.logger.Debug("Starting batch operation",
+		slog.Int("bufferSize", len(rw.operationBuffer)),
+		slog.Any("retryPolicy", rw.retryPolicy),
+	)
 
 	var opErr error
 

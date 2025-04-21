@@ -267,10 +267,12 @@ func writeBinString(name, v string, w io.Writer) (int, error) {
 }
 
 func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error) {
-	var prefix []byte
-	var encoded []byte
-	var result int
-	var err error
+	var (
+		prefix  []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
@@ -287,10 +289,12 @@ func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error
 }
 
 func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, error) {
-	var prefix []byte
-	var encoded []byte
-	var result int
-	var err error
+	var (
+		prefix  []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
@@ -326,11 +330,13 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 }
 
 func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
-	var prefix []byte
-	var v []byte
-	var encoded []byte
-	var result int
-	var err error
+	var (
+		prefix  []byte
+		v       []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
@@ -348,11 +354,13 @@ func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer)
 }
 
 func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
-	var prefix []byte
-	var v []byte
-	var encoded []byte
-	var result int
-	var err error
+	var (
+		prefix  []byte
+		v       []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
@@ -458,6 +466,7 @@ func base64Encode(v []byte) []byte {
 // This must be called after the buffer returned by base64Encode is no longer needed.
 func returnBase64Buffer(buf []byte) {
 	// Reset length but keep capacity
+	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
 	base64EncodedBufferPool.Put(buf[:0])
 }
 
@@ -491,6 +500,7 @@ func writeRecordDigest(digest []byte, w io.Writer) (int, error) {
 	encoded := base64Encode(digest)
 	n, err := writeBytes(w, digestPrefix, encoded)
 	returnBase64Buffer(encoded)
+
 	return n, err
 }
 
@@ -537,13 +547,17 @@ func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
 }
 
 func writeUserKeyString(v string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeString, len(v), v)
+	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeString,
+		len(v), v)
 }
 
 func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
 	encoded := base64Encode(v)
-	n, err := fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeBytes, len(encoded), encoded)
+	n, err := fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeBytes,
+		len(encoded), encoded)
+
 	returnBase64Buffer(encoded)
+
 	return n, err
 }
 

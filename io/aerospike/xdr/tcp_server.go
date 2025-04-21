@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -53,6 +54,8 @@ type TCPConfig struct {
 	AckQueueSize int
 	// Max number of allowed simultaneous connection to server.
 	MaxConnections int
+
+	metrics *metrics.RPSCollector
 }
 
 // NewTCPConfig returns new TCP config.
@@ -64,6 +67,7 @@ func NewTCPConfig(
 	resultQueueSize int,
 	ackQueueSize int,
 	maxConnections int,
+	metrics *metrics.RPSCollector,
 ) *TCPConfig {
 	return &TCPConfig{
 		Address:         address,
@@ -73,6 +77,7 @@ func NewTCPConfig(
 		ResultQueueSize: resultQueueSize,
 		AckQueueSize:    ackQueueSize,
 		MaxConnections:  maxConnections,
+		metrics:         metrics,
 	}
 }
 
@@ -86,6 +91,7 @@ func NewDefaultTCPConfig() *TCPConfig {
 		defaultQueueSize,
 		defaultQueueSize,
 		defaultMaxConnections,
+		nil,
 	)
 }
 
@@ -204,8 +210,6 @@ func (s *TCPServer) reportMetrics(ctx context.Context) {
 // acceptConnections accepts new connections to the TCPServer.
 // It will reject new connections if the number of active connections is greater than MaxConnections.
 func (s *TCPServer) acceptConnections(ctx context.Context) {
-	metrics := mewMetricsCollector(ctx, s.logger)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -233,7 +237,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 						s.config.ReadTimeout,
 						s.config.WriteTimeout,
 						s.logger,
-						metrics,
+						s.config.metrics,
 					)
 					// Handlers wait when all goroutines are finished.
 					handler.Start(ctx)
@@ -279,7 +283,7 @@ type ConnectionHandler struct {
 	timeNow       int64
 
 	logger  *slog.Logger
-	metrics *metricsCollector
+	metrics *metrics.RPSCollector
 }
 
 // NewConnectionHandler returns a new connection handler.
@@ -291,7 +295,7 @@ func NewConnectionHandler(
 	readTimeout time.Duration,
 	writeTimeout time.Duration,
 	logger *slog.Logger,
-	metrics *metricsCollector,
+	metrics *metrics.RPSCollector,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,
@@ -398,7 +402,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 				return
 			}
 
-			h.metrics.increment()
+			h.metrics.Increment()
 
 			// Process message asynchronously
 			h.bodyQueue <- message

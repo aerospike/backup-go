@@ -25,6 +25,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/aerospike"
@@ -80,6 +81,8 @@ type BackupHandler struct {
 	wg sync.WaitGroup
 
 	recordHandler *backupRecordsHandler
+
+	metrics *metrics.RPSCollector
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -142,6 +145,7 @@ func newBackupHandler(
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  models.NewBackupStats(),
+		metrics:                metrics.NewRPSCollector(ctx, logger),
 	}, nil
 }
 
@@ -209,6 +213,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 		bh.logger,
 		bh.scanLimiter,
 		bh.state,
+		bh.metrics,
 	)
 	readerConfig := bh.recordHandler.recordReaderConfigForNode(nodes, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
@@ -276,6 +281,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		bh.logger,
 		bh.scanLimiter,
 		bh.state,
+		bh.metrics,
 	)
 
 	bh.stats.TotalRecords, err = bh.recordHandler.countRecords(ctx, bh.infoClient)

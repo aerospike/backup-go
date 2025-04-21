@@ -25,6 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
@@ -45,6 +46,7 @@ type backupRecordsHandler struct {
 	scanLimiter     *semaphore.Weighted
 	state           *State
 	pl              *pipeline.Pipeline[*models.Token]
+	metrics         *metrics.RPSCollector
 }
 
 func newBackupRecordsHandler(
@@ -54,6 +56,7 @@ func newBackupRecordsHandler(
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
 	state *State,
+	metrics *metrics.RPSCollector,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
@@ -64,6 +67,7 @@ func newBackupRecordsHandler(
 		logger:          logger,
 		scanLimiter:     scanLimiter,
 		state:           state,
+		metrics:         metrics,
 	}
 
 	return h
@@ -351,6 +355,7 @@ func (bh *backupRecordsHandler) recordReaderConfigForPartitions(
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
 		bh.config.PageSize,
+		bh.metrics,
 	)
 }
 
@@ -372,10 +377,12 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 		bh.scanLimiter,
 		bh.config.NoTTLOnly,
 		bh.config.PageSize,
+		bh.metrics,
 	)
 }
 
 // GetMetrics returns the metrics of the backup job.
 func (bh *backupRecordsHandler) GetMetrics() *models.Metrics {
-	return models.NewMetrics(bh.pl.GetMetrics())
+	pr, pw := bh.pl.GetMetrics()
+	return models.NewMetrics(pr, pw, bh.metrics)
 }

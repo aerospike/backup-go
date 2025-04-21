@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -32,6 +33,7 @@ type batchRecordWriter struct {
 	logger            *slog.Logger
 	retryPolicy       *models.RetryPolicy
 	operationBuffer   []a.BatchRecordIfc
+	metrics           *metrics.RPSCollector
 	batchSize         int
 	ignoreRecordError bool
 }
@@ -41,6 +43,7 @@ func newBatchRecordWriter(
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
 	retryPolicy *models.RetryPolicy,
+	metrics *metrics.RPSCollector,
 	batchSize int,
 	ignoreRecordError bool,
 	logger *slog.Logger,
@@ -49,6 +52,7 @@ func newBatchRecordWriter(
 		asc:               asc,
 		writePolicy:       writePolicy,
 		batchPolicy:       mapWriteToBatchPolicy(writePolicy),
+		metrics:           metrics,
 		stats:             stats,
 		logger:            logger,
 		retryPolicy:       retryPolicy,
@@ -60,6 +64,8 @@ func newBatchRecordWriter(
 func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
 	writeOp := rw.batchWrite(record)
 	rw.operationBuffer = append(rw.operationBuffer, writeOp)
+
+	rw.metrics.Increment()
 
 	if len(rw.operationBuffer) >= rw.batchSize {
 		return rw.flushBuffer()
@@ -113,10 +119,10 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		aerr    a.Error
 	)
 
-	rw.logger.Debug("Starting batch operation",
-		slog.Int("bufferSize", len(rw.operationBuffer)),
-		slog.Any("retryPolicy", rw.retryPolicy),
-	)
+	// rw.logger.Debug("Starting batch operation",
+	// 	slog.Int("bufferSize", len(rw.operationBuffer)),
+	// 	slog.Any("retryPolicy", rw.retryPolicy),
+	// )
 
 	var opErr error
 

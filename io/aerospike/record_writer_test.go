@@ -15,12 +15,14 @@
 package aerospike
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
@@ -53,7 +55,8 @@ func TestRestoreWriterRecord(t *testing.T) {
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	stats := models.NewRestoreStats()
-	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
+	rpsMetric := metrics.NewRPSCollector(context.Background(), slog.Default())
+	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, rpsMetric, false)
 	require.NotNil(t, writer)
 
 	err := writer.writeRecord(&expRecord)
@@ -72,7 +75,8 @@ func TestRestoreWriterRecordFail(t *testing.T) {
 	mockDBWriter := mocks.NewMockdbWriter(t)
 	policy := &a.WritePolicy{}
 	stats := models.NewRestoreStats()
-	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
+	rpsMetric := metrics.NewRPSCollector(context.Background(), slog.Default())
+	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, rpsMetric, false)
 	rec := models.Record{
 		Record: &a.Record{
 			Key: key,
@@ -117,7 +121,8 @@ func TestRestoreWriterWithPolicy(t *testing.T) {
 	mockDBWriter.EXPECT().Put(policy, expRecord.Key, expRecord.Bins).Return(nil)
 
 	stats := models.NewRestoreStats()
-	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, false)
+	rpsMetric := metrics.NewRPSCollector(context.Background(), slog.Default())
+	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, nil, rpsMetric, false)
 	require.NotNil(t, writer)
 
 	err := writer.writeRecord(&expRecord)
@@ -140,7 +145,8 @@ func TestSingleRecordWriterRetry(t *testing.T) {
 		Multiplier:  1,
 		MaxRetries:  2,
 	}
-	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, retryPolicy, false)
+	rpsMetric := metrics.NewRPSCollector(context.Background(), slog.Default())
+	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), false, 1, retryPolicy, rpsMetric, false)
 	rec := models.Record{
 		Record: &a.Record{
 			Key: key,
@@ -182,7 +188,8 @@ func TestBatchRecordWriterRetry(t *testing.T) {
 		Multiplier:  1,
 		MaxRetries:  2,
 	}
-	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), true, 1, retryPolicy, false)
+	rpsMetric := metrics.NewRPSCollector(context.Background(), slog.Default())
+	writer := newRecordWriter(mockDBWriter, policy, stats, slog.Default(), true, 1, retryPolicy, rpsMetric, false)
 	rec := models.Record{
 		Record: &a.Record{
 			Key: key,

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -266,31 +267,47 @@ func writeBinString(name, v string, w io.Writer) (int, error) {
 }
 
 func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error) {
-	var prefix []byte
+	var (
+		prefix  []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
 		prefix = binBytesTypeCompactPrefix
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 	case false:
 		prefix = binBytesTypePrefix
-		v = base64Encode(v)
+		encoded = base64Encode(v)
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+		returnBase64Buffer(encoded)
 	}
 
-	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return result, err
 }
 
 func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, error) {
-	var prefix []byte
+	var (
+		prefix  []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
 		prefix = binHLLTypeCompactPrefix
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 	case false:
 		prefix = binHLLTypePrefix
-		v = base64Encode(v)
+		encoded = base64Encode(v)
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+		returnBase64Buffer(encoded)
 	}
 
-	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return result, err
 }
 
 func writeBinGeoJSON(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
@@ -313,33 +330,51 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 }
 
 func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
-	var prefix, v []byte
+	var (
+		prefix  []byte
+		v       []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
 		prefix = binMapTypeCompactPrefix
 		v = cdt.Data
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 	case false:
 		prefix = binMapTypePrefix
-		v = base64Encode(cdt.Data)
+		encoded = base64Encode(cdt.Data)
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+		returnBase64Buffer(encoded)
 	}
 
-	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return result, err
 }
 
 func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
-	var prefix, v []byte
+	var (
+		prefix  []byte
+		v       []byte
+		encoded []byte
+		result  int
+		err     error
+	)
 
 	switch compact {
 	case true:
 		prefix = binListTypeCompactPrefix
 		v = cdt.Data
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
 	case false:
 		prefix = binListTypePrefix
-		v = base64Encode(cdt.Data)
+		encoded = base64Encode(cdt.Data)
+		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+		returnBase64Buffer(encoded)
 	}
 
-	return writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+	return result, err
 }
 
 func blobBinToASB(val []byte, bytesType byte, name string) []byte {
@@ -393,11 +428,46 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 	return bytesWritten, nil
 }
 
-func base64Encode(v []byte) []byte {
-	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(v)))
-	base64.StdEncoding.Encode(encoded, v)
+// base64EncodedBufferPool is a pool of byte slices used for base64 encoding
+var base64EncodedBufferPool = sync.Pool{
+	New: func() interface{} {
+		// The buffer size is arbitrary and will be grown if needed
+		return make([]byte, 0, 1024)
+	},
+}
 
-	return encoded
+// base64Encode encodes the input bytes using base64 encoding.
+// It returns a slice that references a pooled buffer, which must be returned to the pool
+// after use by calling returnBase64Buffer.
+func base64Encode(v []byte) []byte {
+	encodedLen := base64.StdEncoding.EncodedLen(len(v))
+
+	// Get a buffer from the pool
+	bufInterface := base64EncodedBufferPool.Get()
+	buf := bufInterface.([]byte)
+
+	// Ensure the buffer is large enough
+	if cap(buf) < encodedLen {
+		// If the buffer is too small, create a new one with sufficient capacity
+		buf = make([]byte, encodedLen)
+	} else {
+		// Otherwise, resize the existing buffer
+		buf = buf[:encodedLen]
+	}
+
+	// Encode the data
+	base64.StdEncoding.Encode(buf, v)
+
+	// Return a slice that references the pooled buffer
+	return buf
+}
+
+// returnBase64Buffer returns the buffer to the pool.
+// This must be called after the buffer returned by base64Encode is no longer needed.
+func returnBase64Buffer(buf []byte) {
+	// Reset length but keep capacity
+	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
+	base64EncodedBufferPool.Put(buf[:0])
 }
 
 func writeBytes(w io.Writer, data ...[]byte) (int, error) {
@@ -428,7 +498,10 @@ func writeRecordNamespace(namespace string, w io.Writer) (int, error) {
 
 func writeRecordDigest(digest []byte, w io.Writer) (int, error) {
 	encoded := base64Encode(digest)
-	return writeBytes(w, digestPrefix, encoded)
+	n, err := writeBytes(w, digestPrefix, encoded)
+	returnBase64Buffer(encoded)
+
+	return n, err
 }
 
 func writeRecordSet(setName string, w io.Writer) (int, error) {
@@ -474,12 +547,18 @@ func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
 }
 
 func writeUserKeyString(v string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeString, len(v), v)
+	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeString,
+		len(v), v)
 }
 
 func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
 	encoded := base64Encode(v)
-	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeBytes, len(encoded), encoded)
+	n, err := fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeBytes,
+		len(encoded), encoded)
+
+	returnBase64Buffer(encoded)
+
+	return n, err
 }
 
 // **** SINDEX ****

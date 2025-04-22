@@ -40,7 +40,7 @@ func TestTCPServer(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	cfg := NewDefaultTCPConfig()
+	cfg := newDefaultTCPConfig()
 
 	srv := NewTCPServer(
 		cfg,
@@ -119,7 +119,7 @@ func TestTCPServer_DoubleStart(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	cfg := NewDefaultTCPConfig()
+	cfg := newDefaultTCPConfig()
 	cfg.Address = ":8087"
 
 	srv := NewTCPServer(
@@ -141,7 +141,7 @@ func TestTCPServer_DoubleStop(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	cfg := NewDefaultTCPConfig()
+	cfg := newDefaultTCPConfig()
 	cfg.Address = ":8086"
 
 	srv := NewTCPServer(

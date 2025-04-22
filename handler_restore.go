@@ -20,6 +20,7 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -60,7 +61,8 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
-	pl *pipeline.Pipeline[T]
+	pl           *pipeline.Pipeline[T]
+	rpsCollector *metrics.RPSCollector
 
 	id     string
 	errors chan error
@@ -93,12 +95,14 @@ func newRestoreHandler[T models.TokenConstraint](
 	)
 
 	stats := models.NewRestoreStats()
+	rpsCollector := metrics.NewRPSCollector(ctx, logger)
 
 	writeProcessor := newRecordWriterProcessor[T](
 		aerospikeClient,
 		config,
 		stats,
 		makeBandwidthLimiter(config.Bandwidth),
+		rpsCollector,
 		logger,
 	)
 
@@ -113,6 +117,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		logger:         logger,
 		limiter:        makeBandwidthLimiter(config.Bandwidth),
 		errors:         errorsCh,
+		rpsCollector:   rpsCollector,
 	}
 }
 
@@ -214,7 +219,8 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	}
 }
 
-// GetMetrics returns the metrics of the backup job.
+// GetMetrics returns the rpsCollector of the backup job.
 func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
-	return models.NewMetrics(rh.pl.GetMetrics())
+	pr, pw := rh.pl.GetMetrics()
+	return models.NewMetrics(pr, pw, rh.rpsCollector)
 }

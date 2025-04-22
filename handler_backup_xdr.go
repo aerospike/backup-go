@@ -22,6 +22,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -49,6 +50,8 @@ type HandlerBackupXDR struct {
 	wg sync.WaitGroup
 
 	pl *pipeline.Pipeline[*models.ASBXToken]
+
+	rpsCollector *metrics.RPSCollector
 }
 
 // newHandlerBackupXDR returns a new xdr backup handler.
@@ -71,12 +74,15 @@ func newBackupXDRHandler(
 
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
 
+	rpsCollector := metrics.NewRPSCollector(ctx, logger)
+
 	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
 		config,
 		aerospikeClient,
 		infoClient,
 		nil,
 		nil,
+		rpsCollector,
 		logger,
 	)
 
@@ -109,6 +115,7 @@ func newBackupXDRHandler(
 		stats:           stats,
 		logger:          logger,
 		errors:          make(chan error, 1),
+		rpsCollector:    rpsCollector,
 	}
 }
 
@@ -218,7 +225,8 @@ func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 	return bh.stats
 }
 
-// GetMetrics returns the metrics of the backup job.
+// GetMetrics returns the rpsCollector of the backup job.
 func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
-	return models.NewMetrics(bh.pl.GetMetrics())
+	pr, pw := bh.pl.GetMetrics()
+	return models.NewMetrics(pr, pw, bh.rpsCollector)
 }

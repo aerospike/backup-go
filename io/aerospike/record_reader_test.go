@@ -24,6 +24,7 @@ import (
 	"unsafe"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
@@ -68,14 +69,17 @@ func TestAerospikeRecordReader(t *testing.T) {
 		nil,
 	)
 
+	ctx := context.Background()
+
 	reader := NewRecordReader(
-		context.Background(),
+		ctx,
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
 		},
 		slog.Default(),
 	)
@@ -125,14 +129,17 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 		nil,
 	)
 
+	ctx := context.Background()
+
 	reader := NewRecordReader(
-		context.Background(),
+		ctx,
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
 		},
 		slog.Default(),
 	)
@@ -166,15 +173,17 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 		mockRecordSet,
 		nil,
 	)
+	ctx := context.Background()
 
 	reader := NewRecordReader(
-		context.Background(),
+		ctx,
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
 		},
 		slog.Default(),
 	)
@@ -203,14 +212,17 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 		a.ErrInvalidParam,
 	)
 
+	ctx := context.Background()
+
 	reader := NewRecordReader(
-		context.Background(),
+		ctx,
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
 		},
 		slog.Default(),
 	)
@@ -268,14 +280,17 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 		nil,
 	)
 
+	ctx := context.Background()
+
 	reader := NewRecordReader(
-		context.Background(),
+		ctx,
 		mockScanner,
 		&RecordReaderConfig{
 			namespace:       namespace,
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      policy,
+			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
 		},
 		slog.Default(),
 	)

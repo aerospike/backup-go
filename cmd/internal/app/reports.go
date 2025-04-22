@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	headerBackupReport   = "Backup Report"
-	headerRestoreReport  = "Restore Report"
-	headerEstimateReport = "Estimate Report"
+	headerBackupReport   = "Backup report"
+	headerRestoreReport  = "Restore report"
+	headerEstimateReport = "Estimate report"
 )
 
 func printBackupReport(stats *bModels.BackupStats, isXdr bool) {

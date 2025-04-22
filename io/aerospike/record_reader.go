@@ -22,6 +22,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
@@ -43,6 +44,8 @@ type RecordReaderConfig struct {
 	// pageSize used for paginated scan for saving reading state.
 	// If pageSize = 0, we think that we use normal scan.
 	pageSize int64
+
+	metrics *metrics.RPSCollector
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -56,6 +59,7 @@ func NewRecordReaderConfig(namespace string,
 	scanLimiter *semaphore.Weighted,
 	noTTLOnly bool,
 	pageSize int64,
+	metrics *metrics.RPSCollector,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		namespace:       namespace,
@@ -68,6 +72,7 @@ func NewRecordReaderConfig(namespace string,
 		scanLimiter:     scanLimiter,
 		noTTLOnly:       noTTLOnly,
 		pageSize:        pageSize,
+		metrics:         metrics,
 	}
 }
 
@@ -160,6 +165,8 @@ func (r *RecordReader) read() (*models.Token, error) {
 	}
 
 	recToken := models.NewRecordToken(&rec, 0, nil)
+
+	r.config.metrics.Increment()
 
 	return recToken, nil
 }

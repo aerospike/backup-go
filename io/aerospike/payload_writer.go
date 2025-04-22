@@ -19,6 +19,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/xdr"
 	"github.com/aerospike/backup-go/models"
 )
@@ -28,6 +29,7 @@ type payloadWriter struct {
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
 	retryPolicy       *models.RetryPolicy
+	metrics           *metrics.RPSCollector
 	ignoreRecordError bool
 }
 
@@ -36,6 +38,8 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 		aerr    a.Error
 		attempt uint
 	)
+
+	p.metrics.Increment()
 
 	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, t.Payload)
 	t.Payload = xdr.SetRecordExistsActionBit(p.writePolicy.RecordExistsAction, t.Payload)

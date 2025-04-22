@@ -19,6 +19,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -27,6 +28,7 @@ type singleRecordWriter struct {
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
 	retryPolicy       *models.RetryPolicy
+	metrics           *metrics.RPSCollector
 	ignoreRecordError bool
 }
 
@@ -35,6 +37,7 @@ func newSingleRecordWriter(
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
 	retryPolicy *models.RetryPolicy,
+	metrics *metrics.RPSCollector,
 	ignoreRecordError bool,
 ) *singleRecordWriter {
 	return &singleRecordWriter{
@@ -42,6 +45,7 @@ func newSingleRecordWriter(
 		writePolicy:       writePolicy,
 		stats:             stats,
 		retryPolicy:       retryPolicy,
+		metrics:           metrics,
 		ignoreRecordError: ignoreRecordError,
 	}
 }
@@ -56,6 +60,8 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 	}
 
 	writePolicy.Expiration = record.Expiration
+
+	rw.metrics.Increment()
 
 	err := rw.executeWrite(&writePolicy, record)
 	if err != nil {

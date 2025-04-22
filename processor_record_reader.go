@@ -20,6 +20,7 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/xdr"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -34,6 +35,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 	infoClient      *asinfo.InfoClient
 	state           *State
 	scanLimiter     *semaphore.Weighted
+	metrics         *metrics.RPSCollector
 
 	logger *slog.Logger
 }
@@ -45,6 +47,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	infoClient *asinfo.InfoClient,
 	state *State,
 	scanLimiter *semaphore.Weighted,
+	metrics *metrics.RPSCollector,
 	logger *slog.Logger,
 ) *recordReaderProcessor[T] {
 	logger.Debug("created new records reader processor")
@@ -55,6 +58,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 		infoClient:      infoClient,
 		scanLimiter:     scanLimiter,
 		state:           state,
+		metrics:         metrics,
 		logger:          logger,
 	}
 }
@@ -72,6 +76,7 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 		rr.xdrConfig.ResultQueueSize,
 		rr.xdrConfig.AckQueueSize,
 		rr.xdrConfig.MaxConnections,
+		rr.metrics,
 	)
 
 	return xdr.NewRecordReaderConfig(

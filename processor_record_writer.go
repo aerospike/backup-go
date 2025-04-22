@@ -19,6 +19,7 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipeline"
@@ -30,6 +31,7 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 	config          *ConfigRestore
 	stats           *models.RestoreStats
 	limiter         *rate.Limiter
+	metrics         *metrics.RPSCollector
 
 	logger *slog.Logger
 }
@@ -39,6 +41,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	config *ConfigRestore,
 	stats *models.RestoreStats,
 	limiter *rate.Limiter,
+	metrics *metrics.RPSCollector,
 	logger *slog.Logger,
 ) *recordWriterProcessor[T] {
 	logger.Debug("created new records writer processor")
@@ -48,6 +51,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 		config:          config,
 		stats:           stats,
 		limiter:         limiter,
+		metrics:         metrics,
 		logger:          logger,
 	}
 }
@@ -78,6 +82,7 @@ func (rw *recordWriterProcessor[T]) newWriterWorkers() ([]pipeline.Worker[T], er
 			useBatchWrites,
 			rw.config.BatchSize,
 			rw.config.RetryPolicy,
+			rw.metrics,
 			rw.config.IgnoreRecordError,
 		)
 

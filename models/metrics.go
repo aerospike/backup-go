@@ -14,16 +14,20 @@
 
 package models
 
+import "github.com/aerospike/backup-go/internal/metrics"
+
 // Metrics contains app metrics.
 type Metrics struct {
 	PipelineReadQueueSize  int
 	PipelineWriteQueueSize int
+	RecordsPerSecond       float64
 }
 
 // NewMetrics returns a new Metrics with the provided values.
-func NewMetrics(pr, pw int) *Metrics {
+func NewMetrics(pr, pw int, rps *metrics.RPSCollector) *Metrics {
 	return &Metrics{
 		PipelineReadQueueSize:  pr,
 		PipelineWriteQueueSize: pw,
+		RecordsPerSecond:       rps.GetLastResult(),
 	}
 }

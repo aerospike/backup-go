@@ -28,7 +28,6 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
 	"github.com/aerospike/backup-go/models"
-	crystalhq64 "github.com/cristalhq/base64"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -1656,7 +1655,7 @@ func BenchmarkEncodeRecord(b *testing.B) {
 	}
 }
 
-func base64EncodeUnoptimized(v []byte) []byte {
+func base64EncodeNative(v []byte) []byte {
 	encodedLen := base64.StdEncoding.EncodedLen(len(v))
 
 	// Get a buffer from the pool
@@ -1674,28 +1673,6 @@ func base64EncodeUnoptimized(v []byte) []byte {
 
 	// Encode the data
 	base64.StdEncoding.Encode(buf, v)
-
-	// Return a slice that references the pooled buffer
-	return buf
-}
-
-func base64EncodeCrystalhq(v []byte) []byte {
-	encodedLen := crystalhq64.StdEncoding.EncodedLen(len(v))
-	// Get a buffer from the pool
-	bufInterface := base64EncodedBufferPool.Get()
-	buf := bufInterface.([]byte)
-
-	// Ensure the buffer is large enough
-	if cap(buf) < encodedLen {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, encodedLen)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:encodedLen]
-	}
-
-	// Encode the data
-	crystalhq64.StdEncoding.Encode(buf, v)
 
 	// Return a slice that references the pooled buffer
 	return buf
@@ -1726,7 +1703,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 		})
 
 		// Test the unoptimized version
-		b.Run(fmt.Sprintf("unoptimized-size-%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("native-size-%d", size), func(b *testing.B) {
 			data := make([]byte, size)
 			_, err := rand.Read(data)
 			if err != nil {
@@ -1737,27 +1714,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				encoded := base64EncodeUnoptimized(data)
-				if len(encoded) == 0 {
-					b.Fatal("encoded data is empty")
-				}
-				returnBase64Buffer(encoded)
-			}
-		})
-
-		// Test the unoptimized version
-		b.Run(fmt.Sprintf("crystal-size-%d", size), func(b *testing.B) {
-			data := make([]byte, size)
-			_, err := rand.Read(data)
-			if err != nil {
-				b.Fatal(err)
-			}
-
-			b.ResetTimer()
-			b.ReportAllocs()
-
-			for i := 0; i < b.N; i++ {
-				encoded := base64EncodeCrystalhq(data)
+				encoded := base64EncodeNative(data)
 				if len(encoded) == 0 {
 					b.Fatal("encoded data is empty")
 				}

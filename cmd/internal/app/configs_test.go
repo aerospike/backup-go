@@ -54,6 +54,7 @@ func TestMapBackupConfig_Success(t *testing.T) {
 	t.Parallel()
 
 	params := &ASBackupParams{
+		App: &models.App{},
 		BackupParams: &models.Backup{
 			FileLimit:        5000,
 			AfterDigest:      "AvDsV2KuSZHZugDBftnLxGpR+88=",
@@ -124,6 +125,7 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 	t.Parallel()
 
 	params := &ASBackupParams{
+		App: &models.App{},
 		BackupParams: &models.Backup{
 			ModifiedBefore: "invalid-date",
 		},
@@ -145,6 +147,7 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 	t.Parallel()
 
 	params := &ASBackupParams{
+		App: &models.App{},
 		BackupParams: &models.Backup{
 			ModifiedAfter: "invalid-date",
 		},
@@ -166,6 +169,7 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 	t.Parallel()
 
 	params := &ASBackupParams{
+		App: &models.App{},
 		BackupParams: &models.Backup{
 			FilterExpression: "invalid-exp",
 		},
@@ -186,6 +190,7 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 func TestMapRestoreConfig_Success(t *testing.T) {
 	t.Parallel()
 	params := &ASRestoreParams{
+		App: &models.App{},
 		RestoreParams: &models.Restore{},
 		CommonParams: &models.Common{
 			Namespace:        "test-namespace",
@@ -404,6 +409,7 @@ func TestMapRestoreConfig_PartialConfig(t *testing.T) {
 	t.Parallel()
 
 	params := &ASRestoreParams{
+		App: &models.App{},
 		RestoreParams: &models.Restore{
 			ExtraTTL:           3600,
 			IgnoreRecordError:  true,
@@ -573,6 +579,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		{
 			name: "Default configuration",
 			params: &ASBackupParams{
+				App: &models.App{},
 				BackupXDRParams: &models.BackupXDR{
 					DC:            "dc1",
 					LocalAddress:  "127.0.0.1",
@@ -614,6 +621,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		{
 			name: "Full configuration with all parameters",
 			params: &ASBackupParams{
+				App: &models.App{},
 				BackupXDRParams: &models.BackupXDR{
 					DC:                           "dc1",
 					LocalAddress:                 "127.0.0.1",
@@ -649,6 +657,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		{
 			name: "Configuration without optional policies",
 			params: &ASBackupParams{
+				App: &models.App{},
 				BackupXDRParams: &models.BackupXDR{
 					DC:           "dc1",
 					LocalAddress: "127.0.0.1",
@@ -668,6 +677,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		{
 			name: "Configuration with only required fields",
 			params: &ASBackupParams{
+				App: &models.App{},
 				BackupXDRParams: &models.BackupXDR{
 					DC:        "dc1",
 					Namespace: "test",
@@ -685,6 +695,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		{
 			name: "Configuration with zero values",
 			params: &ASBackupParams{
+				App: &models.App{},
 				BackupXDRParams: &models.BackupXDR{
 					DC:                           "dc1",
 					Namespace:                    "test",

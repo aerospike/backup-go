@@ -33,7 +33,7 @@ type batchRecordWriter struct {
 	logger            *slog.Logger
 	retryPolicy       *models.RetryPolicy
 	operationBuffer   []a.BatchRecordIfc
-	metrics           *metrics.RPSCollector
+	metrics           *metrics.PerSecondCollector
 	batchSize         int
 	ignoreRecordError bool
 }
@@ -43,7 +43,7 @@ func newBatchRecordWriter(
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
 	retryPolicy *models.RetryPolicy,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 	batchSize int,
 	ignoreRecordError bool,
 	logger *slog.Logger,

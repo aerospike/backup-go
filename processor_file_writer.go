@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/counter"
 	"github.com/aerospike/backup-go/io/lazy"
@@ -43,6 +44,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	state             *State
 	stats             *models.BackupStats
 	limiter           *rate.Limiter
+	bpsCollector      *metrics.PerSecondCollector
 
 	saveCommandChan chan int
 
@@ -65,6 +67,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	state *State,
 	stats *models.BackupStats,
 	limiter *rate.Limiter,
+	bpsCollector *metrics.PerSecondCollector,
 	fileLimit uint64,
 	parallel int,
 	logger *slog.Logger,
@@ -83,6 +86,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		state:             state,
 		stats:             stats,
 		limiter:           limiter,
+		bpsCollector:      bpsCollector,
 		fileLimit:         fileLimit,
 		parallel:          parallel,
 		logger:            logger,
@@ -120,8 +124,8 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 		if err != nil {
 			return nil, fmt.Errorf("failed to create writer: %w", err)
 		}
-
-		writers[i] = writer
+		// Create a writer with metrics.
+		writers[i] = metrics.NewWriter(writer, fw.bpsCollector)
 	}
 
 	fw.logger.Debug("created new file writers", slog.Int("writersNumber", len(writers)))

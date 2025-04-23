@@ -12,27 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package metrics
 
-import "github.com/aerospike/backup-go/internal/metrics"
+import (
+	"io"
+)
 
-// Metrics contains app metrics.
-type Metrics struct {
-	PipelineReadQueueSize  int
-	PipelineWriteQueueSize int
-	RecordsPerSecond       float64
-	BytesPerSecond         float64
+// Writer wraps an io.Writer to collect metrics on write operations.
+type Writer struct {
+	writer    io.WriteCloser
+	collector *PerSecondCollector
 }
 
-// NewMetrics returns a new Metrics with the provided values.
-func NewMetrics(
-	pr, pw int,
-	rps, bps *metrics.PerSecondCollector,
-) *Metrics {
-	return &Metrics{
-		PipelineReadQueueSize:  pr,
-		PipelineWriteQueueSize: pw,
-		RecordsPerSecond:       rps.GetLastResult(),
-		BytesPerSecond:         bps.GetLastResult(),
+// NewWriter creates a new metrics wrapper around an existing io.Writer.
+func NewWriter(w io.WriteCloser, c *PerSecondCollector) *Writer {
+	return &Writer{
+		writer:    w,
+		collector: c,
 	}
+}
+
+func (w *Writer) Write(p []byte) (n int, err error) {
+	n, err = w.writer.Write(p)
+
+	w.collector.Add(uint64(n))
+
+	return n, err
+}
+
+func (w *Writer) Close() error {
+	return w.writer.Close()
 }

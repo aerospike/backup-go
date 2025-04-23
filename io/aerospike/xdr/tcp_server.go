@@ -55,7 +55,7 @@ type TCPConfig struct {
 	// Max number of allowed simultaneous connection to server.
 	MaxConnections int
 
-	metrics *metrics.RPSCollector
+	metrics *metrics.PerSecondCollector
 }
 
 // NewTCPConfig returns new TCP config.
@@ -67,7 +67,7 @@ func NewTCPConfig(
 	resultQueueSize int,
 	ackQueueSize int,
 	maxConnections int,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 ) *TCPConfig {
 	return &TCPConfig{
 		Address:         address,
@@ -91,7 +91,7 @@ func newDefaultTCPConfig() *TCPConfig {
 		defaultQueueSize,
 		defaultQueueSize,
 		defaultMaxConnections,
-		metrics.NewRPSCollector(context.Background(), slog.Default()),
+		metrics.NewPerSecondCollector(context.Background(), slog.Default(), metrics.MetricRecordsPerSecond, true),
 	)
 }
 
@@ -283,7 +283,7 @@ type ConnectionHandler struct {
 	timeNow       int64
 
 	logger  *slog.Logger
-	metrics *metrics.RPSCollector
+	metrics *metrics.PerSecondCollector
 }
 
 // NewConnectionHandler returns a new connection handler.
@@ -295,7 +295,7 @@ func NewConnectionHandler(
 	readTimeout time.Duration,
 	writeTimeout time.Duration,
 	logger *slog.Logger,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,

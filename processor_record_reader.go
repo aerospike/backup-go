@@ -35,7 +35,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 	infoClient      *asinfo.InfoClient
 	state           *State
 	scanLimiter     *semaphore.Weighted
-	metrics         *metrics.RPSCollector
+	metrics         *metrics.PerSecondCollector
 
 	logger *slog.Logger
 }
@@ -47,7 +47,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	infoClient *asinfo.InfoClient,
 	state *State,
 	scanLimiter *semaphore.Weighted,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 	logger *slog.Logger,
 ) *recordReaderProcessor[T] {
 	logger.Debug("created new records reader processor")

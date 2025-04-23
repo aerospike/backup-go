@@ -28,7 +28,7 @@ type singleRecordWriter struct {
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
 	retryPolicy       *models.RetryPolicy
-	metrics           *metrics.RPSCollector
+	metrics           *metrics.PerSecondCollector
 	ignoreRecordError bool
 }
 
@@ -37,7 +37,7 @@ func newSingleRecordWriter(
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
 	retryPolicy *models.RetryPolicy,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 	ignoreRecordError bool,
 ) *singleRecordWriter {
 	return &singleRecordWriter{

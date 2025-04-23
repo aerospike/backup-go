@@ -46,7 +46,10 @@ type backupRecordsHandler struct {
 	scanLimiter     *semaphore.Weighted
 	state           *State
 	pl              *pipeline.Pipeline[*models.Token]
-	rpsCollector    *metrics.RPSCollector
+	// records per second collector.
+	rpsCollector *metrics.PerSecondCollector
+	// bytes per second collector.
+	bpsCollector *metrics.PerSecondCollector
 }
 
 func newBackupRecordsHandler(
@@ -56,7 +59,8 @@ func newBackupRecordsHandler(
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
 	state *State,
-	rpsCollector *metrics.RPSCollector,
+	rpsCollector *metrics.PerSecondCollector,
+	bpsCollector *metrics.PerSecondCollector,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
@@ -68,6 +72,7 @@ func newBackupRecordsHandler(
 		scanLimiter:     scanLimiter,
 		state:           state,
 		rpsCollector:    rpsCollector,
+		bpsCollector:    bpsCollector,
 	}
 
 	return h
@@ -384,5 +389,5 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 // GetMetrics returns the rpsCollector of the backup job.
 func (bh *backupRecordsHandler) GetMetrics() *models.Metrics {
 	pr, pw := bh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, bh.rpsCollector)
+	return models.NewMetrics(pr, pw, bh.rpsCollector, bh.bpsCollector)
 }

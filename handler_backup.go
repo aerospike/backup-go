@@ -82,7 +82,10 @@ type BackupHandler struct {
 
 	recordHandler *backupRecordsHandler
 
-	rpsCollector *metrics.RPSCollector
+	// records per second collector.
+	rpsCollector *metrics.PerSecondCollector
+	// bytes per second collector.
+	bpsCollector *metrics.PerSecondCollector
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -145,7 +148,10 @@ func newBackupHandler(
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  models.NewBackupStats(),
-		rpsCollector:           metrics.NewRPSCollector(ctx, logger),
+		rpsCollector: metrics.NewPerSecondCollector(ctx, logger, metrics.MetricRecordsPerSecond,
+			config.MetricsEnabled),
+		bpsCollector: metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
+			config.MetricsEnabled),
 	}, nil
 }
 
@@ -214,6 +220,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 		bh.scanLimiter,
 		bh.state,
 		bh.rpsCollector,
+		bh.bpsCollector,
 	)
 	readerConfig := bh.recordHandler.recordReaderConfigForNode(nodes, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
@@ -282,6 +289,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		bh.scanLimiter,
 		bh.state,
 		bh.rpsCollector,
+		bh.bpsCollector,
 	)
 
 	bh.stats.TotalRecords, err = bh.recordHandler.countRecords(ctx, bh.infoClient)
@@ -329,7 +337,7 @@ func (bh *BackupHandler) makeWriters(ctx context.Context, n int) ([]io.WriteClos
 			return nil, err
 		}
 
-		backupWriters[i] = writer
+		backupWriters[i] = metrics.NewWriter(writer, bh.bpsCollector)
 	}
 
 	return backupWriters, nil

@@ -86,6 +86,8 @@ type ConfigRestore struct {
 	IgnoreRecordError bool
 	// Retry policy for info commands.
 	InfoRetryPolicy *models.RetryPolicy
+	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
+	MetricsEnabled bool
 }
 
 // NewDefaultRestoreConfig returns a new ConfigRestore with default values.

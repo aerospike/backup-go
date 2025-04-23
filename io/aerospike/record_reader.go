@@ -45,7 +45,7 @@ type RecordReaderConfig struct {
 	// If pageSize = 0, we think that we use normal scan.
 	pageSize int64
 
-	metrics *metrics.RPSCollector
+	metrics *metrics.PerSecondCollector
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -59,7 +59,7 @@ func NewRecordReaderConfig(namespace string,
 	scanLimiter *semaphore.Weighted,
 	noTTLOnly bool,
 	pageSize int64,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		namespace:       namespace,

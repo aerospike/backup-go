@@ -54,7 +54,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 	useBatchWrites bool,
 	batchSize int,
 	retryPolicy *models.RetryPolicy,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 	ignoreRecordError bool,
 ) *RestoreWriter[T] {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
@@ -106,7 +106,7 @@ func newRecordWriter(
 	useBatchWrites bool,
 	batchSize int,
 	retryPolicy *models.RetryPolicy,
-	metrics *metrics.RPSCollector,
+	metrics *metrics.PerSecondCollector,
 	ignoreRecordError bool,
 ) recordWriter {
 	if useBatchWrites {

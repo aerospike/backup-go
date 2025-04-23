@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const metricRecordsPerSecond = "rps"
+
 func TestNewRPSCollector(t *testing.T) {
 	t.Parallel()
 
@@ -53,10 +55,10 @@ func TestNewRPSCollector(t *testing.T) {
 				Level: tc.loggerLevel,
 			}))
 
-			// Create a new RPSCollector
+			// Create a new PerSecondCollector
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewRPSCollector(ctx, logger)
+			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, true)
 
 			// Verify the collector was initialized correctly
 			assert.NotNil(t, collector)
@@ -64,13 +66,13 @@ func TestNewRPSCollector(t *testing.T) {
 			assert.NotNil(t, collector.Increment)
 
 			// Test if Increment is functional based on logger level
-			initialCount := collector.requestCount.Load()
+			initialCount := collector.counter.Load()
 			collector.Increment()
 
 			if tc.expectEnabled {
-				assert.Equal(t, uint64(1), collector.requestCount.Load())
+				assert.Equal(t, uint64(1), collector.counter.Load())
 			} else {
-				assert.Equal(t, initialCount, collector.requestCount.Load())
+				assert.Equal(t, initialCount, collector.counter.Load())
 			}
 		})
 	}
@@ -81,7 +83,7 @@ func TestRPSCollector_GetLastResult(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		collector      *RPSCollector
+		collector      *PerSecondCollector
 		expectedResult float64
 	}{
 		{
@@ -91,14 +93,14 @@ func TestRPSCollector_GetLastResult(t *testing.T) {
 		},
 		{
 			name: "collector with lastResult returns correct value",
-			collector: &RPSCollector{
+			collector: &PerSecondCollector{
 				lastResult: 42.5,
 			},
 			expectedResult: 42.5,
 		},
 		{
 			name: "collector with zero lastResult returns 0",
-			collector: &RPSCollector{
+			collector: &PerSecondCollector{
 				lastResult: 0,
 			},
 			expectedResult: 0,
@@ -124,8 +126,8 @@ func TestRPSCollector_Report(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create a new RPSCollector
-	collector := NewRPSCollector(ctx, logger)
+	// Create a new PerSecondCollector
+	collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, true)
 	assert.NotNil(t, collector)
 
 	// Simulate some requests
@@ -191,10 +193,10 @@ func TestRPSCollector_Increment(t *testing.T) {
 				Level: tc.loggerLevel,
 			}))
 
-			// Create a new RPSCollector
+			// Create a new PerSecondCollector
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewRPSCollector(ctx, logger)
+			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, true)
 
 			// Call Increment the specified number of times
 			for i := 0; i < tc.numCalls; i++ {
@@ -202,7 +204,7 @@ func TestRPSCollector_Increment(t *testing.T) {
 			}
 
 			// Verify the count
-			assert.Equal(t, tc.expected, collector.requestCount.Load())
+			assert.Equal(t, tc.expected, collector.counter.Load())
 		})
 	}
 }

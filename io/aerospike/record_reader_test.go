@@ -79,7 +79,7 @@ func TestAerospikeRecordReader(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			metrics:         metrics.NewPerSecondCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond, true),
 		},
 		slog.Default(),
 	)
@@ -139,7 +139,7 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			metrics:         metrics.NewPerSecondCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond, true),
 		},
 		slog.Default(),
 	)
@@ -183,7 +183,7 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			metrics:         metrics.NewPerSecondCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond, true),
 		},
 		slog.Default(),
 	)
@@ -222,7 +222,7 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			metrics:         metrics.NewPerSecondCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond, true),
 		},
 		slog.Default(),
 	)
@@ -290,7 +290,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      policy,
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			metrics:         metrics.NewPerSecondCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond, true),
 		},
 		slog.Default(),
 	)

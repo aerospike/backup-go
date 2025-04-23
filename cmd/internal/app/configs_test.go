@@ -190,7 +190,7 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 func TestMapRestoreConfig_Success(t *testing.T) {
 	t.Parallel()
 	params := &ASRestoreParams{
-		App: &models.App{},
+		App:           &models.App{},
 		RestoreParams: &models.Restore{},
 		CommonParams: &models.Common{
 			Namespace:        "test-namespace",

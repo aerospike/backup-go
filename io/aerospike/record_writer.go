@@ -28,7 +28,7 @@ type singleRecordWriter struct {
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
 	retryPolicy       *models.RetryPolicy
-	metrics           *metrics.PerSecondCollector
+	rpsCollector      *metrics.Collector
 	ignoreRecordError bool
 }
 
@@ -37,7 +37,7 @@ func newSingleRecordWriter(
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
 	retryPolicy *models.RetryPolicy,
-	metrics *metrics.PerSecondCollector,
+	rpsCollector *metrics.Collector,
 	ignoreRecordError bool,
 ) *singleRecordWriter {
 	return &singleRecordWriter{
@@ -45,7 +45,7 @@ func newSingleRecordWriter(
 		writePolicy:       writePolicy,
 		stats:             stats,
 		retryPolicy:       retryPolicy,
-		metrics:           metrics,
+		rpsCollector:      rpsCollector,
 		ignoreRecordError: ignoreRecordError,
 	}
 }
@@ -61,7 +61,7 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 
 	writePolicy.Expiration = record.Expiration
 
-	rw.metrics.Increment()
+	rw.rpsCollector.Increment()
 
 	err := rw.executeWrite(&writePolicy, record)
 	if err != nil {

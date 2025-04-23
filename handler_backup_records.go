@@ -47,9 +47,9 @@ type backupRecordsHandler struct {
 	state           *State
 	pl              *pipeline.Pipeline[*models.Token]
 	// records per second collector.
-	rpsCollector *metrics.PerSecondCollector
+	rpsCollector *metrics.Collector
 	// bytes per second collector.
-	kbpsCollector *metrics.PerSecondCollector
+	kbpsCollector *metrics.Collector
 }
 
 func newBackupRecordsHandler(
@@ -59,8 +59,8 @@ func newBackupRecordsHandler(
 	logger *slog.Logger,
 	scanLimiter *semaphore.Weighted,
 	state *State,
-	rpsCollector *metrics.PerSecondCollector,
-	kbpsCollector *metrics.PerSecondCollector,
+	rpsCollector *metrics.Collector,
+	kbpsCollector *metrics.Collector,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 

@@ -21,11 +21,11 @@ import (
 // Writer wraps an io.Writer to collect metrics on write operations.
 type Writer struct {
 	writer    io.WriteCloser
-	collector *PerSecondCollector
+	collector *Collector
 }
 
 // NewWriter creates a new metrics wrapper around an existing io.Writer.
-func NewWriter(w io.WriteCloser, c *PerSecondCollector) *Writer {
+func NewWriter(w io.WriteCloser, c *Collector) *Writer {
 	return &Writer{
 		writer:    w,
 		collector: c,

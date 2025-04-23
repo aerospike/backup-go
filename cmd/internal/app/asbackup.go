@@ -49,6 +49,7 @@ type ASBackup struct {
 
 // ASBackupParams params wrapper for clean code.
 type ASBackupParams struct {
+	App             *models.App
 	ClientConfig    *client.AerospikeConfig
 	ClientPolicy    *models.ClientPolicy
 	BackupParams    *models.Backup

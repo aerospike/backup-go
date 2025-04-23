@@ -52,9 +52,9 @@ type HandlerBackupXDR struct {
 	pl *pipeline.Pipeline[*models.ASBXToken]
 
 	// records per second collector.
-	rpsCollector *metrics.PerSecondCollector
+	rpsCollector *metrics.Collector
 	// bytes per second collector.
-	kbpsCollector *metrics.PerSecondCollector
+	kbpsCollector *metrics.Collector
 }
 
 // newHandlerBackupXDR returns a new xdr backup handler.
@@ -77,8 +77,8 @@ func newBackupXDRHandler(
 
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
 
-	rpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricRecordsPerSecond, config.MetricsEnabled)
-	kbpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
+	rpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond, config.MetricsEnabled)
+	kbpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
 
 	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
 		config,

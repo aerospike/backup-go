@@ -83,9 +83,9 @@ type BackupHandler struct {
 	recordHandler *backupRecordsHandler
 
 	// records per second collector.
-	rpsCollector *metrics.PerSecondCollector
+	rpsCollector *metrics.Collector
 	// bytes per second collector.
-	kbpsCollector *metrics.PerSecondCollector
+	kbpsCollector *metrics.Collector
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -148,9 +148,9 @@ func newBackupHandler(
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  models.NewBackupStats(),
-		rpsCollector: metrics.NewPerSecondCollector(ctx, logger, metrics.MetricRecordsPerSecond,
+		rpsCollector: metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond,
 			config.MetricsEnabled),
-		kbpsCollector: metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
+		kbpsCollector: metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
 			config.MetricsEnabled),
 	}, nil
 }

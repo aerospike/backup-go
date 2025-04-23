@@ -59,7 +59,7 @@ func TestNewPerSecondCollector(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
 
 			assert.NotNil(t, collector)
 			assert.Equal(t, ctx, collector.ctx)
@@ -83,7 +83,7 @@ func TestPerSecondCollector_GetLastResult(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		collector      *PerSecondCollector
+		collector      *Collector
 		expectedResult float64
 	}{
 		{
@@ -93,14 +93,14 @@ func TestPerSecondCollector_GetLastResult(t *testing.T) {
 		},
 		{
 			name: "collector with lastResult returns correct value",
-			collector: &PerSecondCollector{
+			collector: &Collector{
 				lastResult: 42.5,
 			},
 			expectedResult: 42.5,
 		},
 		{
 			name: "collector with zero lastResult returns 0",
-			collector: &PerSecondCollector{
+			collector: &Collector{
 				lastResult: 0,
 			},
 			expectedResult: 0,
@@ -124,7 +124,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, true)
+	collector := NewCollector(ctx, logger, metricRecordsPerSecond, true)
 	assert.NotNil(t, collector)
 
 	for i := 0; i < 10; i++ {
@@ -184,7 +184,7 @@ func TestPerSecondCollector_Increment(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
 
 			for i := 0; i < tc.numCalls; i++ {
 				collector.Increment()
@@ -228,7 +228,7 @@ func TestPerSecondCollector_Add(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
 
 			collector.Add(tc.value)
 
@@ -245,7 +245,7 @@ func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewPerSecondCollector(ctx, logger, metricKilobytesPerSecond, true)
+	collector := NewCollector(ctx, logger, metricKilobytesPerSecond, true)
 	assert.NotNil(t, collector)
 	assert.Equal(t, metricKilobytesPerSecond, collector.name)
 

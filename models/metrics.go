@@ -27,7 +27,7 @@ type Metrics struct {
 // NewMetrics returns a new Metrics with the provided values.
 func NewMetrics(
 	pr, pw int,
-	rps, kbps *metrics.PerSecondCollector,
+	rps, kbps *metrics.Collector,
 ) *Metrics {
 	return &Metrics{
 		PipelineReadQueueSize:  pr,

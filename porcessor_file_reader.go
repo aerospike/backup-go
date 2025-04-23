@@ -36,7 +36,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	config *ConfigRestore
 
 	// bytes per second collector.
-	kbpsCollector *metrics.PerSecondCollector
+	kbpsCollector *metrics.Collector
 
 	readersCh chan models.File
 	errorsCh  chan error
@@ -49,7 +49,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 func newFileReaderProcessor[T models.TokenConstraint](
 	reader StreamingReader,
 	config *ConfigRestore,
-	kbpsCollector *metrics.PerSecondCollector,
+	kbpsCollector *metrics.Collector,
 	readersCh chan models.File,
 	errorsCh chan error,
 	logger *slog.Logger,

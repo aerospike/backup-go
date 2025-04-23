@@ -19,11 +19,11 @@ import "io"
 // Reader wraps an io.Reader to collect metrics on read operations.
 type Reader struct {
 	reader    io.ReadCloser
-	collector *PerSecondCollector
+	collector *Collector
 }
 
 // NewReader creates a new metrics wrapper around an existing io.Reader.
-func NewReader(r io.ReadCloser, c *PerSecondCollector) *Reader {
+func NewReader(r io.ReadCloser, c *Collector) *Reader {
 	return &Reader{
 		reader:    r,
 		collector: c,

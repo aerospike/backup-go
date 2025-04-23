@@ -44,7 +44,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	state             *State
 	stats             *models.BackupStats
 	limiter           *rate.Limiter
-	kbpsCollector     *metrics.PerSecondCollector
+	kbpsCollector     *metrics.Collector
 
 	saveCommandChan chan int
 
@@ -67,7 +67,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	state *State,
 	stats *models.BackupStats,
 	limiter *rate.Limiter,
-	kbpsCollector *metrics.PerSecondCollector,
+	kbpsCollector *metrics.Collector,
 	fileLimit uint64,
 	parallel int,
 	logger *slog.Logger,

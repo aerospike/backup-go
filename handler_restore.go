@@ -62,8 +62,8 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	limiter *rate.Limiter
 
 	pl            *pipeline.Pipeline[T]
-	rpsCollector  *metrics.PerSecondCollector
-	kbpsCollector *metrics.PerSecondCollector
+	rpsCollector  *metrics.Collector
+	kbpsCollector *metrics.Collector
 
 	id     string
 	errors chan error
@@ -88,8 +88,8 @@ func newRestoreHandler[T models.TokenConstraint](
 	errorsCh := make(chan error)
 
 	stats := models.NewRestoreStats()
-	rpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricRecordsPerSecond, config.MetricsEnabled)
-	kbpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
+	rpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond, config.MetricsEnabled)
+	kbpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
 
 	readProcessor := newFileReaderProcessor[T](
 		reader,

@@ -27,8 +27,8 @@ const (
 	MetricKilobytesPerSecond = "kbps"
 )
 
-// PerSecondCollector tracks and logs metrics such as request rate and counts within a context-managed environment.
-type PerSecondCollector struct {
+// Collector tracks and logs metrics such as request rate and counts within a context-managed environment.
+type Collector struct {
 	ctx     context.Context
 	enabled bool
 	name    string
@@ -45,10 +45,10 @@ type PerSecondCollector struct {
 	logger *slog.Logger
 }
 
-// NewPerSecondCollector initializes a new PerSecondCollector with the provided context and logger,
+// NewCollector initializes a new Collector with the provided context and logger,
 // Enabled metrics will be reported to logger debug level.
-func NewPerSecondCollector(ctx context.Context, logger *slog.Logger, name string, enabled bool) *PerSecondCollector {
-	mc := &PerSecondCollector{
+func NewCollector(ctx context.Context, logger *slog.Logger, name string, enabled bool) *Collector {
+	mc := &Collector{
 		ctx:       ctx,
 		enabled:   enabled,
 		name:      name,
@@ -72,8 +72,8 @@ func NewPerSecondCollector(ctx context.Context, logger *slog.Logger, name string
 }
 
 // report periodically calculates and logs requests/records per second based on tracked request counts and elapsed time.
-// It operates until the context of the PerSecondCollector is canceled or its Done channel is closed.
-func (mc *PerSecondCollector) report() {
+// It operates until the context of the Collector is canceled or its Done channel is closed.
+func (mc *Collector) report() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -103,7 +103,7 @@ func (mc *PerSecondCollector) report() {
 }
 
 // GetLastResult returns the last calculated RecordsPerSecond value.
-func (mc *PerSecondCollector) GetLastResult() float64 {
+func (mc *Collector) GetLastResult() float64 {
 	if mc == nil {
 		return 0
 	}

@@ -29,7 +29,7 @@ type payloadWriter struct {
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
 	retryPolicy       *models.RetryPolicy
-	metrics           *metrics.PerSecondCollector
+	metrics           *metrics.Collector
 	ignoreRecordError bool
 }
 

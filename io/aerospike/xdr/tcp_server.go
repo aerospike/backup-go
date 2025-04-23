@@ -55,7 +55,7 @@ type TCPConfig struct {
 	// Max number of allowed simultaneous connection to server.
 	MaxConnections int
 
-	metrics *metrics.PerSecondCollector
+	rpsCollector *metrics.Collector
 }
 
 // NewTCPConfig returns new TCP config.
@@ -67,7 +67,7 @@ func NewTCPConfig(
 	resultQueueSize int,
 	ackQueueSize int,
 	maxConnections int,
-	metrics *metrics.PerSecondCollector,
+	rpsCollector *metrics.Collector,
 ) *TCPConfig {
 	return &TCPConfig{
 		Address:         address,
@@ -77,7 +77,7 @@ func NewTCPConfig(
 		ResultQueueSize: resultQueueSize,
 		AckQueueSize:    ackQueueSize,
 		MaxConnections:  maxConnections,
-		metrics:         metrics,
+		rpsCollector:    rpsCollector,
 	}
 }
 
@@ -91,7 +91,7 @@ func newDefaultTCPConfig() *TCPConfig {
 		defaultQueueSize,
 		defaultQueueSize,
 		defaultMaxConnections,
-		metrics.NewPerSecondCollector(context.Background(), slog.Default(), metrics.MetricRecordsPerSecond, true),
+		metrics.NewCollector(context.Background(), slog.Default(), metrics.MetricRecordsPerSecond, true),
 	)
 }
 
@@ -237,7 +237,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 						s.config.ReadTimeout,
 						s.config.WriteTimeout,
 						s.logger,
-						s.config.metrics,
+						s.config.rpsCollector,
 					)
 					// Handlers wait when all goroutines are finished.
 					handler.Start(ctx)
@@ -283,7 +283,7 @@ type ConnectionHandler struct {
 	timeNow       int64
 
 	logger  *slog.Logger
-	metrics *metrics.PerSecondCollector
+	metrics *metrics.Collector
 }
 
 // NewConnectionHandler returns a new connection handler.
@@ -295,7 +295,7 @@ func NewConnectionHandler(
 	readTimeout time.Duration,
 	writeTimeout time.Duration,
 	logger *slog.Logger,
-	metrics *metrics.PerSecondCollector,
+	metrics *metrics.Collector,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,

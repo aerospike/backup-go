@@ -44,7 +44,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	state             *State
 	stats             *models.BackupStats
 	limiter           *rate.Limiter
-	bpsCollector      *metrics.PerSecondCollector
+	kbpsCollector     *metrics.PerSecondCollector
 
 	saveCommandChan chan int
 
@@ -67,7 +67,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	state *State,
 	stats *models.BackupStats,
 	limiter *rate.Limiter,
-	bpsCollector *metrics.PerSecondCollector,
+	kbpsCollector *metrics.PerSecondCollector,
 	fileLimit uint64,
 	parallel int,
 	logger *slog.Logger,
@@ -86,7 +86,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		state:             state,
 		stats:             stats,
 		limiter:           limiter,
-		bpsCollector:      bpsCollector,
+		kbpsCollector:     kbpsCollector,
 		fileLimit:         fileLimit,
 		parallel:          parallel,
 		logger:            logger,
@@ -125,7 +125,7 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 			return nil, fmt.Errorf("failed to create writer: %w", err)
 		}
 		// Create a writer with metrics.
-		writers[i] = metrics.NewWriter(writer, fw.bpsCollector)
+		writers[i] = metrics.NewWriter(writer, fw.kbpsCollector)
 	}
 
 	fw.logger.Debug("created new file writers", slog.Int("writersNumber", len(writers)))

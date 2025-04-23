@@ -61,9 +61,9 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
-	pl           *pipeline.Pipeline[T]
-	rpsCollector *metrics.PerSecondCollector
-	bpsCollector *metrics.PerSecondCollector
+	pl            *pipeline.Pipeline[T]
+	rpsCollector  *metrics.PerSecondCollector
+	kbpsCollector *metrics.PerSecondCollector
 
 	id     string
 	errors chan error
@@ -89,12 +89,12 @@ func newRestoreHandler[T models.TokenConstraint](
 
 	stats := models.NewRestoreStats()
 	rpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricRecordsPerSecond, config.MetricsEnabled)
-	bpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
+	kbpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
 
 	readProcessor := newFileReaderProcessor[T](
 		reader,
 		config,
-		bpsCollector,
+		kbpsCollector,
 		readersCh,
 		errorsCh,
 		logger,
@@ -121,7 +121,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		limiter:        makeBandwidthLimiter(config.Bandwidth),
 		errors:         errorsCh,
 		rpsCollector:   rpsCollector,
-		bpsCollector:   bpsCollector,
+		kbpsCollector:  kbpsCollector,
 	}
 }
 
@@ -226,5 +226,5 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 // GetMetrics returns the rpsCollector of the backup job.
 func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 	pr, pw := rh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, rh.rpsCollector, rh.bpsCollector)
+	return models.NewMetrics(pr, pw, rh.rpsCollector, rh.kbpsCollector)
 }

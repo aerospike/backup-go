@@ -49,7 +49,7 @@ type backupRecordsHandler struct {
 	// records per second collector.
 	rpsCollector *metrics.PerSecondCollector
 	// bytes per second collector.
-	bpsCollector *metrics.PerSecondCollector
+	kbpsCollector *metrics.PerSecondCollector
 }
 
 func newBackupRecordsHandler(
@@ -60,7 +60,7 @@ func newBackupRecordsHandler(
 	scanLimiter *semaphore.Weighted,
 	state *State,
 	rpsCollector *metrics.PerSecondCollector,
-	bpsCollector *metrics.PerSecondCollector,
+	kbpsCollector *metrics.PerSecondCollector,
 ) *backupRecordsHandler {
 	logger.Debug("created new backup records handler")
 
@@ -72,7 +72,7 @@ func newBackupRecordsHandler(
 		scanLimiter:     scanLimiter,
 		state:           state,
 		rpsCollector:    rpsCollector,
-		bpsCollector:    bpsCollector,
+		kbpsCollector:   kbpsCollector,
 	}
 
 	return h
@@ -389,5 +389,5 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 // GetMetrics returns the rpsCollector of the backup job.
 func (bh *backupRecordsHandler) GetMetrics() *models.Metrics {
 	pr, pw := bh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, bh.rpsCollector, bh.bpsCollector)
+	return models.NewMetrics(pr, pw, bh.rpsCollector, bh.kbpsCollector)
 }

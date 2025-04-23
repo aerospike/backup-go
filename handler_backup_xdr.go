@@ -54,7 +54,7 @@ type HandlerBackupXDR struct {
 	// records per second collector.
 	rpsCollector *metrics.PerSecondCollector
 	// bytes per second collector.
-	bpsCollector *metrics.PerSecondCollector
+	kbpsCollector *metrics.PerSecondCollector
 }
 
 // newHandlerBackupXDR returns a new xdr backup handler.
@@ -78,7 +78,7 @@ func newBackupXDRHandler(
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
 
 	rpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricRecordsPerSecond, config.MetricsEnabled)
-	bpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
+	kbpsCollector := metrics.NewPerSecondCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
 
 	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
 		config,
@@ -102,7 +102,7 @@ func newBackupXDRHandler(
 		nil,
 		stats,
 		nil,
-		bpsCollector,
+		kbpsCollector,
 		config.FileLimit,
 		config.ParallelWrite,
 		logger,
@@ -121,7 +121,7 @@ func newBackupXDRHandler(
 		logger:          logger,
 		errors:          make(chan error, 1),
 		rpsCollector:    rpsCollector,
-		bpsCollector:    bpsCollector,
+		kbpsCollector:   kbpsCollector,
 	}
 }
 
@@ -234,5 +234,5 @@ func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 // GetMetrics returns the rpsCollector of the backup job.
 func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
 	pr, pw := bh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, bh.rpsCollector, bh.bpsCollector)
+	return models.NewMetrics(pr, pw, bh.rpsCollector, bh.kbpsCollector)
 }

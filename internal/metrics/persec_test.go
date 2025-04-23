@@ -24,24 +24,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const metricRecordsPerSecond = "rps"
+const (
+	metricRecordsPerSecond   = "rps"
+	metricKilobytesPerSecond = "kbps"
+)
 
-func TestNewRPSCollector(t *testing.T) {
+func TestNewPerSecondCollector(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name          string
-		loggerLevel   slog.Level
+		enabled       bool
 		expectEnabled bool
 	}{
 		{
-			name:          "debug level logger enables metrics",
-			loggerLevel:   slog.LevelDebug,
+			name:          "enabled collector",
+			enabled:       true,
 			expectEnabled: true,
 		},
 		{
-			name:          "info level logger disables metrics",
-			loggerLevel:   slog.LevelInfo,
+			name:          "disabled collector",
+			enabled:       false,
 			expectEnabled: false,
 		},
 	}
@@ -50,22 +53,19 @@ func TestNewRPSCollector(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Create a logger with the specified level
 			logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-				Level: tc.loggerLevel,
+				Level: slog.LevelDebug,
 			}))
 
-			// Create a new PerSecondCollector
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, true)
+			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
 
-			// Verify the collector was initialized correctly
 			assert.NotNil(t, collector)
 			assert.Equal(t, ctx, collector.ctx)
 			assert.NotNil(t, collector.Increment)
+			assert.Equal(t, tc.enabled, collector.enabled)
 
-			// Test if Increment is functional based on logger level
 			initialCount := collector.counter.Load()
 			collector.Increment()
 
@@ -78,7 +78,7 @@ func TestNewRPSCollector(t *testing.T) {
 	}
 }
 
-func TestRPSCollector_GetLastResult(t *testing.T) {
+func TestPerSecondCollector_GetLastResult(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -116,71 +116,61 @@ func TestRPSCollector_GetLastResult(t *testing.T) {
 	}
 }
 
-func TestRPSCollector_Report(t *testing.T) {
-	// Create a logger with debug level
+func TestPerSecondCollector_Report(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 
-	// Create a context that we can cancel
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create a new PerSecondCollector
 	collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, true)
 	assert.NotNil(t, collector)
 
-	// Simulate some requests
 	for i := 0; i < 10; i++ {
 		collector.Increment()
 	}
 
-	// Wait a bit for the report goroutine to run
 	time.Sleep(1500 * time.Millisecond)
 
-	// Check that lastResult was updated
 	result := collector.GetLastResult()
 	assert.Greater(t, result, float64(0), "Expected RecordsPerSecond to be greater than 0")
 
-	// Cancel the context to stop the report goroutine
 	cancel()
 
-	// Wait for the goroutine to exit
 	time.Sleep(100 * time.Millisecond)
 
-	// Simulate more requests after cancellation
 	prevResult := collector.GetLastResult()
 	for i := 0; i < 10; i++ {
 		collector.Increment()
 	}
 
-	// Wait a bit to ensure no more reports are generated
 	time.Sleep(1500 * time.Millisecond)
 
-	// Check that lastResult hasn't changed
-	assert.Equal(t, prevResult, collector.GetLastResult(), "Expected RecordsPerSecond to remain unchanged after context cancellation")
+	assert.Equal(t, prevResult, collector.GetLastResult(),
+		"Expected RecordsPerSecond to remain unchanged after context cancellation")
 }
 
-func TestRPSCollector_Increment(t *testing.T) {
+func TestPerSecondCollector_Increment(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		loggerLevel slog.Level
-		numCalls    int
-		expected    uint64
+		name     string
+		enabled  bool
+		numCalls int
+		expected uint64
 	}{
 		{
-			name:        "debug level logger counts increments",
-			loggerLevel: slog.LevelDebug,
-			numCalls:    5,
-			expected:    5,
+			name:     "enabled collector counts increments",
+			enabled:  true,
+			numCalls: 5,
+			expected: 5,
 		},
 		{
-			name:        "info level logger doesn't count increments",
-			loggerLevel: slog.LevelInfo,
-			numCalls:    5,
-			expected:    0,
+			name:     "disabled collector doesn't count increments",
+			enabled:  false,
+			numCalls: 5,
+			expected: 0,
 		},
 	}
 
@@ -188,23 +178,87 @@ func TestRPSCollector_Increment(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Create a logger with the specified level
 			logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-				Level: tc.loggerLevel,
+				Level: slog.LevelDebug,
 			}))
 
-			// Create a new PerSecondCollector
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, true)
+			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
 
-			// Call Increment the specified number of times
 			for i := 0; i < tc.numCalls; i++ {
 				collector.Increment()
 			}
 
-			// Verify the count
 			assert.Equal(t, tc.expected, collector.counter.Load())
 		})
 	}
+}
+
+func TestPerSecondCollector_Add(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		enabled  bool
+		value    uint64
+		expected uint64
+	}{
+		{
+			name:     "enabled collector adds value",
+			enabled:  true,
+			value:    10,
+			expected: 10,
+		},
+		{
+			name:     "disabled collector doesn't add value",
+			enabled:  false,
+			value:    10,
+			expected: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			collector := NewPerSecondCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
+
+			collector.Add(tc.value)
+
+			assert.Equal(t, tc.expected, collector.counter.Load())
+		})
+	}
+}
+
+func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	collector := NewPerSecondCollector(ctx, logger, metricKilobytesPerSecond, true)
+	assert.NotNil(t, collector)
+	assert.Equal(t, metricKilobytesPerSecond, collector.name)
+
+	collector.Add(1024)
+
+	time.Sleep(1500 * time.Millisecond)
+
+	result := collector.GetLastResult()
+	assert.Greater(t, result, float64(0), "Expected KilobytesPerSecond to be greater than 0")
+
+	// The result should be approximately 1 KB/s (with some tolerance for timing variations)
+	// Since we added 1024 bytes and waited ~1 second
+	assert.InDelta(t, 1.0, result, 0.5, "Expected approximately 1 KB/s")
+
+	cancel()
 }

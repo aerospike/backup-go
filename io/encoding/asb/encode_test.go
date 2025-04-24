@@ -1655,6 +1655,8 @@ func BenchmarkEncodeRecord(b *testing.B) {
 	}
 }
 
+// base64EncodeNative old encoding mechanism, using a default library.
+// Left here for benchmarking purposes.
 func base64EncodeNative(v []byte) []byte {
 	encodedLen := base64.StdEncoding.EncodedLen(len(v))
 

@@ -35,6 +35,8 @@ type Collector struct {
 	enabled bool
 	// name of the metric, is used for logging.
 	name string
+	// message is used for logging.
+	message string
 	// Increment and Add are used to track and report metrics.
 	Increment func()
 	Add       func(n uint64)
@@ -53,18 +55,24 @@ type Collector struct {
 
 // NewCollector initializes a new Collector with the provided context and logger,
 // Enabled metrics will be reported to logger debug level.
-func NewCollector(ctx context.Context, logger *slog.Logger, name string, enabled bool) *Collector {
+func NewCollector(ctx context.Context, logger *slog.Logger, name, message string, enabled bool) *Collector {
 	mc := &Collector{
 		ctx:       ctx,
 		enabled:   enabled,
 		name:      name,
+		message:   message,
 		Increment: func() {},
 		Add:       func(uint64) {},
 		lastTime:  time.Now(),
 		logger:    logger,
 	}
 
-	logger.Debug("metrics", slog.String("name", name), slog.Bool("enabled", enabled))
+	logger.Debug(
+		"metrics",
+		slog.String("name", name),
+		slog.String("message", message),
+		slog.Bool("enabled", enabled),
+	)
 	mc.Increment()
 
 	if enabled {
@@ -99,7 +107,7 @@ func (mc *Collector) report() {
 			mc.lastResult = result
 			mc.lastResultMu.Unlock()
 
-			mc.logger.Debug("metrics, per second collector", slog.Float64(mc.name, result))
+			mc.logger.Debug(mc.message, slog.Float64(mc.name, result))
 
 			mc.lastTime = t
 		case <-mc.ctx.Done():

@@ -149,8 +149,10 @@ func newBackupHandler(
 		state:                  state,
 		stats:                  models.NewBackupStats(),
 		rpsCollector: metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond,
+			fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id),
 			config.MetricsEnabled),
 		kbpsCollector: metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
+			fmt.Sprintf("%s metrics  %s", logging.HandlerTypeBackup, id),
 			config.MetricsEnabled),
 	}, nil
 }

@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testMetricMessage = "metric message"
+
 func TestNewPerSecondCollector(t *testing.T) {
 	t.Parallel()
 
@@ -54,7 +56,7 @@ func TestNewPerSecondCollector(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, tc.enabled)
 
 			assert.NotNil(t, collector)
 			assert.Equal(t, ctx, collector.ctx)
@@ -119,7 +121,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewCollector(ctx, logger, MetricRecordsPerSecond, true)
+	collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, true)
 	assert.NotNil(t, collector)
 
 	for i := 0; i < 10; i++ {
@@ -179,7 +181,7 @@ func TestPerSecondCollector_Increment(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, tc.enabled)
 
 			for i := 0; i < tc.numCalls; i++ {
 				collector.Increment()
@@ -223,7 +225,7 @@ func TestPerSecondCollector_Add(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, tc.enabled)
 
 			collector.Add(tc.value)
 
@@ -240,7 +242,7 @@ func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewCollector(ctx, logger, MetricKilobytesPerSecond, true)
+	collector := NewCollector(ctx, logger, MetricKilobytesPerSecond, testMetricMessage, true)
 	assert.NotNil(t, collector)
 	assert.Equal(t, MetricKilobytesPerSecond, collector.name)
 

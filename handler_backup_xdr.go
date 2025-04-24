@@ -77,8 +77,12 @@ func newBackupXDRHandler(
 
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
 
-	rpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond, config.MetricsEnabled)
-	kbpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond, config.MetricsEnabled)
+	rpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond,
+		fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id),
+		config.MetricsEnabled)
+	kbpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
+		fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id),
+		config.MetricsEnabled)
 
 	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
 		config,

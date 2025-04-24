@@ -81,20 +81,6 @@ func NewTCPConfig(
 	}
 }
 
-// newDefaultTCPConfig returns default TCP Server config.
-func newDefaultTCPConfig() *TCPConfig {
-	return NewTCPConfig(
-		defaultAddress,
-		nil,
-		defaultTimeout,
-		defaultTimeout,
-		defaultQueueSize,
-		defaultQueueSize,
-		defaultMaxConnections,
-		metrics.NewCollector(context.Background(), slog.Default(), metrics.MetricRecordsPerSecond, true),
-	)
-}
-
 // TCPServer server for serving XDR connections.
 type TCPServer struct {
 	config *TCPConfig

@@ -16,6 +16,7 @@ require (
 	github.com/aws/smithy-go v1.22.3
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.0
+	github.com/segmentio/asm v1.2.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0

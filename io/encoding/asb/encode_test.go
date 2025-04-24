@@ -1655,12 +1655,29 @@ func BenchmarkEncodeRecord(b *testing.B) {
 	}
 }
 
-// base64EncodeUnoptimized is the original implementation of base64Encode
-// before optimization. It's used for benchmarking comparison.
-func base64EncodeUnoptimized(v []byte) []byte {
-	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(v)))
-	base64.StdEncoding.Encode(encoded, v)
-	return encoded
+// base64EncodeNative old encoding mechanism, using a default library.
+// Left here for benchmarking purposes.
+func base64EncodeNative(v []byte) []byte {
+	encodedLen := base64.StdEncoding.EncodedLen(len(v))
+
+	// Get a buffer from the pool
+	bufInterface := base64EncodedBufferPool.Get()
+	buf := bufInterface.([]byte)
+
+	// Ensure the buffer is large enough
+	if cap(buf) < encodedLen {
+		// If the buffer is too small, create a new one with sufficient capacity
+		buf = make([]byte, encodedLen)
+	} else {
+		// Otherwise, resize the existing buffer
+		buf = buf[:encodedLen]
+	}
+
+	// Encode the data
+	base64.StdEncoding.Encode(buf, v)
+
+	// Return a slice that references the pooled buffer
+	return buf
 }
 
 func BenchmarkBase64EncodeComparison(b *testing.B) {
@@ -1688,7 +1705,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 		})
 
 		// Test the unoptimized version
-		b.Run(fmt.Sprintf("unoptimized-size-%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("native-size-%d", size), func(b *testing.B) {
 			data := make([]byte, size)
 			_, err := rand.Read(data)
 			if err != nil {
@@ -1699,10 +1716,11 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				encoded := base64EncodeUnoptimized(data)
+				encoded := base64EncodeNative(data)
 				if len(encoded) == 0 {
 					b.Fatal("encoded data is empty")
 				}
+				returnBase64Buffer(encoded)
 			}
 		})
 	}

@@ -16,7 +16,6 @@ package asb
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +26,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
 	"github.com/aerospike/backup-go/models"
+	"github.com/segmentio/asm/base64"
 )
 
 // Encoder contains logic for encoding backup data into the .asb format.

@@ -30,6 +30,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testMetricMessage = "test metric message"
+
 func TestAerospikeRecordReader(t *testing.T) {
 	t.Parallel()
 
@@ -79,7 +81,8 @@ func TestAerospikeRecordReader(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond,
+				testMetricMessage, true),
 		},
 		slog.Default(),
 	)
@@ -139,7 +142,8 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond,
+				testMetricMessage, true),
 		},
 		slog.Default(),
 	)
@@ -183,7 +187,8 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond,
+				testMetricMessage, true),
 		},
 		slog.Default(),
 	)
@@ -222,7 +227,8 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond,
+				testMetricMessage, true),
 		},
 		slog.Default(),
 	)
@@ -290,7 +296,8 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      policy,
-			metrics:         metrics.NewRPSCollector(ctx, slog.Default()),
+			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.MetricRecordsPerSecond,
+				testMetricMessage, true),
 		},
 		slog.Default(),
 	)

@@ -123,6 +123,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 
 	// Init app.
 	asbParams := &app.ASBackupParams{
+		App:             c.flagsApp.GetApp(),
 		ClientConfig:    c.flagsAerospike.NewAerospikeConfig(),
 		ClientPolicy:    c.flagsClientPolicy.GetClientPolicy(),
 		BackupXDRParams: c.flagsBackupXDR.GetBackupXDR(),

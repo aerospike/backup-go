@@ -131,6 +131,8 @@ type ConfigBackup struct {
 	OutputFilePrefix string
 	// Retry policy for info commands.
 	InfoRetryPolicy *models.RetryPolicy
+	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
+	MetricsEnabled bool
 }
 
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.

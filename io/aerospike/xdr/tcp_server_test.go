@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,6 +35,20 @@ const (
 	testTimeOut         = 1 * time.Second
 	testKeyString       = "source-ns1:set1:777:ff e3 ed ca 38 f4 eb 05 bd cf 1d 00 9f 13 a6 ab 8e 71 27 3b"
 )
+
+// newDefaultTCPConfig returns default TCP Server config.
+func newDefaultTCPConfig() *TCPConfig {
+	return NewTCPConfig(
+		defaultAddress,
+		nil,
+		defaultTimeout,
+		defaultTimeout,
+		defaultQueueSize,
+		defaultQueueSize,
+		defaultMaxConnections,
+		metrics.NewCollector(context.Background(), slog.Default(), metrics.MetricRecordsPerSecond, "", true),
+	)
+}
 
 func TestTCPServer(t *testing.T) {
 	t.Parallel()

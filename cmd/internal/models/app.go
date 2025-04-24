@@ -12,34 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package flags
+package models
 
-import (
-	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/spf13/pflag"
-)
-
+// App contains the global application flags.
 type App struct {
-	models.App
-}
-
-func NewApp() *App {
-	return &App{}
-}
-
-func (f *App) NewFlagSet() *pflag.FlagSet {
-	flagSet := &pflag.FlagSet{}
-
-	flagSet.BoolP("help", "Z", false, "Display help information.")
-	flagSet.BoolVarP(&f.Version, "version", "V",
-		false, "Display version information.")
-	flagSet.BoolVarP(&f.Verbose, "verbose", "v",
-		false,
-		"Enable more detailed logging.")
-
-	return flagSet
-}
-
-func (f *App) GetApp() *models.App {
-	return &f.App
+	Help    bool
+	Version bool
+	Verbose bool
 }

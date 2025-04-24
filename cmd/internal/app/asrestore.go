@@ -40,6 +40,7 @@ type ASRestore struct {
 }
 
 type ASRestoreParams struct {
+	App           *models.App
 	ClientConfig  *client.AerospikeConfig
 	ClientPolicy  *models.ClientPolicy
 	RestoreParams *models.Restore

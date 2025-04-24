@@ -14,6 +14,7 @@
 
 package models
 
+// Compression contains flags that will be mapped to CompressionPolicy for backup and restore operations.
 type Compression struct {
 	Mode  string
 	Level int

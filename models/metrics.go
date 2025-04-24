@@ -21,13 +21,18 @@ type Metrics struct {
 	PipelineReadQueueSize  int
 	PipelineWriteQueueSize int
 	RecordsPerSecond       float64
+	KilobytesPerSecond     float64
 }
 
 // NewMetrics returns a new Metrics with the provided values.
-func NewMetrics(pr, pw int, rps *metrics.RPSCollector) *Metrics {
+func NewMetrics(
+	pr, pw int,
+	rps, kbps *metrics.Collector,
+) *Metrics {
 	return &Metrics{
 		PipelineReadQueueSize:  pr,
 		PipelineWriteQueueSize: pw,
 		RecordsPerSecond:       rps.GetLastResult(),
+		KilobytesPerSecond:     kbps.GetLastResult(),
 	}
 }

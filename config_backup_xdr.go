@@ -92,6 +92,8 @@ type ConfigBackupXDR struct {
 	// datacenters. Setting this parameter to true sends writes that originated from another XDR to the specified
 	// destination datacenters.
 	Forward bool
+	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
+	MetricsEnabled bool
 }
 
 // validate validates the ConfigBackupXDR.

@@ -61,8 +61,9 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
-	pl           *pipeline.Pipeline[T]
-	rpsCollector *metrics.RPSCollector
+	pl            *pipeline.Pipeline[T]
+	rpsCollector  *metrics.Collector
+	kbpsCollector *metrics.Collector
 
 	id     string
 	errors chan error
@@ -78,6 +79,7 @@ func newRestoreHandler[T models.TokenConstraint](
 ) *RestoreHandler[T] {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
+	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id)
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -86,16 +88,30 @@ func newRestoreHandler[T models.TokenConstraint](
 	// Channel for processing errors from readers or writers.
 	errorsCh := make(chan error)
 
+	stats := models.NewRestoreStats()
+	rpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricRecordsPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
+	kbpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricKilobytesPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
+
 	readProcessor := newFileReaderProcessor[T](
 		reader,
 		config,
+		kbpsCollector,
 		readersCh,
 		errorsCh,
 		logger,
 	)
-
-	stats := models.NewRestoreStats()
-	rpsCollector := metrics.NewRPSCollector(ctx, logger)
 
 	writeProcessor := newRecordWriterProcessor[T](
 		aerospikeClient,
@@ -118,6 +134,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		limiter:        makeBandwidthLimiter(config.Bandwidth),
 		errors:         errorsCh,
 		rpsCollector:   rpsCollector,
+		kbpsCollector:  kbpsCollector,
 	}
 }
 
@@ -222,5 +239,5 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 // GetMetrics returns the rpsCollector of the backup job.
 func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 	pr, pw := rh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, rh.rpsCollector)
+	return models.NewMetrics(pr, pw, rh.rpsCollector, rh.kbpsCollector)
 }

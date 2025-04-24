@@ -35,7 +35,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 	infoClient      *asinfo.InfoClient
 	state           *State
 	scanLimiter     *semaphore.Weighted
-	metrics         *metrics.RPSCollector
+	rpsCollector    *metrics.Collector
 
 	logger *slog.Logger
 }
@@ -47,7 +47,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	infoClient *asinfo.InfoClient,
 	state *State,
 	scanLimiter *semaphore.Weighted,
-	metrics *metrics.RPSCollector,
+	rpsCollector *metrics.Collector,
 	logger *slog.Logger,
 ) *recordReaderProcessor[T] {
 	logger.Debug("created new records reader processor")
@@ -58,7 +58,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 		infoClient:      infoClient,
 		scanLimiter:     scanLimiter,
 		state:           state,
-		metrics:         metrics,
+		rpsCollector:    rpsCollector,
 		logger:          logger,
 	}
 }
@@ -76,7 +76,7 @@ func (rr *recordReaderProcessor[T]) recordReaderConfigForXDR() *xdr.RecordReader
 		rr.xdrConfig.ResultQueueSize,
 		rr.xdrConfig.AckQueueSize,
 		rr.xdrConfig.MaxConnections,
-		rr.metrics,
+		rr.rpsCollector,
 	)
 
 	return xdr.NewRecordReaderConfig(

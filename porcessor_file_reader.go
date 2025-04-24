@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
@@ -34,6 +35,9 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *ConfigRestore
 
+	// kilobytes per second collector.
+	kbpsCollector *metrics.Collector
+
 	readersCh chan models.File
 	errorsCh  chan error
 
@@ -45,6 +49,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 func newFileReaderProcessor[T models.TokenConstraint](
 	reader StreamingReader,
 	config *ConfigRestore,
+	kbpsCollector *metrics.Collector,
 	readersCh chan models.File,
 	errorsCh chan error,
 	logger *slog.Logger,
@@ -52,12 +57,13 @@ func newFileReaderProcessor[T models.TokenConstraint](
 	logger.Debug("created file reader processor")
 
 	return &fileReaderProcessor[T]{
-		reader:    reader,
-		config:    config,
-		readersCh: readersCh,
-		errorsCh:  errorsCh,
-		logger:    logger,
-		parallel:  config.Parallel,
+		reader:        reader,
+		config:        config,
+		kbpsCollector: kbpsCollector,
+		readersCh:     readersCh,
+		errorsCh:      errorsCh,
+		logger:        logger,
+		parallel:      config.Parallel,
 	}
 }
 
@@ -71,6 +77,8 @@ func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline
 			fr.errorsCh <- err
 			return nil
 		}
+
+		reader = metrics.NewReader(reader, fr.kbpsCollector)
 
 		d, err := NewDecoder[T](fr.config.EncoderType, fileNumber, reader)
 		if err != nil {

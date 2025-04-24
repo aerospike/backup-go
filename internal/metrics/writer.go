@@ -12,34 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package flags
+package metrics
 
 import (
-	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/spf13/pflag"
+	"io"
 )
 
-type App struct {
-	models.App
+// Writer wraps an io.Writer to collect metrics on write operations.
+type Writer struct {
+	writer    io.WriteCloser
+	collector *Collector
 }
 
-func NewApp() *App {
-	return &App{}
+// NewWriter creates a new metrics wrapper around an existing io.Writer.
+func NewWriter(w io.WriteCloser, c *Collector) *Writer {
+	return &Writer{
+		writer:    w,
+		collector: c,
+	}
 }
 
-func (f *App) NewFlagSet() *pflag.FlagSet {
-	flagSet := &pflag.FlagSet{}
+func (w *Writer) Write(p []byte) (n int, err error) {
+	n, err = w.writer.Write(p)
 
-	flagSet.BoolP("help", "Z", false, "Display help information.")
-	flagSet.BoolVarP(&f.Version, "version", "V",
-		false, "Display version information.")
-	flagSet.BoolVarP(&f.Verbose, "verbose", "v",
-		false,
-		"Enable more detailed logging.")
+	w.collector.Add(uint64(n))
 
-	return flagSet
+	return n, err
 }
 
-func (f *App) GetApp() *models.App {
-	return &f.App
+func (w *Writer) Close() error {
+	return w.writer.Close()
 }

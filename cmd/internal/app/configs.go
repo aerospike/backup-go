@@ -55,6 +55,7 @@ func mapBackupConfig(params *ASBackupParams) (*backup.ConfigBackup, error) {
 	c.Compact = params.BackupParams.Compact
 	c.NoTTLOnly = params.BackupParams.NoTTLOnly
 	c.OutputFilePrefix = params.BackupParams.OutputFilePrefix
+	c.MetricsEnabled = params.App.Verbose
 
 	if params.BackupParams.RackList != "" {
 		list, err := parseRacks(params.BackupParams.RackList)
@@ -164,8 +165,9 @@ func mapBackupXDRConfig(params *ASBackupParams) *backup.ConfigBackupXDR {
 			params.BackupXDRParams.InfoRetriesMultiplier,
 			params.BackupXDRParams.InfoMaxRetries,
 		),
-		MaxThroughput: params.BackupXDRParams.MaxThroughput,
-		Forward:       params.BackupXDRParams.Forward,
+		MaxThroughput:  params.BackupXDRParams.MaxThroughput,
+		Forward:        params.BackupXDRParams.Forward,
+		MetricsEnabled: params.App.Verbose,
 	}
 
 	return c
@@ -195,6 +197,7 @@ func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
 	c.DisableBatchWrites = params.RestoreParams.DisableBatchWrites
 	c.BatchSize = params.RestoreParams.BatchSize
 	c.MaxAsyncBatches = params.RestoreParams.MaxAsyncBatches
+	c.MetricsEnabled = params.App.Verbose
 
 	c.CompressionPolicy = mapCompressionPolicy(params.Compression)
 	c.EncryptionPolicy = mapEncryptionPolicy(params.Encryption)

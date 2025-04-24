@@ -14,6 +14,7 @@
 
 package models
 
+// SecretAgent contains flags that will be mapped to SecretAgentConfig for backup and restore operations.
 type SecretAgent struct {
 	ConnectionType     string
 	Address            string

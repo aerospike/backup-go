@@ -21,6 +21,7 @@ import (
 	"github.com/aerospike/backup-go"
 )
 
+// AzureBlob represents the configuration for Azure Blob storage integration.
 type AzureBlob struct {
 	// Account name + key auth
 	AccountName string

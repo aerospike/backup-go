@@ -215,6 +215,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 
 	// Init app.
 	asrParams := &app.ASRestoreParams{
+		App:           c.flagsApp.GetApp(),
 		ClientConfig:  c.flagsAerospike.NewAerospikeConfig(),
 		ClientPolicy:  c.flagsClientPolicy.GetClientPolicy(),
 		RestoreParams: c.flagsRestore.GetRestore(),

@@ -44,6 +44,7 @@ func Test_BackupRestore(t *testing.T) {
 	hostPort := client.NewDefaultHostTLSPort()
 
 	asbParams := &ASBackupParams{
+		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{
 				hostPort,
@@ -88,6 +89,7 @@ func Test_BackupRestore(t *testing.T) {
 	require.NoError(t, err)
 
 	asrParams := &ASRestoreParams{
+		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{
 				hostPort,
@@ -139,6 +141,7 @@ func Test_BackupWithState(t *testing.T) {
 	hostPort := client.NewDefaultHostTLSPort()
 
 	asbParams := &ASBackupParams{
+		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{
 				hostPort,

@@ -14,6 +14,7 @@
 
 package models
 
+// Encryption contains flags that will be mapped to EncryptionPolicy for backup and restore operations.
 type Encryption struct {
 	Mode      string
 	KeyFile   string

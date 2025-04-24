@@ -12,34 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package flags
+package metrics
 
-import (
-	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/spf13/pflag"
-)
+import "io"
 
-type App struct {
-	models.App
+// Reader wraps an io.Reader to collect metrics on read operations.
+type Reader struct {
+	reader    io.ReadCloser
+	collector *Collector
 }
 
-func NewApp() *App {
-	return &App{}
+// NewReader creates a new metrics wrapper around an existing io.Reader.
+func NewReader(r io.ReadCloser, c *Collector) *Reader {
+	return &Reader{
+		reader:    r,
+		collector: c,
+	}
 }
 
-func (f *App) NewFlagSet() *pflag.FlagSet {
-	flagSet := &pflag.FlagSet{}
+func (r *Reader) Read(p []byte) (n int, err error) {
+	n, err = r.reader.Read(p)
 
-	flagSet.BoolP("help", "Z", false, "Display help information.")
-	flagSet.BoolVarP(&f.Version, "version", "V",
-		false, "Display version information.")
-	flagSet.BoolVarP(&f.Verbose, "verbose", "v",
-		false,
-		"Enable more detailed logging.")
+	r.collector.Add(uint64(n))
 
-	return flagSet
+	return n, err
 }
 
-func (f *App) GetApp() *models.App {
-	return &f.App
+func (r *Reader) Close() error {
+	return r.reader.Close()
 }

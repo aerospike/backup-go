@@ -21,6 +21,7 @@ import (
 	"github.com/aerospike/backup-go"
 )
 
+// AwsS3 represents the configuration for AWS S3 storage integration.
 type AwsS3 struct {
 	BucketName      string
 	Region          string

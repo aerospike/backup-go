@@ -52,4 +52,4 @@ build:
 	@echo "Building asbackup with version $(VERSION)..."
 	go build -o dist/asbackup cmd/asbackup/main.go
 	@echo "Building asrestore with version $(VERSION)..."
-	go build -o dist/asrestore cmd/asbackup/main.go
+	go build -o dist/asrestore cmd/asrestore/main.go

@@ -45,7 +45,7 @@ type RecordReaderConfig struct {
 	// If pageSize = 0, we think that we use normal scan.
 	pageSize int64
 
-	metrics *metrics.RPSCollector
+	rpsCollector *metrics.Collector
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
@@ -59,7 +59,7 @@ func NewRecordReaderConfig(namespace string,
 	scanLimiter *semaphore.Weighted,
 	noTTLOnly bool,
 	pageSize int64,
-	metrics *metrics.RPSCollector,
+	rpsCollector *metrics.Collector,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
 		namespace:       namespace,
@@ -72,7 +72,7 @@ func NewRecordReaderConfig(namespace string,
 		scanLimiter:     scanLimiter,
 		noTTLOnly:       noTTLOnly,
 		pageSize:        pageSize,
-		metrics:         metrics,
+		rpsCollector:    rpsCollector,
 	}
 }
 
@@ -166,7 +166,7 @@ func (r *RecordReader) read() (*models.Token, error) {
 
 	recToken := models.NewRecordToken(&rec, 0, nil)
 
-	r.config.metrics.Increment()
+	r.config.rpsCollector.Increment()
 
 	return recToken, nil
 }

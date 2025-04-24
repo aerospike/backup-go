@@ -20,6 +20,7 @@ const (
 	RestoreModeASBX = "asbx"
 )
 
+// Restore contains flags that will be mapped to restore config.
 type Restore struct {
 	InputFile          string
 	DirectoryList      string

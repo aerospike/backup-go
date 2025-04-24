@@ -79,6 +79,7 @@ func newRestoreHandler[T models.TokenConstraint](
 ) *RestoreHandler[T] {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
+	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id)
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -88,12 +89,20 @@ func newRestoreHandler[T models.TokenConstraint](
 	errorsCh := make(chan error)
 
 	stats := models.NewRestoreStats()
-	rpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond,
-		fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id),
-		config.MetricsEnabled)
-	kbpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
-		fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id),
-		config.MetricsEnabled)
+	rpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricRecordsPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
+	kbpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricKilobytesPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
 
 	readProcessor := newFileReaderProcessor[T](
 		reader,

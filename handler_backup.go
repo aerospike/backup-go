@@ -106,6 +106,7 @@ func newBackupHandler(
 	}
 
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
+	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
 	limiter := makeBandwidthLimiter(config.Bandwidth)
 
@@ -148,12 +149,20 @@ func newBackupHandler(
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  models.NewBackupStats(),
-		rpsCollector: metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond,
-			fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id),
-			config.MetricsEnabled),
-		kbpsCollector: metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
-			fmt.Sprintf("%s metrics  %s", logging.HandlerTypeBackup, id),
-			config.MetricsEnabled),
+		rpsCollector: metrics.NewCollector(
+			ctx,
+			logger,
+			metrics.MetricRecordsPerSecond,
+			metricMessage,
+			config.MetricsEnabled,
+		),
+		kbpsCollector: metrics.NewCollector(
+			ctx,
+			logger,
+			metrics.MetricKilobytesPerSecond,
+			metricMessage,
+			config.MetricsEnabled,
+		),
 	}, nil
 }
 

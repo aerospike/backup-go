@@ -67,6 +67,7 @@ func newBackupXDRHandler(
 ) *HandlerBackupXDR {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
+	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
@@ -77,12 +78,20 @@ func newBackupXDRHandler(
 
 	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
 
-	rpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond,
-		fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id),
-		config.MetricsEnabled)
-	kbpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond,
-		fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id),
-		config.MetricsEnabled)
+	rpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricRecordsPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
+	kbpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricKilobytesPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
 
 	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
 		config,

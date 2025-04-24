@@ -20,6 +20,7 @@ import (
 	"github.com/aerospike/backup-go"
 )
 
+// GcpStorage represents the configuration for GCP storage integration.
 type GcpStorage struct {
 	// Path to file containing Service Account JSON Key.
 	KeyFile string

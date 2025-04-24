@@ -14,6 +14,8 @@
 
 package models
 
+// Backup flags that will be mapped to (scan) backup config.
+// (common for backup and restore flags are in Common).
 type Backup struct {
 	OutputFile          string
 	RemoveFiles         bool

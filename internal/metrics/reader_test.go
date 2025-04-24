@@ -137,7 +137,7 @@ func TestReader_Read(t *testing.T) {
 			}
 
 			if tc.collectorEnabled && tc.readBytes > 0 {
-				assert.Equal(t, uint64(tc.readBytes), collector.counter.Load())
+				assert.Equal(t, uint64(tc.readBytes), collector.processed.Load())
 			}
 		})
 	}

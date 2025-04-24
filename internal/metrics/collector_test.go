@@ -24,11 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	metricRecordsPerSecond   = "rps"
-	metricKilobytesPerSecond = "kbps"
-)
-
 func TestNewPerSecondCollector(t *testing.T) {
 	t.Parallel()
 
@@ -59,20 +54,20 @@ func TestNewPerSecondCollector(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, tc.enabled)
 
 			assert.NotNil(t, collector)
 			assert.Equal(t, ctx, collector.ctx)
 			assert.NotNil(t, collector.Increment)
 			assert.Equal(t, tc.enabled, collector.enabled)
 
-			initialCount := collector.counter.Load()
+			initialCount := collector.processed.Load()
 			collector.Increment()
 
 			if tc.expectEnabled {
-				assert.Equal(t, uint64(1), collector.counter.Load())
+				assert.Equal(t, uint64(1), collector.processed.Load())
 			} else {
-				assert.Equal(t, initialCount, collector.counter.Load())
+				assert.Equal(t, initialCount, collector.processed.Load())
 			}
 		})
 	}
@@ -124,7 +119,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewCollector(ctx, logger, metricRecordsPerSecond, true)
+	collector := NewCollector(ctx, logger, MetricRecordsPerSecond, true)
 	assert.NotNil(t, collector)
 
 	for i := 0; i < 10; i++ {
@@ -184,13 +179,13 @@ func TestPerSecondCollector_Increment(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, tc.enabled)
 
 			for i := 0; i < tc.numCalls; i++ {
 				collector.Increment()
 			}
 
-			assert.Equal(t, tc.expected, collector.counter.Load())
+			assert.Equal(t, tc.expected, collector.processed.Load())
 		})
 	}
 }
@@ -228,11 +223,11 @@ func TestPerSecondCollector_Add(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, metricRecordsPerSecond, tc.enabled)
+			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, tc.enabled)
 
 			collector.Add(tc.value)
 
-			assert.Equal(t, tc.expected, collector.counter.Load())
+			assert.Equal(t, tc.expected, collector.processed.Load())
 		})
 	}
 }
@@ -245,9 +240,9 @@ func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewCollector(ctx, logger, metricKilobytesPerSecond, true)
+	collector := NewCollector(ctx, logger, MetricKilobytesPerSecond, true)
 	assert.NotNil(t, collector)
-	assert.Equal(t, metricKilobytesPerSecond, collector.name)
+	assert.Equal(t, MetricKilobytesPerSecond, collector.name)
 
 	collector.Add(1024)
 

@@ -14,6 +14,7 @@
 
 package models
 
+// ClientPolicy contains flags that will be mapped to ClientPolicy.
 type ClientPolicy struct {
 	Timeout      int64
 	IdleTimeout  int64

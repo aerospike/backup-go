@@ -29,19 +29,25 @@ const (
 
 // Collector tracks and logs metrics such as request rate and counts within a context-managed environment.
 type Collector struct {
-	ctx     context.Context
-	enabled bool
-	name    string
+	ctx context.Context
 
+	// enabled indicates whether the Collector is active and metrics will be tracked and reported.
+	enabled bool
+	// name of the metric, is used for logging.
+	name string
+	// Increment and Add are used to track and report metrics.
 	Increment func()
 	Add       func(n uint64)
 
-	counter  atomic.Uint64
+	// processed tracks the total number of processed requests or operations using an atomic counter.
+	processed atomic.Uint64
+	// lastTime tracks the last time the metrics were reported.
 	lastTime time.Time
-
+	// lastResultMu protects lastResult from concurrent access.
 	lastResultMu sync.RWMutex
-	lastResult   float64
-
+	// lastResult tracks the last calculated RecordsPerSecond value.
+	lastResult float64
+	// logger is used for logging.
 	logger *slog.Logger
 }
 
@@ -62,8 +68,8 @@ func NewCollector(ctx context.Context, logger *slog.Logger, name string, enabled
 	mc.Increment()
 
 	if enabled {
-		mc.Increment = func() { mc.counter.Add(1) }
-		mc.Add = func(n uint64) { mc.counter.Add(n) }
+		mc.Increment = func() { mc.processed.Add(1) }
+		mc.Add = func(n uint64) { mc.processed.Add(n) }
 
 		go mc.report()
 	}
@@ -80,20 +86,20 @@ func (mc *Collector) report() {
 	for {
 		select {
 		case t := <-ticker.C:
-			count := mc.counter.Swap(0)
+			count := mc.processed.Swap(0)
 			elapsed := t.Sub(mc.lastTime).Seconds()
-			rps := float64(count) / elapsed
+			result := float64(count) / elapsed
 
 			// for kbps metric we should divide by 1024.
 			if mc.name == MetricKilobytesPerSecond {
-				rps /= 1024
+				result /= 1024
 			}
 
 			mc.lastResultMu.Lock()
-			mc.lastResult = rps
+			mc.lastResult = result
 			mc.lastResultMu.Unlock()
 
-			mc.logger.Debug("metrics, per second collector", slog.Float64(mc.name, rps))
+			mc.logger.Debug("metrics, per second collector", slog.Float64(mc.name, result))
 
 			mc.lastTime = t
 		case <-mc.ctx.Done():

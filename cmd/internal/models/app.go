@@ -14,6 +14,7 @@
 
 package models
 
+// App contains the global application flags.
 type App struct {
 	Help    bool
 	Version bool

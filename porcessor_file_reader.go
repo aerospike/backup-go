@@ -35,7 +35,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *ConfigRestore
 
-	// bytes per second collector.
+	// kilobytes per second collector.
 	kbpsCollector *metrics.Collector
 
 	readersCh chan models.File

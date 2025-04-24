@@ -84,7 +84,7 @@ type BackupHandler struct {
 
 	// records per second collector.
 	rpsCollector *metrics.Collector
-	// bytes per second collector.
+	// kilobytes per second collector.
 	kbpsCollector *metrics.Collector
 }
 

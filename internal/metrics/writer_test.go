@@ -132,7 +132,7 @@ func TestWriter_Write(t *testing.T) {
 
 			// Verify the collector was updated correctly
 			if tc.collectorEnabled && tc.writeBytes > 0 {
-				assert.Equal(t, uint64(tc.writeBytes), collector.counter.Load())
+				assert.Equal(t, uint64(tc.writeBytes), collector.processed.Load())
 			}
 		})
 	}

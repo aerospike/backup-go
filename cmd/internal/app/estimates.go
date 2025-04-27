@@ -62,8 +62,13 @@ func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Du
 
 	elapsed := time.Since(startTime)
 	totalTime := time.Duration(float64(elapsed) / percentDone)
+	result := totalTime - elapsed
 
-	return totalTime - elapsed
+	if result < 0 {
+		return time.Duration(0)
+	}
+
+	return result
 }
 
 func printRestoreEstimate(ctx context.Context, stats *models.RestoreStats, logger *slog.Logger) {

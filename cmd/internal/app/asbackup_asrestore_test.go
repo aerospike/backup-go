@@ -190,7 +190,7 @@ func Test_BackupWithState(t *testing.T) {
 }
 
 func createRecords(cfg *client.AerospikeConfig, cp *models.ClientPolicy, namespace, set string) error {
-	client, err := newAerospikeClient(cfg, cp, "", 0)
+	client, err := newAerospikeClient(cfg, cp, "", 0, slog.Default())
 	if err != nil {
 		return fmt.Errorf("failed to create aerospike client: %w", err)
 	}

@@ -15,9 +15,11 @@ Usage:
   asrestore [flags]
 
 General Flags:
-  -Z, --help      Display help information.
-  -V, --version   Display version information.
-  -v, --verbose   Enable more detailed logging.
+  -Z, --help               Display help information.
+  -V, --version            Display version information.
+  -v, --verbose            Enable more detailed logging.
+      --log-level string   Determine log level for --verbose output. Log levels are: debug, info, warn, error. (default "debug")
+      --log-json           Set output in JSON format for parsing by external tools.
 
 Aerospike Client Flags:
   -h, --host host[:tls-name][:port][,...]                                                           The Aerospike host. (default 127.0.0.1)

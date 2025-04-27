@@ -17,6 +17,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,7 +62,7 @@ func TestNewLocalWriter(t *testing.T) {
 		AzureBlob:  &models.AzureBlob{},
 	}
 	ctx := context.Background()
-	writer, err := newWriter(ctx, params, nil)
+	writer, err := newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
@@ -75,7 +76,7 @@ func TestNewLocalWriter(t *testing.T) {
 		GcpStorage:   &models.GcpStorage{},
 		AzureBlob:    &models.AzureBlob{},
 	}
-	writer, err = newWriter(ctx, params, nil)
+	writer, err = newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
@@ -87,7 +88,7 @@ func TestNewLocalWriter(t *testing.T) {
 		GcpStorage:   &models.GcpStorage{},
 		AzureBlob:    &models.AzureBlob{},
 	}
-	writer, err = newWriter(ctx, params, nil)
+	writer, err = newWriter(ctx, params, nil, slog.Default())
 	assert.Error(t, err)
 	assert.Nil(t, writer)
 }
@@ -117,7 +118,7 @@ func TestNewS3Writer(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newWriter(ctx, params, nil)
+	writer, err := newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
@@ -137,7 +138,7 @@ func TestNewS3Writer(t *testing.T) {
 		AzureBlob:  &models.AzureBlob{},
 	}
 
-	writer, err = newWriter(ctx, params, nil)
+	writer, err = newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
@@ -195,7 +196,7 @@ func TestGcpWriter(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newWriter(ctx, params, nil)
+	writer, err := newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
@@ -213,7 +214,7 @@ func TestGcpWriter(t *testing.T) {
 		AwsS3:     &models.AwsS3{},
 	}
 
-	writer, err = newWriter(ctx, params, nil)
+	writer, err = newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
@@ -261,7 +262,7 @@ func TestAzureWriter(t *testing.T) {
 
 	ctx := context.Background()
 
-	writer, err := newWriter(ctx, params, nil)
+	writer, err := newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())
@@ -281,7 +282,7 @@ func TestAzureWriter(t *testing.T) {
 		AwsS3:      &models.AwsS3{},
 	}
 
-	writer, err = newWriter(ctx, params, nil)
+	writer, err = newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())

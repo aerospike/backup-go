@@ -17,6 +17,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
@@ -33,31 +34,46 @@ func newWriter(
 	ctx context.Context,
 	params *ASBackupParams,
 	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
 ) (backup.Writer, error) {
 	directory, outputFile := getDirectoryOutputFile(params)
 	shouldClearTarget, continueBackup := getShouldCleanContinue(params)
 	opts := newWriterOpts(directory, outputFile, shouldClearTarget, continueBackup, params.isXDR())
 
+	logger.Info("initializing storage for writer",
+		slog.String("directory", directory),
+		slog.String("output_file", outputFile),
+		slog.Bool("should_clear_target", shouldClearTarget),
+		slog.Bool("continue_backup", continueBackup),
+		slog.Bool("is_xdr", params.isXDR()))
+
 	switch {
-	case params.AwsS3.Region != "":
+	case params.AwsS3.BucketName != "":
+		logger.Info("initializing AWS storage", slog.String("bucket", params.AwsS3.BucketName))
+
 		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
 		}
 
 		return newS3Writer(ctx, params.AwsS3, opts)
 	case params.GcpStorage.BucketName != "":
+		logger.Info("initializing GCP storage", slog.String("bucket", params.GcpStorage.BucketName))
+
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
 		}
 
 		return newGcpWriter(ctx, params.GcpStorage, opts)
 	case params.AzureBlob.ContainerName != "":
+		logger.Info("initializing Azure storage", slog.String("container", params.AzureBlob.ContainerName))
+
 		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
 		}
 
 		return newAzureWriter(ctx, params.AzureBlob, opts)
 	default:
+		logger.Info("initializing local storage")
 		return newLocalWriter(ctx, opts)
 	}
 }

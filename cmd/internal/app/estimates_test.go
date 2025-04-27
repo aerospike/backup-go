@@ -26,8 +26,6 @@ import (
 )
 
 func TestCalculateEstimatedEndTime(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name        string
 		startTime   time.Time
@@ -68,7 +66,6 @@ func TestCalculateEstimatedEndTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := calculateEstimatedEndTime(tt.startTime, tt.percentDone)
 
 			if tt.percentDone < 0.01 {

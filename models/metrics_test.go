@@ -20,24 +20,48 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMetrics_Add(t *testing.T) {
+func TestMetrics_SumMetrics(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		base    *Metrics
 		metrics []*Metrics
 		want    *Metrics
 	}{
 		{
-			name:    "nil base and empty metrics returns nil",
-			base:    nil,
+			name:    "empty metrics returns nil",
 			metrics: []*Metrics{},
 			want:    nil,
 		},
 		{
-			name: "nil base with metrics returns sum of metrics",
-			base: nil,
+			name: "only nil metrics returns empty metrics",
+			metrics: []*Metrics{nil, nil, nil},
+			want: &Metrics{
+				PipelineReadQueueSize:  0,
+				PipelineWriteQueueSize: 0,
+				RecordsPerSecond:       0,
+				KilobytesPerSecond:     0,
+			},
+		},
+		{
+			name: "single metrics returns copy",
+			metrics: []*Metrics{
+				{
+					PipelineReadQueueSize:  10,
+					PipelineWriteQueueSize: 20,
+					RecordsPerSecond:       30,
+					KilobytesPerSecond:     40,
+				},
+			},
+			want: &Metrics{
+				PipelineReadQueueSize:  10,
+				PipelineWriteQueueSize: 20,
+				RecordsPerSecond:       30,
+				KilobytesPerSecond:     40,
+			},
+		},
+		{
+			name: "multiple metrics returns sum",
 			metrics: []*Metrics{
 				{
 					PipelineReadQueueSize:  10,
@@ -51,52 +75,12 @@ func TestMetrics_Add(t *testing.T) {
 					RecordsPerSecond:       25,
 					KilobytesPerSecond:     35,
 				},
-			},
-			want: &Metrics{
-				PipelineReadQueueSize:  15,
-				PipelineWriteQueueSize: 35,
-				RecordsPerSecond:       55,
-				KilobytesPerSecond:     75,
-			},
-		},
-		{
-			name: "base with nil metrics returns base",
-			base: &Metrics{
-				PipelineReadQueueSize:  10,
-				PipelineWriteQueueSize: 20,
-				RecordsPerSecond:       30,
-				KilobytesPerSecond:     40,
-			},
-			metrics: []*Metrics{nil, nil},
-			want: &Metrics{
-				PipelineReadQueueSize:  10,
-				PipelineWriteQueueSize: 20,
-				RecordsPerSecond:       30,
-				KilobytesPerSecond:     40,
-			},
-		},
-		{
-			name: "base with metrics returns sum",
-			base: &Metrics{
-				PipelineReadQueueSize:  10,
-				PipelineWriteQueueSize: 20,
-				RecordsPerSecond:       30,
-				KilobytesPerSecond:     40,
-			},
-			metrics: []*Metrics{
-				{
-					PipelineReadQueueSize:  5,
-					PipelineWriteQueueSize: 15,
-					RecordsPerSecond:       25,
-					KilobytesPerSecond:     35,
-				},
 				{
 					PipelineReadQueueSize:  2,
 					PipelineWriteQueueSize: 3,
 					RecordsPerSecond:       4,
 					KilobytesPerSecond:     5,
 				},
-				nil, // Test handling of nil metrics
 			},
 			want: &Metrics{
 				PipelineReadQueueSize:  17,
@@ -106,18 +90,28 @@ func TestMetrics_Add(t *testing.T) {
 			},
 		},
 		{
-			name: "adding zero metrics returns copy of base",
-			base: &Metrics{
-				PipelineReadQueueSize:  10,
-				PipelineWriteQueueSize: 20,
-				RecordsPerSecond:       30,
-				KilobytesPerSecond:     40,
+			name: "mix of nil and non-nil metrics returns sum",
+			metrics: []*Metrics{
+				nil,
+				{
+					PipelineReadQueueSize:  5,
+					PipelineWriteQueueSize: 15,
+					RecordsPerSecond:       25,
+					KilobytesPerSecond:     35,
+				},
+				nil,
+				{
+					PipelineReadQueueSize:  2,
+					PipelineWriteQueueSize: 3,
+					RecordsPerSecond:       4,
+					KilobytesPerSecond:     5,
+				},
+				nil,
 			},
-			metrics: []*Metrics{},
 			want: &Metrics{
-				PipelineReadQueueSize:  10,
-				PipelineWriteQueueSize: 20,
-				RecordsPerSecond:       30,
+				PipelineReadQueueSize:  7,
+				PipelineWriteQueueSize: 18,
+				RecordsPerSecond:       29,
 				KilobytesPerSecond:     40,
 			},
 		},
@@ -127,9 +121,8 @@ func TestMetrics_Add(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := tt.base.Add(tt.metrics...)
+			got := SumMetrics(tt.metrics...)
 
-			// For the nil case
 			if tt.want == nil {
 				assert.Nil(t, got)
 				return
@@ -140,10 +133,14 @@ func TestMetrics_Add(t *testing.T) {
 			assert.Equal(t, tt.want.RecordsPerSecond, got.RecordsPerSecond)
 			assert.Equal(t, tt.want.KilobytesPerSecond, got.KilobytesPerSecond)
 
-			// Additional test to ensure a copy was made and not a reference
-			if tt.base != nil {
-				tt.base.PipelineReadQueueSize += 1000
-				assert.NotEqual(t, tt.base.PipelineReadQueueSize, got.PipelineReadQueueSize)
+			for _, m := range tt.metrics {
+				if m != nil {
+					originalValue := m.PipelineReadQueueSize
+					m.PipelineReadQueueSize += 1000
+					assert.NotEqual(t, m.PipelineReadQueueSize, got.PipelineReadQueueSize)
+					m.PipelineReadQueueSize = originalValue
+					break
+				}
 			}
 		})
 	}

@@ -35,27 +35,22 @@ func NewMetrics(
 	}
 }
 
-// Add returns a new Metrics object that is the sum of the receiver and another Metrics.
-func (m *Metrics) Add(metrics ...*Metrics) *Metrics {
-	if m == nil && len(metrics) == 0 {
+// SumMetrics returns a new Metrics object that is the sum of Metrics.
+func SumMetrics(metrics ...*Metrics) *Metrics {
+	if len(metrics) == 0 {
 		return nil
 	}
 
 	result := &Metrics{}
-	if m != nil {
-		// Create a copy of m's values, not a reference to m
-		*result = *m
-	}
-
-	for _, other := range metrics {
-		if other == nil {
+	for _, one := range metrics {
+		if one == nil {
 			continue
 		}
 
-		result.PipelineReadQueueSize += other.PipelineReadQueueSize
-		result.PipelineWriteQueueSize += other.PipelineWriteQueueSize
-		result.RecordsPerSecond += other.RecordsPerSecond
-		result.KilobytesPerSecond += other.KilobytesPerSecond
+		result.PipelineReadQueueSize += one.PipelineReadQueueSize
+		result.PipelineWriteQueueSize += one.PipelineWriteQueueSize
+		result.RecordsPerSecond += one.RecordsPerSecond
+		result.KilobytesPerSecond += one.KilobytesPerSecond
 	}
 
 	return result

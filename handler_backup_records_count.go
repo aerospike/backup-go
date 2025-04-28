@@ -102,6 +102,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 // countRecords counts the records returned by the given reader.
 func countRecords(recordReader *aerospike.RecordReader) (uint64, error) {
 	var count uint64
+
 	for {
 		if _, err := recordReader.Read(); err != nil {
 			if errors.Is(err, io.EOF) {
@@ -117,27 +118,20 @@ func countRecords(recordReader *aerospike.RecordReader) (uint64, error) {
 	return count, nil
 }
 
-// randomPartition returns random partition from filters list.
+// randomPartition returns a random partition from the given list of filters.
+// #nosec G404
 func randomPartition(partitionFilters []*a.PartitionFilter) *a.PartitionFilter {
 	if len(partitionFilters) == 0 { // no filter => return any random partition.
-		// #nosec G404
 		return a.NewPartitionFilterById(rand.Intn(MaxPartitions))
 	}
 
-	allPartitionIDs := make([]int, 0, sumPartition(partitionFilters))
+	index := rand.Intn(len(partitionFilters))
+	// get a random filter from the provided list of partition filters
+	randomFilter := partitionFilters[index]
+	// get random partition offset for the filter
+	offset := rand.Intn(randomFilter.Count)
 
-	for _, pf := range partitionFilters {
-		for i := 0; i < pf.Count; i++ {
-			partitionID := pf.Begin + i
-			allPartitionIDs = append(allPartitionIDs, partitionID)
-		}
-	}
-
-	// #nosec G404
-	randomIndex := rand.Intn(len(allPartitionIDs))
-	randomPartitionID := allPartitionIDs[randomIndex]
-
-	return a.NewPartitionFilterById(randomPartitionID)
+	return a.NewPartitionFilterById(randomFilter.Begin + offset)
 }
 
 // sumPartition returns total number of partitions in filters list.

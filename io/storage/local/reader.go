@@ -37,6 +37,9 @@ type Reader struct {
 	// If objectsToStream is not set, we iterate through objects in storage and load them.
 	// If set, we load objects from this slice directly.
 	objectsToStream []string
+
+	// total size of all objects in a folder.
+	totalSize int64
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -55,8 +58,10 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 
 	if r.IsDir {
 		if !r.SkipDirCheck {
-			if err := r.checkRestoreDirectory(r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+			for _, path := range r.PathList {
+				if err := r.checkRestoreDirectory(path); err != nil {
+					return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+				}
 			}
 		}
 
@@ -167,6 +172,14 @@ func (r *Reader) StreamFile(
 		return
 	}
 
+	stat, err := reader.Stat()
+	if err != nil {
+		errorsCh <- fmt.Errorf("failed to get file stats %s: %w", filename, err)
+		return
+	}
+
+	r.totalSize += stat.Size()
+
 	readersCh <- models.File{Reader: reader, Name: filepath.Base(filename)}
 }
 
@@ -178,6 +191,8 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 		// Handle the error
 		return fmt.Errorf("failed to get path info %s: %w", dir, err)
 	}
+
+	r.totalSize += dirInfo.Size()
 
 	if !dirInfo.IsDir() {
 		// Handle the case when it's not a directory
@@ -279,4 +294,9 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 // GetType returns the type of the reader.
 func (r *Reader) GetType() string {
 	return localType
+}
+
+// GetSize returns the size of the file/dir that was initialized.
+func (r *Reader) GetSize() int64 {
+	return r.totalSize
 }

@@ -27,7 +27,7 @@ import (
 )
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
-	if bh.config.isFullBackup() {
+	if bh.config.withoutFilter() {
 		return bh.countUsingInfoClient(infoClient)
 	}
 

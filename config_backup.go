@@ -170,8 +170,7 @@ func (c *ConfigBackup) isStateContinue() bool {
 	return c.StateFile != "" && c.Continue
 }
 
-func (c *ConfigBackup) isFullBackup() bool {
-	// full backup doesn't have a lower bound.
+func (c *ConfigBackup) withoutFilter() bool {
 	return c.ModAfter == nil && c.ScanPolicy.FilterExpression == nil
 }
 

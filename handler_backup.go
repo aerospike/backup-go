@@ -320,7 +320,7 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 func (bh *BackupHandler) countRecords(ctx context.Context) {
 	records, err := bh.recordHandler.countRecords(ctx, bh.infoClient)
 	if err != nil {
-		bh.logger.Error("failed to count records", "error", err)
+		bh.logger.Error("failed to count records", slog.Any("error", err))
 	}
 
 	bh.stats.TotalRecords.Store(records)

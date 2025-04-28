@@ -25,6 +25,7 @@ import (
 func printBackupEstimate(ctx context.Context, stats *models.BackupStats, logger *slog.Logger) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	var previousVal float64
 
 	for {
 		select {
@@ -45,15 +46,17 @@ func printBackupEstimate(ctx context.Context, stats *models.BackupStats, logger 
 			case percentage*100 < 1:
 				// Start printing only when we have somthing.
 				continue
+			case previousVal - percentage < 0.01:
+				// if less than 1% then don't print anything.
+				continue
 			}
 
-			//TODO: if less than 1% then don't print anything.
-
 			logger.Info("progress",
-				slog.Int64("pct", int64(percentage*100)),
+				slog.Uint64("pct", uint64(percentage*100)),
 				slog.Duration("remaining", estimatedEndTime),
 			)
 
+			previousVal = percentage
 		case <-ctx.Done():
 			return
 		}

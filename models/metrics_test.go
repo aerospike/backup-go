@@ -34,7 +34,7 @@ func TestMetrics_SumMetrics(t *testing.T) {
 			want:    nil,
 		},
 		{
-			name: "only nil metrics returns empty metrics",
+			name:    "only nil metrics returns empty metrics",
 			metrics: []*Metrics{nil, nil, nil},
 			want: &Metrics{
 				PipelineReadQueueSize:  0,
@@ -134,13 +134,15 @@ func TestMetrics_SumMetrics(t *testing.T) {
 			assert.Equal(t, tt.want.KilobytesPerSecond, got.KilobytesPerSecond)
 
 			for _, m := range tt.metrics {
-				if m != nil {
-					originalValue := m.PipelineReadQueueSize
-					m.PipelineReadQueueSize += 1000
-					assert.NotEqual(t, m.PipelineReadQueueSize, got.PipelineReadQueueSize)
-					m.PipelineReadQueueSize = originalValue
-					break
+				if m == nil {
+					continue
 				}
+
+				originalValue := m.PipelineReadQueueSize
+				m.PipelineReadQueueSize += 1000
+				assert.NotEqual(t, m.PipelineReadQueueSize, got.PipelineReadQueueSize)
+				m.PipelineReadQueueSize = originalValue
+				break
 			}
 		})
 	}

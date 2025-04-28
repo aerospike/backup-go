@@ -246,11 +246,10 @@ func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 
 // GetMetrics returns the rpsCollector of the backup job.
 func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
-	if bh.pl == nil {
-		return &models.Metrics{}
+	var pr, pw int
+	if bh.pl != nil {
+		pr, pw = bh.pl.GetMetrics()
 	}
-
-	pr, pw := bh.pl.GetMetrics()
 
 	return models.NewMetrics(
 		pr, pw,

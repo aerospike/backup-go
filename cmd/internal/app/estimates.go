@@ -47,8 +47,13 @@ func printBackupEstimate(ctx context.Context, stats *models.BackupStats, logger 
 				continue
 			}
 
-			logger.Info("complete", slog.Int64("%", int64(percentage*100)))
-			logger.Info("estimates", slog.Duration("remains", estimatedEndTime))
+			//TODO: if less than 1% then don't print anything.
+
+			logger.Info("progress",
+				slog.Int64("pct", int64(percentage*100)),
+				slog.Duration("remaining", estimatedEndTime),
+			)
+
 		case <-ctx.Done():
 			return
 		}
@@ -82,6 +87,7 @@ func printRestoreEstimate(ctx context.Context, stats *models.RestoreStats, logge
 				stats.GetRecordsExpired() + stats.GetRecordsFresher()
 
 			// We don't know total records count, so can't calculate estimates.
+			// TODO: get dir size and calc %
 			if done > 0 {
 				logger.Info("complete", slog.Uint64("count", done))
 			}

@@ -38,6 +38,8 @@ type Encoder[T models.TokenConstraint] struct {
 
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
+
+	buffer *bytes.Buffer
 }
 
 // NewEncoder creates a new Encoder.
@@ -45,6 +47,7 @@ func NewEncoder[T models.TokenConstraint](namespace string, compact bool) *Encod
 	return &Encoder[T]{
 		namespace: namespace,
 		compact:   compact,
+		buffer:    bytes.NewBuffer(make([]byte, 0, 256)),
 	}
 }
 
@@ -67,7 +70,8 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 		err error
 	)
 
-	buff := bytes.NewBuffer(make([]byte, 0, 256))
+	e.buffer.Reset()
+	buff := e.buffer
 
 	switch t.Type {
 	case models.TokenTypeRecord:
@@ -102,8 +106,8 @@ func (e *Encoder[T]) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (in
 }
 
 func (e *Encoder[T]) GetHeader(_ uint64) []byte {
-	// capacity is arbitrary, just probably enough to avoid reallocations
-	buff := bytes.NewBuffer(make([]byte, 0, 256))
+	e.buffer.Reset()
+	buff := e.buffer
 
 	writeVersionText(FormatVersion, buff)
 

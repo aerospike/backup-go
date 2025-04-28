@@ -14,25 +14,45 @@
 
 package models
 
-import "github.com/aerospike/backup-go/internal/metrics"
-
 // Metrics contains app metrics.
 type Metrics struct {
 	PipelineReadQueueSize  int
 	PipelineWriteQueueSize int
-	RecordsPerSecond       float64
-	KilobytesPerSecond     float64
+	RecordsPerSecond       uint64
+	KilobytesPerSecond     uint64
 }
 
 // NewMetrics returns a new Metrics with the provided values.
 func NewMetrics(
 	pr, pw int,
-	rps, kbps *metrics.Collector,
+	rps, kbps uint64,
 ) *Metrics {
 	return &Metrics{
 		PipelineReadQueueSize:  pr,
 		PipelineWriteQueueSize: pw,
-		RecordsPerSecond:       rps.GetLastResult(),
-		KilobytesPerSecond:     kbps.GetLastResult(),
+		RecordsPerSecond:       rps,
+		KilobytesPerSecond:     kbps,
 	}
+}
+
+// SumMetrics returns a new Metrics object that is the sum of Metrics.
+func SumMetrics(metrics ...*Metrics) *Metrics {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	result := &Metrics{}
+
+	for _, one := range metrics {
+		if one == nil {
+			continue
+		}
+
+		result.PipelineReadQueueSize += one.PipelineReadQueueSize
+		result.PipelineWriteQueueSize += one.PipelineWriteQueueSize
+		result.RecordsPerSecond += one.RecordsPerSecond
+		result.KilobytesPerSecond += one.KilobytesPerSecond
+	}
+
+	return result
 }

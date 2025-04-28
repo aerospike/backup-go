@@ -238,6 +238,18 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 
 // GetMetrics returns the rpsCollector of the backup job.
 func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
-	pr, pw := rh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, rh.rpsCollector, rh.kbpsCollector)
+	if rh == nil {
+		return nil
+	}
+
+	var pr, pw int
+	if rh.pl != nil {
+		pr, pw = rh.pl.GetMetrics()
+	}
+
+	return models.NewMetrics(
+		pr, pw,
+		rh.rpsCollector.GetLastResult(),
+		rh.kbpsCollector.GetLastResult(),
+	)
 }

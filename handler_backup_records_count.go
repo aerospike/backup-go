@@ -89,6 +89,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 		return 0, fmt.Errorf("failed to get nodes: %w", err)
 	}
 
+	// #nosec G404
 	randomIndex := rand.Intn(len(nodes))
 	randomNode := []*a.Node{nodes[randomIndex]}
 	readerConfig := bh.recordReaderConfigForNode(randomNode, scanPolicy)
@@ -126,6 +127,7 @@ func randomPartition(partitionFilters []*a.PartitionFilter) *a.PartitionFilter {
 		}
 	}
 
+	// #nosec G404
 	randomIndex := rand.Intn(len(allPartitionIDs))
 	randomPartitionID := allPartitionIDs[randomIndex]
 

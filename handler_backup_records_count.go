@@ -68,16 +68,9 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Co
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 	defer recordReader.Close()
 
-	for {
-		if _, err := recordReader.Read(); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-
-			return 0, fmt.Errorf("error during records counting: %w", err)
-		}
-
-		count++
+	count, err := countRecords(recordReader)
+	if err != nil {
+		return 0, err
 	}
 
 	return count * uint64(sumPartition(bh.config.PartitionFilters)), nil
@@ -98,8 +91,17 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 	defer recordReader.Close()
 
-	var count uint64
+	count, err := countRecords(recordReader)
+	if err != nil {
+		return 0, err
+	}
 
+	return count * uint64(len(nodes)), nil
+}
+
+// countRecords counts the records returned by the given reader.
+func countRecords(recordReader *aerospike.RecordReader) (uint64, error) {
+	var count uint64
 	for {
 		if _, err := recordReader.Read(); err != nil {
 			if errors.Is(err, io.EOF) {
@@ -112,7 +114,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 		count++
 	}
 
-	return count * uint64(len(nodes)), nil
+	return count, nil
 }
 
 // randomPartition returns random partition from filters list.

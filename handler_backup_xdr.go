@@ -151,13 +151,12 @@ func (bh *HandlerBackupXDR) run() {
 }
 
 func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
-	var err error
-
 	// Count total records.
-	bh.stats.TotalRecords, err = bh.infoClient.GetRecordCount(bh.config.Namespace, nil)
+	records, err := bh.infoClient.GetRecordCount(bh.config.Namespace, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get records count: %w", err)
 	}
+	bh.stats.TotalRecords.Store(records)
 
 	// Read workers.
 	readWorkers, err := bh.readProcessor.newReadWorkersXDR(ctx)

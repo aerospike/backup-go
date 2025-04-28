@@ -50,7 +50,7 @@ func printBackupReport(stats *bModels.BackupStats, isXdr bool) {
 	fmt.Println()
 
 	printMetric("Bytes Written", stats.GetBytesWritten())
-	printMetric("Total Records", stats.TotalRecords)
+	printMetric("Total Records", stats.TotalRecords.Load())
 	printMetric("Files Written", stats.GetFileCount())
 }
 

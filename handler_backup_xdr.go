@@ -156,6 +156,7 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get records count: %w", err)
 	}
+
 	bh.stats.TotalRecords.Store(records)
 
 	// Read workers.

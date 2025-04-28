@@ -41,6 +41,7 @@ func (bh *backupRecordsHandler) countUsingInfoClient(infoClient *asinfo.InfoClie
 	}
 
 	partitionsToScan := uint64(sumPartition(bh.config.PartitionFilters))
+
 	return totalRecordCount * MaxPartitions / partitionsToScan, nil
 }
 
@@ -62,8 +63,8 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Co
 	var count uint64
 
 	partitionFilter := randomPartition(bh.config.PartitionFilters)
-
 	readerConfig := bh.recordReaderConfigForPartitions(partitionFilter, scanPolicy)
+
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 	defer recordReader.Close()
 
@@ -93,10 +94,12 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 	randomIndex := rand.Intn(len(nodes))
 	randomNode := []*a.Node{nodes[randomIndex]}
 	readerConfig := bh.recordReaderConfigForNode(randomNode, scanPolicy)
+
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 	defer recordReader.Close()
 
 	var count uint64
+
 	for {
 		if _, err := recordReader.Read(); err != nil {
 			if errors.Is(err, io.EOF) {

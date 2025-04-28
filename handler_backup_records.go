@@ -388,6 +388,15 @@ func (bh *backupRecordsHandler) recordReaderConfigForNode(
 
 // GetMetrics returns the rpsCollector of the backup job.
 func (bh *backupRecordsHandler) GetMetrics() *models.Metrics {
+	if bh.pl == nil {
+		return &models.Metrics{}
+	}
+
 	pr, pw := bh.pl.GetMetrics()
-	return models.NewMetrics(pr, pw, bh.rpsCollector, bh.kbpsCollector)
+
+	return models.NewMetrics(
+		pr, pw,
+		bh.rpsCollector.GetLastResult(),
+		bh.kbpsCollector.GetLastResult(),
+	)
 }

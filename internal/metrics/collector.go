@@ -17,7 +17,6 @@ package metrics
 import (
 	"context"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -45,10 +44,8 @@ type Collector struct {
 	processed atomic.Uint64
 	// lastTime tracks the last time the metrics were reported.
 	lastTime time.Time
-	// lastResultMu protects lastResult from concurrent access.
-	lastResultMu sync.RWMutex
 	// lastResult tracks the last calculated RecordsPerSecond value.
-	lastResult float64
+	lastResult atomic.Uint64
 	// logger is used for logging.
 	logger *slog.Logger
 }
@@ -103,12 +100,8 @@ func (mc *Collector) report() {
 				result /= 1024
 			}
 
-			mc.lastResultMu.Lock()
-			mc.lastResult = result
-			mc.lastResultMu.Unlock()
-
+			mc.lastResult.Store(uint64(result))
 			mc.logger.Debug(mc.message, slog.Float64(mc.name, result))
-
 			mc.lastTime = t
 		case <-mc.ctx.Done():
 			return
@@ -117,13 +110,10 @@ func (mc *Collector) report() {
 }
 
 // GetLastResult returns the last calculated RecordsPerSecond value.
-func (mc *Collector) GetLastResult() float64 {
+func (mc *Collector) GetLastResult() uint64 {
 	if mc == nil {
 		return 0
 	}
 
-	mc.lastResultMu.RLock()
-	defer mc.lastResultMu.RUnlock()
-
-	return mc.lastResult
+	return mc.lastResult.Load()
 }

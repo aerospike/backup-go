@@ -78,10 +78,16 @@ func TestNewPerSecondCollector(t *testing.T) {
 func TestPerSecondCollector_GetLastResult(t *testing.T) {
 	t.Parallel()
 
+	collectorWithValue := &Collector{}
+	collectorWithValue.lastResult.Store(42)
+
+	collectorWithZero := &Collector{}
+	collectorWithZero.lastResult.Store(0)
+
 	tests := []struct {
 		name           string
 		collector      *Collector
-		expectedResult float64
+		expectedResult uint64
 	}{
 		{
 			name:           "nil collector returns 0",
@@ -89,17 +95,13 @@ func TestPerSecondCollector_GetLastResult(t *testing.T) {
 			expectedResult: 0,
 		},
 		{
-			name: "collector with lastResult returns correct value",
-			collector: &Collector{
-				lastResult: 42.5,
-			},
-			expectedResult: 42.5,
+			name:           "collector with lastResult returns correct value",
+			collector:      collectorWithValue,
+			expectedResult: 42,
 		},
 		{
-			name: "collector with zero lastResult returns 0",
-			collector: &Collector{
-				lastResult: 0,
-			},
+			name:           "collector with zero lastResult returns 0",
+			collector:      collectorWithZero,
 			expectedResult: 0,
 		},
 	}

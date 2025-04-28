@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
@@ -39,7 +40,7 @@ type Reader struct {
 	objectsToStream []string
 
 	// total size of all objects in a folder.
-	totalSize int64
+	totalSize atomic.Int64
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -178,7 +179,7 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	r.totalSize += stat.Size()
+	r.totalSize.Store(stat.Size())
 
 	readersCh <- models.File{Reader: reader, Name: filepath.Base(filename)}
 }
@@ -192,7 +193,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 		return fmt.Errorf("failed to get path info %s: %w", dir, err)
 	}
 
-	r.totalSize += dirInfo.Size()
+	r.totalSize.Add(dirInfo.Size())
 
 	if !dirInfo.IsDir() {
 		// Handle the case when it's not a directory
@@ -298,5 +299,5 @@ func (r *Reader) GetType() string {
 
 // GetSize returns the size of the file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
-	return r.totalSize
+	return r.totalSize.Load()
 }

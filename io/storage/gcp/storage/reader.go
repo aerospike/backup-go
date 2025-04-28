@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"cloud.google.com/go/storage"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
@@ -46,7 +47,7 @@ type Reader struct {
 	objectsToStream []string
 
 	// total size of all objects in a folder.
-	totalSize int64
+	totalSize atomic.Int64
 }
 
 // NewReader returns new GCP storage directory/file reader.
@@ -316,7 +317,7 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 	for _, path := range r.PathList {
 		size, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
-			r.totalSize = 0
+			// TODO: waht to do with error? interrupt reader?
 			return
 		}
 
@@ -324,10 +325,15 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 	}
 
 	// set size when everything is ready.
-	r.totalSize = totalSize
+	r.totalSize.Store(totalSize)
 }
 
 func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (int64, error) {
+	// if we have file to calculate.
+	if !r.IsDir {
+		
+	}
+
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix:      path,
 		StartOffset: r.StartAfter,
@@ -358,4 +364,9 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 	}
 
 	return totalSize, nil
+}
+
+// GetSize returns the size of the file/dir that was initialized.
+func (r *Reader) GetSize() int64 {
+	return r.totalSize.Load()
 }

@@ -317,7 +317,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup of indexes and udfs: %w", err)
 		}
 
-		go printBackupEstimate(ctx, hXdr.GetStats(), b.logger)
+		go printBackupEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, b.logger)
 
 		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr backup: %w", err)
@@ -337,7 +337,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}
 
-		go printBackupEstimate(ctx, h.GetStats(), b.logger)
+		go printBackupEstimate(ctx, h.GetStats(), h.GetMetrics, b.logger)
 
 		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to backup: %w", err)

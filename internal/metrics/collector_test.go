@@ -78,10 +78,16 @@ func TestNewPerSecondCollector(t *testing.T) {
 func TestPerSecondCollector_GetLastResult(t *testing.T) {
 	t.Parallel()
 
+	collectorWithValue := &Collector{}
+	collectorWithValue.lastResult.Store(42)
+
+	collectorWithZero := &Collector{}
+	collectorWithZero.lastResult.Store(0)
+
 	tests := []struct {
 		name           string
 		collector      *Collector
-		expectedResult float64
+		expectedResult uint64
 	}{
 		{
 			name:           "nil collector returns 0",
@@ -89,17 +95,13 @@ func TestPerSecondCollector_GetLastResult(t *testing.T) {
 			expectedResult: 0,
 		},
 		{
-			name: "collector with lastResult returns correct value",
-			collector: &Collector{
-				lastResult: 42.5,
-			},
-			expectedResult: 42.5,
+			name:           "collector with lastResult returns correct value",
+			collector:      collectorWithValue,
+			expectedResult: 42,
 		},
 		{
-			name: "collector with zero lastResult returns 0",
-			collector: &Collector{
-				lastResult: 0,
-			},
+			name:           "collector with zero lastResult returns 0",
+			collector:      collectorWithZero,
 			expectedResult: 0,
 		},
 	}
@@ -131,7 +133,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond)
 
 	result := collector.GetLastResult()
-	assert.Greater(t, result, float64(0), "Expected RecordsPerSecond to be greater than 0")
+	assert.Greater(t, result, uint64(0), "Expected RecordsPerSecond to be greater than 0")
 
 	cancel()
 
@@ -246,12 +248,13 @@ func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 	assert.NotNil(t, collector)
 	assert.Equal(t, MetricKilobytesPerSecond, collector.name)
 
-	collector.Add(1024)
+	// because of rounding to uint, we should use 1024 for the test.
+	collector.Add(1025)
 
 	time.Sleep(1500 * time.Millisecond)
 
 	result := collector.GetLastResult()
-	assert.Greater(t, result, float64(0), "Expected KilobytesPerSecond to be greater than 0")
+	assert.Greater(t, result, uint64(0), "Expected KilobytesPerSecond to be greater than 0")
 
 	// The result should be approximately 1 KB/s (with some tolerance for timing variations)
 	// Since we added 1024 bytes and waited ~1 second

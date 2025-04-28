@@ -16,13 +16,19 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/aerospike/backup-go/models"
 )
 
-func printBackupEstimate(ctx context.Context, stats *models.BackupStats, logger *slog.Logger) {
+func printBackupEstimate(
+	ctx context.Context,
+	stats *models.BackupStats,
+	getMetrics func() *models.Metrics,
+	logger *slog.Logger,
+) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	var previousVal float64
@@ -46,14 +52,29 @@ func printBackupEstimate(ctx context.Context, stats *models.BackupStats, logger 
 			case percentage*100 < 1:
 				// Start printing only when we have somthing.
 				continue
-			case previousVal - percentage < 0.01:
+			case percentage-previousVal < 0.01:
+				fmt.Println("cont")
+				fmt.Println(previousVal)
+				fmt.Println(percentage)
+				fmt.Println(previousVal - percentage)
 				// if less than 1% then don't print anything.
 				continue
+			}
+
+			var (
+				rps, kbps uint64
+			)
+			metrics := getMetrics()
+			if metrics != nil {
+				rps = metrics.RecordsPerSecond
+				kbps = metrics.KilobytesPerSecond
 			}
 
 			logger.Info("progress",
 				slog.Uint64("pct", uint64(percentage*100)),
 				slog.Duration("remaining", estimatedEndTime),
+				slog.Uint64("rec/s", rps),
+				slog.Uint64("KiB/s", kbps),
 			)
 
 			previousVal = percentage

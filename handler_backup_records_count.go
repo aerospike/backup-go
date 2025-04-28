@@ -18,11 +18,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"math/rand"
+
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/io/aerospike"
-	"io"
-	"math/rand"
 )
 
 func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {

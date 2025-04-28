@@ -589,5 +589,9 @@ func (bh *BackupHandler) backupUDFs(
 
 // GetMetrics returns the rpsCollector of the backup job.
 func (bh *BackupHandler) GetMetrics() *models.Metrics {
+	if bh.recordHandler == nil {
+		return &models.Metrics{}
+	}
+
 	return bh.recordHandler.GetMetrics()
 }

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -58,6 +59,9 @@ type Reader struct {
 
 	// objectsToWarm is used to track the current number of restoring objects.
 	objectsToWarm []string
+
+	// total size of all objects in a path.
+	totalSize atomic.Int64
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -125,6 +129,8 @@ func NewReader(
 
 		r.Logger.Debug("finish warming storage")
 	}
+
+	go r.calculateTotalSize(ctx)
 
 	return r, nil
 }
@@ -516,4 +522,69 @@ func isSkippedByStartAfter(startAfter, fileName string) bool {
 	}
 
 	return false
+}
+
+func (r *Reader) calculateTotalSize(ctx context.Context) {
+	var totalSize int64
+	for _, path := range r.PathList {
+		size, err := r.calculateTotalSizeForPath(ctx, path)
+		if err != nil {
+			// TODO: waht to do with error? interrupt reader?
+			return
+		}
+
+		totalSize += size
+	}
+
+	// set size when everything is ready.
+	r.totalSize.Store(totalSize)
+}
+
+func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (int64, error) {
+	// if we have file to calculate.
+	if !r.IsDir {
+		objProps, err := r.client.ServiceClient().
+			NewContainerClient(r.containerName).
+			NewBlobClient(path).GetProperties(ctx, nil)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+		}
+
+		if objProps.ContentLength == nil {
+			return 0, fmt.Errorf("failed to get length of object %s", path)
+		}
+
+		return *objProps.ContentLength, nil
+	}
+
+	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
+		Prefix: &path,
+	})
+
+	var totalSize int64
+
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		for _, blobItem := range page.Segment.BlobItems {
+			// Skip files in folders.
+			if r.shouldSkip(path, *blobItem.Name) {
+				continue
+			}
+
+			if err = r.Validator.Run(*blobItem.Name); err == nil {
+				totalSize += *blobItem.Properties.ContentLength
+			}
+		}
+	}
+
+	return totalSize, nil
+}
+
+// GetSize returns the size of the file/dir that was initialized.
+func (r *Reader) GetSize() int64 {
+	return r.totalSize.Load()
 }

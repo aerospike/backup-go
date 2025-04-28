@@ -124,7 +124,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
-		go printRestoreEstimate(ctx, h.GetStats(), r.logger)
+		go printRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
 
 		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to asb restore: %w", err)
@@ -140,7 +140,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start asbx restore: %w", err)
 		}
 
-		go printRestoreEstimate(ctx, hXdr.GetStats(), r.logger)
+		go printRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
 
 		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to asbx restore: %w", err)
@@ -177,7 +177,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 					return
 				}
 
-				go printRestoreEstimate(ctx, h.GetStats(), r.logger)
+				go printRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
 
 				if err = h.Wait(ctx); err != nil {
 					errChan <- fmt.Errorf("failed to asb restore: %w", err)
@@ -209,7 +209,7 @@ func (r *ASRestore) Run(ctx context.Context) error {
 					return
 				}
 
-				go printRestoreEstimate(ctx, hXdr.GetStats(), r.logger)
+				go printRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
 
 				if err = hXdr.Wait(ctx); err != nil {
 					errChan <- fmt.Errorf("failed to asbx restore: %w", err)

@@ -39,7 +39,7 @@ type Reader struct {
 	// If set, we load objects from this slice directly.
 	objectsToStream []string
 
-	// total size of all objects in a folder.
+	// total size of all objects in a path.
 	totalSize atomic.Int64
 }
 

@@ -46,7 +46,7 @@ type Reader struct {
 	// If set, we load objects from this slice directly.
 	objectsToStream []string
 
-	// total size of all objects in a folder.
+	// total size of all objects in a path.
 	totalSize atomic.Int64
 }
 
@@ -93,6 +93,8 @@ func NewReader(
 			}
 		}
 	}
+
+	go r.calculateTotalSize(ctx)
 
 	return r, nil
 }
@@ -331,7 +333,12 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (int64, error) {
 	// if we have file to calculate.
 	if !r.IsDir {
-		
+		objAttrs, err := r.bucketHandle.Object(path).Attrs(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+		}
+
+		return objAttrs.Size, nil
 	}
 
 	it := r.bucketHandle.Objects(ctx, &storage.Query{

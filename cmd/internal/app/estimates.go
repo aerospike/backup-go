@@ -100,22 +100,62 @@ func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Du
 	return result
 }
 
-func printRestoreEstimate(ctx context.Context, stats *models.RestoreStats, logger *slog.Logger) {
+func printRestoreEstimate(
+	ctx context.Context,
+	stats *models.RestoreStats,
+	getMetrics func() *models.Metrics,
+	getSize func() int64,
+	logger *slog.Logger,
+) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	var previousVal float64
 
 	for {
 		select {
 		case <-ticker.C:
-			done := stats.GetRecordsInserted() + stats.GetRecordsSkipped() + stats.GetRecordsExisted() +
-				stats.GetRecordsExpired() + stats.GetRecordsFresher()
-
-			// We don't know total records count, so can't calculate estimates.
-			// TODO: get dir size and calc %
-			if done > 0 {
-				logger.Info("complete", slog.Uint64("count", done))
+			totalSize := getSize()
+			if totalSize == 0 {
+				continue
 			}
 
+			done := stats.GetTotalBytesRead()
+			percentage := float64(done) / float64(totalSize)
+			estimatedEndTime := calculateEstimatedEndTime(stats.StartTime, percentage)
+
+			switch {
+			case percentage >= 1:
+				// Exit after 100%.
+				return
+			case percentage*100 < 1:
+				// Start printing only when we have somthing.
+				continue
+			case percentage-previousVal < 0.01:
+				fmt.Println("cont")
+				fmt.Println(previousVal)
+				fmt.Println(percentage)
+				fmt.Println(previousVal - percentage)
+				// if less than 1% then don't print anything.
+				continue
+			}
+
+			var (
+				rps, kbps uint64
+			)
+			metrics := getMetrics()
+			if metrics != nil {
+				rps = metrics.RecordsPerSecond
+				kbps = metrics.KilobytesPerSecond
+			}
+
+			logger.Info("progress",
+				slog.Uint64("pct", uint64(percentage*100)),
+				slog.Duration("remaining", estimatedEndTime),
+				slog.Uint64("rec/s", rps),
+				slog.Uint64("KiB/s", kbps),
+			)
+
+			previousVal = percentage
 		case <-ctx.Done():
 			return
 		}

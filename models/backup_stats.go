@@ -24,7 +24,7 @@ type BackupStats struct {
 	*commonStats
 	fileCount atomic.Uint64
 	// total number of records in database
-	TotalRecords uint64
+	TotalRecords atomic.Uint64
 }
 
 // NewBackupStats returns new backup stats.
@@ -62,7 +62,7 @@ func SumBackupStats(stats ...*BackupStats) *BackupStats {
 
 		result.commonStats = sumCommonStats(result.commonStats, stat.commonStats)
 		result.fileCount.Add(stat.GetFileCount())
-		result.TotalRecords += stat.TotalRecords
+		result.TotalRecords.Add(stat.TotalRecords.Load())
 	}
 
 	return result

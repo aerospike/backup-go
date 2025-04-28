@@ -118,6 +118,7 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 // randomPartition returns random partition from filters list.
 func randomPartition(partitionFilters []*a.PartitionFilter) *a.PartitionFilter {
 	if len(partitionFilters) == 0 { // no filter => return any random partition.
+		// #nosec G404
 		return a.NewPartitionFilterById(rand.Intn(MaxPartitions))
 	}
 

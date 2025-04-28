@@ -303,7 +303,9 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		bh.kbpsCollector,
 	)
 
-	// start counting records in goroutine because it should not delay actual backup.
+	// start counting backup records in a separate goroutine to estimate the total number of records.
+	// This is done in parallel with the backup process to avoid delaying the start of the backup.
+	// The estimated backup record count will be available in statistics once the estimation process is completed.
 	go bh.countRecords(ctx)
 
 	if bh.config.isStateContinue() {
@@ -321,6 +323,7 @@ func (bh *BackupHandler) countRecords(ctx context.Context) {
 	records, err := bh.recordHandler.countRecords(ctx, bh.infoClient)
 	if err != nil {
 		bh.logger.Error("failed to count records", slog.Any("error", err))
+		return
 	}
 
 	bh.stats.TotalRecords.Store(records)

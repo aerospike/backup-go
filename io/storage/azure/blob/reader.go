@@ -576,8 +576,10 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 				continue
 			}
 
-			if err = r.Validator.Run(*blobItem.Name); err == nil {
-				totalSize += *blobItem.Properties.ContentLength
+			if r.Validator != nil {
+				if err = r.Validator.Run(*blobItem.Name); err == nil {
+					totalSize += *blobItem.Properties.ContentLength
+				}
 			}
 		}
 	}

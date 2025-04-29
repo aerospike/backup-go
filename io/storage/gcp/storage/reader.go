@@ -366,8 +366,10 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 			continue
 		}
 
-		if err = r.Validator.Run(objAttrs.Name); err == nil {
-			totalSize += objAttrs.Size
+		if r.Validator != nil {
+			if err = r.Validator.Run(objAttrs.Name); err == nil {
+				totalSize += objAttrs.Size
+			}
 		}
 	}
 

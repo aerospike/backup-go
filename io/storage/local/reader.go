@@ -347,14 +347,15 @@ func (r *Reader) calculateTotalSizeForPath(path string) (int64, error) {
 			continue
 		}
 
-		// If we found a valid file, return.
-		if err = r.Validator.Run(file.Name()); err == nil {
-			info, err := file.Info()
-			if err != nil {
-				return 0, fmt.Errorf("failed to get file info %s: %w", path, err)
-			}
+		if r.Validator != nil {
+			if err = r.Validator.Run(file.Name()); err == nil {
+				info, err := file.Info()
+				if err != nil {
+					return 0, fmt.Errorf("failed to get file info %s: %w", path, err)
+				}
 
-			totalSize += info.Size()
+				totalSize += info.Size()
+			}
 		}
 	}
 

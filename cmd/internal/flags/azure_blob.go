@@ -76,7 +76,7 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	switch f.operation {
 	case OperationBackup:
 		flagSet.IntVar(&f.BlockSize, "azure-block-size",
-			5242880,
+			models.DefaultChunkSize,
 			"Block size defines the size of the buffer used during upload.")
 	case OperationRestore:
 		flagSet.Int64Var(&f.RestorePollDuration, "azure-rehydrate-poll-duration",

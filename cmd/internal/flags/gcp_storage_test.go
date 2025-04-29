@@ -17,6 +17,7 @@ package flags
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,5 +59,5 @@ func TestGcpStorage_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.KeyFile, "The default value for gcp-key-path should be an empty string")
 	assert.Equal(t, "", result.BucketName, "The default value for gcp-bucket-name should be an empty string")
 	assert.Equal(t, "", result.Endpoint, "The default value for gcp-endpoint-override should be an empty string")
-	assert.Equal(t, 5242880, result.ChunkSize, "The default value for gcp-chunk-size should be 5MB")
+	assert.Equal(t, models.DefaultChunkSize, result.ChunkSize, "The default value for gcp-chunk-size should be 5MB")
 }

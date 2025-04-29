@@ -70,6 +70,10 @@ func NewWriter(
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
+	if w.ChunkSize < 0 {
+		return nil, fmt.Errorf("chunk size must be positive")
+	}
+
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
 	}

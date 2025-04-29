@@ -45,10 +45,10 @@ func (f *GcpStorage) NewFlagSet() *pflag.FlagSet {
 
 	if f.operation == OperationBackup {
 		flagSet.IntVar(&f.ChunkSize, "gcp-chunk-size",
-			5242880,
+			models.DefaultChunkSize,
 			"Chunk size controls the maximum number of bytes of the object that the app will attempt to send to\n"+
 				"the server in a single request. Objects smaller than the size will be sent in a single request,\n"+
-				"while larger objects will be split over multiple requests. ")
+				"while larger objects will be split over multiple requests.")
 	}
 
 	return flagSet

@@ -14,6 +14,8 @@
 
 package models
 
+const DefaultChunkSize = 5 * 1024 * 1024
+
 // Common parameters are used by both backup and restore operations.
 type Common struct {
 	Directory        string

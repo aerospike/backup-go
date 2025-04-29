@@ -17,6 +17,7 @@ package flags
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,5 +68,5 @@ func TestAwsS3_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.AccessKeyID, "The default value for s3-access-key-id should be an empty string")
 	assert.Equal(t, "", result.SecretAccessKey, "The default value for s3-secret-access-key should be an empty string")
 	assert.Equal(t, "", result.StorageClass, "The default value for s3-storage-class should be an empty string")
-	assert.Equal(t, 5242880, result.ChunkSize, "The default value for s3-chunk-size should be 5mb")
+	assert.Equal(t, models.DefaultChunkSize, result.ChunkSize, "The default value for s3-chunk-size should be 5mb")
 }

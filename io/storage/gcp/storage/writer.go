@@ -60,6 +60,10 @@ func NewWriter(
 		opt(&w.Options)
 	}
 
+	if w.ChunkSize < 0 {
+		return nil, fmt.Errorf("chunk size must be positive")
+	}
+
 	if w.ChunkSize == 0 {
 		w.ChunkSize = defaultChunkSize
 	}

@@ -17,6 +17,7 @@ package flags
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -129,5 +130,5 @@ func TestAzureBlob_NewFlagSet_DefaultValuesBackup(t *testing.T) {
 	assert.Equal(t, "", result.Endpoint, "The default value for azure-endpoint should be an empty string")
 	assert.Equal(t, "", result.ContainerName, "The default value for azure-container-name should be an empty string")
 	assert.Equal(t, "", result.AccessTier, "The default value for azure-access-tier should be an empty string")
-	assert.Equal(t, 5242880, result.BlockSize, "The default value for azure-block-size should be 5MB")
+	assert.Equal(t, models.DefaultChunkSize, result.BlockSize, "The default value for azure-block-size should be 5MB")
 }

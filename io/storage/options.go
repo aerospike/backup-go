@@ -193,8 +193,8 @@ func WithWarmPollDuration(duration time.Duration) Opt {
 
 // WithChunkSize sets the chunk size for uploading files.
 // Is used only for Writer.
-func WithChunkSize(size int) Opt {
+func WithChunkSize(bytes int) Opt {
 	return func(r *Options) {
-		r.ChunkSize = size
+		r.ChunkSize = bytes
 	}
 }

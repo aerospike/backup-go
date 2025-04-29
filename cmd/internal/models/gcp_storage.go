@@ -30,6 +30,8 @@ type GcpStorage struct {
 	// Alternative url.
 	// It is not recommended to use an alternate URL in a production environment.
 	Endpoint string
+
+	ChunkSize int
 }
 
 // LoadSecrets tries to load field values from secret agent.

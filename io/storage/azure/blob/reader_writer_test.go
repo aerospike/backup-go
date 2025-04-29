@@ -460,6 +460,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 		client,
 		testContainerName,
 		ioStorage.WithDir(testWriteFolderEmpty),
+		ioStorage.WithChunkSize(uploadStreamBlockSize),
 	)
 	s.Require().NoError(err)
 
@@ -489,6 +490,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 		client,
 		testContainerName,
 		ioStorage.WithDir(testWriteFolderWithDataError),
+		ioStorage.WithChunkSize(uploadStreamBlockSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -508,6 +510,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 		testContainerName,
 		ioStorage.WithDir(testWriteFolderWithData),
 		ioStorage.WithRemoveFiles(),
+		ioStorage.WithChunkSize(uploadStreamBlockSize),
 	)
 	s.Require().NoError(err)
 
@@ -538,6 +541,7 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 		testContainerName,
 		ioStorage.WithDir(testWriteFolderMixedData),
 		ioStorage.WithRemoveFiles(),
+		ioStorage.WithChunkSize(uploadStreamBlockSize),
 	)
 	s.Require().NoError(err)
 
@@ -567,6 +571,7 @@ func (s *AzureSuite) TestWriter_WriteSingleFile() {
 		client,
 		testContainerName,
 		ioStorage.WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
+		ioStorage.WithChunkSize(uploadStreamBlockSize),
 	)
 	s.Require().NoError(err)
 

@@ -73,7 +73,12 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 		descAccessTier+
 			"\nTiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.")
 
-	if f.operation == OperationRestore {
+	switch f.operation {
+	case OperationBackup:
+		flagSet.IntVar(&f.BlockSize, "azure-block-size",
+			models.DefaultChunkSize,
+			"Block size defines the size of the buffer used during upload.")
+	case OperationRestore:
 		flagSet.Int64Var(&f.RestorePollDuration, "azure-rehydrate-poll-duration",
 			60000,
 			"How often (in milliseconds) a backup client checks object status when restoring an archived object.",

@@ -68,6 +68,8 @@ type Reader struct {
 
 	// total size of all objects in a path.
 	totalSize atomic.Int64
+	// total number of objects in a path.
+	totalNumber atomic.Int64
 }
 
 // NewReader returns new S3 storage reader.
@@ -572,23 +574,28 @@ func parseAccessTier(tier string) (types.Tier, error) {
 }
 
 func (r *Reader) calculateTotalSize(ctx context.Context) {
-	var totalSize int64
+	var (
+		totalSize int64
+		totalNum  int64
+	)
 
 	for _, path := range r.PathList {
-		size, err := r.calculateTotalSizeForPath(ctx, path)
+		size, num, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
 			// Skip calculation errors.
 			return
 		}
 
 		totalSize += size
+		totalNum += num
 	}
 
 	// set size when everything is ready.
 	r.totalSize.Store(totalSize)
+	r.totalNumber.Store(totalNum)
 }
 
-func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (int64, error) {
+func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
 	// if we have file to calculate.
 	if !r.IsDir {
 		headOutput, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
@@ -596,10 +603,10 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 			Key:    aws.String(path),
 		})
 		if err != nil {
-			return 0, fmt.Errorf("failed to get head object %s %s: %w", r.bucketName, path, err)
+			return 0, 0, fmt.Errorf("failed to get head object %s %s: %w", r.bucketName, path, err)
 		}
 
-		return *headOutput.ContentLength, nil
+		return *headOutput.ContentLength, 1, nil
 	}
 
 	var continuationToken *string
@@ -607,8 +614,6 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 	if path == "/" {
 		path = ""
 	}
-
-	var totalSize int64
 
 	for {
 		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -619,7 +624,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 		})
 
 		if err != nil {
-			return 0, fmt.Errorf("failed to list objects: %w", err)
+			return 0, 0, fmt.Errorf("failed to list objects: %w", err)
 		}
 
 		for _, p := range listResponse.Contents {
@@ -629,6 +634,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 
 			if r.Validator != nil {
 				if err = r.Validator.Run(*p.Key); err == nil {
+					totalNum++
 					totalSize += *p.Size
 				}
 			}
@@ -640,10 +646,15 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 		}
 	}
 
-	return totalSize, nil
+	return totalSize, totalNum, nil
 }
 
-// GetSize returns the size of the file/dir that was initialized.
+// GetSize returns the size of the asb file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
+}
+
+// GetNumber returns the number of asb files/dirs that was initialized.
+func (r *Reader) GetNumber() int64 {
+	return r.totalNumber.Load()
 }

@@ -46,6 +46,8 @@ type ASBackup struct {
 	isEstimate       bool
 	estimatesSamples int64
 
+	isLogJSON bool
+
 	logger *slog.Logger
 }
 
@@ -186,6 +188,7 @@ func NewASBackup(
 		writer:          writer,
 		reader:          reader,
 		logger:          logger,
+		isLogJSON:       params.App.LogJSON,
 	}
 
 	if params.BackupParams != nil {
@@ -303,7 +306,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to calculate backup estimate: %w", err)
 		}
 
-		printEstimateReport(estimates)
+		reportEstimate(estimates, b.isLogJSON, b.logger)
 	case b.backupConfigXDR != nil:
 		b.logger.Info("starting xdr backup")
 		// Running xdr backup.
@@ -328,7 +331,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 		}
 
 		stats := bModels.SumBackupStats(h.GetStats(), hXdr.GetStats())
-		printBackupReport(stats, true)
+		reportBackup(stats, true, b.isLogJSON, b.logger)
 	default:
 		b.logger.Info("starting scan backup")
 		// Running ordinary backup.
@@ -343,7 +346,7 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 
-		printBackupReport(h.GetStats(), false)
+		reportBackup(h.GetStats(), false, b.isLogJSON, b.logger)
 	}
 
 	return nil

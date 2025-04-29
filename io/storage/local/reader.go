@@ -41,6 +41,8 @@ type Reader struct {
 
 	// total size of all objects in a path.
 	totalSize atomic.Int64
+	// total number of objects in a path.
+	totalNumber atomic.Int64
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -290,48 +292,51 @@ func (r *Reader) GetType() string {
 }
 
 func (r *Reader) calculateTotalSize() {
-	var totalSize int64
+	var (
+		totalSize int64
+		totalNum  int64
+	)
 
 	for _, path := range r.PathList {
-		size, err := r.calculateTotalSizeForPath(path)
+		size, num, err := r.calculateTotalSizeForPath(path)
 		if err != nil {
 			// Skip calculation errors.
 			return
 		}
 
 		totalSize += size
+		totalNum += num
 	}
 
 	// set size when everything is ready.
 	r.totalSize.Store(totalSize)
+	r.totalNumber.Store(totalNum)
 }
 
-func (r *Reader) calculateTotalSizeForPath(path string) (int64, error) {
+func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int64, err error) {
 	dirInfo, err := os.Stat(path)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get path info %s: %w", path, err)
+		return 0, 0, fmt.Errorf("failed to get path info %s: %w", path, err)
 	}
 
 	if !dirInfo.IsDir() {
 		reader, err := os.Open(path)
 		if err != nil {
-			return 0, fmt.Errorf("failed to open %s: %w", path, err)
+			return 0, 0, fmt.Errorf("failed to open %s: %w", path, err)
 		}
 
 		stat, err := reader.Stat()
 		if err != nil {
-			return 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
+			return 0, 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
 		}
 
-		return stat.Size(), nil
+		return stat.Size(), 1, nil
 	}
 
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read path %s: %w", path, err)
+		return 0, 0, fmt.Errorf("failed to read path %s: %w", path, err)
 	}
-
-	var totalSize int64
 
 	for _, file := range fileInfo {
 		if file.IsDir() {
@@ -339,8 +344,8 @@ func (r *Reader) calculateTotalSizeForPath(path string) (int64, error) {
 			if r.WithNestedDir {
 				nestedDir := filepath.Join(path, file.Name())
 				// If the nested folder is ok, then return nil.
-				if totalSize, err = r.calculateTotalSizeForPath(nestedDir); err == nil {
-					return totalSize, nil
+				if totalSize, totalNum, err = r.calculateTotalSizeForPath(nestedDir); err == nil {
+					return totalSize, totalNum, nil
 				}
 			}
 
@@ -351,18 +356,24 @@ func (r *Reader) calculateTotalSizeForPath(path string) (int64, error) {
 			if err = r.Validator.Run(file.Name()); err == nil {
 				info, err := file.Info()
 				if err != nil {
-					return 0, fmt.Errorf("failed to get file info %s: %w", path, err)
+					return 0, 0, fmt.Errorf("failed to get file info %s: %w", path, err)
 				}
 
+				totalNum++
 				totalSize += info.Size()
 			}
 		}
 	}
 
-	return totalSize, nil
+	return totalSize, totalNum, nil
 }
 
-// GetSize returns the size of the file/dir that was initialized.
+// GetSize returns the size of the asb file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
+}
+
+// GetNumber returns the number of asb files/dirs that was initialized.
+func (r *Reader) GetNumber() int64 {
+	return r.totalNumber.Load()
 }

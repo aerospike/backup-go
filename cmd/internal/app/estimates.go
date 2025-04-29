@@ -28,6 +28,10 @@ var (
 	errBrake    = errors.New("brake")
 )
 
+// printBackupEstimate prints the backup progress.
+// The progress is printed every second.
+// The progress is printed only when the total records is greater than 0.
+// The progress is printed only when the read records is greater than 0.
 func printBackupEstimate(
 	ctx context.Context,
 	stats *models.BackupStats,
@@ -67,6 +71,10 @@ func printBackupEstimate(
 	}
 }
 
+// printRestoreEstimate prints the restore progress.
+// The progress is printed every second.
+// The progress is printed only when the total file size is greater than 0.
+// The progress is printed only when the written number of bytes is greater than 0.
 func printRestoreEstimate(
 	ctx context.Context,
 	stats *models.RestoreStats,
@@ -172,4 +180,31 @@ func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Du
 	}
 
 	return result
+}
+
+// printFilesNumber prints the number of files.
+func printFilesNumber(
+	ctx context.Context,
+	getNUmber func() int64,
+	fileTypes string,
+	logger *slog.Logger,
+) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			num := getNUmber()
+			if num == 0 {
+				continue
+			}
+
+			logger.Info("found "+fileTypes+" files", slog.Int64("number", num))
+
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }

@@ -48,6 +48,8 @@ type Reader struct {
 
 	// total size of all objects in a path.
 	totalSize atomic.Int64
+	// total number of objects in a path.
+	totalNumber atomic.Int64
 }
 
 // NewReader returns new GCP storage directory/file reader.
@@ -315,31 +317,36 @@ func (r *Reader) shouldSkip(path, fileName string) bool {
 }
 
 func (r *Reader) calculateTotalSize(ctx context.Context) {
-	var totalSize int64
+	var (
+		totalSize int64
+		totalNum  int64
+	)
 
 	for _, path := range r.PathList {
-		size, err := r.calculateTotalSizeForPath(ctx, path)
+		size, num, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
 			// Skip calculation errors.
 			return
 		}
 
 		totalSize += size
+		totalNum += num
 	}
 
 	// set size when everything is ready.
 	r.totalSize.Store(totalSize)
+	r.totalNumber.Store(totalNum)
 }
 
-func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (int64, error) {
+func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
 	// if we have file to calculate.
 	if !r.IsDir {
 		objAttrs, err := r.bucketHandle.Object(path).Attrs(ctx)
 		if err != nil {
-			return 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
 		}
 
-		return objAttrs.Size, nil
+		return objAttrs.Size, 1, nil
 	}
 
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
@@ -347,14 +354,12 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 		StartOffset: r.StartAfter,
 	})
 
-	var totalSize int64
-
 	for {
 		// Iterate over bucket until we're done.
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return 0, fmt.Errorf("failed to read object attr from bucket %s: %w",
+				return 0, 0, fmt.Errorf("failed to read object attr from bucket %s: %w",
 					r.bucketName, err)
 			}
 
@@ -368,15 +373,21 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 
 		if r.Validator != nil {
 			if err = r.Validator.Run(objAttrs.Name); err == nil {
+				totalNum++
 				totalSize += objAttrs.Size
 			}
 		}
 	}
 
-	return totalSize, nil
+	return totalSize, totalNum, nil
 }
 
-// GetSize returns the size of the file/dir that was initialized.
+// GetSize returns the size of the asb file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
+}
+
+// GetNumber returns the number of asb files/dirs that was initialized.
+func (r *Reader) GetNumber() int64 {
+	return r.totalNumber.Load()
 }

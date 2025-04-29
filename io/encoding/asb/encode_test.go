@@ -312,8 +312,6 @@ func Test__SIndexToASB(t *testing.T) {
 				t.Errorf("encodeSIndexToASB() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				fmt.Println("|", gotW, "|")
-				fmt.Println("|", tt.wantW, "|")
 				t.Errorf("encodeSIndexToASB() = %v, want %v", gotW, tt.wantW)
 			}
 		})

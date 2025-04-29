@@ -303,10 +303,10 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		bh.kbpsCollector,
 	)
 
-	bh.stats.TotalRecords, err = bh.recordHandler.countRecords(ctx, bh.infoClient)
-	if err != nil {
-		return err
-	}
+	// start counting backup records in a separate goroutine to estimate the total number of records.
+	// This is done in parallel with the backup process to avoid delaying the start of the backup.
+	// The estimated backup record count will be available in statistics once the estimation process is completed.
+	go bh.countRecords(ctx)
 
 	if bh.config.isStateContinue() {
 		// Have to reload filter, as on count records cursor is moving and future scans returns nothing.
@@ -317,6 +317,16 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 	}
 
 	return bh.recordHandler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
+}
+
+func (bh *BackupHandler) countRecords(ctx context.Context) {
+	records, err := bh.recordHandler.countRecords(ctx, bh.infoClient)
+	if err != nil {
+		bh.logger.Error("failed to count records", slog.Any("error", err))
+		return
+	}
+
+	bh.stats.TotalRecords.Store(records)
 }
 
 func (bh *BackupHandler) makeWriteWorkers(

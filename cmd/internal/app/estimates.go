@@ -36,13 +36,14 @@ func printBackupEstimate(
 	for {
 		select {
 		case <-ticker.C:
-			if stats.TotalRecords == 0 {
+			totalRecords := stats.TotalRecords.Load()
+			if totalRecords == 0 {
 				// Wait until we calculate total records.
 				continue
 			}
 
 			done := stats.GetReadRecords()
-			percentage := float64(done) / float64(stats.TotalRecords)
+			percentage := float64(done) / float64(totalRecords)
 			estimatedEndTime := calculateEstimatedEndTime(stats.StartTime, percentage)
 
 			switch {

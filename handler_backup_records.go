@@ -16,15 +16,11 @@ package backup
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/io/aerospike"
@@ -108,112 +104,6 @@ func (bh *backupRecordsHandler) run(
 	bh.pl = pl
 
 	return pl.Run(ctx)
-}
-
-func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
-	if bh.config.isFullBackup() {
-		return infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
-	}
-
-	return bh.countRecordsUsingScan(ctx)
-}
-
-func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint64, error) {
-	scanPolicy := *bh.config.ScanPolicy
-
-	scanPolicy.IncludeBinData = false
-	scanPolicy.MaxRecords = 0
-
-	if bh.config.isParalleledByNodes() {
-		return bh.countRecordsUsingScanByNodes(ctx, &scanPolicy)
-	}
-
-	return bh.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
-}
-
-func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Context, scanPolicy *a.ScanPolicy,
-) (uint64, error) {
-	var (
-		count atomic.Uint64
-		wg    sync.WaitGroup
-	)
-
-	errorsCh := make(chan error, len(bh.config.PartitionFilters))
-
-	for i := range bh.config.PartitionFilters {
-		wg.Add(1)
-
-		j := i
-
-		go func() {
-			defer wg.Done()
-
-			// We should copy *bh.config.PartitionFilters[i] value, to avoid getting zero results from other scans.
-			// As after filter is applied for any scan it set .Done = true, after that no records will be returned
-			// with this filter.
-			pf := *bh.config.PartitionFilters[j]
-			readerConfig := bh.recordReaderConfigForPartitions(&pf, scanPolicy)
-			recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
-
-			for {
-				if _, err := recordReader.Read(); err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					}
-
-					errorsCh <- fmt.Errorf("error during records counting: %w", err)
-				}
-
-				count.Add(1)
-			}
-
-			recordReader.Close()
-		}()
-		errorsCh <- nil
-	}
-
-	// Wait for all count goroutines to finish.
-	go func() {
-		wg.Wait()
-		close(errorsCh)
-	}()
-
-	for err := range errorsCh {
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	return count.Load(), nil
-}
-
-func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context, scanPolicy *a.ScanPolicy,
-) (uint64, error) {
-	nodes, err := bh.getNodes()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get nodes: %w", err)
-	}
-
-	var count uint64
-
-	readerConfig := bh.recordReaderConfigForNode(nodes, scanPolicy)
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
-
-	for {
-		if _, err := recordReader.Read(); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-
-			return 0, fmt.Errorf("error during records counting: %w", err)
-		}
-
-		count++
-	}
-
-	recordReader.Close()
-
-	return count, nil
 }
 
 func (bh *backupRecordsHandler) makeAerospikeReadWorkers(

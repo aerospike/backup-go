@@ -85,7 +85,7 @@ func TestPrintBackupEstimate(t *testing.T) {
 
 	stats := models.NewBackupStats()
 	stats.Start()
-	stats.TotalRecords = 100
+	stats.TotalRecords.Add(100)
 	stats.ReadRecords.Add(50)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))

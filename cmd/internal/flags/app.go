@@ -32,10 +32,17 @@ func (f *App) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.BoolP("help", "Z", false, "Display help information.")
 	flagSet.BoolVarP(&f.Version, "version", "V",
-		false, "Display version information.")
+		false,
+		"Display version information.")
 	flagSet.BoolVarP(&f.Verbose, "verbose", "v",
 		false,
 		"Enable more detailed logging.")
+	flagSet.StringVar(&f.LogLevel, "log-level",
+		"debug",
+		"Determine log level for --verbose output. Log levels are: debug, info, warn, error.")
+	flagSet.BoolVar(&f.LogJSON, "log-json",
+		false,
+		"Set output in JSON format for parsing by external tools.")
 
 	return flagSet
 }

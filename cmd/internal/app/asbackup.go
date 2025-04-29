@@ -45,6 +45,10 @@ type ASBackup struct {
 	// Additional params.
 	isEstimate       bool
 	estimatesSamples int64
+
+	isLogJSON bool
+
+	logger *slog.Logger
 }
 
 // ASBackupParams params wrapper for clean code.
@@ -94,7 +98,7 @@ func NewASBackup(
 	}
 
 	// Initializations.
-	backupConfig, backupXDRConfig, err := initializeBackupConfigs(params)
+	backupConfig, backupXDRConfig, err := initializeBackupConfigs(params, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +108,7 @@ func NewASBackup(
 	// We don't need a writer for estimates.
 	var writer backup.Writer
 	if params.SkipWriterInit() {
-		writer, err = initializeBackupWriter(ctx, params, secretAgent)
+		writer, err = initializeBackupWriter(ctx, params, secretAgent, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +129,7 @@ func NewASBackup(
 		racks = params.BackupParams.PreferRacks
 	}
 
-	aerospikeClient, err := newAerospikeClient(params.ClientConfig, params.ClientPolicy, racks, 0)
+	aerospikeClient, err := newAerospikeClient(params.ClientConfig, params.ClientPolicy, racks, 0, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
@@ -170,6 +174,8 @@ func NewASBackup(
 		}
 	}
 
+	logger.Info("initializing backup client", slog.String("id", idBackup))
+
 	backupClient, err := backup.NewClient(aerospikeClient, backup.WithLogger(logger), backup.WithID(idBackup))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup client: %w", err)
@@ -181,6 +187,8 @@ func NewASBackup(
 		backupConfigXDR: backupXDRConfig,
 		writer:          writer,
 		reader:          reader,
+		logger:          logger,
+		isLogJSON:       params.App.LogJSON,
 	}
 
 	if params.BackupParams != nil {
@@ -191,12 +199,15 @@ func NewASBackup(
 	return asb, nil
 }
 
-func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *backup.ConfigBackupXDR, error) {
+func initializeBackupConfigs(params *ASBackupParams, logger *slog.Logger,
+) (*backup.ConfigBackup, *backup.ConfigBackupXDR, error) {
 	var (
 		backupConfig    *backup.ConfigBackup
 		backupXDRConfig *backup.ConfigBackupXDR
 		err             error
 	)
+
+	logger.Info("initializing backup config")
 
 	switch {
 	case !params.isXDR():
@@ -204,6 +215,11 @@ func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *bac
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
 		}
+
+		logger.Info("initializing scan backup config",
+			slog.String("namespace", backupConfig.Namespace),
+			slog.Any("sets", backupConfig.SetList),
+		)
 	case params.isXDR():
 		backupXDRConfig = mapBackupXDRConfig(params)
 
@@ -212,6 +228,11 @@ func initializeBackupConfigs(params *ASBackupParams) (*backup.ConfigBackup, *bac
 
 		backupConfig.NoRecords = true
 		backupConfig.Namespace = backupXDRConfig.Namespace
+
+		logger.Info("initializing xdr backup config",
+			slog.String("namespace", backupXDRConfig.Namespace),
+			slog.String("rewind", backupXDRConfig.Rewind),
+		)
 	}
 
 	return backupConfig, backupXDRConfig, nil
@@ -244,15 +265,19 @@ func initializeStateReader(
 		},
 	}
 
-	logger.Debug("loading state file", slog.String("path", stateFile))
+	logger.Info("initializing state file", slog.String("path", stateFile))
 
 	return newReader(ctx, restoreParams, sa, false, logger)
 }
 
-func initializeBackupWriter(ctx context.Context, params *ASBackupParams, sa *backup.SecretAgentConfig,
+func initializeBackupWriter(
+	ctx context.Context,
+	params *ASBackupParams,
+	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
 ) (backup.Writer, error) {
 	// We initialize a writer only if output is configured.
-	writer, err := newWriter(ctx, params, sa)
+	writer, err := newWriter(ctx, params, sa, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup writer: %w", err)
 	}
@@ -274,14 +299,16 @@ func (b *ASBackup) Run(ctx context.Context) error {
 
 	switch {
 	case b.isEstimate:
+		b.logger.Info("calculating backup estimate")
 		// Calculating estimates.
 		estimates, err := b.backupClient.Estimate(ctx, b.backupConfig, b.estimatesSamples)
 		if err != nil {
 			return fmt.Errorf("failed to calculate backup estimate: %w", err)
 		}
 
-		printEstimateReport(estimates)
+		reportEstimate(estimates, b.isLogJSON, b.logger)
 	case b.backupConfigXDR != nil:
+		b.logger.Info("starting xdr backup")
 		// Running xdr backup.
 		hXdr, err := b.backupClient.BackupXDR(ctx, b.backupConfigXDR, b.writer)
 		if err != nil {
@@ -293,6 +320,8 @@ func (b *ASBackup) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup of indexes and udfs: %w", err)
 		}
 
+		go printBackupEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, b.logger)
+
 		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr backup: %w", err)
 		}
@@ -302,19 +331,22 @@ func (b *ASBackup) Run(ctx context.Context) error {
 		}
 
 		stats := bModels.SumBackupStats(h.GetStats(), hXdr.GetStats())
-		printBackupReport(stats, true)
+		reportBackup(stats, true, b.isLogJSON, b.logger)
 	default:
+		b.logger.Info("starting scan backup")
 		// Running ordinary backup.
 		h, err := b.backupClient.Backup(ctx, b.backupConfig, b.writer, b.reader)
 		if err != nil {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}
 
+		go printBackupEstimate(ctx, h.GetStats(), h.GetMetrics, b.logger)
+
 		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 
-		printBackupReport(h.GetStats(), false)
+		reportBackup(h.GetStats(), false, b.isLogJSON, b.logger)
 	}
 
 	return nil

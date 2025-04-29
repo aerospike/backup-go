@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"cloud.google.com/go/storage"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
@@ -44,6 +45,11 @@ type Reader struct {
 	// If objectsToStream is not set, we iterate through objects in storage and load them.
 	// If set, we load objects from this slice directly.
 	objectsToStream []string
+
+	// total size of all objects in a path.
+	totalSize atomic.Int64
+	// total number of objects in a path.
+	totalNumber atomic.Int64
 }
 
 // NewReader returns new GCP storage directory/file reader.
@@ -89,6 +95,8 @@ func NewReader(
 			}
 		}
 	}
+	// We "lazy" calculate total size of all files in a path for estimates calculations.
+	go r.calculateTotalSize(ctx)
 
 	return r, nil
 }
@@ -306,4 +314,80 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 // shouldSkip determines whether the file should be skipped.
 func (r *Reader) shouldSkip(path, fileName string) bool {
 	return ioStorage.IsDirectory(path, fileName) && !r.WithNestedDir
+}
+
+func (r *Reader) calculateTotalSize(ctx context.Context) {
+	var (
+		totalSize int64
+		totalNum  int64
+	)
+
+	for _, path := range r.PathList {
+		size, num, err := r.calculateTotalSizeForPath(ctx, path)
+		if err != nil {
+			// Skip calculation errors.
+			return
+		}
+
+		totalSize += size
+		totalNum += num
+	}
+
+	// set size when everything is ready.
+	r.totalSize.Store(totalSize)
+	r.totalNumber.Store(totalNum)
+}
+
+func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
+	// if we have file to calculate.
+	if !r.IsDir {
+		objAttrs, err := r.bucketHandle.Object(path).Attrs(ctx)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+		}
+
+		return objAttrs.Size, 1, nil
+	}
+
+	it := r.bucketHandle.Objects(ctx, &storage.Query{
+		Prefix:      path,
+		StartOffset: r.StartAfter,
+	})
+
+	for {
+		// Iterate over bucket until we're done.
+		objAttrs, err := it.Next()
+		if err != nil {
+			if !errors.Is(err, iterator.Done) {
+				return 0, 0, fmt.Errorf("failed to read object attr from bucket %s: %w",
+					r.bucketName, err)
+			}
+
+			break
+		}
+
+		// Skip files in folders.
+		if r.shouldSkip(path, objAttrs.Name) {
+			continue
+		}
+
+		if r.Validator != nil {
+			if err = r.Validator.Run(objAttrs.Name); err == nil {
+				totalNum++
+				totalSize += objAttrs.Size
+			}
+		}
+	}
+
+	return totalSize, totalNum, nil
+}
+
+// GetSize returns the size of asb/asbx file/dir that was initialized.
+func (r *Reader) GetSize() int64 {
+	return r.totalSize.Load()
+}
+
+// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+func (r *Reader) GetNumber() int64 {
+	return r.totalNumber.Load()
 }

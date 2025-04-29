@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/models"
@@ -37,6 +38,11 @@ type Reader struct {
 	// If objectsToStream is not set, we iterate through objects in storage and load them.
 	// If set, we load objects from this slice directly.
 	objectsToStream []string
+
+	// total size of all objects in a path.
+	totalSize atomic.Int64
+	// total number of objects in a path.
+	totalNumber atomic.Int64
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -55,8 +61,10 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 
 	if r.IsDir {
 		if !r.SkipDirCheck {
-			if err := r.checkRestoreDirectory(r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+			for _, path := range r.PathList {
+				if err := r.checkRestoreDirectory(path); err != nil {
+					return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+				}
 			}
 		}
 
@@ -66,6 +74,8 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 			}
 		}
 	}
+
+	go r.calculateTotalSize()
 
 	return r, nil
 }
@@ -279,4 +289,91 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 // GetType returns the type of the reader.
 func (r *Reader) GetType() string {
 	return localType
+}
+
+func (r *Reader) calculateTotalSize() {
+	var (
+		totalSize int64
+		totalNum  int64
+	)
+
+	for _, path := range r.PathList {
+		size, num, err := r.calculateTotalSizeForPath(path)
+		if err != nil {
+			// Skip calculation errors.
+			return
+		}
+
+		totalSize += size
+		totalNum += num
+	}
+
+	// set size when everything is ready.
+	r.totalSize.Store(totalSize)
+	r.totalNumber.Store(totalNum)
+}
+
+func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int64, err error) {
+	dirInfo, err := os.Stat(path)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get path info %s: %w", path, err)
+	}
+
+	if !dirInfo.IsDir() {
+		reader, err := os.Open(path)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to open %s: %w", path, err)
+		}
+
+		stat, err := reader.Stat()
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
+		}
+
+		return stat.Size(), 1, nil
+	}
+
+	fileInfo, err := os.ReadDir(path)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read path %s: %w", path, err)
+	}
+
+	for _, file := range fileInfo {
+		if file.IsDir() {
+			// Iterate over nested dirs recursively.
+			if r.WithNestedDir {
+				nestedDir := filepath.Join(path, file.Name())
+				// If the nested folder is ok, then return nil.
+				if totalSize, totalNum, err = r.calculateTotalSizeForPath(nestedDir); err == nil {
+					return totalSize, totalNum, nil
+				}
+			}
+
+			continue
+		}
+
+		if r.Validator != nil {
+			if err = r.Validator.Run(file.Name()); err == nil {
+				info, err := file.Info()
+				if err != nil {
+					return 0, 0, fmt.Errorf("failed to get file info %s: %w", path, err)
+				}
+
+				totalNum++
+				totalSize += info.Size()
+			}
+		}
+	}
+
+	return totalSize, totalNum, nil
+}
+
+// GetSize returns the size of asb/asbx file/dir that was initialized.
+func (r *Reader) GetSize() int64 {
+	return r.totalSize.Load()
+}
+
+// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+func (r *Reader) GetNumber() int64 {
+	return r.totalNumber.Load()
 }

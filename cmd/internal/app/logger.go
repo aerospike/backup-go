@@ -12,15 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package app
 
-// App contains the global application flags.
-type App struct {
-	Help    bool
-	Version bool
-	Verbose bool
-	// Set log level for verbose output.
-	LogLevel string
-	// Format logs as JSON, for parsing by external tools.
-	LogJSON bool
+import (
+	"fmt"
+	"log/slog"
+	"os"
+)
+
+func NewLogger(level string, isVerbose, isJSON bool) (*slog.Logger, error) {
+	loggerOpt := &slog.HandlerOptions{}
+
+	if isVerbose {
+		var logLvl slog.Level
+
+		err := logLvl.UnmarshalText([]byte(level))
+		if err != nil {
+			return nil, fmt.Errorf("invalid log level: %w", err)
+		}
+
+		loggerOpt.Level = logLvl
+	}
+
+	switch isJSON {
+	case true:
+		return slog.New(slog.NewJSONHandler(os.Stdout, loggerOpt)), nil
+	default:
+		return slog.New(slog.NewTextHandler(os.Stdout, loggerOpt)), nil
+	}
 }

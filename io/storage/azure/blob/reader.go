@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -58,6 +59,11 @@ type Reader struct {
 
 	// objectsToWarm is used to track the current number of restoring objects.
 	objectsToWarm []string
+
+	// total size of all objects in a path.
+	totalSize atomic.Int64
+	// total number of objects in a path.
+	totalNumber atomic.Int64
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -125,6 +131,8 @@ func NewReader(
 
 		r.Logger.Debug("finish warming storage")
 	}
+	// We "lazy" calculate total size of all files in a path for estimates calculations.
+	go r.calculateTotalSize(ctx)
 
 	return r, nil
 }
@@ -516,4 +524,81 @@ func isSkippedByStartAfter(startAfter, fileName string) bool {
 	}
 
 	return false
+}
+
+func (r *Reader) calculateTotalSize(ctx context.Context) {
+	var (
+		totalSize int64
+		totalNum  int64
+	)
+
+	for _, path := range r.PathList {
+		size, num, err := r.calculateTotalSizeForPath(ctx, path)
+		if err != nil {
+			// Skip calculation errors.
+			return
+		}
+
+		totalSize += size
+		totalNum += num
+	}
+
+	// set size when everything is ready.
+	r.totalSize.Store(totalSize)
+	r.totalNumber.Store(totalNum)
+}
+
+func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
+	// if we have file to calculate.
+	if !r.IsDir {
+		objProps, err := r.client.ServiceClient().
+			NewContainerClient(r.containerName).
+			NewBlobClient(path).GetProperties(ctx, nil)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+		}
+
+		if objProps.ContentLength == nil {
+			return 0, 0, fmt.Errorf("failed to get length of object %s", path)
+		}
+
+		return *objProps.ContentLength, 1, nil
+	}
+
+	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
+		Prefix: &path,
+	})
+
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		for _, blobItem := range page.Segment.BlobItems {
+			// Skip files in folders.
+			if r.shouldSkip(path, *blobItem.Name) {
+				continue
+			}
+
+			if r.Validator != nil {
+				if err = r.Validator.Run(*blobItem.Name); err == nil {
+					totalNum++
+					totalSize += *blobItem.Properties.ContentLength
+				}
+			}
+		}
+	}
+
+	return totalSize, totalNum, nil
+}
+
+// GetSize returns the size of asb/asbx file/dir that was initialized.
+func (r *Reader) GetSize() int64 {
+	return r.totalSize.Load()
+}
+
+// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+func (r *Reader) GetNumber() int64 {
+	return r.totalNumber.Load()
 }

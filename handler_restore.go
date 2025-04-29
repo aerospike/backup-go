@@ -45,6 +45,11 @@ type StreamingReader interface {
 
 	// ListObjects return list of objects in the path.
 	ListObjects(ctx context.Context, path string) ([]string, error)
+
+	// GetSize returns the size of asb/asbx files in the path.
+	GetSize() int64
+	// GetNumber returns the number of asb/asbx files in the path.
+	GetNumber() int64
 }
 
 // RestoreHandler handles a restore job using the given reader.

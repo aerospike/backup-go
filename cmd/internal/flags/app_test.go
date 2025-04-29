@@ -22,42 +22,40 @@ import (
 
 func TestApp_NewFlagSet(t *testing.T) {
 	t.Parallel()
-	// Create a new App object
+
 	app := NewApp()
 
-	// Create a new FlagSet
 	flagSet := app.NewFlagSet()
 
-	// Simulate passing flags via command-line arguments
 	args := []string{
 		"--version",
 		"--verbose",
+		"--log-level", "error",
+		"--log-json",
 	}
 
-	// Parse the arguments
 	err := flagSet.Parse(args)
 	assert.NoError(t, err)
 
-	// Check if the flags were parsed correctly
 	assert.False(t, app.Help, "Help flag should default to false")
 	assert.True(t, app.Version, "Version flag should be true when set")
 	assert.True(t, app.Verbose, "Verbose flag should be true when set")
+	assert.Equal(t, app.LogLevel, "error", "Log level flag should be error")
+	assert.True(t, app.LogJSON, "Log JSON flag should be true when set")
 }
 
 func TestApp_NewFlagSet_DefaultValues(t *testing.T) {
 	t.Parallel()
-	// Create a new App object
 	app := NewApp()
 
-	// Create a new FlagSet without setting any arguments (to test defaults)
 	flagSet := app.NewFlagSet()
 
-	// Parse with no arguments to use default values
 	err := flagSet.Parse([]string{})
 	assert.NoError(t, err)
 
-	// Verify default values
 	assert.False(t, app.Help, "Help flag should default to false")
 	assert.False(t, app.Version, "Version flag should default to false")
 	assert.False(t, app.Verbose, "Verbose flag should default to false")
+	assert.Equal(t, app.LogLevel, "debug", "Log level flag should default be debug")
+	assert.False(t, app.LogJSON, "Log JSON flag should default to false")
 }

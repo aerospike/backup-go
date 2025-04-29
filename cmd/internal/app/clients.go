@@ -17,6 +17,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -40,10 +41,15 @@ func newAerospikeClient(
 	cp *models.ClientPolicy,
 	racks string,
 	warmUp int,
+	logger *slog.Logger,
 ) (*aerospike.Client, error) {
 	if len(cfg.Seeds) < 1 {
 		return nil, fmt.Errorf("at least one seed must be provided")
 	}
+
+	logger.Info("initializing Aerospike client",
+		slog.String("seeds", cfg.Seeds.String()),
+	)
 
 	p, err := cfg.NewClientPolicy()
 	if err != nil {

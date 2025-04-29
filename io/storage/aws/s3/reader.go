@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	ioStorage "github.com/aerospike/backup-go/io/storage"
@@ -64,6 +65,11 @@ type Reader struct {
 
 	// objectsToWarm is used to track the current number of restoring objects.
 	objectsToWarm []string
+
+	// total size of all objects in a path.
+	totalSize atomic.Int64
+	// total number of objects in a path.
+	totalNumber atomic.Int64
 }
 
 // NewReader returns new S3 storage reader.
@@ -135,6 +141,8 @@ func NewReader(
 
 		r.Logger.Debug("finish warming storage")
 	}
+	// We "lazy" calculate total size of all files in a path for estimates calculations.
+	go r.calculateTotalSize(ctx)
 
 	return r, nil
 }
@@ -563,4 +571,90 @@ func parseAccessTier(tier string) (types.Tier, error) {
 	}
 
 	return result, nil
+}
+
+func (r *Reader) calculateTotalSize(ctx context.Context) {
+	var (
+		totalSize int64
+		totalNum  int64
+	)
+
+	for _, path := range r.PathList {
+		size, num, err := r.calculateTotalSizeForPath(ctx, path)
+		if err != nil {
+			// Skip calculation errors.
+			return
+		}
+
+		totalSize += size
+		totalNum += num
+	}
+
+	// set size when everything is ready.
+	r.totalSize.Store(totalSize)
+	r.totalNumber.Store(totalNum)
+}
+
+func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
+	// if we have file to calculate.
+	if !r.IsDir {
+		headOutput, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
+			Bucket: aws.String(r.bucketName),
+			Key:    aws.String(path),
+		})
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get head object %s %s: %w", r.bucketName, path, err)
+		}
+
+		return *headOutput.ContentLength, 1, nil
+	}
+
+	var continuationToken *string
+
+	if path == "/" {
+		path = ""
+	}
+
+	for {
+		listResponse, err := r.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            &r.bucketName,
+			Prefix:            &path,
+			ContinuationToken: continuationToken,
+			StartAfter:        &r.StartAfter,
+		})
+
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to list objects: %w", err)
+		}
+
+		for _, p := range listResponse.Contents {
+			if r.shouldSkip(path, p.Key) {
+				continue
+			}
+
+			if r.Validator != nil {
+				if err = r.Validator.Run(*p.Key); err == nil {
+					totalNum++
+					totalSize += *p.Size
+				}
+			}
+		}
+
+		continuationToken = listResponse.NextContinuationToken
+		if continuationToken == nil {
+			break
+		}
+	}
+
+	return totalSize, totalNum, nil
+}
+
+// GetSize returns the size of asb/asbx file/dir that was initialized.
+func (r *Reader) GetSize() int64 {
+	return r.totalSize.Load()
+}
+
+// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+func (r *Reader) GetNumber() int64 {
+	return r.totalNumber.Load()
 }

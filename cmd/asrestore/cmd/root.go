@@ -16,8 +16,6 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
 
 	"github.com/aerospike/backup-go/cmd/internal/app"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
@@ -206,12 +204,10 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Init logger.
-	loggerOpt := &slog.HandlerOptions{}
-	if c.flagsApp.Verbose {
-		loggerOpt.Level = slog.LevelDebug
+	logger, err := app.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
+	if err != nil {
+		return err
 	}
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, loggerOpt))
 
 	// Init app.
 	asrParams := &app.ASRestoreParams{

@@ -16,6 +16,7 @@ package app
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -27,6 +28,17 @@ const (
 	headerRestoreReport  = "Restore report"
 	headerEstimateReport = "Estimate report"
 )
+
+// printBackupReport prints the backup report.
+// if isJSON is true, it prints the report in JSON format, but logger must be passed
+func reportBackup(stats *bModels.BackupStats, isXdr, isJSON bool, logger *slog.Logger) {
+	if isJSON {
+		logBackupReport(stats, isXdr, logger)
+		return
+	}
+
+	printBackupReport(stats, isXdr)
+}
 
 func printBackupReport(stats *bModels.BackupStats, isXdr bool) {
 	fmt.Println(headerBackupReport)
@@ -54,36 +66,95 @@ func printBackupReport(stats *bModels.BackupStats, isXdr bool) {
 	printMetric("Files Written", stats.GetFileCount())
 }
 
-func printRestoreReport(asbStats *bModels.RestoreStats) {
+func logBackupReport(stats *bModels.BackupStats, isXdr bool, logger *slog.Logger) {
+	recordsMetric := "records_read"
+	if isXdr {
+		recordsMetric = "records_received"
+	}
+
+	logger.Info("backup report",
+		slog.Time("start_time", stats.StartTime),
+		slog.Duration("duration", stats.GetDuration()),
+		slog.Uint64(recordsMetric, stats.GetReadRecords()),
+		slog.Uint64("s_index_read", uint64(stats.GetSIndexes())),
+		slog.Uint64("udf_read", uint64(stats.GetUDFs())),
+		slog.Uint64("bytes_written", stats.GetBytesWritten()),
+		slog.Uint64("total_records", stats.TotalRecords.Load()),
+		slog.Uint64("files_written", stats.GetFileCount()),
+	)
+}
+
+// reportRestore prints the restore report.
+// if isJSON is true, it prints the report in JSON format, but logger must be passed
+func reportRestore(stats *bModels.RestoreStats, isJSON bool, logger *slog.Logger) {
+	if isJSON {
+		logRestoreReport(stats, logger)
+		return
+	}
+
+	printRestoreReport(stats)
+}
+
+func printRestoreReport(stats *bModels.RestoreStats) {
 	fmt.Println(headerRestoreReport)
 	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
 
-	printMetric("Start Time", asbStats.StartTime.Format(time.RFC1123))
-	printMetric("Duration", asbStats.GetDuration())
+	printMetric("Start Time", stats.StartTime.Format(time.RFC1123))
+	printMetric("Duration", stats.GetDuration())
 
 	fmt.Println()
 
-	printMetric("Records Read", asbStats.GetReadRecords())
-	printMetric("sIndex Read", asbStats.GetSIndexes())
-	printMetric("UDFs Read", asbStats.GetUDFs())
+	printMetric("Records Read", stats.GetReadRecords())
+	printMetric("sIndex Read", stats.GetSIndexes())
+	printMetric("UDFs Read", stats.GetUDFs())
 
 	fmt.Println()
 
-	printMetric("Expired Records", asbStats.GetRecordsExpired())
-	printMetric("Skipped Records", asbStats.GetRecordsSkipped())
-	printMetric("Ignored Records", asbStats.GetRecordsIgnored())
-	printMetric("Fresher Records", asbStats.GetRecordsFresher())
-	printMetric("Existed Records", asbStats.GetRecordsExisted())
+	printMetric("Expired Records", stats.GetRecordsExpired())
+	printMetric("Skipped Records", stats.GetRecordsSkipped())
+	printMetric("Ignored Records", stats.GetRecordsIgnored())
+	printMetric("Fresher Records", stats.GetRecordsFresher())
+	printMetric("Existed Records", stats.GetRecordsExisted())
 
 	fmt.Println()
 
-	printMetric("Inserted Records", asbStats.GetRecordsInserted())
-	printMetric("In Doubt Errors", asbStats.GetErrorsInDoubt())
+	printMetric("Inserted Records", stats.GetRecordsInserted())
+	printMetric("In Doubt Errors", stats.GetErrorsInDoubt())
 
-	if asbStats.GetTotalBytesRead() > 0 {
+	if stats.GetTotalBytesRead() > 0 {
 		// At the moment, we don't count the size of records.
-		printMetric("Total Bytes Read", asbStats.GetTotalBytesRead())
+		printMetric("Total Bytes Read", stats.GetTotalBytesRead())
 	}
+}
+
+func logRestoreReport(stats *bModels.RestoreStats, logger *slog.Logger) {
+	logger.Info("restore report",
+		slog.Time("start_time", stats.StartTime),
+		slog.Duration("duration", stats.GetDuration()),
+		slog.Uint64("records_read", stats.GetReadRecords()),
+		slog.Uint64("s_index_read", uint64(stats.GetSIndexes())),
+		slog.Uint64("udf_read", uint64(stats.GetUDFs())),
+		slog.Uint64("expired_records", stats.GetRecordsExpired()),
+		slog.Uint64("skipped_records", stats.GetRecordsSkipped()),
+		slog.Uint64("ignored_records", stats.GetRecordsIgnored()),
+		slog.Uint64("fresher_records", stats.GetRecordsFresher()),
+		slog.Uint64("existed_records", stats.GetRecordsExisted()),
+		slog.Uint64("inserted_records", stats.GetRecordsInserted()),
+		slog.Uint64("in_doubt_errors", stats.GetErrorsInDoubt()),
+		slog.Uint64("total_bytes_read", stats.GetTotalBytesRead()),
+	)
+}
+
+// reportEstimate prints the estimate report.
+// if isJSON is true, it prints the report in JSON format, but logger must be passed.
+// estimate is the size of the backup file in bytes.
+func reportEstimate(estimate uint64, isJSON bool, logger *slog.Logger) {
+	if isJSON {
+		logEstimateReport(estimate, logger)
+		return
+	}
+
+	printEstimateReport(estimate)
 }
 
 func printEstimateReport(estimate uint64) {
@@ -91,6 +162,12 @@ func printEstimateReport(estimate uint64) {
 	fmt.Println(strings.Repeat("-", len(headerEstimateReport)))
 
 	printMetric("File size (bytes)", estimate)
+}
+
+func logEstimateReport(estimate uint64, logger *slog.Logger) {
+	logger.Info("estimate report",
+		slog.Uint64("file_size_bytes", estimate),
+	)
 }
 
 func printMetric(key string, value any) {

@@ -225,7 +225,7 @@ func TestLogBackupReport(t *testing.T) {
 
 	// Verify log output
 	logOutput := buf.String()
-	assert.Contains(t, logOutput, "backup_report")
+	assert.Contains(t, logOutput, "backup report")
 	assert.Contains(t, logOutput, "start_time=")
 	assert.Contains(t, logOutput, "duration=")
 	assert.Contains(t, logOutput, "records_read=1000")
@@ -265,7 +265,7 @@ func TestLogBackupReportXdr(t *testing.T) {
 
 	// Verify log output
 	logOutput := buf.String()
-	assert.Contains(t, logOutput, "backup_report")
+	assert.Contains(t, logOutput, "backup report")
 	assert.Contains(t, logOutput, "records_received=1000")
 	assert.NotContains(t, logOutput, "records_read=")
 }
@@ -326,7 +326,7 @@ func TestReportBackup(t *testing.T) {
 
 		// Verify log output
 		logOutput := buf.String()
-		assert.Contains(t, logOutput, "backup_report")
+		assert.Contains(t, logOutput, "backup report")
 		assert.Contains(t, logOutput, "records_read=1000")
 	})
 }
@@ -578,7 +578,7 @@ func TestLogRestoreReport(t *testing.T) {
 
 	// Verify log output
 	logOutput := buf.String()
-	assert.Contains(t, logOutput, "restore_report")
+	assert.Contains(t, logOutput, "restore report")
 	assert.Contains(t, logOutput, "start_time=")
 	assert.Contains(t, logOutput, "duration=")
 	assert.Contains(t, logOutput, "records_read=1000")
@@ -654,7 +654,7 @@ func TestReportRestore(t *testing.T) {
 
 		// Verify log output
 		logOutput := buf.String()
-		assert.Contains(t, logOutput, "restore_report")
+		assert.Contains(t, logOutput, "restore report")
 		assert.Contains(t, logOutput, "records_read=1000")
 	})
 }
@@ -694,7 +694,7 @@ func TestLogEstimateReport(t *testing.T) {
 
 	// Verify log output
 	logOutput := buf.String()
-	assert.Contains(t, logOutput, "estimate_report")
+	assert.Contains(t, logOutput, "estimate report")
 	assert.Contains(t, logOutput, "file_size_bytes=5000000")
 }
 
@@ -736,7 +736,7 @@ func TestReportEstimate(t *testing.T) {
 
 		// Verify log output
 		logOutput := buf.String()
-		assert.Contains(t, logOutput, "estimate_report")
+		assert.Contains(t, logOutput, "estimate report")
 		assert.Contains(t, logOutput, "file_size_bytes=5000000")
 	})
 }

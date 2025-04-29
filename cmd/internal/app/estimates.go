@@ -185,7 +185,7 @@ func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Du
 // printFilesNumber prints the number of files.
 func printFilesNumber(
 	ctx context.Context,
-	getNUmber func() int64,
+	getNumber func() int64,
 	fileTypes string,
 	logger *slog.Logger,
 ) {
@@ -195,7 +195,7 @@ func printFilesNumber(
 	for {
 		select {
 		case <-ticker.C:
-			num := getNUmber()
+			num := getNumber()
 			if num == 0 {
 				continue
 			}

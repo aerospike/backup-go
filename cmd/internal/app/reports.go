@@ -72,7 +72,7 @@ func logBackupReport(stats *bModels.BackupStats, isXdr bool, logger *slog.Logger
 		recordsMetric = "records_received"
 	}
 
-	logger.Info("backup_report",
+	logger.Info("backup report",
 		slog.Time("start_time", stats.StartTime),
 		slog.Duration("duration", stats.GetDuration()),
 		slog.Uint64(recordsMetric, stats.GetReadRecords()),
@@ -128,7 +128,7 @@ func printRestoreReport(stats *bModels.RestoreStats) {
 }
 
 func logRestoreReport(stats *bModels.RestoreStats, logger *slog.Logger) {
-	logger.Info("restore_report",
+	logger.Info("restore report",
 		slog.Time("start_time", stats.StartTime),
 		slog.Duration("duration", stats.GetDuration()),
 		slog.Uint64("records_read", stats.GetReadRecords()),
@@ -165,7 +165,7 @@ func printEstimateReport(estimate uint64) {
 }
 
 func logEstimateReport(estimate uint64, logger *slog.Logger) {
-	logger.Info("estimate_report",
+	logger.Info("estimate report",
 		slog.Uint64("file_size_bytes", estimate),
 	)
 }

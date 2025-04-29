@@ -2,10 +2,11 @@ package backup
 
 import (
 	"errors"
+	"testing"
+
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCountUsingInfoClient(t *testing.T) {

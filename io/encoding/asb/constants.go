@@ -173,4 +173,20 @@ var (
 	headerGeneration          = []byte("+ g ")
 	headerExpiration          = []byte("+ t ")
 	headerBinCount            = []byte("+ b ")
+
+	recordHeader     = []byte{markerRecordHeader}
+	recordHeaderType = []byte{recordHeaderTypeKey}
+	headerTypeInt    = []byte{keyTypeInt}
+	headerTypeFloat  = []byte{keyTypeFloat}
+	headerTypeString = []byte{keyTypeString}
+	headerTypeBytes  = []byte{keyTypeBytes}
+
+	globalSection = []byte{markerGlobalSection}
+	globalSIndex  = []byte{globalTypeSIndex}
+	globalUDF     = []byte{globalTypeUDF}
+
+	tokenVersion    = []byte(tokenASBVersion)
+	tokenFirst      = []byte(tokenFirstFile)
+	namespaceToken  = []byte(tokenNamespace)
+	metadataSection = []byte{markerMetadataSection}
 )

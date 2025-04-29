@@ -22,6 +22,7 @@ import (
 	mRand "math/rand"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -657,16 +658,16 @@ func Test_userKeyToASB(t *testing.T) {
 		{
 			name: "positive float64 user key",
 			args: args{
-				userKey: a.NewValue(123.456),
+				userKey: a.NewValue(123.456789),
 			},
-			want: []byte("+ k D 123.456000\n"),
+			want: []byte("+ k D 123.456789\n"),
 		},
 		{
 			name: "positive negative float64 user key",
 			args: args{
 				userKey: a.NewValue(-123.456),
 			},
-			want: []byte("+ k D -123.456000\n"),
+			want: []byte("+ k D -123.456\n"),
 		},
 		{
 			name: "positive string user key",
@@ -1523,8 +1524,8 @@ func Test_writeUserKeyFloat(t *testing.T) {
 			args: args{
 				v: 1234.5678,
 			},
-			want:  len("+ k D 1234.567800\n"),
-			wantW: "+ k D 1234.567800\n",
+			want:  len("+ k D 1234.5678\n"),
+			wantW: "+ k D 1234.5678\n",
 		},
 	}
 	for _, tt := range tests {
@@ -2122,4 +2123,61 @@ func Test_udfToASB(t *testing.T) {
 			}
 		})
 	}
+}
+
+// BenchmarkIntToString compares different methods of converting integers to strings.
+func BenchmarkIntToString(b *testing.B) {
+	num := int64(12345678901234)
+
+	// Benchmark strconv.FormatInt
+	b.Run("strconv.FormatInt", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = strconv.FormatInt(num, 10)
+		}
+	})
+
+	// Benchmark fmt.Sprintf
+	b.Run("fmt.Sprintf", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = fmt.Sprintf("%d", num)
+		}
+	})
+
+	// Benchmark fmt.Fprintf with bytes.Buffer
+	b.Run("fmt.Fprintf-Buffer", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			fmt.Fprintf(&buf, "%d", num)
+			_ = buf.String()
+		}
+	})
+
+	// Benchmark fmt.Fprintf with pre-allocated bytes.Buffer
+	b.Run("fmt.Fprintf-PreallocBuffer", func(b *testing.B) {
+		var buf bytes.Buffer
+		buf.Grow(20) // Pre-allocate space for the result
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			fmt.Fprintf(&buf, "%d", num)
+			_ = buf.String()
+		}
+	})
+
+	// Add strconv.Itoa for comparison (common for regular ints)
+	b.Run("strconv.Itoa", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = strconv.Itoa(int(num))
+		}
+	})
 }

@@ -52,7 +52,7 @@ func NewEncoder[T models.TokenConstraint](namespace string, compact bool) *Encod
 
 // GenerateFilename generates a file name for the given namespace.
 func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
-	return fmt.Sprintf("%s%s_%d%s.asb", prefix, e.namespace, e.id.Add(1), suffix)
+	return prefix + e.namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
 // EncodeToken encodes a token to the ASB format.
@@ -125,15 +125,15 @@ func (e *Encoder[T]) GetHeader(_ uint64) []byte {
 // **** META DATA ****
 
 func writeVersionText(asbVersion string, w io.Writer) {
-	_, _ = fmt.Fprintf(w, "Version %s\n", asbVersion)
+	_, _ = writeBytes(w, tokenVersion, space, []byte(asbVersion))
 }
 
 func writeNamespaceMetaText(namespace string, w io.Writer) {
-	_, _ = fmt.Fprintf(w, "%c namespace %s\n", markerMetadataSection, escapeASB(namespace))
+	_, _ = writeBytes(w, metadataSection, space, namespaceToken, space, escapeASB(namespace))
 }
 
 func writeFirstMetaText(w io.Writer) {
-	_, _ = fmt.Fprintf(w, "%c first-file\n", markerMetadataSection)
+	_, _ = writeBytes(w, metadataSection, space, tokenFirst)
 }
 
 // **** RECORD ****
@@ -384,7 +384,23 @@ func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 }
 
 func blobBinToASB(val []byte, bytesType byte, name string) []byte {
-	return []byte(fmt.Sprintf("%c %s %d %s\n", bytesType, name, len(val), val))
+	// Calculate the total size needed to avoid reallocations
+	totalSize := 1 + 1 + len(name) + 1 + len(strconv.Itoa(len(val))) + 1 + len(val) + 1
+
+	// Create a buffer with the calculated capacity
+	buf := bytes.NewBuffer(make([]byte, 0, totalSize))
+
+	// Write the data to the buffer
+	buf.WriteByte(bytesType)
+	buf.Write(space)
+	buf.WriteString(name)
+	buf.Write(space)
+	buf.WriteString(strconv.Itoa(len(val)))
+	buf.Write(space)
+	buf.Write(val)
+	buf.Write(newLine)
+
+	return buf.Bytes()
 }
 
 func boolToASB(b bool) []byte {
@@ -545,22 +561,59 @@ type UserKeyTypesInt interface {
 }
 
 func writeUserKeyInt[T UserKeyTypesInt](v T, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %c %d\n", markerRecordHeader, recordHeaderTypeKey, keyTypeInt, v)
+	return writeBytes(
+		w,
+		recordHeader,
+		space,
+		recordHeaderType,
+		space,
+		headerTypeInt,
+		space,
+		[]byte(strconv.FormatInt(int64(v), 10)),
+	)
 }
 
 func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %c %f\n", markerRecordHeader, recordHeaderTypeKey, keyTypeFloat, v)
+	return writeBytes(
+		w,
+		recordHeader,
+		space,
+		recordHeaderType,
+		space,
+		headerTypeFloat,
+		space,
+		[]byte(strconv.FormatFloat(v, 'f', -1, 64)),
+	)
 }
 
 func writeUserKeyString(v string, w io.Writer) (int, error) {
-	return fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeString,
-		len(v), v)
+	return writeBytes(
+		w,
+		recordHeader,
+		space,
+		recordHeaderType,
+		space,
+		headerTypeString,
+		space,
+		[]byte(strconv.Itoa(len(v))),
+		space,
+		[]byte(v),
+	)
 }
 
 func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
 	encoded := base64Encode(v)
-	n, err := fmt.Fprintf(w, "%c %c %c %d %s\n", markerRecordHeader, recordHeaderTypeKey, keyTypeBytes,
-		len(encoded), encoded)
+	n, err := writeBytes(w,
+		recordHeader,
+		space,
+		recordHeaderType,
+		space,
+		headerTypeBytes,
+		space,
+		[]byte(strconv.Itoa(len(encoded))),
+		space,
+		encoded,
+	)
 
 	returnBase64Buffer(encoded)
 
@@ -606,56 +659,54 @@ func escapeASB(s string) []byte {
 }
 
 func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
-	var bytesWritten int
-
 	// sindexes only ever use 1 path for now
 	numPaths := 1
 
-	n, err := fmt.Fprintf(
-		w,
-		"%c %c %s %s %s %c %d %s %c",
-		markerGlobalSection,
-		globalTypeSIndex,
+	// Prepare all parameters
+	params := [][]byte{
+		globalSection,
+		space,
+		globalSIndex,
+		space,
 		escapeASB(sindex.Namespace),
+		space,
 		escapeASB(sindex.Set),
+		space,
 		escapeASB(sindex.Name),
-		byte(sindex.IndexType),
-		numPaths,
+		space,
+		{byte(sindex.IndexType)},
+		space,
+		[]byte(strconv.Itoa(numPaths)),
+		space,
 		escapeASB(sindex.Path.BinName),
-		byte(sindex.Path.BinType),
-	)
-	bytesWritten += n
-
-	if err != nil {
-		return bytesWritten, err
+		space,
+		{byte(sindex.Path.BinType)},
 	}
 
+	// If there's a B64Context, add it to the parameters
 	if sindex.Path.B64Context != "" {
-		n, err = fmt.Fprintf(w, " %s", sindex.Path.B64Context)
-		bytesWritten += n
-
-		if err != nil {
-			return bytesWritten, err
-		}
+		params = append(params, space, []byte(sindex.Path.B64Context))
 	}
 
-	n, err = fmt.Fprintf(w, "\n")
-	bytesWritten += n
-
-	return bytesWritten, err
+	// Write all parameters at once
+	return writeBytes(w, params...)
 }
 
 // **** UDFs ****
 
 func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
-	return fmt.Fprintf(
+	return writeBytes(
 		w,
-		"%c %c %c %s %d %s\n",
-		markerGlobalSection,
-		globalTypeUDF,
-		byte(udf.UDFType),
+		globalSection,
+		space,
+		globalUDF,
+		space,
+		[]byte{byte(udf.UDFType)},
+		space,
 		escapeASB(udf.Name),
-		len(udf.Content),
+		space,
+		[]byte(strconv.Itoa(len(udf.Content))),
+		space,
 		udf.Content,
 	)
 }

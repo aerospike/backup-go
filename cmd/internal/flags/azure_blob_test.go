@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAzureBlob_NewFlagSet(t *testing.T) {
+func TestAzureBlob_NewFlagSetRestore(t *testing.T) {
 	t.Parallel()
 	azureBlob := NewAzureBlob(OperationRestore)
 
@@ -36,7 +36,6 @@ func TestAzureBlob_NewFlagSet(t *testing.T) {
 		"--azure-container-name", "my-container",
 		"--azure-access-tier", "Standard",
 		"--azure-rehydrate-poll-duration", "1000",
-		"--azure-block-size", "1",
 	}
 
 	err := flagSet.Parse(args)
@@ -53,10 +52,9 @@ func TestAzureBlob_NewFlagSet(t *testing.T) {
 	assert.Equal(t, "my-container", result.ContainerName, "The azure-container-name flag should be parsed correctly")
 	assert.Equal(t, "Standard", result.AccessTier, "The azure-access-tier flag should be parsed correctly")
 	assert.Equal(t, int64(1000), result.RestorePollDuration, "The azure-rehydrate-poll-duration flag should be parsed correctly")
-	assert.Equal(t, 1, result.BlockSize, "The azure-block-size flag should be parsed correctly")
 }
 
-func TestAzureBlob_NewFlagSet_DefaultValues(t *testing.T) {
+func TestAzureBlob_NewFlagSet_DefaultValuesRestore(t *testing.T) {
 	t.Parallel()
 	azureBlob := NewAzureBlob(OperationRestore)
 
@@ -76,5 +74,60 @@ func TestAzureBlob_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.ContainerName, "The default value for azure-container-name should be an empty string")
 	assert.Equal(t, "", result.AccessTier, "The default value for azure-access-tier should be an empty string")
 	assert.Equal(t, int64(60000), result.RestorePollDuration, "The default value for azure-rehydrate-poll-duration should be 60000")
+}
+
+func TestAzureBlob_NewFlagSetBackup(t *testing.T) {
+	t.Parallel()
+	azureBlob := NewAzureBlob(OperationBackup)
+
+	flagSet := azureBlob.NewFlagSet()
+
+	args := []string{
+		"--azure-account-name", "myaccount",
+		"--azure-account-key", "mykey",
+		"--azure-tenant-id", "tenant-id",
+		"--azure-client-id", "client-id",
+		"--azure-client-secret", "client-secret",
+		"--azure-endpoint", "https://custom-endpoint.com",
+		"--azure-container-name", "my-container",
+		"--azure-access-tier", "Standard",
+		"--azure-block-size", "1",
+	}
+
+	err := flagSet.Parse(args)
+	assert.NoError(t, err)
+
+	result := azureBlob.GetAzureBlob()
+
+	assert.Equal(t, "myaccount", result.AccountName, "The azure-account-name flag should be parsed correctly")
+	assert.Equal(t, "mykey", result.AccountKey, "The azure-account-key flag should be parsed correctly")
+	assert.Equal(t, "tenant-id", result.TenantID, "The azure-tenant-id flag should be parsed correctly")
+	assert.Equal(t, "client-id", result.ClientID, "The azure-client-id flag should be parsed correctly")
+	assert.Equal(t, "client-secret", result.ClientSecret, "The azure-client-secret flag should be parsed correctly")
+	assert.Equal(t, "https://custom-endpoint.com", result.Endpoint, "The azure-endpoint flag should be parsed correctly")
+	assert.Equal(t, "my-container", result.ContainerName, "The azure-container-name flag should be parsed correctly")
+	assert.Equal(t, "Standard", result.AccessTier, "The azure-access-tier flag should be parsed correctly")
+	assert.Equal(t, 1, result.BlockSize, "The azure-block-size flag should be parsed correctly")
+}
+
+func TestAzureBlob_NewFlagSet_DefaultValuesBackup(t *testing.T) {
+	t.Parallel()
+	azureBlob := NewAzureBlob(OperationBackup)
+
+	flagSet := azureBlob.NewFlagSet()
+
+	err := flagSet.Parse([]string{})
+	assert.NoError(t, err)
+
+	result := azureBlob.GetAzureBlob()
+
+	assert.Equal(t, "", result.AccountName, "The default value for azure-account-name should be an empty string")
+	assert.Equal(t, "", result.AccountKey, "The default value for azure-account-key should be an empty string")
+	assert.Equal(t, "", result.TenantID, "The default value for azure-tenant-id should be an empty string")
+	assert.Equal(t, "", result.ClientID, "The default value for azure-client-id should be an empty string")
+	assert.Equal(t, "", result.ClientSecret, "The default value for azure-client-secret should be an empty string")
+	assert.Equal(t, "", result.Endpoint, "The default value for azure-endpoint should be an empty string")
+	assert.Equal(t, "", result.ContainerName, "The default value for azure-container-name should be an empty string")
+	assert.Equal(t, "", result.AccessTier, "The default value for azure-access-tier should be an empty string")
 	assert.Equal(t, 5242880, result.BlockSize, "The default value for azure-block-size should be 5MB")
 }

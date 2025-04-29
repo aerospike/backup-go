@@ -311,6 +311,8 @@ func Test__SIndexToASB(t *testing.T) {
 				t.Errorf("encodeSIndexToASB() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
+				fmt.Println("|", gotW, "|")
+				fmt.Println("|", tt.wantW, "|")
 				t.Errorf("encodeSIndexToASB() = %v, want %v", gotW, tt.wantW)
 			}
 		})
@@ -657,16 +659,16 @@ func Test_userKeyToASB(t *testing.T) {
 		{
 			name: "positive float64 user key",
 			args: args{
-				userKey: a.NewValue(123.456),
+				userKey: a.NewValue(123.456789),
 			},
-			want: []byte("+ k D 123.456000\n"),
+			want: []byte("+ k D 123.456789\n"),
 		},
 		{
 			name: "positive negative float64 user key",
 			args: args{
 				userKey: a.NewValue(-123.456),
 			},
-			want: []byte("+ k D -123.456000\n"),
+			want: []byte("+ k D -123.456\n"),
 		},
 		{
 			name: "positive string user key",
@@ -1523,8 +1525,8 @@ func Test_writeUserKeyFloat(t *testing.T) {
 			args: args{
 				v: 1234.5678,
 			},
-			want:  len("+ k D 1234.567800\n"),
-			wantW: "+ k D 1234.567800\n",
+			want:  len("+ k D 1234.5678\n"),
+			wantW: "+ k D 1234.5678\n",
 		},
 	}
 	for _, tt := range tests {

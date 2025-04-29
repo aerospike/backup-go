@@ -36,6 +36,7 @@ func TestAzureBlob_NewFlagSet(t *testing.T) {
 		"--azure-container-name", "my-container",
 		"--azure-access-tier", "Standard",
 		"--azure-rehydrate-poll-duration", "1000",
+		"--azure-block-size", "1",
 	}
 
 	err := flagSet.Parse(args)
@@ -52,6 +53,7 @@ func TestAzureBlob_NewFlagSet(t *testing.T) {
 	assert.Equal(t, "my-container", result.ContainerName, "The azure-container-name flag should be parsed correctly")
 	assert.Equal(t, "Standard", result.AccessTier, "The azure-access-tier flag should be parsed correctly")
 	assert.Equal(t, int64(1000), result.RestorePollDuration, "The azure-rehydrate-poll-duration flag should be parsed correctly")
+	assert.Equal(t, 1, result.BlockSize, "The azure-block-size flag should be parsed correctly")
 }
 
 func TestAzureBlob_NewFlagSet_DefaultValues(t *testing.T) {
@@ -73,5 +75,6 @@ func TestAzureBlob_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.Endpoint, "The default value for azure-endpoint should be an empty string")
 	assert.Equal(t, "", result.ContainerName, "The default value for azure-container-name should be an empty string")
 	assert.Equal(t, "", result.AccessTier, "The default value for azure-access-tier should be an empty string")
-	assert.Equal(t, int64(60000), result.RestorePollDuration, "The default value for azure-rehydrate-poll-duration should be an empty string")
+	assert.Equal(t, int64(60000), result.RestorePollDuration, "The default value for azure-rehydrate-poll-duration should be 60000")
+	assert.Equal(t, 5242880, result.BlockSize, "The default value for azure-block-size should be 5MB")
 }

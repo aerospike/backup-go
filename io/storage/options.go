@@ -64,6 +64,9 @@ type Options struct {
 
 	// How often restore status will be polled from cloud provider.
 	PollWarmDuration time.Duration
+
+	// Size of chunk to upload.
+	ChunkSize int
 }
 
 type Opt func(*Options)
@@ -185,5 +188,13 @@ func WithLogger(logger *slog.Logger) Opt {
 func WithWarmPollDuration(duration time.Duration) Opt {
 	return func(r *Options) {
 		r.PollWarmDuration = duration
+	}
+}
+
+// WithChunkSize sets the chunk size for uploading files.
+// Is used only for Writer.
+func WithChunkSize(size int) Opt {
+	return func(r *Options) {
+		r.ChunkSize = size
 	}
 }

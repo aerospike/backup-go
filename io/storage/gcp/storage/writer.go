@@ -60,6 +60,10 @@ func NewWriter(
 		opt(&w.Options)
 	}
 
+	if w.ChunkSize == 0 {
+		w.ChunkSize = defaultChunkSize
+	}
+
 	if len(w.PathList) != 1 {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
@@ -113,7 +117,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	sw := w.bucketHandle.Object(filename).NewWriter(ctx)
 	sw.ContentType = fileType
-	sw.ChunkSize = defaultChunkSize
+	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass
 
 	return sw, nil

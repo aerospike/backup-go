@@ -462,6 +462,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		client,
 		testBucketName,
 		ioStorage.WithDir(testWriteFolderEmpty),
+		ioStorage.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -493,6 +494,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		client,
 		testBucketName,
 		ioStorage.WithDir(testWriteFolderWithDataError),
+		ioStorage.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -514,6 +516,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 		testBucketName,
 		ioStorage.WithDir(testWriteFolderWithData),
 		ioStorage.WithRemoveFiles(),
+		ioStorage.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -546,6 +549,7 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 		testBucketName,
 		ioStorage.WithDir(testWriteFolderMixedData),
 		ioStorage.WithRemoveFiles(),
+		ioStorage.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 

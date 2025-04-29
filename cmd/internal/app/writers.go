@@ -131,6 +131,8 @@ func newS3Writer(
 		opts = append(opts, ioStorage.WithStorageClass(a.StorageClass))
 	}
 
+	opts = append(opts, ioStorage.WithChunkSize(a.ChunkSize))
+
 	return s3.NewWriter(ctx, client, a.BucketName, opts...)
 }
 
@@ -143,6 +145,8 @@ func newGcpWriter(
 	if err != nil {
 		return nil, err
 	}
+
+	opts = append(opts, ioStorage.WithChunkSize(g.ChunkSize))
 
 	return storage.NewWriter(ctx, client, g.BucketName, opts...)
 }
@@ -160,6 +164,8 @@ func newAzureWriter(
 	if a.AccessTier != "" {
 		opts = append(opts, ioStorage.WithAccessTier(a.AccessTier))
 	}
+
+	opts = append(opts, ioStorage.WithChunkSize(a.BlockSize))
 
 	return blob.NewWriter(ctx, client, a.ContainerName, opts...)
 }

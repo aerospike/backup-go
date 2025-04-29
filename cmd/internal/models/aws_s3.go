@@ -33,6 +33,8 @@ type AwsS3 struct {
 	StorageClass        string
 	AccessTier          string
 	RestorePollDuration int64
+
+	ChunkSize int
 }
 
 // LoadSecrets tries to load field values from secret agent.

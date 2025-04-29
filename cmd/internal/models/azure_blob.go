@@ -36,6 +36,8 @@ type AzureBlob struct {
 
 	AccessTier          string
 	RestorePollDuration int64
+
+	BlockSize int
 }
 
 // LoadSecrets tries to load field values from secret agent.

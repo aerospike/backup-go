@@ -22,6 +22,7 @@ import (
 const (
 	testBackupDir  = "/"
 	testBackupFile = "/backup_folder/backup_file.txt"
+	testChunkSize  = 5242880
 )
 
 type writeReadTestSuite struct {
@@ -127,6 +128,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		"backup",
 		ioStorage.WithDir(testBackupDir),
 		ioStorage.WithRemoveFiles(),
+		ioStorage.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -158,6 +160,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		client,
 		"backup",
 		ioStorage.WithDir(testBackupDir),
+		ioStorage.WithChunkSize(testChunkSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 
@@ -200,6 +203,7 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 		"backup",
 		ioStorage.WithFile(testBackupFile),
 		ioStorage.WithRemoveFiles(),
+		ioStorage.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 

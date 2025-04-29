@@ -44,7 +44,7 @@ func TestCountUsingInfoClient(t *testing.T) {
 				a.NewPartitionFilterByRange(1000, 913),
 			},
 			recordCount: 4000,
-			expected:    1000, // 1 + 10 + 100 + 913 = 1024 (of 4096)
+			expected:    1000, // 1 + 10 + 100 + 913 = 1024 (1/4 of 4096)
 			expectError: false,
 		},
 		{

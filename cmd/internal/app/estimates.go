@@ -16,10 +16,16 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/aerospike/backup-go/models"
+)
+
+var (
+	errContinue = errors.New("continue")
+	errBrake    = errors.New("brake")
 )
 
 func printBackupEstimate(
@@ -43,63 +49,22 @@ func printBackupEstimate(
 			}
 
 			done := stats.GetReadRecords()
-			percentage := float64(done) / float64(totalRecords)
-			estimatedEndTime := calculateEstimatedEndTime(stats.StartTime, percentage)
+
+			pct, err := printEstimate(stats.StartTime, float64(done), float64(totalRecords), previousVal, getMetrics, logger)
 
 			switch {
-			case percentage >= 1:
-				// Exit after 100%.
-				return
-			case percentage*100 < 1:
-				// Start printing only when we have somthing.
+			case errors.Is(err, errBrake):
+				break
+			case errors.Is(err, errContinue):
 				continue
-			case percentage-previousVal < 0.01:
-				// if less than 1% then don't print anything.
-				continue
+			default:
+				previousVal = pct
 			}
 
-			var (
-				rps, kbps, recSize uint64
-			)
-
-			metrics := getMetrics()
-			if metrics != nil {
-				rps = metrics.RecordsPerSecond
-				kbps = metrics.KilobytesPerSecond
-				// Reformating record size for pretty printing to avoid printing 1024.000000000 bytes.
-				recSize = uint64(float64(kbps) / float64(rps) * 1024)
-			}
-
-			logger.Info("progress",
-				slog.Uint64("pct", uint64(percentage*100)),
-				// Formatting the remaining time to milliseconds to avoid printing 0.000000000 seconds.
-				slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
-				slog.Uint64("rec/s", rps),
-				slog.Uint64("KiB/s", kbps),
-				slog.Uint64("B/rec", recSize),
-			)
-
-			previousVal = percentage
 		case <-ctx.Done():
 			return
 		}
 	}
-}
-
-func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Duration {
-	if percentDone < 0.01 {
-		return time.Duration(0)
-	}
-
-	elapsed := time.Since(startTime)
-	totalTime := time.Duration(float64(elapsed) / percentDone)
-	result := totalTime - elapsed
-
-	if result < 0 {
-		return time.Duration(0)
-	}
-
-	return result
 }
 
 func printRestoreEstimate(
@@ -127,43 +92,84 @@ func printRestoreEstimate(
 				continue
 			}
 
-			percentage := float64(done) / float64(totalSize)
-			estimatedEndTime := calculateEstimatedEndTime(stats.StartTime, percentage)
+			pct, err := printEstimate(stats.StartTime, float64(done), float64(totalSize), previousVal, getMetrics, logger)
 
 			switch {
-			case percentage >= 1:
-				// Exit after 100%.
-				return
-			case percentage*100 < 1:
-				// Start printing only when we have somthing.
+			case errors.Is(err, errBrake):
+				break
+			case errors.Is(err, errContinue):
 				continue
-			case percentage-previousVal < 0.01:
-				// if less than 1% then don't print anything.
-				continue
+			default:
+				previousVal = pct
 			}
 
-			var (
-				rps, kbps, recSize uint64
-			)
-
-			metrics := getMetrics()
-			if metrics != nil {
-				rps = metrics.RecordsPerSecond
-				kbps = metrics.KilobytesPerSecond
-				recSize = uint64(float64(kbps) / float64(rps) * 1024)
-			}
-
-			logger.Info("progress",
-				slog.Uint64("pct", uint64(percentage*100)),
-				slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
-				slog.Uint64("rec/s", rps),
-				slog.Uint64("KiB/s", kbps),
-				slog.Uint64("B/rec", recSize),
-			)
-
-			previousVal = percentage
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+func printEstimate(
+	startTime time.Time,
+	done,
+	total,
+	previousVal float64,
+	getMetrics func() *models.Metrics,
+	logger *slog.Logger,
+) (float64, error) {
+	percentage := done / total
+	estimatedEndTime := calculateEstimatedEndTime(startTime, percentage)
+
+	switch {
+	case percentage >= 1:
+		// Exit after 100%.
+		return 0, errBrake
+	case percentage*100 < 1:
+		// Start printing only when we have something.
+		return 0, errContinue
+	case percentage-previousVal < 0.01:
+		// if less than 1% then don't print anything.
+		return 0, errContinue
+	}
+
+	var (
+		rps, kbps, recSize uint64
+	)
+
+	metrics := getMetrics()
+	if metrics != nil {
+		rps = metrics.RecordsPerSecond
+		kbps = metrics.KilobytesPerSecond
+		// Reformating record size for pretty printing to avoid printing 1024.000000000 bytes.
+		if rps > 0 {
+			recSize = uint64(float64(kbps) / float64(rps) * 1024)
+		}
+	}
+
+	logger.Info("progress",
+		slog.Uint64("pct", uint64(percentage*100)),
+		// Formatting the remaining time to milliseconds to avoid printing 0.000000000 seconds.
+		slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
+		slog.Uint64("rec/s", rps),
+		slog.Uint64("KiB/s", kbps),
+		slog.Uint64("B/rec", recSize),
+	)
+
+	return percentage, nil
+}
+
+func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Duration {
+	if percentDone < 0.01 {
+		return time.Duration(0)
+	}
+
+	elapsed := time.Since(startTime)
+	totalTime := time.Duration(float64(elapsed) / percentDone)
+	result := totalTime - elapsed
+
+	if result < 0 {
+		return time.Duration(0)
+	}
+
+	return result
 }

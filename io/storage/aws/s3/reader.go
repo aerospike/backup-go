@@ -139,7 +139,7 @@ func NewReader(
 
 		r.Logger.Debug("finish warming storage")
 	}
-
+	// We "lazy" calculate total size of all files in a path for estimates calculations.
 	go r.calculateTotalSize(ctx)
 
 	return r, nil

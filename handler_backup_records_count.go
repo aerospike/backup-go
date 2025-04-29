@@ -22,11 +22,10 @@ import (
 	"math/rand"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/io/aerospike"
 )
 
-func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *asinfo.InfoClient) (uint64, error) {
+func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient infoGetter) (uint64, error) {
 	if bh.config.withoutFilter() {
 		return bh.countUsingInfoClient(infoClient)
 	}
@@ -34,7 +33,7 @@ func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient *as
 	return bh.countRecordsUsingScan(ctx)
 }
 
-func (bh *backupRecordsHandler) countUsingInfoClient(infoClient *asinfo.InfoClient) (uint64, error) {
+func (bh *backupRecordsHandler) countUsingInfoClient(infoClient infoGetter) (uint64, error) {
 	totalRecordCount, err := infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get record count: %w", err)
@@ -42,7 +41,7 @@ func (bh *backupRecordsHandler) countUsingInfoClient(infoClient *asinfo.InfoClie
 
 	partitionsToScan := uint64(sumPartition(bh.config.PartitionFilters))
 
-	return totalRecordCount * MaxPartitions / partitionsToScan, nil
+	return totalRecordCount * partitionsToScan / MaxPartitions, nil
 }
 
 func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint64, error) {

@@ -73,6 +73,8 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 		}
 	}
 
+	go r.calculateTotalSize()
+
 	return r, nil
 }
 
@@ -173,14 +175,6 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	stat, err := reader.Stat()
-	if err != nil {
-		errorsCh <- fmt.Errorf("failed to get file stats %s: %w", filename, err)
-		return
-	}
-
-	r.totalSize.Store(stat.Size())
-
 	readersCh <- models.File{Reader: reader, Name: filepath.Base(filename)}
 }
 
@@ -192,8 +186,6 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 		// Handle the error
 		return fmt.Errorf("failed to get path info %s: %w", dir, err)
 	}
-
-	r.totalSize.Add(dirInfo.Size())
 
 	if !dirInfo.IsDir() {
 		// Handle the case when it's not a directory
@@ -295,6 +287,78 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 // GetType returns the type of the reader.
 func (r *Reader) GetType() string {
 	return localType
+}
+
+func (r *Reader) calculateTotalSize() {
+	var totalSize int64
+
+	for _, path := range r.PathList {
+		size, err := r.calculateTotalSizeForPath(path)
+		if err != nil {
+			// Skip calculation errors.
+			return
+		}
+
+		totalSize += size
+	}
+
+	// set size when everything is ready.
+	r.totalSize.Store(totalSize)
+}
+
+func (r *Reader) calculateTotalSizeForPath(path string) (int64, error) {
+	dirInfo, err := os.Stat(path)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get path info %s: %w", path, err)
+	}
+
+	if !dirInfo.IsDir() {
+		reader, err := os.Open(path)
+		if err != nil {
+			return 0, fmt.Errorf("failed to open %s: %w", path, err)
+		}
+
+		stat, err := reader.Stat()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
+		}
+
+		return stat.Size(), nil
+	}
+
+	fileInfo, err := os.ReadDir(path)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read path %s: %w", path, err)
+	}
+
+	var totalSize int64
+
+	for _, file := range fileInfo {
+		if file.IsDir() {
+			// Iterate over nested dirs recursively.
+			if r.WithNestedDir {
+				nestedDir := filepath.Join(path, file.Name())
+				// If the nested folder is ok, then return nil.
+				if totalSize, err = r.calculateTotalSizeForPath(nestedDir); err == nil {
+					return totalSize, nil
+				}
+			}
+
+			continue
+		}
+
+		// If we found a valid file, return.
+		if err = r.Validator.Run(file.Name()); err == nil {
+			info, err := file.Info()
+			if err != nil {
+				return 0, fmt.Errorf("failed to get file info %s: %w", path, err)
+			}
+
+			totalSize += info.Size()
+		}
+	}
+
+	return totalSize, nil
 }
 
 // GetSize returns the size of the file/dir that was initialized.

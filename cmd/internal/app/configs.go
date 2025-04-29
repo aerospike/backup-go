@@ -198,7 +198,7 @@ func mapRestoreConfig(params *ASRestoreParams) *backup.ConfigRestore {
 	c.DisableBatchWrites = params.RestoreParams.DisableBatchWrites
 	c.BatchSize = params.RestoreParams.BatchSize
 	c.MaxAsyncBatches = params.RestoreParams.MaxAsyncBatches
-	c.MetricsEnabled = params.App.Verbose
+	c.MetricsEnabled = true
 
 	c.CompressionPolicy = mapCompressionPolicy(params.Compression)
 	c.EncryptionPolicy = mapEncryptionPolicy(params.Encryption)

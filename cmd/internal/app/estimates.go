@@ -16,7 +16,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -31,6 +30,7 @@ func printBackupEstimate(
 ) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+
 	var previousVal float64
 
 	for {
@@ -53,28 +53,29 @@ func printBackupEstimate(
 				// Start printing only when we have somthing.
 				continue
 			case percentage-previousVal < 0.01:
-				fmt.Println("cont")
-				fmt.Println(previousVal)
-				fmt.Println(percentage)
-				fmt.Println(previousVal - percentage)
 				// if less than 1% then don't print anything.
 				continue
 			}
 
 			var (
-				rps, kbps uint64
+				rps, kbps, recSize uint64
 			)
+
 			metrics := getMetrics()
 			if metrics != nil {
 				rps = metrics.RecordsPerSecond
 				kbps = metrics.KilobytesPerSecond
+				// Reformating record size for pretty printing to avoid printing 1024.000000000 bytes.
+				recSize = uint64(float64(kbps) / float64(rps) * 1024)
 			}
 
 			logger.Info("progress",
 				slog.Uint64("pct", uint64(percentage*100)),
-				slog.Duration("remaining", estimatedEndTime),
+				// Formatting the remaining time to milliseconds to avoid printing 0.000000000 seconds.
+				slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
 				slog.Uint64("rec/s", rps),
 				slog.Uint64("KiB/s", kbps),
+				slog.Uint64("B/rec", recSize),
 			)
 
 			previousVal = percentage
@@ -109,6 +110,7 @@ func printRestoreEstimate(
 ) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+
 	var previousVal float64
 
 	for {
@@ -120,6 +122,10 @@ func printRestoreEstimate(
 			}
 
 			done := stats.GetTotalBytesRead()
+			if done == 0 {
+				continue
+			}
+
 			percentage := float64(done) / float64(totalSize)
 			estimatedEndTime := calculateEstimatedEndTime(stats.StartTime, percentage)
 
@@ -131,28 +137,27 @@ func printRestoreEstimate(
 				// Start printing only when we have somthing.
 				continue
 			case percentage-previousVal < 0.01:
-				fmt.Println("cont")
-				fmt.Println(previousVal)
-				fmt.Println(percentage)
-				fmt.Println(previousVal - percentage)
 				// if less than 1% then don't print anything.
 				continue
 			}
 
 			var (
-				rps, kbps uint64
+				rps, kbps, recSize uint64
 			)
+
 			metrics := getMetrics()
 			if metrics != nil {
 				rps = metrics.RecordsPerSecond
 				kbps = metrics.KilobytesPerSecond
+				recSize = uint64(float64(kbps) / float64(rps) * 1024)
 			}
 
 			logger.Info("progress",
 				slog.Uint64("pct", uint64(percentage*100)),
-				slog.Duration("remaining", estimatedEndTime),
+				slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
 				slog.Uint64("rec/s", rps),
 				slog.Uint64("KiB/s", kbps),
+				slog.Uint64("B/rec", recSize),
 			)
 
 			previousVal = percentage

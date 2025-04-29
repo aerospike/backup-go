@@ -316,10 +316,11 @@ func (r *Reader) shouldSkip(path, fileName string) bool {
 
 func (r *Reader) calculateTotalSize(ctx context.Context) {
 	var totalSize int64
+
 	for _, path := range r.PathList {
 		size, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
-			// TODO: waht to do with error? interrupt reader?
+			// Skip calculation errors.
 			return
 		}
 

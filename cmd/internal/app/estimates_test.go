@@ -90,9 +90,16 @@ func TestPrintBackupEstimate(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 
+	gm := func() *models.Metrics {
+		return &models.Metrics{
+			KilobytesPerSecond: 1000,
+			RecordsPerSecond:   1000,
+		}
+	}
+
 	done := make(chan struct{})
 	go func() {
-		printBackupEstimate(ctx, stats, logger)
+		printBackupEstimate(ctx, stats, gm, logger)
 		close(done)
 	}()
 
@@ -117,9 +124,20 @@ func TestPrintRestoreEstimate(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 
+	gm := func() *models.Metrics {
+		return &models.Metrics{
+			KilobytesPerSecond: 1000,
+			RecordsPerSecond:   1000,
+		}
+	}
+
+	gs := func() int64 {
+		return 10000
+	}
+
 	done := make(chan struct{})
 	go func() {
-		printRestoreEstimate(ctx, stats, logger)
+		printRestoreEstimate(ctx, stats, gm, gs, logger)
 		close(done)
 	}()
 

@@ -573,10 +573,11 @@ func parseAccessTier(tier string) (types.Tier, error) {
 
 func (r *Reader) calculateTotalSize(ctx context.Context) {
 	var totalSize int64
+
 	for _, path := range r.PathList {
 		size, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
-			// TODO: waht to do with error? interrupt reader?
+			// Skip calculation errors.
 			return
 		}
 
@@ -597,6 +598,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (in
 		if err != nil {
 			return 0, fmt.Errorf("failed to get head object %s %s: %w", r.bucketName, path, err)
 		}
+
 		return *headOutput.ContentLength, nil
 	}
 

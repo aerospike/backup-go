@@ -57,11 +57,19 @@ func NewWriter(
 	w := &Writer{
 		client: client,
 	}
-	// Set default value.
-	w.UploadConcurrency = uploadStreamConcurrencyDefault
 
 	for _, opt := range opts {
 		opt(&w.Options)
+	}
+
+	if w.ChunkSize < 0 {
+		return nil, fmt.Errorf("chunk size must be positive")
+	}
+
+	// Set default value.
+	w.UploadConcurrency = uploadStreamConcurrencyDefault
+	if w.ChunkSize == 0 {
+		w.ChunkSize = uploadStreamBlockSize
 	}
 
 	if len(w.PathList) != 1 {
@@ -125,7 +133,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
 
-	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier), nil
+	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, int64(w.ChunkSize)), nil
 }
 
 var _ io.WriteCloser = (*blobWriter)(nil)
@@ -138,10 +146,11 @@ type blobWriter struct {
 	pipeWriter        *io.PipeWriter
 	done              chan error
 	uploadConcurrency int
+	chunkSize         int64
 }
 
 func newBlobWriter(
-	ctx context.Context, blobClient *blockblob.Client, uploadConcurrency int, tier *blob.AccessTier,
+	ctx context.Context, blobClient *blockblob.Client, uploadConcurrency int, tier *blob.AccessTier, chunkSize int64,
 ) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
 
@@ -152,6 +161,7 @@ func newBlobWriter(
 		pipeWriter:        pipeWriter,
 		done:              make(chan error, 1),
 		uploadConcurrency: uploadConcurrency,
+		chunkSize:         chunkSize,
 	}
 
 	go w.uploadStream(tier)
@@ -162,7 +172,7 @@ func newBlobWriter(
 func (w *blobWriter) uploadStream(tier *blob.AccessTier) {
 	contentType := uploadStreamFileType
 	_, err := w.blobClient.UploadStream(w.ctx, w.pipeReader, &azblob.UploadStreamOptions{
-		BlockSize:   uploadStreamBlockSize,
+		BlockSize:   w.chunkSize,
 		Concurrency: w.uploadConcurrency,
 		HTTPHeaders: &blob.HTTPHeaders{
 			BlobContentType: &contentType,

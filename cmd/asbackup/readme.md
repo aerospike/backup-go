@@ -218,6 +218,9 @@ Any AWS parameter can be retrieved from Secret Agent.
                                       GLACIER_IR,
                                       SNOW,
                                       EXPRESS_ONEZONE.
+      --s3-chunk-size int             Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
+                                      the server in a single request. Objects smaller than the size will be sent in a single request,
+                                      while larger objects will be split over multiple requests.  (default 5242880)
 
 GCP Flags:
 For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
@@ -227,6 +230,9 @@ Any GCP parameter can be retrieved from Secret Agent.
       --gcp-key-path string            Path to file containing service account JSON key.
       --gcp-bucket-name string         Name of the Google cloud storage bucket.
       --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
+      --gcp-chunk-size int             Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
+                                       the server in a single request. Objects smaller than the size will be sent in a single request,
+                                       while larger objects will be split over multiple requests.  (default 5242880)
 
 Azure Flags:
 For Azure storage container name is mandatory, and is set with --azure-storage-container-name flag.
@@ -244,6 +250,7 @@ Any Azure parameter can be retrieved from Secret Agent.
       --azure-container-name string   Azure container Name.
       --azure-access-tier string      Azure access tier is applied to created backup files.
                                       Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
+      --azure-block-size int          Block size defines the size of the buffer used during upload. (default 5242880)
 ```
 
 ## XDR backup. 
@@ -332,6 +339,4 @@ All other flags are valid for XDR backup.
 --s3-connect-timeout        The AWS S3 client's connection timeout in milliseconds.
                             This is equivalent to cli-connect-timeout in the AWS CLI,
                             or connectTimeoutMS in the aws-sdk-cpp client configuration.
-                            
---s3-min-part-size int
 ```

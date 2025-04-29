@@ -17,12 +17,13 @@ package flags
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGcpStorage_NewFlagSet(t *testing.T) {
 	t.Parallel()
-	gcpStorage := NewGcpStorage()
+	gcpStorage := NewGcpStorage(OperationBackup)
 
 	flagSet := gcpStorage.NewFlagSet()
 
@@ -30,6 +31,7 @@ func TestGcpStorage_NewFlagSet(t *testing.T) {
 		"--gcp-key-path", "/path/to/keyfile.json",
 		"--gcp-bucket-name", "my-bucket",
 		"--gcp-endpoint-override", "https://gcp.custom-endpoint.com",
+		"--gcp-chunk-size", "1",
 	}
 
 	err := flagSet.Parse(args)
@@ -40,11 +42,12 @@ func TestGcpStorage_NewFlagSet(t *testing.T) {
 	assert.Equal(t, "/path/to/keyfile.json", result.KeyFile, "The gcp-key-path flag should be parsed correctly")
 	assert.Equal(t, "my-bucket", result.BucketName, "The gcp-bucket-name flag should be parsed correctly")
 	assert.Equal(t, "https://gcp.custom-endpoint.com", result.Endpoint, "The gcp-endpoint-override flag should be parsed correctly")
+	assert.Equal(t, 1, result.ChunkSize, "The gcp-chunk-size flag should be parsed correctly")
 }
 
 func TestGcpStorage_NewFlagSet_DefaultValues(t *testing.T) {
 	t.Parallel()
-	gcpStorage := NewGcpStorage()
+	gcpStorage := NewGcpStorage(OperationBackup)
 
 	flagSet := gcpStorage.NewFlagSet()
 
@@ -56,4 +59,5 @@ func TestGcpStorage_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.KeyFile, "The default value for gcp-key-path should be an empty string")
 	assert.Equal(t, "", result.BucketName, "The default value for gcp-bucket-name should be an empty string")
 	assert.Equal(t, "", result.Endpoint, "The default value for gcp-endpoint-override should be an empty string")
+	assert.Equal(t, models.DefaultChunkSize, result.ChunkSize, "The default value for gcp-chunk-size should be 5MB")
 }

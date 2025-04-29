@@ -70,6 +70,14 @@ func NewWriter(
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
+	if w.ChunkSize < 0 {
+		return nil, fmt.Errorf("chunk size must be positive")
+	}
+
+	if w.ChunkSize == 0 {
+		w.ChunkSize = s3DefaultChunkSize
+	}
+
 	if w.IsDir {
 		w.prefix = ioStorage.CleanPath(w.PathList[0], true)
 	}
@@ -147,7 +155,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		bucket:     w.bucketName,
 		buffer:     new(bytes.Buffer),
 		partNumber: 1,
-		chunkSize:  s3DefaultChunkSize,
+		chunkSize:  w.ChunkSize,
 	}, nil
 }
 

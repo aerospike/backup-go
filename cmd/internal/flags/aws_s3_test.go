@@ -17,6 +17,7 @@ package flags
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,6 +34,7 @@ func TestAwsS3_NewFlagSet(t *testing.T) {
 		"--s3-access-key-id", "my-access-key-id",
 		"--s3-secret-access-key", "my-secret-access-key",
 		"--s3-storage-class", "my-storage-class",
+		"--s3-chunk-size", "1",
 	}
 
 	err := flagSet.Parse(args)
@@ -46,6 +48,7 @@ func TestAwsS3_NewFlagSet(t *testing.T) {
 	assert.Equal(t, "my-access-key-id", result.AccessKeyID, "The s3-access-key-id flag should be parsed correctly")
 	assert.Equal(t, "my-secret-access-key", result.SecretAccessKey, "The s3-secret-access-key flag should be parsed correctly")
 	assert.Equal(t, "my-storage-class", result.StorageClass, "The s3-storage-class flag should be parsed correctly")
+	assert.Equal(t, 1, result.ChunkSize, "The s3-chunk-size flag should be parsed correctly")
 }
 
 func TestAwsS3_NewFlagSet_DefaultValues(t *testing.T) {
@@ -65,4 +68,5 @@ func TestAwsS3_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.AccessKeyID, "The default value for s3-access-key-id should be an empty string")
 	assert.Equal(t, "", result.SecretAccessKey, "The default value for s3-secret-access-key should be an empty string")
 	assert.Equal(t, "", result.StorageClass, "The default value for s3-storage-class should be an empty string")
+	assert.Equal(t, models.DefaultChunkSize, result.ChunkSize, "The default value for s3-chunk-size should be 5mb")
 }

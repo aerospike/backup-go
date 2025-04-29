@@ -34,6 +34,18 @@ func TestCountUsingInfoClient(t *testing.T) {
 			recordCount: 8192,
 			expected:    2,
 			expectError: false,
+		}, {
+			name:      "Successfully get record count for multiple partitions",
+			namespace: "test",
+			partFilters: []*a.PartitionFilter{
+				a.NewPartitionFilterById(1),
+				a.NewPartitionFilterByRange(10, 10),
+				a.NewPartitionFilterByRange(100, 100),
+				a.NewPartitionFilterByRange(1000, 913),
+			},
+			recordCount: 4000,
+			expected:    1000, // 1 + 10 + 100 + 913 = 1024 (of 4096)
+			expectError: false,
 		},
 		{
 			name:        "Successfully get record count with partial partition scan",

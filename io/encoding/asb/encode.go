@@ -125,15 +125,15 @@ func (e *Encoder[T]) GetHeader(_ uint64) []byte {
 // **** META DATA ****
 
 func writeVersionText(asbVersion string, w io.Writer) {
-	_, _ = writeBytes(w, []byte(tokenASBVersion), space, []byte(asbVersion))
+	_, _ = writeBytes(w, tokenVersion, space, []byte(asbVersion))
 }
 
 func writeNamespaceMetaText(namespace string, w io.Writer) {
-	_, _ = writeBytes(w, []byte{markerMetadataSection}, space, []byte(tokenNamespace), space, escapeASB(namespace))
+	_, _ = writeBytes(w, metadataSection, space, namespaceToken, space, escapeASB(namespace))
 }
 
 func writeFirstMetaText(w io.Writer) {
-	_, _ = writeBytes(w, []byte{markerMetadataSection}, space, []byte(tokenFirstFile))
+	_, _ = writeBytes(w, metadataSection, space, tokenFirst)
 }
 
 // **** RECORD ****
@@ -563,11 +563,11 @@ type UserKeyTypesInt interface {
 func writeUserKeyInt[T UserKeyTypesInt](v T, w io.Writer) (int, error) {
 	return writeBytes(
 		w,
-		[]byte{markerRecordHeader},
+		recordHeader,
 		space,
-		[]byte{recordHeaderTypeKey},
+		recordHeaderType,
 		space,
-		[]byte{keyTypeInt},
+		headerTypeInt,
 		space,
 		[]byte(strconv.FormatInt(int64(v), 10)),
 	)
@@ -576,11 +576,11 @@ func writeUserKeyInt[T UserKeyTypesInt](v T, w io.Writer) (int, error) {
 func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
 	return writeBytes(
 		w,
-		[]byte{markerRecordHeader},
+		recordHeader,
 		space,
-		[]byte{recordHeaderTypeKey},
+		recordHeaderType,
 		space,
-		[]byte{keyTypeFloat},
+		headerTypeFloat,
 		space,
 		[]byte(strconv.FormatFloat(v, 'f', -1, 64)),
 	)
@@ -589,11 +589,11 @@ func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
 func writeUserKeyString(v string, w io.Writer) (int, error) {
 	return writeBytes(
 		w,
-		[]byte{markerRecordHeader},
+		recordHeader,
 		space,
-		[]byte{recordHeaderTypeKey},
+		recordHeaderType,
 		space,
-		[]byte{keyTypeString},
+		headerTypeString,
 		space,
 		[]byte(strconv.Itoa(len(v))),
 		space,
@@ -604,11 +604,11 @@ func writeUserKeyString(v string, w io.Writer) (int, error) {
 func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
 	encoded := base64Encode(v)
 	n, err := writeBytes(w,
-		[]byte{markerRecordHeader},
+		recordHeader,
 		space,
-		[]byte{recordHeaderTypeKey},
+		recordHeaderType,
 		space,
-		[]byte{keyTypeBytes},
+		headerTypeBytes,
 		space,
 		[]byte(strconv.Itoa(len(encoded))),
 		space,
@@ -664,9 +664,9 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 
 	// Prepare all parameters
 	params := [][]byte{
-		{markerGlobalSection},
+		globalSection,
 		space,
-		{globalTypeSIndex},
+		globalSIndex,
 		space,
 		escapeASB(sindex.Namespace),
 		space,
@@ -697,9 +697,9 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
 	return writeBytes(
 		w,
-		[]byte{markerGlobalSection},
+		globalSection,
 		space,
-		[]byte{globalTypeUDF},
+		globalUDF,
 		space,
 		[]byte{byte(udf.UDFType)},
 		space,

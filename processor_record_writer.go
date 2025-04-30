@@ -27,11 +27,11 @@ import (
 )
 
 type recordWriterProcessor[T models.TokenConstraint] struct {
-	aerospikeClient AerospikeClient
-	config          *ConfigRestore
-	stats           *models.RestoreStats
-	limiter         *rate.Limiter
-	metrics         *metrics.Collector
+	aerospikeClient  AerospikeClient
+	config           *ConfigRestore
+	stats            *models.RestoreStats
+	limiter          *rate.Limiter
+	metricsCollector *metrics.Collector
 
 	logger *slog.Logger
 }
@@ -41,18 +41,18 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	config *ConfigRestore,
 	stats *models.RestoreStats,
 	limiter *rate.Limiter,
-	metrics *metrics.Collector,
+	metricsCollector *metrics.Collector,
 	logger *slog.Logger,
 ) *recordWriterProcessor[T] {
 	logger.Debug("created new records writer processor")
 
 	return &recordWriterProcessor[T]{
-		aerospikeClient: aerospikeClient,
-		config:          config,
-		stats:           stats,
-		limiter:         limiter,
-		metrics:         metrics,
-		logger:          logger,
+		aerospikeClient:  aerospikeClient,
+		config:           config,
+		stats:            stats,
+		limiter:          limiter,
+		metricsCollector: metricsCollector,
+		logger:           logger,
 	}
 }
 
@@ -82,7 +82,7 @@ func (rw *recordWriterProcessor[T]) newWriterWorkers() ([]pipeline.Worker[T], er
 			useBatchWrites,
 			rw.config.BatchSize,
 			rw.config.RetryPolicy,
-			rw.metrics,
+			rw.metricsCollector,
 			rw.config.IgnoreRecordError,
 		)
 

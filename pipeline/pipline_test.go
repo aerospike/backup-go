@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/pipeline/mocks"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -186,4 +187,89 @@ func (suite *pipelineTestSuite) TestDataPipelineRunWorkerFails() {
 
 func TestPipelineTestSuite(t *testing.T) {
 	suite.Run(t, new(pipelineTestSuite))
+}
+
+func TestNewPipelineWithDifferentModes(t *testing.T) {
+	t.Run("ModeSingle", func(t *testing.T) {
+		worker1 := mocks.NewMockWorker[string](t)
+		worker1.EXPECT().SetReceiveChan(mock.Anything)
+		worker1.EXPECT().SetSendChan(mock.Anything)
+
+		worker2 := mocks.NewMockWorker[string](t)
+		worker2.EXPECT().SetReceiveChan(mock.Anything)
+		worker2.EXPECT().SetSendChan(mock.Anything)
+
+		workers := [][]Worker[string]{{worker1}, {worker2}}
+
+		pipeline, err := NewPipeline(ModeSingle, nil, workers...)
+		assert.NoError(t, err)
+		assert.NotNil(t, pipeline)
+	})
+
+	t.Run("ModeParallel", func(t *testing.T) {
+		worker1 := mocks.NewMockWorker[string](t)
+		worker1.EXPECT().SetReceiveChan(mock.Anything)
+		worker1.EXPECT().SetSendChan(mock.Anything)
+
+		worker2 := mocks.NewMockWorker[string](t)
+		worker2.EXPECT().SetReceiveChan(mock.Anything)
+		worker2.EXPECT().SetSendChan(mock.Anything)
+
+		workers := [][]Worker[string]{{worker1}, {worker2}}
+
+		pipeline, err := NewPipeline(ModeParallel, nil, workers...)
+		assert.NoError(t, err)
+		assert.NotNil(t, pipeline)
+	})
+
+	t.Run("ModeSingleParallel", func(t *testing.T) {
+		worker1 := mocks.NewMockWorker[string](t)
+		worker1.EXPECT().SetReceiveChan(mock.Anything)
+		worker1.EXPECT().SetSendChan(mock.Anything)
+
+		worker2 := mocks.NewMockWorker[string](t)
+		worker2.EXPECT().SetReceiveChan(mock.Anything)
+		worker2.EXPECT().SetSendChan(mock.Anything)
+
+		worker3 := mocks.NewMockWorker[string](t)
+		worker3.EXPECT().SetReceiveChan(mock.Anything)
+		worker3.EXPECT().SetSendChan(mock.Anything)
+
+		sf := func(v string) int {
+			if v == "test" {
+				return 0
+			}
+			return 1
+		}
+
+		workers := [][]Worker[string]{{worker1}, {worker2}, {worker3}}
+
+		pipeline, err := NewPipeline(ModeSingleParallel, sf, workers...)
+		assert.NoError(t, err)
+		assert.NotNil(t, pipeline)
+	})
+
+	t.Run("ModeSingleParallelWrongStagesNumber", func(t *testing.T) {
+		worker1 := mocks.NewMockWorker[string](t)
+		worker2 := mocks.NewMockWorker[string](t)
+
+		// Split function for ModeSingleParallel
+		sf := func(_ string) int {
+			return 0
+		}
+
+		workers := [][]Worker[string]{{worker1}, {worker2}}
+
+		pipeline, err := NewPipeline(ModeSingleParallel, sf, workers...)
+		assert.Error(t, err)
+		assert.Nil(t, pipeline)
+		assert.Contains(t, err.Error(), "this pipeline mode supports only 3 working groups")
+	})
+
+	t.Run("NoWorkers", func(t *testing.T) {
+		pipeline, err := NewPipeline[string](ModeSingle, nil)
+		assert.Error(t, err)
+		assert.Nil(t, pipeline)
+		assert.Contains(t, err.Error(), "workGroups is empty")
+	})
 }

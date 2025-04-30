@@ -247,6 +247,10 @@ func ParseFields(message []byte, numFields int16) []*Field {
 	start := int32(0)
 
 	for i := range result {
+		if start >= int32(len(message)) {
+			break
+		}
+		//nolint:gosec // We have check for start value.
 		field, cursor := ParseField(message[start:])
 		result[i] = field
 		start += cursor

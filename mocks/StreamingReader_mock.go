@@ -22,6 +22,96 @@ func (_m *MockStreamingReader) EXPECT() *MockStreamingReader_Expecter {
 	return &MockStreamingReader_Expecter{mock: &_m.Mock}
 }
 
+// GetNumber provides a mock function with given fields:
+func (_m *MockStreamingReader) GetNumber() int64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNumber")
+	}
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func() int64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
+}
+
+// MockStreamingReader_GetNumber_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNumber'
+type MockStreamingReader_GetNumber_Call struct {
+	*mock.Call
+}
+
+// GetNumber is a helper method to define mock.On call
+func (_e *MockStreamingReader_Expecter) GetNumber() *MockStreamingReader_GetNumber_Call {
+	return &MockStreamingReader_GetNumber_Call{Call: _e.mock.On("GetNumber")}
+}
+
+func (_c *MockStreamingReader_GetNumber_Call) Run(run func()) *MockStreamingReader_GetNumber_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockStreamingReader_GetNumber_Call) Return(_a0 int64) *MockStreamingReader_GetNumber_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockStreamingReader_GetNumber_Call) RunAndReturn(run func() int64) *MockStreamingReader_GetNumber_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSize provides a mock function with given fields:
+func (_m *MockStreamingReader) GetSize() int64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSize")
+	}
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func() int64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
+}
+
+// MockStreamingReader_GetSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSize'
+type MockStreamingReader_GetSize_Call struct {
+	*mock.Call
+}
+
+// GetSize is a helper method to define mock.On call
+func (_e *MockStreamingReader_Expecter) GetSize() *MockStreamingReader_GetSize_Call {
+	return &MockStreamingReader_GetSize_Call{Call: _e.mock.On("GetSize")}
+}
+
+func (_c *MockStreamingReader_GetSize_Call) Run(run func()) *MockStreamingReader_GetSize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockStreamingReader_GetSize_Call) Return(_a0 int64) *MockStreamingReader_GetSize_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockStreamingReader_GetSize_Call) RunAndReturn(run func() int64) *MockStreamingReader_GetSize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetType provides a mock function with given fields:
 func (_m *MockStreamingReader) GetType() string {
 	ret := _m.Called()

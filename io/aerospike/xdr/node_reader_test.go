@@ -29,7 +29,6 @@ import (
 
 func TestNodeReader_Run(t *testing.T) {
 	t.Parallel()
-
 	t.Run("StartXDRError", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
@@ -57,7 +56,6 @@ func TestNodeReader_Run(t *testing.T) {
 
 func TestNodeReader_BlockMrt(t *testing.T) {
 	t.Parallel()
-
 	t.Run("SuccessfulBlock", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
@@ -107,7 +105,6 @@ func TestNodeReader_BlockMrt(t *testing.T) {
 
 func TestNodeReader_GetStats(t *testing.T) {
 	t.Parallel()
-
 	t.Run("SuccessfulGetStats", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
@@ -225,7 +222,6 @@ func TestNodeReader_GetStats(t *testing.T) {
 
 func TestNodeReader_Close(t *testing.T) {
 	t.Parallel()
-
 	t.Run("CloseWithoutRecovery", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
@@ -276,6 +272,7 @@ func TestNodeReader_Close(t *testing.T) {
 
 		select {
 		case <-nodesRecovered:
+
 			t.Fatal("nodesRecovered channel should not have received a message")
 		default:
 			// Success

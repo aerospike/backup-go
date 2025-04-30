@@ -25,14 +25,13 @@ import (
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProcessorTTL_Process(t *testing.T) {
 	t.Parallel()
 	key, aerr := aerospike.NewKey("test", "test", "test")
-	if aerr != nil {
-		t.Fatal(aerr)
-	}
+	require.NoError(t, aerr)
 
 	type fields struct {
 		getNow  func() cltime.CLTime

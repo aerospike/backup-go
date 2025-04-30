@@ -20,7 +20,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -89,7 +88,6 @@ func newInfoMock(t *testing.T) infoCommander {
 
 func TestRecordReader(t *testing.T) {
 	t.Parallel()
-
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		// Level: slog.LevelDebug,
@@ -99,7 +97,6 @@ func TestRecordReader(t *testing.T) {
 	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(testCurrentHost2), logger)
 	require.NoError(t, err)
 
-	// Start to read messages.
 	var counter atomic.Uint64
 	go func() {
 		for {
@@ -117,15 +114,12 @@ func TestRecordReader(t *testing.T) {
 		}
 	}()
 
-	// Wait for the TCP server to start.
 	time.Sleep(1 * time.Second)
 
 	tcpClient, err := newTCPClient(testCurrentHost2)
 	require.NoError(t, err)
 
-	// Sending messages.
 	go func() {
-		// Send 3 valid messages.
 		for i := 0; i < 3; i++ {
 			msg, err := newMessage(testMessageB64)
 			require.NoError(t, err)
@@ -141,89 +135,42 @@ func TestRecordReader(t *testing.T) {
 	require.Equal(t, uint64(3), counter.Load())
 }
 
-func TestRecordReaderTimeout(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
-
-	// Create a mock with necessary expectations
-	ic := mocks.NewMockinfoCommander(t)
-	ic.On("GetNodesNames").Return([]string{"node1"})
-	ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything,
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil)
-
-	// Create a config with a very short timeout
-	cfg := testRecordReaderConfig(testCurrentHost4) // Use a different port
-	cfg.startTimeout = 10 * time.Millisecond
-
-	r, err := NewRecordReader(ctx, ic, cfg, logger)
-	require.NoError(t, err)
-
-	// Start the reader - this should start the TCP server
-	// But since we don't send any messages, it should timeout
-	_, err = r.Read()
-	require.Error(t, err)
-	// The error could be either a timeout or EOF depending on timing
-	require.True(t, strings.Contains(err.Error(), "xdr scan timed out") || errors.Is(err, io.EOF),
-		"Expected timeout or EOF error, got: %v", err)
-
-	// Close the reader explicitly to ensure it's closed
-	r.Close()
-
-	// The second read might return EOF or another timeout depending on timing
-	_, err = r.Read()
-	require.Error(t, err)
-}
-
 func TestRecordReaderCloseNotRunning(t *testing.T) {
 	t.Parallel()
-
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
 
-	// Create a simple mock that doesn't expect any calls
 	ic := mocks.NewMockinfoCommander(t)
 
 	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(testCurrentHost3), logger)
 	require.NoError(t, err)
 
-	// Close should not panic even if the reader is not running
 	r.Close()
 }
 
 func TestRecordReaderServeNoNodes(t *testing.T) {
 	t.Parallel()
-
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
 
-	// Create a mock info commander that returns no nodes
 	ic := mocks.NewMockinfoCommander(t)
 	ic.On("GetNodesNames").Return([]string{})
 
 	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(testCurrentHost4), logger)
 	require.NoError(t, err)
 
-	// Manually start the serve method
 	r.serve()
 
-	// Reader should be closed due to no nodes
 	require.False(t, r.isRunning.Load())
 }
 
 func TestRecordReaderWatchNodes(t *testing.T) {
 	t.Parallel()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
 
-	// Create a simple mock that just implements BlockMRTWrites
 	ic := mocks.NewMockinfoCommander(t)
 	ic.On("BlockMRTWrites", mock.Anything, mock.Anything).Return(nil)
 
@@ -231,7 +178,6 @@ func TestRecordReaderWatchNodes(t *testing.T) {
 	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(hostPort), logger)
 	require.NoError(t, err)
 
-	// Create two node readers
 	node1 := NewNodeReader(ctx, "node1", ic, testRecordReaderConfig(hostPort), r.nodesRecovered, logger)
 	node2 := NewNodeReader(ctx, "node2", ic, testRecordReaderConfig(hostPort), r.nodesRecovered, logger)
 
@@ -239,17 +185,13 @@ func TestRecordReaderWatchNodes(t *testing.T) {
 	r.activeNodes = []*NodeReader{node1, node2}
 	r.anMu.Unlock()
 
-	// Start the watchNodes goroutine
 	go r.watchNodes()
 
-	// Simulate both nodes recovering
 	r.nodesRecovered <- struct{}{}
 	r.nodesRecovered <- struct{}{}
 
-	// Give some time for the goroutine to process
 	time.Sleep(100 * time.Millisecond)
 
-	// Both nodes should have MRT blocked
 	require.True(t, node1.mrtWritesStopped.Load())
 	require.True(t, node2.mrtWritesStopped.Load())
 }

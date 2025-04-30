@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package xdr
 
 import (
@@ -67,14 +66,12 @@ func (m *mockConn) SetWriteDeadline(_ time.Time) error { return nil }
 
 func TestParserRead(t *testing.T) {
 	t.Parallel()
-
 	validBody, err := base64.StdEncoding.DecodeString(testMessageB64)
 	require.NoError(t, err)
 
 	validMsg := NewPayload(validBody)
 
 	t.Run("SuccessfulRead", func(t *testing.T) {
-		t.Parallel()
 		conn := &mockConn{readData: validMsg}
 		parser := NewParser(conn)
 
@@ -143,7 +140,6 @@ func TestParserRead(t *testing.T) {
 
 func TestParseAerospikeMessage(t *testing.T) {
 	t.Parallel()
-
 	validBody, err := base64.StdEncoding.DecodeString(testMessageB64)
 	require.NoError(t, err)
 
@@ -166,7 +162,6 @@ func TestParseAerospikeMessage(t *testing.T) {
 
 func TestParseFields(t *testing.T) {
 	t.Parallel()
-
 	validBody, err := base64.StdEncoding.DecodeString(testMessageB64)
 	require.NoError(t, err)
 
@@ -188,7 +183,6 @@ func TestParseFields(t *testing.T) {
 
 func TestParseField(t *testing.T) {
 	t.Parallel()
-
 	t.Run("EmptyField", func(t *testing.T) {
 		t.Parallel()
 		field, end := ParseField([]byte{})
@@ -211,7 +205,6 @@ func TestParseField(t *testing.T) {
 
 func TestNewPayload(t *testing.T) {
 	t.Parallel()
-
 	body := []byte{1, 2, 3, 4, 5}
 	payload := NewPayload(body)
 
@@ -225,7 +218,6 @@ func TestNewPayload(t *testing.T) {
 
 func TestResetXDRBit(t *testing.T) {
 	t.Parallel()
-
 	msg := []byte{0, MsgInfo1Xdr, 0, 0, 0}
 	result := ResetXDRBit(msg)
 
@@ -234,7 +226,6 @@ func TestResetXDRBit(t *testing.T) {
 
 func TestSetGenerationBit(t *testing.T) {
 	t.Parallel()
-
 	msg := NewPayload([]byte{0, 0, 0, 0, 0})
 
 	t.Run("NonePolicy", func(t *testing.T) {
@@ -261,7 +252,6 @@ func TestSetGenerationBit(t *testing.T) {
 
 func TestSetRecordExistsActionBit(t *testing.T) {
 	t.Parallel()
-
 	msg := NewPayload([]byte{0, 0, 0, 0, 0})
 
 	t.Run("UpdatePolicy", func(t *testing.T) {
@@ -312,7 +302,6 @@ func TestSetRecordExistsActionBit(t *testing.T) {
 
 func TestNewAckMessage(t *testing.T) {
 	t.Parallel()
-
 	t.Run("OkAck", func(t *testing.T) {
 		t.Parallel()
 		ack := NewAckMessage(AckOK)
@@ -332,7 +321,6 @@ func TestNewAckMessage(t *testing.T) {
 
 func TestNewAerospikeKey(t *testing.T) {
 	t.Parallel()
-
 	t.Run("NotEnoughFields", func(t *testing.T) {
 		t.Parallel()
 		_, err := NewAerospikeKey([]*Field{})
@@ -414,7 +402,6 @@ func TestNewAerospikeKey(t *testing.T) {
 
 func TestFieldToInt64(t *testing.T) {
 	t.Parallel()
-
 	t.Run("EmptyInput", func(t *testing.T) {
 		t.Parallel()
 		result := fieldToInt64([]byte{})
@@ -430,7 +417,6 @@ func TestFieldToInt64(t *testing.T) {
 
 func TestFieldToInt32(t *testing.T) {
 	t.Parallel()
-
 	t.Run("EmptyInput", func(t *testing.T) {
 		t.Parallel()
 		result := fieldToInt32([]byte{})
@@ -446,7 +432,6 @@ func TestFieldToInt32(t *testing.T) {
 
 func TestFieldToInt16(t *testing.T) {
 	t.Parallel()
-
 	t.Run("EmptyInput", func(t *testing.T) {
 		t.Parallel()
 		result := fieldToInt16([]byte{})
@@ -462,7 +447,6 @@ func TestFieldToInt16(t *testing.T) {
 
 func TestFieldToInt8(t *testing.T) {
 	t.Parallel()
-
 	t.Run("EmptyInput", func(t *testing.T) {
 		t.Parallel()
 		result := fieldToInt8([]byte{})
@@ -478,7 +462,6 @@ func TestFieldToInt8(t *testing.T) {
 
 func TestReadBytes(t *testing.T) {
 	t.Parallel()
-
 	t.Run("SuccessfulRead", func(t *testing.T) {
 		t.Parallel()
 		data := []byte{1, 2, 3, 4, 5}
@@ -506,7 +489,6 @@ func TestReadBytes(t *testing.T) {
 
 func TestSetLength(t *testing.T) {
 	t.Parallel()
-
 	msg := make([]byte, 8)
 	setLength(msg, 123456789)
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -48,6 +49,10 @@ const (
 	testFolderFileList       = "folder_file_list"
 	testFolderSorted         = "folder_sorted"
 	testFolderMixed          = "folder_mixed"
+	testFolderEmpty          = "folder_empty"
+	testFolderWithData       = "folder_with_data"
+	testFolderMixedData      = "folder_mixed_data"
+	testFolderOneFile        = "folder_one_file"
 	testFileNameMetadata     = "metadata.yaml"
 	testFileNameAsbTemplate  = "backup_%d.asb"
 	testFileNameAsbxTemplate = "%d_backup_%d.asbx"
@@ -158,10 +163,53 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		}); err != nil {
 			return err
 		}
+
+		// For StreamFilesOk test
+		fileName = fmt.Sprintf("%s/%s", testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, i))
+		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+			Body:   bytes.NewReader([]byte(testFileContentAsb)),
+		}); err != nil {
+			return err
+		}
+
+		// For StreamFilesMixed test
+		fileName = fmt.Sprintf("%s/%s", testFolderMixedData, fmt.Sprintf(testFileNameAsbTemplate, i))
+		if i%2 == 0 {
+			fileName = fmt.Sprintf("%s/%s", testFolderMixedData, fmt.Sprintf(testFileNameTemplateWrong, i))
+		}
+		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+			Body:   bytes.NewReader([]byte(testFileContentAsb)),
+		}); err != nil {
+			return err
+		}
+	}
+
+	// Create empty folder
+	_, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(testBucket),
+		Key:    aws.String(testFolderEmpty),
+		Body:   nil,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create one file for OpenFileOk test
+	fileName := fmt.Sprintf("%s/%s", testFolderOneFile, testFileNameOneFile)
+	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(testBucket),
+		Key:    aws.String(fileName),
+		Body:   bytes.NewReader([]byte(testFileContentAsb)),
+	}); err != nil {
+		return err
 	}
 
 	// Unsorted files.
-	fileName := fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbxTemplate, 0, 3))
+	fileName = fmt.Sprintf("%s/%s", testFolderSorted, fmt.Sprintf(testFileNameAsbxTemplate, 0, 3))
 	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(testBucket),
 		Key:    aws.String(fileName),
@@ -456,6 +504,202 @@ func readAll(r io.ReadCloser) (string, error) {
 	return string(data), nil
 }
 
+func (s *AwsSuite) TestReader_StreamFilesOk() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == util.FileExtAsb {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithDir(testFolderWithData),
+		ioStorage.WithValidator(mockValidator),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), testFilesNumber, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *AwsSuite) TestReader_StreamFilesEmpty() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == util.FileExtAsb {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	_, err = NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithDir(testFolderEmpty),
+		ioStorage.WithValidator(mockValidator),
+	)
+	s.Require().ErrorContains(err, "is empty")
+}
+
+func (s *AwsSuite) TestReader_StreamFilesMixed() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == util.FileExtAsb {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithDir(testFolderMixedData),
+		ioStorage.WithValidator(mockValidator),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), testFilesNumber/2, filesCounter) // Only half of the files have .asb extension
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *AwsSuite) TestReader_GetType() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithDir(testFolderWithData),
+	)
+	s.Require().NoError(err)
+
+	result := reader.GetType()
+	require.Equal(s.T(), s3type, result)
+}
+
+func (s *AwsSuite) TestReader_OpenFileOk() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithFile(fmt.Sprintf("%s/%s", testFolderOneFile, testFileNameOneFile)),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err = <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 1, filesCounter)
+				return
+			}
+			filesCounter++
+		}
+	}
+}
+
+func (s *AwsSuite) TestReader_OpenFileErr() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithFile(fmt.Sprintf("%s/%s", testFolderOneFile, "file_error")),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	for err = range eCH {
+		s.Require().Error(err)
+		return
+	}
+}
+
 func TestParseStorageClass(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -556,5 +800,205 @@ func TestParseStorageClass(t *testing.T) {
 
 			assert.Equal(t, tc.expected, result)
 		})
+	}
+}
+
+func TestParseAccessTier(t *testing.T) {
+	tests := []struct {
+		name          string
+		tier          string
+		expected      types.Tier
+		expectedError error
+	}{
+		{
+			name:          "expedited tier",
+			tier:          "Expedited",
+			expected:      types.TierExpedited,
+			expectedError: nil,
+		},
+		{
+			name:          "standard tier",
+			tier:          "Standard",
+			expected:      types.TierStandard,
+			expectedError: nil,
+		},
+		{
+			name:          "bulk tier",
+			tier:          "Bulk",
+			expected:      types.TierBulk,
+			expectedError: nil,
+		},
+		{
+			name:          "lower case input",
+			tier:          "expedited",
+			expected:      types.TierExpedited,
+			expectedError: nil,
+		},
+		{
+			name:          "mixed case input",
+			tier:          "sTaNdArD",
+			expected:      types.TierStandard,
+			expectedError: nil,
+		},
+		{
+			name:          "empty input",
+			tier:          "",
+			expected:      "",
+			expectedError: fmt.Errorf("invalid access tier "),
+		},
+		{
+			name:          "invalid tier",
+			tier:          "INVALID_TIER",
+			expected:      "",
+			expectedError: fmt.Errorf("invalid access tier Invalid_tier"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := parseAccessTier(tc.tier)
+
+			if tc.expectedError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedError.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func (s *AwsSuite) TestReader_ListObjects() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	// Create a reader for a directory with known files
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithDir(testFolderWithData),
+		ioStorage.WithSkipDirCheck(),
+	)
+	s.Require().NoError(err)
+
+	// List objects in the directory
+	objects, err := reader.ListObjects(ctx, testFolderWithData)
+	s.Require().NoError(err)
+
+	// Check that the correct number of objects is returned
+	s.Require().Equal(testFilesNumber, len(objects), "Expected number of objects to be equal to testFilesNumber")
+
+	// Check that all objects have the correct prefix
+	for _, obj := range objects {
+		s.Require().True(strings.HasPrefix(obj, testFolderWithData),
+			"Expected object %s to have prefix %s", obj, testFolderWithData)
+	}
+}
+
+func TestReader_ShouldSkip(t *testing.T) {
+	tests := []struct {
+		name          string
+		path          string
+		fileName      *string
+		withNestedDir bool
+		expected      bool
+	}{
+		{
+			name:          "nil filename",
+			path:          "test/path",
+			fileName:      nil,
+			withNestedDir: false,
+			expected:      true,
+		},
+		{
+			name:          "directory with nested dir enabled",
+			path:          "test/path/",
+			fileName:      aws.String("test/path/subdir/"),
+			withNestedDir: true,
+			expected:      false,
+		},
+		{
+			name:          "directory with nested dir disabled",
+			path:          "test/path/",
+			fileName:      aws.String("test/path/subdir/"),
+			withNestedDir: false,
+			expected:      true,
+		},
+		{
+			name:          "regular file",
+			path:          "test/path/",
+			fileName:      aws.String("test/path/file.txt"),
+			withNestedDir: false,
+			expected:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := &Reader{
+				Options: ioStorage.Options{
+					WithNestedDir: tc.withNestedDir,
+				},
+			}
+			result := reader.shouldSkip(tc.path, tc.fileName)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func (s *AwsSuite) TestReader_SetObjectsToStream() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	// Create a reader
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithDir(testFolderWithData),
+		ioStorage.WithSkipDirCheck(),
+	)
+	s.Require().NoError(err)
+
+	// Define a list of objects to stream
+	objectsToStream := []string{
+		filepath.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 0)),
+		filepath.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 1)),
+	}
+
+	// Set the objects to stream
+	reader.SetObjectsToStream(objectsToStream)
+
+	// Verify that the objects were set correctly
+	s.Require().Equal(objectsToStream, reader.objectsToStream)
+
+	// Test streaming the objects
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), len(objectsToStream), filesCounter)
+				return
+			}
+			filesCounter++
+		}
 	}
 }

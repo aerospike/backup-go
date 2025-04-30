@@ -50,7 +50,9 @@ func (m *mockZstdWriter) Close() error {
 }
 
 func TestNewWriter(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
 		mockW := &mockWriteCloser{
 			writeFunc: func(p []byte) (int, error) { return len(p), nil },
 			closeFunc: func() error { return nil },
@@ -65,6 +67,7 @@ func TestNewWriter(t *testing.T) {
 	})
 
 	t.Run("Invalid compression level", func(t *testing.T) {
+		t.Parallel()
 		mockW := &mockWriteCloser{
 			writeFunc: func(p []byte) (int, error) { return len(p), nil },
 			closeFunc: func() error { return nil },
@@ -78,7 +81,9 @@ func TestNewWriter(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
 		var buf bytes.Buffer
 		bufCloser := &mockWriteCloser{
 			writeFunc: buf.Write,
@@ -107,7 +112,9 @@ func TestWrite(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
 		mockW := &mockWriteCloser{
 			writeFunc: func(p []byte) (int, error) { return len(p), nil },
 			closeFunc: func() error { return nil },
@@ -121,6 +128,7 @@ func TestClose(t *testing.T) {
 	})
 
 	t.Run("Error closing zstd writer", func(t *testing.T) {
+		t.Parallel()
 		mockW := &mockWriteCloser{
 			writeFunc: func(p []byte) (int, error) { return len(p), nil },
 			closeFunc: func() error { return nil },
@@ -142,6 +150,7 @@ func TestClose(t *testing.T) {
 	})
 
 	t.Run("Error closing underlying writer", func(t *testing.T) {
+		t.Parallel()
 		expectedErr := errors.New("close error")
 		mockW := &mockWriteCloser{
 			writeFunc: func(p []byte) (int, error) { return len(p), nil },
@@ -158,6 +167,7 @@ func TestClose(t *testing.T) {
 }
 
 func TestRealCompression(t *testing.T) {
+	t.Parallel()
 	var compressedBuf bytes.Buffer
 	bufCloser := &mockWriteCloser{
 		writeFunc: compressedBuf.Write,

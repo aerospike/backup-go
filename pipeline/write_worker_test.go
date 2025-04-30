@@ -96,7 +96,7 @@ func TestReadWorkerSetReceiveChan(t *testing.T) {
 	worker.SetReceiveChan(receiveChan)
 
 	if worker.reader != mock {
-		t.Error("SetReceiveChan modified the reader field")
+		t.Fatal("SetReceiveChan modified the reader field")
 	}
 }
 
@@ -127,10 +127,10 @@ func TestWriteWorkerSetSendChan(t *testing.T) {
 	worker.SetSendChan(sendChan)
 
 	if worker.DataWriter != mock {
-		t.Error("SetSendChan modified the DataWriter field")
+		t.Fatal("SetSendChan modified the DataWriter field")
 	}
 	if worker.receive != receiveChan {
-		t.Error("SetSendChan modified the receive field")
+		t.Fatal("SetSendChan modified the receive field")
 	}
 }
 

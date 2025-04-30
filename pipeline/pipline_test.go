@@ -190,6 +190,7 @@ func TestPipelineTestSuite(t *testing.T) {
 }
 
 func TestNewPipelineWithDifferentModes(t *testing.T) {
+	t.Parallel()
 	t.Run("ModeSingle", func(t *testing.T) {
 		worker1 := mocks.NewMockWorker[string](t)
 		worker1.EXPECT().SetReceiveChan(mock.Anything)
@@ -207,6 +208,7 @@ func TestNewPipelineWithDifferentModes(t *testing.T) {
 	})
 
 	t.Run("ModeParallel", func(t *testing.T) {
+		t.Parallel()
 		worker1 := mocks.NewMockWorker[string](t)
 		worker1.EXPECT().SetReceiveChan(mock.Anything)
 		worker1.EXPECT().SetSendChan(mock.Anything)
@@ -223,6 +225,7 @@ func TestNewPipelineWithDifferentModes(t *testing.T) {
 	})
 
 	t.Run("ModeSingleParallel", func(t *testing.T) {
+		t.Parallel()
 		worker1 := mocks.NewMockWorker[string](t)
 		worker1.EXPECT().SetReceiveChan(mock.Anything)
 		worker1.EXPECT().SetSendChan(mock.Anything)
@@ -250,6 +253,7 @@ func TestNewPipelineWithDifferentModes(t *testing.T) {
 	})
 
 	t.Run("ModeSingleParallelWrongStagesNumber", func(t *testing.T) {
+		t.Parallel()
 		worker1 := mocks.NewMockWorker[string](t)
 		worker2 := mocks.NewMockWorker[string](t)
 
@@ -267,6 +271,7 @@ func TestNewPipelineWithDifferentModes(t *testing.T) {
 	})
 
 	t.Run("NoWorkers", func(t *testing.T) {
+		t.Parallel()
 		pipeline, err := NewPipeline[string](ModeSingle, nil)
 		assert.Error(t, err)
 		assert.Nil(t, pipeline)

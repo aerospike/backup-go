@@ -268,8 +268,8 @@ type ConnectionHandler struct {
 	ackMsgRetry   []byte
 	timeNow       int64
 
-	logger  *slog.Logger
-	metrics *metrics.Collector
+	logger           *slog.Logger
+	metricsCollector *metrics.Collector
 }
 
 // NewConnectionHandler returns a new connection handler.
@@ -281,7 +281,7 @@ func NewConnectionHandler(
 	readTimeout time.Duration,
 	writeTimeout time.Duration,
 	logger *slog.Logger,
-	metrics *metrics.Collector,
+	metricsCollector *metrics.Collector,
 ) *ConnectionHandler {
 	return &ConnectionHandler{
 		conn:             conn,
@@ -294,7 +294,7 @@ func NewConnectionHandler(
 		ackMsgSuccess:    NewAckMessage(AckOK),
 		ackMsgRetry:      NewAckMessage(AckRetry),
 		logger:           logger,
-		metrics:          metrics,
+		metricsCollector: metricsCollector,
 	}
 }
 
@@ -388,7 +388,7 @@ func (h *ConnectionHandler) handleMessages(ctx context.Context) {
 				return
 			}
 
-			h.metrics.Increment()
+			h.metricsCollector.Increment()
 
 			// Process message asynchronously
 			h.bodyQueue <- message

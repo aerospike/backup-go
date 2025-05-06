@@ -34,11 +34,16 @@ func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) pipeline.D
 
 func (c sizeCounter[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
-	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for size counter", token)
+	if ok {
+		c.counter.Add(t.Size)
+		return token, nil
 	}
 
-	c.counter.Add(t.Size)
+	tx, ok := any(token).(*models.ASBXToken)
+	if ok {
+		c.counter.Add(uint64(len(tx.Payload)))
+		return token, nil
+	}
 
-	return token, nil
+	return nil, fmt.Errorf("unsupported token type %T for size counter", token)
 }

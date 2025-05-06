@@ -208,6 +208,7 @@ func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) ([]pipelin
 
 	case EncoderTypeASBX:
 		return newTokenWorker[T](processors.NewComposeProcessor[T](
+			processors.NewSizeCounter[T](&rh.stats.TotalBytesRead),
 			processors.NewTokenCounter[T](&rh.stats.ReadRecords),
 			processors.NewTPSLimiter[T](ctx, rh.config.RecordsPerSecond),
 		), rh.config.Parallel), nil

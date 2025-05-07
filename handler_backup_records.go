@@ -253,12 +253,14 @@ func (bh *backupRecordsHandler) filterNodes(nodesList []string, nodes []*a.Node)
 			continue
 		}
 
-		nodeStr, err := bh.infoClient.GetService(nodes[i].GetName())
+		nodeServiceAddress, err := bh.infoClient.GetService(nodes[i].GetName())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get node %s service: %w", nodes[i].GetName(), err)
 		}
 
-		_, ok := nodesMap[nodeStr]
+		bh.logger.Debug("node %s service: %s", nodes[i].GetName(), nodeServiceAddress)
+
+		_, ok := nodesMap[nodeServiceAddress]
 		if ok {
 			filteredNodes = append(filteredNodes, nodes[i])
 		}

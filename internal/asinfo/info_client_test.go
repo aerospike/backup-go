@@ -1956,8 +1956,8 @@ func TestInfoCommander_getService(t *testing.T) {
 
 	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
-	res, err := ic.getService("BB902D7A8C04202")
-	require.NoError(t, err)
+	nodes := ic.GetNodesNames()
 
-	fmt.Println(res)
+	_, err := ic.getService(nodes[0])
+	require.NoError(t, err)
 }

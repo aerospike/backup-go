@@ -84,11 +84,13 @@ func (bh *backupRecordsHandler) run(
 		return err
 	}
 
+	rps := bh.config.RecordsPerSecond / bh.config.ParallelRead
+
 	composeProcessor := newTokenWorker(processors.NewComposeProcessor(
 		processors.NewRecordCounter[*models.Token](recordsReadTotal),
 		processors.NewVoidTimeSetter[*models.Token](bh.logger),
 		processors.NewTPSLimiter[*models.Token](
-			ctx, bh.config.RecordsPerSecond),
+			ctx, rps),
 	), bh.config.ParallelRead)
 
 	pl, err := pipeline.NewPipeline(

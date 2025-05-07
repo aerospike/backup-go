@@ -16,7 +16,12 @@ package models
 
 import a "github.com/aerospike/aerospike-client-go/v8"
 
+type Sizer interface {
+	GetSize() uint64
+}
+
 type TokenConstraint interface {
+	Sizer
 	*Token | *ASBXToken
 }
 
@@ -40,6 +45,10 @@ type Token struct {
 	// Filter represents serialized partition filter for page, that record belongs to.
 	// Is used only on pagination read, to save reading states.
 	Filter *PartitionFilterSerialized
+}
+
+func (t *Token) GetSize() uint64 {
+	return t.Size
 }
 
 // NewRecordToken creates a new token with the given record.
@@ -82,4 +91,8 @@ func NewASBXToken(key *a.Key, payload []byte) *ASBXToken {
 		Key:     key,
 		Payload: payload,
 	}
+}
+
+func (t *ASBXToken) GetSize() uint64 {
+	return uint64(len(t.Payload))
 }

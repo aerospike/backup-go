@@ -83,8 +83,6 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		ctx...,
 	)
 	if err != nil {
-		// if the sindex already exists, replace it because
-		// the seconday index may have changed since the backup was taken
 		if err.Matches(atypes.INDEX_FOUND) {
 			rw.logger.Debug("index already exists, replacing it", "sindex", si.Name)
 
@@ -116,6 +114,9 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	}
 
 	errs := job.OnComplete()
+	if errs == nil {
+		return fmt.Errorf("error creating sindex: OnComplete returned nil channel")
+	}
 
 	err = <-errs
 	if err != nil {

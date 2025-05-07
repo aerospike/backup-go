@@ -16,6 +16,7 @@
 package secret_agent
 
 import (
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -59,6 +60,7 @@ FP/P34Ge5nNmSyP5atj9rdMBPR6c4T/TdDPndykvAoGBAKkxR2CDdmpwzR9pdNHc
 N3TlUGL8bf3ri9vC1Uwx4HFrqo99pEz4JwXT8VZ/J3KYH9H6hsPfoS9swlBxDjwU
 rqDyLDkROLjIJE1InlzrtH9rHGInExFVWbzL1jpCV7GtQsYVdiSxHzNaRB47UGZI
 ah87+EsQLgoao6VWDlepN54P`
+	testBase64Value = "dGVzdFZhbHVl" // base64 encoded "testValue"
 )
 
 func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error) {
@@ -100,17 +102,159 @@ func mockHandler(conn net.Conn) {
 	}
 }
 
+func mockBase64Handler(conn net.Conn) {
+	defer conn.Close()
+	_, _ = connection.ReadBytes(conn, 10)
+
+	resp := models.Response{
+		SecretValue: testBase64Value,
+		Error:       "",
+	}
+	respJSON, _ := json.Marshal(resp)
+	length := len(respJSON)
+	header := make([]byte, 8)
+	binary.BigEndian.PutUint32(header[:4], magic)
+	binary.BigEndian.PutUint32(header[4:], uint32(length))
+
+	_, err := conn.Write(append(header, respJSON...))
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func mockErrorHandler(conn net.Conn) {
+	defer conn.Close()
+	_, _ = connection.ReadBytes(conn, 10)
+
+	resp := models.Response{
+		SecretValue: "",
+		Error:       "test error",
+	}
+	respJSON, _ := json.Marshal(resp)
+	length := len(respJSON)
+	header := make([]byte, 8)
+	binary.BigEndian.PutUint32(header[:4], magic)
+	binary.BigEndian.PutUint32(header[4:], uint32(length))
+
+	_, err := conn.Write(append(header, respJSON...))
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func mockInvalidBase64Handler(conn net.Conn) {
+	defer conn.Close()
+	_, _ = connection.ReadBytes(conn, 10)
+
+	resp := models.Response{
+		SecretValue: "invalid-base64",
+		Error:       "",
+	}
+	respJSON, _ := json.Marshal(resp)
+	length := len(respJSON)
+	header := make([]byte, 8)
+	binary.BigEndian.PutUint32(header[:4], magic)
+	binary.BigEndian.PutUint32(header[4:], uint32(length))
+
+	_, err := conn.Write(append(header, respJSON...))
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func TestNewClient(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		client, err := NewClient(ConnectionTypeTCP, testAddress, testTimeout, true, nil)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+		require.Equal(t, ConnectionTypeTCP, client.connectionType)
+		require.Equal(t, testAddress, client.address)
+		require.Equal(t, testTimeout, client.timeout)
+		require.True(t, client.isBase64)
+		require.Nil(t, client.tlsConfig)
+	})
+
+	t.Run("Error with TLS and non-TCP", func(t *testing.T) {
+		//nolint:gosec // For test we can use default unsecured TLS version.
+		tlsConfig := &tls.Config{}
+		client, err := NewClient(ConnectionTypeUDS, testAddress, testTimeout, true, tlsConfig)
+		require.Error(t, err)
+		require.Nil(t, client)
+		require.Contains(t, err.Error(), "tls connection type unix is not supported")
+	})
+}
+
 func TestClient_GetSecret(t *testing.T) {
-	listener, err := mockTCPServer(testAddress, mockHandler)
-	require.NoError(t, err)
-	defer listener.Close()
+	t.Run("Success", func(t *testing.T) {
+		listener, err := mockTCPServer(testAddress, mockHandler)
+		require.NoError(t, err)
+		defer listener.Close()
 
-	// Wait for server start.
-	time.Sleep(1 * time.Second)
+		// Wait for server start.
+		time.Sleep(1 * time.Second)
 
-	client, err := NewClient(ConnectionTypeTCP, testAddress, testTimeout, true, nil)
-	require.NoError(t, err)
+		client, err := NewClient(ConnectionTypeTCP, testAddress, testTimeout, false, nil)
+		require.NoError(t, err)
 
-	_, err = client.GetSecret("", testSecretKey)
-	require.NoError(t, err)
+		secret, err := client.GetSecret("", testSecretKey)
+		require.NoError(t, err)
+		require.Equal(t, testPKey, secret)
+	})
+
+	t.Run("Success with Base64 Decoding", func(t *testing.T) {
+		listener, err := mockTCPServer(":1112", mockBase64Handler)
+		require.NoError(t, err)
+		defer listener.Close()
+
+		// Wait for server start.
+		time.Sleep(1 * time.Second)
+
+		client, err := NewClient(ConnectionTypeTCP, ":1112", testTimeout, true, nil)
+		require.NoError(t, err)
+
+		secret, err := client.GetSecret("", testSecretKey)
+		require.NoError(t, err)
+		require.Equal(t, "testValue", secret)
+	})
+
+	t.Run("Error from Server", func(t *testing.T) {
+		listener, err := mockTCPServer(":1113", mockErrorHandler)
+		require.NoError(t, err)
+		defer listener.Close()
+
+		// Wait for server start.
+		time.Sleep(1 * time.Second)
+
+		client, err := NewClient(ConnectionTypeTCP, ":1113", testTimeout, false, nil)
+		require.NoError(t, err)
+
+		_, err = client.GetSecret("", testSecretKey)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "test error")
+	})
+
+	t.Run("Invalid Base64", func(t *testing.T) {
+		listener, err := mockTCPServer(":1114", mockInvalidBase64Handler)
+		require.NoError(t, err)
+		defer listener.Close()
+
+		// Wait for server start.
+		time.Sleep(1 * time.Second)
+
+		client, err := NewClient(ConnectionTypeTCP, ":1114", testTimeout, true, nil)
+		require.NoError(t, err)
+
+		_, err = client.GetSecret("", testSecretKey)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "illegal base64")
+	})
+
+	t.Run("Connection Error", func(t *testing.T) {
+		client, err := NewClient(ConnectionTypeTCP, "invalid-address", testTimeout, false, nil)
+		require.NoError(t, err)
+
+		_, err = client.GetSecret("", testSecretKey)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to connect to secret agent")
+	})
 }

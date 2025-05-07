@@ -52,7 +52,6 @@ func newDefaultTCPConfig() *TCPConfig {
 
 func TestTCPServer(t *testing.T) {
 	t.Parallel()
-
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	cfg := newDefaultTCPConfig()
@@ -131,7 +130,6 @@ func newMessage(message string) ([]byte, error) {
 
 func TestTCPServer_DoubleStart(t *testing.T) {
 	t.Parallel()
-
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	cfg := newDefaultTCPConfig()
@@ -153,7 +151,6 @@ func TestTCPServer_DoubleStart(t *testing.T) {
 
 func TestTCPServer_DoubleStop(t *testing.T) {
 	t.Parallel()
-
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	cfg := newDefaultTCPConfig()

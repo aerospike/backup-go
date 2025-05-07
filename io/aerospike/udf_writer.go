@@ -49,6 +49,9 @@ func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	}
 
 	errs := job.OnComplete()
+	if errs == nil {
+		return fmt.Errorf("error registering UDF %s: OnComplete returned nil channel", udf.Name)
+	}
 
 	err := <-errs
 	if err != nil {

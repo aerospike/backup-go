@@ -317,7 +317,7 @@ func TestSIndexReader(t *testing.T) {
 	mockSIndexes := []*models.SIndex{
 		{
 			Namespace: namespace,
-			Set:       "set",
+			Set:       "testSet",
 		},
 		{},
 	}
@@ -440,7 +440,7 @@ func setFieldValue(target any, fieldName string, value any) {
 	}
 	if rv.Kind() != reflect.Struct {
 		panic(fmt.Sprintf(
-			"unable to set the '%s' field value of the type %T, target must be a struct",
+			"unable to testSet the '%s' field value of the type %T, target must be a struct",
 			fieldName,
 			target,
 		))

@@ -84,11 +84,16 @@ func (bh *backupRecordsHandler) run(
 		return err
 	}
 
+	// Calculate the Records Per Second (RPS) target for each individual parallel reader/processor.
+	// This value evenly distributes the overall read rate across the parallel workers,
+	// ensuring each worker adheres to a portion of the total RPS limit.
+	rps := bh.config.RecordsPerSecond / bh.config.ParallelRead
+
 	composeProcessor := newTokenWorker(processors.NewComposeProcessor(
 		processors.NewRecordCounter[*models.Token](recordsReadTotal),
 		processors.NewVoidTimeSetter[*models.Token](bh.logger),
 		processors.NewTPSLimiter[*models.Token](
-			ctx, bh.config.RecordsPerSecond),
+			ctx, rps),
 	), bh.config.ParallelRead)
 
 	pl, err := pipeline.NewPipeline(

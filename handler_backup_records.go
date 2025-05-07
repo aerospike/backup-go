@@ -263,6 +263,7 @@ func (bh *backupRecordsHandler) filterNodes(nodesList []string, nodes []*a.Node)
 		_, ok := nodesMap[nodeServiceAddress]
 		if ok {
 			filteredNodes = append(filteredNodes, nodes[i])
+			continue
 		}
 
 		// If nodeList contains node names instead of address.
@@ -274,7 +275,8 @@ func (bh *backupRecordsHandler) filterNodes(nodesList []string, nodes []*a.Node)
 
 	// Check that we found all nodes.
 	if len(filteredNodes) != len(nodesList) {
-		return nil, fmt.Errorf("failed to find all nodes in list: %v", nodesList)
+		return nil, fmt.Errorf("failed to find all nodes %d/%d in list: %v",
+			len(filteredNodes), len(nodesList), nodesList)
 	}
 
 	return filteredNodes, nil

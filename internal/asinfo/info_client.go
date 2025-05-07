@@ -684,7 +684,7 @@ func (ic *InfoClient) GetStats(nodeName, dc, namespace string) (Stats, error) {
 	return stats, nil
 }
 
-// GetService returns service name by nod name.
+// GetService returns service name by node name.
 func (ic *InfoClient) GetService(node string) (string, error) {
 	var (
 		result string
@@ -706,7 +706,7 @@ func (ic *InfoClient) GetService(node string) (string, error) {
 func (ic *InfoClient) getService(node string) (string, error) {
 	resp, err := ic.requestByNode(node, cmdService)
 	if err != nil {
-		return "", fmt.Errorf("failed get service info: %w", err)
+		return "", fmt.Errorf("failed get service info for node %s: %w", node, err)
 	}
 
 	result, err := parseResultResponse(cmdService, resp)

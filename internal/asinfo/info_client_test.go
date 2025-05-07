@@ -1944,3 +1944,20 @@ func TestInfoCommander_getRackNodes(t *testing.T) {
 
 	fmt.Println(res)
 }
+
+func TestInfoCommander_getService(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	nodes := ic.GetNodesNames()
+
+	_, err := ic.getService(nodes[0])
+	require.NoError(t, err)
+}

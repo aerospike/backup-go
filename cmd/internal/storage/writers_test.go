@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package storage
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -50,11 +51,11 @@ const (
 func TestNewLocalWriter(t *testing.T) {
 	t.Parallel()
 
-	params := &ASBackupParams{
-		BackupParams: &models.Backup{
+	params := &config.BackupParams{
+		Backup: &models.Backup{
 			RemoveFiles: true,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Directory: t.TempDir(),
 		},
 		AwsS3:      &models.AwsS3{},
@@ -67,26 +68,26 @@ func TestNewLocalWriter(t *testing.T) {
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
 
-	params = &ASBackupParams{
-		BackupParams: &models.Backup{
+	params = &config.BackupParams{
+		Backup: &models.Backup{
 			OutputFile: t.TempDir() + testFileName,
 		},
-		CommonParams: &models.Common{},
-		AwsS3:        &models.AwsS3{},
-		GcpStorage:   &models.GcpStorage{},
-		AzureBlob:    &models.AzureBlob{},
+		Common:     &models.Common{},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 	writer, err = newWriter(ctx, params, nil, slog.Default())
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testLocalType, writer.GetType())
 
-	params = &ASBackupParams{
-		BackupParams: &models.Backup{},
-		CommonParams: &models.Common{},
-		AwsS3:        &models.AwsS3{},
-		GcpStorage:   &models.GcpStorage{},
-		AzureBlob:    &models.AzureBlob{},
+	params = &config.BackupParams{
+		Backup:     &models.Backup{},
+		Common:     &models.Common{},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 	writer, err = newWriter(ctx, params, nil, slog.Default())
 	assert.Error(t, err)
@@ -98,11 +99,11 @@ func TestNewS3Writer(t *testing.T) {
 	err := createAwsCredentials()
 	assert.NoError(t, err)
 
-	params := &ASBackupParams{
-		BackupParams: &models.Backup{
+	params := &config.BackupParams{
+		Backup: &models.Backup{
 			RemoveFiles: true,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Directory: t.TempDir(),
 		},
 		AwsS3: &models.AwsS3{
@@ -123,11 +124,11 @@ func TestNewS3Writer(t *testing.T) {
 	assert.NotNil(t, writer)
 	assert.Equal(t, testS3Type, writer.GetType())
 
-	params = &ASBackupParams{
-		BackupParams: &models.Backup{
+	params = &config.BackupParams{
+		Backup: &models.Backup{
 			OutputFile: t.TempDir() + testFileName,
 		},
-		CommonParams: &models.Common{},
+		Common: &models.Common{},
 		AwsS3: &models.AwsS3{
 			BucketName: testS3Bucket,
 			Region:     testS3Region,
@@ -179,11 +180,11 @@ func TestGcpWriter(t *testing.T) {
 	err := createGcpBucket()
 	assert.NoError(t, err)
 
-	params := &ASBackupParams{
-		BackupParams: &models.Backup{
+	params := &config.BackupParams{
+		Backup: &models.Backup{
 			RemoveFiles: true,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Directory: t.TempDir(),
 		},
 		GcpStorage: &models.GcpStorage{
@@ -201,11 +202,11 @@ func TestGcpWriter(t *testing.T) {
 	assert.NotNil(t, writer)
 	assert.Equal(t, testGcpType, writer.GetType())
 
-	params = &ASBackupParams{
-		BackupParams: &models.Backup{
+	params = &config.BackupParams{
+		Backup: &models.Backup{
 			OutputFile: t.TempDir() + testFileName,
 		},
-		CommonParams: &models.Common{},
+		Common: &models.Common{},
 		GcpStorage: &models.GcpStorage{
 			BucketName: testBucket,
 			Endpoint:   testGcpEndpoint,
@@ -242,11 +243,11 @@ func TestAzureWriter(t *testing.T) {
 	err := createAzureContainer()
 	assert.NoError(t, err)
 
-	params := &ASBackupParams{
-		BackupParams: &models.Backup{
+	params := &config.BackupParams{
+		Backup: &models.Backup{
 			RemoveFiles: true,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Directory: t.TempDir(),
 		},
 		AzureBlob: &models.AzureBlob{
@@ -267,11 +268,11 @@ func TestAzureWriter(t *testing.T) {
 	assert.NotNil(t, writer)
 	assert.Equal(t, testAzureType, writer.GetType())
 
-	params = &ASBackupParams{
-		BackupParams: &models.Backup{
+	params = &config.BackupParams{
+		Backup: &models.Backup{
 			OutputFile: t.TempDir() + testFileName,
 		},
-		CommonParams: &models.Common{},
+		Common: &models.Common{},
 		AzureBlob: &models.AzureBlob{
 			AccountName:   testAzureAccountName,
 			AccountKey:    testAzureAccountKey,

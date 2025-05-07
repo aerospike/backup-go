@@ -89,8 +89,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"This option is mutually exclusive with --continue and --estimate.")
 	flagSet.StringVarP(&f.NodeList, "node-list", "l",
 		"",
-		"<IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]\n"+
-			"<IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]\n"+
+		"<addr 1>:<port 1>[,<addr 2>:<port 2>[,...]]\n"+
+			"<node name 1>[,<node name 2>[,...]]\n"+
+			"To get the correct node address use 'service:' info command, to get node name use 'node:' info command.\n"+
 			"Back up the given cluster nodes only.\n"+
 			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
 			"This argument is mutually exclusive with --partition-list and --after-digest arguments.\n"+

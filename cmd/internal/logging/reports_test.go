@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package logging
 
 import (
 	"bytes"
@@ -298,7 +298,7 @@ func TestReportBackup(t *testing.T) {
 		os.Stdout = w
 
 		// Call the function
-		reportBackup(stats, false, false, nil)
+		ReportBackup(stats, false, false, nil)
 
 		// Close writer and restore stdout
 		w.Close()
@@ -322,7 +322,7 @@ func TestReportBackup(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(&buf, nil))
 
 		// Call the function
-		reportBackup(stats, false, true, logger)
+		ReportBackup(stats, false, true, logger)
 
 		// Verify log output
 		logOutput := buf.String()
@@ -626,7 +626,7 @@ func TestReportRestore(t *testing.T) {
 		os.Stdout = w
 
 		// Call the function
-		reportRestore(stats, false, nil)
+		ReportRestore(stats, false, nil)
 
 		// Close writer and restore stdout
 		w.Close()
@@ -650,7 +650,7 @@ func TestReportRestore(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(&buf, nil))
 
 		// Call the function
-		reportRestore(stats, true, logger)
+		ReportRestore(stats, true, logger)
 
 		// Verify log output
 		logOutput := buf.String()
@@ -707,7 +707,7 @@ func TestReportEstimate(t *testing.T) {
 		os.Stdout = w
 
 		// Call the function
-		reportEstimate(5000000, false, nil)
+		ReportEstimate(5000000, false, nil)
 
 		// Close writer and restore stdout
 		w.Close()
@@ -732,7 +732,7 @@ func TestReportEstimate(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(&buf, nil))
 
 		// Call the function
-		reportEstimate(5000000, true, logger)
+		ReportEstimate(5000000, true, logger)
 
 		// Verify log output
 		logOutput := buf.String()

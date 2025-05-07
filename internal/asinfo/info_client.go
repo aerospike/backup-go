@@ -48,6 +48,7 @@ const (
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 	cmdRack                = "racks"
 	cmdReplicaMaster       = "replicas-master"
+	cmdService             = "service:"
 
 	cmdRespErrPrefix = "ERROR"
 )
@@ -681,6 +682,39 @@ func (ic *InfoClient) GetStats(nodeName, dc, namespace string) (Stats, error) {
 	}
 
 	return stats, nil
+}
+
+// GetService returns service name by node name.
+func (ic *InfoClient) GetService(node string) (string, error) {
+	var (
+		result string
+		err    error
+	)
+
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		result, err = ic.getService(node)
+		if err != nil {
+			return err
+		}
+
+		return err
+	})
+
+	return result, err
+}
+
+func (ic *InfoClient) getService(node string) (string, error) {
+	resp, err := ic.requestByNode(node, cmdService)
+	if err != nil {
+		return "", fmt.Errorf("failed get service info for node %s: %w", node, err)
+	}
+
+	result, err := parseResultResponse(cmdService, resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse service info response: %w", err)
+	}
+
+	return result, nil
 }
 
 // ***** Utility functions *****

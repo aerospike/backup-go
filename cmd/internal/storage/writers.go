@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package storage
 
 import (
 	"context"
@@ -20,6 +20,7 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
@@ -30,22 +31,45 @@ import (
 	"github.com/aerospike/backup-go/io/storage/local"
 )
 
+// NewBackupWriter initializes and returns a backup.Writer
+// based on the provided parameters or cleans up artifacts if required.
+func NewBackupWriter(
+	ctx context.Context,
+	params *config.BackupParams,
+	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
+) (backup.Writer, error) {
+	// We initialize a writer only if output is configured.
+	writer, err := newWriter(ctx, params, sa, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup writer: %w", err)
+	}
+
+	// If asbackup was launched with --remove-artifacts, we don't need to initialize all clients.
+	// We clean the folder on writer initialization and exit.
+	if params.Backup != nil && params.Backup.RemoveArtifacts {
+		return nil, nil
+	}
+
+	return writer, nil
+}
+
 func newWriter(
 	ctx context.Context,
-	params *ASBackupParams,
+	params *config.BackupParams,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (backup.Writer, error) {
 	directory, outputFile := getDirectoryOutputFile(params)
 	shouldClearTarget, continueBackup := getShouldCleanContinue(params)
-	opts := newWriterOpts(directory, outputFile, shouldClearTarget, continueBackup, params.isXDR())
+	opts := newWriterOpts(directory, outputFile, shouldClearTarget, continueBackup, params.IsXDR())
 
 	logger.Info("initializing storage for writer",
 		slog.String("directory", directory),
 		slog.String("output_file", outputFile),
 		slog.Bool("should_clear_target", shouldClearTarget),
 		slog.Bool("continue_backup", continueBackup),
-		slog.Bool("is_xdr", params.isXDR()))
+		slog.Bool("is_xdr", params.IsXDR()))
 
 	switch {
 	case params.AwsS3.BucketName != "":
@@ -78,21 +102,21 @@ func newWriter(
 	}
 }
 
-func getDirectoryOutputFile(params *ASBackupParams) (directory, outputFile string) {
-	if params.BackupParams != nil {
-		return params.CommonParams.Directory, params.BackupParams.OutputFile
+func getDirectoryOutputFile(params *config.BackupParams) (directory, outputFile string) {
+	if params.Backup != nil {
+		return params.Common.Directory, params.Backup.OutputFile
 	}
 	// Xdr backup.
-	return params.BackupXDRParams.Directory, ""
+	return params.BackupXDR.Directory, ""
 }
 
-func getShouldCleanContinue(params *ASBackupParams) (shouldClearTarget, continueBackup bool) {
-	if params.BackupParams != nil {
-		return params.BackupParams.ShouldClearTarget(), params.BackupParams.Continue != ""
+func getShouldCleanContinue(params *config.BackupParams) (shouldClearTarget, continueBackup bool) {
+	if params.Backup != nil {
+		return params.Backup.ShouldClearTarget(), params.Backup.Continue != ""
 	}
 	// Xdr backup.
 
-	return params.BackupXDRParams.RemoveFiles, false
+	return params.BackupXDR.RemoveFiles, false
 }
 
 func newWriterOpts(

@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package storage
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"time"
 
-	"cloud.google.com/go/storage"
+	gcpStorage "cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aerospike/aerospike-client-go/v8"
+	appConfig "github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,9 +34,10 @@ import (
 	"google.golang.org/api/option"
 )
 
-const maxRack = 1000000
-
-func newAerospikeClient(
+// NewAerospikeClient initializes and returns a new Aerospike client with the specified configuration and settings.
+// It validates input parameters, applies client policies, and optionally warms up the client for better performance.
+// Returns an Aerospike client instance or an error if initialization fails.
+func NewAerospikeClient(
 	cfg *client.AerospikeConfig,
 	cp *models.ClientPolicy,
 	racks string,
@@ -61,7 +62,7 @@ func newAerospikeClient(
 	p.LoginTimeout = time.Duration(cp.LoginTimeout) * time.Millisecond
 
 	if racks != "" {
-		racksIDs, err := parseRacks(racks)
+		racksIDs, err := appConfig.ParseRacks(racks)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +122,7 @@ func newS3Client(ctx context.Context, a *models.AwsS3) (*s3.Client, error) {
 	return s3Client, nil
 }
 
-func newGcpClient(ctx context.Context, g *models.GcpStorage) (*storage.Client, error) {
+func newGcpClient(ctx context.Context, g *models.GcpStorage) (*gcpStorage.Client, error) {
 	opts := make([]option.ClientOption, 0)
 
 	if g.KeyFile != "" {
@@ -132,7 +133,7 @@ func newGcpClient(ctx context.Context, g *models.GcpStorage) (*storage.Client, e
 		opts = append(opts, option.WithEndpoint(g.Endpoint), option.WithoutAuthentication())
 	}
 
-	gcpClient, err := storage.NewClient(ctx, opts...)
+	gcpClient, err := gcpStorage.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCP client: %w", err)
 	}
@@ -188,28 +189,4 @@ func toHosts(htpSlice client.HostTLSPortSlice) []*aerospike.Host {
 	}
 
 	return hosts
-}
-
-func parseRacks(racks string) ([]int, error) {
-	racksStringSlice := splitByComma(racks)
-	racksIntSlice := make([]int, 0, len(racksStringSlice))
-
-	for i := range racksStringSlice {
-		rackID, err := strconv.Atoi(racksStringSlice[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse racks: %w", err)
-		}
-
-		if rackID < 0 {
-			return nil, fmt.Errorf("rack id %d invalid, should be positive number", rackID)
-		}
-
-		if rackID > maxRack {
-			return nil, fmt.Errorf("rack id %d invalid, should not exceed %d", rackID, maxRack)
-		}
-
-		racksIntSlice = append(racksIntSlice, rackID)
-	}
-
-	return racksIntSlice, nil
 }

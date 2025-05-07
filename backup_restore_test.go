@@ -630,8 +630,13 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	require.NoError(t, err)
 	defer asClient.Close()
 
+	nodes := asClient.GetNodes()
+	ic := asinfo.NewInfoClientFromAerospike(asClient, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	nodeServiceAddress, err := ic.GetService(nodes[0].GetName())
+	require.NoError(t, err)
+
 	backupConfig := NewDefaultBackupConfig()
-	backupConfig.NodeList = []string{fmt.Sprintf("%s:%d", testASHost, testASPort)}
+	backupConfig.NodeList = []string{nodeServiceAddress}
 	backupConfig.SetList = []string{setName}
 	restoreConfig := NewDefaultRestoreConfig()
 

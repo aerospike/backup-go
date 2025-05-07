@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package logging
 
 import (
 	"fmt"
@@ -29,9 +29,9 @@ const (
 	headerEstimateReport = "Estimate report"
 )
 
-// printBackupReport prints the backup report.
+// ReportBackup prints the backup report.
 // if isJSON is true, it prints the report in JSON format, but logger must be passed
-func reportBackup(stats *bModels.BackupStats, isXdr, isJSON bool, logger *slog.Logger) {
+func ReportBackup(stats *bModels.BackupStats, isXdr, isJSON bool, logger *slog.Logger) {
 	if isJSON {
 		logBackupReport(stats, isXdr, logger)
 		return
@@ -84,9 +84,9 @@ func logBackupReport(stats *bModels.BackupStats, isXdr bool, logger *slog.Logger
 	)
 }
 
-// reportRestore prints the restore report.
+// ReportRestore prints the restore report.
 // if isJSON is true, it prints the report in JSON format, but logger must be passed
-func reportRestore(stats *bModels.RestoreStats, isJSON bool, logger *slog.Logger) {
+func ReportRestore(stats *bModels.RestoreStats, isJSON bool, logger *slog.Logger) {
 	if isJSON {
 		logRestoreReport(stats, logger)
 		return
@@ -145,10 +145,10 @@ func logRestoreReport(stats *bModels.RestoreStats, logger *slog.Logger) {
 	)
 }
 
-// reportEstimate prints the estimate report.
+// ReportEstimate prints the estimate report.
 // if isJSON is true, it prints the report in JSON format, but logger must be passed.
 // estimate is the size of the backup file in bytes.
-func reportEstimate(estimate uint64, isJSON bool, logger *slog.Logger) {
+func ReportEstimate(estimate uint64, isJSON bool, logger *slog.Logger) {
 	if isJSON {
 		logEstimateReport(estimate, logger)
 		return

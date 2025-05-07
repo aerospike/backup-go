@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package storage
 
 import (
 	"fmt"
@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v8"
+	appConfig "github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/assert"
@@ -45,14 +46,14 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		IdleTimeout:  1000,
 		LoginTimeout: 1000,
 	}
-	_, err := newAerospikeClient(cfg, cp, "1", 10, slog.Default())
+	_, err := NewAerospikeClient(cfg, cp, "1", 10, slog.Default())
 	require.NoError(t, err)
 
 	cfg = &client.AerospikeConfig{
 		User:     testASLoginPassword,
 		Password: testASLoginPassword,
 	}
-	_, err = newAerospikeClient(cfg, cp, "", 10, slog.Default())
+	_, err = NewAerospikeClient(cfg, cp, "", 10, slog.Default())
 	require.ErrorContains(t, err, "at least one seed must be provided")
 
 	cfg = &client.AerospikeConfig{
@@ -65,7 +66,7 @@ func TestClients_newAerospikeClient(t *testing.T) {
 			Cert: []byte("error"),
 		},
 	}
-	_, err = newAerospikeClient(cfg, cp, "", 10, slog.Default())
+	_, err = NewAerospikeClient(cfg, cp, "", 10, slog.Default())
 	require.ErrorContains(t, err, "failed to create Aerospike client policy")
 
 	hostPort.Host = "255.255.255.255"
@@ -76,7 +77,7 @@ func TestClients_newAerospikeClient(t *testing.T) {
 		User:     testASLoginPassword,
 		Password: testASLoginPassword,
 	}
-	_, err = newAerospikeClient(cfg, cp, "", 10, slog.Default())
+	_, err = NewAerospikeClient(cfg, cp, "", 10, slog.Default())
 	require.ErrorContains(t, err, "failed to create Aerospike client")
 }
 
@@ -197,10 +198,11 @@ func TestParseRacks(t *testing.T) {
 		},
 		{
 			name:        "Invalid Rack - Exceeds MaxRack",
-			racks:       fmt.Sprintf("1,%d,3", maxRack+1),
+			racks:       fmt.Sprintf("1,%d,3", appConfig.MaxRack+1),
 			expected:    nil,
 			expectError: true,
-			errorText:   fmt.Sprintf("rack id %d invalid, should not exceed %d", maxRack+1, maxRack),
+			errorText: fmt.Sprintf("rack id %d invalid, should not exceed %d",
+				appConfig.MaxRack+1, appConfig.MaxRack),
 		},
 		{
 			name:     "Empty Input",
@@ -211,7 +213,7 @@ func TestParseRacks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseRacks(tt.racks)
+			result, err := appConfig.ParseRacks(tt.racks)
 
 			if tt.expectError {
 				assert.Error(t, err)

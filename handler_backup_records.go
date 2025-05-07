@@ -32,6 +32,7 @@ import (
 type infoGetter interface {
 	GetRecordCount(namespace string, sets []string) (uint64, error)
 	GetRackNodes(rackID int) ([]string, error)
+	GetService(node string) (string, error)
 }
 
 type backupRecordsHandler struct {
@@ -230,9 +231,60 @@ func (bh *backupRecordsHandler) getNodes() ([]*a.Node, error) {
 
 	nodes := bh.aerospikeClient.GetNodes()
 	// If bh.config.NodeList is not empty we filter nodes.
-	nodes = filterNodes(nodesToFilter, nodes)
+	nodes, err := bh.filterNodes(nodesToFilter, nodes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter nodes: %w", err)
+	}
 
 	return nodes, nil
+}
+
+// filterNodes iterates over the nodes and selects only those nodes that are in nodesList.
+// Returns a slice of filtered *a.Node and error.
+func (bh *backupRecordsHandler) filterNodes(nodesList []string, nodes []*a.Node) ([]*a.Node, error) {
+	if len(nodesList) == 0 {
+		return nodes, nil
+	}
+
+	nodesMap := make(map[string]struct{}, len(nodesList))
+	for j := range nodesList {
+		nodesMap[nodesList[j]] = struct{}{}
+	}
+
+	filteredNodes := make([]*a.Node, 0, len(nodesList))
+
+	for i := range nodes {
+		if !nodes[i].IsActive() {
+			continue
+		}
+
+		nodeServiceAddress, err := bh.infoClient.GetService(nodes[i].GetName())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get node %s service: %w", nodes[i].GetName(), err)
+		}
+
+		bh.logger.Debug("node %s service: %s", nodes[i].GetName(), nodeServiceAddress)
+
+		_, ok := nodesMap[nodeServiceAddress]
+		if ok {
+			filteredNodes = append(filteredNodes, nodes[i])
+			continue
+		}
+
+		// If nodeList contains node names instead of address.
+		_, ok = nodesMap[nodes[i].GetName()]
+		if ok {
+			filteredNodes = append(filteredNodes, nodes[i])
+		}
+	}
+
+	// Check that we found all nodes.
+	if len(filteredNodes) != len(nodesList) {
+		return nil, fmt.Errorf("failed to find all nodes %d/%d in list: %v",
+			len(filteredNodes), len(nodesList), nodesList)
+	}
+
+	return filteredNodes, nil
 }
 
 func (bh *backupRecordsHandler) recordReaderConfigForPartitions(

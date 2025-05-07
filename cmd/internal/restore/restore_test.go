@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package restore
 
 import (
 	"context"
@@ -24,15 +24,19 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
+	appBackup "github.com/aerospike/backup-go/cmd/internal/backup"
+	config2 "github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/cmd/internal/storage"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	testNamespace = "test"
-	testSet       = "test"
-	testStateFile = "state"
+	testNamespace       = "test"
+	testSet             = "test"
+	testStateFile       = "state"
+	testASLoginPassword = "admin"
 )
 
 // Test_BackupRestore one test for both so we can restore from just backed-up files.
@@ -43,7 +47,7 @@ func Test_BackupRestore(t *testing.T) {
 	dir := t.TempDir()
 	hostPort := client.NewDefaultHostTLSPort()
 
-	asbParams := &ASBackupParams{
+	asbParams := &config2.BackupParams{
 		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{
@@ -57,12 +61,12 @@ func Test_BackupRestore(t *testing.T) {
 			IdleTimeout:  1000,
 			LoginTimeout: 1000,
 		},
-		BackupParams: &models.Backup{
+		Backup: &models.Backup{
 			InfoMaxRetries:                3,
 			InfoRetriesMultiplier:         1,
 			InfoRetryIntervalMilliseconds: 1000,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Directory: dir,
 			Namespace: testNamespace,
 			Parallel:  1,
@@ -82,13 +86,13 @@ func Test_BackupRestore(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	asb, err := NewASBackup(ctx, asbParams, logger)
+	asb, err := appBackup.NewService(ctx, asbParams, logger)
 	require.NoError(t, err)
 
 	err = asb.Run(ctx)
 	require.NoError(t, err)
 
-	asrParams := &ASRestoreParams{
+	asrParams := &config2.RestoreParams{
 		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{
@@ -102,12 +106,12 @@ func Test_BackupRestore(t *testing.T) {
 			IdleTimeout:  1000,
 			LoginTimeout: 1000,
 		},
-		RestoreParams: &models.Restore{
+		Restore: &models.Restore{
 			BatchSize:       1,
 			MaxAsyncBatches: 1,
 			Mode:            models.RestoreModeASB,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Directory: dir,
 			Namespace: testNamespace,
 			Parallel:  1,
@@ -126,71 +130,15 @@ func Test_BackupRestore(t *testing.T) {
 		},
 	}
 
-	asr, err := NewASRestore(ctx, asrParams, logger)
+	asr, err := NewService(ctx, asrParams, logger)
 	require.NoError(t, err)
 
 	err = asr.Run(ctx)
 	require.NoError(t, err)
 }
 
-func Test_BackupWithState(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	dir := t.TempDir()
-	hostPort := client.NewDefaultHostTLSPort()
-
-	asbParams := &ASBackupParams{
-		App: &models.App{},
-		ClientConfig: &client.AerospikeConfig{
-			Seeds: client.HostTLSPortSlice{
-				hostPort,
-			},
-			User:     testASLoginPassword,
-			Password: testASLoginPassword,
-		},
-		ClientPolicy: &models.ClientPolicy{
-			Timeout:      1000,
-			IdleTimeout:  1000,
-			LoginTimeout: 1000,
-		},
-		BackupParams: &models.Backup{
-			StateFileDst:                  testStateFile,
-			ScanPageSize:                  10,
-			FileLimit:                     100000,
-			InfoMaxRetries:                3,
-			InfoRetriesMultiplier:         1,
-			InfoRetryIntervalMilliseconds: 1000,
-		},
-		CommonParams: &models.Common{
-			Directory: dir,
-			Namespace: testNamespace,
-			Parallel:  1,
-		},
-		Compression: &models.Compression{
-			Mode: backup.CompressNone,
-		},
-		Encryption:  &models.Encryption{},
-		SecretAgent: &models.SecretAgent{},
-		AwsS3:       &models.AwsS3{},
-		GcpStorage:  &models.GcpStorage{},
-		AzureBlob:   &models.AzureBlob{},
-	}
-
-	err := createRecords(asbParams.ClientConfig, asbParams.ClientPolicy, testNamespace, testSet)
-	require.NoError(t, err)
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	asb, err := NewASBackup(ctx, asbParams, logger)
-	require.NoError(t, err)
-
-	err = asb.Run(ctx)
-	require.NoError(t, err)
-}
-
 func createRecords(cfg *client.AerospikeConfig, cp *models.ClientPolicy, namespace, set string) error {
-	client, err := newAerospikeClient(cfg, cp, "", 0, slog.Default())
+	client, err := storage.NewAerospikeClient(cfg, cp, "", 0, slog.Default())
 	if err != nil {
 		return fmt.Errorf("failed to create aerospike client: %w", err)
 	}
@@ -248,7 +196,7 @@ func TestGetWarmUp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getWarmUp(tt.warmUp, tt.maxAsyncBatches)
+			result := GetWarmUp(tt.warmUp, tt.maxAsyncBatches)
 			if result != tt.expected {
 				t.Errorf("getWarmUp(%d, %d) = %d, want %d",
 					tt.warmUp, tt.maxAsyncBatches, result, tt.expected)

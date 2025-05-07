@@ -17,7 +17,9 @@ package xdr
 import (
 	"fmt"
 
-	"github.com/aerospike/backup-go/cmd/internal/app"
+	appBackup "github.com/aerospike/backup-go/cmd/internal/app/backup"
+	"github.com/aerospike/backup-go/cmd/internal/app/config"
+	"github.com/aerospike/backup-go/cmd/internal/app/logging"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
 	asFlags "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
@@ -112,26 +114,26 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Init logger.
-	logger, err := app.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
+	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
 		return err
 	}
 
 	// Init app.
-	asbParams := &app.ASBackupParams{
-		App:             c.flagsApp.GetApp(),
-		ClientConfig:    c.flagsAerospike.NewAerospikeConfig(),
-		ClientPolicy:    c.flagsClientPolicy.GetClientPolicy(),
-		BackupXDRParams: c.flagsBackupXDR.GetBackupXDR(),
-		Compression:     c.flagsCompression.GetCompression(),
-		Encryption:      c.flagsEncryption.GetEncryption(),
-		SecretAgent:     c.flagsSecretAgent.GetSecretAgent(),
-		AwsS3:           c.flagsAws.GetAwsS3(),
-		GcpStorage:      c.flagsGcp.GetGcpStorage(),
-		AzureBlob:       c.flagsAzure.GetAzureBlob(),
+	asbParams := &config.BackupParams{
+		App:          c.flagsApp.GetApp(),
+		ClientConfig: c.flagsAerospike.NewAerospikeConfig(),
+		ClientPolicy: c.flagsClientPolicy.GetClientPolicy(),
+		BackupXDR:    c.flagsBackupXDR.GetBackupXDR(),
+		Compression:  c.flagsCompression.GetCompression(),
+		Encryption:   c.flagsEncryption.GetEncryption(),
+		SecretAgent:  c.flagsSecretAgent.GetSecretAgent(),
+		AwsS3:        c.flagsAws.GetAwsS3(),
+		GcpStorage:   c.flagsGcp.GetGcpStorage(),
+		AzureBlob:    c.flagsAzure.GetAzureBlob(),
 	}
 
-	asb, err := app.NewASBackup(cmd.Context(), asbParams, logger)
+	asb, err := appBackup.NewService(cmd.Context(), asbParams, logger)
 	if err != nil {
 		return err
 	}

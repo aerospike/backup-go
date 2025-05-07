@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package config
 
 import (
 	"runtime"
@@ -53,9 +53,9 @@ func testSecretAgent() *models.SecretAgent {
 func TestMapBackupConfig_Success(t *testing.T) {
 	t.Parallel()
 
-	params := &ASBackupParams{
+	params := &BackupParams{
 		App: &models.App{},
-		BackupParams: &models.Backup{
+		Backup: &models.Backup{
 			FileLimit:        5000,
 			AfterDigest:      "AvDsV2KuSZHZugDBftnLxGpR+88=",
 			ModifiedBefore:   "2023-09-01_12:00:00",
@@ -66,7 +66,7 @@ func TestMapBackupConfig_Success(t *testing.T) {
 			NodeList:         "node1,node2",
 			NoTTLOnly:        true,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Namespace:        "test-namespace",
 			SetList:          "set1,set2",
 			BinList:          "bin1,bin2",
@@ -81,7 +81,7 @@ func TestMapBackupConfig_Success(t *testing.T) {
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := mapBackupConfig(params)
+	config, err := NewBackupConfig(params)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "test-namespace", config.Namespace)
@@ -124,12 +124,12 @@ func TestMapBackupConfig_Success(t *testing.T) {
 func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 	t.Parallel()
 
-	params := &ASBackupParams{
+	params := &BackupParams{
 		App: &models.App{},
-		BackupParams: &models.Backup{
+		Backup: &models.Backup{
 			ModifiedBefore: "invalid-date",
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Namespace: "test-namespace",
 		},
 		Compression: testCompression(),
@@ -137,7 +137,7 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := mapBackupConfig(params)
+	config, err := NewBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified before date")
@@ -146,12 +146,12 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 	t.Parallel()
 
-	params := &ASBackupParams{
+	params := &BackupParams{
 		App: &models.App{},
-		BackupParams: &models.Backup{
+		Backup: &models.Backup{
 			ModifiedAfter: "invalid-date",
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Namespace: "test-namespace",
 		},
 		Compression: testCompression(),
@@ -159,7 +159,7 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := mapBackupConfig(params)
+	config, err := NewBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified after date")
@@ -168,12 +168,12 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 	t.Parallel()
 
-	params := &ASBackupParams{
+	params := &BackupParams{
 		App: &models.App{},
-		BackupParams: &models.Backup{
+		Backup: &models.Backup{
 			FilterExpression: "invalid-exp",
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Namespace: "test-namespace",
 		},
 		Compression: testCompression(),
@@ -181,7 +181,7 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := mapBackupConfig(params)
+	config, err := NewBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse filter expression")
@@ -189,10 +189,10 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 
 func TestMapRestoreConfig_Success(t *testing.T) {
 	t.Parallel()
-	params := &ASRestoreParams{
-		App:           &models.App{},
-		RestoreParams: &models.Restore{},
-		CommonParams: &models.Common{
+	params := &RestoreParams{
+		App:     &models.App{},
+		Restore: &models.Restore{},
+		Common: &models.Common{
 			Namespace:        "test-namespace",
 			SetList:          "set1,set2",
 			BinList:          "bin1,bin2",
@@ -207,7 +207,7 @@ func TestMapRestoreConfig_Success(t *testing.T) {
 		SecretAgent: testSecretAgent(),
 	}
 
-	config := mapRestoreConfig(params)
+	config := NewRestoreConfig(params)
 	assert.Equal(t, "test-namespace", *config.Namespace.Source)
 	assert.Equal(t, "test-namespace", *config.Namespace.Destination)
 	assert.ElementsMatch(t, []string{"set1", "set2"}, config.SetList)
@@ -233,7 +233,7 @@ func TestMapCompressionPolicy_Success(t *testing.T) {
 	t.Parallel()
 	compressionModel := testCompression()
 
-	compressionPolicy := mapCompressionPolicy(compressionModel)
+	compressionPolicy := newCompressionPolicy(compressionModel)
 	assert.NotNil(t, compressionPolicy)
 	assert.Equal(t, "ZSTD", compressionPolicy.Mode)
 	assert.Equal(t, 3, compressionPolicy.Level)
@@ -242,7 +242,7 @@ func TestMapCompressionPolicy_Success(t *testing.T) {
 func TestMapCompressionPolicy_EmptyMode(t *testing.T) {
 	t.Parallel()
 	compressionModel := &models.Compression{}
-	compressionPolicy := mapCompressionPolicy(compressionModel)
+	compressionPolicy := newCompressionPolicy(compressionModel)
 	assert.Nil(t, compressionPolicy)
 }
 
@@ -253,7 +253,7 @@ func TestMapCompressionPolicy_CaseInsensitiveMode(t *testing.T) {
 		Level: 3,
 	}
 
-	compressionPolicy := mapCompressionPolicy(compressionModel)
+	compressionPolicy := newCompressionPolicy(compressionModel)
 	assert.NotNil(t, compressionPolicy)
 	assert.Equal(t, "ZSTD", compressionPolicy.Mode, "Compression mode should be converted to uppercase")
 	assert.Equal(t, 3, compressionPolicy.Level)
@@ -269,7 +269,7 @@ func TestMapEncryptionPolicy_Success(t *testing.T) {
 		KeySecret: "secret",
 	}
 
-	encryptionPolicy := mapEncryptionPolicy(encryptionModel)
+	encryptionPolicy := newEncryptionPolicy(encryptionModel)
 	assert.NotNil(t, encryptionPolicy)
 	assert.Equal(t, "AES256", encryptionPolicy.Mode)
 	assert.Equal(t, "/path/to/keyfile", *encryptionPolicy.KeyFile)
@@ -280,7 +280,7 @@ func TestMapEncryptionPolicy_Success(t *testing.T) {
 func TestMapEncryptionPolicy_EmptyMode(t *testing.T) {
 	t.Parallel()
 	encryptionModel := &models.Encryption{}
-	encryptionPolicy := mapEncryptionPolicy(encryptionModel)
+	encryptionPolicy := newEncryptionPolicy(encryptionModel)
 	assert.Nil(t, encryptionPolicy)
 }
 
@@ -290,7 +290,7 @@ func TestMapEncryptionPolicy_UpperCaseMode(t *testing.T) {
 		Mode: "aes256", // Lowercase mode
 	}
 
-	encryptionPolicy := mapEncryptionPolicy(encryptionModel)
+	encryptionPolicy := newEncryptionPolicy(encryptionModel)
 	assert.NotNil(t, encryptionPolicy)
 	assert.Equal(t, "AES256", encryptionPolicy.Mode, "Encryption mode should be converted to uppercase")
 }
@@ -300,7 +300,7 @@ func TestMapSecretAgentConfig_Success(t *testing.T) {
 	t.Parallel()
 	secretAgentModel := testSecretAgent()
 
-	secretAgentConfig := mapSecretAgentConfig(secretAgentModel)
+	secretAgentConfig := newSecretAgentConfig(secretAgentModel)
 	assert.NotNil(t, secretAgentConfig)
 	assert.Equal(t, "localhost", *secretAgentConfig.Address)
 	assert.Equal(t, "tcp", *secretAgentConfig.ConnectionType)
@@ -313,7 +313,7 @@ func TestMapSecretAgentConfig_Success(t *testing.T) {
 func TestMapSecretAgentConfig_EmptyAddress(t *testing.T) {
 	t.Parallel()
 	secretAgentModel := &models.SecretAgent{}
-	secretAgentConfig := mapSecretAgentConfig(secretAgentModel)
+	secretAgentConfig := newSecretAgentConfig(secretAgentModel)
 	assert.Nil(t, secretAgentConfig)
 }
 
@@ -324,7 +324,7 @@ func TestMapSecretAgentConfig_PartialConfig(t *testing.T) {
 		Port:    8080,
 	}
 
-	secretAgentConfig := mapSecretAgentConfig(secretAgentModel)
+	secretAgentConfig := newSecretAgentConfig(secretAgentModel)
 	assert.NotNil(t, secretAgentConfig)
 	assert.Equal(t, "localhost", *secretAgentConfig.Address)
 	assert.Equal(t, 8080, *secretAgentConfig.Port)
@@ -334,7 +334,7 @@ func TestMapSecretAgentConfig_PartialConfig(t *testing.T) {
 func TestMapRestoreNamespace_SuccessSingleNamespace(t *testing.T) {
 	t.Parallel()
 	ns := "source-ns"
-	result := mapRestoreNamespace(ns)
+	result := newRestoreNamespace(ns)
 	assert.NotNil(t, result, "Result should not be nil")
 	assert.Equal(t, "source-ns", *result.Source, "Source should be 'source-ns'")
 	assert.Equal(t, "source-ns", *result.Destination, "Destination should be the same as Source")
@@ -343,7 +343,7 @@ func TestMapRestoreNamespace_SuccessSingleNamespace(t *testing.T) {
 func TestMapRestoreNamespace_SuccessDifferentNamespaces(t *testing.T) {
 	t.Parallel()
 	ns := "source-ns,destination-ns"
-	result := mapRestoreNamespace(ns)
+	result := newRestoreNamespace(ns)
 	assert.NotNil(t, result, "Result should not be nil")
 	assert.Equal(t, "source-ns", *result.Source, "Source should be 'source-ns'")
 	assert.Equal(t, "destination-ns", *result.Destination, "Destination should be 'destination-ns'")
@@ -352,7 +352,7 @@ func TestMapRestoreNamespace_SuccessDifferentNamespaces(t *testing.T) {
 func TestMapRestoreNamespace_InvalidNamespace(t *testing.T) {
 	t.Parallel()
 	ns := "source-ns,destination-ns,extra-ns"
-	result := mapRestoreNamespace(ns)
+	result := newRestoreNamespace(ns)
 	assert.Nil(t, result, "Result should be nil for invalid input")
 }
 
@@ -408,16 +408,16 @@ func TestMapPartitionFilter_NoFilters(t *testing.T) {
 func TestMapRestoreConfig_PartialConfig(t *testing.T) {
 	t.Parallel()
 
-	params := &ASRestoreParams{
+	params := &RestoreParams{
 		App: &models.App{},
-		RestoreParams: &models.Restore{
+		Restore: &models.Restore{
 			ExtraTTL:           3600,
 			IgnoreRecordError:  true,
 			DisableBatchWrites: true,
 			BatchSize:          1000,
 			MaxAsyncBatches:    5,
 		},
-		CommonParams: &models.Common{
+		Common: &models.Common{
 			Namespace: "test-namespace",
 		},
 		Compression: testCompression(),
@@ -425,7 +425,7 @@ func TestMapRestoreConfig_PartialConfig(t *testing.T) {
 		SecretAgent: testSecretAgent(),
 	}
 
-	config := mapRestoreConfig(params)
+	config := NewRestoreConfig(params)
 	assert.Equal(t, int64(3600), config.ExtraTTL)
 	assert.True(t, config.IgnoreRecordError)
 	assert.True(t, config.DisableBatchWrites)
@@ -449,7 +449,7 @@ func TestMapScanPolicy_Success(t *testing.T) {
 		SocketTimeout: 3000,
 	}
 
-	scanPolicy, err := mapScanPolicy(backupModel, commonModel)
+	scanPolicy, err := newScanPolicy(backupModel, commonModel)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(500), scanPolicy.MaxRecords)
 	assert.Equal(t, 3, scanPolicy.MaxRetries)
@@ -473,7 +473,7 @@ func TestMapWritePolicy_Success(t *testing.T) {
 		SocketTimeout: 1500,
 	}
 
-	writePolicy := mapWritePolicy(restoreModel, commonModel)
+	writePolicy := newWritePolicy(restoreModel, commonModel)
 	assert.Equal(t, aerospike.REPLACE, writePolicy.RecordExistsAction)
 	assert.Equal(t, 3, writePolicy.MaxRetries)
 	assert.Equal(t, 5000*time.Millisecond, writePolicy.TotalTimeout)
@@ -482,13 +482,13 @@ func TestMapWritePolicy_Success(t *testing.T) {
 
 func TestSplitByComma_EmptyString(t *testing.T) {
 	t.Parallel()
-	result := splitByComma("")
+	result := SplitByComma("")
 	assert.Nil(t, result)
 }
 
 func TestSplitByComma_NonEmptyString(t *testing.T) {
 	t.Parallel()
-	result := splitByComma("item1,item2,item3")
+	result := SplitByComma("item1,item2,item3")
 	assert.Equal(t, []string{"item1", "item2", "item3"}, result)
 }
 
@@ -573,14 +573,14 @@ func TestMapBackupXDRConfig(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		params *ASBackupParams
+		params *BackupParams
 		verify func(*testing.T, *backup.ConfigBackupXDR)
 	}{
 		{
 			name: "Default configuration",
-			params: &ASBackupParams{
+			params: &BackupParams{
 				App: &models.App{},
-				BackupXDRParams: &models.BackupXDR{
+				BackupXDR: &models.BackupXDR{
 					DC:            "dc1",
 					LocalAddress:  "127.0.0.1",
 					LocalPort:     3004,
@@ -620,9 +620,9 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		},
 		{
 			name: "Full configuration with all parameters",
-			params: &ASBackupParams{
+			params: &BackupParams{
 				App: &models.App{},
-				BackupXDRParams: &models.BackupXDR{
+				BackupXDR: &models.BackupXDR{
 					DC:                           "dc1",
 					LocalAddress:                 "127.0.0.1",
 					LocalPort:                    3004,
@@ -656,9 +656,9 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		},
 		{
 			name: "Configuration without optional policies",
-			params: &ASBackupParams{
+			params: &BackupParams{
 				App: &models.App{},
-				BackupXDRParams: &models.BackupXDR{
+				BackupXDR: &models.BackupXDR{
 					DC:           "dc1",
 					LocalAddress: "127.0.0.1",
 					LocalPort:    3004,
@@ -676,9 +676,9 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		},
 		{
 			name: "Configuration with only required fields",
-			params: &ASBackupParams{
+			params: &BackupParams{
 				App: &models.App{},
-				BackupXDRParams: &models.BackupXDR{
+				BackupXDR: &models.BackupXDR{
 					DC:        "dc1",
 					Namespace: "test",
 				},
@@ -694,9 +694,9 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		},
 		{
 			name: "Configuration with zero values",
-			params: &ASBackupParams{
+			params: &BackupParams{
 				App: &models.App{},
-				BackupXDRParams: &models.BackupXDR{
+				BackupXDR: &models.BackupXDR{
 					DC:                           "dc1",
 					Namespace:                    "test",
 					FileLimit:                    0,
@@ -727,7 +727,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			config := mapBackupXDRConfig(tt.params)
+			config := NewBackupXDRConfig(tt.params)
 			assert.NotNil(t, config)
 			tt.verify(t, config)
 		})
@@ -765,7 +765,7 @@ func TestMapScanPolicy_Errors(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := mapScanPolicy(tt.backupModel, tt.commonModel)
+			got, err := newScanPolicy(tt.backupModel, tt.commonModel)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -811,7 +811,7 @@ func TestMapWritePolicy_ConfigurationCombinations(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := mapWritePolicy(tt.restoreModel, tt.commonModel)
+			got := newWritePolicy(tt.restoreModel, tt.commonModel)
 			assert.Equal(t, tt.wantAction, got.RecordExistsAction)
 			assert.Equal(t, tt.wantGenPolicy, got.GenerationPolicy)
 			assert.True(t, got.SendKey)

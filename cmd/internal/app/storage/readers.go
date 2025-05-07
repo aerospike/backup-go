@@ -12,35 +12,123 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path"
 	"time"
 
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/cmd/internal/app/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/aws/s3"
 	"github.com/aerospike/backup-go/io/storage/azure/blob"
-	"github.com/aerospike/backup-go/io/storage/gcp/storage"
+	gcpStorage "github.com/aerospike/backup-go/io/storage/gcp/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
 )
 
+// NewRestoreReader creates and returns a reader based on the restore mode specified in RestoreParams.
+func NewRestoreReader(
+	ctx context.Context,
+	params *config.RestoreParams,
+	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
+) (reader, xdrReader backup.StreamingReader, err error) {
+	switch params.Restore.Mode {
+	case models.RestoreModeASB:
+		reader, err = newReader(ctx, params, sa, false, logger)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
+		}
+
+		return reader, nil, nil
+	case models.RestoreModeASBX:
+		xdrReader, err = newReader(ctx, params, sa, true, logger)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
+		}
+
+		return nil, xdrReader, nil
+	case models.RestoreModeAuto:
+		reader, err = newReader(ctx, params, sa, false, logger)
+
+		switch {
+		case errors.Is(err, ioStorage.ErrEmptyStorage):
+			reader = nil
+		case err != nil:
+			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
+		default:
+		}
+
+		xdrReader, err = newReader(ctx, params, sa, true, logger)
+
+		switch {
+		case errors.Is(err, ioStorage.ErrEmptyStorage):
+			xdrReader = nil
+		case err != nil:
+			return nil, nil, fmt.Errorf("failed to create asbx reader: %w", err)
+		default:
+		}
+
+		// If both readers are nil return an error, as no files were found.
+		if reader == nil && xdrReader == nil {
+			return nil, nil, err
+		}
+
+		return reader, xdrReader, nil
+	default:
+		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.Restore.Mode)
+	}
+}
+
+// NewStateReader initialize reader for a state file.
+func NewStateReader(
+	ctx context.Context,
+	params *config.BackupParams,
+	sa *backup.SecretAgentConfig,
+	logger *slog.Logger,
+) (backup.StreamingReader, error) {
+	if params.Backup == nil ||
+		!params.Backup.ShouldSaveState() ||
+		params.Backup.StateFileDst != "" {
+		return nil, nil
+	}
+
+	stateFile := params.Backup.StateFileDst
+	if params.Backup.Continue != "" {
+		stateFile = params.Backup.Continue
+	}
+
+	restoreParams := &config.RestoreParams{
+		Common: &models.Common{
+			Directory: params.Common.Directory,
+		},
+		Restore: &models.Restore{
+			InputFile: stateFile,
+		},
+	}
+
+	logger.Info("initializing state file", slog.String("path", stateFile))
+
+	return newReader(ctx, restoreParams, sa, false, logger)
+}
+
 func newReader(
 	ctx context.Context,
-	params *ASRestoreParams,
+	params *config.RestoreParams,
 	sa *backup.SecretAgentConfig,
 	isXdr bool,
 	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
-	directory, inputFile := params.CommonParams.Directory, params.RestoreParams.InputFile
-	parentDirectory, directoryList := params.RestoreParams.ParentDirectory, params.RestoreParams.DirectoryList
+	directory, inputFile := params.Common.Directory, params.Restore.InputFile
+	parentDirectory, directoryList := params.Restore.ParentDirectory, params.Restore.DirectoryList
 
 	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr)
 
@@ -152,7 +240,7 @@ func newGcpReader(
 		return nil, err
 	}
 
-	return storage.NewReader(ctx, client, g.BucketName, opts...)
+	return gcpStorage.NewReader(ctx, client, g.BucketName, opts...)
 }
 
 func newAzureReader(
@@ -180,7 +268,7 @@ func newAzureReader(
 
 // prepareDirectoryList parses command line parameters and return slice of strings.
 func prepareDirectoryList(parentDir, dirList string) []string {
-	result := splitByComma(dirList)
+	result := config.SplitByComma(dirList)
 	if parentDir != "" {
 		for i := range result {
 			result[i] = path.Join(parentDir, result[i])

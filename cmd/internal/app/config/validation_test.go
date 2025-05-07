@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package config
 
 import (
 	"testing"
@@ -21,6 +21,8 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
+
+const testNamespace = "test"
 
 func TestValidateStorages(t *testing.T) {
 	t.Parallel()
@@ -159,7 +161,7 @@ func TestValidateStorages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateStorages(tt.awsS3, tt.gcpStorage, tt.azureBlob)
+			err := ValidateStorages(tt.awsS3, tt.gcpStorage, tt.azureBlob)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
 			} else {
@@ -404,7 +406,7 @@ func TestValidateBackupParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateBackupParams(tt.backupParams, tt.commonParams)
+			err := ValidateBackupParams(tt.backupParams, tt.commonParams)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
 				assert.Equal(t, tt.expectedErr, err.Error())
@@ -575,7 +577,7 @@ func TestValidateCommonParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateCommonParams(tt.commonParams)
+			err := ValidateCommonParams(tt.commonParams)
 			if tt.wantErr {
 				assert.Error(t, err, "Expected error but got none")
 				assert.Equal(t, tt.expectedErr, err.Error())
@@ -686,7 +688,7 @@ func TestValidateRestoreParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateRestoreParams(tt.restoreParams, tt.commonParams)
+			err := ValidateRestoreParams(tt.restoreParams, tt.commonParams)
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
 			} else {
@@ -829,7 +831,7 @@ func Test_validateBackupXDRParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateBackupXDRParams(tt.params)
+			err := ValidateBackupXDRParams(tt.params)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
 			} else {
@@ -844,17 +846,17 @@ func TestValidateBackup(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		params  *ASBackupParams
+		params  *BackupParams
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name: "Valid backup configuration with output file",
-			params: &ASBackupParams{
-				BackupParams: &models.Backup{
+			params: &BackupParams{
+				Backup: &models.Backup{
 					OutputFile: "backup.asb",
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 			},
@@ -862,9 +864,9 @@ func TestValidateBackup(t *testing.T) {
 		},
 		{
 			name: "Valid backup configuration with directory",
-			params: &ASBackupParams{
-				BackupParams: &models.Backup{},
-				CommonParams: &models.Common{
+			params: &BackupParams{
+				Backup: &models.Backup{},
+				Common: &models.Common{
 					Directory: "backup-dir",
 					Namespace: "test",
 				},
@@ -873,12 +875,12 @@ func TestValidateBackup(t *testing.T) {
 		},
 		{
 			name: "Valid backup configuration with estimate",
-			params: &ASBackupParams{
-				BackupParams: &models.Backup{
+			params: &BackupParams{
+				Backup: &models.Backup{
 					Estimate:        true,
 					EstimateSamples: 100,
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 			},
@@ -886,8 +888,8 @@ func TestValidateBackup(t *testing.T) {
 		},
 		{
 			name: "Valid backup configuration with BackupXDR",
-			params: &ASBackupParams{
-				BackupXDRParams: &models.BackupXDR{
+			params: &BackupParams{
+				BackupXDR: &models.BackupXDR{
 					MaxConnections: 10,
 					FileLimit:      1000,
 				},
@@ -896,9 +898,9 @@ func TestValidateBackup(t *testing.T) {
 		},
 		{
 			name: "Missing output file and directory",
-			params: &ASBackupParams{
-				BackupParams: &models.Backup{},
-				CommonParams: &models.Common{
+			params: &BackupParams{
+				Backup: &models.Backup{},
+				Common: &models.Common{
 					Namespace: "test",
 				},
 			},
@@ -907,11 +909,11 @@ func TestValidateBackup(t *testing.T) {
 		},
 		{
 			name: "Invalid backup params - both output file and directory",
-			params: &ASBackupParams{
-				BackupParams: &models.Backup{
+			params: &BackupParams{
+				Backup: &models.Backup{
 					OutputFile: "backup.asb",
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Directory: "backup-dir",
 					Namespace: "test",
 				},
@@ -921,19 +923,19 @@ func TestValidateBackup(t *testing.T) {
 		},
 		{
 			name: "Invalid common params - missing namespace",
-			params: &ASBackupParams{
-				BackupParams: &models.Backup{
+			params: &BackupParams{
+				Backup: &models.Backup{
 					OutputFile: "backup.asb",
 				},
-				CommonParams: &models.Common{},
+				Common: &models.Common{},
 			},
 			wantErr: true,
 			errMsg:  "namespace is required",
 		},
 		{
 			name: "Invalid BackupXDR params",
-			params: &ASBackupParams{
-				BackupXDRParams: &models.BackupXDR{
+			params: &BackupParams{
+				BackupXDR: &models.BackupXDR{
 					MaxConnections: 0, // Invalid: must be >= 1
 				},
 			},
@@ -942,11 +944,11 @@ func TestValidateBackup(t *testing.T) {
 		},
 		{
 			name: "Multiple cloud storage providers configured",
-			params: &ASBackupParams{
-				BackupParams: &models.Backup{
+			params: &BackupParams{
+				Backup: &models.Backup{
 					OutputFile: "backup.asb",
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 				AwsS3: &models.AwsS3{
@@ -964,7 +966,7 @@ func TestValidateBackup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateBackup(tt.params)
+			err := ValidateBackup(tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -982,18 +984,18 @@ func TestValidateRestore(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		params  *ASRestoreParams
+		params  *RestoreParams
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name: "Valid restore configuration with input file",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					InputFile: "backup.asb",
 					Mode:      models.RestoreModeASB,
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 			},
@@ -1001,11 +1003,11 @@ func TestValidateRestore(t *testing.T) {
 		},
 		{
 			name: "Valid restore configuration with directory",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					Mode: models.RestoreModeASB,
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Directory: "restore-dir",
 					Namespace: "test",
 				},
@@ -1014,13 +1016,13 @@ func TestValidateRestore(t *testing.T) {
 		},
 		{
 			name: "Valid restore configuration with directory list",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					DirectoryList:   "dir1,dir2",
 					ParentDirectory: "parent",
 					Mode:            models.RestoreModeASB,
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 			},
@@ -1028,12 +1030,12 @@ func TestValidateRestore(t *testing.T) {
 		},
 		{
 			name: "Invalid restore mode",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					InputFile: "backup.asb",
 					Mode:      "invalid-mode",
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 			},
@@ -1042,11 +1044,11 @@ func TestValidateRestore(t *testing.T) {
 		},
 		{
 			name: "Missing input source",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					Mode: models.RestoreModeASB,
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 			},
@@ -1055,12 +1057,12 @@ func TestValidateRestore(t *testing.T) {
 		},
 		{
 			name: "Invalid restore params - both input file and directory",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					InputFile: "backup.asb",
 					Mode:      models.RestoreModeASB,
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Directory: "restore-dir",
 					Namespace: "test",
 				},
@@ -1070,24 +1072,24 @@ func TestValidateRestore(t *testing.T) {
 		},
 		{
 			name: "Invalid common params - missing namespace",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					InputFile: "backup.asb",
 					Mode:      models.RestoreModeASB,
 				},
-				CommonParams: &models.Common{},
+				Common: &models.Common{},
 			},
 			wantErr: true,
 			errMsg:  "namespace is required",
 		},
 		{
 			name: "Multiple cloud storage providers configured",
-			params: &ASRestoreParams{
-				RestoreParams: &models.Restore{
+			params: &RestoreParams{
+				Restore: &models.Restore{
 					InputFile: "backup.asb",
 					Mode:      models.RestoreModeASB,
 				},
-				CommonParams: &models.Common{
+				Common: &models.Common{
 					Namespace: "test",
 				},
 				AwsS3: &models.AwsS3{
@@ -1105,7 +1107,7 @@ func TestValidateRestore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateRestore(tt.params)
+			err := ValidateRestore(tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {

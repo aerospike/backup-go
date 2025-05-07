@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package logging
 
 import (
 	"context"
@@ -99,14 +99,14 @@ func TestPrintBackupEstimate(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		printBackupEstimate(ctx, stats, gm, logger)
+		PrintBackupEstimate(ctx, stats, gm, logger)
 		close(done)
 	}()
 
 	select {
 	case <-done:
 	case <-time.After(200 * time.Millisecond):
-		t.Fatal("printBackupEstimate did not complete in time")
+		t.Fatal("PrintBackupEstimate did not complete in time")
 	}
 }
 
@@ -137,13 +137,13 @@ func TestPrintRestoreEstimate(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		printRestoreEstimate(ctx, stats, gm, gs, logger)
+		PrintRestoreEstimate(ctx, stats, gm, gs, logger)
 		close(done)
 	}()
 
 	select {
 	case <-done:
 	case <-time.After(200 * time.Millisecond):
-		t.Fatal("printRestoreEstimate did not complete in time")
+		t.Fatal("PrintRestoreEstimate did not complete in time")
 	}
 }

@@ -17,7 +17,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/aerospike/backup-go/cmd/internal/app"
+	"github.com/aerospike/backup-go/cmd/internal/app/config"
+	"github.com/aerospike/backup-go/cmd/internal/app/logging"
+	"github.com/aerospike/backup-go/cmd/internal/app/restore"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
 	asFlags "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
@@ -204,27 +206,27 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Init logger.
-	logger, err := app.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
+	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
 		return err
 	}
 
 	// Init app.
-	asrParams := &app.ASRestoreParams{
-		App:           c.flagsApp.GetApp(),
-		ClientConfig:  c.flagsAerospike.NewAerospikeConfig(),
-		ClientPolicy:  c.flagsClientPolicy.GetClientPolicy(),
-		RestoreParams: c.flagsRestore.GetRestore(),
-		CommonParams:  c.flagsCommon.GetCommon(),
-		Compression:   c.flagsCompression.GetCompression(),
-		Encryption:    c.flagsEncryption.GetEncryption(),
-		SecretAgent:   c.flagsSecretAgent.GetSecretAgent(),
-		AwsS3:         c.flagsAws.GetAwsS3(),
-		GcpStorage:    c.flagsGcp.GetGcpStorage(),
-		AzureBlob:     c.flagsAzure.GetAzureBlob(),
+	asrParams := &config.RestoreParams{
+		App:          c.flagsApp.GetApp(),
+		ClientConfig: c.flagsAerospike.NewAerospikeConfig(),
+		ClientPolicy: c.flagsClientPolicy.GetClientPolicy(),
+		Restore:      c.flagsRestore.GetRestore(),
+		Common:       c.flagsCommon.GetCommon(),
+		Compression:  c.flagsCompression.GetCompression(),
+		Encryption:   c.flagsEncryption.GetEncryption(),
+		SecretAgent:  c.flagsSecretAgent.GetSecretAgent(),
+		AwsS3:        c.flagsAws.GetAwsS3(),
+		GcpStorage:   c.flagsGcp.GetGcpStorage(),
+		AzureBlob:    c.flagsAzure.GetAzureBlob(),
 	}
 
-	asr, err := app.NewASRestore(cmd.Context(), asrParams, logger)
+	asr, err := restore.NewService(cmd.Context(), asrParams, logger)
 	if err != nil {
 		return err
 	}

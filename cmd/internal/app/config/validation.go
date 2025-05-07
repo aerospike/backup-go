@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package config
 
 import (
 	"fmt"
@@ -22,35 +22,35 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/models"
 )
 
-func validateBackup(params *ASBackupParams) error {
-	if params.BackupParams != nil && params.CommonParams != nil {
-		if params.BackupParams.OutputFile == "" && params.CommonParams.Directory == "" && !params.BackupParams.Estimate {
+func ValidateBackup(params *BackupParams) error {
+	if params.Backup != nil && params.Common != nil {
+		if params.Backup.OutputFile == "" && params.Common.Directory == "" && !params.Backup.Estimate {
 			return fmt.Errorf("output file or directory required")
 		}
 
-		if err := validateBackupParams(params.BackupParams, params.CommonParams); err != nil {
+		if err := ValidateBackupParams(params.Backup, params.Common); err != nil {
 			return err
 		}
 
-		if err := validateCommonParams(params.CommonParams); err != nil {
-			return err
-		}
-	}
-
-	if params.BackupXDRParams != nil {
-		if err := validateBackupXDRParams(params.BackupXDRParams); err != nil {
+		if err := ValidateCommonParams(params.Common); err != nil {
 			return err
 		}
 	}
 
-	if err := validateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
+	if params.BackupXDR != nil {
+		if err := ValidateBackupXDRParams(params.BackupXDR); err != nil {
+			return err
+		}
+	}
+
+	if err := ValidateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func validateBackupXDRParams(params *models.BackupXDR) error {
+func ValidateBackupXDRParams(params *models.BackupXDR) error {
 	if params.ReadTimeoutMilliseconds < 0 {
 		return fmt.Errorf("backup xdr read timeout can't be negative")
 	}
@@ -98,31 +98,31 @@ func validateBackupXDRParams(params *models.BackupXDR) error {
 	return nil
 }
 
-func validateRestore(params *ASRestoreParams) error {
-	if params.RestoreParams != nil && params.CommonParams != nil {
-		switch params.RestoreParams.Mode {
+func ValidateRestore(params *RestoreParams) error {
+	if params.Restore != nil && params.Common != nil {
+		switch params.Restore.Mode {
 		case models.RestoreModeAuto, models.RestoreModeASB, models.RestoreModeASBX:
 			// ok.
 		default:
-			return fmt.Errorf("invalid restore mode: %s", params.RestoreParams.Mode)
+			return fmt.Errorf("invalid restore mode: %s", params.Restore.Mode)
 		}
 
-		if params.RestoreParams.InputFile == "" &&
-			params.CommonParams.Directory == "" &&
-			params.RestoreParams.DirectoryList == "" {
+		if params.Restore.InputFile == "" &&
+			params.Common.Directory == "" &&
+			params.Restore.DirectoryList == "" {
 			return fmt.Errorf("input file or directory required")
 		}
 
-		if err := validateRestoreParams(params.RestoreParams, params.CommonParams); err != nil {
+		if err := ValidateRestoreParams(params.Restore, params.Common); err != nil {
 			return err
 		}
 
-		if err := validateCommonParams(params.CommonParams); err != nil {
+		if err := ValidateCommonParams(params.Common); err != nil {
 			return err
 		}
 	}
 
-	if err := validateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
+	if err := ValidateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
 		return err
 	}
 
@@ -141,7 +141,7 @@ func validateRestore(params *ASRestoreParams) error {
 	return nil
 }
 
-func validateStorages(
+func ValidateStorages(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
@@ -170,7 +170,7 @@ func validateStorages(
 }
 
 //nolint:gocyclo // It is a long validation function.
-func validateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
+func ValidateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
 	if backupParams == nil || commonParams == nil {
 		return fmt.Errorf("params can't be nil")
 	}
@@ -221,7 +221,7 @@ func validateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 	return nil
 }
 
-func validateCommonParams(commonParams *models.Common) error {
+func ValidateCommonParams(commonParams *models.Common) error {
 	if commonParams.Namespace == "" {
 		return fmt.Errorf("namespace is required")
 	}
@@ -283,7 +283,7 @@ func validatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) err
 	return nil
 }
 
-func validateRestoreParams(restoreParams *models.Restore, commonParams *models.Common) error {
+func ValidateRestoreParams(restoreParams *models.Restore, commonParams *models.Common) error {
 	if commonParams.Directory != "" && restoreParams.InputFile != "" {
 		return fmt.Errorf("only one of directory and input-file may be configured at the same time")
 	}

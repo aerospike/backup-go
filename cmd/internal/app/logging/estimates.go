@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package logging
 
 import (
 	"context"
@@ -28,11 +28,11 @@ var (
 	errBrake    = errors.New("brake")
 )
 
-// printBackupEstimate prints the backup progress.
+// PrintBackupEstimate prints the backup progress.
 // The progress is printed every second.
 // The progress is printed only when the total records is greater than 0.
 // The progress is printed only when the read records is greater than 0.
-func printBackupEstimate(
+func PrintBackupEstimate(
 	ctx context.Context,
 	stats *models.BackupStats,
 	getMetrics func() *models.Metrics,
@@ -71,11 +71,11 @@ func printBackupEstimate(
 	}
 }
 
-// printRestoreEstimate prints the restore progress.
+// PrintRestoreEstimate prints the restore progress.
 // The progress is printed every second.
 // The progress is printed only when the total file size is greater than 0.
 // The progress is printed only when the written number of bytes is greater than 0.
-func printRestoreEstimate(
+func PrintRestoreEstimate(
 	ctx context.Context,
 	stats *models.RestoreStats,
 	getMetrics func() *models.Metrics,
@@ -182,8 +182,8 @@ func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Du
 	return result
 }
 
-// printFilesNumber prints the number of files.
-func printFilesNumber(
+// PrintFilesNumber prints the number of files.
+func PrintFilesNumber(
 	ctx context.Context,
 	getNumber func() int64,
 	fileTypes string,

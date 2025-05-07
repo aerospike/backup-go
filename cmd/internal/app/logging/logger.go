@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package logging
 
 import (
 	"fmt"
@@ -20,6 +20,13 @@ import (
 	"os"
 )
 
+// NewLogger creates a new logger with the given level, verbose, and JSON flags.
+//
+// The level flag is used to set the log level. The valid values are:
+// - debug
+// - info
+// - warn
+// - error
 func NewLogger(level string, isVerbose, isJSON bool) (*slog.Logger, error) {
 	loggerOpt := &slog.HandlerOptions{}
 

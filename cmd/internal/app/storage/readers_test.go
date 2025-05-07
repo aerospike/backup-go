@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package storage
 
 import (
 	"bytes"
@@ -27,6 +27,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	appConfig "github.com/aerospike/backup-go/cmd/internal/app/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -46,9 +47,9 @@ func TestNewLocalReader(t *testing.T) {
 
 	dir := t.TempDir()
 
-	params := &ASRestoreParams{
-		RestoreParams: &models.Restore{},
-		CommonParams: &models.Common{
+	params := &appConfig.RestoreParams{
+		Restore: &models.Restore{},
+		Common: &models.Common{
 			Directory: dir,
 		},
 		AwsS3:      &models.AwsS3{},
@@ -66,14 +67,14 @@ func TestNewLocalReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	params = &ASRestoreParams{
-		RestoreParams: &models.Restore{
+	params = &appConfig.RestoreParams{
+		Restore: &models.Restore{
 			InputFile: dir + testFileNameASBX,
 		},
-		CommonParams: &models.Common{},
-		AwsS3:        &models.AwsS3{},
-		GcpStorage:   &models.GcpStorage{},
-		AzureBlob:    &models.AzureBlob{},
+		Common:     &models.Common{},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 
 	reader, err = newReader(ctx, params, nil, false, logger)
@@ -81,12 +82,12 @@ func TestNewLocalReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	params = &ASRestoreParams{
-		RestoreParams: &models.Restore{},
-		CommonParams:  &models.Common{},
-		AwsS3:         &models.AwsS3{},
-		GcpStorage:    &models.GcpStorage{},
-		AzureBlob:     &models.AzureBlob{},
+	params = &appConfig.RestoreParams{
+		Restore:    &models.Restore{},
+		Common:     &models.Common{},
+		AwsS3:      &models.AwsS3{},
+		GcpStorage: &models.GcpStorage{},
+		AzureBlob:  &models.AzureBlob{},
 	}
 	reader, err = newReader(ctx, params, nil, false, logger)
 	assert.Error(t, err)
@@ -112,9 +113,9 @@ func TestNewS3Reader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &ASRestoreParams{
-		RestoreParams: &models.Restore{},
-		CommonParams: &models.Common{
+	params := &appConfig.RestoreParams{
+		Restore: &models.Restore{},
+		Common: &models.Common{
 			Directory: dir,
 		},
 		AwsS3: &models.AwsS3{
@@ -142,11 +143,11 @@ func TestNewS3Reader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
 
-	params = &ASRestoreParams{
-		RestoreParams: &models.Restore{
+	params = &appConfig.RestoreParams{
+		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		CommonParams: &models.Common{},
+		Common: &models.Common{},
 		AwsS3: &models.AwsS3{
 			BucketName: testS3Bucket,
 			Region:     testS3Region,
@@ -184,9 +185,9 @@ func TestNewGcpReader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &ASRestoreParams{
-		RestoreParams: &models.Restore{},
-		CommonParams: &models.Common{
+	params := &appConfig.RestoreParams{
+		Restore: &models.Restore{},
+		Common: &models.Common{
 			Directory: dir,
 		},
 		GcpStorage: &models.GcpStorage{
@@ -210,11 +211,11 @@ func TestNewGcpReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testGcpType, reader.GetType())
 
-	params = &ASRestoreParams{
-		RestoreParams: &models.Restore{
+	params = &appConfig.RestoreParams{
+		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		CommonParams: &models.Common{},
+		Common: &models.Common{},
 		GcpStorage: &models.GcpStorage{
 			BucketName: testBucket,
 			Endpoint:   testGcpEndpoint,
@@ -250,9 +251,9 @@ func TestNewAzureReader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &ASRestoreParams{
-		RestoreParams: &models.Restore{},
-		CommonParams: &models.Common{
+	params := &appConfig.RestoreParams{
+		Restore: &models.Restore{},
+		Common: &models.Common{
 			Directory: dir,
 		},
 		AzureBlob: &models.AzureBlob{
@@ -280,11 +281,11 @@ func TestNewAzureReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())
 
-	params = &ASRestoreParams{
-		RestoreParams: &models.Restore{
+	params = &appConfig.RestoreParams{
+		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		CommonParams: &models.Common{},
+		Common: &models.Common{},
 		AzureBlob: &models.AzureBlob{
 			AccountName:   testAzureAccountName,
 			AccountKey:    testAzureAccountKey,

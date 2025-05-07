@@ -18,7 +18,9 @@ import (
 	"fmt"
 
 	"github.com/aerospike/backup-go/cmd/asbackup/cmd/xdr"
-	"github.com/aerospike/backup-go/cmd/internal/app"
+	"github.com/aerospike/backup-go/cmd/internal/app/backup"
+	"github.com/aerospike/backup-go/cmd/internal/app/config"
+	"github.com/aerospike/backup-go/cmd/internal/app/logging"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
 	asFlags "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
@@ -212,18 +214,18 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Init logger.
-	logger, err := app.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
+	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
 		return err
 	}
 
 	// Init app.
-	asbParams := &app.ASBackupParams{
+	asbParams := &config.BackupParams{
 		App:          c.flagsApp.GetApp(),
 		ClientConfig: c.flagsAerospike.NewAerospikeConfig(),
 		ClientPolicy: c.flagsClientPolicy.GetClientPolicy(),
-		BackupParams: c.flagsBackup.GetBackup(),
-		CommonParams: c.flagsCommon.GetCommon(),
+		Backup:       c.flagsBackup.GetBackup(),
+		Common:       c.flagsCommon.GetCommon(),
 		Compression:  c.flagsCompression.GetCompression(),
 		Encryption:   c.flagsEncryption.GetEncryption(),
 		SecretAgent:  c.flagsSecretAgent.GetSecretAgent(),
@@ -232,7 +234,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 		AzureBlob:    c.flagsAzure.GetAzureBlob(),
 	}
 
-	asb, err := app.NewASBackup(cmd.Context(), asbParams, logger)
+	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
 	if err != nil {
 		return err
 	}

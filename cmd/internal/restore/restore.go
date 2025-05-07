@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"github.com/aerospike/backup-go"
-	config2 "github.com/aerospike/backup-go/cmd/internal/config"
-	logging2 "github.com/aerospike/backup-go/cmd/internal/logging"
+	"github.com/aerospike/backup-go/cmd/internal/config"
+	"github.com/aerospike/backup-go/cmd/internal/logging"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/cmd/internal/storage"
 	bModels "github.com/aerospike/backup-go/models"
@@ -49,11 +49,11 @@ type Service struct {
 // configuring all necessary components for a restore process.
 func NewService(
 	ctx context.Context,
-	params *config2.RestoreParams,
+	params *config.RestoreParams,
 	logger *slog.Logger,
 ) (*Service, error) {
 	// Validations.
-	if err := config2.ValidateRestore(params); err != nil {
+	if err := config.ValidateRestore(params); err != nil {
 		return nil, err
 	}
 
@@ -63,7 +63,26 @@ func NewService(
 		slog.String("mode", params.Restore.Mode),
 	)
 
-	restoreConfig := config2.NewRestoreConfig(params)
+	restoreConfig := config.NewRestoreConfig(params)
+
+	logger.Info("initializing restore config",
+		slog.Any("namespace_source", *restoreConfig.Namespace.Source),
+		slog.Any("namespace_destination", *restoreConfig.Namespace.Destination),
+		slog.String("encryption", params.Encryption.Mode),
+		slog.Int("compression", params.Compression.Level),
+		slog.Any("retry", *restoreConfig.RetryPolicy),
+		slog.Any("sets", restoreConfig.SetList),
+		slog.Any("bins", restoreConfig.BinList),
+		slog.Int("parallel", restoreConfig.Parallel),
+		slog.Bool("no_records", restoreConfig.NoRecords),
+		slog.Bool("no_indexes", restoreConfig.NoIndexes),
+		slog.Bool("no_udfs", restoreConfig.NoUDFs),
+		slog.Bool("disable_batch_writes", restoreConfig.DisableBatchWrites),
+		slog.Int("batch_size", restoreConfig.BatchSize),
+		slog.Int("max_asynx_batches", restoreConfig.MaxAsyncBatches),
+		slog.Int64("extra_ttl", restoreConfig.ExtraTTL),
+		slog.Bool("ignore_records_error", restoreConfig.IgnoreRecordError),
+	)
 
 	reader, xdrReader, err := storage.NewRestoreReader(ctx, params, restoreConfig.SecretAgentConfig, logger)
 	if err != nil {
@@ -118,14 +137,14 @@ func (r *Service) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start asb restore: %w", err)
 		}
 
-		go logging2.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASB, r.logger)
-		go logging2.PrintRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
+		go logging.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASB, r.logger)
+		go logging.PrintRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
 
 		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to asb restore: %w", err)
 		}
 
-		logging2.ReportRestore(h.GetStats(), r.isLogJSON, r.logger)
+		logging.ReportRestore(h.GetStats(), r.isLogJSON, r.logger)
 	case models.RestoreModeASBX:
 		r.logger.Info("starting asbx restore")
 		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
@@ -135,14 +154,14 @@ func (r *Service) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start asbx restore: %w", err)
 		}
 
-		go logging2.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASBX, r.logger)
-		go logging2.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
+		go logging.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASBX, r.logger)
+		go logging.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
 
 		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to asbx restore: %w", err)
 		}
 
-		logging2.ReportRestore(hXdr.GetStats(), r.isLogJSON, r.logger)
+		logging.ReportRestore(hXdr.GetStats(), r.isLogJSON, r.logger)
 	case models.RestoreModeAuto:
 		r.logger.Info("starting auto restore")
 		// If one of restore operations fails, we cancel another.
@@ -173,8 +192,8 @@ func (r *Service) Run(ctx context.Context) error {
 					return
 				}
 
-				go logging2.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASB, r.logger)
-				go logging2.PrintRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
+				go logging.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASB, r.logger)
+				go logging.PrintRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
 
 				if err = h.Wait(ctx); err != nil {
 					errChan <- fmt.Errorf("failed to asb restore: %w", err)
@@ -206,8 +225,8 @@ func (r *Service) Run(ctx context.Context) error {
 					return
 				}
 
-				go logging2.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASBX, r.logger)
-				go logging2.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
+				go logging.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASBX, r.logger)
+				go logging.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
 
 				if err = hXdr.Wait(ctx); err != nil {
 					errChan <- fmt.Errorf("failed to asbx restore: %w", err)
@@ -233,7 +252,7 @@ func (r *Service) Run(ctx context.Context) error {
 		}
 
 		restStats := bModels.SumRestoreStats(xdrStats, stats)
-		logging2.ReportRestore(restStats, r.isLogJSON, r.logger)
+		logging.ReportRestore(restStats, r.isLogJSON, r.logger)
 
 		// To prevent context leaking.
 		cancel()

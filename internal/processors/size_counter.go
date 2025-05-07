@@ -15,7 +15,6 @@
 package processors
 
 import (
-	"fmt"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
@@ -33,12 +32,6 @@ func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) pipeline.D
 }
 
 func (c sizeCounter[T]) Process(token T) (T, error) {
-	t, ok := any(token).(*models.Token)
-	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for size counter", token)
-	}
-
-	c.counter.Add(t.Size)
-
+	c.counter.Add(token.GetSize())
 	return token, nil
 }

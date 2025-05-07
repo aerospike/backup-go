@@ -96,8 +96,8 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 
 	logger.Info("initializing backup config")
 
-	switch {
-	case !params.IsXDR():
+	switch params.IsXDR() {
+	case false:
 		backupConfig, err = NewBackupConfig(params)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
@@ -105,9 +105,30 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 
 		logger.Info("initializing scan backup config",
 			slog.String("namespace", backupConfig.Namespace),
+			slog.String("encryption", params.Encryption.Mode),
+			slog.Int("compression", params.Compression.Level),
+			slog.String("filters", params.Backup.PartitionList),
+			slog.Any("nodes", backupConfig.NodeList),
 			slog.Any("sets", backupConfig.SetList),
+			slog.Any("bins", backupConfig.BinList),
+			slog.Any("rack", backupConfig.RackList),
+			slog.Any("parallel_node", backupConfig.ParallelNodes),
+			slog.Any("parallel_read", backupConfig.ParallelRead),
+			slog.Any("parallel_write", backupConfig.ParallelWrite),
+			slog.Bool("no_records", backupConfig.NoRecords),
+			slog.Bool("no_indexes", backupConfig.NoIndexes),
+			slog.Bool("no_udfs", backupConfig.NoUDFs),
+			slog.Int("records_per_second", backupConfig.RecordsPerSecond),
+			slog.Int("bandwidth", backupConfig.Bandwidth),
+			slog.Uint64("file_limit", backupConfig.FileLimit),
+			slog.Bool("compact", backupConfig.Compact),
+			slog.Bool("not_ttl_only", backupConfig.NoTTLOnly),
+			slog.String("state_file", backupConfig.StateFile),
+			slog.Bool("continue", backupConfig.Continue),
+			slog.Int64("page_size", backupConfig.PageSize),
+			slog.String("output_prefix", backupConfig.OutputFilePrefix),
 		)
-	case params.IsXDR():
+	case true:
 		backupXDRConfig = NewBackupXDRConfig(params)
 
 		// On xdr backup we backup only uds and indexes.
@@ -118,7 +139,20 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 
 		logger.Info("initializing xdr backup config",
 			slog.String("namespace", backupXDRConfig.Namespace),
+			slog.String("encryption", params.Encryption.Mode),
+			slog.Int("compression", params.Compression.Level),
+			slog.Any("parallel_write", backupXDRConfig.ParallelWrite),
+			slog.Uint64("file_limit", backupXDRConfig.FileLimit),
+			slog.String("dc", backupXDRConfig.DC),
+			slog.String("local_address", backupXDRConfig.LocalAddress),
+			slog.Int("local_port", backupXDRConfig.LocalPort),
 			slog.String("rewind", backupXDRConfig.Rewind),
+			slog.Int("max_throughput", backupXDRConfig.MaxThroughput),
+			slog.Duration("read_timeout", backupXDRConfig.ReadTimeout),
+			slog.Duration("write_timeout", backupXDRConfig.WriteTimeout),
+			slog.Int("result_queue_size", backupXDRConfig.ResultQueueSize),
+			slog.Int("ack_queue_size", backupXDRConfig.AckQueueSize),
+			slog.Int("max_connections", backupXDRConfig.MaxConnections),
 		)
 	}
 

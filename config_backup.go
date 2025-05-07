@@ -63,8 +63,8 @@ type ConfigBackup struct {
 	// Namespace is the Aerospike namespace to back up.
 	Namespace string
 	// NodeList contains a list of nodes to back up.
-	// <IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]
-	// <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]
+	// <addr 1>:<port 1>[,<addr 2>:<port 2>[,...]] or <node name 1>[,<node name 2>[,...]]
+	// To get the correct node address use "service:" info command, to get node name use "node:" info command.
 	// Backup the given cluster nodes only.
 	// If it is set, ParallelNodes automatically set to true.
 	// This argument is mutually exclusive to partition-list/AfterDigest arguments.

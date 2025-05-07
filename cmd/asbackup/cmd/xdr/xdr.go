@@ -17,7 +17,7 @@ package xdr
 import (
 	"fmt"
 
-	appBackup "github.com/aerospike/backup-go/cmd/internal/backup"
+	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
 	"github.com/aerospike/backup-go/cmd/internal/logging"
@@ -133,7 +133,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 		AzureBlob:    c.flagsAzure.GetAzureBlob(),
 	}
 
-	asb, err := appBackup.NewService(cmd.Context(), asbParams, logger)
+	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
 	if err != nil {
 		return err
 	}

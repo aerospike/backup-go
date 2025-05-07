@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v8"
-	appConfig "github.com/aerospike/backup-go/cmd/internal/app/config"
+	appConfig "github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/assert"

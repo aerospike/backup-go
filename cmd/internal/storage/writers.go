@@ -20,7 +20,7 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/cmd/internal/app/config"
+	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"

@@ -17,10 +17,10 @@ package xdr
 import (
 	"fmt"
 
-	appBackup "github.com/aerospike/backup-go/cmd/internal/app/backup"
-	"github.com/aerospike/backup-go/cmd/internal/app/config"
-	"github.com/aerospike/backup-go/cmd/internal/app/logging"
+	appBackup "github.com/aerospike/backup-go/cmd/internal/backup"
+	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
+	"github.com/aerospike/backup-go/cmd/internal/logging"
 	asFlags "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
 )

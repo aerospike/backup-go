@@ -27,7 +27,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	appConfig "github.com/aerospike/backup-go/cmd/internal/app/config"
+	appConfig "github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"

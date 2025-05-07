@@ -17,10 +17,10 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/aerospike/backup-go/cmd/internal/app/config"
-	"github.com/aerospike/backup-go/cmd/internal/app/logging"
-	"github.com/aerospike/backup-go/cmd/internal/app/restore"
+	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
+	"github.com/aerospike/backup-go/cmd/internal/logging"
+	"github.com/aerospike/backup-go/cmd/internal/restore"
 	asFlags "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
 )

@@ -24,10 +24,10 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
-	appBackup "github.com/aerospike/backup-go/cmd/internal/app/backup"
-	"github.com/aerospike/backup-go/cmd/internal/app/config"
-	"github.com/aerospike/backup-go/cmd/internal/app/storage"
+	appBackup "github.com/aerospike/backup-go/cmd/internal/backup"
+	config2 "github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
+	"github.com/aerospike/backup-go/cmd/internal/storage"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +47,7 @@ func Test_BackupRestore(t *testing.T) {
 	dir := t.TempDir()
 	hostPort := client.NewDefaultHostTLSPort()
 
-	asbParams := &config.BackupParams{
+	asbParams := &config2.BackupParams{
 		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{
@@ -92,7 +92,7 @@ func Test_BackupRestore(t *testing.T) {
 	err = asb.Run(ctx)
 	require.NoError(t, err)
 
-	asrParams := &config.RestoreParams{
+	asrParams := &config2.RestoreParams{
 		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{

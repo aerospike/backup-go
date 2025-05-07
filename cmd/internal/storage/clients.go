@@ -24,7 +24,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aerospike/aerospike-client-go/v8"
-	appConfig "github.com/aerospike/backup-go/cmd/internal/app/config"
+	appConfig "github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/aws/aws-sdk-go-v2/aws"

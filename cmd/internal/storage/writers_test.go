@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/cmd/internal/app/config"
+	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )

@@ -1,5 +1,5 @@
 # Aerospike restore (asrestore)
-Aerospike Restore CLI tool. This page describes the features and benefits of the Aerospike restore tool, `asrestore`.
+Aerospike Restore CLI tool. This page describes capabilities and configuration options of the Aerospike restore tool, `asrestore`.
 
 ## Overview
 `asrestore` restores backups created with `asbackup`. With the `asrestore` tool, you can restore to specific bins or sets, secure connections using username/password credentials or TLS (or both), and use configuration files to automate restore operations.
@@ -7,7 +7,6 @@ Aerospike Restore CLI tool. This page describes the features and benefits of the
 ## Considerations for Aerospike restore
 When using `asrestore`, be aware of the following considerations:
 
-- You can use `asrestore` to restore backups from Aerospike server version 3.0 or later. To restore a backup from earlier releases, contact Aerospike Support.
 - The TTL of restored keys is preserved, but the last-update-time and generation count are reset to the current time.
 - `asrestore` creates records from the backup. If records exist in the namespace on the cluster, you can configure a write policy to determine whether the backup records or the records in the namespace take precedence when using `asrestore`.
 - If a restore transaction fails, you can configure timeout options for retries.

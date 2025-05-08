@@ -17,7 +17,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/aerospike/backup-go/cmd/asbackup/cmd/xdr"
 	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
@@ -79,18 +78,18 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 	rootCmd.SilenceUsage = true
 
 	// Add sub command
-	xdrCmd := xdr.NewCmd(
-		c.flagsApp,
-		c.flagsAerospike,
-		c.flagsClientPolicy,
-		c.flagsCompression,
-		c.flagsEncryption,
-		c.flagsSecretAgent,
-		c.flagsAws,
-		c.flagsGcp,
-		c.flagsAzure,
-	)
-	rootCmd.AddCommand(xdrCmd)
+	// xdrCmd := xdr.NewCmd(
+	// 	c.flagsApp,
+	// 	c.flagsAerospike,
+	// 	c.flagsClientPolicy,
+	// 	c.flagsCompression,
+	// 	c.flagsEncryption,
+	// 	c.flagsSecretAgent,
+	// 	c.flagsAws,
+	// 	c.flagsGcp,
+	// 	c.flagsAzure,
+	// )
+	// rootCmd.AddCommand(xdrCmd)
 
 	appFlagSet := c.flagsApp.NewFlagSet()
 	aerospikeFlagSet := c.flagsAerospike.NewFlagSet(asFlags.DefaultWrapHelpString)
@@ -125,7 +124,9 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		fmt.Println("-----------------------------------------")
 		fmt.Println("\nUsage:")
 		fmt.Println("  asbackup [flags]")
-		fmt.Println("  asbackup xdr [flags]")
+
+		// Printing hint for xdr command.
+		//	fmt.Println("  asbackup xdr [flags]")
 
 		// Print section: App Flags
 		fmt.Println("\nGeneral Flags:")

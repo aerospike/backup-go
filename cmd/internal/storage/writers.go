@@ -69,7 +69,7 @@ func newWriter(
 		slog.String("output_file", outputFile),
 		slog.Bool("should_clear_target", shouldClearTarget),
 		slog.Bool("continue_backup", continueBackup),
-		slog.Bool("is_xdr", params.IsXDR()))
+	)
 
 	switch {
 	case params.AwsS3.BucketName != "":

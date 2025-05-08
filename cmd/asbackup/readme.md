@@ -1,5 +1,37 @@
-# ASBackup
-Aerospike Backup CLI tool.
+# Aerospike backup (asbackup)
+Aerospike Backup CLI tool. This page describes capabilities and configuration options of the Aerospike backup tool, `asbackup`.
+
+## Overview
+`asbackup` backs up data from an Aerospike database according to a user-defined scope of specific namespaces, sets, or both. The scope supports further refinement with partition or time-based filters.
+
+After you define the scope, `asbackup` scans the database and fetches the records that match the specified criteria. `asbackup` captures only the essential data needed for recovery and ignores non-critical system or secondary data.
+
+As `asbackup` identifies records for backup, it serializes the data into a predefined format and writes it to a backup file or directory. Serialization converts the in-memory representation of records into a stable format that can be safely stored on disk.
+
+`asbackup` supports backing up locally, to an Amazon S3 bucket, to an Azure container or GCP bucket.
+
+## `asbackup` limitations
+`asbackup` has the following limitations:
+
+- `asbackup` requires read privileges or higher. See [Configuring Access Control in EE and FE](https://aerospike.com/docs/database/manage/security/rbac/#privileges) for more information.
+- Direct backups are supported to S3, Azure Blob, GCP Storage, also you can use other services for storing the backup files after creating them locally.
+- When running in directory mode, each parallel worker creates its own backup file.
+- You can control the size of backup files created by `asbackup` with the `--file-limit` option. After a backup file reaches the predefined size, `asbackup` creates another file. `asbackup` does not have an upper limit for the size of a backup file.
+- zstd is the only compression algorithm available with `asbackup`.
+
+## Default backup content
+`asbackup` backs up the following data by default:
+
+- Keys
+  - Key metadata: digest, TTL, generation count, and key
+  - Regular bins: string, integer, boolean, and binary
+  - Collection data type (CDT) bins: list and map
+  - GeoJSON data type bins
+  - HyperLogLog data type bins
+- Secondary index definitions
+- User-Defined Function (UDF) modules
+
+---
 
 ## Build
 ### Dev
@@ -13,7 +45,6 @@ Version artifacts are automatically built and uploaded under releases in GitHub.
 ```
 Usage:
   asbackup [flags]
-  asbackup xdr [flags]
 
 General Flags:
   -Z, --help               Display help information.
@@ -162,10 +193,10 @@ Backup Flags:
       --scan-page-size int            Number of records will be read on one iteration for continuation backup.
                                       Affects size if overlap on resuming backup after an error.
                                       Used only with --state-file-dst or --continue. (default 10000)
-      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.This parameter is applied to stop xdr and unblock MRT writes requests. (default 1000)
+      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.(default 1000)
       --info-retry-multiplier float   Increases the delay between subsequent retry attempts.
                                       The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber) (default 1)
-      --info-max-retries uint         How many times to retry to send info commands before failing. This parameter is applied to stop xdr and unblock MRT writes requests. (default 3)
+      --info-max-retries uint         How many times to retry to send info commands before failing. (default 3)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -252,59 +283,6 @@ Any Azure parameter can be retrieved from Secret Agent.
                                       Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
       --azure-block-size int          Block size defines the size of the buffer used during upload. (default 5242880)
 ```
-
-## XDR backup. 
-For XDR backup the client starts a TCP server and accepts connections from the database.
-
-```
-Usage:
-  asbackup xdr [flags]
-
-XDR Backup Flags:
-This sections replace Backup Flags section in main documentation.
-All other flags are valid for XDR backup.
-  -n, --namespace string              The namespace to be backed up. Required.
-  -d, --directory string              The directory that holds the backup files. Required.
-  -r, --remove-files                  Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.
-  -F, --file-limit int                Rotate backup files when their size crosses the given
-                                      value (in bytes). Only used when backing up to a directory.
-                                       (default 262144000)
-      --parallel-write int            Number of concurrent backup files writing.
-                                      If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
-      --dc string                     DC that will be created on source instance for xdr backup.
-                                      DC name can include only Latin lowercase and uppercase letters with no diacritical marks (a-z, A-Z),
-                                      digits 0-9, underscores (_), hyphens (-), and dollar signs ($). Max length is 31 bytes. (default "dc")
-      --local-address string          Local IP address that the XDR server listens on. (default "127.0.0.1")
-      --local-port int                Local port that the XDR server listens on. (default 8080)
-      --rewind string                 Rewind is used to ship all existing records of a namespace.
-                                      When rewinding a namespace, XDR will scan through the index and ship
-                                      all the records for that namespace, partition by partition.
-                                      Can be the string "all" or an integer number of seconds. (default "all")
-      --max-throughput int            Number of records per second to ship using XDR.The --max-throughput value should be in multiples of 100.
-                                      If 0, the default server value will be used.
-      --read-timeout int              Timeout in milliseconds for TCP read operations. Used by TCP server for XDR. (default 1000)
-      --write-timeout int             Timeout in milliseconds for TCP write operations. Used by TCP server for XDR. (default 1000)
-      --results-queue-size int        Buffer for processing messages received from XDR. (default 256)
-      --ack-queue-size int            Buffer for processing acknowledge messages sent to XDR. (default 256)
-      --max-connections int           Maximum number of concurrent TCP connections. (default 256)
-      --info-poling-period int        How often (in milliseconds) a backup client sends info commands
-                                      to check Aerospike cluster statistics on recovery rate and lag. (default 1000)
-      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.
-                                      This parameter is applied to stop-xdr and unblock-mrt requests. (default 1000)
-      --info-retry-multiplier float   Increases the delay between subsequent retry attempts.
-                                      The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber) (default 1)
-      --info-max-retries uint         How many times to retry sending info commands before failing.
-                                       This parameter is applied to stop-xdr and unblock-mrt requests. (default 3)
-      --start-timeout int             Timeout for starting TCP server for XDR.
-                                      If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
-                                      This situation can occur if the --local-address and --local-port options are misconfigured. (default 30000)
-      --stop-xdr                      Stops XDR and removes XDR configuration from the database.
-                                      Used if previous XDR backup was interrupted or failed, but the database server still sends XDR events.
-                                      Use this functionality to stop XDR after an interrupted backup.
-      --unblock-mrt                   Unblock MRT writes on the database.
-                                      Use this functionality to unblock MRT writes after an interrupted backup.
-```
-
 
 ## Unsupported flags
 ```

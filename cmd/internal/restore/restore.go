@@ -125,7 +125,7 @@ func (r *Service) Run(ctx context.Context) error {
 	}
 
 	switch r.mode {
-	case models.RestoreModeASB:
+	case models.RestoreModeASB, models.RestoreModeAuto:
 		r.logger.Info("starting asb restore")
 		r.restoreConfig.EncoderType = backup.EncoderTypeASB
 
@@ -159,7 +159,7 @@ func (r *Service) Run(ctx context.Context) error {
 		}
 
 		logging.ReportRestore(hXdr.GetStats(), r.isLogJSON, r.logger)
-	case models.RestoreModeAuto:
+	default:
 		r.logger.Info("starting auto restore")
 		// If one of restore operations fails, we cancel another.
 		ctx, cancel := context.WithCancel(ctx)
@@ -253,8 +253,6 @@ func (r *Service) Run(ctx context.Context) error {
 
 		// To prevent context leaking.
 		cancel()
-	default:
-		return fmt.Errorf("invalid mode: %s", r.mode)
 	}
 
 	return nil

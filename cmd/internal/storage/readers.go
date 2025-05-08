@@ -42,7 +42,7 @@ func NewRestoreReader(
 	logger *slog.Logger,
 ) (reader, xdrReader backup.StreamingReader, err error) {
 	switch params.Restore.Mode {
-	case models.RestoreModeASB:
+	case models.RestoreModeASB, models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false, logger)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
@@ -56,7 +56,7 @@ func NewRestoreReader(
 		}
 
 		return nil, xdrReader, nil
-	case models.RestoreModeAuto:
+	default:
 		reader, err = newReader(ctx, params, sa, false, logger)
 
 		switch {
@@ -83,8 +83,6 @@ func NewRestoreReader(
 		}
 
 		return reader, xdrReader, nil
-	default:
-		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.Restore.Mode)
 	}
 }
 
@@ -137,7 +135,6 @@ func newReader(
 		slog.String("input_file", inputFile),
 		slog.String("parent_directory", parentDirectory),
 		slog.String("directory_list", directoryList),
-		slog.Bool("is_xdr", isXdr),
 	)
 
 	switch {

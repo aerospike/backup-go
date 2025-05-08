@@ -252,10 +252,10 @@ func TestSetGenerationBit(t *testing.T) {
 
 func TestSetRecordExistsActionBit(t *testing.T) {
 	t.Parallel()
-	msg := NewPayload([]byte{0, 0, 0, 0, 0})
 
 	t.Run("UpdatePolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetRecordExistsActionBit(aerospike.UPDATE, msg)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3UpdateOnly)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3CreateOrReplace)
@@ -265,6 +265,7 @@ func TestSetRecordExistsActionBit(t *testing.T) {
 
 	t.Run("CreateOnlyPolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetRecordExistsActionBit(aerospike.CREATE_ONLY, msg)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3UpdateOnly)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3CreateOrReplace)
@@ -274,6 +275,7 @@ func TestSetRecordExistsActionBit(t *testing.T) {
 
 	t.Run("ReplacePolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetRecordExistsActionBit(aerospike.REPLACE, msg)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3UpdateOnly)
 		require.Equal(t, byte(MsgInfo3CreateOrReplace), result[info3Pos+LenProtoHeader]&MsgInfo3CreateOrReplace)
@@ -283,6 +285,7 @@ func TestSetRecordExistsActionBit(t *testing.T) {
 
 	t.Run("ReplaceOnlyPolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetRecordExistsActionBit(aerospike.REPLACE_ONLY, msg)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3UpdateOnly)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3CreateOrReplace)
@@ -292,6 +295,7 @@ func TestSetRecordExistsActionBit(t *testing.T) {
 
 	t.Run("UpdateOnlyPolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetRecordExistsActionBit(aerospike.UPDATE_ONLY, msg)
 		require.Equal(t, byte(MsgInfo3UpdateOnly), result[info3Pos+LenProtoHeader]&MsgInfo3UpdateOnly)
 		require.Equal(t, byte(0), result[info3Pos+LenProtoHeader]&MsgInfo3CreateOrReplace)

@@ -210,6 +210,8 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	if params.Backup.ParallelNodes || params.Backup.NodeList != "" {
 		c.ParallelNodes = params.Backup.ParallelNodes
 		c.NodeList = SplitByComma(params.Backup.NodeList)
+		// For node list we can't use parallel mode as we need to change workers number.
+		c.PipelinesMode = pipeline.ModeSingle
 	}
 
 	pf, err := mapPartitionFilter(params.Backup, params.Common)

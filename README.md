@@ -413,12 +413,6 @@ backupCfg.PartitionFilters = []*aerospike.PartitionFilter{
 - [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v8
 - [Mockery](https://github.com/vektra/mockery) for test mocks
 
-## Installation
-
-```bash
-go get github.com/aerospike/backup-go
-```
-
 ## License
 
 Apache License, Version 2.0. See [LICENSE](LICENSE) file for details.

@@ -110,7 +110,7 @@ func (rs *RestoreStats) GetErrorsInDoubt() uint64 {
 
 // SumRestoreStats combines multiple RestoreStats.
 func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
-	result := &RestoreStats{}
+	result := NewRestoreStats()
 
 	for _, stat := range stats {
 		if stat == nil {

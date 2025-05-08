@@ -42,7 +42,7 @@ func NewRestoreReader(
 	logger *slog.Logger,
 ) (reader, xdrReader backup.StreamingReader, err error) {
 	switch params.Restore.Mode {
-	case models.RestoreModeASB:
+	case models.RestoreModeASB, models.RestoreModeAuto:
 		reader, err = newReader(ctx, params, sa, false, logger)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create asb reader: %w", err)
@@ -56,7 +56,7 @@ func NewRestoreReader(
 		}
 
 		return nil, xdrReader, nil
-	case models.RestoreModeAuto:
+	default:
 		reader, err = newReader(ctx, params, sa, false, logger)
 
 		switch {
@@ -83,8 +83,6 @@ func NewRestoreReader(
 		}
 
 		return reader, xdrReader, nil
-	default:
-		return nil, nil, fmt.Errorf("invalid restore mode: %s", params.Restore.Mode)
 	}
 }
 
@@ -137,12 +135,16 @@ func newReader(
 		slog.String("input_file", inputFile),
 		slog.String("parent_directory", parentDirectory),
 		slog.String("directory_list", directoryList),
-		slog.Bool("is_xdr", isXdr),
 	)
 
 	switch {
 	case params.AwsS3 != nil && params.AwsS3.BucketName != "":
-		logger.Info("initializing AWS storage", slog.String("bucket", params.AwsS3.BucketName))
+		defer logger.Info("initialized AWS storage reader",
+			slog.String("bucket", params.AwsS3.BucketName),
+			slog.String("access_tier", params.AwsS3.AccessTier),
+			slog.Int("chunk_size", params.AwsS3.ChunkSize),
+			slog.String("endpoint", params.AwsS3.Endpoint),
+		)
 
 		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
@@ -150,7 +152,11 @@ func newReader(
 
 		return newS3Reader(ctx, params.AwsS3, opts, logger)
 	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
-		logger.Info("initializing GCP storage", slog.String("bucket", params.GcpStorage.BucketName))
+		defer logger.Info("initialized GCP storage reader",
+			slog.String("bucket", params.GcpStorage.BucketName),
+			slog.Int("chunk_size", params.GcpStorage.ChunkSize),
+			slog.String("endpoint", params.GcpStorage.Endpoint),
+		)
 
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
@@ -158,7 +164,12 @@ func newReader(
 
 		return newGcpReader(ctx, params.GcpStorage, opts)
 	case params.AzureBlob != nil && params.AzureBlob.ContainerName != "":
-		logger.Info("initializing Azure storage", slog.String("container", params.AzureBlob.ContainerName))
+		defer logger.Info("initialized Azure storage reader",
+			slog.String("container", params.AzureBlob.ContainerName),
+			slog.String("access_tier", params.AzureBlob.AccessTier),
+			slog.Int("block_size", params.AzureBlob.BlockSize),
+			slog.String("endpoint", params.AzureBlob.Endpoint),
+		)
 
 		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
@@ -166,7 +177,7 @@ func newReader(
 
 		return newAzureReader(ctx, params.AzureBlob, opts, logger)
 	default:
-		logger.Info("initializing local storage")
+		defer logger.Info("initialized local storage reader")
 		return newLocalReader(ctx, opts)
 	}
 }

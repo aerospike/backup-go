@@ -69,11 +69,16 @@ func newWriter(
 		slog.String("output_file", outputFile),
 		slog.Bool("should_clear_target", shouldClearTarget),
 		slog.Bool("continue_backup", continueBackup),
-		slog.Bool("is_xdr", params.IsXDR()))
+	)
 
 	switch {
 	case params.AwsS3.BucketName != "":
-		logger.Info("initializing AWS storage", slog.String("bucket", params.AwsS3.BucketName))
+		defer logger.Info("initialized AWS storage writer",
+			slog.String("bucket", params.AwsS3.BucketName),
+			slog.String("storage_class", params.AwsS3.StorageClass),
+			slog.Int("chunk_size", params.AwsS3.ChunkSize),
+			slog.String("endpoint", params.AwsS3.Endpoint),
+		)
 
 		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
@@ -81,7 +86,11 @@ func newWriter(
 
 		return newS3Writer(ctx, params.AwsS3, opts)
 	case params.GcpStorage.BucketName != "":
-		logger.Info("initializing GCP storage", slog.String("bucket", params.GcpStorage.BucketName))
+		defer logger.Info("initialized GCP storage writer",
+			slog.String("bucket", params.GcpStorage.BucketName),
+			slog.Int("chunk_size", params.GcpStorage.ChunkSize),
+			slog.String("endpoint", params.GcpStorage.Endpoint),
+		)
 
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
@@ -89,7 +98,12 @@ func newWriter(
 
 		return newGcpWriter(ctx, params.GcpStorage, opts)
 	case params.AzureBlob.ContainerName != "":
-		logger.Info("initializing Azure storage", slog.String("container", params.AzureBlob.ContainerName))
+		defer logger.Info("initialized Azure storage writer",
+			slog.String("container", params.AzureBlob.ContainerName),
+			slog.String("access_tier", params.AzureBlob.AccessTier),
+			slog.Int("block_size", params.AzureBlob.BlockSize),
+			slog.String("endpoint", params.AzureBlob.Endpoint),
+		)
 
 		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
@@ -97,7 +111,7 @@ func newWriter(
 
 		return newAzureWriter(ctx, params.AzureBlob, opts)
 	default:
-		logger.Info("initializing local storage")
+		defer logger.Info("initialized local storage writer")
 		return newLocalWriter(ctx, opts)
 	}
 }

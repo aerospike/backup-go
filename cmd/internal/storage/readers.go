@@ -142,7 +142,7 @@ func newReader(
 
 	switch {
 	case params.AwsS3 != nil && params.AwsS3.BucketName != "":
-		logger.Info("initializing AWS storage", slog.String("bucket", params.AwsS3.BucketName))
+		defer logger.Info("initialized AWS storage", slog.String("bucket", params.AwsS3.BucketName))
 
 		if err := params.AwsS3.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load AWS secrets: %w", err)
@@ -150,7 +150,7 @@ func newReader(
 
 		return newS3Reader(ctx, params.AwsS3, opts, logger)
 	case params.GcpStorage != nil && params.GcpStorage.BucketName != "":
-		logger.Info("initializing GCP storage", slog.String("bucket", params.GcpStorage.BucketName))
+		defer logger.Info("initialized GCP storage", slog.String("bucket", params.GcpStorage.BucketName))
 
 		if err := params.GcpStorage.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load GCP secrets: %w", err)
@@ -158,7 +158,7 @@ func newReader(
 
 		return newGcpReader(ctx, params.GcpStorage, opts)
 	case params.AzureBlob != nil && params.AzureBlob.ContainerName != "":
-		logger.Info("initializing Azure storage", slog.String("container", params.AzureBlob.ContainerName))
+		defer logger.Info("initialized Azure storage", slog.String("container", params.AzureBlob.ContainerName))
 
 		if err := params.AzureBlob.LoadSecrets(sa); err != nil {
 			return nil, fmt.Errorf("failed to load azure secrets: %w", err)
@@ -166,7 +166,7 @@ func newReader(
 
 		return newAzureReader(ctx, params.AzureBlob, opts, logger)
 	default:
-		logger.Info("initializing local storage")
+		defer logger.Info("initialized local storage")
 		return newLocalReader(ctx, opts)
 	}
 }

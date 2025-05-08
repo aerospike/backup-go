@@ -103,7 +103,7 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
 		}
 
-		logger.Info("initializing scan backup config",
+		logger.Info("initialized scan backup config",
 			slog.String("namespace", backupConfig.Namespace),
 			slog.String("encryption", params.Encryption.Mode),
 			slog.Int("compression", params.Compression.Level),
@@ -137,7 +137,7 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 		backupConfig.NoRecords = true
 		backupConfig.Namespace = backupXDRConfig.Namespace
 
-		logger.Info("initializing xdr backup config",
+		logger.Info("initialized xdr backup config",
 			slog.String("namespace", backupXDRConfig.Namespace),
 			slog.String("encryption", params.Encryption.Mode),
 			slog.Int("compression", params.Compression.Level),

@@ -58,14 +58,11 @@ func NewService(
 	}
 
 	// Initializations.
-	logger.Info("initializing restore config",
-		slog.String("namespace_source", params.Common.Namespace),
-		slog.String("mode", params.Restore.Mode),
-	)
+	logger.Info("initializing restore config")
 
 	restoreConfig := config.NewRestoreConfig(params)
 
-	logger.Info("initializing restore config",
+	logger.Info("initialized restore config",
 		slog.Any("namespace_source", *restoreConfig.Namespace.Source),
 		slog.Any("namespace_destination", *restoreConfig.Namespace.Destination),
 		slog.String("encryption", params.Encryption.Mode),
@@ -225,8 +222,8 @@ func (r *Service) Run(ctx context.Context) error {
 					return
 				}
 
-				go logging.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASBX, r.logger)
-				go logging.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
+				go logging.PrintFilesNumber(ctx, r.xdrReader.GetNumber, models.RestoreModeASBX, r.logger)
+				go logging.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.xdrReader.GetSize, r.logger)
 
 				if err = hXdr.Wait(ctx); err != nil {
 					errChan <- fmt.Errorf("failed to asbx restore: %w", err)

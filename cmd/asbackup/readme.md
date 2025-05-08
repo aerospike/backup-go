@@ -1,5 +1,37 @@
-# ASBackup
-Aerospike Backup CLI tool.
+# Aerospike backup (asbackup)
+Aerospike Backup CLI tool. This page describes the features and benefits of the Aerospike backup tool, `asbackup`.
+
+## Overview
+`asbackup` backs up data from an Aerospike database according to a user-defined scope of specific namespaces, sets, or both. The scope supports further refinement with partition or time-based filters.
+
+After you define the scope, `asbackup` scans the database and fetches the records that match the specified criteria. `asbackup` captures only the essential data needed for recovery and ignores non-critical system or secondary data.
+
+As `asbackup` identifies records for backup, it serializes the data into a predefined format and writes it to a backup file or directory. Serialization converts the in-memory representation of records into a stable format that can be safely stored on disk.
+
+`asbackup` supports backing up locally (see [Get started](https://aerospike.com/docs/database/tools/asbackup/use#get-started)), to an Amazon S3 bucket, to an Azure container or GCP bucket.
+
+## `asbackup` limitations
+`asbackup` has the following limitations:
+
+- `asbackup` requires read privileges or higher. See [Configuring Access Control in EE and FE](https://aerospike.com/docs/database/manage/security/rbac/#privileges) for more information.
+- Direct backups are supported only to S3, but you can use other services for storing the backup files after creating them locally.
+- When running in directory mode, each worker thread creates its own backup file. If the backup file is less than --file-limit MB in size, the backup file is placed on a queue to be reused by another backup job.
+- You can control the size of backup files created by `asbackup` with the --file-limit option. After a backup file reaches the predefined size, `asbackup` creates another file. `asbackup` does not have an upper limit for the size of a backup file.
+- zstd is the only compression algorithm available with `asbackup`.
+
+## Default backup content
+`asbackup` backs up the following data by default:
+
+- Keys
+  - Key metadata: digest, TTL, generation count, and key
+  - Regular bins: string, integer, boolean, and binary
+  - Collection data type (CDT) bins: list and map
+  - GeoJSON data type bins
+  - HyperLogLog data type bins
+- Secondary index definitions
+- User-Defined Function (UDF) modules
+
+---
 
 ## Build
 ### Dev

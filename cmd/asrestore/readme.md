@@ -1,5 +1,28 @@
-# ASRestore
-Aerospike Restore CLI tool.
+# Aerospike restore (asrestore)
+Aerospike Restore CLI tool. This page describes the features and benefits of the Aerospike restore tool, `asrestore`.
+
+## Overview
+`asrestore` restores backups created with `asbackup`. With the `asrestore` tool, you can restore to specific bins or sets, secure connections using username/password credentials or TLS (or both), and use configuration files to automate restore operations.
+
+## Considerations for Aerospike restore
+When using `asrestore`, be aware of the following considerations:
+
+- You can use `asrestore` to restore backups from Aerospike server version 3.0 or later. To restore a backup from earlier releases, contact Aerospike Support.
+- The TTL of restored keys is preserved, but the last-update-time and generation count are reset to the current time.
+- `asrestore` creates records from the backup. If records exist in the namespace on the cluster, you can configure a write policy to determine whether the backup records or the records in the namespace take precedence when using `asrestore`.
+- If a restore transaction fails, you can configure timeout options for retries.
+- Restore is cluster-configuration-agnostic. A backup can be restored to a cluster of any size and configuration. Restored data is evenly distributed among cluster nodes, regardless of cluster configuration.
+
+## Privileges required for `asrestore`
+The privileges required to run `asrestore` depend on the type of objects in the namespace.
+
+- If the namespace does not contain [user-defined functions](https://aerospike.com/docs/database/learn/architecture/udf) or [secondary indexes](https://aerospike.com/docs/database/learn/architecture/data-storage/secondary-index), `read-write` is the minimum necessary privilege.
+- If the namespace contains [user-defined functions](https://aerospike.com/docs/database/learn/architecture/udf), `udf-admin` is the minimum necessary privilege to restore UDFs for Database 6.0 or newer. Otherwise, use `data-admin`.
+- If the namespace contains [secondary indexes](https://aerospike.com/docs/database/learn/architecture/data-storage/secondary-index), `sindex-admin` is the minimum necessary privilege to restore secondary indexes for Database 6.0 or newer. Otherwise, use `data-admin`.
+
+For more information about Aerospike’s role-based access control system, see [Configuring Access Control in EE and FE](https://aerospike.com/docs/database/manage/security/rbac/#privileges).
+
+---
 
 ## Build
 ### Dev
@@ -277,7 +300,5 @@ Any Azure parameter can be retrieved from Secret Agent.
 
 --s3-connect-timeout        The AWS S3 client's connection timeout in milliseconds.
                             This is equivalent to cli-connect-timeout in the AWS CLI,
-                            or connectTimeoutMS in the aws-sdk-cpp client configuration.
-                           
---s3-min-part-size int
+                            or connectTimeoutMS in the aws-sdk-cpp client configuration.                  
 ```

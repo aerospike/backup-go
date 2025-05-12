@@ -41,7 +41,7 @@ func SumMetrics(metrics ...*Metrics) *Metrics {
 		return nil
 	}
 
-	result := &Metrics{}
+	result := NewMetrics(0, 0, 0, 0)
 
 	for _, one := range metrics {
 		if one == nil {

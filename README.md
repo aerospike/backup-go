@@ -56,60 +56,60 @@ which is subsequently stored by a supported writer.
 package main
 
 import (
-    "context"
-    "log"
+  "context"
+  "log"
 
-    "github.com/aerospike/aerospike-client-go/v8"
-    "github.com/aerospike/backup-go"
-    "github.com/aerospike/backup-go/io/storage/local"
-    ioStorage "github.com/aerospike/backup-go/io/storage"
+  "github.com/aerospike/aerospike-client-go/v8"
+  "github.com/aerospike/backup-go"
+  ioStorage "github.com/aerospike/backup-go/io/storage"
+  "github.com/aerospike/backup-go/io/storage/local"
 )
 
 func main() {
-    // Create Aerospike client.
-    aerospikeClient, aerr := aerospike.NewClient("127.0.0.1", 3000)
-    if aerr != nil {
-        log.Fatal(aerr)
-    }
+  // Create Aerospike client.
+  aerospikeClient, aerr := aerospike.NewClient("127.0.0.1", 3000)
+  if aerr != nil {
+    log.Fatal(aerr)
+  }
 
-    // Create backup client.
-    backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
-    if err != nil {
-	    log.Fatal(err)
-    }
+  // Create backup client.
+  backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
+  if err != nil {
+    log.Fatal(err)
+  }
 
-    ctx := context.Background()
+  ctx := context.Background()
 
-    // Configure writers for backup.
-    // For backup to single file use local.WithFile(fileName).
-    writers, err := local.NewWriter(
-        ctx,
-        ioStorage.WithRemoveFiles(),
-        ioStorage.WithDir("backups_folder"),
-    )
-    if err != nil {
-	    log.Fatal(err)
-    }
+  // Configure writers for backup.
+  // For backup to single file use local.WithFile(fileName).
+  writers, err := local.NewWriter(
+    ctx,
+    ioStorage.WithRemoveFiles(),
+    ioStorage.WithDir("backups_folder"),
+  )
+  if err != nil {
+    log.Fatal(err)
+  }
 
-    // Configure backup.
-    backupCfg := backup.NewDefaultBackupConfig()
-    backupCfg.Namespace = "test"
-    backupCfg.ParallelRead = 10
-    backupCfg.ParallelWrite = 10
+  // Configure backup.
+  backupCfg := backup.NewDefaultBackupConfig()
+  backupCfg.Namespace = "test"
+  backupCfg.ParallelRead = 10
+  backupCfg.ParallelWrite = 10
 
-    // Start backup.
-    backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
-    if err != nil {
-	    log.Fatal(err)
-    }
+  // Start backup.
+  backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
+  if err != nil {
+    log.Fatal(err)
+  }
 
-    // Wait for completion. 
-    // Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
-    // You can use different context here, and if it is canceled
-    // backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
-    if err = backupHandler.Wait(ctx); err != nil {
-        log.Printf("Backup failed: %v", err)
-    }
+  // Wait for completion. 
+  // Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
+  // You can use different context here, and if it is canceled
+  // backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
+  if err = backupHandler.Wait(ctx); err != nil {
+    log.Printf("Backup failed: %v", err)
+  }
 }
 ```
 
@@ -545,12 +545,6 @@ backupCfg.PartitionFilters = []*aerospike.PartitionFilter{
 - Go v1.23.0+
 - [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v8
 - [Mockery](https://github.com/vektra/mockery) for test mocks
-
-## Installation
-
-```bash
-go get github.com/aerospike/backup-go
-```
 
 ## License
 

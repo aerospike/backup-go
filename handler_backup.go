@@ -175,7 +175,6 @@ func (bh *BackupHandler) run() {
 
 	go doWork(bh.errors, bh.logger, func() error {
 		defer bh.wg.Done()
-		defer bh.cancel()
 
 		return bh.backupSync(bh.ctx)
 	})
@@ -505,6 +504,8 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 func (bh *BackupHandler) Wait(ctx context.Context) error {
 	defer func() {
 		bh.stats.Stop()
+		bh.rpsCollector.Stop()
+		bh.kbpsCollector.Stop()
 	}()
 
 	select {

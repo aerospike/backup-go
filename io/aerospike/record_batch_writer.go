@@ -237,7 +237,6 @@ func mapWriteToBatchPolicy(w *a.WritePolicy) *a.BatchPolicy {
 	bp := a.NewBatchPolicy()
 	bp.SocketTimeout = w.SocketTimeout
 	bp.TotalTimeout = w.TotalTimeout
-	bp.MaxRetries = w.MaxRetries
 
 	return bp
 }

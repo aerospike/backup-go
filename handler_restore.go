@@ -147,6 +147,8 @@ func (rh *RestoreHandler[T]) run() {
 	rh.stats.Start()
 
 	go doWork(rh.errors, rh.logger, func() error {
+		defer rh.ctx.Done()
+
 		return rh.restore(rh.ctx)
 	})
 }

@@ -176,6 +176,7 @@ func (bh *BackupHandler) run() {
 	go doWork(bh.errors, bh.logger, func() error {
 		defer bh.wg.Done()
 		defer bh.ctx.Done()
+
 		return bh.backupSync(bh.ctx)
 	})
 }

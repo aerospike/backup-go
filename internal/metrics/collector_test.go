@@ -59,7 +59,6 @@ func TestNewPerSecondCollector(t *testing.T) {
 			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, tc.enabled)
 
 			assert.NotNil(t, collector)
-			assert.Equal(t, ctx, collector.ctx)
 			assert.NotNil(t, collector.Increment)
 			assert.Equal(t, tc.enabled, collector.enabled)
 

@@ -147,7 +147,7 @@ func (rh *RestoreHandler[T]) run() {
 	rh.stats.Start()
 
 	go doWork(rh.errors, rh.logger, func() error {
-		defer rh.ctx.Done()
+		defer rh.cancel()
 
 		return rh.restore(rh.ctx)
 	})

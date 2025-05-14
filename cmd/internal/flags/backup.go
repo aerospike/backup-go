@@ -91,7 +91,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"",
 		"<addr 1>:<port 1>[,<addr 2>:<port 2>[,...]]\n"+
 			"<node name 1>[,<node name 2>[,...]]\n"+
-			"To get the correct node address use 'service:' info command, to get node name use 'node:' info command.\n"+
+			"To get the correct node address, use 'service-tls-std' if a database configured to use TLS\n"+
+			"and 'service-clear-std' info command if no TLS is configured.\n"+
+			"To get the node name, use the 'node:' info command.\n"+
 			"Back up the given cluster nodes only.\n"+
 			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
 			"This argument is mutually exclusive with --partition-list and --after-digest arguments.\n"+

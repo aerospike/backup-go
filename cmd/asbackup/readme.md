@@ -152,8 +152,11 @@ Backup Flags:
                                       If this flag is set to true, asbackup launches parallel workers for nodes.
                                       The number of parallel workers is set by the --parallel flag.
                                       This option is mutually exclusive with --continue and --estimate.
-  -l, --node-list string              <IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]
-                                      <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]
+  -l, --node-list string              <addr 1>:<port 1>[,<addr 2>:<port 2>[,...]]
+                                      <node name 1>[,<node name 2>[,...]]
+                                      To get the correct node address, use 'service-tls-std' if a database configured to use TLS
+                                      and 'service-clear-std' info command if no TLS is configured.
+                                      To get the node name, use the 'node:' info command.
                                       Back up the given cluster nodes only.
                                       The job is parallelized by number of nodes unless --parallel is set less than nodes number.
                                       This argument is mutually exclusive with --partition-list and --after-digest arguments.
@@ -193,10 +196,10 @@ Backup Flags:
       --scan-page-size int            Number of records will be read on one iteration for continuation backup.
                                       Affects size if overlap on resuming backup after an error.
                                       Used only with --state-file-dst or --continue. (default 10000)
-      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.(default 1000)
+      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.This parameter is applied to stop xdr and unblock MRT writes requests. (default 1000)
       --info-retry-multiplier float   Increases the delay between subsequent retry attempts.
                                       The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber) (default 1)
-      --info-max-retries uint         How many times to retry to send info commands before failing. (default 3)
+      --info-max-retries uint         How many times to retry to send info commands before failing. This parameter is applied to stop xdr and unblock MRT writes requests. (default 3)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.
@@ -251,7 +254,7 @@ Any AWS parameter can be retrieved from Secret Agent.
                                       EXPRESS_ONEZONE.
       --s3-chunk-size int             Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
                                       the server in a single request. Objects smaller than the size will be sent in a single request,
-                                      while larger objects will be split over multiple requests.  (default 5242880)
+                                      while larger objects will be split over multiple requests. (default 5242880)
 
 GCP Flags:
 For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
@@ -263,7 +266,7 @@ Any GCP parameter can be retrieved from Secret Agent.
       --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
       --gcp-chunk-size int             Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
                                        the server in a single request. Objects smaller than the size will be sent in a single request,
-                                       while larger objects will be split over multiple requests.  (default 5242880)
+                                       while larger objects will be split over multiple requests. (default 5242880)
 
 Azure Flags:
 For Azure storage container name is mandatory, and is set with --azure-storage-container-name flag.

@@ -1945,7 +1945,7 @@ func TestInfoCommander_getRackNodes(t *testing.T) {
 	fmt.Println(res)
 }
 
-func TestInfoCommander_getServiceClearStd(t *testing.T) {
+func TestInfoCommander_getService(t *testing.T) {
 	t.Parallel()
 
 	asPolicy := a.NewClientPolicy()
@@ -1958,11 +1958,11 @@ func TestInfoCommander_getServiceClearStd(t *testing.T) {
 
 	nodes := ic.GetNodesNames()
 
-	_, err := ic.getServiceClearStd(nodes[0])
+	_, err := ic.getService(nodes[0], cmdServiceTLSStd)
 	require.NoError(t, err)
 }
 
-func TestInfoCommander_getServiceTlsStd(t *testing.T) {
+func TestInfoCommander_GetService(t *testing.T) {
 	t.Parallel()
 
 	asPolicy := a.NewClientPolicy()
@@ -1975,6 +1975,6 @@ func TestInfoCommander_getServiceTlsStd(t *testing.T) {
 
 	nodes := ic.GetNodesNames()
 
-	_, err := ic.getServiceTLSStd(nodes[0])
+	_, err := ic.GetService(nodes[0])
 	require.NoError(t, err)
 }

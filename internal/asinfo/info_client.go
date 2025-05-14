@@ -693,7 +693,7 @@ func (ic *InfoClient) GetService(node string) (string, error) {
 	)
 	// First request TLS name.
 	err = executeWithRetry(ic.retryPolicy, func() error {
-		result, err = ic.getServiceTLSStd(node)
+		result, err = ic.getService(node, cmdServiceTLSStd)
 		if err != nil {
 			return err
 		}
@@ -703,7 +703,7 @@ func (ic *InfoClient) GetService(node string) (string, error) {
 	// If result is empty, then request plain.
 	if result == "" {
 		err = executeWithRetry(ic.retryPolicy, func() error {
-			result, err = ic.getServiceClearStd(node)
+			result, err = ic.getService(node, cmdServiceClearStd)
 			if err != nil {
 				return err
 			}
@@ -715,29 +715,15 @@ func (ic *InfoClient) GetService(node string) (string, error) {
 	return result, err
 }
 
-func (ic *InfoClient) getServiceClearStd(node string) (string, error) {
-	resp, err := ic.requestByNode(node, cmdServiceClearStd)
+func (ic *InfoClient) getService(node, cmd string) (string, error) {
+	resp, err := ic.requestByNode(node, cmd)
 	if err != nil {
-		return "", fmt.Errorf("failed get service info for node %s: %w", node, err)
+		return "", fmt.Errorf("failed get %s info for node %s: %w", cmd, node, err)
 	}
 
-	result, err := parseResultResponse(cmdServiceClearStd, resp)
+	result, err := parseResultResponse(cmd, resp)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse service info response: %w", err)
-	}
-
-	return result, nil
-}
-
-func (ic *InfoClient) getServiceTLSStd(node string) (string, error) {
-	resp, err := ic.requestByNode(node, cmdServiceTLSStd)
-	if err != nil {
-		return "", fmt.Errorf("failed get service info for node %s: %w", node, err)
-	}
-
-	result, err := parseResultResponse(cmdServiceTLSStd, resp)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse service info response: %w", err)
+		return "", fmt.Errorf("failed to parse %s info response: %w", cmd, err)
 	}
 
 	return result, nil

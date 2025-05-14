@@ -64,7 +64,9 @@ type ConfigBackup struct {
 	Namespace string
 	// NodeList contains a list of nodes to back up.
 	// <addr 1>:<port 1>[,<addr 2>:<port 2>[,...]] or <node name 1>[,<node name 2>[,...]]
-	// To get the correct node address use "service:" info command, to get node name use "node:" info command.
+	// To get the correct node address, use 'service-tls-std' if a database configured to use TLS
+	// and 'service-clear-std' info command if no TLS is configured.
+	// To get the node name, use the 'node:' info command.
 	// Backup the given cluster nodes only.
 	// If it is set, ParallelNodes automatically set to true.
 	// This argument is mutually exclusive to partition-list/AfterDigest arguments.

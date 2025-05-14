@@ -91,7 +91,9 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"",
 		"<addr 1>:<port 1>[,<addr 2>:<port 2>[,...]]\n"+
 			"<node name 1>[,<node name 2>[,...]]\n"+
-			"To get the correct node address use 'service:' info command, to get node name use 'node:' info command.\n"+
+			"To get the correct node address, use 'service-tls-std' if a database configured to use TLS\n"+
+			"and 'service-clear-std' info command if no TLS is configured.\n"+
+			"To get the node name, use the 'node:' info command.\n"+
 			"Back up the given cluster nodes only.\n"+
 			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
 			"This argument is mutually exclusive with --partition-list and --after-digest arguments.\n"+
@@ -153,15 +155,13 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"Affects size if overlap on resuming backup after an error.\n"+
 			"Used only with --state-file-dst or --continue.")
 	flagSet.Int64Var(&f.InfoRetryIntervalMilliseconds, "info-retry-timeout", 1000,
-		"Set the initial timeout for a retry in milliseconds when info commands are sent."+
-			"This parameter is applied to stop xdr and unblock MRT writes requests.")
+		"Set the initial timeout for a retry in milliseconds when info commands are sent.")
 	flagSet.Float64Var(&f.InfoRetriesMultiplier, "info-retry-multiplier",
 		1,
 		"Increases the delay between subsequent retry attempts.\n"+
 			"The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.InfoMaxRetries, "info-max-retries", 3,
-		"How many times to retry to send info commands before failing. "+
-			"This parameter is applied to stop xdr and unblock MRT writes requests.")
+		"How many times to retry to send info commands before failing. ")
 
 	return flagSet
 }

@@ -146,6 +146,7 @@ func (bh *HandlerBackupXDR) run() {
 
 	go doWork(bh.errors, bh.logger, func() error {
 		defer bh.wg.Done()
+
 		return bh.backup(bh.ctx)
 	})
 }
@@ -201,6 +202,8 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 	defer func() {
 		bh.stats.Stop()
+		bh.rpsCollector.Stop()
+		bh.kbpsCollector.Stop()
 	}()
 
 	select {

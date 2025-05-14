@@ -230,6 +230,9 @@ func (bh *backupRecordsHandler) getNodes() ([]*a.Node, error) {
 	}
 
 	nodes := bh.aerospikeClient.GetNodes()
+
+	bh.logger.Info("got nodes from cluster", slog.Any("nodes", nodes))
+
 	// If bh.config.NodeList is not empty we filter nodes.
 	nodes, err := bh.filterNodes(nodesToFilter, nodes)
 	if err != nil {
@@ -263,7 +266,11 @@ func (bh *backupRecordsHandler) filterNodes(nodesList []string, nodes []*a.Node)
 			return nil, fmt.Errorf("failed to get node %s service: %w", nodes[i].GetName(), err)
 		}
 
-		bh.logger.Debug("node %s service: %s", nodes[i].GetName(), nodeServiceAddress)
+		bh.logger.Info("got service for node",
+			slog.String("node", nodes[i].GetName()),
+			slog.String("host", nodes[i].GetHost().String()),
+			slog.String("service", nodeServiceAddress),
+		)
 
 		_, ok := nodesMap[nodeServiceAddress]
 		if ok {

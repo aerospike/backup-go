@@ -227,6 +227,8 @@ func (rh *RestoreHandler[T]) GetStats() *models.RestoreStats {
 func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	defer func() {
 		rh.stats.Stop()
+		rh.rpsCollector.Stop()
+		rh.kbpsCollector.Stop()
 	}()
 
 	select {

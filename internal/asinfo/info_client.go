@@ -48,7 +48,8 @@ const (
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 	cmdRack                = "racks"
 	cmdReplicaMaster       = "replicas-master"
-	cmdService             = "service:"
+	cmdServiceClearStd     = "service-clear-std"
+	cmdServiceTLSStd       = "service-tls-std"
 
 	cmdRespErrPrefix = "ERROR"
 )
@@ -690,28 +691,39 @@ func (ic *InfoClient) GetService(node string) (string, error) {
 		result string
 		err    error
 	)
-
+	// First request TLS name.
 	err = executeWithRetry(ic.retryPolicy, func() error {
-		result, err = ic.getService(node)
+		result, err = ic.getService(node, cmdServiceTLSStd)
 		if err != nil {
 			return err
 		}
 
 		return err
 	})
+	// If result is empty, then request plain.
+	if result == "" {
+		err = executeWithRetry(ic.retryPolicy, func() error {
+			result, err = ic.getService(node, cmdServiceClearStd)
+			if err != nil {
+				return err
+			}
+
+			return err
+		})
+	}
 
 	return result, err
 }
 
-func (ic *InfoClient) getService(node string) (string, error) {
-	resp, err := ic.requestByNode(node, cmdService)
+func (ic *InfoClient) getService(node, cmd string) (string, error) {
+	resp, err := ic.requestByNode(node, cmd)
 	if err != nil {
-		return "", fmt.Errorf("failed get service info for node %s: %w", node, err)
+		return "", fmt.Errorf("failed get %s info for node %s: %w", cmd, node, err)
 	}
 
-	result, err := parseResultResponse(cmdService, resp)
+	result, err := parseResultResponse(cmd, resp)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse service info response: %w", err)
+		return "", fmt.Errorf("failed to parse %s info response: %w", cmd, err)
 	}
 
 	return result, nil

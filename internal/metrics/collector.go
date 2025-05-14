@@ -28,7 +28,8 @@ const (
 
 // Collector tracks and logs metrics such as request rate and counts within a context-managed environment.
 type Collector struct {
-	ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	// enabled indicates whether the Collector is active and metrics will be tracked and reported.
 	enabled bool
@@ -53,8 +54,10 @@ type Collector struct {
 // NewCollector initializes a new Collector with the provided context and logger,
 // Enabled metrics will be reported to logger debug level.
 func NewCollector(ctx context.Context, logger *slog.Logger, name, message string, enabled bool) *Collector {
+	ctx, cancel := context.WithCancel(ctx)
 	mc := &Collector{
 		ctx:       ctx,
+		cancel:    cancel,
 		enabled:   enabled,
 		name:      name,
 		message:   message,
@@ -116,4 +119,9 @@ func (mc *Collector) GetLastResult() uint64 {
 	}
 
 	return mc.lastResult.Load()
+}
+
+// Stop stops collecting metrics and closes the context of the Collector.
+func (mc *Collector) Stop() {
+	mc.cancel()
 }

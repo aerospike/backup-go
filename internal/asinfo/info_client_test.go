@@ -1958,6 +1958,23 @@ func TestInfoCommander_getService(t *testing.T) {
 
 	nodes := ic.GetNodesNames()
 
-	_, err := ic.getService(nodes[0])
+	_, err := ic.getService(nodes[0], cmdServiceTLSStd)
+	require.NoError(t, err)
+}
+
+func TestInfoCommander_GetService(t *testing.T) {
+	t.Parallel()
+
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	require.NoError(t, aerr)
+
+	ic := NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+	nodes := ic.GetNodesNames()
+
+	_, err := ic.GetService(nodes[0])
 	require.NoError(t, err)
 }

@@ -272,10 +272,6 @@ func (bh *backupRecordsHandler) filterNodes(nodesList []string, nodes []*a.Node)
 			slog.String("service", nodeServiceAddress),
 		)
 
-		fmt.Println("got service for node")
-		fmt.Println(nodes[i].GetName())
-		fmt.Println(nodeServiceAddress)
-
 		_, ok := nodesMap[nodeServiceAddress]
 		if ok {
 			filteredNodes = append(filteredNodes, nodes[i])

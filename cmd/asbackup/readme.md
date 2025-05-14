@@ -196,10 +196,10 @@ Backup Flags:
       --scan-page-size int            Number of records will be read on one iteration for continuation backup.
                                       Affects size if overlap on resuming backup after an error.
                                       Used only with --state-file-dst or --continue. (default 10000)
-      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent.This parameter is applied to stop xdr and unblock MRT writes requests. (default 1000)
+      --info-retry-timeout int        Set the initial timeout for a retry in milliseconds when info commands are sent. (default 1000)
       --info-retry-multiplier float   Increases the delay between subsequent retry attempts.
                                       The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber) (default 1)
-      --info-max-retries uint         How many times to retry to send info commands before failing. This parameter is applied to stop xdr and unblock MRT writes requests. (default 3)
+      --info-max-retries uint         How many times to retry to send info commands before failing.  (default 3)
 
 Compression Flags:
   -z, --compress string         Enables compressing of backup files using the specified compression algorithm.

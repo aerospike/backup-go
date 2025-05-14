@@ -155,15 +155,13 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"Affects size if overlap on resuming backup after an error.\n"+
 			"Used only with --state-file-dst or --continue.")
 	flagSet.Int64Var(&f.InfoRetryIntervalMilliseconds, "info-retry-timeout", 1000,
-		"Set the initial timeout for a retry in milliseconds when info commands are sent."+
-			"This parameter is applied to stop xdr and unblock MRT writes requests.")
+		"Set the initial timeout for a retry in milliseconds when info commands are sent.")
 	flagSet.Float64Var(&f.InfoRetriesMultiplier, "info-retry-multiplier",
 		1,
 		"Increases the delay between subsequent retry attempts.\n"+
 			"The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber)")
 	flagSet.UintVar(&f.InfoMaxRetries, "info-max-retries", 3,
-		"How many times to retry to send info commands before failing. "+
-			"This parameter is applied to stop xdr and unblock MRT writes requests.")
+		"How many times to retry to send info commands before failing. ")
 
 	return flagSet
 }

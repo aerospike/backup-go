@@ -104,7 +104,10 @@ func (mc *Collector) report() {
 			}
 
 			mc.lastResult.Store(uint64(result))
-			mc.logger.Debug(mc.message, slog.Float64(mc.name, result))
+
+			// TODO: make this logging less noisy.
+			// mc.logger.Debug(mc.message, slog.Float64(mc.name, result))
+
 			mc.lastTime = t
 		case <-mc.ctx.Done():
 			return

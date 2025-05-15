@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"testing"
@@ -25,7 +26,6 @@ import (
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 )
 
 const testASLoginPassword = "admin"

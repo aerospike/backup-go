@@ -3,8 +3,6 @@ version: 2
 before:
   hooks:
     - go mod tidy
-    - go install github.com/vektra/mockery/v2@v2.45.0
-    - mockery --config=.mockery.yaml
 
 builds:
   - id: "asbackup"

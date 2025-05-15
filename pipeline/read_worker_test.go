@@ -22,20 +22,12 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/pipeline/mocks"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type readersTestSuite struct {
-	suite.Suite
-}
-
-func TestReaders(t *testing.T) {
-	suite.Run(t, new(readersTestSuite))
-}
-
-func (suite *readersTestSuite) TestReadWorker() {
-	suite.T().Parallel()
-	mockReader := mocks.NewMockdataReader[string](suite.T())
+func TestReadWorker(t *testing.T) {
+	t.Parallel()
+	mockReader := mocks.NewMockdataReader[string](t)
 
 	readCalls := 0
 	mockReader.EXPECT().Read().RunAndReturn(func() (string, error) {
@@ -48,31 +40,31 @@ func (suite *readersTestSuite) TestReadWorker() {
 	mockReader.EXPECT().Close()
 
 	worker := NewReadWorker[string](mockReader)
-	suite.NotNil(worker)
+	require.NotNil(t, worker)
 
 	send := make(chan string, 3)
 	worker.SetSendChan(send)
 
 	ctx := context.Background()
 	err := worker.Run(ctx)
-	suite.Nil(err)
+	require.Nil(t, err)
 	close(send)
 
-	suite.Equal(3, len(send))
+	require.Equal(t, 3, len(send))
 
 	for v := range send {
-		suite.Equal("hi", v)
+		require.Equal(t, "hi", v)
 	}
 }
 
-func (suite *readersTestSuite) TestReadWorkerClose() {
-	suite.T().Parallel()
-	mockReader := mocks.NewMockdataReader[string](suite.T())
+func TestReadWorkerClose(t *testing.T) {
+	t.Parallel()
+	mockReader := mocks.NewMockdataReader[string](t)
 	mockReader.EXPECT().Read().Return("hi", nil)
 	mockReader.EXPECT().Close()
 
 	worker := NewReadWorker[string](mockReader)
-	suite.NotNil(worker)
+	require.NotNil(t, worker)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -81,7 +73,7 @@ func (suite *readersTestSuite) TestReadWorkerClose() {
 	go func() {
 		defer wg.Done()
 		err := worker.Run(ctx)
-		suite.NotNil(err)
+		require.NotNil(t, err)
 	}()
 
 	// give the worker some time to start

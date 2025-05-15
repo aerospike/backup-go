@@ -23,7 +23,7 @@ clean: mocks-clean
 # Install mockery for generating test mocks.
 .PHONY: mockery-install
 mockery-install:
-	go install github.com/vektra/mockery/v2@v2.45.0
+	go install github.com/vektra/mockery/v3@v3.2.5
 
 # Iterate over project directory and generate mocks in packages where they must be.
 # FYI: --recursively not working, because then mockery creates mock in root dirs, not putting them to /mocks folder.

@@ -1,42 +1,42 @@
-with-expecter: True
+all: true
 filename: "{{.InterfaceName}}_mock.go"
-all: True
-exported: True
-disable-func-mocks: True
+structname: "Mock{{.InterfaceName}}"
+formatter: goimports
+template: testify
 packages:
-  github.com/aerospike/backup-go/io/encoding/asb:
-    config:
-      dir: ./io/encoding/asb/mocks
-      outpkg: mocks
-  github.com/aerospike/backup-go/internal/asinfo:
-    config:
-      dir: ./internal/asinfo/mocks
-      outpkg: mocks
-  github.com/aerospike/backup-go/io/aerospike:
-    config:
-      dir: ./io/aerospike/mocks
-      outpkg: mocks
-  github.com/aerospike/backup-go/pipeline:
-    config:
-      dir: ./pipeline/mocks
-      outpkg: mocks
   github.com/aerospike/backup-go:
     config:
       dir: mocks
-      outpkg: mocks
-      exclude:
+      exclude-subpkg-regex:
         - ClientOpt
-  github.com/aerospike/backup-go/pkg/secret-agent/connection:
+      pkgname: mocks
+  github.com/aerospike/backup-go/internal/asinfo:
     config:
-      dir: ./pkg/secret-agent/connection/mocks
-      outpkg: mocks
-  github.com/aerospike/backup-go/io/storage:
+      dir: ./internal/asinfo/mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/io/aerospike:
     config:
-      dir: ./io/storage/mocks
-      outpkg: mocks
-      exclude:
-        - Opt
+      dir: ./io/aerospike/mocks
+      pkgname: mocks
   github.com/aerospike/backup-go/io/aerospike/xdr:
     config:
       dir: ./io/aerospike/xdr/mocks
-      outpkg: mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/io/encoding/asb:
+    config:
+      dir: ./io/encoding/asb/mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/io/storage:
+    config:
+      dir: ./io/storage/mocks
+      exclude-subpkg-regex:
+        - Opt
+      pkgname: mocks
+  github.com/aerospike/backup-go/pipeline:
+    config:
+      dir: ./pipeline/mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/pkg/secret-agent/connection:
+    config:
+      dir: ./pkg/secret-agent/connection/mocks
+      pkgname: mocks

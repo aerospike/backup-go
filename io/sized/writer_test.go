@@ -22,12 +22,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
-
-type sizedTestSuite struct {
-	suite.Suite
-}
 
 type mockWriteCloser struct {
 	io.Writer
@@ -40,13 +36,8 @@ func (m *mockWriteCloser) Close() error {
 	return m.closeError
 }
 
-func Test_SizedTestSuite(t *testing.T) {
+func Test_writeCloserSized(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(sizedTestSuite))
-}
-
-func (suite *sizedTestSuite) Test_writeCloserSized() {
-	suite.T().Parallel()
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
@@ -66,41 +57,41 @@ func (suite *sizedTestSuite) Test_writeCloserSized() {
 	}
 
 	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
-	suite.NotNil(wcs)
-	suite.Nil(err)
+	require.NotNil(t, wcs)
+	require.Nil(t, err)
 
 	defer wcs.Close()
 
 	n, err := wcs.Write([]byte("test"))
 	wcs.sizeCounter.Add(4)
-	suite.NoError(err)
-	suite.Equal(4, n)
+	require.NoError(t, err)
+	require.Equal(t, 4, n)
 
-	suite.NotNil(writer1)
-	suite.False(writer1.closed)
-	suite.Equal(writer1, wcs.writer)
+	require.NotNil(t, writer1)
+	require.False(t, writer1.closed)
+	require.Equal(t, writer1, wcs.writer)
 
 	// cross the limit here
 	n, err = wcs.Write([]byte("0123456789"))
 	wcs.sizeCounter.Add(10)
-	suite.NoError(err)
-	suite.Equal(10, n)
+	require.NoError(t, err)
+	require.Equal(t, 10, n)
 
 	n, err = wcs.Write([]byte("test1"))
 	wcs.sizeCounter.Add(5)
-	suite.NoError(err)
-	suite.Equal(5, n)
+	require.NoError(t, err)
+	require.Equal(t, 5, n)
 
-	suite.True(writer1.closed)
-	suite.NotNil(writer2)
-	suite.Equal(writer2, wcs.writer)
+	require.True(t, writer1.closed)
+	require.NotNil(t, writer2)
+	require.Equal(t, writer2, wcs.writer)
 
-	suite.Equal("test0123456789", writer1.Writer.(*bytes.Buffer).String())
-	suite.Equal("test1", writer2.Writer.(*bytes.Buffer).String())
+	require.Equal(t, "test0123456789", writer1.Writer.(*bytes.Buffer).String())
+	require.Equal(t, "test1", writer2.Writer.(*bytes.Buffer).String())
 }
 
-func (suite *sizedTestSuite) Test_writeCloserSized_WithSaveCommandChan() {
-	suite.T().Parallel()
+func Test_writeCloserSized_WithSaveCommandChan(t *testing.T) {
+	t.Parallel()
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
@@ -122,31 +113,31 @@ func (suite *sizedTestSuite) Test_writeCloserSized_WithSaveCommandChan() {
 	}
 
 	wcs, err := NewWriter(context.Background(), 5, saveCommandChan, 10, open)
-	suite.NotNil(wcs)
-	suite.Nil(err)
+	require.NotNil(t, wcs)
+	require.Nil(t, err)
 
 	defer wcs.Close()
 
 	n, err := wcs.Write([]byte("test"))
-	suite.NoError(err)
-	suite.Equal(4, n)
+	require.NoError(t, err)
+	require.Equal(t, 4, n)
 
 	wcs.sizeCounter.Store(11)
 
 	n, err = wcs.Write([]byte("next"))
-	suite.NoError(err)
-	suite.Equal(4, n)
+	require.NoError(t, err)
+	require.Equal(t, 4, n)
 
 	select {
 	case cmd := <-saveCommandChan:
-		suite.Equal(5, cmd)
+		require.Equal(t, 5, cmd)
 	default:
-		suite.Fail("Expected save command to be sent")
+		require.Fail(t, "Expected save command to be sent")
 	}
 }
 
-func (suite *sizedTestSuite) Test_writeCloserSized_CloseError() {
-	suite.T().Parallel()
+func Test_writeCloserSized_CloseError(t *testing.T) {
+	t.Parallel()
 	var writer1 *mockWriteCloser
 
 	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
@@ -162,48 +153,48 @@ func (suite *sizedTestSuite) Test_writeCloserSized_CloseError() {
 	}
 
 	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
-	suite.NotNil(wcs)
-	suite.Nil(err)
+	require.NotNil(t, wcs)
+	require.Nil(t, err)
 
 	n, err := wcs.Write([]byte("test"))
 	wcs.sizeCounter.Add(4)
-	suite.NoError(err)
-	suite.Equal(4, n)
+	require.NoError(t, err)
+	require.Equal(t, 4, n)
 
 	// cross the limit here to trigger close error
 	wcs.sizeCounter.Add(10)
 	_, err = wcs.Write([]byte("test"))
-	suite.Error(err)
-	suite.Contains(err.Error(), "close error")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "close error")
 }
 
-func (suite *sizedTestSuite) Test_writeCloserSized_OpenError() {
-	suite.T().Parallel()
+func Test_writeCloserSized_OpenError(t *testing.T) {
+	t.Parallel()
 
 	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
 		return nil, fmt.Errorf("open error")
 	}
 
 	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
-	suite.NotNil(wcs)
-	suite.Nil(err)
+	require.NotNil(t, wcs)
+	require.Nil(t, err)
 
 	_, err = wcs.Write([]byte("test"))
-	suite.Error(err)
-	suite.Contains(err.Error(), "open error")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "open error")
 }
 
-func (suite *sizedTestSuite) Test_writeCloserSized_CloseNilWriter() {
-	suite.T().Parallel()
+func Test_writeCloserSized_CloseNilWriter(t *testing.T) {
+	t.Parallel()
 
 	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
 		return nil, fmt.Errorf("open error")
 	}
 
 	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
-	suite.NotNil(wcs)
-	suite.Nil(err)
+	require.NotNil(t, wcs)
+	require.Nil(t, err)
 
 	err = wcs.Close()
-	suite.NoError(err)
+	require.NoError(t, err)
 }

@@ -36,7 +36,7 @@ builds:
 
 archives:
   - id: "asbackup"
-    format: tar.gz
+    formats:  [ 'tar.gz' ]
     name_template: >-
       {{ .Binary }}_{{ .Version }}_
       {{- title .Os }}_
@@ -46,13 +46,13 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ 'zip' ]
     files:
       - LICENSE
-    builds:
+    ids:
       - "asbackup"
   - id: "asrestore"
-    format: tar.gz
+    formats:  [ 'tar.gz' ]
     name_template: >-
       {{ .Binary }}_{{ .Version }}_
       {{- title .Os }}_
@@ -62,10 +62,10 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ 'zip' ]
     files:
       - LICENSE
-    builds:
+    ids:
       - "asrestore"
 
 release:

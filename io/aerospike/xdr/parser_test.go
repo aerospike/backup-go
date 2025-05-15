@@ -226,10 +226,10 @@ func TestResetXDRBit(t *testing.T) {
 
 func TestSetGenerationBit(t *testing.T) {
 	t.Parallel()
-	msg := NewPayload([]byte{0, 0, 0, 0, 0})
 
 	t.Run("NonePolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetGenerationBit(aerospike.NONE, msg)
 		require.Equal(t, byte(0), result[info2Pos+LenProtoHeader]&MsgInfo2Generation)
 		require.Equal(t, byte(0), result[info2Pos+LenProtoHeader]&MsgInfo2GenerationGt)
@@ -237,6 +237,7 @@ func TestSetGenerationBit(t *testing.T) {
 
 	t.Run("ExpectGenGtPolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetGenerationBit(aerospike.EXPECT_GEN_GT, msg)
 		require.Equal(t, byte(0), result[info2Pos+LenProtoHeader]&MsgInfo2Generation)
 		require.Equal(t, byte(MsgInfo2GenerationGt), result[info2Pos+LenProtoHeader]&MsgInfo2GenerationGt)
@@ -244,6 +245,7 @@ func TestSetGenerationBit(t *testing.T) {
 
 	t.Run("ExpectGenEqualPolicy", func(t *testing.T) {
 		t.Parallel()
+		msg := NewPayload([]byte{0, 0, 0, 0, 0})
 		result := SetGenerationBit(aerospike.EXPECT_GEN_EQUAL, msg)
 		require.Equal(t, byte(MsgInfo2Generation), result[info2Pos+LenProtoHeader]&MsgInfo2Generation)
 		require.Equal(t, byte(0), result[info2Pos+LenProtoHeader]&MsgInfo2GenerationGt)

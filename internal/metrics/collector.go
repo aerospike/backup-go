@@ -105,7 +105,7 @@ func (mc *Collector) report() {
 
 			mc.lastResult.Store(uint64(result))
 
-			// TODO: rework this printing, not to flood the logs.
+			// TODO: make this logging less noisy.
 			// mc.logger.Debug(mc.message, slog.Float64(mc.name, result))
 
 			mc.lastTime = t

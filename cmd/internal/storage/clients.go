@@ -18,9 +18,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	gcpStorage "cloud.google.com/go/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aerospike/aerospike-client-go/v8"
@@ -28,9 +31,11 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/option"
 )
 
@@ -89,6 +94,22 @@ func NewAerospikeClient(
 func newS3Client(ctx context.Context, a *models.AwsS3) (*s3.Client, error) {
 	cfgOpts := make([]func(*config.LoadOptions) error, 0)
 
+	// use an adaptive mode for more aggressive retries
+	cfgOpts = append(cfgOpts,
+		config.WithRetryer(func() aws.Retryer {
+			return retry.NewAdaptiveMode(func(o *retry.AdaptiveModeOptions) {
+				o.StandardOptions = append(o.StandardOptions,
+					func(so *retry.StandardOptions) {
+						so.MaxAttempts = a.RetryMaxAttempts
+						so.MaxBackoff = time.Duration(a.RetryMaxBackoffSeconds) * time.Second
+						so.Backoff = retry.NewExponentialJitterBackoff(
+							time.Duration(a.RetryBackoffSeconds) * time.Second,
+						)
+					})
+			})
+		}),
+	)
+
 	if a.Profile != "" {
 		cfgOpts = append(cfgOpts, config.WithSharedConfigProfile(a.Profile))
 	}
@@ -138,6 +159,17 @@ func newGcpClient(ctx context.Context, g *models.GcpStorage) (*gcpStorage.Client
 		return nil, fmt.Errorf("failed to create GCP client: %w", err)
 	}
 
+	backoff := gax.Backoff{
+		Initial:    time.Duration(g.RetryBackoffInitSeconds) * time.Second,
+		Max:        time.Duration(g.RetryBackoffMaxSeconds) * time.Second,
+		Multiplier: g.RetryBackoffMultiplier,
+	}
+
+	gcpClient.SetRetry(
+		gcpStorage.WithPolicy(gcpStorage.RetryAlways),
+		gcpStorage.WithBackoff(backoff),
+		gcpStorage.WithMaxAttempts(g.RetryMaxAttempts))
+
 	return gcpClient, nil
 }
 
@@ -147,6 +179,25 @@ func newAzureClient(a *models.AzureBlob) (*azblob.Client, error) {
 		err      error
 	)
 
+	azOpts := &azblob.ClientOptions{
+		ClientOptions: azcore.ClientOptions{
+			Retry: policy.RetryOptions{
+				MaxRetries:    int32(a.RetryMaxAttempts),
+				TryTimeout:    time.Duration(a.RetryTryTimeoutSeconds) * time.Second,
+				RetryDelay:    time.Duration(a.RetryDelaySeconds) * time.Second,
+				MaxRetryDelay: time.Duration(a.RetryMaxDelaySeconds) * time.Second,
+				StatusCodes: []int{
+					http.StatusRequestTimeout,
+					http.StatusTooManyRequests,
+					http.StatusInternalServerError,
+					http.StatusBadGateway,
+					http.StatusServiceUnavailable,
+					http.StatusGatewayTimeout,
+				},
+			},
+		},
+	}
+
 	switch {
 	case a.AccountName != "" && a.AccountKey != "":
 		cred, err := azblob.NewSharedKeyCredential(a.AccountName, a.AccountKey)
@@ -154,7 +205,7 @@ func newAzureClient(a *models.AzureBlob) (*azblob.Client, error) {
 			return nil, fmt.Errorf("failed to create Azure shared key credentials: %w", err)
 		}
 
-		azClient, err = azblob.NewClientWithSharedKeyCredential(a.Endpoint, cred, nil)
+		azClient, err = azblob.NewClientWithSharedKeyCredential(a.Endpoint, cred, azOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure Blob client with shared key: %w", err)
 		}
@@ -164,12 +215,12 @@ func newAzureClient(a *models.AzureBlob) (*azblob.Client, error) {
 			return nil, fmt.Errorf("failed to create Azure AAD credentials: %w", err)
 		}
 
-		azClient, err = azblob.NewClient(a.Endpoint, cred, nil)
+		azClient, err = azblob.NewClient(a.Endpoint, cred, azOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure Blob client with AAD: %w", err)
 		}
 	default:
-		azClient, err = azblob.NewClientWithNoCredential(a.Endpoint, nil)
+		azClient, err = azblob.NewClientWithNoCredential(a.Endpoint, azOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure Blob client with SAS: %w", err)
 		}

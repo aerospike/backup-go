@@ -35,6 +35,9 @@ func TestAwsS3_NewFlagSet(t *testing.T) {
 		"--s3-secret-access-key", "my-secret-access-key",
 		"--s3-storage-class", "my-storage-class",
 		"--s3-chunk-size", "1",
+		"--s3-retry-max-attempts", "10",
+		"--s3-retry-max-backoff", "10",
+		"--s3-retry-backoff", "10",
 	}
 
 	err := flagSet.Parse(args)
@@ -49,6 +52,9 @@ func TestAwsS3_NewFlagSet(t *testing.T) {
 	assert.Equal(t, "my-secret-access-key", result.SecretAccessKey, "The s3-secret-access-key flag should be parsed correctly")
 	assert.Equal(t, "my-storage-class", result.StorageClass, "The s3-storage-class flag should be parsed correctly")
 	assert.Equal(t, 1, result.ChunkSize, "The s3-chunk-size flag should be parsed correctly")
+	assert.Equal(t, 10, result.RetryMaxAttempts, "The s3-retry-max-attempts flag should be parsed correctly")
+	assert.Equal(t, 10, result.RetryMaxBackoffSeconds, "The s3-retry-max-backoff flag should be parsed correctly")
+	assert.Equal(t, 10, result.RetryBackoffSeconds, "The s3-retry-backoff flag should be parsed correctly")
 }
 
 func TestAwsS3_NewFlagSet_DefaultValues(t *testing.T) {
@@ -69,4 +75,7 @@ func TestAwsS3_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.SecretAccessKey, "The default value for s3-secret-access-key should be an empty string")
 	assert.Equal(t, "", result.StorageClass, "The default value for s3-storage-class should be an empty string")
 	assert.Equal(t, models.DefaultChunkSize, result.ChunkSize, "The default value for s3-chunk-size should be 5mb")
+	assert.Equal(t, 100, result.RetryMaxAttempts, "The default value for s3-retry-max-attempts should be ")
+	assert.Equal(t, 90, result.RetryMaxBackoffSeconds, "The default value for s3-retry-max-backoff should be ")
+	assert.Equal(t, 60, result.RetryBackoffSeconds, "The default value for s3-retry-backoff should be ")
 }

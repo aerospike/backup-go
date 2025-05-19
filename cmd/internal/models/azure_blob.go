@@ -37,6 +37,11 @@ type AzureBlob struct {
 	AccessTier          string
 	RestorePollDuration int64
 
+	RetryMaxAttempts       int
+	RetryTryTimeoutSeconds int
+	RetryDelaySeconds      int
+	RetryMaxDelaySeconds   int
+
 	BlockSize int
 }
 
@@ -82,6 +87,35 @@ func (a *AzureBlob) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	a.AccessTier, err = backup.ParseSecret(cfg, a.AccessTier)
 	if err != nil {
 		return fmt.Errorf("failed to load access tier key from secret agent: %w", err)
+	}
+
+	return nil
+}
+
+// Validate internal validation for struct params.
+func (a *AzureBlob) Validate() error {
+	if a.ContainerName == "" {
+		return fmt.Errorf("container name is required")
+	}
+
+	if a.RetryMaxAttempts < 1 {
+		return fmt.Errorf("retry maximum attempts must be non-negative")
+	}
+
+	if a.RetryTryTimeoutSeconds < 1 {
+		return fmt.Errorf("retry try timeout must be non-negative")
+	}
+
+	if a.RetryDelaySeconds < 1 {
+		return fmt.Errorf("retry delay must be non-negative")
+	}
+
+	if a.RetryMaxDelaySeconds < 1 {
+		return fmt.Errorf("retry max delay must be non-negative")
+	}
+
+	if a.BlockSize < 1 {
+		return fmt.Errorf("block size must be non-negative")
 	}
 
 	return nil

@@ -84,6 +84,16 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 		)
 	}
 
+	flagSet.IntVar(&f.RetryMaxAttempts, "s3-retry-max-attempts",
+		100,
+		"Maximum number of attempts that should be made in case of an error.")
+	flagSet.IntVar(&f.RetryMaxBackoffSeconds, "s3-retry-max-backoff",
+		90,
+		"Max backoff duration in seconds between retried attempts.")
+	flagSet.IntVar(&f.RetryBackoffSeconds, "s3-retry-backoff",
+		60,
+		"Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts.")
+
 	return flagSet
 }
 

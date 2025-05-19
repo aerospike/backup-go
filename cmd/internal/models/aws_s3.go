@@ -34,6 +34,10 @@ type AwsS3 struct {
 	AccessTier          string
 	RestorePollDuration int64
 
+	RetryMaxAttempts       int
+	RetryMaxBackoffSeconds int
+	RetryBackoffSeconds    int
+
 	ChunkSize int
 }
 
@@ -79,6 +83,31 @@ func (a *AwsS3) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	a.AccessTier, err = backup.ParseSecret(cfg, a.AccessTier)
 	if err != nil {
 		return fmt.Errorf("failed to load access tier key from secret agent: %w", err)
+	}
+
+	return nil
+}
+
+// Validate internal validation for struct params.
+func (a *AwsS3) Validate() error {
+	if a.BucketName == "" {
+		return fmt.Errorf("bucket name is required")
+	}
+
+	if a.RetryMaxAttempts < 1 {
+		return fmt.Errorf("retry maximum attempts must be non-negative")
+	}
+
+	if a.RetryMaxBackoffSeconds < 1 {
+		return fmt.Errorf("retry max backoff must be non-negative")
+	}
+
+	if a.RetryBackoffSeconds < 1 {
+		return fmt.Errorf("retry backoff must be non-negative")
+	}
+
+	if a.ChunkSize < 1 {
+		return fmt.Errorf("chunk size must be non-negative")
 	}
 
 	return nil

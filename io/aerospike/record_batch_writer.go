@@ -172,7 +172,8 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("lastError", aerr),
 	)
 
-	return fmt.Errorf("max retries reached, %d operations failed: %w", len(rw.operationBuffer), aerr)
+	return fmt.Errorf("max retries reached, %d operations failed: %w",
+		len(rw.operationBuffer), errors.Join(aerr, opErr))
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {
@@ -226,8 +227,10 @@ func errMapToErr(errMap map[atypes.ResultCode]error) error {
 
 	var result error
 
-	for _, v := range errMap {
-		result = errors.Join(result, v)
+	for _, e := range errMap {
+		if !errors.Is(result, e) {
+			result = errors.Join(result, e)
+		}
 	}
 
 	return result

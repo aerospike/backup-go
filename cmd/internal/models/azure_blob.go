@@ -98,23 +98,23 @@ func (a *AzureBlob) Validate() error {
 		return fmt.Errorf("container name is required")
 	}
 
-	if a.RetryMaxAttempts < 1 {
+	if a.RetryMaxAttempts < 0 {
 		return fmt.Errorf("retry maximum attempts must be non-negative")
 	}
 
-	if a.RetryTryTimeoutSeconds < 1 {
+	if a.RetryTryTimeoutSeconds < 0 {
 		return fmt.Errorf("retry try timeout must be non-negative")
 	}
 
-	if a.RetryDelaySeconds < 1 {
+	if a.RetryDelaySeconds < 0 {
 		return fmt.Errorf("retry delay must be non-negative")
 	}
 
-	if a.RetryMaxDelaySeconds < 1 {
+	if a.RetryMaxDelaySeconds < 0 {
 		return fmt.Errorf("retry max delay must be non-negative")
 	}
 
-	if a.BlockSize < 1 {
+	if a.BlockSize < 0 {
 		return fmt.Errorf("block size must be non-negative")
 	}
 

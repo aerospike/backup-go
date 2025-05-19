@@ -67,23 +67,23 @@ func (g *GcpStorage) Validate() error {
 		return fmt.Errorf("bucket name is required")
 	}
 
-	if g.RetryMaxAttempts < 1 {
+	if g.RetryMaxAttempts < 0 {
 		return fmt.Errorf("retry maximum attempts must be non-negative")
 	}
 
-	if g.RetryBackoffMaxSeconds < 1 {
+	if g.RetryBackoffMaxSeconds < 0 {
 		return fmt.Errorf("retry max backoff must be non-negative")
 	}
 
-	if g.RetryBackoffInitSeconds < 1 {
+	if g.RetryBackoffInitSeconds < 0 {
 		return fmt.Errorf("retry backoff must be non-negative")
 	}
 
 	if g.RetryBackoffMultiplier < 1 {
-		return fmt.Errorf("retry backoff multiplier must be non-negative")
+		return fmt.Errorf("retry backoff multiplier must be not less than 1")
 	}
 
-	if g.ChunkSize < 1 {
+	if g.ChunkSize < 0 {
 		return fmt.Errorf("chunk size must be non-negative")
 	}
 

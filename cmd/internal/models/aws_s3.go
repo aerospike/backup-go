@@ -94,19 +94,19 @@ func (a *AwsS3) Validate() error {
 		return fmt.Errorf("bucket name is required")
 	}
 
-	if a.RetryMaxAttempts < 1 {
+	if a.RetryMaxAttempts < 0 {
 		return fmt.Errorf("retry maximum attempts must be non-negative")
 	}
 
-	if a.RetryMaxBackoffSeconds < 1 {
+	if a.RetryMaxBackoffSeconds < 0 {
 		return fmt.Errorf("retry max backoff must be non-negative")
 	}
 
-	if a.RetryBackoffSeconds < 1 {
+	if a.RetryBackoffSeconds < 0 {
 		return fmt.Errorf("retry backoff must be non-negative")
 	}
 
-	if a.ChunkSize < 1 {
+	if a.ChunkSize < 0 {
 		return fmt.Errorf("chunk size must be non-negative")
 	}
 

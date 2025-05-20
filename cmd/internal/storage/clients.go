@@ -183,7 +183,7 @@ func newAzureClient(a *models.AzureBlob) (*azblob.Client, error) {
 		ClientOptions: azcore.ClientOptions{
 			Retry: policy.RetryOptions{
 				MaxRetries:    int32(a.RetryMaxAttempts),
-				TryTimeout:    time.Duration(a.RetryTryTimeoutSeconds) * time.Second,
+				TryTimeout:    time.Duration(a.RetryTimeoutSeconds) * time.Second,
 				RetryDelay:    time.Duration(a.RetryDelaySeconds) * time.Second,
 				MaxRetryDelay: time.Duration(a.RetryMaxDelaySeconds) * time.Second,
 				StatusCodes: []int{

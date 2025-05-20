@@ -80,7 +80,7 @@ func (g *GcpStorage) Validate() error {
 	}
 
 	if g.RetryBackoffMultiplier < 1 {
-		return fmt.Errorf("retry backoff multiplier must be not less than 1")
+		return fmt.Errorf("retry backoff multiplier must be positive")
 	}
 
 	if g.ChunkSize < 0 {

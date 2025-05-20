@@ -151,7 +151,7 @@ func ValidateStorages(
 
 	if awsS3 != nil && (awsS3.BucketName != "" || awsS3.Region != "" || awsS3.Profile != "" || awsS3.Endpoint != "") {
 		if err := awsS3.Validate(); err != nil {
-			return fmt.Errorf("faield to validate aws s3: %w", err)
+			return fmt.Errorf("failed to validate aws s3: %w", err)
 		}
 
 		count++
@@ -159,7 +159,7 @@ func ValidateStorages(
 
 	if gcpStorage != nil && (gcpStorage.BucketName != "" || gcpStorage.KeyFile != "" || gcpStorage.Endpoint != "") {
 		if err := gcpStorage.Validate(); err != nil {
-			return fmt.Errorf("faield to validate gcp storage: %w", err)
+			return fmt.Errorf("failed to validate gcp storage: %w", err)
 		}
 
 		count++
@@ -169,7 +169,7 @@ func ValidateStorages(
 		azureBlob.Endpoint != "" || azureBlob.TenantID != "" || azureBlob.ClientID != "" ||
 		azureBlob.ClientSecret != "") {
 		if err := azureBlob.Validate(); err != nil {
-			return fmt.Errorf("faield to validate azure blob: %w", err)
+			return fmt.Errorf("failed to validate azure blob: %w", err)
 		}
 
 		count++

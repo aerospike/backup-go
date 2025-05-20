@@ -68,8 +68,8 @@ func TestGcpStorage_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.BucketName, "The default value for gcp-bucket-name should be an empty string")
 	assert.Equal(t, "", result.Endpoint, "The default value for gcp-endpoint-override should be an empty string")
 	assert.Equal(t, models.DefaultChunkSize, result.ChunkSize, "The default value for gcp-chunk-size should be 5MB")
-	assert.Equal(t, 100, result.RetryMaxAttempts, "The default value for gcp-retry-max-attempts should be 100")
-	assert.Equal(t, 90, result.RetryBackoffMaxSeconds, "The default value for gcp-retry-max-backoff should be 90")
-	assert.Equal(t, 60, result.RetryBackoffInitSeconds, "The default value for gcp-retry-init-backoff should be 60")
+	assert.Equal(t, cloudMaxRetries, result.RetryMaxAttempts, "The default value for gcp-retry-max-attempts should be 100")
+	assert.Equal(t, cloudMaxBackoff, result.RetryBackoffMaxSeconds, "The default value for gcp-retry-max-backoff should be 90")
+	assert.Equal(t, cloudBackoff, result.RetryBackoffInitSeconds, "The default value for gcp-retry-init-backoff should be 60")
 	assert.Equal(t, float64(2), result.RetryBackoffMultiplier, "The default value for gcp-retry-backoff-multiplier should be 2")
 }

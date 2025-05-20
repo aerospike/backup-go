@@ -60,7 +60,7 @@ func TestAzureBlob_NewFlagSetRestore(t *testing.T) {
 	assert.Equal(t, 10, result.RetryMaxAttempts, "The azure-retry-max-attempts flag should be parsed correctly")
 	assert.Equal(t, 10, result.RetryMaxDelaySeconds, "The azure-retry-max-delay flag should be parsed correctly")
 	assert.Equal(t, 10, result.RetryDelaySeconds, "The azure-retry-delay flag should be parsed correctly")
-	assert.Equal(t, 10, result.RetryTryTimeoutSeconds, "The azure-retry-timeout flag should be parsed correctly")
+	assert.Equal(t, 10, result.RetryTimeoutSeconds, "The azure-retry-timeout flag should be parsed correctly")
 }
 
 func TestAzureBlob_NewFlagSet_DefaultValuesRestore(t *testing.T) {
@@ -83,10 +83,10 @@ func TestAzureBlob_NewFlagSet_DefaultValuesRestore(t *testing.T) {
 	assert.Equal(t, "", result.ContainerName, "The default value for azure-container-name should be an empty string")
 	assert.Equal(t, "", result.AccessTier, "The default value for azure-access-tier should be an empty string")
 	assert.Equal(t, int64(60000), result.RestorePollDuration, "The default value for azure-rehydrate-poll-duration should be 60000")
-	assert.Equal(t, 100, result.RetryMaxAttempts, "The default value for azure-retry-max-attempts flag should be 100")
-	assert.Equal(t, 90, result.RetryMaxDelaySeconds, "The default value for azure-retry-max-delay flag should be 90")
-	assert.Equal(t, 60, result.RetryDelaySeconds, "The default value for azure-retry-delay flag should be 60")
-	assert.Equal(t, 0, result.RetryTryTimeoutSeconds, "The default value for azure-retry-timeout flag should be 0")
+	assert.Equal(t, cloudMaxRetries, result.RetryMaxAttempts, "The default value for azure-retry-max-attempts flag should be 100")
+	assert.Equal(t, cloudMaxBackoff, result.RetryMaxDelaySeconds, "The default value for azure-retry-max-delay flag should be 90")
+	assert.Equal(t, cloudBackoff, result.RetryDelaySeconds, "The default value for azure-retry-delay flag should be 60")
+	assert.Equal(t, 0, result.RetryTimeoutSeconds, "The default value for azure-retry-timeout flag should be 0")
 }
 
 func TestAzureBlob_NewFlagSetBackup(t *testing.T) {

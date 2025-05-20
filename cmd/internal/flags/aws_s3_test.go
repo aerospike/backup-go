@@ -75,7 +75,7 @@ func TestAwsS3_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", result.SecretAccessKey, "The default value for s3-secret-access-key should be an empty string")
 	assert.Equal(t, "", result.StorageClass, "The default value for s3-storage-class should be an empty string")
 	assert.Equal(t, models.DefaultChunkSize, result.ChunkSize, "The default value for s3-chunk-size should be 5mb")
-	assert.Equal(t, 100, result.RetryMaxAttempts, "The default value for s3-retry-max-attempts should be ")
-	assert.Equal(t, 90, result.RetryMaxBackoffSeconds, "The default value for s3-retry-max-backoff should be ")
-	assert.Equal(t, 60, result.RetryBackoffSeconds, "The default value for s3-retry-backoff should be ")
+	assert.Equal(t, cloudMaxRetries, result.RetryMaxAttempts, "The default value for s3-retry-max-attempts should be ")
+	assert.Equal(t, cloudMaxBackoff, result.RetryMaxBackoffSeconds, "The default value for s3-retry-max-backoff should be ")
+	assert.Equal(t, cloudBackoff, result.RetryBackoffSeconds, "The default value for s3-retry-backoff should be ")
 }

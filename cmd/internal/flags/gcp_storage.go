@@ -52,21 +52,19 @@ func (f *GcpStorage) NewFlagSet() *pflag.FlagSet {
 	}
 
 	flagSet.IntVar(&f.RetryMaxAttempts, "gcp-retry-max-attempts",
-		100,
+		cloudMaxRetries,
 		"Max retries specifies the maximum number of attempts a failed operation will be retried\n"+
 			"before producing an error.")
 	flagSet.IntVar(&f.RetryBackoffMaxSeconds, "gcp-retry-max-backoff",
-		90,
+		cloudMaxBackoff,
 		"Max backoff is the maximum value in seconds of the retry period.")
 	flagSet.IntVar(&f.RetryBackoffInitSeconds, "gcp-retry-init-backoff",
-		60,
-		"Initial backoff is the initial value in seconds of the retry period.",
-	)
+		cloudBackoff,
+		"Initial backoff is the initial value in seconds of the retry period.")
 	flagSet.Float64Var(&f.RetryBackoffMultiplier, "gcp-retry-backoff-multiplier",
 		2,
 		"Multiplier is the factor by which the retry period increases.\n"+
-			"It should be greater than 1.",
-	)
+			"It should be greater than 1.")
 
 	return flagSet
 }

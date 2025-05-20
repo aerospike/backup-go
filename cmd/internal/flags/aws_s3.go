@@ -19,6 +19,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	cloudMaxRetries = 100
+	cloudMaxBackoff = 90
+	cloudBackoff    = 60
+)
+
 type AwsS3 struct {
 	operation int
 	models.AwsS3
@@ -85,13 +91,13 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 	}
 
 	flagSet.IntVar(&f.RetryMaxAttempts, "s3-retry-max-attempts",
-		100,
+		cloudMaxRetries,
 		"Maximum number of attempts that should be made in case of an error.")
 	flagSet.IntVar(&f.RetryMaxBackoffSeconds, "s3-retry-max-backoff",
-		90,
+		cloudMaxBackoff,
 		"Max backoff duration in seconds between retried attempts.")
 	flagSet.IntVar(&f.RetryBackoffSeconds, "s3-retry-backoff",
-		60,
+		cloudBackoff,
 		"Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts.")
 
 	return flagSet

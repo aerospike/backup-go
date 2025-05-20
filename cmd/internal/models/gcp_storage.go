@@ -31,6 +31,11 @@ type GcpStorage struct {
 	// It is not recommended to use an alternate URL in a production environment.
 	Endpoint string
 
+	RetryMaxAttempts        int
+	RetryBackoffMaxSeconds  int
+	RetryBackoffInitSeconds int
+	RetryBackoffMultiplier  float64
+
 	ChunkSize int
 }
 
@@ -51,6 +56,35 @@ func (g *GcpStorage) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	g.Endpoint, err = backup.ParseSecret(cfg, g.Endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to load endpoint from secret agent: %w", err)
+	}
+
+	return nil
+}
+
+// Validate internal validation for struct params.
+func (g *GcpStorage) Validate() error {
+	if g.BucketName == "" {
+		return fmt.Errorf("bucket name is required")
+	}
+
+	if g.RetryMaxAttempts < 0 {
+		return fmt.Errorf("retry maximum attempts must be non-negative")
+	}
+
+	if g.RetryBackoffMaxSeconds < 0 {
+		return fmt.Errorf("retry max backoff must be non-negative")
+	}
+
+	if g.RetryBackoffInitSeconds < 0 {
+		return fmt.Errorf("retry backoff must be non-negative")
+	}
+
+	if g.RetryBackoffMultiplier < 1 {
+		return fmt.Errorf("retry backoff multiplier must be positive")
+	}
+
+	if g.ChunkSize < 0 {
+		return fmt.Errorf("chunk size must be non-negative")
 	}
 
 	return nil

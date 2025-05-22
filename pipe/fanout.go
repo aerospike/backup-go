@@ -2,6 +2,7 @@ package pipe
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/aerospike/backup-go/models"
@@ -13,57 +14,81 @@ type RouteRule[T models.TokenConstraint] func(T) int
 type FanoutStrategy int
 
 const (
-	// FanoutStrategyStraight default val
-	FanoutStrategyStraight FanoutStrategy = iota
-	FanoutStrategyRoundRobin
-	FanoutStrategyCustomRule
+	// Straight default val
+	Straight FanoutStrategy = iota
+	RoundRobin
+	CustomRule
 )
 
+// Fanout routes messages between chain pools.
+// Depending on, FanoutStrategy messages can be distributed in different ways.
 type Fanout[T models.TokenConstraint] struct {
 	Inputs  []chan T
 	Outputs []chan T
 
 	strategy FanoutStrategy
-	// for FanoutStrategyCustomRule
+	// for CustomRule
 	rule RouteRule[T]
-	// for FanoutStrategyRoundRobin
+	// for RoundRobin
 	currentIndex int
 	indexMu      sync.Mutex
 }
 
+// FanoutOption describes options for Fanout.
 type FanoutOption[T models.TokenConstraint] func(*Fanout[T])
 
+// WithRule sets a CustomRule strategy and assigns custom rule to route messages.
 func WithRule[T models.TokenConstraint](rule RouteRule[T]) FanoutOption[T] {
 	return func(f *Fanout[T]) {
 		f.rule = rule
+		f.strategy = CustomRule
 	}
 }
 
+// WithStrategy sets the distribution strategy for a Fanout instance.
 func WithStrategy[T models.TokenConstraint](strategy FanoutStrategy) FanoutOption[T] {
 	return func(f *Fanout[T]) {
 		f.strategy = strategy
 	}
 }
 
+// NewFanout returns a new Fanout.
+// The Default strategy is RoundRobin.
 func NewFanout[T models.TokenConstraint](
 	inputs []chan T,
 	outputs []chan T,
 	options ...FanoutOption[T],
-) *Fanout[T] {
+) (*Fanout[T], error) {
 	f := &Fanout[T]{
 		Inputs:   inputs,
 		Outputs:  outputs,
-		strategy: FanoutStrategyRoundRobin, // Default
+		strategy: RoundRobin, // Default
 	}
 
 	for _, option := range options {
 		option(f)
 	}
 
-	return f
+	// Validations.
+	switch f.strategy {
+	case Straight:
+		if len(f.Outputs) != len(f.Inputs) {
+			return nil, fmt.Errorf("invalid inputs %d and outputs %d number for Straight strategy",
+				len(f.Inputs), len(f.Outputs))
+		}
+	case CustomRule:
+		if f.rule == nil {
+			return nil, fmt.Errorf("custom rule is required for CustomRule strategy")
+		}
+	default:
+		// ok.
+	}
+
+	return f, nil
 }
 
-func (f *Fanout[T]) Run(ctx context.Context) error {
+// Run starts routing messages in separate goroutines based on the defined fanout strategy.
+func (f *Fanout[T]) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for i, input := range f.Inputs {
@@ -79,16 +104,16 @@ func (f *Fanout[T]) Run(ctx context.Context) error {
 
 	wg.Wait()
 	f.Close()
-
-	return nil
 }
 
+// Close closes all output channels.
 func (f *Fanout[T]) Close() {
 	for _, output := range f.Outputs {
 		close(output)
 	}
 }
 
+// processInput listens for incoming data on the input channel and routes it based on the fanout strategy or context state.
 func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T) {
 	for {
 		select {
@@ -104,17 +129,19 @@ func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T)
 	}
 }
 
+// routeData routes a given piece of data based on the current fanout strategy (Straight, RoundRobin, or CustomRule).
 func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 	switch f.strategy {
-	case FanoutStrategyStraight:
+	case Straight:
 		f.routeStraightData(ctx, index, data)
-	case FanoutStrategyRoundRobin:
+	case RoundRobin:
 		f.routeRoundRobinData(ctx, data)
-	case FanoutStrategyCustomRule:
+	case CustomRule:
 		f.routeCustomRuleData(ctx, data)
 	}
 }
 
+// routeStraightData routes a given piece of data to the output channel at the given index.
 func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
 	if len(f.Outputs) == 0 {
 		return
@@ -128,6 +155,7 @@ func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
 	}
 }
 
+// routeRoundRobinData routes a given piece of data to the output channel at the next index in round-robin fashion.
 func (f *Fanout[T]) routeRoundRobinData(ctx context.Context, data T) {
 	if len(f.Outputs) == 0 {
 		return
@@ -146,6 +174,7 @@ func (f *Fanout[T]) routeRoundRobinData(ctx context.Context, data T) {
 	}
 }
 
+// routeCustomRuleData routes a given piece of data to the output channel based on the custom rule.
 func (f *Fanout[T]) routeCustomRuleData(ctx context.Context, data T) {
 	if len(f.Outputs) == 0 || f.rule == nil {
 		return

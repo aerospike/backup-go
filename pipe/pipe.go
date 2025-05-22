@@ -21,17 +21,20 @@ func NewBackupPipe[T models.TokenConstraint](
 	rc readerCreator[T],
 	pc processorCreator[T],
 	wc writerCreator[T],
-) *Pipe[T] {
+) (*Pipe[T], error) {
 	readPool := NewReaderBackupPool[T](parallelRead, rc, pc)
 	writePool := NewWriterBackupPool[T](parallelWrite, wc, nil)
 	// Swap channels!
-	fanout := NewFanout[T](readPool.Outputs, writePool.Inputs, WithStrategy[T](FanoutStrategyRoundRobin))
+	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, WithStrategy[T](RoundRobin))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create fanout: %w", err)
+	}
 
 	return &Pipe[T]{
 		readPool:  readPool,
 		writePool: writePool,
 		fanout:    fanout,
-	}
+	}, nil
 }
 
 func (p *Pipe[T]) Run(ctx context.Context) error {
@@ -51,6 +54,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		if err != nil {
 			errCh <- fmt.Errorf("read pool failed: %w", err)
 			cancel()
+
 			return
 		}
 
@@ -63,6 +67,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		if err != nil {
 			errCh <- fmt.Errorf("write pool failed: %w", err)
 			cancel()
+
 			return
 		}
 
@@ -71,12 +76,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 	go func() {
 		defer wg.Done()
-		err := p.fanout.Run(ctx)
-		if err != nil {
-			errCh <- fmt.Errorf("fanout failed: %w", err)
-			cancel()
-			return
-		}
+		p.fanout.Run(ctx)
 
 		return
 	}()

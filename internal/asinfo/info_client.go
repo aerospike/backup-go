@@ -46,7 +46,7 @@ const (
 
 	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
-	cmdRack                = "racks"
+	cmdRack                = "racks:"
 	cmdReplicaMaster       = "replicas-master"
 	cmdServiceClearStd     = "service-clear-std"
 	cmdServiceTLSStd       = "service-tls-std"
@@ -599,17 +599,17 @@ func (ic *InfoClient) GetRackNodes(rackID int) ([]string, error) {
 func (ic *InfoClient) getRackNodes(rackID int) ([]string, error) {
 	resp, err := ic.GetInfo(cmdRack)
 	if err != nil {
-		return nil, fmt.Errorf("failed get reacks info: %w", err)
+		return nil, fmt.Errorf("failed get racks info: %w", err)
 	}
 
 	result, err := parseResultResponse(cmdRack, resp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse sets info response: %w", err)
+		return nil, fmt.Errorf("failed to parse racks info response: %w", err)
 	}
 
 	resultMap, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse sets info: %w", err)
+		return nil, fmt.Errorf("failed to parse racks info: %w", err)
 	}
 
 	var nodes []string

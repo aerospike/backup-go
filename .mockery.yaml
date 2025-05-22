@@ -36,6 +36,10 @@ packages:
     config:
       dir: ./pipeline/mocks
       pkgname: mocks
+  github.com/aerospike/backup-go/pipe:
+    config:
+      dir: ./pipe/mocks
+      pkgname: mocks
   github.com/aerospike/backup-go/pkg/secret-agent/connection:
     config:
       dir: ./pkg/secret-agent/connection/mocks

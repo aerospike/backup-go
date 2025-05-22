@@ -604,12 +604,12 @@ func (ic *InfoClient) getRackNodes(rackID int) ([]string, error) {
 
 	result, err := parseResultResponse(cmdRack, resp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse sets info response: %w", err)
+		return nil, fmt.Errorf("failed to parse reacks info response: %w", err)
 	}
 
 	resultMap, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse sets info: %w", err)
+		return nil, fmt.Errorf("failed to parse reacks info: %w", err)
 	}
 
 	var nodes []string

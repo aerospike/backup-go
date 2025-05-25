@@ -32,6 +32,7 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 
 		go func() {
 			defer wg.Done()
+
 			if err := p.Chains[i].Run(ctx); err != nil {
 				errorCh <- err
 				// Shut down all chains on one error.
@@ -43,6 +44,7 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 	wg.Wait()
 
 	close(errorCh)
+
 	for err := range errorCh {
 		return fmt.Errorf("failed to run chains: %w", err)
 	}
@@ -50,22 +52,17 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 	return nil
 }
 
-// readerCreator is a function that creates a reader.
-type readerCreator[T models.TokenConstraint] func() reader[T]
+// ProcessorCreator is a function type that defines a creator for a Processor.
+type ProcessorCreator[T models.TokenConstraint] func() Processor[T]
 
-// processorCreator is a function type that defines a creator for a processor.
-type processorCreator[T models.TokenConstraint] func() processor[T]
-
-// writerCreator is a function type that creates a writer.
-type writerCreator[T models.TokenConstraint] func() writer[T]
-
-// NewReaderBackupPool returns a new pool of reader and processor chains for backup operations,
+// NewReaderBackupPool returns a new pool of Reader and Processor chains for backup operations,
 // with the specified parallelism.
-func NewReaderBackupPool[T models.TokenConstraint](parallel uint, rc readerCreator[T], pc processorCreator[T]) *Pool[T] {
-	chains := make([]*Chain[T], parallel)
-	outputs := make([]chan T, parallel)
-	for i := range parallel {
-		chains[i], outputs[i] = NewReaderBackupChain[T](rc(), pc())
+func NewReaderBackupPool[T models.TokenConstraint](readers []Reader[T], pc ProcessorCreator[T]) *Pool[T] {
+	chains := make([]*Chain[T], len(readers))
+	outputs := make([]chan T, len(readers))
+
+	for i := range readers {
+		chains[i], outputs[i] = NewReaderBackupChain[T](readers[i], pc())
 	}
 
 	return &Pool[T]{
@@ -74,13 +71,14 @@ func NewReaderBackupPool[T models.TokenConstraint](parallel uint, rc readerCreat
 	}
 }
 
-// NewWriterBackupPool creates a new pool of writer chains for backup operations,
+// NewWriterBackupPool creates a new pool of Writer chains for backup operations,
 // with the specified parallelism and limiter.
-func NewWriterBackupPool[T models.TokenConstraint](parallel uint, wc writerCreator[T], limiter *rate.Limiter) *Pool[T] {
-	chains := make([]*Chain[T], parallel)
-	inputs := make([]chan T, parallel)
-	for i := range parallel {
-		chains[i], inputs[i] = NewWriterBackupChain[T](wc(), limiter)
+func NewWriterBackupPool[T models.TokenConstraint](writers []Writer[T], limiter *rate.Limiter) *Pool[T] {
+	chains := make([]*Chain[T], len(writers))
+	inputs := make([]chan T, len(writers))
+
+	for i := range writers {
+		chains[i], inputs[i] = NewWriterBackupChain[T](writers[i], limiter)
 	}
 
 	return &Pool[T]{

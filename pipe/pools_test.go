@@ -2,7 +2,6 @@ package pipe
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -17,35 +16,33 @@ const testParallel = 10
 func TestPools_RunReaderBackupPool(t *testing.T) {
 	t.Parallel()
 
-	newReaderMock := func() reader[*models.Token] {
-		mock := mocks.NewMockreader[*models.Token](t)
-		var mockCounter int
-		mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-			if mockCounter < testCount {
-				mockCounter++
-				time.Sleep(testDealy)
-				return defaultToken(), nil
-			}
+	mock := mocks.NewMockreader[*models.Token](t)
+	var mockCounter int
+	mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+		if mockCounter < testCount {
+			mockCounter++
+			time.Sleep(testDealy)
+			return defaultToken(), nil
+		}
 
-			return nil, io.EOF
-		})
+		return nil, io.EOF
+	})
 
-		mock.EXPECT().Close()
+	mock.EXPECT().Close()
 
-		return mock
-	}
-
-	newProcessorMock := func() processor[*models.Token] {
+	newProcessorMock := func() Processor[*models.Token] {
 		mock := mocks.NewMockprocessor[*models.Token](t)
 		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
 
 		return mock
 	}
 
-	pool := NewReaderBackupPool[*models.Token](testParallel, newReaderMock, newProcessorMock)
+	ctx := context.Background()
+
+	pool := NewReaderBackupPool[*models.Token]([]Reader[*models.Token]{mock, mock, mock}, newProcessorMock)
 	require.NotNil(t, pool)
 
-	err := pool.Run(context.Background())
+	err := pool.Run(ctx)
 	require.NoError(t, err)
 
 	var resultCounter int
@@ -61,35 +58,33 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 func TestPools_RunReaderBackupPoolError(t *testing.T) {
 	t.Parallel()
 
-	newReaderMock := func() reader[*models.Token] {
-		mock := mocks.NewMockreader[*models.Token](t)
-		var mockCounter int
-		mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-			if mockCounter < testCount {
-				mockCounter++
-				time.Sleep(testDealy)
-				return defaultToken(), nil
-			}
+	mock := mocks.NewMockreader[*models.Token](t)
+	var mockCounter int
+	mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+		if mockCounter < testCount {
+			mockCounter++
+			time.Sleep(testDealy)
+			return defaultToken(), nil
+		}
 
-			return nil, errTest
-		})
+		return nil, errTest
+	})
 
-		mock.EXPECT().Close()
+	mock.EXPECT().Close()
 
-		return mock
-	}
-
-	newProcessorMock := func() processor[*models.Token] {
+	newProcessorMock := func() Processor[*models.Token] {
 		mock := mocks.NewMockprocessor[*models.Token](t)
 		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
 
 		return mock
 	}
 
-	pool := NewReaderBackupPool[*models.Token](testParallel, newReaderMock, newProcessorMock)
+	ctx := context.Background()
+
+	pool := NewReaderBackupPool[*models.Token]([]Reader[*models.Token]{mock, mock, mock}, newProcessorMock)
 	require.NotNil(t, pool)
 
-	err := pool.Run(context.Background())
+	err := pool.Run(ctx)
 	require.ErrorIs(t, err, errTest)
 }
 
@@ -97,20 +92,18 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 	t.Parallel()
 
 	var mockCounterWrite int
-	newWriterMock := func() writer[*models.Token] {
-		mock := mocks.NewMockwriter[*models.Token](t)
+	mock := mocks.NewMockwriter[*models.Token](t)
 
-		mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
-			mockCounterWrite++
-			return testSize, nil
-		})
+	mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+		mockCounterWrite++
+		return testSize, nil
+	})
 
-		mock.EXPECT().Close().Return(nil)
+	mock.EXPECT().Close().Return(nil)
 
-		return mock
-	}
+	ctx := context.Background()
 
-	pool := NewWriterBackupPool[*models.Token](testParallel, newWriterMock, nil)
+	pool := NewWriterBackupPool[*models.Token]([]Writer[*models.Token]{mock, mock, mock}, nil)
 	require.NotNil(t, pool)
 
 	go func() {
@@ -119,7 +112,6 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 				time.Sleep(testDealy)
 				pool.Inputs[i] <- defaultToken()
 			}
-
 		}
 
 		for i := range pool.Inputs {
@@ -127,7 +119,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 		}
 	}()
 
-	err := pool.Run(context.Background())
+	err := pool.Run(ctx)
 	require.NoError(t, err)
 
 	require.Equal(t, testCount*testParallel, mockCounterWrite)
@@ -136,26 +128,24 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 	t.Parallel()
 
-	newWriterMock := func() writer[*models.Token] {
-		mock := mocks.NewMockwriter[*models.Token](t)
+	mock := mocks.NewMockwriter[*models.Token](t)
 
-		var mockCounter int
-		mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
-			if mockCounter < testCount {
-				mockCounter++
-				time.Sleep(testDealy)
-				return testSize, nil
-			}
+	var mockCounter int
+	mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+		if mockCounter < testCount {
+			mockCounter++
+			time.Sleep(testDealy)
+			return testSize, nil
+		}
 
-			return 0, errTest
-		})
+		return 0, errTest
+	})
 
-		mock.EXPECT().Close().Return(nil)
+	mock.EXPECT().Close().Return(nil)
 
-		return mock
-	}
+	ctx := context.Background()
 
-	pool := NewWriterBackupPool[*models.Token](testParallel, newWriterMock, nil)
+	pool := NewWriterBackupPool[*models.Token]([]Writer[*models.Token]{mock, mock, mock}, nil)
 	require.NotNil(t, pool)
 
 	go func() {
@@ -164,7 +154,6 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 				time.Sleep(testDealy)
 				pool.Inputs[i] <- defaultToken()
 			}
-
 		}
 
 		for i := range pool.Inputs {
@@ -172,7 +161,6 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 		}
 	}()
 
-	err := pool.Run(context.Background())
-	fmt.Println("ERROR:", err)
+	err := pool.Run(ctx)
 	require.ErrorIs(t, err, errTest)
 }

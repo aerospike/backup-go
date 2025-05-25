@@ -40,8 +40,11 @@ type tokenStatsWriter[T models.TokenConstraint] struct {
 	logger *slog.Logger
 }
 
-func newWriterWithTokenStats[T models.TokenConstraint](writer pipeline.DataWriter[T],
-	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter[T] {
+func newWriterWithTokenStats[T models.TokenConstraint](
+	writer pipeline.DataWriter[T],
+	stats statsSetterToken,
+	logger *slog.Logger,
+) *tokenStatsWriter[T] {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
 	logger.Debug("created new token stats writer")

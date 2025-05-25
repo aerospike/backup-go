@@ -102,7 +102,7 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 	}()
 
-	// Read from output to avoid deadlock.
+	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
 }
@@ -137,7 +137,7 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 		require.ErrorIs(t, err, errTest)
 	}()
 
-	// Read from output to avoid deadlock.
+	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
 }
@@ -166,7 +166,7 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 		require.ErrorIs(t, err, errTest)
 	}()
 
-	// Read from output to avoid deadlock.
+	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
 }
@@ -210,7 +210,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	// Read from output to avoid deadlock.
+	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
 }

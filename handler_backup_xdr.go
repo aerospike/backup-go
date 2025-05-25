@@ -36,7 +36,7 @@ type HandlerBackupXDR struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	readProcessor   *recordReaderProcessor[*models.ASBXToken]
+	readerProcessor *recordReaderProcessorXDR[*models.ASBXToken]
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
 	encoder         Encoder[*models.ASBXToken]
 	config          *ConfigBackupXDR
@@ -85,6 +85,7 @@ func newBackupXDRHandler(
 		metricMessage,
 		config.MetricsEnabled,
 	)
+
 	kbpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
@@ -93,7 +94,7 @@ func newBackupXDRHandler(
 		config.MetricsEnabled,
 	)
 
-	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
+	readerProcessor := newRecordReaderProcessorXDR[*models.ASBXToken](
 		config,
 		aerospikeClient,
 		infoClient,
@@ -126,7 +127,7 @@ func newBackupXDRHandler(
 		ctx:             ctx,
 		cancel:          cancel,
 		encoder:         encoder,
-		readProcessor:   readProcessor,
+		readerProcessor: readerProcessor,
 		writerProcessor: writerProcessor,
 		config:          config,
 		infoClient:      infoClient,
@@ -161,7 +162,7 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	bh.stats.TotalRecords.Store(records)
 
 	// Read workers.
-	readWorkers, err := bh.readProcessor.newReadWorkersXDR(ctx)
+	readWorkers, err := bh.readerProcessor.newReadWorkersXDR(ctx)
 	if err != nil {
 		return fmt.Errorf("failed create read workers: %w", err)
 	}
@@ -247,7 +248,7 @@ func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 	return bh.stats
 }
 
-// GetMetrics returns the rpsCollector of the backup job.
+// GetMetrics returns metrics of the backup job.
 func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
 	if bh == nil {
 		return nil

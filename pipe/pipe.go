@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/aerospike/backup-go/models"
+	"golang.org/x/time/rate"
 )
 
 // Pipe is running and managing everything.
@@ -17,13 +18,13 @@ type Pipe[T models.TokenConstraint] struct {
 }
 
 func NewBackupPipe[T models.TokenConstraint](
-	parallelRead, parallelWrite uint,
-	rc readerCreator[T],
-	pc processorCreator[T],
-	wc writerCreator[T],
+	pc ProcessorCreator[T],
+	readers []Reader[T],
+	writers []Writer[T],
+	limiter *rate.Limiter,
 ) (*Pipe[T], error) {
-	readPool := NewReaderBackupPool[T](parallelRead, rc, pc)
-	writePool := NewWriterBackupPool[T](parallelWrite, wc, nil)
+	readPool := NewReaderBackupPool[T](readers, pc)
+	writePool := NewWriterBackupPool[T](writers, limiter)
 	// Swap channels!
 	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, WithStrategy[T](RoundRobin))
 	if err != nil {
@@ -40,8 +41,7 @@ func NewBackupPipe[T models.TokenConstraint](
 func (p *Pipe[T]) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 
-	errCh := make(chan error, 3)
-	defer close(errCh)
+	errorCh := make(chan error, 3)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -50,41 +50,42 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 	go func() {
 		defer wg.Done()
+
 		err := p.readPool.Run(ctx)
 		if err != nil {
-			errCh <- fmt.Errorf("read pool failed: %w", err)
+			errorCh <- fmt.Errorf("read pool failed: %w", err)
+
 			cancel()
 
 			return
 		}
-
-		return
 	}()
 
 	go func() {
 		defer wg.Done()
+
 		err := p.writePool.Run(ctx)
 		if err != nil {
-			errCh <- fmt.Errorf("write pool failed: %w", err)
+			errorCh <- fmt.Errorf("write pool failed: %w", err)
+
 			cancel()
 
 			return
 		}
-
-		return
 	}()
 
 	go func() {
 		defer wg.Done()
 		p.fanout.Run(ctx)
-
-		return
 	}()
 
 	wg.Wait()
 
+	close(errorCh)
+
 	var errs []error
-	for err := range errCh {
+
+	for err := range errorCh {
 		if err != nil {
 			errs = append(errs, err)
 		}

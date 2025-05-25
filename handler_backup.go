@@ -27,14 +27,9 @@ import (
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
-	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/io/aerospike"
-	"github.com/aerospike/backup-go/io/compression"
-	"github.com/aerospike/backup-go/io/counter"
-	"github.com/aerospike/backup-go/io/encryption"
-	"github.com/aerospike/backup-go/io/lazy"
-	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipe"
 	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
@@ -61,10 +56,12 @@ type BackupHandler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	writer          Writer
+	readerProcessor *recordReaderProcessor[*models.Token]
+	writerProcessor *fileWriterProcessor[*models.Token]
 	encoder         Encoder[*models.Token]
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
+	recordCounter   *recordCounter
 
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
@@ -80,7 +77,7 @@ type BackupHandler struct {
 	// For graceful shutdown.
 	wg sync.WaitGroup
 
-	recordHandler *backupRecordsHandler
+	pl *pipe.Pipe[*models.Token]
 
 	// records per second collector.
 	rpsCollector *metrics.Collector
@@ -134,36 +131,81 @@ func newBackupHandler(
 		}
 	}
 
-	return &BackupHandler{
+	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact)
+
+	stats := models.NewBackupStats()
+
+	rpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricRecordsPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
+
+	kbpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.MetricKilobytesPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
+
+	infoCLient := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy, config.InfoRetryPolicy)
+
+	readerProcessor := newRecordReaderProcessor[*models.Token](
+		config,
+		ac,
+		infoCLient,
+		state,
+		scanLimiter,
+		rpsCollector,
+		logger,
+	)
+
+	recCounter := newRecordCounter(ac, infoCLient, config, readerProcessor, logger)
+
+	bh := &BackupHandler{
 		ctx:                    ctx,
 		cancel:                 cancel,
 		config:                 config,
 		aerospikeClient:        ac,
 		id:                     id,
 		logger:                 logger,
-		writer:                 writer,
 		firstFileHeaderWritten: &atomic.Bool{},
-		encoder:                NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact),
+		encoder:                encoder,
+		readerProcessor:        readerProcessor,
+		recordCounter:          recCounter,
 		limiter:                limiter,
-		infoClient:             asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy, config.InfoRetryPolicy),
+		infoClient:             infoCLient,
 		scanLimiter:            scanLimiter,
 		state:                  state,
-		stats:                  models.NewBackupStats(),
-		rpsCollector: metrics.NewCollector(
-			ctx,
-			logger,
-			metrics.MetricRecordsPerSecond,
-			metricMessage,
-			config.MetricsEnabled,
-		),
-		kbpsCollector: metrics.NewCollector(
-			ctx,
-			logger,
-			metrics.MetricKilobytesPerSecond,
-			metricMessage,
-			config.MetricsEnabled,
-		),
-	}, nil
+		stats:                  stats,
+		rpsCollector:           rpsCollector,
+		kbpsCollector:          kbpsCollector,
+	}
+
+	writerProcessor := newFileWriterProcessor[*models.Token](
+		emptyPrefixSuffix,
+		bh.stateSuffixGenerator,
+		nil,
+		writer,
+		encoder,
+		config.EncryptionPolicy,
+		config.SecretAgentConfig,
+		config.CompressionPolicy,
+		state,
+		stats,
+		limiter,
+		kbpsCollector,
+		config.FileLimit,
+		config.ParallelWrite,
+		logger,
+	)
+
+	bh.writerProcessor = writerProcessor
+
+	return bh, nil
 }
 
 // run runs the backup job.
@@ -176,7 +218,7 @@ func (bh *BackupHandler) run() {
 	go doWork(bh.errors, bh.logger, func() error {
 		defer bh.wg.Done()
 
-		return bh.backupSync(bh.ctx)
+		return bh.backup(bh.ctx)
 	})
 }
 
@@ -224,17 +266,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	scanPolicy.RawCDT = true
 
 	nodes := bh.aerospikeClient.GetNodes()
-	bh.recordHandler = newBackupRecordsHandler(
-		bh.config,
-		bh.aerospikeClient,
-		bh.infoClient,
-		bh.logger,
-		bh.scanLimiter,
-		bh.state,
-		bh.rpsCollector,
-		bh.kbpsCollector,
-	)
-	readerConfig := bh.recordHandler.recordReaderConfigForNode(nodes, &scanPolicy)
+	readerConfig := bh.readerProcessor.recordReaderConfigForNode(nodes, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
 
 	// Timestamp processor.
@@ -267,11 +299,13 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	return samples, samplesData, nil
 }
 
-func (bh *BackupHandler) backupSync(ctx context.Context) error {
-	backupWriters, err := bh.makeWriters(ctx, bh.config.ParallelWrite)
+func (bh *BackupHandler) backup(ctx context.Context) error {
+	backupWriters, err := bh.writerProcessor.newWriters(ctx)
 	if err != nil {
 		return err
 	}
+	// TODO: move this inside writer processor.
+	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
 
 	defer closeWriters(backupWriters, bh.logger)
 
@@ -291,19 +325,6 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		return nil
 	}
 
-	writeWorkers := bh.makeWriteWorkers(backupWriters)
-
-	bh.recordHandler = newBackupRecordsHandler(
-		bh.config,
-		bh.aerospikeClient,
-		bh.infoClient,
-		bh.logger,
-		bh.scanLimiter,
-		bh.state,
-		bh.rpsCollector,
-		bh.kbpsCollector,
-	)
-
 	// start counting backup records in a separate goroutine to estimate the total number of records.
 	// This is done in parallel with the backup process to avoid delaying the start of the backup.
 	// The estimated backup record count will be available in statistics once the estimation process is completed.
@@ -317,11 +338,38 @@ func (bh *BackupHandler) backupSync(ctx context.Context) error {
 		}
 	}
 
-	return bh.recordHandler.run(ctx, writeWorkers, &bh.stats.ReadRecords)
+	// Calculate the Records Per Second (RPS) target for each individual parallel reader/processor.
+	// This value evenly distributes the overall read rate across the parallel workers,
+	// ensuring each worker adheres to a portion of the total RPS limit.
+	rps := bh.config.RecordsPerSecond / bh.config.ParallelRead
+
+	proc := NewProcessorWrap(
+		processors.NewRecordCounter[*models.Token](&bh.stats.ReadRecords),
+		processors.NewVoidTimeSetter[*models.Token](bh.logger),
+		processors.NewTPSLimiter[*models.Token](
+			ctx, rps),
+	)
+
+	dataReaders, err := bh.readerProcessor.makeAerospikeReadWorkers(ctx, bh.config.ParallelRead)
+	if err != nil {
+		return err
+	}
+
+	pip, err := pipe.NewBackupPipe(
+		proc,
+		dataReaders,
+		dataWriters,
+		bh.limiter,
+	)
+
+	// Assign, so we can get pl stats.
+	bh.pl = pip
+
+	return pip.Run(ctx)
 }
 
 func (bh *BackupHandler) countRecords(ctx context.Context) {
-	records, err := bh.recordHandler.countRecords(ctx, bh.infoClient)
+	records, err := bh.recordCounter.countRecords(ctx, bh.infoClient)
 	if err != nil {
 		bh.logger.Error("failed to count records", slog.Any("error", err))
 		return
@@ -350,120 +398,12 @@ func (bh *BackupHandler) makeWriteWorkers(
 	return writeWorkers
 }
 
-func (bh *BackupHandler) makeWriters(ctx context.Context, n int) ([]io.WriteCloser, error) {
-	backupWriters := make([]io.WriteCloser, n)
-
-	for i := 0; i < n; i++ {
-		writer, err := bh.newWriter(ctx, i)
-		if err != nil {
-			return nil, err
-		}
-
-		backupWriters[i] = metrics.NewWriter(writer, bh.kbpsCollector)
-	}
-
-	return backupWriters, nil
-}
-
 func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 	for _, w := range backupWriters {
 		if err := w.Close(); err != nil {
 			logger.Error("failed to close backup file", "error", err)
 		}
 	}
-}
-
-// newWriter creates a new writer based on the current configuration.
-// If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
-// The returned writer may be compressed or encrypted depending on the BackupHandler's
-// configuration.
-func (bh *BackupHandler) newWriter(ctx context.Context, n int) (io.WriteCloser, error) {
-	if bh.config.FileLimit > 0 {
-		// Init a writer with a communication channel, for saving state operation
-		if bh.config.isStateFirstRun() || bh.config.isStateContinue() {
-			return sized.NewWriter(ctx, n, bh.state.SaveCommandChan, bh.config.FileLimit, bh.newConfiguredWriter)
-		}
-
-		return sized.NewWriter(ctx, n, nil, bh.config.FileLimit, bh.newConfiguredWriter)
-	}
-
-	return lazy.NewWriter(ctx, n, bh.newConfiguredWriter)
-}
-
-func (bh *BackupHandler) newConfiguredWriter(ctx context.Context, _ string, sizeCounter *atomic.Uint64,
-) (io.WriteCloser, error) {
-	suffix := ""
-	if bh.state != nil {
-		suffix = bh.state.getFileSuffix()
-	}
-
-	filename := bh.encoder.GenerateFilename(bh.config.OutputFilePrefix, suffix)
-
-	storageWriter, err := bh.writer.NewWriter(ctx, filename)
-	if err != nil {
-		return nil, err
-	}
-
-	countingWriter := counter.NewWriter(storageWriter, &bh.stats.BytesWritten, sizeCounter)
-
-	encryptedWriter, err := newEncryptionWriter(
-		bh.config.EncryptionPolicy,
-		bh.config.SecretAgentConfig,
-		countingWriter,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("cannot set encryption: %w", err)
-	}
-
-	zippedWriter, err := newCompressionWriter(bh.config.CompressionPolicy, encryptedWriter)
-	if err != nil {
-		return nil, err
-	}
-
-	num, err := util.GetFileNumber(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = zippedWriter.Write(bh.encoder.GetHeader(num))
-	if err != nil {
-		return nil, err
-	}
-
-	bh.stats.IncFiles()
-
-	return zippedWriter, nil
-}
-
-// newCompressionWriter returns a compression writer for compressing backup.
-func newCompressionWriter(
-	policy *CompressionPolicy, writer io.WriteCloser,
-) (io.WriteCloser, error) {
-	if policy == nil || policy.Mode == CompressNone {
-		return writer, nil
-	}
-
-	if policy.Mode == CompressZSTD {
-		return compression.NewWriter(writer, policy.Level)
-	}
-
-	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
-}
-
-// newEncryptionWriter returns an encryption writer for encrypting backup.
-func newEncryptionWriter(
-	policy *EncryptionPolicy, saConfig *SecretAgentConfig, writer io.WriteCloser,
-) (io.WriteCloser, error) {
-	if policy == nil || policy.Mode == EncryptNone {
-		return writer, nil
-	}
-
-	privateKey, err := readPrivateKey(policy, saConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return encryption.NewWriter(writer, privateKey)
 }
 
 func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
@@ -600,7 +540,30 @@ func (bh *BackupHandler) backupUDFs(
 	return udfPipeline.Run(ctx)
 }
 
-// GetMetrics returns the rpsCollector of the backup job.
+// GetMetrics returns metrics of the backup job.
 func (bh *BackupHandler) GetMetrics() *models.Metrics {
-	return bh.recordHandler.GetMetrics()
+	if bh == nil {
+		return nil
+	}
+
+	var pr, pw int
+	// if bh.pl != nil {
+	// 	pr, pw = bh.pl.GetMetrics()
+	// }
+
+	return models.NewMetrics(
+		pr, pw,
+		bh.rpsCollector.GetLastResult(),
+		bh.kbpsCollector.GetLastResult(),
+	)
+}
+
+// stateSuffixGenerator returns state suffix generator.
+func (bh *BackupHandler) stateSuffixGenerator() string {
+	suffix := ""
+	if bh.state != nil {
+		suffix = bh.state.getFileSuffix()
+	}
+
+	return suffix
 }

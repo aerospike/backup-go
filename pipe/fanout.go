@@ -80,8 +80,7 @@ func NewFanout[T models.TokenConstraint](
 		if f.rule == nil {
 			return nil, fmt.Errorf("custom rule is required for CustomRule strategy")
 		}
-	default:
-		// ok.
+	default: // ok.
 	}
 
 	return f, nil
@@ -113,7 +112,8 @@ func (f *Fanout[T]) Close() {
 	}
 }
 
-// processInput listens for incoming data on the input channel and routes it based on the fanout strategy or context state.
+// processInput listens for incoming data on the input channel
+// and routes it based on the fanout strategy or context state.
 func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T) {
 	for {
 		select {
@@ -150,8 +150,7 @@ func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
 	select {
 	case <-ctx.Done():
 		return
-	case f.Outputs[index] <- data:
-		// ok.
+	case f.Outputs[index] <- data: // ok.
 	}
 }
 
@@ -169,8 +168,7 @@ func (f *Fanout[T]) routeRoundRobinData(ctx context.Context, data T) {
 	select {
 	case <-ctx.Done():
 		return
-	case f.Outputs[index] <- data:
-		// ok.
+	case f.Outputs[index] <- data: // ok.
 	}
 }
 
@@ -185,7 +183,6 @@ func (f *Fanout[T]) routeCustomRuleData(ctx context.Context, data T) {
 	select {
 	case <-ctx.Done():
 		return
-	case f.Outputs[index] <- data:
-		// ok.
+	case f.Outputs[index] <- data: // ok.
 	}
 }

@@ -57,7 +57,6 @@ func TestFanout_RunDefault(t *testing.T) {
 			}
 			close(inputs[n])
 		}()
-
 	}
 
 	// Consume data.
@@ -74,7 +73,6 @@ func TestFanout_RunDefault(t *testing.T) {
 				counter++
 			}
 		}()
-
 	}
 
 	fan.Run(context.Background())
@@ -108,7 +106,6 @@ func TestFanout_RunStraight(t *testing.T) {
 			}
 			close(inputs[n])
 		}()
-
 	}
 
 	// Consume data.
@@ -126,7 +123,6 @@ func TestFanout_RunStraight(t *testing.T) {
 				counter++
 			}
 		}()
-
 	}
 
 	fan.Run(context.Background())
@@ -147,7 +143,7 @@ func TestFanout_RunCustomRule(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	rule := func(token *models.Token) int {
+	rule := func(_ *models.Token) int {
 		return testIndex
 	}
 
@@ -169,7 +165,6 @@ func TestFanout_RunCustomRule(t *testing.T) {
 			}
 			close(inputs[n])
 		}()
-
 	}
 
 	// Consume data.
@@ -220,7 +215,6 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 			}
 			close(inputs[n])
 		}()
-
 	}
 
 	// Consume data.
@@ -237,7 +231,6 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 				counter++
 			}
 		}()
-
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -278,7 +271,6 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 			}
 			close(inputs[n])
 		}()
-
 	}
 
 	// Consume data.
@@ -296,7 +288,6 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 				counter++
 			}
 		}()
-
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -324,7 +315,7 @@ func TestFanout_RunCustomRuleContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	rule := func(token *models.Token) int {
+	rule := func(_ *models.Token) int {
 		return testIndex
 	}
 
@@ -346,7 +337,6 @@ func TestFanout_RunCustomRuleContextCancel(t *testing.T) {
 			}
 			close(inputs[n])
 		}()
-
 	}
 
 	// Consume data.

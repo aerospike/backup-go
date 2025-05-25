@@ -16,29 +16,29 @@ const (
 	writerBufferSize = 10000
 )
 
-// ErrFilteredOut is returned by a processor when a token
+// ErrFilteredOut is returned by a Processor when a token
 // should be filtered out of the pipeline.
 var ErrFilteredOut = errors.New("filtered out")
 
-// Reader describes data readers. To exit worker, the reader must return io.EOF.
-type reader[T models.TokenConstraint] interface {
+// Reader describes data readers. To exit worker, the Reader must return io.EOF.
+type Reader[T models.TokenConstraint] interface {
 	Read() (T, error)
 	Close()
 }
 
-// writer describes data writers.
-type writer[T models.TokenConstraint] interface {
+// Writer describes data writers.
+type Writer[T models.TokenConstraint] interface {
 	Write(T) (n int, err error)
 	Close() (err error)
 }
 
-// describes data processors.
-type processor[T models.TokenConstraint] interface {
+// Processor describes data processors.
+type Processor[T models.TokenConstraint] interface {
 	Process(T) (T, error)
 }
 
 // The Chain contains a routine to process data. Chains will be running in parallel.
-// Each routine is built from a reader and/or processor and/or writer.
+// Each routine is built from a Reader and/or Processor and/or Writer.
 type Chain[T models.TokenConstraint] struct {
 	routine func(context.Context) error
 }
@@ -48,8 +48,11 @@ func (c *Chain[T]) Run(ctx context.Context) error {
 	return c.routine(ctx)
 }
 
-// NewReaderBackupChain returns a new Chain with a reader and a processor for backup operation.
-func NewReaderBackupChain[T models.TokenConstraint](r reader[T], p processor[T]) (*Chain[T], chan T) {
+// NewReaderBackupChain returns a new Chain with a Reader and a Processor,
+// and communication channel for backup operation.
+//
+//nolint:gocritic // No need to give names to the result here.
+func NewReaderBackupChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (*Chain[T], chan T) {
 	output := make(chan T, readerBufferSize)
 	routine := newReaderBackupRoutine(r, p, output)
 
@@ -58,7 +61,8 @@ func NewReaderBackupChain[T models.TokenConstraint](r reader[T], p processor[T])
 	}, output
 }
 
-func newReaderBackupRoutine[T models.TokenConstraint](r reader[T], p processor[T], output chan<- T) func(context.Context) error {
+func newReaderBackupRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], output chan<- T,
+) func(context.Context) error {
 	return func(ctx context.Context) error {
 		defer r.Close()
 		defer close(output)
@@ -71,7 +75,6 @@ func newReaderBackupRoutine[T models.TokenConstraint](r reader[T], p processor[T
 				data, err := r.Read()
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-
 						return nil
 					}
 
@@ -81,9 +84,9 @@ func newReaderBackupRoutine[T models.TokenConstraint](r reader[T], p processor[T
 				processed, err := p.Process(data)
 				if err != nil {
 					if errors.Is(err, ErrFilteredOut) {
-
 						continue
 					}
+
 					return fmt.Errorf("failed to process data: %w", err)
 				}
 
@@ -93,13 +96,15 @@ func newReaderBackupRoutine[T models.TokenConstraint](r reader[T], p processor[T
 				case output <- processed:
 				}
 			}
-
 		}
 	}
 }
 
-// NewWriterBackupChain returns a new Chain with a writer for backup operation.
-func NewWriterBackupChain[T models.TokenConstraint](w writer[T], limiter *rate.Limiter) (*Chain[T], chan T) {
+// NewWriterBackupChain returns a new Chain with a Writer,
+// and communication channel for backup operation.
+//
+//nolint:gocritic // No need to give names to the result here.
+func NewWriterBackupChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter) (*Chain[T], chan T) {
 	input := make(chan T, writerBufferSize)
 	routine := newWriterBackupRoutine(w, input, limiter)
 
@@ -108,7 +113,8 @@ func NewWriterBackupChain[T models.TokenConstraint](w writer[T], limiter *rate.L
 	}, input
 }
 
-func newWriterBackupRoutine[T models.TokenConstraint](w writer[T], input <-chan T, limiter *rate.Limiter) func(context.Context) error {
+func newWriterBackupRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, limiter *rate.Limiter,
+) func(context.Context) error {
 	// Notice!
 	// It is important to return func with `(err error)`,
 	// otherwise the err variable will always be nil.
@@ -122,7 +128,7 @@ func newWriterBackupRoutine[T models.TokenConstraint](w writer[T], input <-chan 
 				// In case the main error is nil, we assign a close error to it. (close error can be nil, it's ok)
 				err = cErr
 			case cErr != nil:
-				// In case we have a writer error and close error, we combine them into one error.
+				// In case we have a Writer error and close error, we combine them into one error.
 				err = fmt.Errorf("write error: %w, close error: %w", err, cErr)
 			}
 		}()

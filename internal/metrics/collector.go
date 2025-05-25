@@ -85,6 +85,7 @@ func NewCollector(
 		cancel:     cancel,
 		enabled:    enabled,
 		metricType: metricType,
+		name:       metricType.String(),
 		message:    message,
 		Increment:  func() {},
 		Add:        func(uint64) {},

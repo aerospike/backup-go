@@ -245,7 +245,7 @@ func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 
 	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 	assert.NotNil(t, collector)
-	assert.Equal(t, KilobytesPerSecond, collector.name)
+	assert.Equal(t, KilobytesPerSecond.String(), collector.name)
 
 	// because of rounding to uint, we should use 1024 for the test.
 	collector.Add(1025)

@@ -48,8 +48,6 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	limiter           *rate.Limiter
 	kbpsCollector     *metrics.Collector
 
-	saveCommandChan chan int
-
 	fileLimit uint64
 	parallel  int
 
@@ -60,7 +58,6 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 func newFileWriterProcessor[T models.TokenConstraint](
 	prefixGenerator func() string,
 	suffixGenerator func() string,
-	saveCommandChan chan int,
 	writer Writer,
 	encoder Encoder[T],
 	encryptionPolicy *EncryptionPolicy,
@@ -79,7 +76,6 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	return &fileWriterProcessor[T]{
 		prefixGenerator:   prefixGenerator,
 		suffixGenerator:   suffixGenerator,
-		saveCommandChan:   saveCommandChan,
 		writer:            writer,
 		encoder:           encoder,
 		encryptionPolicy:  encryptionPolicy,
@@ -121,7 +117,7 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	writers := make([]io.WriteCloser, fw.parallel)
 
 	for i := range fw.parallel {
-		writer, err := fw.newWriter(ctx, i, fw.saveCommandChan, fw.fileLimit)
+		writer, err := fw.newWriter(ctx, i, fw.fileLimit)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create writer: %w", err)
 		}
@@ -138,8 +134,13 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 // If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
 // The returned writer may be compressed or encrypted depending on the BackupHandler's
 // configuration.
-func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveCommandChan chan int, fileLimit uint64,
+func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, fileLimit uint64,
 ) (io.WriteCloser, error) {
+	var saveCommandChan chan int
+	if fw.state != nil {
+		saveCommandChan = fw.state.SaveCommandChan
+	}
+
 	if fileLimit > 0 {
 		return sized.NewWriter(ctx, n, saveCommandChan, fileLimit, fw.configureWriter)
 	}

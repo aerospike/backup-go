@@ -119,6 +119,7 @@ func newBackupHandler(
 			cancel()
 			return nil, fmt.Errorf("failed to initialize state: %w", err)
 		}
+
 		// If it is a continuation operation, we load partition filters from state.
 		if config.isStateContinue() {
 			// change filters in config.
@@ -187,7 +188,6 @@ func newBackupHandler(
 	writerProcessor := newFileWriterProcessor[*models.Token](
 		emptyPrefixSuffix,
 		bh.stateSuffixGenerator,
-		nil,
 		writer,
 		encoder,
 		config.EncryptionPolicy,

@@ -22,7 +22,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const testNamespace = "test"
+const (
+	testNamespace = "test"
+	testBucket    = "test-bucket"
+)
 
 func TestValidateStorages(t *testing.T) {
 	t.Parallel()
@@ -37,7 +40,8 @@ func TestValidateStorages(t *testing.T) {
 		{
 			name: "Valid AWS S3 configuration only",
 			awsS3: &models.AwsS3{
-				Region: "us-west-2",
+				Region:     "us-west-2",
+				BucketName: testBucket,
 			},
 			gcpStorage: &models.GcpStorage{},
 			azureBlob:  &models.AzureBlob{},
@@ -47,7 +51,8 @@ func TestValidateStorages(t *testing.T) {
 			name:  "Valid GCP Storage configuration only",
 			awsS3: &models.AwsS3{},
 			gcpStorage: &models.GcpStorage{
-				BucketName: "my-bucket",
+				BucketName:             testBucket,
+				RetryBackoffMultiplier: 2,
 			},
 			azureBlob: &models.AzureBlob{},
 			wantErr:   false,
@@ -57,7 +62,7 @@ func TestValidateStorages(t *testing.T) {
 			awsS3:      &models.AwsS3{},
 			gcpStorage: &models.GcpStorage{},
 			azureBlob: &models.AzureBlob{
-				ContainerName: "my-container",
+				ContainerName: testBucket,
 				AccountName:   "account-name",
 				AccountKey:    "account-key",
 			},
@@ -98,8 +103,9 @@ func TestValidateStorages(t *testing.T) {
 		{
 			name: "Partial AWS S3 configuration",
 			awsS3: &models.AwsS3{
-				Region:  "",
-				Profile: "default",
+				BucketName: testBucket,
+				Region:     "",
+				Profile:    "default",
 			},
 			gcpStorage: &models.GcpStorage{},
 			azureBlob:  &models.AzureBlob{},
@@ -109,8 +115,9 @@ func TestValidateStorages(t *testing.T) {
 			name:  "Partial GCP Storage configuration",
 			awsS3: &models.AwsS3{},
 			gcpStorage: &models.GcpStorage{
-				BucketName: "partial-bucket",
-				KeyFile:    "",
+				BucketName:             testBucket,
+				KeyFile:                "",
+				RetryBackoffMultiplier: 2,
 			},
 			azureBlob: &models.AzureBlob{},
 			wantErr:   false,
@@ -120,7 +127,7 @@ func TestValidateStorages(t *testing.T) {
 			awsS3:      &models.AwsS3{},
 			gcpStorage: &models.GcpStorage{},
 			azureBlob: &models.AzureBlob{
-				ContainerName: "",
+				ContainerName: testBucket,
 				AccountName:   "account-name",
 				AccountKey:    "",
 			},
@@ -131,16 +138,18 @@ func TestValidateStorages(t *testing.T) {
 			awsS3:      &models.AwsS3{},
 			gcpStorage: &models.GcpStorage{},
 			azureBlob: &models.AzureBlob{
-				TenantID:     "tenant-id",
-				ClientID:     "client-id",
-				ClientSecret: "client-secret",
+				ContainerName: testBucket,
+				TenantID:      "tenant-id",
+				ClientID:      "client-id",
+				ClientSecret:  "client-secret",
 			},
 			wantErr: false,
 		},
 		{
 			name: "Only endpoints configured",
 			awsS3: &models.AwsS3{
-				Endpoint: "custom-endpoint",
+				BucketName: "custom-bucket",
+				Endpoint:   "custom-endpoint",
 			},
 			gcpStorage: &models.GcpStorage{},
 			azureBlob:  &models.AzureBlob{},
@@ -952,10 +961,11 @@ func TestValidateBackup(t *testing.T) {
 					Namespace: "test",
 				},
 				AwsS3: &models.AwsS3{
-					Region: "us-west-2",
+					BucketName: "us-west-2",
 				},
 				GcpStorage: &models.GcpStorage{
-					BucketName: "my-bucket",
+					BucketName:             "my-bucket",
+					RetryBackoffMultiplier: 2,
 				},
 			},
 			wantErr: true,
@@ -1093,10 +1103,10 @@ func TestValidateRestore(t *testing.T) {
 					Namespace: "test",
 				},
 				AwsS3: &models.AwsS3{
-					Region: "us-west-2",
+					BucketName: testBucket,
 				},
 				AzureBlob: &models.AzureBlob{
-					ContainerName: "my-container",
+					ContainerName: testBucket,
 				},
 			},
 			wantErr: true,

@@ -81,9 +81,27 @@ func (f *AzureBlob) NewFlagSet() *pflag.FlagSet {
 	case OperationRestore:
 		flagSet.Int64Var(&f.RestorePollDuration, "azure-rehydrate-poll-duration",
 			60000,
-			"How often (in milliseconds) a backup client checks object status when restoring an archived object.",
-		)
+			"How often (in milliseconds) a backup client checks object status when restoring an archived object.")
 	}
+
+	flagSet.IntVar(&f.RetryMaxAttempts, "azure-retry-max-attempts",
+		cloudMaxRetries,
+		"Max retries specifies the maximum number of attempts a failed operation will be retried\n"+
+			"before producing an error.")
+	flagSet.IntVar(&f.RetryMaxDelaySeconds, "azure-retry-max-delay",
+		cloudMaxBackoff,
+		"Max retry delay specifies the maximum delay in seconds allowed before retrying an operation.\n"+
+			"Typically the value is greater than or equal to the value specified in azure-retry-delay.")
+	flagSet.IntVar(&f.RetryDelaySeconds, "azure-retry-delay",
+		cloudBackoff,
+		"Retry delay specifies the initial amount of delay in seconds to use before retrying an operation.\n"+
+			"The value is used only if the HTTP response does not contain a Retry-After header.\n"+
+			"The delay increases exponentially with each retry up to the maximum specified by azure-retry-max-delay.")
+	flagSet.IntVar(&f.RetryTimeoutSeconds, "azure-retry-timeout",
+		0,
+		"Retry timeout in seconds indicates the maximum time allowed for any single try of an HTTP request.\n"+
+			"This is disabled by default. Specify a value greater than zero to enable.\n"+
+			"NOTE: Setting this to a small value might cause premature HTTP request time-outs.")
 
 	return flagSet
 }

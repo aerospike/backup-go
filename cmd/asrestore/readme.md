@@ -226,15 +226,24 @@ Any AWS parameter can be retrieved from Secret Agent.
       --s3-tier string                 If is set, tool will try to restore archived files to the specified tier.
                                        Tiers are: Standard, Bulk, Expedited.
       --s3-restore-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
+      --s3-retry-max-attempts int      Maximum number of attempts that should be made in case of an error. (default 100)
+      --s3-retry-max-backoff int       Max backoff duration in seconds between retried attempts. (default 90)
+      --s3-retry-backoff int           Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts. (default 60)
 
 GCP Flags:
 For GCP storage bucket name is mandatory, and is set with --gcp-bucket-name flag.
 So --directory path will only contain folder name.
 Flag --gcp-endpoint-override is mandatory, as each storage account has different service address.
 Any GCP parameter can be retrieved from Secret Agent.
-      --gcp-key-path string            Path to file containing service account JSON key.
-      --gcp-bucket-name string         Name of the Google cloud storage bucket.
-      --gcp-endpoint-override string   An alternate url endpoint to send GCP API calls to.
+      --gcp-key-path string                  Path to file containing service account JSON key.
+      --gcp-bucket-name string               Name of the Google cloud storage bucket.
+      --gcp-endpoint-override string         An alternate url endpoint to send GCP API calls to.
+      --gcp-retry-max-attempts int           Max retries specifies the maximum number of attempts a failed operation will be retried
+                                             before producing an error. (default 100)
+      --gcp-retry-max-backoff int            Max backoff is the maximum value in seconds of the retry period. (default 90)
+      --gcp-retry-init-backoff int           Initial backoff is the initial value in seconds of the retry period. (default 60)
+      --gcp-retry-backoff-multiplier float   Multiplier is the factor by which the retry period increases.
+                                             It should be greater than 1. (default 2)
 
 Azure Flags:
 For Azure storage container name is mandatory, and is set with --azure-storage-container-name flag.
@@ -253,6 +262,16 @@ Any Azure parameter can be retrieved from Secret Agent.
       --azure-access-tier string            If is set, tool will try to rehydrate archived files to the specified tier.
                                             Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
       --azure-rehydrate-poll-duration int   How often (in milliseconds) a backup client checks object status when restoring an archived object. (default 60000)
+      --azure-retry-max-attempts int        Max retries specifies the maximum number of attempts a failed operation will be retried
+                                            before producing an error. (default 100)
+      --azure-retry-max-delay int           Max retry delay specifies the maximum delay in seconds allowed before retrying an operation.
+                                            Typically the value is greater than or equal to the value specified in azure-retry-delay. (default 90)
+      --azure-retry-delay int               Retry delay specifies the initial amount of delay in seconds to use before retrying an operation.
+                                            The value is used only if the HTTP response does not contain a Retry-After header.
+                                            The delay increases exponentially with each retry up to the maximum specified by azure-retry-max-delay. (default 60)
+      --azure-retry-timeout int             Retry timeout in seconds indicates the maximum time allowed for any single try of an HTTP request.
+                                            This is disabled by default. Specify a value greater than zero to enable.
+                                            NOTE: Setting this to a small value might cause premature HTTP request time-outs.
 ```
 
 ## Unsupported flags

@@ -16,7 +16,7 @@ const testParallel = 10
 func TestPools_RunReaderBackupPool(t *testing.T) {
 	t.Parallel()
 
-	mock := mocks.NewMockreader[*models.Token](t)
+	mock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
 	mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
 		if mockCounter < testCount*testParallel {
@@ -31,7 +31,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 	mock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockprocessor[*models.Token](t)
+		mock := mocks.NewMockProcessor[*models.Token](t)
 		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
 
 		return mock
@@ -58,7 +58,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 func TestPools_RunReaderBackupPoolError(t *testing.T) {
 	t.Parallel()
 
-	mock := mocks.NewMockreader[*models.Token](t)
+	mock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
 	mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
 		if mockCounter < testCount {
@@ -73,7 +73,7 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 	mock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockprocessor[*models.Token](t)
+		mock := mocks.NewMockProcessor[*models.Token](t)
 		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
 
 		return mock
@@ -92,7 +92,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 	t.Parallel()
 
 	var mockCounterWrite int
-	mock := mocks.NewMockwriter[*models.Token](t)
+	mock := mocks.NewMockWriter[*models.Token](t)
 
 	mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
 		mockCounterWrite++
@@ -133,7 +133,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 	t.Parallel()
 
-	mock := mocks.NewMockwriter[*models.Token](t)
+	mock := mocks.NewMockWriter[*models.Token](t)
 
 	var mockCounter int
 	mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {

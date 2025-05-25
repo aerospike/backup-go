@@ -14,7 +14,7 @@ import (
 func TestPipe_RunBackupPipe(t *testing.T) {
 	t.Parallel()
 
-	readersMock := mocks.NewMockreader[*models.Token](t)
+	readersMock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
 	readersMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
 		if mockCounter < testCount*testParallel {
@@ -29,14 +29,14 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	readersMock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockprocessor[*models.Token](t)
+		mock := mocks.NewMockProcessor[*models.Token](t)
 		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
 
 		return mock
 	}
 
 	var mockCounterWrite int
-	writersMocks := mocks.NewMockwriter[*models.Token](t)
+	writersMocks := mocks.NewMockWriter[*models.Token](t)
 
 	writersMocks.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
 		mockCounterWrite++
@@ -71,7 +71,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 func TestPipe_RunBackupPipeError(t *testing.T) {
 	t.Parallel()
 
-	readersMock := mocks.NewMockreader[*models.Token](t)
+	readersMock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
 	readersMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
 		if mockCounter < testCount {
@@ -85,13 +85,13 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 	readersMock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockprocessor[*models.Token](t)
+		mock := mocks.NewMockProcessor[*models.Token](t)
 		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
 
 		return mock
 	}
 
-	writersMocks := mocks.NewMockwriter[*models.Token](t)
+	writersMocks := mocks.NewMockWriter[*models.Token](t)
 	var mockCounterWrite int
 	writersMocks.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
 		if mockCounterWrite < testCount {

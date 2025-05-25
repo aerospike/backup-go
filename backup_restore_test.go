@@ -1435,13 +1435,16 @@ func TestBackupContinuation(t *testing.T) {
 			time.Sleep(time.Duration(randomNumber) * time.Second)
 			cancel()
 		}()
-
+		t.Log("first backup")
 		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
+		t.Log("first backup finished")
 
 		ctx = context.Background()
+		t.Log("continue backup")
 		second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
+		t.Log("continue backup finished")
 
 		t.Log("first:", first, "second:", second)
 		t.Log(first + second)

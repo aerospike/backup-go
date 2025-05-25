@@ -31,8 +31,8 @@ type Pipe[T models.TokenConstraint] struct {
 	fanout    *Fanout[T]
 }
 
-// NewBackupPipe creates cew backup pipeline.
-func NewBackupPipe[T models.TokenConstraint](
+// NewPipe creates cew backup pipeline.
+func NewPipe[T models.TokenConstraint](
 	pc ProcessorCreator[T],
 	readers []Reader[T],
 	writers []Writer[T],
@@ -40,8 +40,8 @@ func NewBackupPipe[T models.TokenConstraint](
 	strategy FanoutStrategy,
 	xdrRule RouteRule[T],
 ) (*Pipe[T], error) {
-	readPool := NewReaderBackupPool[T](readers, pc)
-	writePool := NewWriterBackupPool[T](writers, limiter)
+	readPool := NewReaderPool[T](readers, pc)
+	writePool := NewWriterPool[T](writers, limiter)
 	// Swap channels!
 	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, getOpts[T](strategy, xdrRule)...)
 	if err != nil {

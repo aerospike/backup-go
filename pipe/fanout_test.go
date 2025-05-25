@@ -42,6 +42,14 @@ func TestFanout_Validation(t *testing.T) {
 	fan, err = NewFanout[*models.Token](inputs, outputs, WithStrategy[*models.Token](CustomRule))
 	require.Nil(t, fan)
 	require.ErrorContains(t, err, "custom rule is required for CustomRule strategy")
+
+	fan, err = NewFanout[*models.Token](inputs, nil, WithStrategy[*models.Token](CustomRule))
+	require.Nil(t, fan)
+	require.ErrorContains(t, err, "no outputs provided")
+
+	fan, err = NewFanout[*models.Token](nil, outputs, WithStrategy[*models.Token](CustomRule))
+	require.Nil(t, fan)
+	require.ErrorContains(t, err, "no inputs provided")
 }
 
 func TestFanout_RunDefault(t *testing.T) {

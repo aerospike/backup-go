@@ -84,6 +84,14 @@ func NewFanout[T models.TokenConstraint](
 	}
 
 	// Validations.
+	if len(f.Outputs) == 0 {
+		return nil, fmt.Errorf("no outputs provided")
+	}
+
+	if len(f.Inputs) == 0 {
+		return nil, fmt.Errorf("no inputs provided")
+	}
+
 	switch f.strategy {
 	case Straight:
 		if len(f.Outputs) != len(f.Inputs) {
@@ -157,10 +165,6 @@ func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 
 // routeStraightData routes a given piece of data to the output channel at the given index.
 func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
-	if len(f.Outputs) == 0 {
-		return
-	}
-
 	select {
 	case <-ctx.Done():
 		return
@@ -170,10 +174,6 @@ func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
 
 // routeRoundRobinData routes a given piece of data to the output channel at the next index in round-robin fashion.
 func (f *Fanout[T]) routeRoundRobinData(ctx context.Context, data T) {
-	if len(f.Outputs) == 0 {
-		return
-	}
-
 	f.indexMu.Lock()
 	index := f.currentIndex
 	f.currentIndex = (f.currentIndex + 1) % len(f.Outputs)
@@ -188,10 +188,6 @@ func (f *Fanout[T]) routeRoundRobinData(ctx context.Context, data T) {
 
 // routeCustomRuleData routes a given piece of data to the output channel based on the custom rule.
 func (f *Fanout[T]) routeCustomRuleData(ctx context.Context, data T) {
-	if len(f.Outputs) == 0 || f.rule == nil {
-		return
-	}
-
 	index := f.rule(data)
 
 	select {

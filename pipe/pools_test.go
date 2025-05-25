@@ -53,7 +53,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool := NewReaderBackupPool[*models.Token]([]Reader[*models.Token]{mock, mock, mock}, newProcessorMock)
+	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{mock, mock, mock}, newProcessorMock)
 	require.NotNil(t, pool)
 
 	err := pool.Run(ctx)
@@ -95,7 +95,7 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool := NewReaderBackupPool[*models.Token]([]Reader[*models.Token]{mock, mock, mock}, newProcessorMock)
+	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{mock, mock, mock}, newProcessorMock)
 	require.NotNil(t, pool)
 
 	err := pool.Run(ctx)
@@ -122,7 +122,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 		writers[i] = mock
 	}
 
-	pool := NewWriterBackupPool[*models.Token](writers, nil)
+	pool := NewWriterPool[*models.Token](writers, nil)
 	require.NotNil(t, pool)
 
 	go func() {
@@ -164,7 +164,7 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool := NewWriterBackupPool[*models.Token]([]Writer[*models.Token]{mock, mock, mock}, nil)
+	pool := NewWriterPool[*models.Token]([]Writer[*models.Token]{mock, mock, mock}, nil)
 	require.NotNil(t, pool)
 
 	go func() {

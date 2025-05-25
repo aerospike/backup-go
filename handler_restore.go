@@ -169,7 +169,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		pipelineMode = pipe.Straight
 	}
 
-	pl, err := pipe.NewBackupPipe(
+	pl, err := pipe.NewPipe(
 		composeProcessor,
 		dataReaders,
 		dataWriters,

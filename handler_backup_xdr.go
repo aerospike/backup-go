@@ -180,7 +180,7 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 		processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
 	)
 
-	pl, err := pipe.NewBackupPipe(
+	pl, err := pipe.NewPipe(
 		proc,
 		readWorkers,
 		writeWorkers,

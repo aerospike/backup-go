@@ -66,7 +66,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		readerSlice[i] = readersMock
 	}
 
-	p, err := NewBackupPipe(
+	p, err := NewPipe(
 		newProcessorMock,
 		readerSlice,
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
@@ -80,6 +80,10 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	err = p.Run(ctx)
 	require.NoError(t, err)
 	require.Equal(t, testCount*testParallel, mockCounterWrite)
+
+	in, out := p.GetMetrics()
+	require.Equal(t, 0, in)
+	require.Equal(t, 0, out)
 }
 
 func TestPipe_RunBackupPipeError(t *testing.T) {
@@ -120,12 +124,12 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 
 	ctx := context.Background()
 
-	p, err := NewBackupPipe(
+	p, err := NewPipe(
 		newProcessorMock,
-		[]Reader[*models.Token]{readersMock},
+		[]Reader[*models.Token]{readersMock, readersMock, readersMock},
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
 		nil,
-		RoundRobin,
+		Straight,
 		nil,
 	)
 	require.NoError(t, err)
@@ -133,4 +137,26 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 
 	err = p.Run(ctx)
 	require.ErrorIs(t, err, errTest)
+}
+
+func TestPipe_NewBackupPipeError(t *testing.T) {
+	t.Parallel()
+
+	newProcessorMock := func() Processor[*models.Token] {
+		mock := mocks.NewMockProcessor[*models.Token](t)
+		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+
+		return mock
+	}
+
+	p, err := NewPipe(
+		newProcessorMock,
+		nil,
+		nil,
+		nil,
+		CustomRule,
+		nil,
+	)
+	require.ErrorContains(t, err, "failed to create fanout")
+	require.Nil(t, p)
 }

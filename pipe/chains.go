@@ -58,20 +58,20 @@ func (c *Chain[T]) Run(ctx context.Context) error {
 	return c.routine(ctx)
 }
 
-// NewReaderBackupChain returns a new Chain with a Reader and a Processor,
+// NewReaderChain returns a new Chain with a Reader and a Processor,
 // and communication channel for backup operation.
 //
 //nolint:gocritic // No need to give names to the result here.
-func NewReaderBackupChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (*Chain[T], chan T) {
+func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (*Chain[T], chan T) {
 	output := make(chan T, readerBufferSize)
-	routine := newReaderBackupRoutine(r, p, output)
+	routine := newReaderRoutine(r, p, output)
 
 	return &Chain[T]{
 		routine: routine,
 	}, output
 }
 
-func newReaderBackupRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], output chan<- T,
+func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], output chan<- T,
 ) func(context.Context) error {
 	return func(ctx context.Context) error {
 		defer r.Close()
@@ -110,20 +110,20 @@ func newReaderBackupRoutine[T models.TokenConstraint](r Reader[T], p Processor[T
 	}
 }
 
-// NewWriterBackupChain returns a new Chain with a Writer,
+// NewWriterChain returns a new Chain with a Writer,
 // and communication channel for backup operation.
 //
 //nolint:gocritic // No need to give names to the result here.
-func NewWriterBackupChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter) (*Chain[T], chan T) {
+func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter) (*Chain[T], chan T) {
 	input := make(chan T, writerBufferSize)
-	routine := newWriterBackupRoutine(w, input, limiter)
+	routine := newWriterRoutine(w, input, limiter)
 
 	return &Chain[T]{
 		routine: routine,
 	}, input
 }
 
-func newWriterBackupRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, limiter *rate.Limiter,
+func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, limiter *rate.Limiter,
 ) func(context.Context) error {
 	// Notice!
 	// It is important to return func with `(err error)`,

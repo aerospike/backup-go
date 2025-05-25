@@ -359,7 +359,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		pipelineMode = pipe.Straight
 	}
 
-	pl, err := pipe.NewBackupPipe(
+	pl, err := pipe.NewPipe(
 		proc,
 		dataReaders,
 		dataWriters,
@@ -481,7 +481,7 @@ func (bh *BackupHandler) backupSIndexes(
 
 	proc := newDataProcessor(processors.NewNoop[*models.Token]())
 
-	sindexPipeline, err := pipe.NewBackupPipe(
+	sindexPipeline, err := pipe.NewPipe(
 		proc,
 		[]pipe.Reader[*models.Token]{dataReader},
 		[]pipe.Writer[*models.Token]{sindexWriter},
@@ -520,7 +520,7 @@ func (bh *BackupHandler) backupUDFs(
 
 	proc := newDataProcessor(processors.NewNoop[*models.Token]())
 
-	udfPipeline, err := pipe.NewBackupPipe(
+	udfPipeline, err := pipe.NewPipe(
 		proc,
 		[]pipe.Reader[*models.Token]{dataReader},
 		[]pipe.Writer[*models.Token]{udfWriter},

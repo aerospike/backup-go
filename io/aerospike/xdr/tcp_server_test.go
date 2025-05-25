@@ -46,7 +46,7 @@ func newDefaultTCPConfig() *TCPConfig {
 		defaultQueueSize,
 		defaultQueueSize,
 		defaultMaxConnections,
-		metrics.NewCollector(context.Background(), slog.Default(), metrics.MetricRecordsPerSecond, "", true),
+		metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond, "", true),
 	)
 }
 

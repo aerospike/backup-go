@@ -23,7 +23,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 )
@@ -66,7 +66,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *rate.Limiter
 
-	pl            *pipeline.Pipeline[T]
+	pl            *pipe.Pipe[T]
 	rpsCollector  *metrics.Collector
 	kbpsCollector *metrics.Collector
 
@@ -97,14 +97,14 @@ func newRestoreHandler[T models.TokenConstraint](
 	rpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
-		metrics.MetricRecordsPerSecond,
+		metrics.RecordsPerSecond,
 		metricMessage,
 		config.MetricsEnabled,
 	)
 	kbpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
-		metrics.MetricKilobytesPerSecond,
+		metrics.KilobytesPerSecond,
 		metricMessage,
 		config.MetricsEnabled,
 	)
@@ -152,9 +152,9 @@ func (rh *RestoreHandler[T]) run() {
 }
 
 func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
-	readWorkers := rh.readProcessor.newReadWorkers(ctx)
+	dataReaders := rh.readProcessor.newDataReaders(ctx)
 
-	writeWorkers, err := rh.writeProcessor.newWriterWorkers()
+	dataWriters, err := rh.writeProcessor.newDataWriters()
 	if err != nil {
 		return fmt.Errorf("failed to create writer workers: %w", err)
 	}
@@ -164,16 +164,18 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		return fmt.Errorf("failed to create compose processor: %w", err)
 	}
 
-	pipelineMode := pipeline.ModeSingle
+	pipelineMode := pipe.RoundRobin
 	if rh.config.EncoderType == EncoderTypeASBX {
-		pipelineMode = pipeline.ModeParallel
+		pipelineMode = pipe.Straight
 	}
 
-	pl, err := pipeline.NewPipeline(
-		pipelineMode, nil,
-		readWorkers,
+	pl, err := pipe.NewBackupPipe(
 		composeProcessor,
-		writeWorkers,
+		dataReaders,
+		dataWriters,
+		rh.limiter,
+		pipelineMode,
+		nil,
 	)
 	if err != nil {
 		return err
@@ -185,7 +187,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 	return pl.Run(ctx)
 }
 
-func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) ([]pipeline.Worker[T], error) {
+func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.ProcessorCreator[T], error) {
 	switch rh.config.EncoderType {
 	case EncoderTypeASB:
 		// Namespace Source and Destination
@@ -195,7 +197,7 @@ func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) ([]pipelin
 			nsDest = rh.config.Namespace.Destination
 		}
 
-		return newTokenWorker[T](processors.NewComposeProcessor[T](
+		return newDataProcessor[T](
 			processors.NewRecordCounter[T](&rh.stats.ReadRecords),
 			processors.NewSizeCounter[T](&rh.stats.TotalBytesRead),
 			processors.NewFilterByType[T](rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs),
@@ -204,14 +206,14 @@ func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) ([]pipelin
 			processors.NewChangeNamespace[T](nsSource, nsDest),
 			processors.NewExpirationSetter[T](&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
 			processors.NewTPSLimiter[T](ctx, rh.config.RecordsPerSecond),
-		), rh.config.Parallel), nil
+		), nil
 
 	case EncoderTypeASBX:
-		return newTokenWorker[T](processors.NewComposeProcessor[T](
+		return newDataProcessor[T](
 			processors.NewSizeCounter[T](&rh.stats.TotalBytesRead),
 			processors.NewTokenCounter[T](&rh.stats.ReadRecords),
 			processors.NewTPSLimiter[T](ctx, rh.config.RecordsPerSecond),
-		), rh.config.Parallel), nil
+		), nil
 
 	default:
 		return nil, fmt.Errorf("unknown encoder type: %d", rh.config.EncoderType)

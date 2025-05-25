@@ -30,7 +30,6 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
@@ -138,7 +137,7 @@ func newBackupHandler(
 	rpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
-		metrics.MetricRecordsPerSecond,
+		metrics.RecordsPerSecond,
 		metricMessage,
 		config.MetricsEnabled,
 	)
@@ -146,7 +145,7 @@ func newBackupHandler(
 	kbpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
-		metrics.MetricKilobytesPerSecond,
+		metrics.KilobytesPerSecond,
 		metricMessage,
 		config.MetricsEnabled,
 	)
@@ -304,7 +303,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// TODO: move this inside writer processor.
+
 	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
 
 	defer closeWriters(backupWriters, bh.logger)
@@ -343,29 +342,39 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	// ensuring each worker adheres to a portion of the total RPS limit.
 	rps := bh.config.RecordsPerSecond / bh.config.ParallelRead
 
-	proc := NewProcessorWrap(
+	proc := newDataProcessor(
 		processors.NewRecordCounter[*models.Token](&bh.stats.ReadRecords),
 		processors.NewVoidTimeSetter[*models.Token](bh.logger),
 		processors.NewTPSLimiter[*models.Token](
 			ctx, rps),
 	)
 
-	dataReaders, err := bh.readerProcessor.makeAerospikeReadWorkers(ctx, bh.config.ParallelRead)
+	dataReaders, err := bh.readerProcessor.newAerospikeReadWorkers(ctx, bh.config.ParallelRead)
 	if err != nil {
 		return err
 	}
 
-	pip, err := pipe.NewBackupPipe(
+	pipelineMode := pipe.RoundRobin
+	if bh.config.StateFile != "" {
+		pipelineMode = pipe.Straight
+	}
+
+	pl, err := pipe.NewBackupPipe(
 		proc,
 		dataReaders,
 		dataWriters,
 		bh.limiter,
+		pipelineMode,
+		nil,
 	)
+	if err != nil {
+		return err
+	}
 
 	// Assign, so we can get pl stats.
-	bh.pl = pip
+	bh.pl = pl
 
-	return pip.Run(ctx)
+	return pl.Run(ctx)
 }
 
 func (bh *BackupHandler) countRecords(ctx context.Context) {
@@ -376,26 +385,6 @@ func (bh *BackupHandler) countRecords(ctx context.Context) {
 	}
 
 	bh.stats.TotalRecords.Store(records)
-}
-
-func (bh *BackupHandler) makeWriteWorkers(
-	backupWriters []io.WriteCloser,
-) []pipeline.Worker[*models.Token] {
-	writeWorkers := make([]pipeline.Worker[*models.Token], len(backupWriters))
-
-	for i, w := range backupWriters {
-		var dataWriter pipeline.DataWriter[*models.Token] = newTokenWriter(bh.encoder, w, bh.logger, nil)
-
-		if bh.state != nil {
-			stInfo := newStateInfo(bh.state.RecordsStateChan, i)
-			dataWriter = newTokenWriter(bh.encoder, w, bh.logger, stInfo)
-		}
-
-		dataWriter = newWriterWithTokenStats(dataWriter, bh.stats, bh.logger)
-		writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, bh.limiter)
-	}
-
-	return writeWorkers
 }
 
 func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
@@ -472,30 +461,33 @@ func (bh *BackupHandler) backupSIndexes(
 	ctx context.Context,
 	writer io.Writer,
 ) error {
-	reader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
-	sindexReadWorker := pipeline.NewReadWorker[*models.Token](reader)
+	dataReader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
 
-	sindexWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
-
+	var stInfo *stateInfo
 	if bh.state != nil {
-		stInfo := newStateInfo(bh.state.RecordsStateChan, -1)
-		sindexWriter = pipeline.DataWriter[*models.Token](
-			newTokenWriter(
-				bh.encoder,
-				writer,
-				bh.logger,
-				stInfo,
-			),
-		)
+		stInfo = newStateInfo(bh.state.RecordsStateChan, -1)
 	}
 
-	sindexWriter = newWriterWithTokenStats(sindexWriter, bh.stats, bh.logger)
-	sindexWriteWorker := pipeline.NewWriteWorker(sindexWriter, bh.limiter)
+	sindexWriter := pipe.Writer[*models.Token](
+		newTokenWriter(
+			bh.encoder,
+			writer,
+			bh.logger,
+			stInfo,
+		),
+	)
 
-	sindexPipeline, err := pipeline.NewPipeline[*models.Token](
-		bh.config.PipelinesMode, nil,
-		[]pipeline.Worker[*models.Token]{sindexReadWorker},
-		[]pipeline.Worker[*models.Token]{sindexWriteWorker},
+	sindexWriter = newWriterWithTokenStats(sindexWriter, bh.stats, bh.logger)
+
+	proc := newDataProcessor(processors.NewNoop[*models.Token]())
+
+	sindexPipeline, err := pipe.NewBackupPipe(
+		proc,
+		[]pipe.Reader[*models.Token]{dataReader},
+		[]pipe.Writer[*models.Token]{sindexWriter},
+		bh.limiter,
+		pipe.Straight,
+		nil,
 	)
 	if err != nil {
 		return err
@@ -508,30 +500,33 @@ func (bh *BackupHandler) backupUDFs(
 	ctx context.Context,
 	writer io.Writer,
 ) error {
-	reader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
-	udfReadWorker := pipeline.NewReadWorker[*models.Token](reader)
+	dataReader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
 
-	udfWriter := pipeline.DataWriter[*models.Token](newTokenWriter(bh.encoder, writer, bh.logger, nil))
-
+	var stInfo *stateInfo
 	if bh.state != nil {
-		stInfo := newStateInfo(bh.state.RecordsStateChan, -1)
-		udfWriter = pipeline.DataWriter[*models.Token](
-			newTokenWriter(
-				bh.encoder,
-				writer,
-				bh.logger,
-				stInfo,
-			),
-		)
+		stInfo = newStateInfo(bh.state.RecordsStateChan, -1)
 	}
 
-	udfWriter = newWriterWithTokenStats(udfWriter, bh.stats, bh.logger)
-	udfWriteWorker := pipeline.NewWriteWorker(udfWriter, bh.limiter)
+	udfWriter := pipe.Writer[*models.Token](
+		newTokenWriter(
+			bh.encoder,
+			writer,
+			bh.logger,
+			stInfo,
+		),
+	)
 
-	udfPipeline, err := pipeline.NewPipeline[*models.Token](
-		bh.config.PipelinesMode, nil,
-		[]pipeline.Worker[*models.Token]{udfReadWorker},
-		[]pipeline.Worker[*models.Token]{udfWriteWorker},
+	udfWriter = newWriterWithTokenStats(udfWriter, bh.stats, bh.logger)
+
+	proc := newDataProcessor(processors.NewNoop[*models.Token]())
+
+	udfPipeline, err := pipe.NewBackupPipe(
+		proc,
+		[]pipe.Reader[*models.Token]{dataReader},
+		[]pipe.Writer[*models.Token]{udfWriter},
+		bh.limiter,
+		pipe.Straight,
+		nil,
 	)
 	if err != nil {
 		return err
@@ -547,9 +542,9 @@ func (bh *BackupHandler) GetMetrics() *models.Metrics {
 	}
 
 	var pr, pw int
-	// if bh.pl != nil {
-	// 	pr, pw = bh.pl.GetMetrics()
-	// }
+	if bh.pl != nil {
+		pr, pw = bh.pl.GetMetrics()
+	}
 
 	return models.NewMetrics(
 		pr, pw,

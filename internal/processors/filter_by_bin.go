@@ -20,7 +20,6 @@ import (
 
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 )
 
 // filterByBin will remove bins with names in binsToRemove from every record it receives.
@@ -30,7 +29,7 @@ type filterByBin[T models.TokenConstraint] struct {
 }
 
 // NewFilterByBin creates new filterByBin processor with given binList.
-func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.Uint64) pipeline.DataProcessor[T] {
+func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.Uint64) processor[T] {
 	return &filterByBin[T]{
 		binsToRemove: util.ListToMap(binList),
 		skipped:      skipped,
@@ -58,7 +57,7 @@ func (p filterByBin[T]) Process(token T) (T, error) {
 
 	if len(t.Record.Bins) == 0 {
 		p.skipped.Add(1)
-		return nil, pipeline.ErrFilteredOut
+		return nil, models.ErrFilteredOut
 	}
 
 	return any(t).(T), nil

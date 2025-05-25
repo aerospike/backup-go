@@ -17,16 +17,19 @@ type Pipe[T models.TokenConstraint] struct {
 	fanout    *Fanout[T]
 }
 
+// NewBackupPipe creates cew backup pipeline.
 func NewBackupPipe[T models.TokenConstraint](
 	pc ProcessorCreator[T],
 	readers []Reader[T],
 	writers []Writer[T],
 	limiter *rate.Limiter,
+	strategy FanoutStrategy,
+	xdrRule RouteRule[T],
 ) (*Pipe[T], error) {
 	readPool := NewReaderBackupPool[T](readers, pc)
 	writePool := NewWriterBackupPool[T](writers, limiter)
 	// Swap channels!
-	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, WithStrategy[T](RoundRobin))
+	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, getOpts[T](strategy, xdrRule)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fanout: %w", err)
 	}
@@ -36,6 +39,21 @@ func NewBackupPipe[T models.TokenConstraint](
 		writePool: writePool,
 		fanout:    fanout,
 	}, nil
+}
+
+func getOpts[T models.TokenConstraint](strategy FanoutStrategy, xdrRule RouteRule[T]) []FanoutOption[T] {
+	opts := make([]FanoutOption[T], 0)
+
+	switch strategy {
+	case Straight:
+		opts = append(opts, WithStrategy[T](Straight))
+	case RoundRobin:
+		opts = append(opts, WithStrategy[T](RoundRobin))
+	case CustomRule:
+		opts = append(opts, WithStrategy[T](CustomRule), WithRule[T](xdrRule))
+	}
+
+	return opts
 }
 
 func (p *Pipe[T]) Run(ctx context.Context) error {
@@ -48,6 +66,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 	wg.Add(3)
 
+	// Run readers.
 	go func() {
 		defer wg.Done()
 
@@ -61,6 +80,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		}
 	}()
 
+	// Run writers.
 	go func() {
 		defer wg.Done()
 
@@ -74,6 +94,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		}
 	}()
 
+	// Run fanout.
 	go func() {
 		defer wg.Done()
 		p.fanout.Run(ctx)
@@ -81,6 +102,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 	wg.Wait()
 
+	// Process errors.
 	close(errorCh)
 
 	var errs []error
@@ -92,4 +114,9 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 	}
 
 	return errors.Join(errs...)
+}
+
+// GetMetrics returns summ of len for input and output channels.
+func (p *Pipe[T]) GetMetrics() (in, out int) {
+	return p.fanout.GetMetrics()
 }

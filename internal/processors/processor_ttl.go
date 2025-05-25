@@ -23,7 +23,6 @@ import (
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 )
 
@@ -40,7 +39,7 @@ type expirationSetter[T models.TokenConstraint] struct {
 
 // NewExpirationSetter creates a new expirationSetter processor
 func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extraTTL int64, logger *slog.Logger,
-) pipeline.DataProcessor[T] {
+) processor[T] {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
 	logger.Debug("created new TTL processor")
@@ -56,7 +55,7 @@ func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extra
 // errExpiredRecord is returned when a record is expired
 // by embedding errFilteredOut, the processor worker will filter out the token
 // containing the expired record
-var errExpiredRecord = fmt.Errorf("%w: record is expired", pipeline.ErrFilteredOut)
+var errExpiredRecord = fmt.Errorf("%w: record is expired", models.ErrFilteredOut)
 
 // Process sets the TTL of a record based on its VoidTime
 func (p *expirationSetter[T]) Process(token T) (T, error) {

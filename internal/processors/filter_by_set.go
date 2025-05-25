@@ -20,7 +20,6 @@ import (
 
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 )
 
 // filterBySet filter records by set.
@@ -30,7 +29,7 @@ type filterBySet[T models.TokenConstraint] struct {
 }
 
 // NewFilterBySet creates new filterBySet processor with given setList.
-func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.Uint64) pipeline.DataProcessor[T] {
+func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.Uint64) processor[T] {
 	return &filterBySet[T]{
 		setsToRestore: util.ListToMap(setList),
 		skipped:       skipped,
@@ -60,5 +59,5 @@ func (p filterBySet[T]) Process(token T) (T, error) {
 
 	p.skipped.Add(1)
 
-	return nil, pipeline.ErrFilteredOut
+	return nil, models.ErrFilteredOut
 }

@@ -16,10 +16,6 @@ const (
 	writerBufferSize = 10000
 )
 
-// ErrFilteredOut is returned by a Processor when a token
-// should be filtered out of the pipeline.
-var ErrFilteredOut = errors.New("filtered out")
-
 // Reader describes data readers. To exit worker, the Reader must return io.EOF.
 type Reader[T models.TokenConstraint] interface {
 	Read() (T, error)
@@ -83,7 +79,7 @@ func newReaderBackupRoutine[T models.TokenConstraint](r Reader[T], p Processor[T
 
 				processed, err := p.Process(data)
 				if err != nil {
-					if errors.Is(err, ErrFilteredOut) {
+					if errors.Is(err, models.ErrFilteredOut) {
 						continue
 					}
 

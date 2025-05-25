@@ -56,7 +56,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	}
 }
 
-func (rr *recordReaderProcessor[T]) makeAerospikeReadWorkers(
+func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(
 	ctx context.Context, n int,
 ) ([]pipe.Reader[*models.Token], error) {
 	scanPolicy := *rr.config.ScanPolicy
@@ -67,13 +67,13 @@ func (rr *recordReaderProcessor[T]) makeAerospikeReadWorkers(
 
 	// If we are paralleling scans by nodes.
 	if rr.config.isParalleledByNodes() {
-		return rr.makeAerospikeReadWorkersForNodes(ctx, n, &scanPolicy)
+		return rr.newAerospikeReadWorkersForNodes(ctx, n, &scanPolicy)
 	}
 
-	return rr.makeAerospikeReadWorkersForPartition(ctx, n, &scanPolicy)
+	return rr.newAerospikeReadWorkersForPartition(ctx, n, &scanPolicy)
 }
 
-func (rr *recordReaderProcessor[T]) makeAerospikeReadWorkersForPartition(
+func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForPartition(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipe.Reader[*models.Token], error) {
 	var err error
@@ -113,7 +113,7 @@ func (rr *recordReaderProcessor[T]) makeAerospikeReadWorkersForPartition(
 	return readers, nil
 }
 
-func (rr *recordReaderProcessor[T]) makeAerospikeReadWorkersForNodes(
+func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForNodes(
 	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
 ) ([]pipe.Reader[*models.Token], error) {
 	nodes, err := rr.getNodes()

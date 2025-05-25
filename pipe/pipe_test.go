@@ -17,7 +17,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	readersMock := mocks.NewMockreader[*models.Token](t)
 	var mockCounter int
 	readersMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-		if mockCounter < testCount {
+		if mockCounter < testCount*testParallel {
 			mockCounter++
 			time.Sleep(testDealy)
 			return defaultToken(), nil
@@ -47,10 +47,18 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 
 	ctx := context.Background()
 
+	readerSlice := make([]Reader[*models.Token], testParallel)
+	for i := range testParallel {
+		readerSlice[i] = readersMock
+	}
+
 	p, err := NewBackupPipe(
 		newProcessorMock,
-		[]Reader[*models.Token]{readersMock},
+		readerSlice,
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
+		nil,
+		RoundRobin,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, p)
@@ -102,6 +110,9 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 		newProcessorMock,
 		[]Reader[*models.Token]{readersMock},
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
+		nil,
+		RoundRobin,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, p)

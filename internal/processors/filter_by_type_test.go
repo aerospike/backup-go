@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -176,7 +175,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 			if tt.expectError {
 				assert.Nil(t, result)
 				assert.Error(t, err)
-				assert.True(t, errors.Is(err, pipeline.ErrFilteredOut))
+				assert.True(t, errors.Is(err, models.ErrFilteredOut))
 				assert.Contains(t, err.Error(), tt.errorMessage)
 			} else {
 				assert.NoError(t, err)

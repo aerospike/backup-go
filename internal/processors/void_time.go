@@ -21,7 +21,6 @@ import (
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/google/uuid"
 )
 
@@ -36,7 +35,7 @@ type voidTimeSetter[T models.TokenConstraint] struct {
 }
 
 // NewVoidTimeSetter creates a new VoidTimeProcessor
-func NewVoidTimeSetter[T models.TokenConstraint](logger *slog.Logger) pipeline.DataProcessor[T] {
+func NewVoidTimeSetter[T models.TokenConstraint](logger *slog.Logger) processor[T] {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeVoidTime)
 	logger.Debug("created new VoidTime processor")

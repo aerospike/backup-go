@@ -19,7 +19,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 	mock := mocks.NewMockreader[*models.Token](t)
 	var mockCounter int
 	mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-		if mockCounter < testCount {
+		if mockCounter < testCount*testParallel {
 			mockCounter++
 			time.Sleep(testDealy)
 			return defaultToken(), nil
@@ -103,7 +103,12 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 
 	ctx := context.Background()
 
-	pool := NewWriterBackupPool[*models.Token]([]Writer[*models.Token]{mock, mock, mock}, nil)
+	writers := make([]Writer[*models.Token], testParallel)
+	for i := range testParallel {
+		writers[i] = mock
+	}
+
+	pool := NewWriterBackupPool[*models.Token](writers, nil)
 	require.NotNil(t, pool)
 
 	go func() {

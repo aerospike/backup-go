@@ -56,7 +56,7 @@ func TestNewPerSecondCollector(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, tc.enabled)
+			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
 
 			assert.NotNil(t, collector)
 			assert.NotNil(t, collector.Increment)
@@ -122,7 +122,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, true)
+	collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, true)
 	assert.NotNil(t, collector)
 
 	for i := 0; i < 10; i++ {
@@ -182,7 +182,7 @@ func TestPerSecondCollector_Increment(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, tc.enabled)
+			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
 
 			for i := 0; i < tc.numCalls; i++ {
 				collector.Increment()
@@ -226,7 +226,7 @@ func TestPerSecondCollector_Add(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			collector := NewCollector(ctx, logger, MetricRecordsPerSecond, testMetricMessage, tc.enabled)
+			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
 
 			collector.Add(tc.value)
 
@@ -243,9 +243,9 @@ func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	collector := NewCollector(ctx, logger, MetricKilobytesPerSecond, testMetricMessage, true)
+	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 	assert.NotNil(t, collector)
-	assert.Equal(t, MetricKilobytesPerSecond, collector.name)
+	assert.Equal(t, KilobytesPerSecond, collector.name)
 
 	// because of rounding to uint, we should use 1024 for the test.
 	collector.Add(1025)

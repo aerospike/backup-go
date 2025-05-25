@@ -23,7 +23,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/xdr"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -95,18 +95,13 @@ func (rr *recordReaderProcessorXDR[T]) recordReaderConfigForXDR() *xdr.RecordRea
 // newReadWorkersXDR returns an XDR reader worker. The XDR reader worker will always
 // use *models.ASBXToken.
 func (rr *recordReaderProcessorXDR[T]) newReadWorkersXDR(ctx context.Context,
-) ([]pipeline.Worker[*models.ASBXToken], error) {
-	// For xdr we will have 1 worker always.
-	readWorkers := make([]pipeline.Worker[*models.ASBXToken], 1)
-
+) ([]pipe.Reader[*models.ASBXToken], error) {
 	readerConfig := rr.recordReaderConfigForXDR()
 	reader, err := xdr.NewRecordReader(ctx, rr.infoClient, readerConfig, rr.logger)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create xdr reader: %w", err)
 	}
-
-	readWorkers[0] = pipeline.NewReadWorker[*models.ASBXToken](reader)
-
-	return readWorkers, nil
+	// For xdr we will have 1 worker always.
+	return []pipe.Reader[*models.ASBXToken]{reader}, nil
 }

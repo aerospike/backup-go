@@ -25,7 +25,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
 )
 
@@ -49,7 +49,7 @@ type HandlerBackupXDR struct {
 	// For graceful shutdown.
 	wg sync.WaitGroup
 
-	pl *pipeline.Pipeline[*models.ASBXToken]
+	pl *pipe.Pipe[*models.ASBXToken]
 
 	// records per second collector.
 	rpsCollector *metrics.Collector
@@ -81,7 +81,7 @@ func newBackupXDRHandler(
 	rpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
-		metrics.MetricRecordsPerSecond,
+		metrics.RecordsPerSecond,
 		metricMessage,
 		config.MetricsEnabled,
 	)
@@ -89,7 +89,7 @@ func newBackupXDRHandler(
 	kbpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
-		metrics.MetricKilobytesPerSecond,
+		metrics.KilobytesPerSecond,
 		metricMessage,
 		config.MetricsEnabled,
 	)
@@ -173,24 +173,24 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 		return fmt.Errorf("failed to create storage writers: %w", err)
 	}
 
+	writeWorkers := bh.writerProcessor.newDataWriters(backupWriters)
+
 	defer closeWriters(backupWriters, bh.logger)
 
-	writeWorkers := bh.writerProcessor.newWriteWorkers(backupWriters)
-
-	// Process workers.
-	composeProcessor := newTokenWorker[*models.ASBXToken](
+	proc := newDataProcessor(
 		processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
-		1)
+	)
 
-	// Create a pipeline and start.
-	pl, err := pipeline.NewPipeline(
-		pipeline.ModeSingleParallel, bh.splitFunc,
+	pl, err := pipe.NewBackupPipe(
+		proc,
 		readWorkers,
-		composeProcessor,
 		writeWorkers,
+		nil,
+		pipe.CustomRule,
+		bh.splitFunc,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create pipeline: %w", err)
+		return err
 	}
 
 	// Assign, so we can get pl stats.

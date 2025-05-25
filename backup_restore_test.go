@@ -32,7 +32,6 @@ import (
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/aerospike/backup-go/tests"
 	"github.com/stretchr/testify/require"
 )
@@ -1481,7 +1480,6 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	backupCfg.FileLimit = 10
 	backupCfg.Bandwidth = 1000000
 	backupCfg.PageSize = 1
-	backupCfg.PipelinesMode = pipeline.ModeParallel
 
 	backupClient, err := NewClient(asClient, WithID("test_client"))
 	if err != nil {
@@ -1532,7 +1530,6 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 	backupCfg.Continue = true
 	backupCfg.FileLimit = 100000
 	backupCfg.PageSize = 100
-	backupCfg.PipelinesMode = pipeline.ModeParallel
 
 	backupClient, err := NewClient(asClient, WithID("test_client"))
 	if err != nil {

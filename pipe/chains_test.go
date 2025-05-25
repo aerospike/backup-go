@@ -195,7 +195,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 		if mockCounterProc < testCount {
 			mockCounterProc++
 			time.Sleep(testDealy)
-			return defaultToken(), ErrFilteredOut
+			return defaultToken(), models.ErrFilteredOut
 		}
 
 		return defaultToken(), nil

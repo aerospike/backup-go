@@ -186,3 +186,15 @@ func (f *Fanout[T]) routeCustomRuleData(ctx context.Context, data T) {
 	case f.Outputs[index] <- data: // ok.
 	}
 }
+
+func (f *Fanout[T]) GetMetrics() (in, out int) {
+	for _, input := range f.Inputs {
+		in += len(input)
+	}
+
+	for _, output := range f.Outputs {
+		out += len(output)
+	}
+
+	return in, out
+}

@@ -21,16 +21,35 @@ import (
 	"time"
 )
 
+type MetricType int
+
 const (
-	MetricRecordsPerSecond   = "rps"
-	MetricKilobytesPerSecond = "kbps"
+	RecordsPerSecond MetricType = iota
+	KilobytesPerSecond
 )
+
+const (
+	recordsPerSecondName   = "rps"
+	kilobytesPerSecondName = "kbps"
+)
+
+func (mt MetricType) String() string {
+	switch mt {
+	case KilobytesPerSecond:
+		return kilobytesPerSecondName
+	case RecordsPerSecond:
+		return recordsPerSecondName
+	default:
+		return ""
+	}
+}
 
 // Collector tracks and logs metrics such as request rate and counts within a context-managed environment.
 type Collector struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	metricType MetricType
 	// enabled indicates whether the Collector is active and metrics will be tracked and reported.
 	enabled bool
 	// name of the metric, is used for logging.
@@ -53,23 +72,29 @@ type Collector struct {
 
 // NewCollector initializes a new Collector with the provided context and logger,
 // Enabled metrics will be reported to logger debug level.
-func NewCollector(ctx context.Context, logger *slog.Logger, name, message string, enabled bool) *Collector {
+func NewCollector(
+	ctx context.Context,
+	logger *slog.Logger,
+	metricType MetricType,
+	message string,
+	enabled bool,
+) *Collector {
 	ctx, cancel := context.WithCancel(ctx)
 	mc := &Collector{
-		ctx:       ctx,
-		cancel:    cancel,
-		enabled:   enabled,
-		name:      name,
-		message:   message,
-		Increment: func() {},
-		Add:       func(uint64) {},
-		lastTime:  time.Now(),
-		logger:    logger,
+		ctx:        ctx,
+		cancel:     cancel,
+		enabled:    enabled,
+		metricType: metricType,
+		message:    message,
+		Increment:  func() {},
+		Add:        func(uint64) {},
+		lastTime:   time.Now(),
+		logger:     logger,
 	}
 
 	logger.Debug(
 		"metrics",
-		slog.String("name", name),
+		slog.String("name", metricType.String()),
 		slog.String("message", message),
 		slog.Bool("enabled", enabled),
 	)
@@ -99,7 +124,7 @@ func (mc *Collector) report() {
 			result := float64(count) / elapsed
 
 			// for kbps metric we should divide by 1024.
-			if mc.name == MetricKilobytesPerSecond {
+			if mc.metricType == KilobytesPerSecond {
 				result /= 1024
 			}
 

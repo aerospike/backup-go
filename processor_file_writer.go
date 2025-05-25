@@ -30,7 +30,6 @@ import (
 	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pipeline"
 	"golang.org/x/time/rate"
 )
 
@@ -97,34 +96,12 @@ func newFileWriterProcessor[T models.TokenConstraint](
 }
 
 // newWriteWorkers returns a pipeline writing workers' for writers.
-func (fw *fileWriterProcessor[T]) newWriteWorkers(writers []io.WriteCloser,
-) []pipeline.Worker[T] {
-	writeWorkers := make([]pipeline.Worker[T], len(writers))
-
-	for i, writer := range writers {
-		var dataWriter pipeline.DataWriter[T] = newTokenWriter(fw.encoder, writer, fw.logger, nil)
-
-		if fw.state != nil {
-			stInfo := newStateInfo(fw.state.RecordsStateChan, i)
-			dataWriter = newTokenWriter(fw.encoder, writer, fw.logger, stInfo)
-		}
-
-		dataWriter = newWriterWithTokenStats(dataWriter, fw.stats, fw.logger)
-		writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, fw.limiter)
-	}
-
-	fw.logger.Debug("created new writers pipeline", slog.Int("writersNumber", len(writers)))
-
-	return writeWorkers
-}
-
-// newWriteWorkers returns a pipeline writing workers' for writers.
 func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser,
 ) []pipe.Writer[T] {
 	dataWriters := make([]pipe.Writer[T], len(writers))
 
 	for i, writer := range writers {
-		var dataWriter pipeline.DataWriter[T] = newTokenWriter(fw.encoder, writer, fw.logger, nil)
+		var dataWriter pipe.Writer[T] = newTokenWriter(fw.encoder, writer, fw.logger, nil)
 
 		if fw.state != nil {
 			stInfo := newStateInfo(fw.state.RecordsStateChan, i)

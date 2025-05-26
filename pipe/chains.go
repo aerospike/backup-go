@@ -25,9 +25,8 @@ import (
 )
 
 const (
-	// TODO: add Metrics and measure these values, to make it more accurate.
-	readerBufferSize = 100000
-	writerBufferSize = 100000
+	readerBufferSize = 1024
+	writerBufferSize = readerBufferSize
 )
 
 // Reader describes data readers. To exit worker, the Reader must return io.EOF.

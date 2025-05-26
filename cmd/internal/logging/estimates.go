@@ -161,6 +161,8 @@ func printEstimate(
 		slog.Uint64("rec/s", rps),
 		slog.Uint64("KiB/s", kbps),
 		slog.Uint64("B/rec", recSize),
+		slog.Int("read", metrics.PipelineReadQueueSize),
+		slog.Int("write", metrics.PipelineWriteQueueSize),
 	)
 
 	return percentage, nil

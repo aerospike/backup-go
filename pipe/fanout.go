@@ -194,6 +194,7 @@ func (f *Fanout[T]) routeCustomRuleData(ctx context.Context, data T) {
 	}
 }
 
+// GetMetrics returns summ of len for input and output channels.
 func (f *Fanout[T]) GetMetrics() (in, out int) {
 	for _, input := range f.Inputs {
 		in += len(input)

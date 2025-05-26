@@ -70,6 +70,7 @@ func getOpts[T models.TokenConstraint](strategy FanoutStrategy, xdrRule RouteRul
 	return opts
 }
 
+// Run start pipe with readers, writers and fanout.
 func (p *Pipe[T]) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 
@@ -80,7 +81,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 	wg.Add(3)
 
-	// Run readers.
+	// Run a readers pool. Each reader in a pool has an output channel, that sends data to fanout.
 	go func() {
 		defer wg.Done()
 
@@ -94,7 +95,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Run writers.
+	// Run a writers pool. Each writer has an input channel in which it receives data to write.
 	go func() {
 		defer wg.Done()
 
@@ -108,7 +109,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Run fanout.
+	// Fanout runs goroutine for each reader channel that routes messages to writers according to pipe strategy.
 	go func() {
 		defer wg.Done()
 		p.fanout.Run(ctx)

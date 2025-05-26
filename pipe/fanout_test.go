@@ -122,11 +122,11 @@ func TestFanout_RunStraight(t *testing.T) {
 	for i := range inputs {
 		go func() {
 			n := i
+			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- defaultToken()
 			}
-			close(inputs[n])
 		}()
 	}
 

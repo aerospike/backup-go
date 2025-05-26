@@ -70,6 +70,7 @@ func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (*Cha
 	}, output
 }
 
+// newReaderRoutine returns a function that will be executed in goroutine to process a reader.
 func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], output chan<- T,
 ) func(context.Context) error {
 	return func(ctx context.Context) error {
@@ -118,6 +119,7 @@ func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter
 	}, input
 }
 
+// newWriterRoutine returns a function that will be executed in goroutine to process a writer.
 func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, limiter *rate.Limiter,
 ) func(context.Context) error {
 	// Notice!

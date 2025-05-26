@@ -355,7 +355,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	}
 
 	pipelineMode := pipe.RoundRobin
-	if bh.config.StateFile != "" || len(dataReaders) == len(dataWriters) {
+	if bh.config.StateFile != "" {
 		pipelineMode = pipe.Straight
 	}
 

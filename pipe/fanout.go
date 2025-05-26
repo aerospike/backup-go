@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
 )
@@ -44,8 +45,7 @@ type Fanout[T models.TokenConstraint] struct {
 	// for CustomRule
 	rule RouteRule[T]
 	// for RoundRobin
-	currentIndex int
-	indexMu      sync.Mutex
+	currentIndex uint64
 }
 
 // FanoutOption describes options for Fanout.
@@ -174,10 +174,7 @@ func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
 
 // routeRoundRobinData routes a given piece of data to the output channel at the next index in round-robin fashion.
 func (f *Fanout[T]) routeRoundRobinData(ctx context.Context, data T) {
-	f.indexMu.Lock()
-	index := f.currentIndex
-	f.currentIndex = (f.currentIndex + 1) % len(f.Outputs)
-	f.indexMu.Unlock()
+	index := atomic.AddUint64(&f.currentIndex, 1) % uint64(len(f.Outputs))
 
 	select {
 	case <-ctx.Done():

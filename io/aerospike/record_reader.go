@@ -157,7 +157,7 @@ func (r *RecordReader) read() (*models.Token, error) {
 
 	if res.Err != nil {
 		r.logger.Error("error reading record", "error", res.Err)
-		return nil, res.Err.Unwrap()
+		return nil, res.Err
 	}
 
 	rec := models.Record{

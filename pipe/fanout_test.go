@@ -231,11 +231,11 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 	for i := range inputs {
 		go func() {
 			n := i
+			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- defaultToken()
 			}
-			close(inputs[n])
 		}()
 	}
 
@@ -287,11 +287,11 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 	for i := range inputs {
 		go func() {
 			n := i
+			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- defaultToken()
 			}
-			close(inputs[n])
 		}()
 	}
 
@@ -351,13 +351,13 @@ func TestFanout_RunCustomRuleContextCancel(t *testing.T) {
 	for i := range inputs {
 		go func() {
 			n := i
+			defer close(inputs[n])
 			for j := range testCount {
 				time.Sleep(testDealy)
 				token := defaultToken()
 				token.Size = uint64(j + i)
 				inputs[n] <- token
 			}
-			close(inputs[n])
 		}()
 	}
 

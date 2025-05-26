@@ -173,7 +173,7 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	c.NoUDFs = params.Common.NoUDFs
 	// The original backup tools have a single parallelism configuration property.
 	// We may consider splitting the configuration in the future.
-	c.ParallelWrite = params.Common.Parallel
+	c.ParallelWrite = params.Common.Parallel * 2
 	c.ParallelRead = params.Common.Parallel
 	// As we set --nice in MiB we must convert it to bytes
 	c.Bandwidth = params.Common.Nice * 1024 * 1024

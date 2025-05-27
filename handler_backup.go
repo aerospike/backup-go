@@ -356,7 +356,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 
 	pipelineMode := pipe.RoundRobin
 	if bh.config.StateFile != "" || len(dataReaders) == len(dataWriters) {
-		pipelineMode = pipe.Straight
+		pipelineMode = pipe.Fixed
 	}
 
 	pl, err := pipe.NewPipe(
@@ -365,7 +365,6 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		dataWriters,
 		bh.limiter,
 		pipelineMode,
-		nil,
 	)
 	if err != nil {
 		return err
@@ -486,8 +485,7 @@ func (bh *BackupHandler) backupSIndexes(
 		[]pipe.Reader[*models.Token]{dataReader},
 		[]pipe.Writer[*models.Token]{sindexWriter},
 		bh.limiter,
-		pipe.Straight,
-		nil,
+		pipe.Fixed,
 	)
 	if err != nil {
 		return err
@@ -525,8 +523,7 @@ func (bh *BackupHandler) backupUDFs(
 		[]pipe.Reader[*models.Token]{dataReader},
 		[]pipe.Writer[*models.Token]{udfWriter},
 		bh.limiter,
-		pipe.Straight,
-		nil,
+		pipe.Fixed,
 	)
 	if err != nil {
 		return err

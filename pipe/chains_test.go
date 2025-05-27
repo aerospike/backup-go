@@ -39,7 +39,7 @@ const (
 
 var errTest = errors.New("test error")
 
-func defaultToken() *models.Token {
+func testToken() *models.Token {
 	return &models.Token{
 		Type:   models.TokenTypeRecord,
 		Record: &models.Record{},
@@ -58,7 +58,7 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 		if mockCounter < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
-			return defaultToken(), nil
+			return testToken(), nil
 		}
 
 		return nil, io.EOF
@@ -67,7 +67,7 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 	readerMock.EXPECT().Close()
 
 	processorMock := mocks.NewMockProcessor[*models.Token](t)
-	processorMock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
 	require.NotNil(t, readChain)
@@ -93,13 +93,13 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 
 	readerMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
 		time.Sleep(testDealy)
-		return defaultToken(), nil
+		return testToken(), nil
 	})
 
 	readerMock.EXPECT().Close()
 
 	processorMock := mocks.NewMockProcessor[*models.Token](t)
-	processorMock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
 	require.NotNil(t, readChain)
@@ -131,7 +131,7 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 		if mockCounter < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
-			return defaultToken(), nil
+			return testToken(), nil
 		}
 
 		return nil, errTest
@@ -140,7 +140,7 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	readerMock.EXPECT().Close()
 
 	processorMock := mocks.NewMockProcessor[*models.Token](t)
-	processorMock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
 	require.NotNil(t, readChain)
@@ -163,13 +163,13 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 
 	readerMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
 		time.Sleep(testDealy)
-		return defaultToken(), nil
+		return testToken(), nil
 	})
 
 	readerMock.EXPECT().Close()
 
 	processorMock := mocks.NewMockProcessor[*models.Token](t)
-	processorMock.EXPECT().Process(defaultToken()).Return(nil, errTest)
+	processorMock.EXPECT().Process(testToken()).Return(nil, errTest)
 
 	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
 	require.NotNil(t, readChain)
@@ -195,7 +195,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 		if mockCounterRead < testCount*2 {
 			mockCounterRead++
 			time.Sleep(testDealy)
-			return defaultToken(), nil
+			return testToken(), nil
 		}
 
 		return nil, io.EOF
@@ -205,14 +205,14 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 
 	processorMock := mocks.NewMockProcessor[*models.Token](t)
 	var mockCounterProc int
-	processorMock.EXPECT().Process(defaultToken()).RunAndReturn(func(*models.Token) (*models.Token, error) {
+	processorMock.EXPECT().Process(testToken()).RunAndReturn(func(*models.Token) (*models.Token, error) {
 		if mockCounterProc < testCount {
 			mockCounterProc++
 			time.Sleep(testDealy)
-			return defaultToken(), models.ErrFilteredOut
+			return testToken(), models.ErrFilteredOut
 		}
 
-		return defaultToken(), nil
+		return testToken(), nil
 	})
 
 	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
@@ -235,7 +235,7 @@ func TestChains_WriterBackupChain(t *testing.T) {
 	writerMock := mocks.NewMockWriter[*models.Token](t)
 
 	var mockCounterWrite int
-	writerMock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		mockCounterWrite++
 		return testSize, nil
 	})
@@ -259,7 +259,7 @@ func TestChains_WriterBackupChain(t *testing.T) {
 		defer wg.Done()
 		for range testCount {
 			time.Sleep(testDealy)
-			input <- defaultToken()
+			input <- testToken()
 		}
 
 		close(input)
@@ -275,7 +275,7 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 	writerMock := mocks.NewMockWriter[*models.Token](t)
 
 	var mockCounterWrite int
-	writerMock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		mockCounterWrite++
 		return testSize, nil
 	})
@@ -305,7 +305,7 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 		defer wg.Done()
 		for range testCount {
 			time.Sleep(testDealy)
-			input <- defaultToken()
+			input <- testToken()
 		}
 	}()
 
@@ -317,7 +317,7 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
 
-	writerMock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		return testSize, errTest
 	})
 
@@ -340,7 +340,7 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 		defer wg.Done()
 		for range testCount {
 			time.Sleep(testDealy)
-			input <- defaultToken()
+			input <- testToken()
 		}
 
 		close(input)
@@ -354,7 +354,7 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
 
-	writerMock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		return testSize, nil
 	})
 
@@ -378,7 +378,7 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 		defer wg.Done()
 		for range testCount {
 			time.Sleep(testDealy)
-			input <- defaultToken()
+			input <- testToken()
 		}
 
 		close(input)
@@ -392,7 +392,7 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
 
-	writerMock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		return testSize, errTest
 	})
 
@@ -418,7 +418,7 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 		defer wg.Done()
 		for range testCount {
 			time.Sleep(testDealy)
-			input <- defaultToken()
+			input <- testToken()
 		}
 
 		close(input)
@@ -432,7 +432,7 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
 
-	writerMock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		return testSize, nil
 	})
 
@@ -459,7 +459,7 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 		defer wg.Done()
 		for range testCount {
 			time.Sleep(testDealy)
-			input <- defaultToken()
+			input <- testToken()
 		}
 
 		close(input)

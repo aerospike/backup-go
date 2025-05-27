@@ -38,12 +38,13 @@ func NewPipe[T models.TokenConstraint](
 	writers []Writer[T],
 	limiter *rate.Limiter,
 	strategy FanoutStrategy,
-	xdrRule RouteRule[T],
 ) (*Pipe[T], error) {
 	readPool := NewReaderPool[T](readers, pc)
 	writePool := NewWriterPool[T](writers, limiter)
 	// Swap channels!
-	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, getOpts[T](strategy, xdrRule)...)
+	// Output of readPool is an input of fanout.
+	// Input of writePool is an output of fanout.
+	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, strategy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fanout: %w", err)
 	}
@@ -53,21 +54,6 @@ func NewPipe[T models.TokenConstraint](
 		writePool: writePool,
 		fanout:    fanout,
 	}, nil
-}
-
-func getOpts[T models.TokenConstraint](strategy FanoutStrategy, xdrRule RouteRule[T]) []FanoutOption[T] {
-	opts := make([]FanoutOption[T], 0)
-
-	switch strategy {
-	case Straight:
-		opts = append(opts, WithStrategy[T](Straight))
-	case RoundRobin:
-		opts = append(opts, WithStrategy[T](RoundRobin))
-	case CustomRule:
-		opts = append(opts, WithStrategy[T](CustomRule), WithRule[T](xdrRule))
-	}
-
-	return opts
 }
 
 // Run start pipe with readers, writers and fanout.
@@ -131,7 +117,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// GetMetrics returns summ of len for input and output channels.
+// GetMetrics returns the accumulated length for input and output channels.
 func (p *Pipe[T]) GetMetrics() (in, out int) {
 	return p.fanout.GetMetrics()
 }

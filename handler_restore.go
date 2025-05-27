@@ -166,7 +166,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 
 	pipelineMode := pipe.RoundRobin
 	if rh.config.EncoderType == EncoderTypeASBX || len(dataReaders) == len(dataWriters) {
-		pipelineMode = pipe.Straight
+		pipelineMode = pipe.Fixed
 	}
 
 	pl, err := pipe.NewPipe(
@@ -175,7 +175,6 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		dataWriters,
 		rh.limiter,
 		pipelineMode,
-		nil,
 	)
 	if err != nil {
 		return err

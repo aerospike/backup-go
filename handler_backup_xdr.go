@@ -185,8 +185,7 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 		readWorkers,
 		writeWorkers,
 		nil,
-		pipe.CustomRule,
-		bh.splitFunc,
+		pipe.Split,
 	)
 	if err != nil {
 		return err
@@ -224,22 +223,6 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 	case err := <-bh.errors:
 		return err
 	}
-}
-
-// splitFunc distributes token between pipeline workers.
-func (bh *HandlerBackupXDR) splitFunc(t *models.ASBXToken) int {
-	partPerWorker := MaxPartitions / bh.config.ParallelWrite
-
-	var id int
-	if partPerWorker > 0 {
-		id = t.Key.PartitionId() / partPerWorker
-	}
-
-	if id >= bh.config.ParallelWrite {
-		return id - 1
-	}
-
-	return id
 }
 
 // GetStats returns the stats of the backup job.

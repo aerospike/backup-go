@@ -34,7 +34,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		if mockCounter < testCount*testParallel {
 			mockCounter++
 			time.Sleep(testDealy)
-			return defaultToken(), nil
+			return testToken(), nil
 		}
 
 		return nil, io.EOF
@@ -44,7 +44,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 
 	newProcessorMock := func() Processor[*models.Token] {
 		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return mock
 	}
@@ -52,7 +52,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	var mockCounterWrite int
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
 
-	writersMocks.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		mockCounterWrite++
 		return testSize, nil
 	})
@@ -72,7 +72,6 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
 		nil,
 		RoundRobin,
-		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, p)
@@ -95,7 +94,7 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 		if mockCounter < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
-			return defaultToken(), nil
+			return testToken(), nil
 		}
 
 		return nil, errTest
@@ -104,14 +103,14 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 
 	newProcessorMock := func() Processor[*models.Token] {
 		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return mock
 	}
 
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
 	var mockCounterWrite int
-	writersMocks.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		if mockCounterWrite < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
@@ -129,8 +128,7 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 		[]Reader[*models.Token]{readersMock, readersMock, readersMock},
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
 		nil,
-		Straight,
-		nil,
+		Fixed,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, p)
@@ -144,7 +142,7 @@ func TestPipe_NewBackupPipeError(t *testing.T) {
 
 	newProcessorMock := func() Processor[*models.Token] {
 		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return mock
 	}
@@ -154,8 +152,7 @@ func TestPipe_NewBackupPipeError(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		CustomRule,
-		nil,
+		Split,
 	)
 	require.ErrorContains(t, err, "failed to create fanout")
 	require.Nil(t, p)

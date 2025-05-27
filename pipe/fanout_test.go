@@ -20,7 +20,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
+	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,25 +31,47 @@ const (
 	testIndex  = 0
 )
 
+const (
+	testNamespace  = "source-ns1"
+	testSetName    = "set1"
+	testDigestB64  = "/+Ptyjj06wW9zx0AnxOmq45xJzs="
+	testPayloadB64 = "FhABEAAAAAAAAgAnjQAAAAAAAAUAAQAAAAsAc291cmNlLW5zMQAAABUE/+Ptyjj06wW9zx0AnxOmq45xJzsAAAAFAXNldDEAAAAKAgEAAAAAAAADCQAAAAkOAAAAbcndaZgAAAAUAgMAAWF6enp6enp6enp6enp6eno="
+)
+
+func testASBXToken() (*models.ASBXToken, error) {
+	digest, err := base64.StdEncoding.DecodeString(testDigestB64)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := base64.StdEncoding.DecodeString(testPayloadB64)
+	if err != nil {
+		return nil, err
+	}
+
+	k, err := aerospike.NewKeyWithDigest(testNamespace, testSetName, "", digest)
+	if err != nil {
+		return nil, err
+	}
+
+	return models.NewASBXToken(k, payload), nil
+}
+
 func TestFanout_Validation(t *testing.T) {
 	t.Parallel()
 
 	inputs := make([]chan *models.Token, testParallel)
 	outputs := make([]chan *models.Token, testParallel*2)
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, WithStrategy[*models.Token](Straight))
+	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
 	require.Nil(t, fan)
-	require.ErrorContains(t, err, "number for Straight strategy")
+	require.ErrorContains(t, err, "number for Fixed strategy")
 
-	fan, err = NewFanout[*models.Token](inputs, outputs, WithStrategy[*models.Token](CustomRule))
-	require.Nil(t, fan)
-	require.ErrorContains(t, err, "custom rule is required for CustomRule strategy")
-
-	fan, err = NewFanout[*models.Token](inputs, nil, WithStrategy[*models.Token](CustomRule))
+	fan, err = NewFanout[*models.Token](inputs, nil, Split)
 	require.Nil(t, fan)
 	require.ErrorContains(t, err, "no outputs provided")
 
-	fan, err = NewFanout[*models.Token](nil, outputs, WithStrategy[*models.Token](CustomRule))
+	fan, err = NewFanout[*models.Token](nil, outputs, Split)
 	require.Nil(t, fan)
 	require.ErrorContains(t, err, "no inputs provided")
 }
@@ -66,7 +90,7 @@ func TestFanout_RunDefault(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs)
+	fan, err := NewFanout[*models.Token](inputs, outputs, RoundRobin)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -75,7 +99,7 @@ func TestFanout_RunDefault(t *testing.T) {
 			n := i
 			for range testCount {
 				time.Sleep(testDealy)
-				inputs[n] <- defaultToken()
+				inputs[n] <- testToken()
 			}
 			close(inputs[n])
 		}()
@@ -115,7 +139,7 @@ func TestFanout_RunStraight(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, WithStrategy[*models.Token](Straight))
+	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -125,7 +149,7 @@ func TestFanout_RunStraight(t *testing.T) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
-				inputs[n] <- defaultToken()
+				inputs[n] <- testToken()
 			}
 		}()
 	}
@@ -154,35 +178,28 @@ func TestFanout_RunStraight(t *testing.T) {
 	require.Equal(t, testCount*testParallel, counter)
 }
 
-func TestFanout_RunCustomRule(t *testing.T) {
+func TestFanout_RunSplit(t *testing.T) {
 	t.Parallel()
 
-	inputs := make([]chan *models.Token, testParallel)
-	outputs := make([]chan *models.Token, testParallel)
+	inputs := make([]chan *models.ASBXToken, testParallel)
+	outputs := make([]chan *models.ASBXToken, testParallel)
 
 	for i := range testParallel {
-		inputs[i] = make(chan *models.Token, testBuffer)
-		outputs[i] = make(chan *models.Token, testBuffer)
+		inputs[i] = make(chan *models.ASBXToken, testBuffer)
+		outputs[i] = make(chan *models.ASBXToken, testBuffer)
 	}
 
-	rule := func(_ *models.Token) int {
-		return testIndex
-	}
-
-	fan, err := NewFanout[*models.Token](inputs, outputs,
-		WithStrategy[*models.Token](CustomRule),
-		WithRule[*models.Token](rule),
-	)
+	fan, err := NewFanout[*models.ASBXToken](inputs, outputs, Split)
 	require.NoError(t, err)
 
 	// Generate data.
 	for i := range inputs {
 		go func() {
 			n := i
-			for j := range testCount {
+			for range testCount {
 				time.Sleep(testDealy)
-				token := defaultToken()
-				token.Size = uint64(j + i)
+				token, err := testASBXToken()
+				require.NoError(t, err)
 				inputs[n] <- token
 			}
 			close(inputs[n])
@@ -198,7 +215,8 @@ func TestFanout_RunCustomRule(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range outputs[testIndex] {
+		// For testASBXToken() index will be 2.
+		for range outputs[2] {
 			counter++
 		}
 	}()
@@ -224,7 +242,7 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs)
+	fan, err := NewFanout[*models.Token](inputs, outputs, RoundRobin)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -234,7 +252,7 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
-				inputs[n] <- defaultToken()
+				inputs[n] <- testToken()
 			}
 		}()
 	}
@@ -280,7 +298,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, WithStrategy[*models.Token](Straight))
+	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -290,7 +308,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
-				inputs[n] <- defaultToken()
+				inputs[n] <- testToken()
 			}
 		}()
 	}
@@ -326,7 +344,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 	require.Greater(t, counter, testCount)
 }
 
-func TestFanout_RunCustomRuleContextCancel(t *testing.T) {
+func TestFanout_RunSplitContextCancel(t *testing.T) {
 	t.Parallel()
 
 	inputs := make([]chan *models.Token, testParallel)
@@ -337,14 +355,7 @@ func TestFanout_RunCustomRuleContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	rule := func(_ *models.Token) int {
-		return testIndex
-	}
-
-	fan, err := NewFanout[*models.Token](inputs, outputs,
-		WithStrategy[*models.Token](CustomRule),
-		WithRule[*models.Token](rule),
-	)
+	fan, err := NewFanout[*models.Token](inputs, outputs, Split)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -354,7 +365,7 @@ func TestFanout_RunCustomRuleContextCancel(t *testing.T) {
 			defer close(inputs[n])
 			for j := range testCount {
 				time.Sleep(testDealy)
-				token := defaultToken()
+				token := testToken()
 				token.Size = uint64(j + i)
 				inputs[n] <- token
 			}

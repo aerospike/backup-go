@@ -16,7 +16,7 @@ package pipe
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/aerospike/backup-go/models"
@@ -59,11 +59,15 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 
 	close(errorCh)
 
+	var errs []error
+
 	for err := range errorCh {
-		return fmt.Errorf("failed to run chains: %w", err)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 // ProcessorCreator is a function type that defines a creator for a Processor.

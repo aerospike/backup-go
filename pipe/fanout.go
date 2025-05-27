@@ -23,16 +23,13 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-// RouteRule returns the output channel index for a given token.
-type RouteRule[T models.TokenConstraint] func(T) int
-
 type FanoutStrategy int
 
 const (
-	// Straight default val
-	Straight FanoutStrategy = iota
+	// Fixed default val
+	Fixed FanoutStrategy = iota
 	RoundRobin
-	CustomRule
+	Split
 )
 
 // Fanout routes messages between chain pools.
@@ -42,28 +39,8 @@ type Fanout[T models.TokenConstraint] struct {
 	Outputs []chan T
 
 	strategy FanoutStrategy
-	// for CustomRule
-	rule RouteRule[T]
 	// for RoundRobin
 	currentIndex uint64
-}
-
-// FanoutOption describes options for Fanout.
-type FanoutOption[T models.TokenConstraint] func(*Fanout[T])
-
-// WithRule sets a CustomRule strategy and assigns custom rule to route messages.
-func WithRule[T models.TokenConstraint](rule RouteRule[T]) FanoutOption[T] {
-	return func(f *Fanout[T]) {
-		f.rule = rule
-		f.strategy = CustomRule
-	}
-}
-
-// WithStrategy sets the distribution strategy for a Fanout instance.
-func WithStrategy[T models.TokenConstraint](strategy FanoutStrategy) FanoutOption[T] {
-	return func(f *Fanout[T]) {
-		f.strategy = strategy
-	}
 }
 
 // NewFanout returns a new Fanout.
@@ -71,16 +48,12 @@ func WithStrategy[T models.TokenConstraint](strategy FanoutStrategy) FanoutOptio
 func NewFanout[T models.TokenConstraint](
 	inputs []chan T,
 	outputs []chan T,
-	options ...FanoutOption[T],
+	strategy FanoutStrategy,
 ) (*Fanout[T], error) {
 	f := &Fanout[T]{
 		Inputs:   inputs,
 		Outputs:  outputs,
-		strategy: RoundRobin, // Default
-	}
-
-	for _, option := range options {
-		option(f)
+		strategy: strategy, // Default
 	}
 
 	// Validations.
@@ -92,17 +65,9 @@ func NewFanout[T models.TokenConstraint](
 		return nil, fmt.Errorf("no inputs provided")
 	}
 
-	switch f.strategy {
-	case Straight:
-		if len(f.Outputs) != len(f.Inputs) {
-			return nil, fmt.Errorf("invalid inputs %d and outputs %d number for Straight strategy",
-				len(f.Inputs), len(f.Outputs))
-		}
-	case CustomRule:
-		if f.rule == nil {
-			return nil, fmt.Errorf("custom rule is required for CustomRule strategy")
-		}
-	default: // ok.
+	if f.strategy == Fixed && len(f.Inputs) != len(f.Outputs) {
+		return nil, fmt.Errorf("invalid inputs %d and outputs %d number for Fixed strategy",
+			len(f.Inputs), len(f.Outputs))
 	}
 
 	return f, nil
@@ -151,20 +116,16 @@ func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T)
 	}
 }
 
-// routeData routes a given piece of data based on the current fanout strategy (Straight, RoundRobin, or CustomRule).
+// routeData routes a given piece of data based on the current fanout strategy (Fixed, RoundRobin, or Split).
 func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 	switch f.strategy {
-	case Straight:
-		f.routeStraightData(ctx, index, data)
+	case Fixed: // Sen to current index.
 	case RoundRobin:
-		f.routeRoundRobinData(ctx, data)
-	case CustomRule:
-		f.routeCustomRuleData(ctx, data)
+		index = f.roundRobin(data)
+	case Split:
+		index = f.splitFunc(data)
 	}
-}
 
-// routeStraightData routes a given piece of data to the output channel at the given index.
-func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
 	select {
 	case <-ctx.Done():
 		return
@@ -172,29 +133,34 @@ func (f *Fanout[T]) routeStraightData(ctx context.Context, index int, data T) {
 	}
 }
 
-// routeRoundRobinData routes a given piece of data to the output channel at the next index in round-robin fashion.
-func (f *Fanout[T]) routeRoundRobinData(ctx context.Context, data T) {
+func (f *Fanout[T]) roundRobin(_ T) int {
 	index := atomic.AddUint64(&f.currentIndex, 1) % uint64(len(f.Outputs))
 
-	select {
-	case <-ctx.Done():
-		return
-	case f.Outputs[index] <- data: // ok.
-	}
+	return int(index)
 }
 
-// routeCustomRuleData routes a given piece of data to the output channel based on the custom rule.
-func (f *Fanout[T]) routeCustomRuleData(ctx context.Context, data T) {
-	index := f.rule(data)
-
-	select {
-	case <-ctx.Done():
-		return
-	case f.Outputs[index] <- data: // ok.
+// splitFunc distributes token between pipeline workers for xdr backup.
+func (f *Fanout[T]) splitFunc(token T) int {
+	t, ok := any(token).(*models.ASBXToken)
+	if !ok {
+		return 0
 	}
+
+	partPerWorker := 4096 / len(f.Outputs)
+
+	var id int
+	if partPerWorker > 0 {
+		id = t.Key.PartitionId() / partPerWorker
+	}
+
+	if id >= len(f.Outputs) {
+		return id - 1
+	}
+
+	return id
 }
 
-// GetMetrics returns summ of len for input and output channels.
+// GetMetrics returns the accumulated length for input and output channels.
 func (f *Fanout[T]) GetMetrics() (in, out int) {
 	for _, input := range f.Inputs {
 		in += len(input)

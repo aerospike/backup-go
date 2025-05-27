@@ -36,7 +36,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 		if mockCounter < testCount*testParallel {
 			mockCounter++
 			time.Sleep(testDealy)
-			return defaultToken(), nil
+			return testToken(), nil
 		}
 
 		return nil, io.EOF
@@ -46,7 +46,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 
 	newProcessorMock := func() Processor[*models.Token] {
 		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return mock
 	}
@@ -78,7 +78,7 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 		if mockCounter < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
-			return defaultToken(), nil
+			return testToken(), nil
 		}
 
 		return nil, errTest
@@ -88,7 +88,7 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 
 	newProcessorMock := func() Processor[*models.Token] {
 		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(defaultToken()).Return(defaultToken(), nil)
+		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return mock
 	}
@@ -108,7 +108,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 	var mockCounterWrite int
 	mock := mocks.NewMockWriter[*models.Token](t)
 
-	mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	mock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		mockCounterWrite++
 		return testSize, nil
 	})
@@ -129,7 +129,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 		for range testCount {
 			for i := range pool.Inputs {
 				time.Sleep(testDealy)
-				pool.Inputs[i] <- defaultToken()
+				pool.Inputs[i] <- testToken()
 			}
 		}
 
@@ -150,7 +150,7 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 	mock := mocks.NewMockWriter[*models.Token](t)
 
 	var mockCounter int
-	mock.EXPECT().Write(defaultToken()).RunAndReturn(func(*models.Token) (int, error) {
+	mock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		if mockCounter < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
@@ -171,7 +171,7 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 		for range testCount * 2 {
 			for i := range pool.Inputs {
 				time.Sleep(testDealy)
-				pool.Inputs[i] <- defaultToken()
+				pool.Inputs[i] <- testToken()
 			}
 		}
 

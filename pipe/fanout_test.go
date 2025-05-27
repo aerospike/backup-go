@@ -95,14 +95,13 @@ func TestFanout_RunDefault(t *testing.T) {
 
 	// Generate data.
 	for i := range inputs {
-		go func() {
-			n := i
+		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- testToken()
 			}
-		}()
+		}(i)
 	}
 
 	// Consume data.
@@ -112,13 +111,12 @@ func TestFanout_RunDefault(t *testing.T) {
 	)
 	for i := range outputs {
 		wg.Add(1)
-		go func() {
+		go func(n int) {
 			defer wg.Done()
-			n := i
 			for range outputs[n] {
 				counter++
 			}
-		}()
+		}(i)
 	}
 
 	fan.Run(context.Background())
@@ -144,14 +142,13 @@ func TestFanout_RunStraight(t *testing.T) {
 
 	// Generate data.
 	for i := range inputs {
-		go func() {
-			n := i
+		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- testToken()
 			}
-		}()
+		}(i)
 	}
 
 	// Consume data.
@@ -162,13 +159,12 @@ func TestFanout_RunStraight(t *testing.T) {
 	for i := range outputs {
 		wg.Add(1)
 
-		go func() {
+		go func(n int) {
 			defer wg.Done()
-			n := i
 			for range outputs[n] {
 				counter++
 			}
-		}()
+		}(i)
 	}
 
 	fan.Run(context.Background())
@@ -194,8 +190,7 @@ func TestFanout_RunSplit(t *testing.T) {
 
 	// Generate data.
 	for i := range inputs {
-		go func() {
-			n := i
+		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
@@ -203,7 +198,7 @@ func TestFanout_RunSplit(t *testing.T) {
 				require.NoError(t, err)
 				inputs[n] <- token
 			}
-		}()
+		}(i)
 	}
 
 	// Consume data.
@@ -247,14 +242,13 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 
 	// Generate data.
 	for i := range inputs {
-		go func() {
-			n := i
+		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- testToken()
 			}
-		}()
+		}(i)
 	}
 
 	// Consume data.
@@ -264,13 +258,12 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 	)
 	for i := range outputs {
 		wg.Add(1)
-		go func() {
+		go func(n int) {
 			defer wg.Done()
-			n := i
 			for range outputs[n] {
 				counter++
 			}
-		}()
+		}(i)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -303,14 +296,13 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 
 	// Generate data.
 	for i := range inputs {
-		go func() {
-			n := i
+		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- testToken()
 			}
-		}()
+		}(i)
 	}
 
 	// Consume data.
@@ -321,13 +313,12 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 	for i := range outputs {
 		wg.Add(1)
 
-		go func() {
+		go func(n int) {
 			defer wg.Done()
-			n := i
 			for range outputs[n] {
 				counter++
 			}
-		}()
+		}(i)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -360,8 +351,7 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 
 	// Generate data.
 	for i := range inputs {
-		go func() {
-			n := i
+		go func(n int) {
 			defer close(inputs[n])
 			for j := range testCount {
 				time.Sleep(testDealy)
@@ -369,7 +359,7 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 				token.Size = uint64(j + i)
 				inputs[n] <- token
 			}
-		}()
+		}(i)
 	}
 
 	// Consume data.

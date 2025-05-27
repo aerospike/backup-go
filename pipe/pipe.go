@@ -16,11 +16,10 @@ package pipe
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/aerospike/backup-go/models"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
 
@@ -58,63 +57,25 @@ func NewPipe[T models.TokenConstraint](
 
 // Run start pipe with readers, writers and fanout.
 func (p *Pipe[T]) Run(ctx context.Context) error {
-	var wg sync.WaitGroup
-
-	errorCh := make(chan error, 3)
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	wg.Add(3)
+	errGroup, ctx := errgroup.WithContext(ctx)
 
 	// Run a readers pool. Each reader in a pool has an output channel, that sends data to fanout.
-	go func() {
-		defer wg.Done()
-
-		err := p.readPool.Run(ctx)
-		if err != nil {
-			errorCh <- fmt.Errorf("read pool failed: %w", err)
-
-			cancel()
-
-			return
-		}
-	}()
+	errGroup.Go(func() error {
+		return p.readPool.Run(ctx)
+	})
 
 	// Run a writers pool. Each writer has an input channel in which it receives data to write.
-	go func() {
-		defer wg.Done()
-
-		err := p.writePool.Run(ctx)
-		if err != nil {
-			errorCh <- fmt.Errorf("write pool failed: %w", err)
-
-			cancel()
-
-			return
-		}
-	}()
+	errGroup.Go(func() error {
+		return p.writePool.Run(ctx)
+	})
 
 	// Fanout runs goroutine for each reader channel that routes messages to writers according to pipe strategy.
-	go func() {
-		defer wg.Done()
+	errGroup.Go(func() error {
 		p.fanout.Run(ctx)
-	}()
+		return nil
+	})
 
-	wg.Wait()
-
-	// Process errors.
-	close(errorCh)
-
-	var errs []error
-
-	for err := range errorCh {
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return errors.Join(errs...)
+	return errGroup.Wait()
 }
 
 // GetMetrics returns the accumulated length for input and output channels.

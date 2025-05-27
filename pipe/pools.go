@@ -16,10 +16,9 @@ package pipe
 
 import (
 	"context"
-	"errors"
-	"sync"
 
 	"github.com/aerospike/backup-go/models"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
 
@@ -35,39 +34,17 @@ type Pool[T models.TokenConstraint] struct {
 
 // Run runs all chains in the pool.
 func (p *Pool[T]) Run(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	errGroup, ctx := errgroup.WithContext(ctx)
 
-	errorCh := make(chan error, len(p.Chains))
-
-	var wg sync.WaitGroup
 	for i := range p.Chains {
-		wg.Add(1)
+		chain := p.Chains[i]
 
-		go func() {
-			defer wg.Done()
-
-			if err := p.Chains[i].Run(ctx); err != nil {
-				errorCh <- err
-				// Shut down all chains on one error.
-				cancel()
-			}
-		}()
+		errGroup.Go(func() error {
+			return chain.Run(ctx)
+		})
 	}
 
-	wg.Wait()
-
-	close(errorCh)
-
-	var errs []error
-
-	for err := range errorCh {
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return errors.Join(errs...)
+	return errGroup.Wait()
 }
 
 // ProcessorCreator is a function type that defines a creator for a Processor.

@@ -93,12 +93,10 @@ func (f *Fanout[T]) Run(ctx context.Context) {
 	for i, input := range f.Inputs {
 		wg.Add(1)
 
-		index := i
-
-		go func(in <-chan T) {
+		go func(index int, in <-chan T) {
 			defer wg.Done()
 			f.processInput(ctx, index, in)
-		}(input)
+		}(i, input)
 	}
 
 	wg.Wait()

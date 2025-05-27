@@ -106,10 +106,11 @@ func TestFanout_RunDefault(t *testing.T) {
 
 	// Consume data.
 	var (
-		counter int
+		counter      int
 		counterMutex sync.Mutex
-		wg      sync.WaitGroup
+		wg           sync.WaitGroup
 	)
+
 	for i := range outputs {
 		wg.Add(1)
 		go func(n int) {
@@ -156,9 +157,9 @@ func TestFanout_RunStraight(t *testing.T) {
 
 	// Consume data.
 	var (
-		counter int
+		counter      int
 		counterMutex sync.Mutex
-		wg      sync.WaitGroup
+		wg           sync.WaitGroup
 	)
 	for i := range outputs {
 		wg.Add(1)
@@ -209,9 +210,9 @@ func TestFanout_RunSplit(t *testing.T) {
 
 	// Consume data.
 	var (
-		counter int
+		counter      int
 		counterMutex sync.Mutex
-		wg      sync.WaitGroup
+		wg           sync.WaitGroup
 	)
 	// Count only first output.
 	wg.Add(1)
@@ -262,9 +263,9 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 
 	// Consume data.
 	var (
-		counter int
+		counter      int
 		counterMutex sync.Mutex
-		wg      sync.WaitGroup
+		wg           sync.WaitGroup
 	)
 	for i := range outputs {
 		wg.Add(1)
@@ -319,9 +320,9 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 
 	// Consume data.
 	var (
-		counter int
+		counter      int
 		counterMutex sync.Mutex
-		wg      sync.WaitGroup
+		wg           sync.WaitGroup
 	)
 	for i := range outputs {
 		wg.Add(1)
@@ -379,9 +380,9 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 
 	// Consume data.
 	var (
-		counter int
+		counter      int
 		counterMutex sync.Mutex
-		wg      sync.WaitGroup
+		wg           sync.WaitGroup
 	)
 	// Count only first output.
 	wg.Add(1)

@@ -97,11 +97,11 @@ func TestFanout_RunDefault(t *testing.T) {
 	for i := range inputs {
 		go func() {
 			n := i
+			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				inputs[n] <- testToken()
 			}
-			close(inputs[n])
 		}()
 	}
 
@@ -196,13 +196,13 @@ func TestFanout_RunSplit(t *testing.T) {
 	for i := range inputs {
 		go func() {
 			n := i
+			defer close(inputs[n])
 			for range testCount {
 				time.Sleep(testDealy)
 				token, err := testASBXToken()
 				require.NoError(t, err)
 				inputs[n] <- token
 			}
-			close(inputs[n])
 		}()
 	}
 

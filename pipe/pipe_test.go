@@ -17,6 +17,7 @@ package pipe
 import (
 	"context"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,12 +31,17 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 
 	readersMock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
+	var counterMutex sync.Mutex
 	readersMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-		if mockCounter < testCount*testParallel {
+		counterMutex.Lock()
+		currentCount := mockCounter
+		if currentCount < testCount*testParallel {
 			mockCounter++
+			counterMutex.Unlock()
 			time.Sleep(testDealy)
 			return testToken(), nil
 		}
+		counterMutex.Unlock()
 
 		return nil, io.EOF
 	})
@@ -50,10 +56,13 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	}
 
 	var mockCounterWrite int
+	var writeMutex sync.Mutex
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
 
 	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+		writeMutex.Lock()
 		mockCounterWrite++
+		writeMutex.Unlock()
 		return testSize, nil
 	})
 
@@ -90,12 +99,17 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 
 	readersMock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
+	var counterMutex sync.Mutex
 	readersMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-		if mockCounter < testCount {
+		counterMutex.Lock()
+		currentCount := mockCounter
+		if currentCount < testCount {
 			mockCounter++
+			counterMutex.Unlock()
 			time.Sleep(testDealy)
 			return testToken(), nil
 		}
+		counterMutex.Unlock()
 
 		return nil, errTest
 	})
@@ -110,12 +124,20 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
 	var mockCounterWrite int
+	var writeMutex sync.Mutex
 	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
-		if mockCounterWrite < testCount {
+		writeMutex.Lock()
+		currentCount := mockCounterWrite
+		if currentCount < testCount {
+			mockCounterWrite++
+			counterMutex.Lock()
 			mockCounter++
+			counterMutex.Unlock()
+			writeMutex.Unlock()
 			time.Sleep(testDealy)
 			return testSize, nil
 		}
+		writeMutex.Unlock()
 
 		return 0, errTest
 	})

@@ -17,6 +17,7 @@ package pipe
 import (
 	"context"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,12 +33,17 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 
 	mock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
+	var counterMutex sync.Mutex
 	mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-		if mockCounter < testCount*testParallel {
+		counterMutex.Lock()
+		currentCount := mockCounter
+		if currentCount < testCount*testParallel {
 			mockCounter++
+			counterMutex.Unlock()
 			time.Sleep(testDealy)
 			return testToken(), nil
 		}
+		counterMutex.Unlock()
 
 		return nil, io.EOF
 	})
@@ -74,12 +80,17 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 
 	mock := mocks.NewMockReader[*models.Token](t)
 	var mockCounter int
+	var counterMutex sync.Mutex
 	mock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
-		if mockCounter < testCount {
+		counterMutex.Lock()
+		currentCount := mockCounter
+		if currentCount < testCount {
 			mockCounter++
+			counterMutex.Unlock()
 			time.Sleep(testDealy)
 			return testToken(), nil
 		}
+		counterMutex.Unlock()
 
 		return nil, errTest
 	})
@@ -106,10 +117,13 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 	t.Parallel()
 
 	var mockCounterWrite int
+	var writeMutex sync.Mutex
 	mock := mocks.NewMockWriter[*models.Token](t)
 
 	mock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+		writeMutex.Lock()
 		mockCounterWrite++
+		writeMutex.Unlock()
 		return testSize, nil
 	})
 
@@ -150,12 +164,17 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 	mock := mocks.NewMockWriter[*models.Token](t)
 
 	var mockCounter int
+	var counterMutex sync.Mutex
 	mock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
-		if mockCounter < testCount {
+		counterMutex.Lock()
+		currentCount := mockCounter
+		if currentCount < testCount {
 			mockCounter++
+			counterMutex.Unlock()
 			time.Sleep(testDealy)
 			return testSize, nil
 		}
+		counterMutex.Unlock()
 
 		return 0, errTest
 	})

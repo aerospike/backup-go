@@ -107,6 +107,7 @@ func TestFanout_RunDefault(t *testing.T) {
 	// Consume data.
 	var (
 		counter int
+		counterMutex sync.Mutex
 		wg      sync.WaitGroup
 	)
 	for i := range outputs {
@@ -114,7 +115,9 @@ func TestFanout_RunDefault(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			for range outputs[n] {
+				counterMutex.Lock()
 				counter++
+				counterMutex.Unlock()
 			}
 		}(i)
 	}
@@ -154,6 +157,7 @@ func TestFanout_RunStraight(t *testing.T) {
 	// Consume data.
 	var (
 		counter int
+		counterMutex sync.Mutex
 		wg      sync.WaitGroup
 	)
 	for i := range outputs {
@@ -162,7 +166,9 @@ func TestFanout_RunStraight(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			for range outputs[n] {
+				counterMutex.Lock()
 				counter++
+				counterMutex.Unlock()
 			}
 		}(i)
 	}
@@ -204,6 +210,7 @@ func TestFanout_RunSplit(t *testing.T) {
 	// Consume data.
 	var (
 		counter int
+		counterMutex sync.Mutex
 		wg      sync.WaitGroup
 	)
 	// Count only first output.
@@ -212,7 +219,9 @@ func TestFanout_RunSplit(t *testing.T) {
 		defer wg.Done()
 		// For testASBXToken() index will be 2.
 		for range outputs[2] {
+			counterMutex.Lock()
 			counter++
+			counterMutex.Unlock()
 		}
 	}()
 
@@ -254,6 +263,7 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 	// Consume data.
 	var (
 		counter int
+		counterMutex sync.Mutex
 		wg      sync.WaitGroup
 	)
 	for i := range outputs {
@@ -261,7 +271,9 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			for range outputs[n] {
+				counterMutex.Lock()
 				counter++
+				counterMutex.Unlock()
 			}
 		}(i)
 	}
@@ -308,6 +320,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 	// Consume data.
 	var (
 		counter int
+		counterMutex sync.Mutex
 		wg      sync.WaitGroup
 	)
 	for i := range outputs {
@@ -316,7 +329,9 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			for range outputs[n] {
+				counterMutex.Lock()
 				counter++
+				counterMutex.Unlock()
 			}
 		}(i)
 	}
@@ -356,7 +371,7 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 			for j := range testCount {
 				time.Sleep(testDealy)
 				token := testToken()
-				token.Size = uint64(j + i)
+				token.Size = uint64(j + n)
 				inputs[n] <- token
 			}
 		}(i)
@@ -365,6 +380,7 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 	// Consume data.
 	var (
 		counter int
+		counterMutex sync.Mutex
 		wg      sync.WaitGroup
 	)
 	// Count only first output.
@@ -372,7 +388,9 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for range outputs[testIndex] {
+			counterMutex.Lock()
 			counter++
+			counterMutex.Unlock()
 		}
 	}()
 

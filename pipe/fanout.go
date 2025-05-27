@@ -23,17 +23,27 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+// FanoutStrategy represents a pipeline routing strategy.
 type FanoutStrategy int
 
 const (
-	// Fixed default val
+	// Fixed strategy routes incoming tokens to output channels, establishing a
+	// dedicated one-to-one mapping between input channels and output channels.
+	// All tokens read from a specific input channel are routed to its pre-assigned
+	// output channel. The number of output channels must equal the number of input
+	// channels being processed.
 	Fixed FanoutStrategy = iota
+	// RoundRobin distributes incoming tokens between available output channels in a
+	// fair, rotating manner.
 	RoundRobin
+	// Split routes incoming tokens to output channels using a custom routing function.
+	// The routing function determines the destination channel for each token based on
+	// its partition id.
 	Split
 )
 
 // Fanout routes messages between chain pools.
-// Depending on, FanoutStrategy messages can be distributed in different ways.
+// FanoutStrategy controls the distribution of messages to output channels.
 type Fanout[T models.TokenConstraint] struct {
 	Inputs  []chan T
 	Outputs []chan T
@@ -44,7 +54,6 @@ type Fanout[T models.TokenConstraint] struct {
 }
 
 // NewFanout returns a new Fanout.
-// The Default strategy is RoundRobin.
 func NewFanout[T models.TokenConstraint](
 	inputs []chan T,
 	outputs []chan T,
@@ -53,7 +62,7 @@ func NewFanout[T models.TokenConstraint](
 	f := &Fanout[T]{
 		Inputs:   inputs,
 		Outputs:  outputs,
-		strategy: strategy, // Default
+		strategy: strategy,
 	}
 
 	// Validations.
@@ -68,6 +77,10 @@ func NewFanout[T models.TokenConstraint](
 	if f.strategy == Fixed && len(f.Inputs) != len(f.Outputs) {
 		return nil, fmt.Errorf("invalid inputs %d and outputs %d number for Fixed strategy",
 			len(f.Inputs), len(f.Outputs))
+	}
+
+	if f.strategy != Fixed && f.strategy != RoundRobin && f.strategy != Split {
+		return nil, fmt.Errorf("unsupported fanout strategy: %d", f.strategy)
 	}
 
 	return f, nil
@@ -119,7 +132,7 @@ func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T)
 // routeData routes a given piece of data based on the current fanout strategy (Fixed, RoundRobin, or Split).
 func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 	switch f.strategy {
-	case Fixed: // Sen to current index.
+	case Fixed: // Send it to the current index.
 	case RoundRobin:
 		index = f.roundRobin(data)
 	case Split:
@@ -133,13 +146,14 @@ func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 	}
 }
 
+// roundRobin returns the next output chain index, distributing tokens in a fair, rotating manner.
 func (f *Fanout[T]) roundRobin(_ T) int {
 	index := atomic.AddUint64(&f.currentIndex, 1) % uint64(len(f.Outputs))
 
 	return int(index)
 }
 
-// splitFunc distributes token between pipeline workers for xdr backup.
+// splitFunc determines an output chain for the token based on its partition id.
 func (f *Fanout[T]) splitFunc(token T) int {
 	t, ok := any(token).(*models.ASBXToken)
 	if !ok {

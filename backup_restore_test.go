@@ -32,7 +32,6 @@ import (
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/aerospike/backup-go/tests"
 	"github.com/stretchr/testify/require"
 )
@@ -1436,13 +1435,16 @@ func TestBackupContinuation(t *testing.T) {
 			time.Sleep(time.Duration(randomNumber) * time.Second)
 			cancel()
 		}()
-
+		t.Log("first backup")
 		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
+		t.Log("first backup finished")
 
 		ctx = context.Background()
+		t.Log("continue backup")
 		second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
+		t.Log("continue backup finished")
 
 		t.Log("first:", first, "second:", second)
 		t.Log(first + second)
@@ -1481,7 +1483,6 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	backupCfg.FileLimit = 10
 	backupCfg.Bandwidth = 1000000
 	backupCfg.PageSize = 1
-	backupCfg.PipelinesMode = pipeline.ModeParallel
 
 	backupClient, err := NewClient(asClient, WithID("test_client"))
 	if err != nil {
@@ -1532,7 +1533,6 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 	backupCfg.Continue = true
 	backupCfg.FileLimit = 100000
 	backupCfg.PageSize = 100
-	backupCfg.PipelinesMode = pipeline.ModeParallel
 
 	backupClient, err := NewClient(asClient, WithID("test_client"))
 	if err != nil {

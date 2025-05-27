@@ -25,7 +25,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
 )
 
@@ -36,7 +36,7 @@ type HandlerBackupXDR struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	readProcessor   *recordReaderProcessor[*models.ASBXToken]
+	readerProcessor *recordReaderProcessorXDR[*models.ASBXToken]
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
 	encoder         Encoder[*models.ASBXToken]
 	config          *ConfigBackupXDR
@@ -49,7 +49,7 @@ type HandlerBackupXDR struct {
 	// For graceful shutdown.
 	wg sync.WaitGroup
 
-	pl *pipeline.Pipeline[*models.ASBXToken]
+	pl *pipe.Pipe[*models.ASBXToken]
 
 	// records per second collector.
 	rpsCollector *metrics.Collector
@@ -81,19 +81,20 @@ func newBackupXDRHandler(
 	rpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
-		metrics.MetricRecordsPerSecond,
-		metricMessage,
-		config.MetricsEnabled,
-	)
-	kbpsCollector := metrics.NewCollector(
-		ctx,
-		logger,
-		metrics.MetricKilobytesPerSecond,
+		metrics.RecordsPerSecond,
 		metricMessage,
 		config.MetricsEnabled,
 	)
 
-	readProcessor := newRecordReaderProcessor[*models.ASBXToken](
+	kbpsCollector := metrics.NewCollector(
+		ctx,
+		logger,
+		metrics.KilobytesPerSecond,
+		metricMessage,
+		config.MetricsEnabled,
+	)
+
+	readerProcessor := newRecordReaderProcessorXDR[*models.ASBXToken](
 		config,
 		aerospikeClient,
 		infoClient,
@@ -106,7 +107,6 @@ func newBackupXDRHandler(
 	writerProcessor := newFileWriterProcessor[*models.ASBXToken](
 		emptyPrefixSuffix,
 		emptyPrefixSuffix,
-		nil,
 		writer,
 		encoder,
 		config.EncryptionPolicy,
@@ -126,7 +126,7 @@ func newBackupXDRHandler(
 		ctx:             ctx,
 		cancel:          cancel,
 		encoder:         encoder,
-		readProcessor:   readProcessor,
+		readerProcessor: readerProcessor,
 		writerProcessor: writerProcessor,
 		config:          config,
 		infoClient:      infoClient,
@@ -161,7 +161,7 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	bh.stats.TotalRecords.Store(records)
 
 	// Read workers.
-	readWorkers, err := bh.readProcessor.newReadWorkersXDR(ctx)
+	readWorkers, err := bh.readerProcessor.newReadWorkersXDR(ctx)
 	if err != nil {
 		return fmt.Errorf("failed create read workers: %w", err)
 	}
@@ -172,24 +172,23 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 		return fmt.Errorf("failed to create storage writers: %w", err)
 	}
 
+	writeWorkers := bh.writerProcessor.newDataWriters(backupWriters)
+
 	defer closeWriters(backupWriters, bh.logger)
 
-	writeWorkers := bh.writerProcessor.newWriteWorkers(backupWriters)
-
-	// Process workers.
-	composeProcessor := newTokenWorker[*models.ASBXToken](
+	proc := newDataProcessor(
 		processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
-		1)
+	)
 
-	// Create a pipeline and start.
-	pl, err := pipeline.NewPipeline(
-		pipeline.ModeSingleParallel, bh.splitFunc,
+	pl, err := pipe.NewPipe(
+		proc,
 		readWorkers,
-		composeProcessor,
 		writeWorkers,
+		nil,
+		pipe.Split,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create pipeline: %w", err)
+		return err
 	}
 
 	// Assign, so we can get pl stats.
@@ -226,28 +225,12 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 	}
 }
 
-// splitFunc distributes token between pipeline workers.
-func (bh *HandlerBackupXDR) splitFunc(t *models.ASBXToken) int {
-	partPerWorker := MaxPartitions / bh.config.ParallelWrite
-
-	var id int
-	if partPerWorker > 0 {
-		id = t.Key.PartitionId() / partPerWorker
-	}
-
-	if id >= bh.config.ParallelWrite {
-		return id - 1
-	}
-
-	return id
-}
-
 // GetStats returns the stats of the backup job.
 func (bh *HandlerBackupXDR) GetStats() *models.BackupStats {
 	return bh.stats
 }
 
-// GetMetrics returns the rpsCollector of the backup job.
+// GetMetrics returns metrics of the backup job.
 func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
 	if bh == nil {
 		return nil

@@ -22,7 +22,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"golang.org/x/time/rate"
 )
 
@@ -56,7 +56,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	}
 }
 
-func (rw *recordWriterProcessor[T]) newWriterWorkers() ([]pipeline.Worker[T], error) {
+func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 	var parallelism int
 
 	switch {
@@ -71,7 +71,7 @@ func (rw *recordWriterProcessor[T]) newWriterWorkers() ([]pipeline.Worker[T], er
 		return nil, fmt.Errorf("failed to check batch writes: %w", err)
 	}
 
-	writeWorkers := make([]pipeline.Worker[T], parallelism)
+	dataWriters := make([]pipe.Writer[T], parallelism)
 
 	for i := 0; i < parallelism; i++ {
 		writer := aerospike.NewRestoreWriter[T](
@@ -86,11 +86,10 @@ func (rw *recordWriterProcessor[T]) newWriterWorkers() ([]pipeline.Worker[T], er
 			rw.config.IgnoreRecordError,
 		)
 
-		statsWriter := newWriterWithTokenStats[T](writer, rw.stats, rw.logger)
-		writeWorkers[i] = pipeline.NewWriteWorker[T](statsWriter, rw.limiter)
+		dataWriters[i] = newWriterWithTokenStats[T](writer, rw.stats, rw.logger)
 	}
 
-	return writeWorkers, nil
+	return dataWriters, nil
 }
 
 func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {

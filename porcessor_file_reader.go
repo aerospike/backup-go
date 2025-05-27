@@ -26,7 +26,7 @@ import (
 	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -67,7 +67,7 @@ func newFileReaderProcessor[T models.TokenConstraint](
 	}
 }
 
-func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline.Worker[T] {
+func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Reader[T] {
 	// Start lazy file reading.
 	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh)
 
@@ -89,12 +89,12 @@ func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline
 		return d
 	}
 
-	readWorkers := make([]pipeline.Worker[T], fr.parallel)
+	readWorkers := make([]pipe.Reader[T], fr.parallel)
 
 	switch fr.config.EncoderType {
 	case EncoderTypeASB:
 		for i := 0; i < fr.parallel; i++ {
-			readWorkers[i] = pipeline.NewReadWorker[T](newTokenReader(fr.readersCh, fr.logger, fn))
+			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fn)
 		}
 	case EncoderTypeASBX:
 		workersReadChans := make([]chan models.File, fr.parallel)
@@ -102,7 +102,7 @@ func (fr *fileReaderProcessor[T]) newReadWorkers(ctx context.Context) []pipeline
 		for i := 0; i < fr.parallel; i++ {
 			rCh := make(chan models.File)
 			workersReadChans[i] = rCh
-			readWorkers[i] = pipeline.NewReadWorker[T](newTokenReader(rCh, fr.logger, fn))
+			readWorkers[i] = newTokenReader(rCh, fr.logger, fn)
 		}
 
 		go distributeFiles(fr.readersCh, workersReadChans, fr.errorsCh)

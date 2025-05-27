@@ -19,7 +19,6 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 )
 
 // changeNamespace is used to restore to another namespace.
@@ -29,7 +28,7 @@ type changeNamespace[T models.TokenConstraint] struct {
 }
 
 // NewChangeNamespace creates new changeNamespace
-func NewChangeNamespace[T models.TokenConstraint](source, destination *string) pipeline.DataProcessor[T] {
+func NewChangeNamespace[T models.TokenConstraint](source, destination *string) processor[T] {
 	if source == nil || destination == nil {
 		return &noopProcessor[T]{}
 	}

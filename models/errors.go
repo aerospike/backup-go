@@ -12,24 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package processors
+package models
 
-import (
-	"github.com/aerospike/backup-go/models"
-)
+import "errors"
 
-type processor[T models.TokenConstraint] interface {
-	Process(token T) (T, error)
-}
-
-// noopProcessor is a no-op implementation of a processor.
-type noopProcessor[T models.TokenConstraint] struct{}
-
-func NewNoop[T models.TokenConstraint]() processor[T] {
-	return &noopProcessor[T]{}
-}
-
-// Process just passes the token through for noopProcessor.
-func (n *noopProcessor[T]) Process(token T) (T, error) {
-	return token, nil
-}
+// ErrFilteredOut is returned by a Data Processor when a token
+// should be filtered out of the pipeline.
+var ErrFilteredOut = errors.New("filtered out")

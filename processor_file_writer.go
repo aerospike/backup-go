@@ -23,11 +23,13 @@ import (
 
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
+	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/io/lazy"
 	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"golang.org/x/time/rate"
 )
 
@@ -46,8 +48,6 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	limiter           *rate.Limiter
 	kbpsCollector     *metrics.Collector
 
-	saveCommandChan chan int
-
 	fileLimit uint64
 	parallel  int
 
@@ -58,7 +58,6 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 func newFileWriterProcessor[T models.TokenConstraint](
 	prefixGenerator func() string,
 	suffixGenerator func() string,
-	saveCommandChan chan int,
 	writer Writer,
 	encoder Encoder[T],
 	encryptionPolicy *EncryptionPolicy,
@@ -77,7 +76,6 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	return &fileWriterProcessor[T]{
 		prefixGenerator:   prefixGenerator,
 		suffixGenerator:   suffixGenerator,
-		saveCommandChan:   saveCommandChan,
 		writer:            writer,
 		encoder:           encoder,
 		encryptionPolicy:  encryptionPolicy,
@@ -94,25 +92,24 @@ func newFileWriterProcessor[T models.TokenConstraint](
 }
 
 // newWriteWorkers returns a pipeline writing workers' for writers.
-func (fw *fileWriterProcessor[T]) newWriteWorkers(writers []io.WriteCloser,
-) []pipeline.Worker[T] {
-	writeWorkers := make([]pipeline.Worker[T], len(writers))
+func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser,
+) []pipe.Writer[T] {
+	dataWriters := make([]pipe.Writer[T], len(writers))
 
 	for i, writer := range writers {
-		var dataWriter pipeline.DataWriter[T] = newTokenWriter(fw.encoder, writer, fw.logger, nil)
+		var dataWriter pipe.Writer[T] = newTokenWriter(fw.encoder, writer, fw.logger, nil)
 
 		if fw.state != nil {
 			stInfo := newStateInfo(fw.state.RecordsStateChan, i)
 			dataWriter = newTokenWriter(fw.encoder, writer, fw.logger, stInfo)
 		}
 
-		dataWriter = newWriterWithTokenStats(dataWriter, fw.stats, fw.logger)
-		writeWorkers[i] = pipeline.NewWriteWorker(dataWriter, fw.limiter)
+		dataWriters[i] = newWriterWithTokenStats(dataWriter, fw.stats, fw.logger)
 	}
 
-	fw.logger.Debug("created new writers pipeline", slog.Int("writersNumber", len(writers)))
+	fw.logger.Debug("created new data writer", slog.Int("writersNumber", len(writers)))
 
-	return writeWorkers
+	return dataWriters
 }
 
 // newWriters returns a slice of configured writers.
@@ -120,7 +117,7 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	writers := make([]io.WriteCloser, fw.parallel)
 
 	for i := range fw.parallel {
-		writer, err := fw.newWriter(ctx, i, fw.saveCommandChan, fw.fileLimit)
+		writer, err := fw.newWriter(ctx, i, fw.fileLimit)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create writer: %w", err)
 		}
@@ -133,9 +130,17 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	return writers, nil
 }
 
-// newWriter returns a new configured writer.
-func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, saveCommandChan chan int, fileLimit uint64,
+// newWriter creates a new writer based on the current configuration.
+// If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
+// The returned writer may be compressed or encrypted depending on the BackupHandler's
+// configuration.
+func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, fileLimit uint64,
 ) (io.WriteCloser, error) {
+	var saveCommandChan chan int
+	if fw.state != nil {
+		saveCommandChan = fw.state.SaveCommandChan
+	}
+
 	if fileLimit > 0 {
 		return sized.NewWriter(ctx, n, saveCommandChan, fileLimit, fw.configureWriter)
 	}
@@ -191,4 +196,35 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix st
 // emptyPrefixSuffix returns empty string, to configure prefix and suffix generator.
 func emptyPrefixSuffix() string {
 	return ""
+}
+
+// newCompressionWriter returns a compression writer for compressing backup.
+func newCompressionWriter(
+	policy *CompressionPolicy, writer io.WriteCloser,
+) (io.WriteCloser, error) {
+	if policy == nil || policy.Mode == CompressNone {
+		return writer, nil
+	}
+
+	if policy.Mode == CompressZSTD {
+		return compression.NewWriter(writer, policy.Level)
+	}
+
+	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
+}
+
+// newEncryptionWriter returns an encryption writer for encrypting backup.
+func newEncryptionWriter(
+	policy *EncryptionPolicy, saConfig *SecretAgentConfig, writer io.WriteCloser,
+) (io.WriteCloser, error) {
+	if policy == nil || policy.Mode == EncryptNone {
+		return writer, nil
+	}
+
+	privateKey, err := readPrivateKey(policy, saConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return encryption.NewWriter(writer, privateKey)
 }

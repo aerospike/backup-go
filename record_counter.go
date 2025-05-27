@@ -19,52 +19,81 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/aerospike"
+	"github.com/aerospike/backup-go/models"
 )
 
-func (bh *backupRecordsHandler) countRecords(ctx context.Context, infoClient infoGetter) (uint64, error) {
-	if bh.config.withoutFilter() {
-		return bh.countUsingInfoClient(infoClient)
-	}
+// recordCounter contains logic to calculate approximate records count.
+// Notice! At the moment works only with *models.Token type.
+type recordCounter struct {
+	aerospikeClient AerospikeClient
+	infoClient      infoGetter
+	config          *ConfigBackup
+	readerProcessor *recordReaderProcessor[*models.Token]
 
-	return bh.countRecordsUsingScan(ctx)
+	logger *slog.Logger
 }
 
-func (bh *backupRecordsHandler) countUsingInfoClient(infoClient infoGetter) (uint64, error) {
-	totalRecordCount, err := infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
+func newRecordCounter(
+	aerospikeClient AerospikeClient,
+	infoClient infoGetter,
+	config *ConfigBackup,
+	readerProcessor *recordReaderProcessor[*models.Token],
+	logger *slog.Logger,
+) *recordCounter {
+	return &recordCounter{
+		aerospikeClient: aerospikeClient,
+		infoClient:      infoClient,
+		config:          config,
+		readerProcessor: readerProcessor,
+		logger:          logger,
+	}
+}
+
+func (rc *recordCounter) countRecords(ctx context.Context, infoClient infoGetter) (uint64, error) {
+	if rc.config.withoutFilter() {
+		return rc.countUsingInfoClient(infoClient)
+	}
+
+	return rc.countRecordsUsingScan(ctx)
+}
+
+func (rc *recordCounter) countUsingInfoClient(infoClient infoGetter) (uint64, error) {
+	totalRecordCount, err := infoClient.GetRecordCount(rc.config.Namespace, rc.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get record count: %w", err)
 	}
 
-	partitionsToScan := uint64(sumPartition(bh.config.PartitionFilters))
+	partitionsToScan := uint64(sumPartition(rc.config.PartitionFilters))
 
 	return totalRecordCount * partitionsToScan / MaxPartitions, nil
 }
 
-func (bh *backupRecordsHandler) countRecordsUsingScan(ctx context.Context) (uint64, error) {
-	scanPolicy := *bh.config.ScanPolicy
+func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, error) {
+	scanPolicy := *rc.config.ScanPolicy
 
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	if bh.config.isParalleledByNodes() {
-		return bh.countRecordsUsingScanByNodes(ctx, &scanPolicy)
+	if rc.config.isParalleledByNodes() {
+		return rc.countRecordsUsingScanByNodes(ctx, &scanPolicy)
 	}
 
-	return bh.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
+	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
 }
 
-func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Context, scanPolicy *a.ScanPolicy,
+func (rc *recordCounter) countRecordsUsingScanByPartitions(ctx context.Context, scanPolicy *a.ScanPolicy,
 ) (uint64, error) {
 	var count uint64
 
-	partitionFilter := randomPartition(bh.config.PartitionFilters)
-	readerConfig := bh.recordReaderConfigForPartitions(partitionFilter, scanPolicy)
+	partitionFilter := randomPartition(rc.config.PartitionFilters)
+	readerConfig := rc.readerProcessor.recordReaderConfigForPartitions(partitionFilter, scanPolicy)
 
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+	recordReader := aerospike.NewRecordReader(ctx, rc.aerospikeClient, readerConfig, rc.logger)
 	defer recordReader.Close()
 
 	count, err := countRecords(recordReader)
@@ -72,12 +101,12 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByPartitions(ctx context.Co
 		return 0, err
 	}
 
-	return count * uint64(sumPartition(bh.config.PartitionFilters)), nil
+	return count * uint64(sumPartition(rc.config.PartitionFilters)), nil
 }
 
-func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context, scanPolicy *a.ScanPolicy,
+func (rc *recordCounter) countRecordsUsingScanByNodes(ctx context.Context, scanPolicy *a.ScanPolicy,
 ) (uint64, error) {
-	nodes, err := bh.getNodes()
+	nodes, err := rc.readerProcessor.getNodes()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get nodes: %w", err)
 	}
@@ -85,9 +114,9 @@ func (bh *backupRecordsHandler) countRecordsUsingScanByNodes(ctx context.Context
 	// #nosec G404
 	randomIndex := rand.Intn(len(nodes))
 	randomNode := []*a.Node{nodes[randomIndex]}
-	readerConfig := bh.recordReaderConfigForNode(randomNode, scanPolicy)
+	readerConfig := rc.readerProcessor.recordReaderConfigForNode(randomNode, scanPolicy)
 
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+	recordReader := aerospike.NewRecordReader(ctx, rc.aerospikeClient, readerConfig, rc.logger)
 	defer recordReader.Close()
 
 	count, err := countRecords(recordReader)

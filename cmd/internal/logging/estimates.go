@@ -163,6 +163,11 @@ func printEstimate(
 		slog.Uint64("B/rec", recSize),
 	)
 
+	logger.Debug("pipe metrics",
+		slog.Int("read", metrics.PipelineReadQueueSize),
+		slog.Int("write", metrics.PipelineWriteQueueSize),
+	)
+
 	return percentage, nil
 }
 

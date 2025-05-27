@@ -22,7 +22,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
+	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
 )
 
@@ -35,13 +35,16 @@ type statsSetterToken interface {
 }
 
 type tokenStatsWriter[T models.TokenConstraint] struct {
-	writer pipeline.DataWriter[T]
+	writer pipe.Writer[T]
 	stats  statsSetterToken
 	logger *slog.Logger
 }
 
-func newWriterWithTokenStats[T models.TokenConstraint](writer pipeline.DataWriter[T],
-	stats statsSetterToken, logger *slog.Logger) *tokenStatsWriter[T] {
+func newWriterWithTokenStats[T models.TokenConstraint](
+	writer pipe.Writer[T],
+	stats statsSetterToken,
+	logger *slog.Logger,
+) *tokenStatsWriter[T] {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
 	logger.Debug("created new token stats writer")

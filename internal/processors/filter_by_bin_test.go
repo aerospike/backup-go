@@ -21,7 +21,6 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,7 +58,7 @@ func TestFilterBin_RecordWithNoBins(t *testing.T) {
 
 	result, err := processor.Process(token)
 
-	assert.ErrorIs(t, err, pipeline.ErrFilteredOut)
+	assert.ErrorIs(t, err, models.ErrFilteredOut)
 	assert.Nil(t, result)
 	assert.Equal(t, uint64(1), skipped.Load())
 }
@@ -113,7 +112,7 @@ func TestFilterBin_RecordWithAllBinsRemoved(t *testing.T) {
 
 	result, err := processor.Process(token)
 
-	assert.ErrorIs(t, err, pipeline.ErrFilteredOut)
+	assert.ErrorIs(t, err, models.ErrFilteredOut)
 	assert.Nil(t, result)
 	assert.Equal(t, uint64(1), skipped.Load())
 }

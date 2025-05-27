@@ -12,26 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package processors
+package backup
 
-import "github.com/aerospike/backup-go/pipeline"
+import (
+	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pipe"
+)
 
-// composeProcessor is a no-op implementation of a processor.
-type composeProcessor[T any] struct {
-	processors []pipeline.DataProcessor[T]
+type dataProcessor[T models.TokenConstraint] struct {
+	execs []pipe.Processor[T]
 }
 
-// NewComposeProcessor creates a new ComposeProcessor with the given processors.
-func NewComposeProcessor[T any](processors ...pipeline.DataProcessor[T]) pipeline.DataProcessor[T] {
-	return &composeProcessor[T]{
-		processors: processors,
+func newDataProcessor[T models.TokenConstraint](execs ...pipe.Processor[T]) pipe.ProcessorCreator[T] {
+	return func() pipe.Processor[T] {
+		return &dataProcessor[T]{
+			execs: execs,
+		}
 	}
 }
 
-// Process applies all composed processors in sequence.
-func (cp *composeProcessor[T]) Process(data T) (T, error) {
+func (p *dataProcessor[T]) Process(data T) (T, error) {
 	var err error
-	for _, processor := range cp.processors {
+	for _, processor := range p.execs {
 		data, err = processor.Process(data)
 		if err != nil {
 			return data, err

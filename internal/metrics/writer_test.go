@@ -50,7 +50,7 @@ func TestNewWriter(t *testing.T) {
 	// Create a collector
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	collector := NewCollector(ctx, logger, MetricKilobytesPerSecond, testMetricMessage, true)
+	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
 	// Create a new Writer
 	writer := NewWriter(mockWriter, collector)
@@ -113,7 +113,7 @@ func TestWriter_Write(t *testing.T) {
 			// Create a collector
 			ctx := context.Background()
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			collector := NewCollector(ctx, logger, MetricKilobytesPerSecond, testMetricMessage, tc.collectorEnabled)
+			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, tc.collectorEnabled)
 
 			// Create a new Writer
 			writer := NewWriter(mockWriter, collector)
@@ -171,7 +171,7 @@ func TestWriter_Close(t *testing.T) {
 			// Create a collector
 			ctx := context.Background()
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			collector := NewCollector(ctx, logger, MetricKilobytesPerSecond, testMetricMessage, true)
+			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
 			// Create a new Writer
 			writer := NewWriter(mockWriter, collector)

@@ -15,15 +15,11 @@
 package backup
 
 import (
-	"context"
 	"errors"
-	"log/slog"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/mocks"
-	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,7 +86,7 @@ func TestCountUsingInfoClient(t *testing.T) {
 			mockInfoClient := mocks.NewMockinfoGetter(t)
 			mockInfoClient.On("GetRecordCount", tt.namespace, []string{"set1"}).Return(tt.recordCount, tt.infoError)
 
-			handler := &backupRecordsHandler{
+			handler := &recordCounter{
 				config: &ConfigBackup{
 					Namespace:        tt.namespace,
 					SetList:          []string{"set1"},
@@ -210,68 +206,6 @@ func TestSumPartition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := sumPartition(tt.partitionFilters)
 			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestGetMetrics(t *testing.T) {
-	// Create collectors
-	ctx := context.Background()
-	logger := slog.Default()
-	rpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricRecordsPerSecond, "test", true)
-	kbpsCollector := metrics.NewCollector(ctx, logger, metrics.MetricKilobytesPerSecond, "test", true)
-
-	tests := []struct {
-		name            string
-		setupHandler    func() *backupRecordsHandler
-		expectedMetrics *models.Metrics
-	}{
-		{
-			name: "Nil handler returns nil metrics",
-			setupHandler: func() *backupRecordsHandler {
-				return nil
-			},
-			expectedMetrics: nil,
-		},
-		{
-			name: "Handler with nil pipeline returns metrics with zero pipeline values",
-			setupHandler: func() *backupRecordsHandler {
-				return &backupRecordsHandler{
-					pl:            nil,
-					rpsCollector:  rpsCollector,
-					kbpsCollector: kbpsCollector,
-				}
-			},
-			expectedMetrics: &models.Metrics{
-				PipelineReadQueueSize:  0,
-				PipelineWriteQueueSize: 0,
-				RecordsPerSecond:       0, // Collector starts at 0
-				KilobytesPerSecond:     0, // Collector starts at 0
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup handler
-			handler := tt.setupHandler()
-
-			// Call the method being tested
-			var metrics *models.Metrics
-			if handler != nil {
-				metrics = handler.GetMetrics()
-			}
-
-			// Verify results
-			if tt.expectedMetrics == nil {
-				assert.Nil(t, metrics)
-			} else {
-				require.NotNil(t, metrics)
-				assert.Equal(t, tt.expectedMetrics.PipelineReadQueueSize, metrics.PipelineReadQueueSize)
-				assert.Equal(t, tt.expectedMetrics.PipelineWriteQueueSize, metrics.PipelineWriteQueueSize)
-				assert.Equal(t, tt.expectedMetrics.RecordsPerSecond, metrics.RecordsPerSecond)
-				assert.Equal(t, tt.expectedMetrics.KilobytesPerSecond, metrics.KilobytesPerSecond)
-			}
 		})
 	}
 }

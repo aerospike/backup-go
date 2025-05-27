@@ -32,9 +32,9 @@ packages:
       exclude-subpkg-regex:
         - Opt
       pkgname: mocks
-  github.com/aerospike/backup-go/pipeline:
+  github.com/aerospike/backup-go/pipe:
     config:
-      dir: ./pipeline/mocks
+      dir: ./pipe/mocks
       pkgname: mocks
   github.com/aerospike/backup-go/pkg/secret-agent/connection:
     config:

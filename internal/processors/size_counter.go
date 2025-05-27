@@ -18,14 +18,13 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 )
 
 type sizeCounter[T models.TokenConstraint] struct {
 	counter *atomic.Uint64
 }
 
-func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) pipeline.DataProcessor[T] {
+func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) processor[T] {
 	return &sizeCounter[T]{
 		counter: counter,
 	}

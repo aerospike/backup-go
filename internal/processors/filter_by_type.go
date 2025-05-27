@@ -18,7 +18,6 @@ import (
 	"fmt"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 )
 
 // tokenTypeFilterProcessor is used to support no-records, no-indexes and no-udf flags.
@@ -29,7 +28,7 @@ type filterByType[T models.TokenConstraint] struct {
 }
 
 // NewFilterByType creates new filterByType processor
-func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool) pipeline.DataProcessor[T] {
+func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool) processor[T] {
 	if !noRecords && !noIndexes && !noUdf {
 		return &noopProcessor[T]{}
 	}
@@ -49,15 +48,15 @@ func (p filterByType[T]) Process(token T) (T, error) {
 	}
 
 	if p.noRecords && t.Type == models.TokenTypeRecord {
-		return nil, fmt.Errorf("%w: record is filtered with no-records flag", pipeline.ErrFilteredOut)
+		return nil, fmt.Errorf("%w: record is filtered with no-records flag", models.ErrFilteredOut)
 	}
 
 	if p.noIndexes && t.Type == models.TokenTypeSIndex {
-		return nil, fmt.Errorf("%w: index is filtered with no-indexes flag", pipeline.ErrFilteredOut)
+		return nil, fmt.Errorf("%w: index is filtered with no-indexes flag", models.ErrFilteredOut)
 	}
 
 	if p.noUdf && t.Type == models.TokenTypeUDF {
-		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", pipeline.ErrFilteredOut)
+		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", models.ErrFilteredOut)
 	}
 
 	return token, nil

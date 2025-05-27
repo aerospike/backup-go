@@ -20,7 +20,6 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pipeline"
 )
 
 // ConfigBackup contains configuration for the backup operation.
@@ -126,9 +125,6 @@ type ConfigBackup struct {
 	// By default, it must be zero. If any value is set, reading from Aerospike will be paginated.
 	// Which affects the performance and RAM usage.
 	PageSize int64
-	// If set to true, the same number of workers will be created for each stage of the pipeline.
-	// Each worker will be connected to the next stage worker with a separate unbuffered channel.
-	PipelinesMode pipeline.Mode
 	// When using directory parameter, prepend a prefix to the names of the generated files.
 	OutputFilePrefix string
 	// Retry policy for info commands.
@@ -214,10 +210,6 @@ func (c *ConfigBackup) validate() error {
 
 	if c.Continue && c.StateFile == "" {
 		return fmt.Errorf("state file must be set if continue is enabled")
-	}
-
-	if c.StateFile != "" && c.PipelinesMode != pipeline.ModeParallel {
-		return fmt.Errorf("parallel pipelines must be enabled if stage file is set")
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {

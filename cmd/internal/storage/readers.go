@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go"
-	config2 "github.com/aerospike/backup-go/cmd/internal/config"
+	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
@@ -37,7 +37,7 @@ import (
 // NewRestoreReader creates and returns a reader based on the restore mode specified in RestoreParams.
 func NewRestoreReader(
 	ctx context.Context,
-	params *config2.RestoreParams,
+	params *config.RestoreParams,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (reader, xdrReader backup.StreamingReader, err error) {
@@ -89,7 +89,7 @@ func NewRestoreReader(
 // NewStateReader initialize reader for a state file.
 func NewStateReader(
 	ctx context.Context,
-	params *config2.BackupParams,
+	params *config.BackupParams,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
@@ -104,7 +104,7 @@ func NewStateReader(
 		stateFile = params.Backup.Continue
 	}
 
-	restoreParams := &config2.RestoreParams{
+	restoreParams := &config.RestoreParams{
 		Common: &models.Common{
 			Directory: params.Common.Directory,
 		},
@@ -120,7 +120,7 @@ func NewStateReader(
 
 func newReader(
 	ctx context.Context,
-	params *config2.RestoreParams,
+	params *config.RestoreParams,
 	sa *backup.SecretAgentConfig,
 	isXdr bool,
 	logger *slog.Logger,
@@ -279,7 +279,7 @@ func newAzureReader(
 
 // prepareDirectoryList parses command line parameters and return slice of strings.
 func prepareDirectoryList(parentDir, dirList string) []string {
-	result := config2.SplitByComma(dirList)
+	result := config.SplitByComma(dirList)
 	if parentDir != "" {
 		for i := range result {
 			result[i] = path.Join(parentDir, result[i])

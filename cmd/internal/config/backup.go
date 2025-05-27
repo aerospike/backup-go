@@ -25,7 +25,6 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/models"
-	"github.com/aerospike/backup-go/pipeline"
 	"github.com/aerospike/tools-common-go/client"
 )
 
@@ -182,7 +181,6 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	c.NoTTLOnly = params.Backup.NoTTLOnly
 	c.OutputFilePrefix = params.Backup.OutputFilePrefix
 	c.MetricsEnabled = true
-	c.PipelinesMode = pipeline.ModeParallel
 
 	if params.Backup.RackList != "" {
 		list, err := ParseRacks(params.Backup.RackList)
@@ -196,13 +194,11 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	if params.Backup.Continue != "" {
 		c.StateFile = path.Join(params.Common.Directory, params.Backup.Continue)
 		c.Continue = true
-		c.PipelinesMode = pipeline.ModeParallel
 		c.PageSize = params.Backup.ScanPageSize
 	}
 
 	if params.Backup.StateFileDst != "" {
 		c.StateFile = params.Backup.StateFileDst
-		c.PipelinesMode = pipeline.ModeParallel
 		c.PageSize = params.Backup.ScanPageSize
 	}
 
@@ -210,8 +206,6 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	if params.Backup.ParallelNodes || params.Backup.NodeList != "" {
 		c.ParallelNodes = params.Backup.ParallelNodes
 		c.NodeList = SplitByComma(params.Backup.NodeList)
-		// For node list we can't use parallel mode as we need to change workers number.
-		c.PipelinesMode = pipeline.ModeSingle
 	}
 
 	pf, err := mapPartitionFilter(params.Backup, params.Common)

@@ -450,8 +450,8 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 	return bytesWritten, nil
 }
 
-// base64EncodedBufferPool is a pool of byte slices used for base64 encoding
-var base64EncodedBufferPool = sync.Pool{
+// base64BufferPool is a pool of byte slices used for base64 encoding
+var base64BufferPool = sync.Pool{
 	New: func() interface{} {
 		// The buffer size is arbitrary and will be grown if needed
 		return make([]byte, 0, 1024)
@@ -465,8 +465,7 @@ func base64Encode(v []byte) []byte {
 	encodedLen := base64.StdEncoding.EncodedLen(len(v))
 
 	// Get a buffer from the pool
-	bufInterface := base64EncodedBufferPool.Get()
-	buf := bufInterface.([]byte)
+	buf := base64BufferPool.Get().([]byte)
 
 	// Ensure the buffer is large enough
 	if cap(buf) < encodedLen {
@@ -489,7 +488,7 @@ func base64Encode(v []byte) []byte {
 func returnBase64Buffer(buf []byte) {
 	// Reset length but keep capacity
 	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	base64EncodedBufferPool.Put(buf[:0])
+	base64BufferPool.Put(buf[:0])
 }
 
 func writeBytes(w io.Writer, data ...[]byte) (int, error) {

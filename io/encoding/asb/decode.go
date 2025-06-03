@@ -30,6 +30,31 @@ import (
 
 const supportedVersion = "3.1"
 
+var (
+	bytesBufPool = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 0, 256)
+		},
+	}
+	smallBufPool = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 0, 64)
+		},
+	}
+)
+
+func returnBytesBuffer(buf []byte) {
+	// Reset length but keep capacity
+	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
+	bytesBufPool.Put(buf[:0])
+}
+
+func returnSmallBuffer(buf []byte) {
+	// Reset length but keep capacity
+	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
+	smallBufPool.Put(buf[:0])
+}
+
 func newDecoderError(offset uint64, err error) error {
 	if errors.Is(err, io.EOF) {
 		return err
@@ -242,8 +267,10 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 		if err != nil {
 			return nil, err
 		}
+		mToken := string(metaToken)
+		returnSmallBuffer(metaToken)
 
-		switch string(metaToken) {
+		switch mToken {
 		case tokenNamespace:
 			if err := _expectChar(r.reader, ' '); err != nil {
 				return nil, err
@@ -265,7 +292,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 			res.First = val
 
 		default:
-			return nil, fmt.Errorf("unknown meta data line type %s", metaToken)
+			return nil, fmt.Errorf("unknown meta data line type %s", mToken)
 		}
 	}
 
@@ -277,12 +304,14 @@ func (r *Decoder[T]) readNamespace() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	result := string(data)
+	returnSmallBuffer(data)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return "", err
 	}
 
-	return string(data), nil
+	return result, nil
 }
 
 func (r *Decoder[T]) readFirst() (bool, error) {
@@ -343,6 +372,8 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 	res.Namespace = string(namespace)
 
+	returnSmallBuffer(namespace)
+
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
@@ -354,6 +385,8 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 	res.Set = string(set)
 
+	returnSmallBuffer(set)
+
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
@@ -364,6 +397,8 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 	}
 
 	res.Name = string(name)
+
+	returnSmallBuffer(name)
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -402,6 +437,8 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 	path.BinName = string(binName)
 
+	returnSmallBuffer(binName)
+
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
@@ -422,7 +459,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 			return nil, err
 		}
 
-		// NOTE: the context should always be base64 encoded
+		// NOTE: the context should always be base64 encoded,
 		// so escaping is not needed
 		context, err := _readUntil(r.reader, '\n', false)
 		if err != nil {
@@ -430,6 +467,8 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		}
 
 		path.B64Context = string(context)
+
+		returnSmallBuffer(context)
 	}
 
 	res.Path = path
@@ -512,6 +551,8 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 	}
 
 	res.Name = string(name)
+
+	returnSmallBuffer(name)
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -748,6 +789,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 	}
 
 	name := string(nameBytes)
+	returnSmallBuffer(nameBytes)
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
@@ -817,6 +859,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 		if err != nil {
 			return nil, err
 		}
+		defer returnBase64Buffer(val)
 
 		return string(val), nil
 	case binTypeGeoJSON:
@@ -834,6 +877,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 
 	if base64Encoded {
 		val, err = _readBase64BytesSized(r.reader, ' ')
+		defer returnBase64Buffer(val)
 	} else {
 		val, err = _readBytesSized(r.reader, ' ')
 		defer returnBytesBuffer(val)
@@ -886,7 +930,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		return nil, err
 	}
 
-	// handle the special case where a bytes key is not base64 encoded
+	// handle the special case where a byte key is not base64 encoded
 	var base64Encoded bool
 
 	switch b {
@@ -933,6 +977,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer returnBase64Buffer(keyVal)
 
 		res = string(keyVal)
 
@@ -940,6 +985,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		var keyVal []byte
 		if base64Encoded {
 			keyVal, err = _readBase64BytesSized(r.reader, ' ')
+			defer returnBase64Buffer(keyVal)
 		} else {
 			keyVal, err = _readBytesSized(r.reader, ' ')
 			defer returnBytesBuffer(keyVal)
@@ -1023,11 +1069,14 @@ func (r *Decoder[T]) readSet() (string, error) {
 		return "", err
 	}
 
+	result := string(set)
+	returnSmallBuffer(set)
+
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return "", err
 	}
 
-	return string(set), err
+	return result, err
 }
 
 func (r *Decoder[T]) readDigest() ([]byte, error) {
@@ -1035,12 +1084,16 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer returnBase64Buffer(digest)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return nil, err
 	}
 
-	return digest, nil
+	result := make([]byte, len(digest))
+	copy(result, digest)
+
+	return result, nil
 }
 
 // ***** Helper Functions
@@ -1050,8 +1103,11 @@ func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
+	result := make([]byte, len(encoded))
+	copy(result, encoded)
+	returnSmallBuffer(encoded)
 
-	return _decodeBase64(encoded)
+	return _decodeBase64(result)
 }
 
 func _readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
@@ -1072,20 +1128,38 @@ func _readBlockDecodeBase64(src *countingReader, n int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer returnBytesBuffer(data)
 
-	return _decodeBase64(data)
-}
-
-func _decodeBase64(src []byte) ([]byte, error) {
-	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(src)))
-
-	bw, err := base64.StdEncoding.Decode(decoded, src)
+	result, err := _decodeBase64(data)
 	if err != nil {
 		return nil, err
 	}
 
-	return decoded[:bw], nil
+	returnSmallBuffer(data)
+
+	return result, nil
+}
+
+func _decodeBase64(src []byte) ([]byte, error) {
+	decodedLen := base64.StdEncoding.DecodedLen(len(src))
+
+	// Get a buffer from the pool
+	buf := base64BufferPool.Get().([]byte)
+
+	// Ensure the buffer is large enough
+	if cap(buf) < decodedLen {
+		// If the buffer is too small, create a new one with sufficient capacity
+		buf = make([]byte, decodedLen)
+	} else {
+		// Otherwise, resize the existing buffer
+		buf = buf[:decodedLen]
+	}
+
+	bw, err := base64.StdEncoding.Decode(buf, src)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf[:bw], nil
 }
 
 func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
@@ -1134,8 +1208,10 @@ func _readFloat(src *countingReader, delim byte) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+	result := string(data)
+	returnSmallBuffer(data)
 
-	return strconv.ParseFloat(string(data), 64)
+	return strconv.ParseFloat(result, 64)
 }
 
 func _readInteger(src *countingReader, delim byte) (int64, error) {
@@ -1143,8 +1219,10 @@ func _readInteger(src *countingReader, delim byte) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	result := string(data)
+	returnSmallBuffer(data)
 
-	return strconv.ParseInt(string(data), 10, 64)
+	return strconv.ParseInt(result, 10, 64)
 }
 
 func _readGeoJSON(src *countingReader, sizeDelim byte) (a.GeoJSONValue, error) {
@@ -1175,8 +1253,10 @@ func _readSize(src *countingReader, delim byte) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
+	result := string(data)
+	returnSmallBuffer(data)
 
-	num, err := strconv.ParseUint(string(data), 10, 32)
+	num, err := strconv.ParseUint(result, 10, 32)
 
 	return uint32(num), err
 }
@@ -1186,7 +1266,8 @@ func _readUntil(src *countingReader, delim byte, escaped bool) ([]byte, error) {
 }
 
 func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, error) {
-	buf := make([]byte, 0, 64)
+	bufInterface := smallBufPool.Get()
+	buf := bufInterface.([]byte)
 
 	var esc bool
 
@@ -1217,21 +1298,8 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 	return nil, errors.New("token larger than max size")
 }
 
-var bytesBufPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 0, 1024)
-	},
-}
-
-func returnBytesBuffer(buf []byte) {
-	// Reset length but keep capacity
-	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	bytesBufPool.Put(buf[:0])
-}
-
 func _readNBytes(src *countingReader, n int) ([]byte, error) {
-	bufInterface := bytesBufPool.Get()
-	buf := bufInterface.([]byte)
+	buf := bytesBufPool.Get().([]byte)
 
 	// Ensure the buffer is large enough
 	if cap(buf) < n {

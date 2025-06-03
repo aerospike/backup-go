@@ -1662,7 +1662,7 @@ func base64EncodeNative(v []byte) []byte {
 	encodedLen := base64.StdEncoding.EncodedLen(len(v))
 
 	// Get a buffer from the pool
-	bufInterface := base64EncodedBufferPool.Get()
+	bufInterface := base64BufferPool.Get()
 	buf := bufInterface.([]byte)
 
 	// Ensure the buffer is large enough

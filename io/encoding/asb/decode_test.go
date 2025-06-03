@@ -3231,7 +3231,6 @@ func Test_readUntilAny(t *testing.T) {
 }
 
 func Test_readNBytes(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		src *countingReader
 		n   int
@@ -3278,7 +3277,6 @@ func Test_readNBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got, err := _readNBytes(tt.args.src, tt.args.n)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readNBytes() error = %v, wantErr %v", err, tt.wantErr)

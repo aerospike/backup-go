@@ -268,6 +268,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		mToken := string(metaToken)
 		returnSmallBuffer(metaToken)
 
@@ -305,6 +306,7 @@ func (r *Decoder[T]) readNamespace() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	result := string(data)
 	returnSmallBuffer(data)
 
@@ -875,22 +877,16 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	}
 
 	var (
-		raw, val []byte
-		err      error
+		val []byte
+		err error
 	)
 
 	if base64Encoded {
-		raw, err = _readBase64BytesSized(r.reader, ' ')
-		val = make([]byte, len(raw))
-		copy(val, raw)
-
-		returnBase64Buffer(raw)
+		val, err = _readBase64BytesSized(r.reader, ' ')
+		defer returnBase64Buffer(val)
 	} else {
-		raw, err = _readBytesSized(r.reader, ' ')
-		val = make([]byte, len(raw))
-		copy(val, raw)
-
-		returnBytesBuffer(raw)
+		val, err = _readBytesSized(r.reader, ' ')
+		defer returnBytesBuffer(val)
 	}
 
 	if err != nil {
@@ -898,12 +894,20 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	}
 
 	if _, ok := isMsgPackBytes[binType]; !ok {
-		return val, nil
+		// We should copy a result, as buffer will be returned.
+		mspVal := make([]byte, len(val))
+		copy(mspVal, val)
+
+		return mspVal, nil
 	}
 
 	switch binType {
 	case binTypeBytesHLL:
-		return a.NewHLLValue(val), nil
+		// Only HLL val is not copied inside the lib, so we should copy it ourselves.
+		hllVal := make([]byte, len(val))
+		copy(hllVal, val)
+
+		return a.NewHLLValue(hllVal), nil
 	case binTypeBytesMap:
 		return a.NewRawBlobValue(particleType.MAP, val), nil
 	case binTypeBytesList:
@@ -1119,6 +1123,7 @@ func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	returnSmallBuffer(encoded)
 
 	decoded := make([]byte, len(result))
@@ -1228,6 +1233,7 @@ func _readFloat(src *countingReader, delim byte) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	result := string(data)
 	returnSmallBuffer(data)
 
@@ -1239,6 +1245,7 @@ func _readInteger(src *countingReader, delim byte) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	result := string(data)
 	returnSmallBuffer(data)
 
@@ -1274,6 +1281,7 @@ func _readSize(src *countingReader, delim byte) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	result := string(data)
 	returnSmallBuffer(data)
 

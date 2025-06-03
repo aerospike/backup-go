@@ -3284,6 +3284,7 @@ func Test_readNBytes(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("_readNBytes() = %v, want %v", got, tt.want)
 			}
+			returnBytesBuffer(got)
 		})
 	}
 }

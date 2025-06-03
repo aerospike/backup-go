@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
@@ -199,6 +200,7 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer returnBytesBuffer(ver)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return nil, err
@@ -528,6 +530,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer returnBytesBuffer(content)
 
 	res.Content = content
 
@@ -833,6 +836,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 		val, err = _readBase64BytesSized(r.reader, ' ')
 	} else {
 		val, err = _readBytesSized(r.reader, ' ')
+		defer returnBytesBuffer(val)
 	}
 
 	if err != nil {
@@ -938,6 +942,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 			keyVal, err = _readBase64BytesSized(r.reader, ' ')
 		} else {
 			keyVal, err = _readBytesSized(r.reader, ' ')
+			defer returnBytesBuffer(keyVal)
 		}
 
 		if err != nil {
@@ -1067,6 +1072,7 @@ func _readBlockDecodeBase64(src *countingReader, n int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer returnBytesBuffer(data)
 
 	return _decodeBase64(data)
 }
@@ -1087,8 +1093,11 @@ func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer returnBytesBuffer(val)
 
-	return string(val), err
+	result := string(val)
+
+	return result, err
 }
 
 func _readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
@@ -1152,8 +1161,11 @@ func _readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer returnBytesBuffer(data)
 
-	return a.NewHLLValue(data), nil
+	result := a.NewHLLValue(data)
+
+	return result, nil
 }
 
 // _readSize reads a size or length token from the asb format
@@ -1205,15 +1217,37 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 	return nil, errors.New("token larger than max size")
 }
 
-func _readNBytes(src *countingReader, n int) ([]byte, error) {
-	data := make([]byte, n)
+var bytesBufPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 0, 1024)
+	},
+}
 
-	_, err := io.ReadFull(src, data)
+func returnBytesBuffer(buf []byte) {
+	// Reset length but keep capacity
+	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
+	bytesBufPool.Put(buf[:0])
+}
+
+func _readNBytes(src *countingReader, n int) ([]byte, error) {
+	bufInterface := bytesBufPool.Get()
+	buf := bufInterface.([]byte)
+
+	// Ensure the buffer is large enough
+	if cap(buf) < n {
+		// If the buffer is too small, create a new one with sufficient capacity
+		buf = make([]byte, n)
+	} else {
+		// Otherwise, resize the existing buffer
+		buf = buf[:n]
+	}
+
+	_, err := io.ReadFull(src, buf)
 	if err != nil {
 		return nil, err
 	}
 
-	return data, nil
+	return buf, nil
 }
 
 func _expectChar(src *countingReader, c byte) error {
@@ -1244,6 +1278,7 @@ func _expectToken(src *countingReader, token string) error {
 	if err != nil {
 		return err
 	}
+	defer returnBytesBuffer(data)
 
 	if string(data) != token {
 		return fmt.Errorf("invalid token, read %s, expected %s", string(data), token)

@@ -225,13 +225,14 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer returnBytesBuffer(ver)
+
+	res.Version = string(ver)
+
+	returnBytesBuffer(ver)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return nil, err
 	}
-
-	res.Version = string(ver)
 
 	return &res, nil
 }
@@ -571,9 +572,10 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer returnBytesBuffer(content)
 
-	res.Content = content
+	res.Content = make([]byte, len(content))
+	copy(res.Content, content)
+	returnBytesBuffer(content)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return nil, err
@@ -859,9 +861,11 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 		if err != nil {
 			return nil, err
 		}
-		defer returnBase64Buffer(val)
 
-		return string(val), nil
+		result := string(val)
+		returnBase64Buffer(val)
+
+		return result, nil
 	case binTypeGeoJSON:
 		return _readGeoJSON(r.reader, ' ')
 	}
@@ -871,16 +875,22 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	}
 
 	var (
-		val []byte
-		err error
+		raw, val []byte
+		err      error
 	)
 
 	if base64Encoded {
-		val, err = _readBase64BytesSized(r.reader, ' ')
-		defer returnBase64Buffer(val)
+		raw, err = _readBase64BytesSized(r.reader, ' ')
+		val = make([]byte, len(raw))
+		copy(val, raw)
+
+		returnBase64Buffer(raw)
 	} else {
-		val, err = _readBytesSized(r.reader, ' ')
-		defer returnBytesBuffer(val)
+		raw, err = _readBytesSized(r.reader, ' ')
+		val = make([]byte, len(raw))
+		copy(val, raw)
+
+		returnBytesBuffer(raw)
 	}
 
 	if err != nil {
@@ -898,9 +908,9 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 		return a.NewRawBlobValue(particleType.MAP, val), nil
 	case binTypeBytesList:
 		return a.NewRawBlobValue(particleType.LIST, val), nil
+	default:
+		return nil, fmt.Errorf("invalid bytes to type binType %d", binType)
 	}
-
-	return nil, fmt.Errorf("invalid bytes to type binType %d", binType)
 }
 
 var asbKeyTypes = map[byte]struct{}{
@@ -977,25 +987,30 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer returnBase64Buffer(keyVal)
 
 		res = string(keyVal)
 
+		returnBase64Buffer(keyVal)
+
 	case keyTypeBytes:
-		var keyVal []byte
+		var keyVal, cVal []byte
 		if base64Encoded {
 			keyVal, err = _readBase64BytesSized(r.reader, ' ')
-			defer returnBase64Buffer(keyVal)
+			cVal = make([]byte, len(keyVal))
+			copy(cVal, keyVal)
+			returnBase64Buffer(keyVal)
 		} else {
 			keyVal, err = _readBytesSized(r.reader, ' ')
-			defer returnBytesBuffer(keyVal)
+			cVal = make([]byte, len(keyVal))
+			copy(cVal, keyVal)
+			returnBytesBuffer(keyVal)
 		}
 
 		if err != nil {
 			return nil, err
 		}
 
-		res = keyVal
+		res = cVal
 
 	default:
 		// should never happen because of the previous check for membership in asbKeyTypes
@@ -1084,16 +1099,12 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer returnBase64Buffer(digest)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return nil, err
 	}
 
-	result := make([]byte, len(digest))
-	copy(result, digest)
-
-	return result, nil
+	return digest, nil
 }
 
 // ***** Helper Functions
@@ -1103,11 +1114,19 @@ func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	result := make([]byte, len(encoded))
-	copy(result, encoded)
+
+	result, err := _decodeBase64(encoded)
+	if err != nil {
+		return nil, err
+	}
 	returnSmallBuffer(encoded)
 
-	return _decodeBase64(result)
+	decoded := make([]byte, len(result))
+	copy(decoded, result)
+
+	returnBase64Buffer(result)
+
+	return decoded, nil
 }
 
 func _readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
@@ -1167,11 +1186,12 @@ func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer returnBytesBuffer(val)
 
 	result := string(val)
 
-	return result, err
+	returnBytesBuffer(val)
+
+	return result, nil
 }
 
 func _readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
@@ -1239,9 +1259,10 @@ func _readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer returnBytesBuffer(data)
 
 	result := a.NewHLLValue(data)
+
+	returnBytesBuffer(data)
 
 	return result, nil
 }
@@ -1346,9 +1367,11 @@ func _expectToken(src *countingReader, token string) error {
 	if err != nil {
 		return err
 	}
-	defer returnBytesBuffer(data)
 
-	if string(data) != token {
+	result := string(data)
+	returnBytesBuffer(data)
+
+	if result != token {
 		return fmt.Errorf("invalid token, read %s, expected %s", string(data), token)
 	}
 

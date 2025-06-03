@@ -30,12 +30,15 @@ import (
 
 const supportedVersion = "3.1"
 
+// We create different pools to save the memory, as some operations need big pool, and some small.
 var (
-	bytesBufPool = sync.Pool{
+	// bigBufPool is a pool of big byte slices used for decoding.
+	bigBufPool = sync.Pool{
 		New: func() interface{} {
-			return make([]byte, 0, 256)
+			return make([]byte, 0, 512)
 		},
 	}
+	// smallBufPool is a pool of small byte slices used for decoding.
 	smallBufPool = sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 0, 64)
@@ -43,12 +46,14 @@ var (
 	}
 )
 
-func returnBytesBuffer(buf []byte) {
+// returnBigBuffer return buffer to pool.
+func returnBigBuffer(buf []byte) {
 	// Reset length but keep capacity
 	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	bytesBufPool.Put(buf[:0])
+	bigBufPool.Put(buf[:0])
 }
 
+// returnSmallBuffer return buffer to pool.
 func returnSmallBuffer(buf []byte) {
 	// Reset length but keep capacity
 	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
@@ -85,11 +90,14 @@ func newLineError(lineType string, err error) error {
 	return fmt.Errorf("error while reading line type: %s, %w", lineType, err)
 }
 
+// countingReader wrapper for fast reading.
+// It keeps track of the number of bytes read.
 type countingReader struct {
 	*bufio.Reader
 	count uint64
 }
 
+// ReadByte reads a single byte from the underlying reader.
 func (c *countingReader) ReadByte() (byte, error) {
 	b, err := c.Reader.ReadByte()
 	if err == nil {
@@ -99,6 +107,7 @@ func (c *countingReader) ReadByte() (byte, error) {
 	return b, err
 }
 
+// UnreadByte unreads a single byte from the underlying reader.
 func (c *countingReader) UnreadByte() error {
 	err := c.Reader.UnreadByte()
 	if err == nil {
@@ -108,6 +117,7 @@ func (c *countingReader) UnreadByte() error {
 	return err
 }
 
+// Read reads data into the provided byte slice and increments the internal count by the number of bytes read.
 func (c *countingReader) Read(p []byte) (int, error) {
 	n, err := c.Reader.Read(p)
 	c.count += uint64(n)
@@ -228,7 +238,7 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 
 	res.Version = string(ver)
 
-	returnBytesBuffer(ver)
+	returnBigBuffer(ver)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return nil, err
@@ -577,7 +587,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 
 	res.Content = make([]byte, len(content))
 	copy(res.Content, content)
-	returnBytesBuffer(content)
+	returnBigBuffer(content)
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return nil, err
@@ -886,7 +896,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 		defer returnBase64Buffer(val)
 	} else {
 		val, err = _readBytesSized(r.reader, ' ')
-		defer returnBytesBuffer(val)
+		defer returnBigBuffer(val)
 	}
 
 	if err != nil {
@@ -1007,7 +1017,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 			keyVal, err = _readBytesSized(r.reader, ' ')
 			cVal = make([]byte, len(keyVal))
 			copy(cVal, keyVal)
-			returnBytesBuffer(keyVal)
+			returnBigBuffer(keyVal)
 		}
 
 		if err != nil {
@@ -1194,7 +1204,7 @@ func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 
 	result := string(val)
 
-	returnBytesBuffer(val)
+	returnBigBuffer(val)
 
 	return result, nil
 }
@@ -1269,7 +1279,7 @@ func _readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 
 	result := a.NewHLLValue(data)
 
-	returnBytesBuffer(data)
+	returnBigBuffer(data)
 
 	return result, nil
 }
@@ -1328,7 +1338,7 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 }
 
 func _readNBytes(src *countingReader, n int) ([]byte, error) {
-	buf := bytesBufPool.Get().([]byte)
+	buf := bigBufPool.Get().([]byte)
 
 	// Ensure the buffer is large enough
 	if cap(buf) < n {
@@ -1377,7 +1387,7 @@ func _expectToken(src *countingReader, token string) error {
 	}
 
 	result := string(data)
-	returnBytesBuffer(data)
+	returnBigBuffer(data)
 
 	if result != token {
 		return fmt.Errorf("invalid token, read %s, expected %s", string(data), token)

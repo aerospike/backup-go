@@ -3001,7 +3001,7 @@ func Test_readUntil(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []byte
+		want    string
 		wantErr bool
 	}{
 		{
@@ -3013,7 +3013,7 @@ func Test_readUntil(t *testing.T) {
 				delim:   '\n',
 				escaped: false,
 			},
-			want:    []byte("string"),
+			want:    "string",
 			wantErr: false,
 		},
 		{
@@ -3025,7 +3025,7 @@ func Test_readUntil(t *testing.T) {
 				delim:   '\n',
 				escaped: true,
 			},
-			want:    []byte("str\ning"),
+			want:    "str\ning",
 			wantErr: false,
 		},
 		{
@@ -3037,7 +3037,7 @@ func Test_readUntil(t *testing.T) {
 				delim:   '\n',
 				escaped: false,
 			},
-			want:    []byte("str\\"),
+			want:    "str\\",
 			wantErr: false,
 		},
 		{
@@ -3049,7 +3049,7 @@ func Test_readUntil(t *testing.T) {
 				delim:   '\n',
 				escaped: false,
 			},
-			want:    nil,
+			want:    "",
 			wantErr: true,
 		},
 	}
@@ -3064,7 +3064,6 @@ func Test_readUntil(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("_readUntil() = %v, want %v", got, tt.want)
 			}
-			returnSmallBuffer(got)
 		})
 	}
 }

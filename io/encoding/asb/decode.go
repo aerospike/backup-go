@@ -30,7 +30,8 @@ import (
 
 const supportedVersion = "3.1"
 
-// We create different pools to save the memory, as some operations need big pool, and some small.
+// The following sync.Pool instances provide optimized memory reuse
+// for byte slices of varying capacities.
 var (
 	// bigBufPool is a pool of big byte slices used for decoding.
 	bigBufPool = sync.Pool{
@@ -90,7 +91,7 @@ func newLineError(lineType string, err error) error {
 	return fmt.Errorf("error while reading line type: %s, %w", lineType, err)
 }
 
-// countingReader wrapper for fast reading.
+// countingReader represents a wrapper for fast reading.
 // It keeps track of the number of bytes read.
 type countingReader struct {
 	*bufio.Reader
@@ -317,14 +318,11 @@ func (r *Decoder[T]) readNamespace() (string, error) {
 		return "", err
 	}
 
-	result := string(data)
-	returnSmallBuffer(data)
-
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return "", err
 	}
 
-	return result, nil
+	return data, nil
 }
 
 func (r *Decoder[T]) readFirst() (bool, error) {
@@ -369,8 +367,8 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 	return res, nil
 }
 
-// readSindex is used to read secondary index lines in the global section of the asb file.
-// readSindex expects that r has been advanced past the secondary index global line marker '* i'
+// readSIndex is used to read secondary index lines in the global section of the asb file.
+// readSIndex expects that r has been advanced past the secondary index global line marker '* i'
 func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 	var res models.SIndex
 
@@ -383,9 +381,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	res.Namespace = string(namespace)
-
-	returnSmallBuffer(namespace)
+	res.Namespace = namespace
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -396,9 +392,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	res.Set = string(set)
-
-	returnSmallBuffer(set)
+	res.Set = set
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -409,9 +403,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	res.Name = string(name)
-
-	returnSmallBuffer(name)
+	res.Name = name
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -448,9 +440,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	path.BinName = string(binName)
-
-	returnSmallBuffer(binName)
+	path.BinName = binName
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -479,9 +469,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 			return nil, err
 		}
 
-		path.B64Context = string(context)
-
-		returnSmallBuffer(context)
+		path.B64Context = context
 	}
 
 	res.Path = path
@@ -563,9 +551,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	res.Name = string(name)
-
-	returnSmallBuffer(name)
+	res.Name = name
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -1098,8 +1084,7 @@ func (r *Decoder[T]) readSet() (string, error) {
 		return "", err
 	}
 
-	result := string(set)
-	returnSmallBuffer(set)
+	result := set
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return "", err
@@ -1124,7 +1109,7 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 // ***** Helper Functions
 
 func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) {
-	encoded, err := _readUntil(src, delim, false)
+	encoded, err := _readUntilAny(src, []byte{delim}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1244,10 +1229,7 @@ func _readFloat(src *countingReader, delim byte) (float64, error) {
 		return 0, err
 	}
 
-	result := string(data)
-	returnSmallBuffer(data)
-
-	return strconv.ParseFloat(result, 64)
+	return strconv.ParseFloat(data, 64)
 }
 
 func _readInteger(src *countingReader, delim byte) (int64, error) {
@@ -1256,10 +1238,7 @@ func _readInteger(src *countingReader, delim byte) (int64, error) {
 		return 0, err
 	}
 
-	result := string(data)
-	returnSmallBuffer(data)
-
-	return strconv.ParseInt(result, 10, 64)
+	return strconv.ParseInt(data, 10, 64)
 }
 
 func _readGeoJSON(src *countingReader, sizeDelim byte) (a.GeoJSONValue, error) {
@@ -1292,16 +1271,22 @@ func _readSize(src *countingReader, delim byte) (uint32, error) {
 		return 0, err
 	}
 
-	result := string(data)
-	returnSmallBuffer(data)
-
-	num, err := strconv.ParseUint(result, 10, 32)
+	num, err := strconv.ParseUint(data, 10, 32)
 
 	return uint32(num), err
 }
 
-func _readUntil(src *countingReader, delim byte, escaped bool) ([]byte, error) {
-	return _readUntilAny(src, []byte{delim}, escaped)
+func _readUntil(src *countingReader, delim byte, escaped bool) (string, error) {
+	result, err := _readUntilAny(src, []byte{delim}, escaped)
+	if err != nil {
+		return "", err
+	}
+
+	resultStr := string(result)
+
+	returnSmallBuffer(result)
+
+	return resultStr, nil
 }
 
 func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, error) {

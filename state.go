@@ -34,7 +34,7 @@ type State struct {
 	// Global backup context.
 	ctx context.Context
 
-	// counter tracks the number of times the State instance has been initialized.
+	// Counter tracks the number of times the State instance has been initialized.
 	// This is used to generate a unique suffix for backup files.
 	Counter int
 	// RecordsStateChan is a channel for communicating serialized partition filter

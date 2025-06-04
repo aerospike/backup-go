@@ -230,7 +230,7 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 	return w.Remove(ctx, w.PathList[0])
 }
 
-// Remove removes a file or files from directory.
+// Remove deletes the file or directory contents specified by path.
 func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove file.
 	if !w.IsDir {

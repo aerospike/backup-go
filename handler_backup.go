@@ -434,7 +434,7 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *BackupHandler) Wait(ctx context.Context) error {
 	// Define err, to check it on defer function.
-	// If the err is nil, we can remove a state file.
+	// If the err is nil, we can remove the state file.
 	var err error
 	defer func() {
 		bh.stats.Stop()
@@ -470,7 +470,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 		return err
 	case err = <-bh.errors:
 		// On error, we cancel global context.
-		// To stop all goroutines and prevent leak.
+		// To stop all goroutines and prevent leaks.
 		bh.cancel()
 
 		return err

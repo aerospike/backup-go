@@ -241,6 +241,10 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 		rh.cancel()
 		return ctx.Err()
 	case err := <-rh.errors:
+		// On error, we cancel global context.
+		// To stop all goroutines and prevent leaks.
+		rh.cancel()
+
 		return err
 	}
 }

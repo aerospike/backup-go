@@ -147,6 +147,7 @@ func (r *Reader) streamDirectory(
 			errorsCh <- fmt.Errorf("failed to get file info %s: %w", filePath, err)
 			return
 		}
+
 		if info.Size() == 0 {
 			continue
 		}

@@ -573,7 +573,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			NewContainerClient(r.containerName).
 			NewBlobClient(path).GetProperties(ctx, nil)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object attr: %s", path)
+			return 0, 0, fmt.Errorf("failed to get object properties: %s: %w", path, err)
 		}
 
 		if objProps.ContentLength == nil {

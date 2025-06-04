@@ -271,13 +271,18 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix
 
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
+	return w.Remove(ctx, w.PathList[0])
+}
+
+// Remove removes a file or files from directory.
+func (w *Writer) Remove(ctx context.Context, path string) error {
 	// Remove file.
 	if !w.IsDir {
 		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 			Bucket: aws.String(w.bucketName),
-			Key:    aws.String(w.PathList[0]),
+			Key:    aws.String(path),
 		}); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", w.PathList[0], err)
+			return fmt.Errorf("failed to delete object %s: %w", path, err)
 		}
 
 		return nil
@@ -285,10 +290,12 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 	// Remove files from dir.
 	var continuationToken *string
 
+	prefix := ioStorage.CleanPath(path, true)
+
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 			Bucket:            aws.String(w.bucketName),
-			Prefix:            aws.String(w.prefix),
+			Prefix:            aws.String(prefix),
 			ContinuationToken: continuationToken,
 		})
 		if err != nil {
@@ -296,7 +303,7 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || ioStorage.IsDirectory(w.prefix, *p.Key) && !w.WithNestedDir {
+			if p.Key == nil || ioStorage.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
 				continue
 			}
 

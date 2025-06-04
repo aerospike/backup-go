@@ -47,6 +47,9 @@ type Writer interface {
 	GetType() string
 	// RemoveFiles removes a backup file or files from directory.
 	RemoveFiles(ctx context.Context) error
+	// Remove removes a file or directory at the specified path from the backup storage.
+	// Returns an error if the operation fails.
+	Remove(ctx context.Context, path string) error
 }
 
 // BackupHandler handles a backup job.
@@ -430,10 +433,20 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *BackupHandler) Wait(ctx context.Context) error {
+	// Define err, to check it on defer function.
+	// If the err is nil, we can remove a state file.
+	var err error
 	defer func() {
 		bh.stats.Stop()
 		bh.rpsCollector.Stop()
 		bh.kbpsCollector.Stop()
+
+		if err == nil && bh.state != nil {
+			// Clen only if err == nil and state is not nil.
+			if err = bh.state.cleanup(ctx); err != nil {
+				bh.logger.Error("failed to cleanup state", slog.Any("error", err))
+			}
+		}
 	}()
 
 	select {
@@ -442,7 +455,9 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 		// Global context - is context that was passed to Backup() method.
 		bh.wg.Wait()
 
-		return bh.ctx.Err()
+		err = ctx.Err()
+
+		return err
 	case <-ctx.Done():
 		// When local context is done, we cancel global context.
 		// Then wait until all routines finish their work properly.
@@ -450,8 +465,14 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 		bh.cancel()
 		bh.wg.Wait()
 
-		return ctx.Err()
-	case err := <-bh.errors:
+		err = ctx.Err()
+
+		return err
+	case err = <-bh.errors:
+		// On error, we cancel global context.
+		// To stop all goroutines and prevent leak.
+		bh.cancel()
+
 		return err
 	}
 }

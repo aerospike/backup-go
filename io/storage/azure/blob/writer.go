@@ -231,18 +231,18 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 }
 
 // Remove removes a file or files from directory.
-func (w *Writer) Remove(ctx context.Context, path string) error {
+func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove file.
 	if !w.IsDir {
-		_, err := w.client.DeleteBlob(ctx, w.containerName, path, nil)
+		_, err := w.client.DeleteBlob(ctx, w.containerName, targetPath, nil)
 		if err != nil {
-			return fmt.Errorf("failed to delete blob %s: %w", path, err)
+			return fmt.Errorf("failed to delete blob %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
 
-	prefix := ioStorage.CleanPath(path, false)
+	prefix := ioStorage.CleanPath(targetPath, false)
 	// Remove files from dir.
 	pager := w.client.NewListBlobsFlatPager(w.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &prefix,

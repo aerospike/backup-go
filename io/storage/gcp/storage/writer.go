@@ -133,17 +133,17 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 }
 
 // Remove removes a file or files from a directory.
-func (w *Writer) Remove(ctx context.Context, path string) error {
+func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove file.
 	if !w.IsDir {
-		if err := w.bucketHandle.Object(path).Delete(ctx); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", path, err)
+		if err := w.bucketHandle.Object(targetPath).Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
 
-	prefix := ioStorage.CleanPath(path, false)
+	prefix := ioStorage.CleanPath(targetPath, false)
 	// Remove files from dir.
 	it := w.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix: prefix,

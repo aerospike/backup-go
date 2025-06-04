@@ -275,14 +275,14 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 }
 
 // Remove removes a file or files from directory.
-func (w *Writer) Remove(ctx context.Context, path string) error {
+func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove file.
 	if !w.IsDir {
 		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 			Bucket: aws.String(w.bucketName),
-			Key:    aws.String(path),
+			Key:    aws.String(targetPath),
 		}); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", path, err)
+			return fmt.Errorf("failed to delete object %s: %w", targetPath, err)
 		}
 
 		return nil
@@ -290,7 +290,7 @@ func (w *Writer) Remove(ctx context.Context, path string) error {
 	// Remove files from dir.
 	var continuationToken *string
 
-	prefix := ioStorage.CleanPath(path, true)
+	prefix := ioStorage.CleanPath(targetPath, true)
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{

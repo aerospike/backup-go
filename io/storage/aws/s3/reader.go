@@ -202,7 +202,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		for _, p := range listResponse.Contents {
-			if r.shouldSkip(path, p.Key) {
+			if r.shouldSkip(path, p) {
 				continue
 			}
 
@@ -304,7 +304,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if r.shouldSkip(path, p.Key) {
+			if r.shouldSkip(path, p) {
 				continue
 			}
 
@@ -349,7 +349,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		}
 
 		for _, p := range listResponse.Contents {
-			if r.shouldSkip(path, p.Key) {
+			if r.shouldSkip(path, p) {
 				continue
 			}
 
@@ -374,8 +374,9 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 }
 
 // shouldSkip performs check, is we should skip files.
-func (r *Reader) shouldSkip(path string, fileName *string) bool {
-	return fileName == nil || ioStorage.IsDirectory(path, *fileName) && !r.WithNestedDir
+func (r *Reader) shouldSkip(path string, obj types.Object) bool {
+	return obj.Key == nil || ioStorage.IsDirectory(path, *obj.Key) && !r.WithNestedDir ||
+		(obj.Size != nil && *obj.Size == 0)
 }
 
 // SetObjectsToStream set objects to stream.
@@ -628,7 +629,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		}
 
 		for _, p := range listResponse.Contents {
-			if r.shouldSkip(path, p.Key) {
+			if r.shouldSkip(path, p) {
 				continue
 			}
 

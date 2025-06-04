@@ -902,40 +902,51 @@ func (s *AwsSuite) TestReader_ListObjects() {
 }
 
 func TestReader_ShouldSkip(t *testing.T) {
+	testSize := int64(1000)
+	testEmptySize := int64(0)
+
 	tests := []struct {
 		name          string
 		path          string
 		fileName      *string
+		obj           types.Object
 		withNestedDir bool
 		expected      bool
 	}{
 		{
 			name:          "nil filename",
 			path:          "test/path",
-			fileName:      nil,
+			obj:           types.Object{Key: nil, Size: &testSize},
 			withNestedDir: false,
 			expected:      true,
 		},
 		{
 			name:          "directory with nested dir enabled",
 			path:          "test/path/",
-			fileName:      aws.String("test/path/subdir/"),
+			obj:           types.Object{Key: aws.String("test/path/subdir/"), Size: &testSize},
 			withNestedDir: true,
 			expected:      false,
 		},
 		{
 			name:          "directory with nested dir disabled",
 			path:          "test/path/",
-			fileName:      aws.String("test/path/subdir/"),
+			obj:           types.Object{Key: aws.String("test/path/subdir/"), Size: &testSize},
 			withNestedDir: false,
 			expected:      true,
 		},
 		{
 			name:          "regular file",
 			path:          "test/path/",
-			fileName:      aws.String("test/path/file.txt"),
+			obj:           types.Object{Key: aws.String("test/path/file.txt"), Size: &testSize},
 			withNestedDir: false,
 			expected:      false,
+		},
+		{
+			name:          "nil filename",
+			path:          "test/path",
+			obj:           types.Object{Key: nil, Size: &testEmptySize},
+			withNestedDir: false,
+			expected:      true,
 		},
 	}
 
@@ -946,7 +957,7 @@ func TestReader_ShouldSkip(t *testing.T) {
 					WithNestedDir: tc.withNestedDir,
 				},
 			}
-			result := reader.shouldSkip(tc.path, tc.fileName)
+			result := reader.shouldSkip(tc.path, tc.obj)
 			assert.Equal(t, tc.expected, result)
 		})
 	}

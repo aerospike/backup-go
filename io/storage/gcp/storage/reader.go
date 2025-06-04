@@ -158,7 +158,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 
@@ -234,7 +234,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 
@@ -281,7 +281,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 
@@ -312,8 +312,8 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 }
 
 // shouldSkip determines whether the file should be skipped.
-func (r *Reader) shouldSkip(path, fileName string) bool {
-	return ioStorage.IsDirectory(path, fileName) && !r.WithNestedDir
+func (r *Reader) shouldSkip(path string, attr *storage.ObjectAttrs) bool {
+	return (ioStorage.IsDirectory(path, attr.Name) && !r.WithNestedDir) || attr.Size == 0
 }
 
 func (r *Reader) calculateTotalSize(ctx context.Context) {
@@ -367,7 +367,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 

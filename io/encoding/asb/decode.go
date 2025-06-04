@@ -157,7 +157,7 @@ func NewDecoder[T models.TokenConstraint](src io.Reader) (*Decoder[T], error) {
 	}
 
 	if asb.header.Version != supportedVersion {
-		return nil, fmt.Errorf("unsupported backup file version: %s", header.Version)
+		return nil, fmt.Errorf("unsupported backup file version: %s", asb.header.Version)
 	}
 
 	asb.metaData, err = asb.readMetadata()

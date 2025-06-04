@@ -182,9 +182,16 @@ func (r *Reader) streamDirectory(
 		page, err := pager.NextPage(ctx)
 		if err != nil {
 			errorsCh <- fmt.Errorf("failed to get next page: %w", err)
+
+			return
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				errorsCh <- fmt.Errorf("failed to get object attr: %s: %w", path, err)
+
+				return
+			}
 			// Skip files in folders.
 			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue
@@ -276,6 +283,10 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				return fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			}
+
 			// Skip files in folders.
 			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue
@@ -318,6 +329,10 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				return nil, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			}
+
 			// Skip files in folders.
 			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue
@@ -579,6 +594,10 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			}
+
 			// Skip files in folders.
 			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue

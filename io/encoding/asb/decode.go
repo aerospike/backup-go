@@ -140,6 +140,8 @@ type Decoder[T models.TokenConstraint] struct {
 
 // NewDecoder creates a new Decoder.
 func NewDecoder[T models.TokenConstraint](src io.Reader) (*Decoder[T], error) {
+	var err error
+
 	reader := &countingReader{
 		Reader: bufio.NewReader(src),
 		count:  0,
@@ -149,23 +151,19 @@ func NewDecoder[T models.TokenConstraint](src io.Reader) (*Decoder[T], error) {
 		reader: reader,
 	}
 
-	header, err := asb.readHeader()
+	asb.header, err = asb.readHeader()
 	if err != nil {
 		return nil, fmt.Errorf("error while reading header: %w", err)
 	}
 
-	if header.Version != supportedVersion {
+	if asb.header.Version != supportedVersion {
 		return nil, fmt.Errorf("unsupported backup file version: %s", header.Version)
 	}
 
-	asb.header = header
-
-	meta, err := asb.readMetadata()
+	asb.metaData, err = asb.readMetadata()
 	if err != nil {
 		return nil, fmt.Errorf("error while reading metadata: %w", err)
 	}
-
-	asb.metaData = meta
 
 	return &asb, nil
 }
@@ -289,20 +287,16 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 				return nil, err
 			}
 
-			val, err := r.readNamespace()
+			res.Namespace, err = r.readNamespace()
 			if err != nil {
 				return nil, newLineError(lineTypeNamespace, err)
 			}
 
-			res.Namespace = val
-
 		case tokenFirstFile:
-			val, err := r.readFirst()
+			res.First, err = r.readFirst()
 			if err != nil {
 				return nil, newLineError(lineTypeFirst, err)
 			}
-
-			res.First = val
 
 		default:
 			return nil, fmt.Errorf("unknown meta data line type %s", mToken)
@@ -370,40 +364,37 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 // readSIndex is used to read secondary index lines in the global section of the asb file.
 // readSIndex expects that r has been advanced past the secondary index global line marker '* i'
 func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
-	var res models.SIndex
+	var (
+		res models.SIndex
+		err error
+	)
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	namespace, err := _readUntil(r.reader, ' ', true)
+	res.Namespace, err = _readUntil(r.reader, ' ', true)
 	if err != nil {
 		return nil, err
 	}
-
-	res.Namespace = namespace
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	set, err := _readUntil(r.reader, ' ', true)
+	res.Set, err = _readUntil(r.reader, ' ', true)
 	if err != nil {
 		return nil, err
 	}
-
-	res.Set = set
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	name, err := _readUntil(r.reader, ' ', true)
+	res.Name, err = _readUntil(r.reader, ' ', true)
 	if err != nil {
 		return nil, err
 	}
-
-	res.Name = name
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -435,12 +426,10 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		return nil, err
 	}
 
-	binName, err := _readUntil(r.reader, ' ', true)
+	path.BinName, err = _readUntil(r.reader, ' ', true)
 	if err != nil {
 		return nil, err
 	}
-
-	path.BinName = binName
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -464,12 +453,10 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 		// NOTE: the context should always be base64 encoded,
 		// so escaping is not needed
-		context, err := _readUntil(r.reader, '\n', false)
+		path.B64Context, err = _readUntil(r.reader, '\n', false)
 		if err != nil {
 			return nil, err
 		}
-
-		path.B64Context = context
 	}
 
 	res.Path = path
@@ -524,7 +511,9 @@ func (r *Decoder[T]) readSIndexBinType() (models.SIPathBinType, error) {
 // readUDF is used to read UDF lines in the global section of the asb file.
 // readUDF expects that r has been advanced past the UDF global line marker '* u '
 func (r *Decoder[T]) readUDF() (*models.UDF, error) {
-	var res models.UDF
+	var (
+		res models.UDF
+	)
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -546,12 +535,10 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	name, err := _readUntil(r.reader, ' ', true)
+	res.Name, err = _readUntil(r.reader, ' ', true)
 	if err != nil {
 		return nil, err
 	}
-
-	res.Name = name
 
 	if err := _expectChar(r.reader, ' '); err != nil {
 		return nil, err
@@ -1084,13 +1071,11 @@ func (r *Decoder[T]) readSet() (string, error) {
 		return "", err
 	}
 
-	result := set
-
 	if err := _expectChar(r.reader, '\n'); err != nil {
 		return "", err
 	}
 
-	return result, err
+	return set, err
 }
 
 func (r *Decoder[T]) readDigest() ([]byte, error) {

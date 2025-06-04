@@ -49,7 +49,7 @@ func TestTokenReader_ReadSingleToken(t *testing.T) {
 	mockDecoder := mocks.NewMockDecoder[*models.Token](t)
 	mockDecoder.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Once()
 
-	convertFn := func(uint64, io.ReadCloser) Decoder[*models.Token] {
+	convertFn := func(io.ReadCloser, uint64, string) Decoder[*models.Token] {
 		return mockDecoder
 	}
 
@@ -73,7 +73,7 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	mockDecoder.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Times(3)
 	mockDecoder.EXPECT().NextToken().Return((*models.Token)(nil), io.EOF).Once()
 
-	convertFn := func(uint64, io.ReadCloser) Decoder[*models.Token] {
+	convertFn := func(io.ReadCloser, uint64, string) Decoder[*models.Token] {
 		return mockDecoder
 	}
 
@@ -112,7 +112,7 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 	mockDecoder2.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeUDF}, nil).Once()
 
 	currentDecoder := mockDecoder1
-	convertFn := func(uint64, io.ReadCloser) Decoder[*models.Token] {
+	convertFn := func(io.ReadCloser, uint64, string) Decoder[*models.Token] {
 		defer func() {
 			currentDecoder = mockDecoder2
 		}()
@@ -162,7 +162,7 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 	expectedErr := io.ErrUnexpectedEOF
 	mockDecoder.EXPECT().NextToken().Return((*models.Token)(nil), expectedErr).Once()
 
-	convertFn := func(uint64, io.ReadCloser) Decoder[*models.Token] {
+	convertFn := func(io.ReadCloser, uint64, string) Decoder[*models.Token] {
 		return mockDecoder
 	}
 

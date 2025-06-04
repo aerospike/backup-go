@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
@@ -240,7 +241,13 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return asb.Run(cmd.Context())
+	if err = asb.Run(cmd.Context()); err != nil {
+		logger.Error("backup failed", slog.Any("error", err))
+
+		return err
+	}
+
+	return nil
 }
 
 func (c *Cmd) printVersion() {

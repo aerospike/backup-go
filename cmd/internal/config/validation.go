@@ -117,8 +117,11 @@ func ValidateRestore(params *RestoreParams) error {
 			return err
 		}
 
-		if err := ValidateCommonParams(params.Common); err != nil {
-			return err
+		if !params.Restore.ValidateOnly {
+			// Validate common params only if restore is not in validate only mode.
+			if err := ValidateCommonParams(params.Common); err != nil {
+				return err
+			}
 		}
 	}
 

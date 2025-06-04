@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"sync"
 
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/logging"
@@ -52,6 +53,11 @@ func NewService(
 	params *config.RestoreParams,
 	logger *slog.Logger,
 ) (*Service, error) {
+	var (
+		aerospikeClient *a.Client
+		err             error
+	)
+
 	// Validations.
 	if err := config.ValidateRestore(params); err != nil {
 		return nil, err
@@ -62,42 +68,45 @@ func NewService(
 
 	restoreConfig := config.NewRestoreConfig(params)
 
-	logger.Info("initialized restore config",
-		slog.Any("namespace_source", *restoreConfig.Namespace.Source),
-		slog.Any("namespace_destination", *restoreConfig.Namespace.Destination),
-		slog.String("encryption", params.Encryption.Mode),
-		slog.Int("compression", params.Compression.Level),
-		slog.Any("retry", *restoreConfig.RetryPolicy),
-		slog.Any("sets", restoreConfig.SetList),
-		slog.Any("bins", restoreConfig.BinList),
-		slog.Int("parallel", restoreConfig.Parallel),
-		slog.Bool("no_records", restoreConfig.NoRecords),
-		slog.Bool("no_indexes", restoreConfig.NoIndexes),
-		slog.Bool("no_udfs", restoreConfig.NoUDFs),
-		slog.Bool("disable_batch_writes", restoreConfig.DisableBatchWrites),
-		slog.Int("batch_size", restoreConfig.BatchSize),
-		slog.Int("max_asynx_batches", restoreConfig.MaxAsyncBatches),
-		slog.Int64("extra_ttl", restoreConfig.ExtraTTL),
-		slog.Bool("ignore_records_error", restoreConfig.IgnoreRecordError),
-	)
+	// Skip this part on validation.
+	if !restoreConfig.ValidateOnly {
+		logger.Info("initialized restore config",
+			slog.Any("namespace_source", *restoreConfig.Namespace.Source),
+			slog.Any("namespace_destination", *restoreConfig.Namespace.Destination),
+			slog.String("encryption", params.Encryption.Mode),
+			slog.Int("compression", params.Compression.Level),
+			slog.Any("retry", *restoreConfig.RetryPolicy),
+			slog.Any("sets", restoreConfig.SetList),
+			slog.Any("bins", restoreConfig.BinList),
+			slog.Int("parallel", restoreConfig.Parallel),
+			slog.Bool("no_records", restoreConfig.NoRecords),
+			slog.Bool("no_indexes", restoreConfig.NoIndexes),
+			slog.Bool("no_udfs", restoreConfig.NoUDFs),
+			slog.Bool("disable_batch_writes", restoreConfig.DisableBatchWrites),
+			slog.Int("batch_size", restoreConfig.BatchSize),
+			slog.Int("max_asynx_batches", restoreConfig.MaxAsyncBatches),
+			slog.Int64("extra_ttl", restoreConfig.ExtraTTL),
+			slog.Bool("ignore_records_error", restoreConfig.IgnoreRecordError),
+		)
+
+		warmUp := GetWarmUp(params.Restore.WarmUp, params.Restore.MaxAsyncBatches)
+		logger.Debug("warm up is set", slog.Int("value", warmUp))
+
+		aerospikeClient, err = storage.NewAerospikeClient(
+			params.ClientConfig,
+			params.ClientPolicy,
+			"",
+			warmUp,
+			logger,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create aerospike client: %w", err)
+		}
+	}
 
 	reader, xdrReader, err := storage.NewRestoreReader(ctx, params, restoreConfig.SecretAgentConfig, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create restore reader: %w", err)
-	}
-
-	warmUp := GetWarmUp(params.Restore.WarmUp, params.Restore.MaxAsyncBatches)
-	logger.Debug("warm up is set", slog.Int("value", warmUp))
-
-	aerospikeClient, err := storage.NewAerospikeClient(
-		params.ClientConfig,
-		params.ClientPolicy,
-		"",
-		warmUp,
-		logger,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
 
 	logger.Info("initializing restore client", slog.String("id", idRestore))

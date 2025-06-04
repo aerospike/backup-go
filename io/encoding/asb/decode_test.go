@@ -30,6 +30,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testFileName = "test_backup.asb"
+
 func TestASBReader_readHeader(t *testing.T) {
 	t.Parallel()
 	type fields struct {
@@ -3898,7 +3900,7 @@ func TestNewASBReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := NewDecoder[*models.Token](tt.args.src)
+			got, err := NewDecoder[*models.Token](tt.args.src, testFileName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)
 				return

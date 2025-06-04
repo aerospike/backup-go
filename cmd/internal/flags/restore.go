@@ -139,6 +139,10 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 			"asb - restore only .asb backup files.\n"+
 			"asbx - restore only .asbx backup files.")
 
+	flagSet.BoolVar(&f.ValidateOnly, "validate",
+		false,
+		"Validate the backup file without restoring it.")
+
 	return flagSet
 }
 

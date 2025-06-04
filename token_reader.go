@@ -29,7 +29,7 @@ type tokenReader[T models.TokenConstraint] struct {
 	readersCh     <-chan models.File
 	decoder       Decoder[T]
 	logger        *slog.Logger
-	newDecoderFn  func(uint64, io.ReadCloser) Decoder[T]
+	newDecoderFn  func(io.ReadCloser, uint64, string) Decoder[T]
 	currentReader io.Closer
 }
 
@@ -37,7 +37,7 @@ type tokenReader[T models.TokenConstraint] struct {
 func newTokenReader[T models.TokenConstraint](
 	readersCh <-chan models.File,
 	logger *slog.Logger,
-	newDecoderFn func(uint64, io.ReadCloser) Decoder[T],
+	newDecoderFn func(io.ReadCloser, uint64, string) Decoder[T],
 ) *tokenReader[T] {
 	return &tokenReader[T]{
 		readersCh:    readersCh,
@@ -88,7 +88,7 @@ func (tr *tokenReader[T]) Read() (T, error) {
 			// Assign the new reader
 			tr.currentReader = file.Reader
 
-			tr.decoder = tr.newDecoderFn(num, file.Reader)
+			tr.decoder = tr.newDecoderFn(file.Reader, num, file.Name)
 		}
 	}
 }

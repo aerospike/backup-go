@@ -94,15 +94,18 @@ type metaData struct {
 
 // Decoder contains logic for decoding backup data from the .asb format.
 type Decoder[T models.TokenConstraint] struct {
+	// filename for logging purposes.
+	filename string
 	header   *header
 	metaData *metaData
 	countingByteScanner
 }
 
 // NewDecoder creates a new Decoder.
-func NewDecoder[T models.TokenConstraint](src io.Reader) (*Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](src io.Reader, filename string) (*Decoder[T], error) {
 	cbs := bufio.NewReader(src)
 	asb := Decoder[T]{
+		filename: filename,
 		countingByteScanner: countingByteScanner{
 			cbs,
 			0,

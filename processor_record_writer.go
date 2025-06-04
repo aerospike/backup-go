@@ -66,6 +66,11 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 		parallelism = rw.config.MaxAsyncBatches
 	}
 
+	// If we need only validation, we create empty writers.
+	if rw.config.ValidateOnly {
+		return newEmptyWriters[T](parallelism), nil
+	}
+
 	useBatchWrites, err := rw.useBatchWrites()
 	if err != nil {
 		return nil, fmt.Errorf("failed to check batch writes: %w", err)
@@ -100,4 +105,27 @@ func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
 	infoClient := asinfo.NewInfoClientFromAerospike(rw.aerospikeClient, rw.config.InfoPolicy, rw.config.InfoRetryPolicy)
 
 	return infoClient.SupportsBatchWrite()
+}
+
+// emptyWriter is a writer that does nothing. Used for backup files validation.
+type emptyWriter[T models.TokenConstraint] struct{}
+
+// Write does nothing.
+func (w *emptyWriter[T]) Write(_ T) (int, error) {
+	return 0, nil
+}
+
+// Close does nothing.
+func (w *emptyWriter[T]) Close() error {
+	return nil
+}
+
+// newEmptyWriters creates a slice of empty writers.
+func newEmptyWriters[T models.TokenConstraint](parallelism int) []pipe.Writer[T] {
+	dataWriters := make([]pipe.Writer[T], parallelism)
+	for i := 0; i < parallelism; i++ {
+		dataWriters[i] = &emptyWriter[T]{}
+	}
+
+	return dataWriters
 }

@@ -234,8 +234,8 @@ func createTmpFile(dir, fileName string) error {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 
-	f.Write([]byte("test content"))
-	
+	_, _ = f.WriteString("test content")
+
 	_ = f.Close()
 
 	return nil

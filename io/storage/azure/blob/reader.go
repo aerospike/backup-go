@@ -188,7 +188,7 @@ func (r *Reader) streamDirectory(
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				errorsCh <- fmt.Errorf("failed to get object attr: %s: %w", path, err)
+				errorsCh <- fmt.Errorf("failed to get object attr: %s", path)
 
 				return
 			}
@@ -284,7 +284,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return fmt.Errorf("failed to get object attr: %s: %w", path, err)
+				return fmt.Errorf("failed to get object attr: %s", path)
 			}
 
 			// Skip files in folders.
@@ -330,7 +330,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return nil, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+				return nil, fmt.Errorf("failed to get object attr: %s", path)
 			}
 
 			// Skip files in folders.
@@ -573,7 +573,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			NewContainerClient(r.containerName).
 			NewBlobClient(path).GetProperties(ctx, nil)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			return 0, 0, fmt.Errorf("failed to get object attr: %s", path)
 		}
 
 		if objProps.ContentLength == nil {
@@ -595,7 +595,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+				return 0, 0, fmt.Errorf("failed to get object attr: %s", path)
 			}
 
 			// Skip files in folders.

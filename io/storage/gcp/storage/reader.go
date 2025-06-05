@@ -75,7 +75,7 @@ func NewReader(
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket attr: %s: %w", bucketName, err)
+		return nil, fmt.Errorf("failed to get bucket attributes: %s: %w", bucketName, err)
 	}
 
 	r.bucketHandle = bucket
@@ -148,7 +148,7 @@ func (r *Reader) streamDirectory(
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				errorsCh <- fmt.Errorf("failed to read object attr from bucket %s: %w",
+				errorsCh <- fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -224,7 +224,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return fmt.Errorf("failed to read object attr from bucket %s: %w",
+				return fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -273,7 +273,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return nil, fmt.Errorf("failed to read object attr from bucket %s: %w",
+				return nil, fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 
@@ -343,7 +343,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	if !r.IsDir {
 		objAttrs, err := r.bucketHandle.Object(path).Attrs(ctx)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			return 0, 0, fmt.Errorf("failed to get object attributes for %s: %w", path, err)
 		}
 
 		return objAttrs.Size, 1, nil
@@ -359,7 +359,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return 0, 0, fmt.Errorf("failed to read object attr from bucket %s: %w",
+				return 0, 0, fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 

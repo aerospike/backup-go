@@ -135,22 +135,39 @@ func (r *Service) Run(ctx context.Context) error {
 
 	switch r.mode {
 	case models.RestoreModeASB, models.RestoreModeAuto:
-		r.logger.Info("starting asb restore")
-		r.restoreConfig.EncoderType = backup.EncoderTypeASB
+		// For restore and validation we init different header for log messages.
+		logMessage := "restore"
+		if r.restoreConfig.ValidateOnly {
+			logMessage = "validation"
+		}
 
+		r.logger.Info(fmt.Sprintf("starting asb %s", logMessage))
+
+		r.restoreConfig.EncoderType = backup.EncoderTypeASB
+		// Run restore / validation.
 		h, err := r.backupClient.Restore(ctx, r.restoreConfig, r.reader)
 		if err != nil {
-			return fmt.Errorf("failed to start asb restore: %w", err)
+			return fmt.Errorf("failed to start asb %s: %w", logMessage, err)
 		}
+		// Run async printing files stats.
+		var wg sync.WaitGroup
 
-		go logging.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASB, r.logger)
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			logging.PrintFilesNumber(ctx, r.reader.GetNumber, models.RestoreModeASB, r.logger)
+		}()
 		go logging.PrintRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
 
+		// Wait for restore / validation to finish.
 		if err = h.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to asb restore: %w", err)
+			return fmt.Errorf("failed to perform asb %s: %w", logMessage, err)
 		}
 
-		logging.ReportRestore(h.GetStats(), r.isLogJSON, r.logger)
+		wg.Wait()
+		// Print report.
+		logging.ReportRestore(h.GetStats(), r.restoreConfig.ValidateOnly, r.isLogJSON, r.logger)
 	case models.RestoreModeASBX:
 		r.logger.Info("starting asbx restore")
 		r.restoreConfig.EncoderType = backup.EncoderTypeASBX
@@ -164,10 +181,10 @@ func (r *Service) Run(ctx context.Context) error {
 		go logging.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.reader.GetSize, r.logger)
 
 		if err = hXdr.Wait(ctx); err != nil {
-			return fmt.Errorf("failed to asbx restore: %w", err)
+			return fmt.Errorf("failed to perform asbx restore: %w", err)
 		}
 
-		logging.ReportRestore(hXdr.GetStats(), r.isLogJSON, r.logger)
+		logging.ReportRestore(hXdr.GetStats(), r.restoreConfig.ValidateOnly, r.isLogJSON, r.logger)
 	default:
 		r.logger.Info("starting auto restore")
 		// If one of restore operations fails, we cancel another.
@@ -202,7 +219,7 @@ func (r *Service) Run(ctx context.Context) error {
 				go logging.PrintRestoreEstimate(ctx, h.GetStats(), h.GetMetrics, r.reader.GetSize, r.logger)
 
 				if err = h.Wait(ctx); err != nil {
-					errChan <- fmt.Errorf("failed to asb restore: %w", err)
+					errChan <- fmt.Errorf("failed to perform asb restore: %w", err)
 
 					cancel()
 
@@ -235,7 +252,7 @@ func (r *Service) Run(ctx context.Context) error {
 				go logging.PrintRestoreEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, r.xdrReader.GetSize, r.logger)
 
 				if err = hXdr.Wait(ctx); err != nil {
-					errChan <- fmt.Errorf("failed to asbx restore: %w", err)
+					errChan <- fmt.Errorf("failed to perform asbx restore: %w", err)
 
 					cancel()
 
@@ -258,7 +275,7 @@ func (r *Service) Run(ctx context.Context) error {
 		}
 
 		restStats := bModels.SumRestoreStats(xdrStats, stats)
-		logging.ReportRestore(restStats, r.isLogJSON, r.logger)
+		logging.ReportRestore(restStats, r.restoreConfig.ValidateOnly, r.isLogJSON, r.logger)
 
 		// To prevent context leaking.
 		cancel()

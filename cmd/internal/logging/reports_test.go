@@ -504,7 +504,7 @@ func TestPrintRestoreReport(t *testing.T) {
 	os.Stdout = w
 
 	// Call the function
-	printRestoreReport(stats)
+	printRestoreReport(stats, false)
 
 	// Close writer and restore stdout
 	w.Close()
@@ -574,7 +574,7 @@ func TestLogRestoreReport(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
 
 	// Call the function
-	logRestoreReport(stats, logger)
+	logRestoreReport(stats, logger, false)
 
 	// Verify log output
 	logOutput := buf.String()
@@ -626,7 +626,7 @@ func TestReportRestore(t *testing.T) {
 		os.Stdout = w
 
 		// Call the function
-		ReportRestore(stats, false, nil)
+		ReportRestore(stats, false, false, nil)
 
 		// Close writer and restore stdout
 		w.Close()
@@ -650,7 +650,7 @@ func TestReportRestore(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(&buf, nil))
 
 		// Call the function
-		ReportRestore(stats, true, logger)
+		ReportRestore(stats, false, true, logger)
 
 		// Verify log output
 		logOutput := buf.String()

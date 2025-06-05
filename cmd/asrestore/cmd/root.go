@@ -232,15 +232,20 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 		AzureBlob:    c.flagsAzure.GetAzureBlob(),
 	}
 
+	logMsg := "restore"
+	if asrParams.Restore.ValidateOnly {
+		logMsg = "validation"
+	}
+
 	asr, err := restore.NewService(cmd.Context(), asrParams, logger)
 	if err != nil {
-		logger.Error("restore initialization failed", slog.Any("error", err))
+		logger.Error(fmt.Sprintf("%s initialization failed", logMsg), slog.Any("error", err))
 
 		return err
 	}
 
 	if err = asr.Run(cmd.Context()); err != nil {
-		logger.Error("restore failed", slog.Any("error", err))
+		logger.Error(fmt.Sprintf("%s failed", logMsg), slog.Any("error", err))
 
 		return err
 	}

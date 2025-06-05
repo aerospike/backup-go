@@ -61,14 +61,21 @@ func returnSmallBuffer(buf []byte) {
 	smallBufPool.Put(buf[:0])
 }
 
-func newDecoderError(offset uint64, err error) error {
+func newDecoderError(tracker *positionTracker, err error) error {
 	if errors.Is(err, io.EOF) {
 		return err
 	} else if err == nil {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading asb data at byte %d: %w", offset, err)
+	return fmt.Errorf(
+		"error while reading asb data: %s line %d col %d (total byte %d): %w",
+		tracker.fileName,
+		tracker.line,
+		tracker.column,
+		tracker.offset,
+		err,
+	)
 }
 
 func newSectionError(section string, err error) error {
@@ -78,7 +85,7 @@ func newSectionError(section string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading section: %s, %w", section, err)
+	return fmt.Errorf("error while reading section: %s: %w", section, err)
 }
 
 func newLineError(lineType string, err error) error {
@@ -88,42 +95,51 @@ func newLineError(lineType string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading line type: %s, %w", lineType, err)
+	return fmt.Errorf("error while reading line type: %s: %w", lineType, err)
+}
+
+type positionTracker struct {
+	fileName string
+	offset   uint64
+	line     int
+	column   int
 }
 
 // countingReader represents a wrapper for fast reading.
 // It keeps track of the number of bytes read.
 type countingReader struct {
 	*bufio.Reader
-	count uint64
+	tracker *positionTracker
 }
 
 // ReadByte reads a single byte from the underlying reader.
 func (c *countingReader) ReadByte() (byte, error) {
 	b, err := c.Reader.ReadByte()
-	if err == nil {
-		c.count++
+	if err != nil {
+		return 0, err
 	}
 
-	return b, err
+	c.tracker.offset++
+
+	if b == '\n' {
+		c.tracker.line++
+		fmt.Println("NEW LINE!:", c.tracker.fileName, "-", c.tracker.line)
+		c.tracker.column = 1
+	} else {
+		c.tracker.column++
+	}
+
+	return b, nil
 }
 
 // UnreadByte unreads a single byte from the underlying reader.
 func (c *countingReader) UnreadByte() error {
 	err := c.Reader.UnreadByte()
 	if err == nil {
-		c.count--
+		c.tracker.offset--
 	}
 
 	return err
-}
-
-// Read reads data into the provided byte slice and increments the internal count by the number of bytes read.
-func (c *countingReader) Read(p []byte) (int, error) {
-	n, err := c.Reader.Read(p)
-	c.count += uint64(n)
-
-	return n, err
 }
 
 type metaData struct {
@@ -141,16 +157,19 @@ type Decoder[T models.TokenConstraint] struct {
 }
 
 // NewDecoder creates a new Decoder.
-func NewDecoder[T models.TokenConstraint](src io.Reader, filename string) (*Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Decoder[T], error) {
 	var err error
 
 	reader := &countingReader{
 		Reader: bufio.NewReader(src),
-		count:  0,
+		tracker: &positionTracker{
+			fileName: fileName,
+			line:     0,
+			column:   1,
+		},
 	}
 
 	asb := Decoder[T]{
-		filename: filename,
 		reader: reader,
 	}
 
@@ -172,7 +191,7 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, filename string) (*Deco
 }
 
 func (r *Decoder[T]) NextToken() (T, error) {
-	countBefore := r.reader.count
+	countBefore := r.reader.tracker.offset
 
 	v, err := func() (any, error) {
 		b, err := _peek(r.reader)
@@ -197,10 +216,10 @@ func (r *Decoder[T]) NextToken() (T, error) {
 	}()
 
 	if err != nil {
-		return nil, newDecoderError(r.reader.count, err)
+		return nil, newDecoderError(r.reader.tracker, err)
 	}
 
-	size := r.reader.count - countBefore
+	size := r.reader.tracker.offset - countBefore
 
 	var t *models.Token
 	switch v := v.(type) {
@@ -659,7 +678,7 @@ func (r *Decoder[T]) readRecordData(i int, recData *recordData) error {
 		recData.binCount, err = r.readBinCount()
 	default:
 		// should never happen because this is set to the length of expectedRecordHeaderTypes
-		return fmt.Errorf("read too many record header lines, count: %d", i)
+		return fmt.Errorf("read too many record header lines, offset: %d", i)
 	}
 
 	if err != nil {
@@ -1021,7 +1040,7 @@ func (r *Decoder[T]) readBinCount() (uint16, error) {
 	}
 
 	if binCount > maxBinCount || binCount < 0 {
-		return 0, fmt.Errorf("invalid bin count %d", binCount)
+		return 0, fmt.Errorf("invalid bin offset %d", binCount)
 	}
 
 	if err := _expectChar(r.reader, '\n'); err != nil {
@@ -1058,7 +1077,7 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 	}
 
 	if gen < 0 || gen > maxGeneration {
-		return 0, fmt.Errorf("invalid generation count %d", gen)
+		return 0, fmt.Errorf("invalid generation offset %d", gen)
 	}
 
 	if err := _expectChar(r.reader, '\n'); err != nil {

@@ -1796,7 +1796,7 @@ func TestASBReader_readRecord(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative missing bin count",
+			name: "negative missing bin offset",
 			fields: fields{
 				reader: &countingReader{
 					Reader: bufio.NewReader(strings.NewReader(
@@ -1953,7 +1953,7 @@ func TestASBReader_readRecord(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative bad bin count",
+			name: "negative bad bin offset",
 			fields: fields{
 				reader: &countingReader{
 					Reader: bufio.NewReader(strings.NewReader(
@@ -2008,7 +2008,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "positive bin count",
+			name: "positive bin offset",
 			fields: fields{
 				reader: &countingReader{
 					Reader: bufio.NewReader(strings.NewReader("2\n")),
@@ -2018,7 +2018,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "negative bad bin count",
+			name: "negative bad bin offset",
 			fields: fields{
 				reader: &countingReader{
 					Reader: bufio.NewReader(strings.NewReader("notanint\n")),
@@ -2028,7 +2028,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative missing line feed after bin count",
+			name: "negative missing line feed after bin offset",
 			fields: fields{
 				reader: &countingReader{
 					Reader: bufio.NewReader(strings.NewReader("2")),
@@ -2038,7 +2038,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative bin count less than 0",
+			name: "negative bin offset less than 0",
 			fields: fields{
 				reader: &countingReader{
 					Reader: bufio.NewReader(strings.NewReader("-1\n")),
@@ -2048,7 +2048,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative bin count greater than max",
+			name: "negative bin offset greater than max",
 			fields: fields{
 				reader: &countingReader{
 					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("%d\n", maxBinCount+1))),

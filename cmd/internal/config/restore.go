@@ -71,6 +71,7 @@ func NewRestoreConfig(params *RestoreParams) *backup.ConfigRestore {
 		params.Restore.RetryMultiplier,
 		params.Restore.RetryMaxRetries,
 	)
+	c.ValidateOnly = params.Restore.ValidateOnly
 
 	return c
 }

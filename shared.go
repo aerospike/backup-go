@@ -35,7 +35,7 @@ func handlePanic(errors chan<- error, logger *slog.Logger) {
 		}
 
 		err = fmt.Errorf("%w, with stacktrace: \"%s\"", err, debug.Stack())
-		logger.Error("job failed", "error", err)
+		logger.Debug("job failed", "error", err)
 
 		errors <- err
 	}
@@ -52,7 +52,7 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 
 	err := work()
 	if err != nil {
-		logger.Error("job failed", "error", err)
+		logger.Debug("job failed", "error", err)
 		errors <- err
 
 		return

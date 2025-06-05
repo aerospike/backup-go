@@ -29,6 +29,9 @@ const (
 	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns\n" +
 		"Restoring to different namespace is incompatible with --mode=asbx."
 
+	descDirectoryBackup  = "The directory that holds the backup files. Required, unless -o or -e is used."
+	descDirectoryRestore = "The directory that holds the backup files. Required, unless --input-file is used."
+
 	descSetListBackup = "The set(s) to be backed up. Accepts comma-separated values with no spaces: 'set1,set2,set3'\n" +
 		"If multiple sets are being backed up, filter-exp cannot be used.\n" +
 		"If empty, include all sets."
@@ -78,14 +81,16 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 	flagSet := &pflag.FlagSet{}
 
 	var (
-		descNamespace, descSetList, descBinList, descNoRecords, descNoIndexes, descNoUDFs, descParallel string
-		defaultTotalTimeout                                                                             int64
-		defaultParallel                                                                                 int
+		descNamespace, descSetList, descBinList, descNoRecords,
+		descNoIndexes, descNoUDFs, descParallel, descDirectory string
+		defaultTotalTimeout int64
+		defaultParallel     int
 	)
 
 	switch f.operation {
 	case OperationBackup:
 		descNamespace = descNamespaceBackup
+		descDirectory = descDirectoryBackup
 		descSetList = descSetListBackup
 		descBinList = descBinListBackup
 		descNoRecords = descNoRecordsBackup
@@ -96,6 +101,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		defaultParallel = 1
 	case OperationRestore:
 		descNamespace = descNamespaceRestore
+		descDirectory = descDirectoryRestore
 		descSetList = descSetListRestore
 		descBinList = descBinListRestore
 		descNoRecords = descNoRecordsRestore
@@ -108,7 +114,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.StringVarP(&f.Directory, "directory", "d",
 		"",
-		"The directory that holds the backup files. Required, unless -o or -e is used.")
+		descDirectory)
 	flagSet.StringVarP(&f.Namespace, "namespace", "n",
 		"",
 		descNamespace)

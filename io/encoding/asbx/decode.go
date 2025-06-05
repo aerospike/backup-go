@@ -27,15 +27,18 @@ import (
 // Decoder contains logic for decoding backup data from the binary .asbx format.
 // This is a stateful object that should be created for each file being decoded.
 type Decoder[T models.TokenConstraint] struct {
+	// filename for logging purposes.
+	filename   string
 	fileNumber uint64
 	namespace  string
 	reader     io.Reader
 }
 
 // NewDecoder creates a new Decoder that reads from the provided io.Reader.
-func NewDecoder[T models.TokenConstraint](fileNumber uint64, r io.Reader) (*Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](r io.Reader, fileNumber uint64, filename string) (*Decoder[T], error) {
 	d := &Decoder[T]{
-		reader: r,
+		filename: filename,
+		reader:   r,
 	}
 
 	if err := d.readHeader(); err != nil {

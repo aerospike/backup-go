@@ -16,6 +16,8 @@ package xdr
 
 import (
 	"fmt"
+	"log"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
@@ -107,6 +109,8 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// If no flags were passed, show help.
 	if cmd.Flags().NFlag() == 0 {
 		if err := cmd.Help(); err != nil {
+			log.Println(err)
+
 			return err
 		}
 
@@ -116,6 +120,8 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// Init logger.
 	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
+		log.Println(err)
+
 		return err
 	}
 
@@ -135,8 +141,16 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 
 	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
 	if err != nil {
+		logger.Error("backup initialization failed", slog.Any("error", err))
+
 		return err
 	}
 
-	return asb.Run(cmd.Context())
+	if err = asb.Run(cmd.Context()); err != nil {
+		logger.Error("backup failed", slog.Any("error", err))
+
+		return err
+	}
+
+	return nil
 }

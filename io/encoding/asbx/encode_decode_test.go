@@ -78,7 +78,7 @@ func TestEncoder_Decoder(t *testing.T) {
 
 	// Decode.
 	reader := bytes.NewReader(content)
-	dec, err := NewDecoder[*models.ASBXToken](1, reader)
+	dec, err := NewDecoder[*models.ASBXToken](reader, 1, testFileName)
 	require.NoError(t, err)
 
 	nt, err := dec.NextToken()
@@ -94,7 +94,7 @@ func TestDecoder_ErrorHeader(t *testing.T) {
 	content := make([]byte, 0)
 
 	reader := bytes.NewReader(content)
-	_, err := NewDecoder[*models.ASBXToken](0, reader)
+	_, err := NewDecoder[*models.ASBXToken](reader, 0, testFileName)
 	require.ErrorIs(t, err, io.EOF)
 }
 
@@ -113,7 +113,7 @@ func TestDecoder_ErrorToken(t *testing.T) {
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)
-	dec, err := NewDecoder[*models.ASBXToken](1, reader)
+	dec, err := NewDecoder[*models.ASBXToken](reader, 1, testFileName)
 	require.NoError(t, err)
 
 	_, err = dec.NextToken()
@@ -128,6 +128,6 @@ func TestDecoder_ErrorFileNumber(t *testing.T) {
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)
-	_, err := NewDecoder[*models.ASBXToken](1, reader)
+	_, err := NewDecoder[*models.ASBXToken](reader, 1, testFileName)
 	require.Equal(t, "file number mismatch got 1, want 0", err.Error())
 }

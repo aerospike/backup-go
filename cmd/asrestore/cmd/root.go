@@ -16,6 +16,8 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
@@ -199,6 +201,8 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// If no flags were passed, show help.
 	if cmd.Flags().NFlag() == 0 {
 		if err := cmd.Help(); err != nil {
+			log.Println(err)
+
 			return err
 		}
 
@@ -208,6 +212,8 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// Init logger.
 	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
+		log.Println(err)
+
 		return err
 	}
 
@@ -226,12 +232,25 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 		AzureBlob:    c.flagsAzure.GetAzureBlob(),
 	}
 
+	logMsg := "restore"
+	if asrParams.Restore.ValidateOnly {
+		logMsg = "validation"
+	}
+
 	asr, err := restore.NewService(cmd.Context(), asrParams, logger)
 	if err != nil {
+		logger.Error(fmt.Sprintf("%s initialization failed", logMsg), slog.Any("error", err))
+
 		return err
 	}
 
-	return asr.Run(cmd.Context())
+	if err = asr.Run(cmd.Context()); err != nil {
+		logger.Error(fmt.Sprintf("%s failed", logMsg), slog.Any("error", err))
+
+		return err
+	}
+
+	return nil
 }
 
 func (c *Cmd) printVersion() {

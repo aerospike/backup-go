@@ -182,11 +182,18 @@ func (r *Reader) streamDirectory(
 		page, err := pager.NextPage(ctx)
 		if err != nil {
 			errorsCh <- fmt.Errorf("failed to get next page: %w", err)
+
+			return
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				errorsCh <- fmt.Errorf("failed to get object attributes for %s", path)
+
+				return
+			}
 			// Skip files in folders.
-			if r.shouldSkip(path, *blobItem.Name) {
+			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue
 			}
 
@@ -250,9 +257,12 @@ func (r *Reader) StreamFile(
 }
 
 // shouldSkip performs check, is we should skip files.
-func (r *Reader) shouldSkip(path, fileName string) bool {
+// Unfortunately azure blob returns *generated.BlobItem from internal api that can't be imported.
+// So we have to pass exact values of *generated.BlobItem to this function.
+func (r *Reader) shouldSkip(path, fileName string, fileSize int64) bool {
 	return (ioStorage.IsDirectory(path, fileName) && !r.WithNestedDir) ||
-		isSkippedByStartAfter(r.StartAfter, fileName)
+		isSkippedByStartAfter(r.StartAfter, fileName) ||
+		fileSize == 0
 }
 
 // GetType return `gcpStorageType` type of storage. Used in logging.
@@ -273,8 +283,12 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				return fmt.Errorf("failed to get object attributes for %s", path)
+			}
+
 			// Skip files in folders.
-			if r.shouldSkip(path, *blobItem.Name) {
+			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue
 			}
 
@@ -315,8 +329,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				return nil, fmt.Errorf("failed to get object attributes for %s", path)
+			}
+
 			// Skip files in folders.
-			if r.shouldSkip(path, *blobItem.Name) {
+			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue
 			}
 
@@ -555,7 +573,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			NewContainerClient(r.containerName).
 			NewBlobClient(path).GetProperties(ctx, nil)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			return 0, 0, fmt.Errorf("failed to get object properties: %s: %w", path, err)
 		}
 
 		if objProps.ContentLength == nil {
@@ -576,8 +594,12 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
+			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
+				return 0, 0, fmt.Errorf("failed to get object attributes for %s", path)
+			}
+
 			// Skip files in folders.
-			if r.shouldSkip(path, *blobItem.Name) {
+			if r.shouldSkip(path, *blobItem.Name, *blobItem.Properties.ContentLength) {
 				continue
 			}
 

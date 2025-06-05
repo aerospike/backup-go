@@ -122,14 +122,33 @@ func (c *countingReader) ReadByte() (byte, error) {
 	c.tracker.offset++
 
 	if b == '\n' {
+		next, err := c.ReadByte()
+		if err != nil {
+			return 0, err
+		}
+		if err = c.UnreadByte(); err != nil {
+			return 0, err
+		}
+		c.tracker.column = 0
+		if isASBLineStart(next) {
+			c.tracker.line++
+			fmt.Println("NEW LINE!:", c.tracker.fileName, "-", c.tracker.line)
+			c.tracker.column = 0
+		}
+
 		c.tracker.line++
 		fmt.Println("NEW LINE!:", c.tracker.fileName, "-", c.tracker.line)
-		c.tracker.column = 1
+		c.tracker.column = 0
+
 	} else {
 		c.tracker.column++
 	}
 
 	return b, nil
+}
+
+func isASBLineStart(b byte) bool {
+	return b == 'V' || b == '#' || b == '+' || b == '-' || b == '\n'
 }
 
 // UnreadByte unreads a single byte from the underlying reader.
@@ -164,8 +183,6 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Deco
 		Reader: bufio.NewReader(src),
 		tracker: &positionTracker{
 			fileName: fileName,
-			line:     0,
-			column:   1,
 		},
 	}
 
@@ -1389,6 +1406,7 @@ func _expectToken(src *countingReader, token string) error {
 }
 
 func _peek(src *countingReader) (byte, error) {
+	src.Reader.Peek(1)
 	b, err := src.ReadByte()
 	if err != nil {
 		return 0, err

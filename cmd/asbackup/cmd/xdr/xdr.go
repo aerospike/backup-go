@@ -109,7 +109,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// If no flags were passed, show help.
 	if cmd.Flags().NFlag() == 0 {
 		if err := cmd.Help(); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 
 			return err
 		}
@@ -120,7 +120,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// Init logger.
 	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 
 		return err
 	}

@@ -75,7 +75,7 @@ func NewReader(
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket attributes: %s: %w", bucketName, err)
+		return nil, fmt.Errorf("failed to get bucket %s attributes: %w", bucketName, err)
 	}
 
 	r.bucketHandle = bucket

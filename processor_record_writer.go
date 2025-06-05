@@ -68,7 +68,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 
 	// If we need only validation, we create empty writers.
 	if rw.config.ValidateOnly {
-		return newEmptyWriters[T](parallelism), nil
+		return newDiscardWriters[T](parallelism), nil
 	}
 
 	useBatchWrites, err := rw.useBatchWrites()
@@ -107,24 +107,24 @@ func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
 	return infoClient.SupportsBatchWrite()
 }
 
-// emptyWriter is a writer that does nothing. Used for backup files validation.
-type emptyWriter[T models.TokenConstraint] struct{}
+// discardWriter is a writer that does nothing. Used for backup files validation.
+type discardWriter[T models.TokenConstraint] struct{}
 
 // Write does nothing.
-func (w *emptyWriter[T]) Write(_ T) (int, error) {
+func (w *discardWriter[T]) Write(_ T) (int, error) {
 	return 0, nil
 }
 
 // Close does nothing.
-func (w *emptyWriter[T]) Close() error {
+func (w *discardWriter[T]) Close() error {
 	return nil
 }
 
-// newEmptyWriters creates a slice of empty writers.
-func newEmptyWriters[T models.TokenConstraint](parallelism int) []pipe.Writer[T] {
+// newDiscardWriters creates a slice of empty writers.
+func newDiscardWriters[T models.TokenConstraint](parallelism int) []pipe.Writer[T] {
 	dataWriters := make([]pipe.Writer[T], parallelism)
 	for i := 0; i < parallelism; i++ {
-		dataWriters[i] = &emptyWriter[T]{}
+		dataWriters[i] = &discardWriter[T]{}
 	}
 
 	return dataWriters

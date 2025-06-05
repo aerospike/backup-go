@@ -141,7 +141,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 
 	flagSet.BoolVar(&f.ValidateOnly, "validate",
 		false,
-		"Validate the backup file without restoring it.")
+		"Validate backup files without restoring.")
 
 	return flagSet
 }

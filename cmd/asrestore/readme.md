@@ -181,7 +181,7 @@ Restore Flags:
                                   auto - starts restoring from both .asb and .asbx files.
                                   asb - restore only .asb backup files.
                                   asbx - restore only .asbx backup files. (default "auto")
-      --validate                  Validate the backup file without restoring it.
+      --validate                  Validate backup files without restoring.
 
 Compression Flags:
   -z, --compress string         Enables decompressing of backup files using the specified compression algorithm.

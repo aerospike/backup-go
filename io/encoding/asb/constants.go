@@ -48,7 +48,7 @@ const (
 	lineTypesSet         = "set"
 	lineTypeGen          = "generation"
 	lineTypeExpiration   = "expiration"
-	lineTypeBinCount     = "bin offset"
+	lineTypeBinCount     = "bin count"
 	lineTypeFirst        = "first"
 )
 

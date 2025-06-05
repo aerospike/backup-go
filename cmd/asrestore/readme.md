@@ -181,6 +181,7 @@ Restore Flags:
                                   auto - starts restoring from both .asb and .asbx files.
                                   asb - restore only .asb backup files.
                                   asbx - restore only .asbx backup files. (default "auto")
+      --validate                  Validate the backup file without restoring it.
 
 Compression Flags:
   -z, --compress string         Enables decompressing of backup files using the specified compression algorithm.
@@ -279,8 +280,6 @@ Any Azure parameter can be retrieved from Secret Agent.
 
 -m, --machine <path>    Output machine-readable status updates to the given path, 
                         typically a FIFO.
-                        
---validate      Validate backup files but don't restore anything.
 
 --indexes-last  Restore secondary indexes only after UDFs and records have been restored.
 

@@ -221,6 +221,10 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 
 		return ctx.Err()
 	case err := <-bh.errors:
+		// On error, we cancel global context.
+		// To stop all goroutines and prevent leaks.
+		bh.cancel()
+
 		return err
 	}
 }

@@ -22,9 +22,9 @@ import (
 	"strings"
 
 	"github.com/aerospike/backup-go"
-	config2 "github.com/aerospike/backup-go/cmd/internal/config"
-	logging2 "github.com/aerospike/backup-go/cmd/internal/logging"
-	storage2 "github.com/aerospike/backup-go/cmd/internal/storage"
+	"github.com/aerospike/backup-go/cmd/internal/config"
+	"github.com/aerospike/backup-go/cmd/internal/logging"
+	"github.com/aerospike/backup-go/cmd/internal/storage"
 	"github.com/aerospike/backup-go/internal/asinfo"
 	bModels "github.com/aerospike/backup-go/models"
 )
@@ -59,26 +59,26 @@ type Service struct {
 // configuring all necessary components for a backup process.
 func NewService(
 	ctx context.Context,
-	params *config2.BackupParams,
+	params *config.BackupParams,
 	logger *slog.Logger,
 ) (*Service, error) {
 	// Validations.
-	if err := config2.ValidateBackup(params); err != nil {
+	if err := config.ValidateBackup(params); err != nil {
 		return nil, err
 	}
 
 	// Initializations.
-	backupConfig, backupXDRConfig, err := config2.NewBackupConfigs(params, logger)
+	backupConfig, backupXDRConfig, err := config.NewBackupConfigs(params, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	secretAgent := config2.GetSecretAgent(backupConfig, backupXDRConfig)
+	secretAgent := config.GetSecretAgent(backupConfig, backupXDRConfig)
 
 	// We don't need a writer for estimates.
 	var writer backup.Writer
 	if params.SkipWriterInit() {
-		writer, err = storage2.NewBackupWriter(ctx, params, secretAgent, logger)
+		writer, err = storage.NewBackupWriter(ctx, params, secretAgent, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -89,7 +89,7 @@ func NewService(
 		}
 	}
 
-	reader, err := storage2.NewStateReader(ctx, params, secretAgent, logger)
+	reader, err := storage.NewStateReader(ctx, params, secretAgent, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize state reader: %w", err)
 	}
@@ -99,7 +99,7 @@ func NewService(
 		racks = params.Backup.PreferRacks
 	}
 
-	aerospikeClient, err := storage2.NewAerospikeClient(params.ClientConfig, params.ClientPolicy, racks, 0, logger)
+	aerospikeClient, err := storage.NewAerospikeClient(params.ClientConfig, params.ClientPolicy, racks, 0, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aerospike client: %w", err)
 	}
@@ -187,7 +187,7 @@ func (s *Service) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to calculate backup estimate: %w", err)
 		}
 
-		logging2.ReportEstimate(estimates, s.isLogJSON, s.logger)
+		logging.ReportEstimate(estimates, s.isLogJSON, s.logger)
 	case s.backupConfigXDR != nil:
 		s.logger.Info("starting xdr backup")
 		// Running xdr backup.
@@ -201,7 +201,7 @@ func (s *Service) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup of indexes and udfs: %w", err)
 		}
 
-		go logging2.PrintBackupEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, s.logger)
+		go logging.PrintBackupEstimate(ctx, hXdr.GetStats(), hXdr.GetMetrics, s.logger)
 
 		if err = hXdr.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to xdr backup: %w", err)
@@ -212,7 +212,7 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 
 		stats := bModels.SumBackupStats(h.GetStats(), hXdr.GetStats())
-		logging2.ReportBackup(stats, true, s.isLogJSON, s.logger)
+		logging.ReportBackup(stats, true, s.isLogJSON, s.logger)
 	default:
 		s.logger.Info("starting scan backup")
 		// Running ordinary backup.
@@ -221,13 +221,13 @@ func (s *Service) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start backup: %w", err)
 		}
 
-		go logging2.PrintBackupEstimate(ctx, h.GetStats(), h.GetMetrics, s.logger)
+		go logging.PrintBackupEstimate(ctx, h.GetStats(), h.GetMetrics, s.logger)
 
 		if err = h.Wait(ctx); err != nil {
 			return fmt.Errorf("failed to backup: %w", err)
 		}
 
-		logging2.ReportBackup(h.GetStats(), false, s.isLogJSON, s.logger)
+		logging.ReportBackup(h.GetStats(), false, s.isLogJSON, s.logger)
 	}
 
 	return nil

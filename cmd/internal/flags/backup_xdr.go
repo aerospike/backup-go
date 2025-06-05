@@ -43,7 +43,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 	flagSet.Uint64VarP(&f.FileLimit, "file-limit", "F",
 		262144000, // 250 MB
 		"Rotate backup files when their size crosses the given\n"+
-			"value (in bytes). Only used when backing up to a directory.\n")
+			"value (in bytes). Only used when backing up to a directory.")
 	flagSet.IntVar(&f.ParallelWrite, "parallel-write",
 		0,
 		"Number of concurrent backup files writing.\n"+
@@ -72,7 +72,7 @@ func (f *BackupXDR) NewFlagSet() *pflag.FlagSet {
 			"Can be the string \"all\" or an integer number of seconds.")
 	flagSet.IntVar(&f.MaxThroughput, "max-throughput",
 		0,
-		"Number of records per second to ship using XDR."+
+		"Number of records per second to ship using XDR.\n"+
 			"The --max-throughput value should be in multiples of 100.\n"+
 			"If 0, the default server value will be used.")
 	flagSet.Int64Var(&f.ReadTimeoutMilliseconds, "read-timeout",

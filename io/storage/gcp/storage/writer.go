@@ -128,20 +128,25 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 }
 
 // RemoveFiles removes a backup file or files from directory.
-func (w *Writer) RemoveFiles(
-	ctx context.Context,
-) error {
+func (w *Writer) RemoveFiles(ctx context.Context) error {
+	return w.Remove(ctx, w.PathList[0])
+}
+
+// Remove deletes the file or directory contents specified by path.
+func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove file.
 	if !w.IsDir {
-		if err := w.bucketHandle.Object(w.PathList[0]).Delete(ctx); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", w.PathList[0], err)
+		if err := w.bucketHandle.Object(targetPath).Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
+
+	prefix := ioStorage.CleanPath(targetPath, false)
 	// Remove files from dir.
 	it := w.bucketHandle.Objects(ctx, &storage.Query{
-		Prefix: w.PathList[0],
+		Prefix: prefix,
 	})
 
 	for {
@@ -156,7 +161,7 @@ func (w *Writer) RemoveFiles(
 		}
 
 		// Skip files in folders.
-		if ioStorage.IsDirectory(w.PathList[0], objAttrs.Name) && !w.WithNestedDir {
+		if ioStorage.IsDirectory(prefix, objAttrs.Name) && !w.WithNestedDir {
 			continue
 		}
 

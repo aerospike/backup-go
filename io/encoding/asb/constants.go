@@ -139,7 +139,8 @@ const (
 
 // escape character
 const (
-	asbEscape = '\\'
+	asbEscape  = '\\'
+	asbNewLine = '\n'
 )
 
 // misc constants

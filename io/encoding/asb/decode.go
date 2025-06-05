@@ -98,11 +98,13 @@ func newLineError(lineType string, err error) error {
 	return fmt.Errorf("error while reading line type: %s: %w", lineType, err)
 }
 
+// positionTracker is used for logging line and column errors.
 type positionTracker struct {
 	fileName string
 	offset   uint64
 	line     int
 	column   int
+	prevByte byte
 }
 
 // countingReader represents a wrapper for fast reading.
@@ -121,44 +123,34 @@ func (c *countingReader) ReadByte() (byte, error) {
 
 	c.tracker.offset++
 
-	if b == '\n' {
-		next, err := c.ReadByte()
-		if err != nil {
-			return 0, err
-		}
-		if err = c.UnreadByte(); err != nil {
-			return 0, err
-		}
-		c.tracker.column = 0
-		if isASBLineStart(next) {
+	if b == asbNewLine {
+		// Check if the previous byte wasn't asbNewLine.
+		// As some times asbNewLine can repeat.
+		if c.tracker.prevByte != asbNewLine {
+			// Increase line counter.
 			c.tracker.line++
-			fmt.Println("NEW LINE!:", c.tracker.fileName, "-", c.tracker.line)
+			// Reset column counter.
 			c.tracker.column = 0
 		}
-
-		c.tracker.line++
-		fmt.Println("NEW LINE!:", c.tracker.fileName, "-", c.tracker.line)
-		c.tracker.column = 0
-
 	} else {
 		c.tracker.column++
 	}
+	// Save the previous value, as there can be several asbNewLine in a row.
+	c.tracker.prevByte = b
 
 	return b, nil
-}
-
-func isASBLineStart(b byte) bool {
-	return b == 'V' || b == '#' || b == '+' || b == '-' || b == '\n'
 }
 
 // UnreadByte unreads a single byte from the underlying reader.
 func (c *countingReader) UnreadByte() error {
 	err := c.Reader.UnreadByte()
-	if err == nil {
-		c.tracker.offset--
+	if err != nil {
+		return err
 	}
 
-	return err
+	c.tracker.offset--
+
+	return nil
 }
 
 type metaData struct {
@@ -168,8 +160,6 @@ type metaData struct {
 
 // Decoder contains logic for decoding backup data from the .asb format.
 type Decoder[T models.TokenConstraint] struct {
-	// filename for logging purposes.
-	filename string
 	header   *header
 	metaData *metaData
 	reader   *countingReader
@@ -183,6 +173,8 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Deco
 		Reader: bufio.NewReader(src),
 		tracker: &positionTracker{
 			fileName: fileName,
+			// For printing lines starting from 1.
+			line: 1,
 		},
 	}
 
@@ -278,7 +270,7 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 
 	returnBigBuffer(ver)
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -312,7 +304,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 			return nil, err
 		}
 
-		metaToken, err := _readUntilAny(r.reader, []byte{' ', '\n'}, false)
+		metaToken, err := _readUntilAny(r.reader, []byte{' ', asbNewLine}, false)
 		if err != nil {
 			return nil, err
 		}
@@ -346,12 +338,12 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 }
 
 func (r *Decoder[T]) readNamespace() (string, error) {
-	data, err := _readUntil(r.reader, '\n', true)
+	data, err := _readUntil(r.reader, asbNewLine, true)
 	if err != nil {
 		return "", err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return "", err
 	}
 
@@ -359,7 +351,7 @@ func (r *Decoder[T]) readNamespace() (string, error) {
 }
 
 func (r *Decoder[T]) readFirst() (bool, error) {
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return false, err
 	}
 
@@ -492,7 +484,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 		// NOTE: the context should always be base64 encoded,
 		// so escaping is not needed
-		path.B64Context, err = _readUntil(r.reader, '\n', false)
+		path.B64Context, err = _readUntil(r.reader, asbNewLine, false)
 		if err != nil {
 			return nil, err
 		}
@@ -500,7 +492,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 	res.Path = path
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -601,7 +593,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 	copy(res.Content, content)
 	returnBigBuffer(content)
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -809,7 +801,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return err
 	}
 
-	nameBytes, err := _readUntilAny(r.reader, []byte{' ', '\n'}, true)
+	nameBytes, err := _readUntilAny(r.reader, []byte{' ', asbNewLine}, true)
 	if err != nil {
 		return err
 	}
@@ -819,7 +811,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
-		if err := _expectChar(r.reader, '\n'); err != nil {
+		if err := _expectChar(r.reader, asbNewLine); err != nil {
 			return err
 		}
 
@@ -838,7 +830,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return binErr
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return err
 	}
 
@@ -873,9 +865,9 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	case binTypeBool:
 		return _readBool(r.reader)
 	case binTypeInt:
-		return _readInteger(r.reader, '\n')
+		return _readInteger(r.reader, asbNewLine)
 	case binTypeFloat:
-		return _readFloat(r.reader, '\n')
+		return _readFloat(r.reader, asbNewLine)
 	case binTypeString:
 		return _readStringSized(r.reader, ' ')
 	case binTypeLDT:
@@ -985,7 +977,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 
 	switch keyTypeChar {
 	case keyTypeInt:
-		keyVal, err := _readInteger(r.reader, '\n')
+		keyVal, err := _readInteger(r.reader, asbNewLine)
 		if err != nil {
 			return nil, err
 		}
@@ -993,7 +985,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		res = keyVal
 
 	case keyTypeFloat:
-		keyVal, err := _readFloat(r.reader, '\n')
+		keyVal, err := _readFloat(r.reader, asbNewLine)
 		if err != nil {
 			return nil, err
 		}
@@ -1043,7 +1035,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		return nil, fmt.Errorf("invalid key type %c", keyTypeChar)
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -1051,7 +1043,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 }
 
 func (r *Decoder[T]) readBinCount() (uint16, error) {
-	binCount, err := _readInteger(r.reader, '\n')
+	binCount, err := _readInteger(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
@@ -1060,7 +1052,7 @@ func (r *Decoder[T]) readBinCount() (uint16, error) {
 		return 0, fmt.Errorf("invalid bin offset %d", binCount)
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1071,12 +1063,12 @@ func (r *Decoder[T]) readBinCount() (uint16, error) {
 // it expects that r has been advanced past the expiration line marker '+ t '
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 func (r *Decoder[T]) readExpiration() (int64, error) {
-	exp, err := _readInteger(r.reader, '\n')
+	exp, err := _readInteger(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1088,7 +1080,7 @@ func (r *Decoder[T]) readExpiration() (int64, error) {
 }
 
 func (r *Decoder[T]) readGeneration() (uint32, error) {
-	gen, err := _readInteger(r.reader, '\n')
+	gen, err := _readInteger(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
@@ -1097,7 +1089,7 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 		return 0, fmt.Errorf("invalid generation offset %d", gen)
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1105,12 +1097,12 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 }
 
 func (r *Decoder[T]) readSet() (string, error) {
-	set, err := _readUntil(r.reader, '\n', true)
+	set, err := _readUntil(r.reader, asbNewLine, true)
 	if err != nil {
 		return "", err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return "", err
 	}
 
@@ -1118,12 +1110,12 @@ func (r *Decoder[T]) readSet() (string, error) {
 }
 
 func (r *Decoder[T]) readDigest() ([]byte, error) {
-	digest, err := _readBase64BytesDelimited(r.reader, '\n')
+	digest, err := _readBase64BytesDelimited(r.reader, asbNewLine)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -1406,7 +1398,6 @@ func _expectToken(src *countingReader, token string) error {
 }
 
 func _peek(src *countingReader) (byte, error) {
-	src.Reader.Peek(1)
 	b, err := src.ReadByte()
 	if err != nil {
 		return 0, err

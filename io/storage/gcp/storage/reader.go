@@ -75,7 +75,7 @@ func NewReader(
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket attr: %s: %w", bucketName, err)
+		return nil, fmt.Errorf("failed to get bucket %s attributes: %w", bucketName, err)
 	}
 
 	r.bucketHandle = bucket
@@ -148,7 +148,7 @@ func (r *Reader) streamDirectory(
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				errorsCh <- fmt.Errorf("failed to read object attr from bucket %s: %w",
+				errorsCh <- fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -158,7 +158,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 
@@ -224,7 +224,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return fmt.Errorf("failed to read object attr from bucket %s: %w",
+				return fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -234,7 +234,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 
@@ -273,7 +273,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return nil, fmt.Errorf("failed to read object attr from bucket %s: %w",
+				return nil, fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 
@@ -281,7 +281,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 
@@ -312,8 +312,8 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 }
 
 // shouldSkip determines whether the file should be skipped.
-func (r *Reader) shouldSkip(path, fileName string) bool {
-	return ioStorage.IsDirectory(path, fileName) && !r.WithNestedDir
+func (r *Reader) shouldSkip(path string, attr *storage.ObjectAttrs) bool {
+	return (ioStorage.IsDirectory(path, attr.Name) && !r.WithNestedDir) || attr.Size == 0
 }
 
 func (r *Reader) calculateTotalSize(ctx context.Context) {
@@ -343,7 +343,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	if !r.IsDir {
 		objAttrs, err := r.bucketHandle.Object(path).Attrs(ctx)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object attr: %s: %w", path, err)
+			return 0, 0, fmt.Errorf("failed to get object attributes for %s: %w", path, err)
 		}
 
 		return objAttrs.Size, 1, nil
@@ -359,7 +359,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return 0, 0, fmt.Errorf("failed to read object attr from bucket %s: %w",
+				return 0, 0, fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err)
 			}
 
@@ -367,7 +367,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		}
 
 		// Skip files in folders.
-		if r.shouldSkip(path, objAttrs.Name) {
+		if r.shouldSkip(path, objAttrs) {
 			continue
 		}
 

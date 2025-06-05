@@ -80,7 +80,7 @@ func NewWriter(
 	// Check if bucketHandler exists, to avoid errors.
 	_, err := bucketHandler.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucketHandler %s attr: %w", bucketName, err)
+		return nil, fmt.Errorf("failed to get bucketHandler %s attributes: %w", bucketName, err)
 	}
 
 	if w.IsDir && !w.SkipDirCheck {
@@ -157,7 +157,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("failed to read object attr from bucket %s: %w", w.bucketName, err)
+			return fmt.Errorf("failed to read object attributes from bucket %s: %w", w.bucketName, err)
 		}
 
 		// Skip files in folders.

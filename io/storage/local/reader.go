@@ -141,6 +141,17 @@ func (r *Reader) streamDirectory(
 
 		filePath := filepath.Join(path, file.Name())
 
+		// Skip empty files.
+		info, err := file.Info()
+		if err != nil {
+			errorsCh <- fmt.Errorf("failed to get file info %s: %w", filePath, err)
+			return
+		}
+
+		if info.Size() == 0 {
+			continue
+		}
+
 		if r.Validator != nil {
 			if err = r.Validator.Run(filePath); err != nil {
 				// Since we are passing invalid files, we don't need to handle this

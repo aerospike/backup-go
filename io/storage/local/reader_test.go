@@ -233,6 +233,9 @@ func createTmpFile(dir, fileName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
+
+	_, _ = f.WriteString("test content")
+
 	_ = f.Close()
 
 	return nil

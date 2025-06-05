@@ -29,6 +29,7 @@ import (
 )
 
 // State contains current backups status data.
+// Fields must be Exportable for marshaling to GOB.
 type State struct {
 	// Global backup context.
 	ctx context.Context
@@ -47,8 +48,10 @@ type State struct {
 	SaveCommandChan chan int
 	// Mutex for synchronizing operations on record states.
 	mu sync.Mutex
-	// FileName specifies the file path where the backup state is persisted.
+	// FileName specifies the file name where the backup state is persisted.
 	FileName string
+	// FilePath specifies the file path where the backup state is persisted.
+	FilePath string
 
 	// writer is used to create a state file.
 	writer Writer
@@ -94,6 +97,7 @@ func newState(
 		RecordStates:      make(map[int]models.PartitionFilterSerialized),
 		RecordStatesSaved: make(map[int]models.PartitionFilterSerialized),
 		SaveCommandChan:   make(chan int),
+		FilePath:          config.StateFile,
 		FileName:          filepath.Base(config.StateFile),
 		writer:            writer,
 		logger:            logger,
@@ -247,6 +251,16 @@ func (s *State) getFileSuffix() string {
 	}
 
 	return ""
+}
+
+// cleanup removes the state file.
+// Must be called when backup is completed.
+func (s *State) cleanup(ctx context.Context) error {
+	if err := s.writer.Remove(ctx, s.FilePath); err != nil {
+		return fmt.Errorf("failed to remove state file: %w", err)
+	}
+
+	return nil
 }
 
 func openFile(ctx context.Context, reader StreamingReader, fileName string) (io.ReadCloser, error) {

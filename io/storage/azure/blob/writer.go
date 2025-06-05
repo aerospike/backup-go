@@ -227,18 +227,25 @@ func isEmptyDirectory(ctx context.Context, client *azblob.Client, containerName,
 
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
+	return w.Remove(ctx, w.PathList[0])
+}
+
+// Remove deletes the file or directory contents specified by path.
+func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove file.
 	if !w.IsDir {
-		_, err := w.client.DeleteBlob(ctx, w.containerName, w.PathList[0], nil)
+		_, err := w.client.DeleteBlob(ctx, w.containerName, targetPath, nil)
 		if err != nil {
-			return fmt.Errorf("failed to delete blob %s: %w", w.PathList[0], err)
+			return fmt.Errorf("failed to delete blob %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
+
+	prefix := ioStorage.CleanPath(targetPath, false)
 	// Remove files from dir.
 	pager := w.client.NewListBlobsFlatPager(w.containerName, &azblob.ListBlobsFlatOptions{
-		Prefix: &w.prefix,
+		Prefix: &prefix,
 	})
 
 	for pager.More() {
@@ -249,7 +256,7 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 
 		for _, blobItem := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if ioStorage.IsDirectory(w.prefix, *blobItem.Name) && !w.WithNestedDir {
+			if ioStorage.IsDirectory(prefix, *blobItem.Name) && !w.WithNestedDir {
 				continue
 			}
 

@@ -19,7 +19,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"path"
 	"sync"
@@ -1429,12 +1428,7 @@ func TestBackupContinuation(t *testing.T) {
 		require.NoError(t, err)
 		stateFile := path.Join(testFolder, testStateFile)
 
-		randomNumber := rand.Intn(7-3+1) + 3
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() {
-			time.Sleep(time.Duration(randomNumber) * time.Second)
-			cancel()
-		}()
+		ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 		t.Log("first backup")
 		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
@@ -1476,12 +1470,12 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	backupCfg := NewDefaultBackupConfig()
 	backupCfg.Namespace = testASNamespace
 	backupCfg.SetList = []string{setName}
-	backupCfg.ParallelRead = 10
-	backupCfg.ParallelWrite = 10
+	backupCfg.ParallelRead = 1
+	backupCfg.ParallelWrite = 1
 
 	backupCfg.StateFile = testStateFile
 	backupCfg.FileLimit = 10
-	backupCfg.Bandwidth = 1000000
+	backupCfg.Bandwidth = 100000
 	backupCfg.PageSize = 1
 
 	backupClient, err := NewClient(asClient, WithID("test_client"))
@@ -1496,7 +1490,7 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 
 	// use backupHandler.Wait() to wait for the job to finish or fail
 	err = backupHandler.Wait(ctx)
-	if err != nil {
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		return 0, err
 	}
 
@@ -1526,8 +1520,8 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 	backupCfg := NewDefaultBackupConfig()
 	backupCfg.Namespace = testASNamespace
 	backupCfg.SetList = []string{setName}
-	backupCfg.ParallelRead = 10
-	backupCfg.ParallelWrite = 10
+	backupCfg.ParallelRead = 1
+	backupCfg.ParallelWrite = 1
 
 	backupCfg.StateFile = testStateFile
 	backupCfg.Continue = true

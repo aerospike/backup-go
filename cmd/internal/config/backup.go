@@ -198,7 +198,7 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	}
 
 	if params.Backup.StateFileDst != "" {
-		c.StateFile = params.Backup.StateFileDst
+		c.StateFile = path.Join(params.Common.Directory, params.Backup.StateFileDst)
 		c.PageSize = params.Backup.ScanPageSize
 	}
 

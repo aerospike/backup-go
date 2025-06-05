@@ -139,6 +139,52 @@ func (_c *MockWriter_NewWriter_Call) RunAndReturn(run func(ctx context.Context, 
 	return _c
 }
 
+// Remove provides a mock function for the type MockWriter
+func (_mock *MockWriter) Remove(ctx context.Context, path string) error {
+	ret := _mock.Called(ctx, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Remove")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, path)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockWriter_Remove_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Remove'
+type MockWriter_Remove_Call struct {
+	*mock.Call
+}
+
+// Remove is a helper method to define mock.On call
+//   - ctx
+//   - path
+func (_e *MockWriter_Expecter) Remove(ctx interface{}, path interface{}) *MockWriter_Remove_Call {
+	return &MockWriter_Remove_Call{Call: _e.mock.On("Remove", ctx, path)}
+}
+
+func (_c *MockWriter_Remove_Call) Run(run func(ctx context.Context, path string)) *MockWriter_Remove_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockWriter_Remove_Call) Return(err error) *MockWriter_Remove_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockWriter_Remove_Call) RunAndReturn(run func(ctx context.Context, path string) error) *MockWriter_Remove_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RemoveFiles provides a mock function for the type MockWriter
 func (_mock *MockWriter) RemoveFiles(ctx context.Context) error {
 	ret := _mock.Called(ctx)

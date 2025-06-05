@@ -122,11 +122,16 @@ func isEmptyDirectory(path string) (bool, error) {
 
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
+	return w.Remove(ctx, w.PathList[0])
+}
+
+// Remove deletes the file or directory contents specified by path.
+func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	info, err := os.Stat(w.PathList[0])
+	info, err := os.Stat(targetPath)
 
 	switch {
 	case err == nil:
@@ -135,33 +140,33 @@ func (w *Writer) RemoveFiles(ctx context.Context) error {
 		// File doesn't exist, it's ok.
 		return nil
 	default:
-		return fmt.Errorf("failed to stat path %s: %w", w.PathList[0], err)
+		return fmt.Errorf("failed to stat targetPath %s: %w", targetPath, err)
 	}
 	// if it is a file.
 	if !info.IsDir() {
-		if err = os.Remove(w.PathList[0]); err != nil {
-			return fmt.Errorf("failed to remove file %s: %w", w.PathList[0], err)
+		if err = os.Remove(targetPath); err != nil {
+			return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
 
 	if w.WithNestedDir {
-		if err = os.RemoveAll(w.PathList[0]); err != nil {
-			return fmt.Errorf("failed to remove path %s: %w", w.PathList[0], err)
+		if err = os.RemoveAll(targetPath); err != nil {
+			return fmt.Errorf("failed to remove targetPath %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
 
 	// If it is a dir.
-	files, err := os.ReadDir(w.PathList[0])
+	files, err := os.ReadDir(targetPath)
 	if err != nil {
-		return fmt.Errorf("failed to read directory %s: %w", w.PathList[0], err)
+		return fmt.Errorf("failed to read directory %s: %w", targetPath, err)
 	}
 
 	for _, file := range files {
-		filePath := filepath.Join(w.PathList[0], file.Name())
+		filePath := filepath.Join(targetPath, file.Name())
 		// Skip folders.
 		if file.IsDir() {
 			continue

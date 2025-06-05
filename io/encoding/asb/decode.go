@@ -114,6 +114,17 @@ type countingReader struct {
 	tracker *positionTracker
 }
 
+func newCountingReader(src io.Reader, fileName string) *countingReader {
+	return &countingReader{
+		Reader: bufio.NewReader(src),
+		tracker: &positionTracker{
+			fileName: fileName,
+			// For printing lines starting from 1.
+			line: 1,
+		},
+	}
+}
+
 // ReadByte reads a single byte from the underlying reader.
 func (c *countingReader) ReadByte() (byte, error) {
 	b, err := c.Reader.ReadByte()
@@ -169,17 +180,8 @@ type Decoder[T models.TokenConstraint] struct {
 func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Decoder[T], error) {
 	var err error
 
-	reader := &countingReader{
-		Reader: bufio.NewReader(src),
-		tracker: &positionTracker{
-			fileName: fileName,
-			// For printing lines starting from 1.
-			line: 1,
-		},
-	}
-
 	asb := Decoder[T]{
-		reader: reader,
+		reader: newCountingReader(src, fileName),
 	}
 
 	asb.header, err = asb.readHeader()

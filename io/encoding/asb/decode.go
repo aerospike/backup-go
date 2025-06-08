@@ -99,7 +99,7 @@ func newLineError(lineType string, err error) error {
 	return fmt.Errorf("error while reading line type: %s: %w", lineType, err)
 }
 
-// positionTracker is used for logging line and column errors.
+// positionTracker is used for tracking error information when validating backup files.
 type positionTracker struct {
 	fileName string
 	offset   uint64

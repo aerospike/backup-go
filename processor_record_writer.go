@@ -66,7 +66,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 		parallelism = rw.config.MaxAsyncBatches
 	}
 
-	// If we need only validation, we create empty writers.
+	// If we need only validation, we create discard writers.
 	if rw.config.ValidateOnly {
 		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
 	}

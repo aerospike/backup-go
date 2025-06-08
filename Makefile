@@ -73,7 +73,7 @@ docker-build:
 
 .PHONY: docker-buildx
 docker-buildx:
-	cd ./scripts && ./docker-buildx.sh --tag $(TAG) --registry $(REGISTRY) --rh-registry $(RH_REGISTRY)
+	./scripts/docker-buildx.sh --tag $(TAG) --registry $(REGISTRY) --rh-registry $(RH_REGISTRY)
 
 # Build CLI tools.
 .PHONY: build

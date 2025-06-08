@@ -35,18 +35,21 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// A Writer provides access to the backup storage.
-// Exported for integration tests.
+// Writer defines an interface for writing backup data to a storage provider.
+// Implementations, handling different storage types, are located within the io.storage package.
 type Writer interface {
 	// NewWriter returns new writer for backup logic to use. Each call creates
 	// a new writer, they might be working in parallel. Backup logic will close
 	// the writer after backup is done. Header func is executed on a writer
 	// after creation (on each one in case of multipart file).
 	NewWriter(ctx context.Context, filename string) (io.WriteCloser, error)
+
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
+
 	// RemoveFiles removes a backup file or files from directory.
 	RemoveFiles(ctx context.Context) error
+
 	// Remove removes a file or directory at the specified path from the backup storage.
 	// Returns an error if the operation fails.
 	Remove(ctx context.Context, path string) error

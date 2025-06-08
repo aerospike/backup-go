@@ -83,7 +83,7 @@ Aerospike Client Flags:
       --client-login-timeout int   Specifies the login operation timeout for external authentication methods such as LDAP. (default 10000)
 
 Restore Flags:
-  -d, --directory string         The directory that holds the backup files. Required, unless -o or -e is used.
+  -d, --directory string         The directory that holds the backup files. Required, unless --input-file is used.
   -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
                                  Restoring to different namespace is incompatible with --mode=asbx.
   -s, --set string               Only restore the given sets from the backup.

@@ -71,7 +71,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 	// Start lazy file reading.
 	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh)
 
-	fn := func(fileNumber uint64, r io.ReadCloser) Decoder[T] {
+	fn := func(r io.ReadCloser, fileNumber uint64, fileName string) Decoder[T] {
 		reader, err := fr.wrapReader(r)
 		if err != nil {
 			fr.errorsCh <- err
@@ -80,7 +80,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 
 		reader = metrics.NewReader(reader, fr.kbpsCollector)
 
-		d, err := NewDecoder[T](fr.config.EncoderType, fileNumber, reader)
+		d, err := NewDecoder[T](fr.config.EncoderType, reader, fileNumber, fileName)
 		if err != nil {
 			fr.errorsCh <- err
 			return nil

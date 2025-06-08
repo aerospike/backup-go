@@ -28,7 +28,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// StreamingReader provides access to data that should be restored.
+// StreamingReader defines an interface for accessing backup file data from a storage provider.
+// Implementations, handling different storage types, are located within the io.storage package.
 type StreamingReader interface {
 	// StreamFiles creates readers from files and sends them to the channel.
 	// In case of an error, the error is sent to the error channel.
@@ -48,6 +49,7 @@ type StreamingReader interface {
 
 	// GetSize returns the size of asb/asbx files in the path.
 	GetSize() int64
+
 	// GetNumber returns the number of asb/asbx files in the path.
 	GetNumber() int64
 }

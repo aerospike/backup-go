@@ -43,6 +43,8 @@ type Restore struct {
 	RetryMaxRetries  uint
 
 	Mode string
+
+	ValidateOnly bool
 }
 
 func (restore *Restore) IsDirectoryRestore() bool {

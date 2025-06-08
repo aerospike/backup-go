@@ -41,7 +41,9 @@ func main() {
 	}()
 
 	rootCmd := cmd.NewCmd(appVersion, commitHash)
+	rootCmd.SilenceErrors = true
+
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		log.Fatal(err)
+		os.Exit(1)
 	}
 }

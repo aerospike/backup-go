@@ -16,6 +16,7 @@ package asb
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -61,14 +62,21 @@ func returnSmallBuffer(buf []byte) {
 	smallBufPool.Put(buf[:0])
 }
 
-func newDecoderError(offset uint64, err error) error {
+func newDecoderError(tracker *positionTracker, err error) error {
 	if errors.Is(err, io.EOF) {
 		return err
 	} else if err == nil {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading asb data at byte %d: %w", offset, err)
+	return fmt.Errorf(
+		"error while reading asb data: %s line %d col %d (total byte %d): %w",
+		tracker.fileName,
+		tracker.line,
+		tracker.column,
+		tracker.offset,
+		err,
+	)
 }
 
 func newSectionError(section string, err error) error {
@@ -78,7 +86,7 @@ func newSectionError(section string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading section: %s, %w", section, err)
+	return fmt.Errorf("error while reading section: %s: %w", section, err)
 }
 
 func newLineError(lineType string, err error) error {
@@ -88,42 +96,81 @@ func newLineError(lineType string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading line type: %s, %w", lineType, err)
+	return fmt.Errorf("error while reading line type: %s: %w", lineType, err)
+}
+
+// positionTracker is used for tracking error information when validating backup files.
+type positionTracker struct {
+	fileName string
+	offset   uint64
+	line     int
+	column   int
+	prevByte byte
+	prevCol  int
 }
 
 // countingReader represents a wrapper for fast reading.
 // It keeps track of the number of bytes read.
 type countingReader struct {
 	*bufio.Reader
-	count uint64
+	tracker *positionTracker
+}
+
+func newCountingReader(src io.Reader, fileName string) *countingReader {
+	return &countingReader{
+		Reader: bufio.NewReader(src),
+		tracker: &positionTracker{
+			fileName: fileName,
+			// For printing lines starting from 1.
+			line: 1,
+		},
+	}
 }
 
 // ReadByte reads a single byte from the underlying reader.
 func (c *countingReader) ReadByte() (byte, error) {
 	b, err := c.Reader.ReadByte()
-	if err == nil {
-		c.count++
+	if err != nil {
+		return 0, err
 	}
 
-	return b, err
+	c.tracker.offset++
+
+	// If it is a new line byte.
+	if b == asbNewLine {
+		// Increase line counter.
+		c.tracker.line++
+		// Save the previous column counter, so we can return in case of Unread.
+		c.tracker.prevCol = c.tracker.column
+		// Reset column counter.
+		c.tracker.column = 0
+	} else {
+		// If no new line, just move the column counter.
+		c.tracker.column++
+	}
+	// Save the previous value, so we can track changes on Unread.
+	c.tracker.prevByte = b
+
+	return b, nil
 }
 
 // UnreadByte unreads a single byte from the underlying reader.
 func (c *countingReader) UnreadByte() error {
 	err := c.Reader.UnreadByte()
-	if err == nil {
-		c.count--
+	if err != nil {
+		return err
 	}
 
-	return err
-}
+	// Check if the previous byte was asbNewLine.
+	if c.tracker.prevByte == asbNewLine {
+		// We return one step back.
+		c.tracker.line--
+		c.tracker.column = c.tracker.prevCol
+	}
 
-// Read reads data into the provided byte slice and increments the internal count by the number of bytes read.
-func (c *countingReader) Read(p []byte) (int, error) {
-	n, err := c.Reader.Read(p)
-	c.count += uint64(n)
+	c.tracker.offset--
 
-	return n, err
+	return nil
 }
 
 type metaData struct {
@@ -139,16 +186,11 @@ type Decoder[T models.TokenConstraint] struct {
 }
 
 // NewDecoder creates a new Decoder.
-func NewDecoder[T models.TokenConstraint](src io.Reader) (*Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Decoder[T], error) {
 	var err error
 
-	reader := &countingReader{
-		Reader: bufio.NewReader(src),
-		count:  0,
-	}
-
 	asb := Decoder[T]{
-		reader: reader,
+		reader: newCountingReader(src, fileName),
 	}
 
 	asb.header, err = asb.readHeader()
@@ -169,7 +211,7 @@ func NewDecoder[T models.TokenConstraint](src io.Reader) (*Decoder[T], error) {
 }
 
 func (r *Decoder[T]) NextToken() (T, error) {
-	countBefore := r.reader.count
+	countBefore := r.reader.tracker.offset
 
 	v, err := func() (any, error) {
 		b, err := _peek(r.reader)
@@ -194,10 +236,10 @@ func (r *Decoder[T]) NextToken() (T, error) {
 	}()
 
 	if err != nil {
-		return nil, newDecoderError(r.reader.count, err)
+		return nil, newDecoderError(r.reader.tracker, err)
 	}
 
-	size := r.reader.count - countBefore
+	size := r.reader.tracker.offset - countBefore
 
 	var t *models.Token
 	switch v := v.(type) {
@@ -239,7 +281,7 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 
 	returnBigBuffer(ver)
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -273,7 +315,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 			return nil, err
 		}
 
-		metaToken, err := _readUntilAny(r.reader, []byte{' ', '\n'}, false)
+		metaToken, err := _readUntilAny(r.reader, []byte{' ', asbNewLine}, false)
 		if err != nil {
 			return nil, err
 		}
@@ -307,12 +349,12 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 }
 
 func (r *Decoder[T]) readNamespace() (string, error) {
-	data, err := _readUntil(r.reader, '\n', true)
+	data, err := _readUntil(r.reader, asbNewLine, true)
 	if err != nil {
 		return "", err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return "", err
 	}
 
@@ -320,7 +362,7 @@ func (r *Decoder[T]) readNamespace() (string, error) {
 }
 
 func (r *Decoder[T]) readFirst() (bool, error) {
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return false, err
 	}
 
@@ -453,7 +495,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 		// NOTE: the context should always be base64 encoded,
 		// so escaping is not needed
-		path.B64Context, err = _readUntil(r.reader, '\n', false)
+		path.B64Context, err = _readUntil(r.reader, asbNewLine, false)
 		if err != nil {
 			return nil, err
 		}
@@ -461,7 +503,7 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 
 	res.Path = path
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -562,7 +604,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 	copy(res.Content, content)
 	returnBigBuffer(content)
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -656,7 +698,7 @@ func (r *Decoder[T]) readRecordData(i int, recData *recordData) error {
 		recData.binCount, err = r.readBinCount()
 	default:
 		// should never happen because this is set to the length of expectedRecordHeaderTypes
-		return fmt.Errorf("read too many record header lines, count: %d", i)
+		return fmt.Errorf("read too many record header lines, offset: %d", i)
 	}
 
 	if err != nil {
@@ -770,7 +812,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return err
 	}
 
-	nameBytes, err := _readUntilAny(r.reader, []byte{' ', '\n'}, true)
+	nameBytes, err := _readUntilAny(r.reader, []byte{' ', asbNewLine}, true)
 	if err != nil {
 		return err
 	}
@@ -780,7 +822,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
-		if err := _expectChar(r.reader, '\n'); err != nil {
+		if err := _expectChar(r.reader, asbNewLine); err != nil {
 			return err
 		}
 
@@ -799,7 +841,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return binErr
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return err
 	}
 
@@ -834,9 +876,9 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	case binTypeBool:
 		return _readBool(r.reader)
 	case binTypeInt:
-		return _readInteger(r.reader, '\n')
+		return _readInteger(r.reader, asbNewLine)
 	case binTypeFloat:
-		return _readFloat(r.reader, '\n')
+		return _readFloat(r.reader, asbNewLine)
 	case binTypeString:
 		return _readStringSized(r.reader, ' ')
 	case binTypeLDT:
@@ -946,7 +988,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 
 	switch keyTypeChar {
 	case keyTypeInt:
-		keyVal, err := _readInteger(r.reader, '\n')
+		keyVal, err := _readInteger(r.reader, asbNewLine)
 		if err != nil {
 			return nil, err
 		}
@@ -954,7 +996,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		res = keyVal
 
 	case keyTypeFloat:
-		keyVal, err := _readFloat(r.reader, '\n')
+		keyVal, err := _readFloat(r.reader, asbNewLine)
 		if err != nil {
 			return nil, err
 		}
@@ -1004,7 +1046,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		return nil, fmt.Errorf("invalid key type %c", keyTypeChar)
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -1012,16 +1054,16 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 }
 
 func (r *Decoder[T]) readBinCount() (uint16, error) {
-	binCount, err := _readInteger(r.reader, '\n')
+	binCount, err := _readInteger(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
 
 	if binCount > maxBinCount || binCount < 0 {
-		return 0, fmt.Errorf("invalid bin count %d", binCount)
+		return 0, fmt.Errorf("invalid bin offset %d", binCount)
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1032,12 +1074,12 @@ func (r *Decoder[T]) readBinCount() (uint16, error) {
 // it expects that r has been advanced past the expiration line marker '+ t '
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 func (r *Decoder[T]) readExpiration() (int64, error) {
-	exp, err := _readInteger(r.reader, '\n')
+	exp, err := _readInteger(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1049,16 +1091,16 @@ func (r *Decoder[T]) readExpiration() (int64, error) {
 }
 
 func (r *Decoder[T]) readGeneration() (uint32, error) {
-	gen, err := _readInteger(r.reader, '\n')
+	gen, err := _readInteger(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
 
 	if gen < 0 || gen > maxGeneration {
-		return 0, fmt.Errorf("invalid generation count %d", gen)
+		return 0, fmt.Errorf("invalid generation offset %d", gen)
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1066,12 +1108,12 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 }
 
 func (r *Decoder[T]) readSet() (string, error) {
-	set, err := _readUntil(r.reader, '\n', true)
+	set, err := _readUntil(r.reader, asbNewLine, true)
 	if err != nil {
 		return "", err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return "", err
 	}
 
@@ -1079,12 +1121,12 @@ func (r *Decoder[T]) readSet() (string, error) {
 }
 
 func (r *Decoder[T]) readDigest() ([]byte, error) {
-	digest, err := _readBase64BytesDelimited(r.reader, '\n')
+	digest, err := _readBase64BytesDelimited(r.reader, asbNewLine)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, '\n'); err != nil {
+	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -1322,6 +1364,30 @@ func _readNBytes(src *countingReader, n int) ([]byte, error) {
 	_, err := io.ReadFull(src, buf)
 	if err != nil {
 		return nil, err
+	}
+
+	// Increase global offset.
+	src.tracker.offset += uint64(n)
+
+	// Update position tracker by counting newlines in the read data, only if we found at least one newline.
+	if bytes.IndexByte(buf, asbNewLine) != -1 {
+		// Us bytes.Count for fast counting of newlines.
+		newlineCount := bytes.Count(buf, []byte{asbNewLine})
+		// Increase counter.
+		src.tracker.line += newlineCount
+
+		if newlineCount > 0 {
+			src.tracker.column = 0
+		} else {
+			src.tracker.column += n
+		}
+	} else {
+		src.tracker.column += n
+	}
+
+	// Set previous byte as last byte of the read data.
+	if n > 0 {
+		src.tracker.prevByte = buf[n-1]
 	}
 
 	return buf, nil

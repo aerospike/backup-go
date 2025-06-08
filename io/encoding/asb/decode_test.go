@@ -15,7 +15,6 @@
 package asb
 
 import (
-	"bufio"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -29,6 +28,12 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 )
+
+const testFileName = "test_backup.asb"
+
+func newTestCountingReader(s string) *countingReader {
+	return newCountingReader(strings.NewReader(s), testFileName)
+}
 
 func TestASBReader_readHeader(t *testing.T) {
 	t.Parallel()
@@ -46,9 +51,7 @@ func TestASBReader_readHeader(t *testing.T) {
 		{
 			name: "positive simple",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Version 3.1\n")),
-				},
+				reader: newTestCountingReader("Version 3.1\n"),
 			},
 			want: &header{
 				Version: "3.1",
@@ -58,9 +61,7 @@ func TestASBReader_readHeader(t *testing.T) {
 		{
 			name: "negative missing line feed",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Version 3.1")),
-				},
+				reader: newTestCountingReader("Version 3.1"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -68,9 +69,7 @@ func TestASBReader_readHeader(t *testing.T) {
 		{
 			name: "negative missing space",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Version3.1")),
-				},
+				reader: newTestCountingReader("Version3.1"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -78,9 +77,7 @@ func TestASBReader_readHeader(t *testing.T) {
 		{
 			name: "negative bad version number",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Version 31")),
-				},
+				reader: newTestCountingReader("Version 31"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -123,9 +120,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "positive escaped namespace",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# namespace ns\\\n1\n# first-file\n")),
-				},
+				reader: newTestCountingReader("# namespace ns\\\n1\n# first-file\n"),
 			},
 			want: &metaData{
 				Namespace: "ns\n1",
@@ -136,9 +131,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "positive no first-file",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# namespace customers9\nd")),
-				},
+				reader: newTestCountingReader("# namespace customers9\nd"),
 			},
 			want: &metaData{
 				Namespace: "customers9",
@@ -148,9 +141,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "positive no namespace",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# first-file\na")),
-				},
+				reader: newTestCountingReader("# first-file\na"),
 			},
 			want: &metaData{
 				First: true,
@@ -160,9 +151,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "negative empty metadata line",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# ")),
-				},
+				reader: newTestCountingReader("# "),
 			},
 			want:    nil,
 			wantErr: true, // this will be the EOF error
@@ -170,9 +159,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "negative missing space",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("#namespace hugerecords\n# first-file\n")),
-				},
+				reader: newTestCountingReader("#namespace hugerecords\n# first-file\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -180,9 +167,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "negative missing second space",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# namespace dergin3\n#first-file\n")),
-				},
+				reader: newTestCountingReader("# namespace dergin3\n#first-file\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -190,9 +175,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "negative bad token",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# namespace tester\n# bad-token\n")),
-				},
+				reader: newTestCountingReader("# namespace tester\n# bad-token\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -200,9 +183,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "negative bad namespace format (no new line)",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# namespace ns1")),
-				},
+				reader: newTestCountingReader("# namespace ns1"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -210,9 +191,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 		{
 			name: "negative bad first-file (no new line)",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("# first-file bad-data")),
-				},
+				reader: newTestCountingReader("# first-file bad-data"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -258,9 +237,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "positive bin numeric",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 N 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",
@@ -277,9 +254,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "positive bin numeric no set",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1  sindex1 N 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader(" userdata1  sindex1 N 1 bin1 N\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",
@@ -296,9 +271,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "positive bin numeric no set with context",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1  sindex1 N 1 bin1 N context\n")),
-				},
+				reader: newTestCountingReader(" userdata1  sindex1 N 1 bin1 N context\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",
@@ -316,9 +289,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "positive ListElement string",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 L 1 bin1 S\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 L 1 bin1 S\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",
@@ -335,9 +306,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "positive mapKey geo2dsphere",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 K 1 bin1 G\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 K 1 bin1 G\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",
@@ -354,9 +323,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "positive mapValue blob",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 V 1 bin1 B\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 V 1 bin1 B\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",
@@ -373,9 +340,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing first space",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("userdata1 testSet1 sindex1 V 1 bin1 B\n")),
-				},
+				reader: newTestCountingReader("userdata1 testSet1 sindex1 V 1 bin1 B\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -383,9 +348,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing space after namespace",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1\n")),
-				},
+				reader: newTestCountingReader(" userdata1\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -393,9 +356,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing space after set",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -403,9 +364,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing space after name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -413,9 +372,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative invalid index type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 Z 1 bin1 B\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 Z 1 bin1 B\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -423,9 +380,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing space after index type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 V\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 V\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -433,9 +388,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing size",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 V  bin1 B\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 V  bin1 B\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -443,9 +396,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing space after size",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("userdata1 testSet1 sindex1 V 1\n")),
-				},
+				reader: newTestCountingReader("userdata1 testSet1 sindex1 V 1\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -453,9 +404,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing space after path name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 V 1 bin1\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 V 1 bin1\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -463,9 +412,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative invalid path type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 V 1 bin1 Z\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 V 1 bin1 Z\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -473,9 +420,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative missing new line",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 V 1 bin1 B")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 V 1 bin1 B"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -483,9 +428,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "negative 0 paths",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" userdata1 testSet1 sindex1 V 0\n")),
-				},
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 V 0\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -536,9 +479,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "positive lua udf",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf 11 lua-content\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf 11 lua-content\n"),
 			},
 			want: &models.UDF{
 				UDFType: models.UDFTypeLUA,
@@ -550,9 +491,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "positive escaped udf name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf\\\n1 14 lua-content\\\n1\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf\\\n1 14 lua-content\\\n1\n"),
 			},
 			want: &models.UDF{
 				UDFType: models.UDFTypeLUA,
@@ -564,9 +503,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing space after udf type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" Llua-udf 11 lua-content\n")),
-				},
+				reader: newTestCountingReader(" Llua-udf 11 lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -574,9 +511,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing space after udf name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf11 lua-content\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf11 lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -584,9 +519,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing length",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf  lua-content\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf  lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -594,9 +527,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing space after length",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf 11lua-content\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf 11lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -604,9 +535,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing content",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf 11 \n")),
-				},
+				reader: newTestCountingReader(" L lua-udf 11 \n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -614,9 +543,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing new line",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf 11 lua-content")),
-				},
+				reader: newTestCountingReader(" L lua-udf 11 lua-content"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -624,9 +551,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing starting space",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("L lua-udf 11 lua-content\n")),
-				},
+				reader: newTestCountingReader("L lua-udf 11 lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -634,9 +559,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative invalid udf type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" Z lua-udf 11 lua-content\n")),
-				},
+				reader: newTestCountingReader(" Z lua-udf 11 lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -644,9 +567,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing space after UDF name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf11 lua-content\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf11 lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -654,9 +575,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative invalid length",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf notanint lua-content\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf notanint lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -664,9 +583,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		{
 			name: "negative missing space after length",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" L lua-udf 11lua-content\n")),
-				},
+				reader: newTestCountingReader(" L lua-udf 11lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -714,9 +631,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive nil bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("N nil-bin\n")),
-				},
+				reader: newTestCountingReader("N nil-bin\n"),
 			},
 			want: map[string]any{
 				"nil-bin": nil,
@@ -726,9 +641,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative nil bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("N nil-bin")),
-				},
+				reader: newTestCountingReader("N nil-bin"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -736,9 +649,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive bool bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Z bool-bin T\n")),
-				},
+				reader: newTestCountingReader("Z bool-bin T\n"),
 			},
 			want: map[string]any{
 				"bool-bin": true,
@@ -748,9 +659,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative bool bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Z bool-bin X\n")),
-				},
+				reader: newTestCountingReader("Z bool-bin X\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -758,9 +667,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive float bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("D float-bin 1.1\n")),
-				},
+				reader: newTestCountingReader("D float-bin 1.1\n"),
 			},
 			want: map[string]any{
 				"float-bin": 1.1,
@@ -770,9 +677,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive float bin with inf",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("D float-bin inf\n")),
-				},
+				reader: newTestCountingReader("D float-bin inf\n"),
 			},
 			want: map[string]any{
 				"float-bin": math.Inf(1),
@@ -782,9 +687,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative float bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("D float-bin notafloat\n")),
-				},
+				reader: newTestCountingReader("D float-bin notafloat\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -792,9 +695,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive int bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I int-bin 1\n")),
-				},
+				reader: newTestCountingReader("I int-bin 1\n"),
 			},
 			want: map[string]any{
 				"int-bin": int64(1),
@@ -804,9 +705,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive int bin with negative value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I int-bin -1\n")),
-				},
+				reader: newTestCountingReader("I int-bin -1\n"),
 			},
 			want: map[string]any{
 				"int-bin": int64(-1),
@@ -816,9 +715,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative int bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I int-bin notanint\n")),
-				},
+				reader: newTestCountingReader("I int-bin notanint\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -826,9 +723,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive string bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("S string-bin 6 string\n")),
-				},
+				reader: newTestCountingReader("S string-bin 6 string\n"),
 			},
 			want: map[string]any{
 				"string-bin": "string",
@@ -838,9 +733,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive string bin with inline delimiter",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("S string-bin 7 str\ning\n")),
-				},
+				reader: newTestCountingReader("S string-bin 7 str\ning\n"),
 			},
 			want: map[string]any{
 				"string-bin": "str\ning",
@@ -850,9 +743,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative string bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("S string-bin 6 asdf\n")),
-				},
+				reader: newTestCountingReader("S string-bin 6 asdf\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -860,13 +751,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive base64 string bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						fmt.Sprintf("X base64-str %d %s\n",
-							base64.StdEncoding.EncodedLen(7),
-							base64.StdEncoding.EncodeToString([]byte("str\ning"))),
-					)),
-				},
+				reader: newTestCountingReader(
+					fmt.Sprintf("X base64-str %d %s\n",
+						base64.StdEncoding.EncodedLen(7),
+						base64.StdEncoding.EncodeToString([]byte("str\ning"))),
+				),
 			},
 			want: map[string]any{
 				"base64-str": "str\ning",
@@ -876,9 +765,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative base64 string bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("X base64-str %d %s\n", 7, "string!"))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("X base64-str %d %s\n", 7, "string!")),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -886,9 +773,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive geoJSON bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("G geojson-bin 36 {\"type\":\"Point\",\"coordinates\":[1,2]}\n")),
-				},
+				reader: newTestCountingReader("G geojson-bin 36 {\"type\":\"Point\",\"coordinates\":[1,2]}\n"),
 			},
 			want: map[string]any{
 				"geojson-bin": a.NewGeoJSONValue("{\"type\":\"Point\",\"coordinates\":[1,2]}"),
@@ -898,9 +783,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative geoJSON bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("G geojson-bin 100 {\"type\":\"Point\",\"coordinates\":[1,2]")),
-				},
+				reader: newTestCountingReader("G geojson-bin 100 {\"type\":\"Point\",\"coordinates\":[1,2]"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -908,13 +791,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive blob bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"B blob-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"B blob-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"blob-bin": []byte{0, 1, 2, '\n'},
@@ -924,9 +805,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive compressed blob bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("B! blob-bin 5 123\n4\n")),
-				},
+				reader: newTestCountingReader("B! blob-bin 5 123\n4\n"),
 			},
 			want: map[string]any{
 				"blob-bin": []byte("123\n4"),
@@ -936,9 +815,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative blob bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("B blob-bin 4123\n")),
-				},
+				reader: newTestCountingReader("B blob-bin 4123\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -946,9 +823,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative compressed blob bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("B! blob-bin 123\n4")),
-				},
+				reader: newTestCountingReader("B! blob-bin 123\n4"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -956,13 +831,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive java bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"J java-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"J java-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"java-bin": []byte{0, 1, 2, '\n'},
@@ -972,13 +845,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive java bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"J java-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"J java-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"java-bin": []byte{0, 1, 2, '\n'},
@@ -988,13 +859,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive c# bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"C c#-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"C c#-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"c#-bin": []byte{0, 1, 2, '\n'},
@@ -1004,13 +873,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive python bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"P python-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"P python-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"python-bin": []byte{0, 1, 2, '\n'},
@@ -1020,13 +887,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive ruby bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						fmt.Sprintf("R ruby-bin %d %s\n",
-							base64.StdEncoding.EncodedLen(4),
-							base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(
+					fmt.Sprintf("R ruby-bin %d %s\n",
+						base64.StdEncoding.EncodedLen(4),
+						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"ruby-bin": []byte{0, 1, 2, '\n'},
@@ -1036,13 +901,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive php bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"H php-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"H php-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"php-bin": []byte{0, 1, 2, '\n'},
@@ -1052,13 +915,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive erlang bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"E erlang-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"E erlang-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"erlang-bin": []byte{0, 1, 2, '\n'},
@@ -1068,13 +929,11 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive HLL bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"Y hll-bin %d %s\n",
-						base64.StdEncoding.EncodedLen(4),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"Y hll-bin %d %s\n",
+					base64.StdEncoding.EncodedLen(4),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2, '\n'})),
+				),
 			},
 			want: map[string]any{
 				"hll-bin": a.NewHLLValue([]byte{0, 1, 2, '\n'}),
@@ -1084,12 +943,10 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative HLL bytes",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"Y hll-bin %d %s\n", base64.StdEncoding.EncodedLen(100),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"Y hll-bin %d %s\n", base64.StdEncoding.EncodedLen(100),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+				),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1097,11 +954,9 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive list bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
-						len(base64.StdEncoding.EncodeToString([]byte("123"))),
-						base64.StdEncoding.EncodeToString([]byte("123"))))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("L list-bin %d %s\n",
+					len(base64.StdEncoding.EncodeToString([]byte("123"))),
+					base64.StdEncoding.EncodeToString([]byte("123")))),
 			},
 			want: map[string]any{
 				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte("123")),
@@ -1111,10 +966,8 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive plain text list bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("L! list-bin %d %s\n",
-						len("123"), []byte("123")))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("L! list-bin %d %s\n",
+					len("123"), []byte("123"))),
 			},
 			want: map[string]any{
 				"list-bin": a.NewRawBlobValue(particleType.LIST, []byte("123")),
@@ -1124,10 +977,8 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative list bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("L list-bin %d %s\n",
-						500, "123"))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("L list-bin %d %s\n",
+					500, "123")),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1135,11 +986,9 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive map bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
-						len(base64.StdEncoding.EncodeToString([]byte("123"))),
-						base64.StdEncoding.EncodeToString([]byte("123"))))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("M map-bin %d %s\n",
+					len(base64.StdEncoding.EncodeToString([]byte("123"))),
+					base64.StdEncoding.EncodeToString([]byte("123")))),
 			},
 			want: map[string]any{
 				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte("123")),
@@ -1149,10 +998,8 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive plain text map bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("M! map-bin %d %s\n",
-						len("123"), "123"))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("M! map-bin %d %s\n",
+					len("123"), "123")),
 			},
 			want: map[string]any{
 				"map-bin": a.NewRawBlobValue(particleType.MAP, []byte("123")),
@@ -1162,10 +1009,8 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative map bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("M map-bin %d %s\n",
-						500, "abcd"))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("M map-bin %d %s\n",
+					500, "abcd")),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1173,9 +1018,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "positive escaped bin name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("S escaped-bin\\\n 6 string\n")),
-				},
+				reader: newTestCountingReader("S escaped-bin\\\n 6 string\n"),
 			},
 			want: map[string]any{
 				"escaped-bin\n": "string",
@@ -1185,9 +1028,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative missing space after bin type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Nnil-bin\n")),
-				},
+				reader: newTestCountingReader("Nnil-bin\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1195,9 +1036,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative bad end char after bin name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("N nil-bin|")),
-				},
+				reader: newTestCountingReader("N nil-bin|"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1205,9 +1044,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative missing space after bin name",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I int-bin\n")),
-				},
+				reader: newTestCountingReader("I int-bin\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1215,9 +1052,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative missing line feed after int bin value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I int-bin 1")),
-				},
+				reader: newTestCountingReader("I int-bin 1"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1225,9 +1060,7 @@ func TestASBReader_readBin(t *testing.T) {
 		{
 			name: "negative LDT bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("U ldt-bin 1\n")),
-				},
+				reader: newTestCountingReader("U ldt-bin 1\n"),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -1279,9 +1112,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "positive int key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I 1\n")),
-				},
+				reader: newTestCountingReader("I 1\n"),
 			},
 			want:    int64(1),
 			wantErr: false,
@@ -1289,9 +1120,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "positive float key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("D 1.1\n")),
-				},
+				reader: newTestCountingReader("D 1.1\n"),
 			},
 			want:    1.1,
 			wantErr: false,
@@ -1299,9 +1128,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "positive string key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("S 6 string\n")),
-				},
+				reader: newTestCountingReader("S 6 string\n"),
 			},
 			want:    "string",
 			wantErr: false,
@@ -1309,13 +1136,11 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "positive base64 string key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"X %d %s\n",
-						base64.StdEncoding.EncodedLen(6),
-						base64.StdEncoding.EncodeToString([]byte("string"))),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"X %d %s\n",
+					base64.StdEncoding.EncodedLen(6),
+					base64.StdEncoding.EncodeToString([]byte("string"))),
+				),
 			},
 			want:    "string",
 			wantErr: false,
@@ -1323,12 +1148,10 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "positive blob key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"B %d %s\n", base64.StdEncoding.EncodedLen(3),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"B %d %s\n", base64.StdEncoding.EncodedLen(3),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+				),
 			},
 			want:    []byte{0, 1, 2},
 			wantErr: false,
@@ -1336,9 +1159,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "positive compressed blob key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("B! 3 123\n")),
-				},
+				reader: newTestCountingReader("B! 3 123\n"),
 			},
 			want:    []byte("123"),
 			wantErr: false,
@@ -1346,9 +1167,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative bad key type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("Z 1\n")),
-				},
+				reader: newTestCountingReader("Z 1\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1356,9 +1175,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing space after key type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I1\n")),
-				},
+				reader: newTestCountingReader("I1\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1366,9 +1183,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing space after !",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("B!3 123\n")),
-				},
+				reader: newTestCountingReader("B!3 123\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1376,9 +1191,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing line feed after int key value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I 1")),
-				},
+				reader: newTestCountingReader("I 1"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1386,9 +1199,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing line feed after float key value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("D 1.1")),
-				},
+				reader: newTestCountingReader("D 1.1"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1396,9 +1207,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing line feed after string key value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("S 6 string")),
-				},
+				reader: newTestCountingReader("S 6 string"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1406,13 +1215,11 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing line feed after base64 string key value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"X %d %s",
-						base64.StdEncoding.EncodedLen(6),
-						base64.StdEncoding.EncodeToString([]byte("string"))),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"X %d %s",
+					base64.StdEncoding.EncodedLen(6),
+					base64.StdEncoding.EncodeToString([]byte("string"))),
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1420,13 +1227,11 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing line feed after blob key value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"B %d %s",
-						base64.StdEncoding.EncodedLen(3),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"B %d %s",
+					base64.StdEncoding.EncodedLen(3),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1434,9 +1239,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing line feed after compressed blob key value",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("B! 3 123")),
-				},
+				reader: newTestCountingReader("B! 3 123"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1444,9 +1247,7 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing space after string size",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("S 6string\n")),
-				},
+				reader: newTestCountingReader("S 6string\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1454,12 +1255,10 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing space after base64 string size",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"X %d%s\n", base64.StdEncoding.EncodedLen(6),
-						base64.StdEncoding.EncodeToString([]byte("string"))),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"X %d%s\n", base64.StdEncoding.EncodedLen(6),
+					base64.StdEncoding.EncodeToString([]byte("string"))),
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1467,13 +1266,11 @@ func TestASBReader_readKey(t *testing.T) {
 		{
 			name: "negative missing space after blob size",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf(
-						"B %d%s\n",
-						base64.StdEncoding.EncodedLen(3),
-						base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
-					)),
-				},
+				reader: newTestCountingReader(fmt.Sprintf(
+					"B %d%s\n",
+					base64.StdEncoding.EncodedLen(3),
+					base64.StdEncoding.EncodeToString([]byte{0, 1, 2})),
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1541,19 +1338,17 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "positive key and set",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want: &models.Record{
 				Record: &a.Record{
@@ -1571,18 +1366,16 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "positive set and no key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want: &models.Record{
 				Record: &a.Record{
@@ -1600,17 +1393,15 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "positive no set and no key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want: &models.Record{
 				Record: &a.Record{
@@ -1628,17 +1419,15 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative bad starting char",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"x n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"x n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1646,17 +1435,15 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing starting char",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1664,17 +1451,15 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing space after starting char",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1682,17 +1467,15 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative invalid record line type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ Z namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ Z namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1700,19 +1483,17 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing space after record line type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ kI 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ kI 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1720,18 +1501,16 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing namespace",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1739,18 +1518,16 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing digest",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1758,18 +1535,16 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing generation",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1777,37 +1552,33 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing expiration",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
 		},
 		{
-			name: "negative missing bin count",
+			name: "negative missing bin offset",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1815,17 +1586,15 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative missing bins",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1833,19 +1602,17 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative bad user key",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k P hehe\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k P hehe\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1853,19 +1620,17 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative bad namespace",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n " + overMaxASBToken + "\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n " + overMaxASBToken + "\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1873,19 +1638,17 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative bad digest",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + overMaxASBToken + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + overMaxASBToken + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1893,19 +1656,17 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative bad set",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s " + overMaxASBToken + "\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s " + overMaxASBToken + "\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1913,19 +1674,17 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative bad generation",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g " + "notanint" + "\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g " + "notanint" + "\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -1933,39 +1692,35 @@ func TestASBReader_readRecord(t *testing.T) {
 		{
 			name: "negative bad expiration",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 999999999999999999999999999999999999\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 999999999999999999999999999999999999\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
 		},
 		{
-			name: "negative bad bin count",
+			name: "negative bad bin offset",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 9999999999999999999999999999999999\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 9999999999999999999999999999999999\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -2006,51 +1761,41 @@ func TestASBReader_readBinCount(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "positive bin count",
+			name: "positive bin offset",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("2\n")),
-				},
+				reader: newTestCountingReader("2\n"),
 			},
 			want:    2,
 			wantErr: false,
 		},
 		{
-			name: "negative bad bin count",
+			name: "negative bad bin offset",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint\n")),
-				},
+				reader: newTestCountingReader("notanint\n"),
 			},
 			want:    0,
 			wantErr: true,
 		},
 		{
-			name: "negative missing line feed after bin count",
+			name: "negative missing line feed after bin offset",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("2")),
-				},
+				reader: newTestCountingReader("2"),
 			},
 			want:    0,
 			wantErr: true,
 		},
 		{
-			name: "negative bin count less than 0",
+			name: "negative bin offset less than 0",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("-1\n")),
-				},
+				reader: newTestCountingReader("-1\n"),
 			},
 			want:    0,
 			wantErr: true,
 		},
 		{
-			name: "negative bin count greater than max",
+			name: "negative bin offset greater than max",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("%d\n", maxBinCount+1))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("%d\n", maxBinCount+1)),
 			},
 			want:    0,
 			wantErr: true,
@@ -2092,9 +1837,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 		{
 			name: "positive expiration",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("10\n")),
-				},
+				reader: newTestCountingReader("10\n"),
 			},
 			want:    10,
 			wantErr: false,
@@ -2102,9 +1845,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 		{
 			name: "positive no expiration",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("0\n")),
-				},
+				reader: newTestCountingReader("0\n"),
 			},
 			want:    0,
 			wantErr: false,
@@ -2112,9 +1853,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 		{
 			name: "negative bad expiration",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint\n")),
-				},
+				reader: newTestCountingReader("notanint\n"),
 			},
 			want:    0,
 			wantErr: true,
@@ -2122,9 +1861,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 		{
 			name: "negative missing line feed after expiration",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("10")),
-				},
+				reader: newTestCountingReader("10"),
 			},
 			want:    0,
 			wantErr: true,
@@ -2166,9 +1903,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 		{
 			name: "positive generation",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("10\n")),
-				},
+				reader: newTestCountingReader("10\n"),
 			},
 			want:    10,
 			wantErr: false,
@@ -2176,9 +1911,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 		{
 			name: "negative bad generation",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint\n")),
-				},
+				reader: newTestCountingReader("notanint\n"),
 			},
 			want:    0,
 			wantErr: true,
@@ -2186,9 +1919,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 		{
 			name: "negative missing line feed after generation",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("10")),
-				},
+				reader: newTestCountingReader("10"),
 			},
 			want:    0,
 			wantErr: true,
@@ -2196,9 +1927,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 		{
 			name: "negative generation less than 0",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("-1\n")),
-				},
+				reader: newTestCountingReader("-1\n"),
 			},
 			want:    0,
 			wantErr: true,
@@ -2206,9 +1935,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 		{
 			name: "negative generation greater than max",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("%d\n", maxGeneration+1))),
-				},
+				reader: newTestCountingReader(fmt.Sprintf("%d\n", maxGeneration+1)),
 			},
 			want:    0,
 			wantErr: true,
@@ -2250,9 +1977,7 @@ func TestASBReader_readSet(t *testing.T) {
 		{
 			name: "positive set",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("set1\n")),
-				},
+				reader: newTestCountingReader("set1\n"),
 			},
 			want:    "set1",
 			wantErr: false,
@@ -2260,9 +1985,7 @@ func TestASBReader_readSet(t *testing.T) {
 		{
 			name: "negative missing line feed after set",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("set1")),
-				},
+				reader: newTestCountingReader("set1"),
 			},
 			want:    "",
 			wantErr: true,
@@ -2270,9 +1993,7 @@ func TestASBReader_readSet(t *testing.T) {
 		{
 			name: "negative set too long",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(strings.Repeat("a", maxTokenSize+1) + "\n")),
-				},
+				reader: newTestCountingReader(strings.Repeat("a", maxTokenSize+1) + "\n"),
 			},
 			want:    "",
 			wantErr: true,
@@ -2317,9 +2038,7 @@ func TestASBReader_readDigest(t *testing.T) {
 		{
 			name: "positive digest",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(encodedDigest + "\n")),
-				},
+				reader: newTestCountingReader(encodedDigest + "\n"),
 			},
 			want:    digest,
 			wantErr: false,
@@ -2327,9 +2046,7 @@ func TestASBReader_readDigest(t *testing.T) {
 		{
 			name: "negative bad digest",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notabase64string!\n")),
-				},
+				reader: newTestCountingReader("notabase64string!\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -2337,9 +2054,7 @@ func TestASBReader_readDigest(t *testing.T) {
 		{
 			name: "negative missing line feed after digest",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(encodedDigest)),
-				},
+				reader: newTestCountingReader(encodedDigest),
 			},
 			want:    nil,
 			wantErr: true,
@@ -2383,9 +2098,8 @@ func Test_readBase64BytesDelimited(t *testing.T) {
 		{
 			name: "positive base64 string",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(encodedStr + "\n")),
-				},
+				src: newTestCountingReader(encodedStr + "\n"),
+
 				delim: '\n',
 			},
 			want:    []byte(str),
@@ -2394,9 +2108,8 @@ func Test_readBase64BytesDelimited(t *testing.T) {
 		{
 			name: "negative bad base64 string",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notabase64string!\n")),
-				},
+				src: newTestCountingReader("notabase64string!\n"),
+
 				delim: '\n',
 			},
 			want:    nil,
@@ -2405,9 +2118,8 @@ func Test_readBase64BytesDelimited(t *testing.T) {
 		{
 			name: "negative missing delimiter after base64 string",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(encodedStr)),
-				},
+				src: newTestCountingReader(encodedStr),
+
 				delim: '\n',
 			},
 			want:    nil,
@@ -2448,9 +2160,8 @@ func Test_readBase64BytesSized(t *testing.T) {
 		{
 			name: "positive base64 string",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("%d %s", len(encodedStr), encodedStr))),
-				},
+				src: newTestCountingReader(fmt.Sprintf("%d %s", len(encodedStr), encodedStr)),
+
 				sizeDelim: ' ',
 			},
 			want:    []byte(str),
@@ -2459,9 +2170,8 @@ func Test_readBase64BytesSized(t *testing.T) {
 		{
 			name: "negative bad size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint " + encodedStr)),
-				},
+				src: newTestCountingReader("notanint " + encodedStr),
+
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -2470,10 +2180,7 @@ func Test_readBase64BytesSized(t *testing.T) {
 		{
 			name: "negative bad base64 string",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(
-						strings.NewReader(fmt.Sprintf("%d notabase64string!", len("notabase64string!")))),
-				},
+				src:       newTestCountingReader(fmt.Sprintf("%d notabase64string!", len("notabase64string!"))),
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -2482,9 +2189,7 @@ func Test_readBase64BytesSized(t *testing.T) {
 		{
 			name: "negative missing space after size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("%d%s", len(encodedStr), encodedStr))),
-				},
+				src:       newTestCountingReader(fmt.Sprintf("%d%s", len(encodedStr), encodedStr)),
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -2568,9 +2273,8 @@ func Test_readStringSized(t *testing.T) {
 		{
 			name: "positive string",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("6 string")),
-				},
+				src: newTestCountingReader("6 string"),
+
 				sizeDelim: ' ',
 			},
 			want:    "string",
@@ -2579,9 +2283,8 @@ func Test_readStringSized(t *testing.T) {
 		{
 			name: "negative bad size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint string")),
-				},
+				src: newTestCountingReader("notanint string"),
+
 				sizeDelim: ' ',
 			},
 			want:    "",
@@ -2590,9 +2293,8 @@ func Test_readStringSized(t *testing.T) {
 		{
 			name: "negative missing size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				sizeDelim: ' ',
 			},
 			want:    "",
@@ -2601,9 +2303,8 @@ func Test_readStringSized(t *testing.T) {
 		{
 			name: "negative missing space after size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("6string")),
-				},
+				src: newTestCountingReader("6string"),
+
 				sizeDelim: ' ',
 			},
 			want:    "",
@@ -2612,9 +2313,8 @@ func Test_readStringSized(t *testing.T) {
 		{
 			name: "negative missing string",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("6 ")),
-				},
+				src: newTestCountingReader("6 "),
+
 				sizeDelim: ' ',
 			},
 			want:    "",
@@ -2651,9 +2351,8 @@ func Test_readBytesSized(t *testing.T) {
 		{
 			name: "positive bytes",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("6 string")),
-				},
+				src: newTestCountingReader("6 string"),
+
 				sizeDelim: ' ',
 			},
 			want:    []byte("string"),
@@ -2662,9 +2361,8 @@ func Test_readBytesSized(t *testing.T) {
 		{
 			name: "negative bad size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint string")),
-				},
+				src: newTestCountingReader("notanint string"),
+
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -2673,9 +2371,8 @@ func Test_readBytesSized(t *testing.T) {
 		{
 			name: "negative missing size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -2684,9 +2381,8 @@ func Test_readBytesSized(t *testing.T) {
 		{
 			name: "negative missing space after size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("6string")),
-				},
+				src: newTestCountingReader("6string"),
+
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -2695,9 +2391,8 @@ func Test_readBytesSized(t *testing.T) {
 		{
 			name: "negative missing bytes",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("6 ")),
-				},
+				src: newTestCountingReader("6 "),
+
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -2733,9 +2428,7 @@ func Test_readBool(t *testing.T) {
 		{
 			name: "positive true",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("T")),
-				},
+				src: newTestCountingReader("T"),
 			},
 			want:    true,
 			wantErr: false,
@@ -2743,9 +2436,7 @@ func Test_readBool(t *testing.T) {
 		{
 			name: "positive false",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("F")),
-				},
+				src: newTestCountingReader("F"),
 			},
 			want:    false,
 			wantErr: false,
@@ -2753,9 +2444,7 @@ func Test_readBool(t *testing.T) {
 		{
 			name: "negative bad bool char",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("X")),
-				},
+				src: newTestCountingReader("X"),
 			},
 			want:    false,
 			wantErr: true,
@@ -2763,9 +2452,7 @@ func Test_readBool(t *testing.T) {
 		{
 			name: "negative missing bool",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
+				src: newTestCountingReader(""),
 			},
 			want:    false,
 			wantErr: true,
@@ -2801,9 +2488,8 @@ func Test_readFloat(t *testing.T) {
 		{
 			name: "positive float",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("1.2345\n")),
-				},
+				src: newTestCountingReader("1.2345\n"),
+
 				delim: '\n',
 			},
 			want:    1.2345,
@@ -2812,9 +2498,8 @@ func Test_readFloat(t *testing.T) {
 		{
 			name: "negative bad float",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notafloat\n")),
-				},
+				src: newTestCountingReader("notafloat\n"),
+
 				delim: '\n',
 			},
 			want:    0,
@@ -2823,9 +2508,8 @@ func Test_readFloat(t *testing.T) {
 		{
 			name: "negative missing delimiter after float",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("1.2345")),
-				},
+				src: newTestCountingReader("1.2345"),
+
 				delim: '\n',
 			},
 			want:    0,
@@ -2862,9 +2546,8 @@ func Test_readInteger(t *testing.T) {
 		{
 			name: "positive int",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("12345\n")),
-				},
+				src: newTestCountingReader("12345\n"),
+
 				delim: '\n',
 			},
 			want:    12345,
@@ -2873,9 +2556,8 @@ func Test_readInteger(t *testing.T) {
 		{
 			name: "negative bad int",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint\n")),
-				},
+				src: newTestCountingReader("notanint\n"),
+
 				delim: '\n',
 			},
 			want:    0,
@@ -2884,9 +2566,8 @@ func Test_readInteger(t *testing.T) {
 		{
 			name: "negative missing delimiter after int",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("12345")),
-				},
+				src: newTestCountingReader("12345"),
+
 				delim: '\n',
 			},
 			want:    0,
@@ -2923,9 +2604,8 @@ func Test_readSize(t *testing.T) {
 		{
 			name: "positive size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("12345\n")),
-				},
+				src: newTestCountingReader("12345\n"),
+
 				delim: '\n',
 			},
 			want:    12345,
@@ -2934,9 +2614,8 @@ func Test_readSize(t *testing.T) {
 		{
 			name: "negative bad size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint\n")),
-				},
+				src: newTestCountingReader("notanint\n"),
+
 				delim: '\n',
 			},
 			want:    0,
@@ -2945,9 +2624,8 @@ func Test_readSize(t *testing.T) {
 		{
 			name: "negative missing delimiter after size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("12345")),
-				},
+				src: newTestCountingReader("12345"),
+
 				delim: '\n',
 			},
 			want:    0,
@@ -2956,9 +2634,8 @@ func Test_readSize(t *testing.T) {
 		{
 			name: "negative size less than 0",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("-1\n")),
-				},
+				src: newTestCountingReader("-1\n"),
+
 				delim: '\n',
 			},
 			want:    0,
@@ -2967,9 +2644,8 @@ func Test_readSize(t *testing.T) {
 		{
 			name: "negative size greater than max",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(fmt.Sprintf("%d\n", math.MaxUint32+1))),
-				},
+				src: newTestCountingReader(fmt.Sprintf("%d\n", math.MaxUint32+1)),
+
 				delim: '\n',
 			},
 			want:    math.MaxUint32,
@@ -3007,9 +2683,8 @@ func Test_readUntil(t *testing.T) {
 		{
 			name: "positive read until",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string\n")),
-				},
+				src: newTestCountingReader("string\n"),
+
 				delim:   '\n',
 				escaped: false,
 			},
@@ -3019,9 +2694,8 @@ func Test_readUntil(t *testing.T) {
 		{
 			name: "positive read until escaped",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("str\\\ning\n")),
-				},
+				src: newTestCountingReader("str\\\ning\n"),
+
 				delim:   '\n',
 				escaped: true,
 			},
@@ -3031,9 +2705,8 @@ func Test_readUntil(t *testing.T) {
 		{
 			name: "positive read until unescaped control chars",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("str\\\ning\n")),
-				},
+				src: newTestCountingReader("str\\\ning\n"),
+
 				delim:   '\n',
 				escaped: false,
 			},
@@ -3043,9 +2716,8 @@ func Test_readUntil(t *testing.T) {
 		{
 			name: "negative no delimiter",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				delim:   '\n',
 				escaped: false,
 			},
@@ -3084,9 +2756,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string\n")),
-				},
+				src: newTestCountingReader("string\n"),
+
 				delims:  []byte{'\n'},
 				escaped: false,
 			},
@@ -3096,9 +2767,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "positive escaped",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("str\\ing\n")),
-				},
+				src: newTestCountingReader("str\\ing\n"),
+
 				delims:  []byte{'\n'},
 				escaped: true,
 			},
@@ -3108,9 +2778,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "positive escaped delimiter",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("str\\\ning\n")),
-				},
+				src: newTestCountingReader("str\\\ning\n"),
+
 				delims:  []byte{'\n'},
 				escaped: true,
 			},
@@ -3120,9 +2789,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "positive multiple delimiters",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("strHing\n")),
-				},
+				src: newTestCountingReader("strHing\n"),
+
 				delims:  []byte{'\n', 'H'},
 				escaped: false,
 			},
@@ -3132,9 +2800,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "positive multiple escaped delimiters",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("str\\Hing\n")),
-				},
+				src: newTestCountingReader("str\\Hing\n"),
+
 				delims:  []byte{'\n', 'H'},
 				escaped: true,
 			},
@@ -3144,9 +2811,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "positive unescaped delimiter mid input",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("strHing\n")),
-				},
+				src: newTestCountingReader("strHing\n"),
+
 				delims:  []byte{'H'},
 				escaped: false,
 			},
@@ -3156,9 +2822,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "negative empty delimiter list",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string\n")),
-				},
+				src: newTestCountingReader("string\n"),
+
 				delims:  []byte{},
 				escaped: false,
 			},
@@ -3168,9 +2833,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "negative no delimiter",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				delims:  []byte{'\n'},
 				escaped: false,
 			},
@@ -3180,9 +2844,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "negative no delimiter escaped",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string\\\n")),
-				},
+				src: newTestCountingReader("string\\\n"),
+
 				delims:  []byte{'\n'},
 				escaped: true,
 			},
@@ -3192,9 +2855,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "negative token too long",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(strings.Repeat("a", maxTokenSize+1) + "\n")),
-				},
+				src: newTestCountingReader(strings.Repeat("a", maxTokenSize+1) + "\n"),
+
 				delims:  []byte{'\n'},
 				escaped: false,
 			},
@@ -3204,9 +2866,8 @@ func Test_readUntilAny(t *testing.T) {
 		{
 			name: "negative input empty",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
+				src: newTestCountingReader(""),
+
 				delims:  []byte{'\n'},
 				escaped: false,
 			},
@@ -3243,10 +2904,8 @@ func Test_readNBytes(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
-				n: 6,
+				src: newTestCountingReader("string"),
+				n:   6,
 			},
 			want:    []byte("string"),
 			wantErr: false,
@@ -3254,10 +2913,8 @@ func Test_readNBytes(t *testing.T) {
 		{
 			name: "positive read 0 bytes",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
-				n: 0,
+				src: newTestCountingReader("string"),
+				n:   0,
 			},
 			want:    []byte{},
 			wantErr: false,
@@ -3265,10 +2922,8 @@ func Test_readNBytes(t *testing.T) {
 		{
 			name: "negative n greater than input (EOF)",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
-				n: 7,
+				src: newTestCountingReader("string"),
+				n:   7,
 			},
 			want:    nil,
 			wantErr: true,
@@ -3303,30 +2958,24 @@ func Test_expectChar(t *testing.T) {
 		{
 			name: "positive expected char",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
-				c: 's',
+				src: newTestCountingReader("string"),
+				c:   's',
 			},
 			wantErr: false,
 		},
 		{
 			name: "negative unexpected char",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
-				c: 'x',
+				src: newTestCountingReader("string"),
+				c:   'x',
 			},
 			wantErr: true,
 		},
 		{
 			name: "negative EOF",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
-				c: 'x',
+				src: newTestCountingReader(""),
+				c:   'x',
 			},
 			wantErr: true,
 		},
@@ -3355,9 +3004,8 @@ func Test_expectAnyChar(t *testing.T) {
 		{
 			name: "positive expected char",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				chars: []byte{'s'},
 			},
 			wantErr: false,
@@ -3365,9 +3013,8 @@ func Test_expectAnyChar(t *testing.T) {
 		{
 			name: "positive multiple possible expected chars",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				chars: []byte{'t', 's'},
 			},
 			wantErr: false,
@@ -3375,9 +3022,8 @@ func Test_expectAnyChar(t *testing.T) {
 		{
 			name: "negative unexpected char",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				chars: []byte{'x'},
 			},
 			wantErr: true,
@@ -3385,9 +3031,8 @@ func Test_expectAnyChar(t *testing.T) {
 		{
 			name: "negative unexpected char in multiple possible expected chars",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				chars: []byte{'x', 'y'},
 			},
 			wantErr: true,
@@ -3395,9 +3040,8 @@ func Test_expectAnyChar(t *testing.T) {
 		{
 			name: "negative EOF",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
+				src: newTestCountingReader(""),
+
 				chars: []byte{'x'},
 			},
 			wantErr: true,
@@ -3427,9 +3071,8 @@ func Test_expectToken(t *testing.T) {
 		{
 			name: "positive expected token",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				token: "string",
 			},
 			wantErr: false,
@@ -3437,9 +3080,8 @@ func Test_expectToken(t *testing.T) {
 		{
 			name: "negative unexpected token",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
+
 				token: "x",
 			},
 			wantErr: true,
@@ -3447,9 +3089,8 @@ func Test_expectToken(t *testing.T) {
 		{
 			name: "negative EOF",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
+				src: newTestCountingReader(""),
+
 				token: "x",
 			},
 			wantErr: true,
@@ -3479,9 +3120,7 @@ func Test_peek(t *testing.T) {
 		{
 			name: "positive peek",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("string")),
-				},
+				src: newTestCountingReader("string"),
 			},
 			want:    's',
 			wantErr: false,
@@ -3489,9 +3128,7 @@ func Test_peek(t *testing.T) {
 		{
 			name: "negative EOF",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
+				src: newTestCountingReader(""),
 			},
 			want:    0,
 			wantErr: true,
@@ -3532,9 +3169,7 @@ func TestASBReader_readBins(t *testing.T) {
 		{
 			name: "positive single bin",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("- I bi\\\nn1 20\n")),
-				},
+				reader: newTestCountingReader("- I bi\\\nn1 20\n"),
 			},
 			args: args{
 				count: 1,
@@ -3547,9 +3182,7 @@ func TestASBReader_readBins(t *testing.T) {
 		{
 			name: "positive multiple bins",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("- I bin1 20\n- I bin2 30\n")),
-				},
+				reader: newTestCountingReader("- I bin1 20\n- I bin2 30\n"),
 			},
 			args: args{
 				count: 2,
@@ -3563,9 +3196,7 @@ func TestASBReader_readBins(t *testing.T) {
 		{
 			name: "positive 0 bins",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
+				reader: newTestCountingReader(""),
 			},
 			args: args{
 				count: 0,
@@ -3576,9 +3207,7 @@ func TestASBReader_readBins(t *testing.T) {
 		{
 			name: "negative missing bin line start character",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("I bin1 20\n")),
-				},
+				reader: newTestCountingReader("I bin1 20\n"),
 			},
 			args: args{
 				count: 1,
@@ -3589,9 +3218,7 @@ func TestASBReader_readBins(t *testing.T) {
 		{
 			name: "negative missing space after start character",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("-I bin1 20\n")),
-				},
+				reader: newTestCountingReader("-I bin1 20\n"),
 			},
 			args: args{
 				count: 1,
@@ -3602,9 +3229,7 @@ func TestASBReader_readBins(t *testing.T) {
 		{
 			name: "negative bad bins",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("- I bin1 20\n- I bin2 notanint\n")),
-				},
+				reader: newTestCountingReader("- I bin1 20\n- I bin2 notanint\n"),
 			},
 			args: args{
 				count: 2,
@@ -3648,9 +3273,8 @@ func Test_readGeoJSON(t *testing.T) {
 		{
 			name: "positive geojson",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("36 {\"type\":\"Point\",\"coordinates\":[1,2]}")),
-				},
+				src: newTestCountingReader("36 {\"type\":\"Point\",\"coordinates\":[1,2]}"),
+
 				sizeDelim: ' ',
 			},
 			want:    "{\"type\":\"Point\",\"coordinates\":[1,2]}",
@@ -3659,9 +3283,8 @@ func Test_readGeoJSON(t *testing.T) {
 		{
 			name: "negative bad size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint {\"type\":\"Point\",\"coordinates\":[1,2]}")),
-				},
+				src: newTestCountingReader("notanint {\"type\":\"Point\",\"coordinates\":[1,2]}"),
+
 				sizeDelim: ' ',
 			},
 			want:    "",
@@ -3698,9 +3321,8 @@ func Test_readHLL(t *testing.T) {
 		{
 			name: "positive hll",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("6 string")),
-				},
+				src: newTestCountingReader("6 string"),
+
 				sizeDelim: ' ',
 			},
 			want:    a.NewHLLValue([]byte("string")),
@@ -3709,9 +3331,8 @@ func Test_readHLL(t *testing.T) {
 		{
 			name: "negative bad size",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("notanint string")),
-				},
+				src: newTestCountingReader("notanint string"),
+
 				sizeDelim: ' ',
 			},
 			want:    nil,
@@ -3749,9 +3370,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 		{
 			name: "positive sindex",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("* i userdata1 testSet1 sindex1 N 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader("* i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",
@@ -3768,9 +3387,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 		{
 			name: "positive UDF",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("* u L lua-udf 11 lua-content\n")),
-				},
+				reader: newTestCountingReader("* u L lua-udf 11 lua-content\n"),
 			},
 			want: &models.UDF{
 				UDFType: models.UDFTypeLUA,
@@ -3782,9 +3399,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 		{
 			name: "negative missing start char",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(" i userdata1 testSet1 sindex1 N 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader(" i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3792,9 +3407,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 		{
 			name: "negative missing space after start char",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("*i userdata1 testSet1 sindex1 N 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader("*i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3802,9 +3415,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 		{
 			name: "negative bad type",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("* x userdata1 testSet1 sindex1 N 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader("* x userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3812,9 +3423,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 		{
 			name: "negative bad sindex",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("* i userdata1 testSet1 sindex1 X 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader("* i userdata1 testSet1 sindex1 X 1 bin1 N\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3822,9 +3431,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 		{
 			name: "negative bad udf",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("* u X lua-udf 11 lua-content\n")),
-				},
+				reader: newTestCountingReader("* u X lua-udf 11 lua-content\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3874,9 +3481,7 @@ func TestASBReader_NextToken(t *testing.T) {
 		{
 			name: "positive global line",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("* i userdata1 testSet1 sindex1 N 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader("* i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
 			want: models.NewSIndexToken(&models.SIndex{
 				Namespace: "userdata1",
@@ -3893,19 +3498,17 @@ func TestASBReader_NextToken(t *testing.T) {
 		{
 			name: "positive record line",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"+ k I 10\n" +
-							"+ n namespace1\n" +
-							"+ d " + encodedDigest + "\n" +
-							"+ s set1\n" +
-							"+ g 10\n" +
-							"+ t 10\n" +
-							"+ b 2\n" +
-							"- N bin1\n" +
-							"- I bin2 2\n",
-					)),
-				},
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
 			},
 			want: models.NewRecordToken(&models.Record{
 				Record: &a.Record{
@@ -3922,9 +3525,7 @@ func TestASBReader_NextToken(t *testing.T) {
 		{
 			name: "negative EOF",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("")),
-				},
+				reader: newTestCountingReader(""),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3932,9 +3533,7 @@ func TestASBReader_NextToken(t *testing.T) {
 		{
 			name: "negative bad record line",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("+ k I 10\n")),
-				},
+				reader: newTestCountingReader("+ k I 10\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3942,9 +3541,7 @@ func TestASBReader_NextToken(t *testing.T) {
 		{
 			name: "negative bad global line",
 			fields: fields{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader("* i userdata1 testSet1 sindex1 X 1 bin1 N\n")),
-				},
+				reader: newTestCountingReader("* i userdata1 testSet1 sindex1 X 1 bin1 N\n"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -3984,22 +3581,18 @@ func TestNewASBReader(t *testing.T) {
 		{
 			name: "positive",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"Version 3.1\n" +
-							"# namespace ns1\n" +
-							"# first-file\na", // "a" appended to avoid EOF error
-					)),
-				},
+				src: newTestCountingReader(
+					"Version 3.1\n" +
+						"# namespace ns1\n" +
+						"# first-file\na", // "a" appended to avoid EOF error
+				),
 			},
 			want: &Decoder[*models.Token]{
-				reader: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"Version 3.1\n" +
-							"# namespace ns1\n" +
-							"# first-file\na", // "a" appended to avoid EOF error
-					)),
-				},
+				reader: newTestCountingReader(
+					"Version 3.1\n" +
+						"# namespace ns1\n" +
+						"# first-file\na", // "a" appended to avoid EOF error
+				),
 				header: &header{
 					Version: "3.1",
 				},
@@ -4013,12 +3606,10 @@ func TestNewASBReader(t *testing.T) {
 		{
 			name: "negative missing version",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"# namespace ns1\n" +
-							"# first-file\na", // "a" appended to avoid EOF error
-					)),
-				},
+				src: newTestCountingReader(
+					"# namespace ns1\n" +
+						"# first-file\na", // "a" appended to avoid EOF error
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -4026,12 +3617,10 @@ func TestNewASBReader(t *testing.T) {
 		{
 			name: "negative bad metadata",
 			args: args{
-				src: &countingReader{
-					Reader: bufio.NewReader(strings.NewReader(
-						"Version 3.1\n" +
-							"# badtoken\na", // "a" appended to avoid EOF error
-					)),
-				},
+				src: newTestCountingReader(
+					"Version 3.1\n" +
+						"# badtoken\na", // "a" appended to avoid EOF error
+				),
 			},
 			want:    nil,
 			wantErr: true,
@@ -4040,7 +3629,7 @@ func TestNewASBReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := NewDecoder[*models.Token](tt.args.src)
+			got, err := NewDecoder[*models.Token](tt.args.src, testFileName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)
 				return

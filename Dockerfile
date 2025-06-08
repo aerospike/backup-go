@@ -41,8 +41,6 @@ COPY --chown=nonroot:65532 --chmod=0755 --from=builder \
     /usr/bin/asbackup
 
 
-ENV MODE=backup
-
 RUN <<-EOF
 	#!/bin/sh
 	set -e
@@ -51,18 +49,7 @@ RUN <<-EOF
 	#!/bin/sh
 	set -e
 
-	case "$MODE" in
-		backup)
-			exec /usr/bin/asbackup "\$@"
-			;;
-		restore)
-			exec /usr/bin/asrestore "\$@"
-			;;
-		*)
-			echo "Unknown MODE: $MODE" >&2
-			exit 1
-			;;
-	esac
+    exec "$@"
 	SCRIPT
 
 	chmod 0755 /usr/bin/entrypoint.sh
@@ -70,4 +57,4 @@ RUN <<-EOF
 EOF
 
 USER nonroot
-ENTRYPOINT ["sh", "-c", "/usr/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/entrypoint.sh"]

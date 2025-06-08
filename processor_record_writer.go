@@ -68,7 +68,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 
 	// If we need only validation, we create empty writers.
 	if rw.config.ValidateOnly {
-		return newDiscardWriters[T](parallelism), nil
+		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
 	}
 
 	useBatchWrites, err := rw.useBatchWrites()
@@ -121,10 +121,14 @@ func (w *discardWriter[T]) Close() error {
 }
 
 // newDiscardWriters creates a slice of empty writers.
-func newDiscardWriters[T models.TokenConstraint](parallelism int) []pipe.Writer[T] {
+func newDiscardWriters[T models.TokenConstraint](
+	parallelism int,
+	stats statsSetterToken,
+	logger *slog.Logger,
+) []pipe.Writer[T] {
 	dataWriters := make([]pipe.Writer[T], parallelism)
 	for i := 0; i < parallelism; i++ {
-		dataWriters[i] = &discardWriter[T]{}
+		dataWriters[i] = newWriterWithTokenStats[T](&discardWriter[T]{}, stats, logger)
 	}
 
 	return dataWriters

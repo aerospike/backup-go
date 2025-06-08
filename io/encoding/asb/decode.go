@@ -16,6 +16,7 @@ package asb
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -135,18 +136,19 @@ func (c *countingReader) ReadByte() (byte, error) {
 
 	c.tracker.offset++
 
+	// If it is a new line byte.
 	if b == asbNewLine {
-		fmt.Println("NEW LINE:", c.tracker.line)
 		// Increase line counter.
 		c.tracker.line++
-		// Reset column counter.
+		// Save the previous column counter, so we can return in case of Unread.
 		c.tracker.prevCol = c.tracker.column
+		// Reset column counter.
 		c.tracker.column = 0
-
 	} else {
+		// If no new line, just move the column counter.
 		c.tracker.column++
 	}
-	// Save the previous value, as there can be several asbNewLine in a row.
+	// Save the previous value, so we can track changes on Unread.
 	c.tracker.prevByte = b
 
 	return b, nil
@@ -159,14 +161,11 @@ func (c *countingReader) UnreadByte() error {
 		return err
 	}
 
-	// Check if the previous byte wasn't asbNewLine.
-	// As some times asbNewLine can repeat.
+	// Check if the previous byte was asbNewLine.
 	if c.tracker.prevByte == asbNewLine {
-		fmt.Println("REMOVE LINE:", c.tracker.line)
+		// We return one step back.
 		c.tracker.line--
-		if c.tracker.column == 0 {
-			c.tracker.column = c.tracker.prevCol
-		}
+		c.tracker.column = c.tracker.prevCol
 	}
 
 	c.tracker.offset--
@@ -1365,6 +1364,30 @@ func _readNBytes(src *countingReader, n int) ([]byte, error) {
 	_, err := io.ReadFull(src, buf)
 	if err != nil {
 		return nil, err
+	}
+
+	// Increase global offset.
+	src.tracker.offset += uint64(n)
+
+	// Update position tracker by counting newlines in the read data, only if we found at least one newline.
+	if bytes.IndexByte(buf, asbNewLine) != -1 {
+		// Us bytes.Count for fast counting of newlines.
+		newlineCount := bytes.Count(buf, []byte{asbNewLine})
+		// Increase counter.
+		src.tracker.line += newlineCount
+
+		if newlineCount > 0 {
+			src.tracker.column = 0
+		} else {
+			src.tracker.column += n
+		}
+	} else {
+		src.tracker.column += n
+	}
+
+	// Set previous byte as last byte of the read data.
+	if n > 0 {
+		src.tracker.prevByte = buf[n-1]
 	}
 
 	return buf, nil

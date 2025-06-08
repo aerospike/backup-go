@@ -105,6 +105,7 @@ type positionTracker struct {
 	line     int
 	column   int
 	prevByte byte
+	prevCol  int
 }
 
 // countingReader represents a wrapper for fast reading.
@@ -135,14 +136,13 @@ func (c *countingReader) ReadByte() (byte, error) {
 	c.tracker.offset++
 
 	if b == asbNewLine {
-		// Check if the previous byte wasn't asbNewLine.
-		// As some times asbNewLine can repeat.
-		if c.tracker.prevByte != asbNewLine {
-			// Increase line counter.
-			c.tracker.line++
-			// Reset column counter.
-			c.tracker.column = 0
-		}
+		fmt.Println("NEW LINE:", c.tracker.line)
+		// Increase line counter.
+		c.tracker.line++
+		// Reset column counter.
+		c.tracker.prevCol = c.tracker.column
+		c.tracker.column = 0
+
 	} else {
 		c.tracker.column++
 	}
@@ -157,6 +157,16 @@ func (c *countingReader) UnreadByte() error {
 	err := c.Reader.UnreadByte()
 	if err != nil {
 		return err
+	}
+
+	// Check if the previous byte wasn't asbNewLine.
+	// As some times asbNewLine can repeat.
+	if c.tracker.prevByte == asbNewLine {
+		fmt.Println("REMOVE LINE:", c.tracker.line)
+		c.tracker.line--
+		if c.tracker.column == 0 {
+			c.tracker.column = c.tracker.prevCol
+		}
 	}
 
 	c.tracker.offset--

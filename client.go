@@ -308,7 +308,9 @@ func (c *Client) AerospikeClient() AerospikeClient {
 	return c.aerospikeClient
 }
 
-// Estimate calculates the backup size from random sample of estimateSamples records number.
+// Estimate calculates the backup size from a random sample of estimateSamples records number.
+// It counts total records for backup, selects sample records,
+// and interpolates the size of sample on total records count according to parallelism and compression.
 //   - ctx can be used to cancel the calculation operation.
 //   - config is the backup configuration for the calculation operation.
 //   - estimateSamples is number of records to be scanned for calculations.
@@ -339,4 +341,28 @@ func (c *Client) Estimate(
 	}
 
 	return result, nil
+}
+
+// Validate perform validation of backup files.
+// Returns restore stats and error if any.
+//   - ctx can be used to cancel the restore operation.
+//   - config is the configuration for the restore operation.
+//   - streamingReader provides readers with access to backup data.
+func (c *Client) Validate(
+	ctx context.Context,
+	config *ConfigRestore,
+	streamingReader StreamingReader,
+) (*models.RestoreStats, error) {
+	config.ValidateOnly = true
+
+	h, err := c.Restore(ctx, config, streamingReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start asb validation: %w", err)
+	}
+
+	if err = h.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("failed to perform asb validation: %w", err)
+	}
+
+	return h.GetStats(), nil
 }

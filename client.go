@@ -342,28 +342,3 @@ func (c *Client) Estimate(
 
 	return result, nil
 }
-
-// Validate performs validation of backup files.
-// The method will block until all the backup files are validated or an error occurred.
-// Returns restore stats and error if any.
-//   - ctx can be used to cancel the validation operation.
-//   - config is the configuration for the validation operation.
-//   - streamingReader provides readers with access to backup data.
-func (c *Client) Validate(
-	ctx context.Context,
-	config *ConfigRestore,
-	streamingReader StreamingReader,
-) (*models.ValidationStats, error) {
-	config.ValidateOnly = true
-
-	h, err := c.Restore(ctx, config, streamingReader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start validation: %w", err)
-	}
-
-	if err = h.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("failed to perform validation: %w", err)
-	}
-
-	return models.NewValidationStats(h.GetStats()), nil
-}

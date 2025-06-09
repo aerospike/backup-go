@@ -21,6 +21,7 @@ import (
 	"os/signal"
 
 	"github.com/aerospike/backup-go/cmd/asrestore/cmd"
+	"github.com/aerospike/backup-go/cmd/internal/pprof"
 )
 
 var (
@@ -39,6 +40,10 @@ func main() {
 		log.Printf("stopping asrestore: %v\n", sig)
 		cancel()
 	}()
+
+	p := pprof.NewDefaultProfiler()
+	p.Start()
+	defer p.Stop()
 
 	rootCmd := cmd.NewCmd(appVersion, commitHash)
 	rootCmd.SilenceErrors = true

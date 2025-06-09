@@ -19,6 +19,7 @@ GOBUILD = GOOS=$(OS) GOARCH=$(ARCH) $(GO) build \
 GOTEST = $(GO) test
 GOCLEAN = $(GO) clean
 GOBIN_VERSION = $(shell $(GO) version 2>/dev/null)
+NPROC := $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
 
 
 BACKUP_BINARY_NAME = asbackup

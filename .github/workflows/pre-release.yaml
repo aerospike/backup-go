@@ -1,4 +1,8 @@
 name: Create Aerospike Backup Tools Pre Release
+permissions:
+  contents: read
+  packages: write
+  actions: write
 on:
   workflow_dispatch:
   push:

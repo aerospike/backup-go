@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -325,6 +326,10 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 	for _, path := range r.PathList {
 		size, num, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
+			r.Logger.Error("failed to calculate stats for path",
+				slog.String("path", path),
+				slog.Any("error", err),
+			)
 			// Skip calculation errors.
 			return
 		}

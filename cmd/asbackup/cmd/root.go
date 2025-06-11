@@ -224,7 +224,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	// After initialization repace logger.
+	// After initialization replace logger.
 	c.Logger = logger
 
 	// Init app.

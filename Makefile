@@ -83,7 +83,9 @@ docker-buildx:
 .PHONY: build
 build:
 	mkdir -p "$(TARGET_DIR)"
+	@echo "Building $(BACKUP_BINARY_NAME) with version $(VERSION)..."
 	$(GOBUILD) -o $(TARGET_DIR)/$(BACKUP_BINARY_NAME)_$(OS)_$(ARCH) $(CMD_BACKUP_DIR)
+	@echo "Building $(RESTORE_BINARY_NAME) with version $(VERSION)..."
 	$(GOBUILD) -o $(TARGET_DIR)/$(RESTORE_BINARY_NAME)_$(OS)_$(ARCH) $(CMD_RESTORE_DIR)
 
 .PHONY: install

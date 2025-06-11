@@ -16,7 +16,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
@@ -49,9 +48,11 @@ type Cmd struct {
 	// backup flags.
 	flagsBackup *flags.Backup
 	flagsCommon *flags.Common
+
+	Logger *slog.Logger
 }
 
-func NewCmd(appVersion, commitHash string) *cobra.Command {
+func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 	c := &Cmd{
 		appVersion: appVersion,
 		commitHash: commitHash,
@@ -67,6 +68,8 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		flagsAws:          flags.NewAwsS3(flags.OperationBackup),
 		flagsGcp:          flags.NewGcpStorage(flags.OperationBackup),
 		flagsAzure:        flags.NewAzureBlob(flags.OperationBackup),
+		// First init default logger.
+		Logger: logging.NewDefaultLogger(),
 	}
 
 	rootCmd := &cobra.Command{
@@ -196,7 +199,7 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		helpFunc()
 	})
 
-	return rootCmd
+	return rootCmd, c
 }
 
 func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
@@ -210,9 +213,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// If no flags were passed, show help.
 	if cmd.Flags().NFlag() == 0 {
 		if err := cmd.Help(); err != nil {
-			log.Println(err)
-
-			return err
+			return fmt.Errorf("failed to load help: %w", err)
 		}
 
 		return nil
@@ -221,10 +222,10 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// Init logger.
 	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
-		log.Println(err)
-
-		return err
+		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
+	// After initialization repace logger.
+	c.Logger = logger
 
 	// Init app.
 	asbParams := &config.BackupParams{
@@ -243,15 +244,11 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 
 	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
 	if err != nil {
-		logger.Error("backup initialization failed", slog.Any("error", err))
-
-		return err
+		return fmt.Errorf("backup initialization failed: %w", err)
 	}
 
 	if err = asb.Run(cmd.Context()); err != nil {
-		logger.Error("backup failed", slog.Any("error", err))
-
-		return err
+		return fmt.Errorf("backup failed: %w", err)
 	}
 
 	return nil

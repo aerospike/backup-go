@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 
@@ -40,10 +41,12 @@ func main() {
 		cancel()
 	}()
 
-	rootCmd := cmd.NewCmd(appVersion, commitHash)
+	// Return c to log errors properly.
+	rootCmd, c := cmd.NewCmd(appVersion, commitHash)
 	rootCmd.SilenceErrors = true
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
+		c.Logger.Error("failed to execute", slog.Any("error", err))
 		os.Exit(1)
 	}
 }

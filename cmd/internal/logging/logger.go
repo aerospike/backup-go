@@ -48,3 +48,10 @@ func NewLogger(level string, isVerbose, isJSON bool) (*slog.Logger, error) {
 		return slog.New(slog.NewTextHandler(os.Stdout, loggerOpt)), nil
 	}
 }
+
+// NewDefaultLogger returns default logger.
+func NewDefaultLogger() *slog.Logger {
+	// We won't have an error here so ignore it.
+	l, _ := NewLogger("info", false, false)
+	return l
+}

@@ -244,7 +244,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	if err = asr.Run(cmd.Context()); err != nil {
-		return fmt.Errorf("%s failed :%w", logMsg, err)
+		return fmt.Errorf("%s failed: %w", logMsg, err)
 	}
 
 	return nil

@@ -128,7 +128,7 @@ func newReader(
 	directory, inputFile := params.Common.Directory, params.Restore.InputFile
 	parentDirectory, directoryList := params.Restore.ParentDirectory, params.Restore.DirectoryList
 
-	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr)
+	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr, logger)
 
 	logger.Info("initializing storage for reader",
 		slog.String("directory", directory),
@@ -188,6 +188,7 @@ func newReaderOpts(
 	parentDirectory,
 	directoryList string,
 	isXDR bool,
+	logger *slog.Logger,
 ) []ioStorage.Opt {
 	opts := make([]ioStorage.Opt, 0)
 
@@ -208,6 +209,8 @@ func newReaderOpts(
 	} else {
 		opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
 	}
+
+	opts = append(opts, ioStorage.WithLogger(logger))
 
 	return opts
 }

@@ -63,7 +63,7 @@ function tags {
 target aerospike-backup-tools {
   labels = {
     "org.opencontainers.image.title"         = "Aerospike Backup Tools"
-    "org.opencontainers.image.description"   = "A Go tool for backing up and restoring ASDB data, with support for both standard and transactionally consistent backups"
+    "org.opencontainers.image.description"   = "Tools for backing up and restoring Aerospike data"
     "org.opencontainers.image.documentation" = "https://github.com/aerospike/backup-go?tab=readme-ov-file#backup-go"
     "org.opencontainers.image.base.name"     = "registry.access.redhat.com/ubi9/ubi-minimal"
     "org.opencontainers.image.source"        = "https://github.com/aerospike/backup-go/tree/${GIT_BRANCH}"

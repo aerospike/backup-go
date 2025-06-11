@@ -205,6 +205,10 @@ func ValidateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 		return fmt.Errorf("saving states and calculating estimates is not possible in parallel node mode")
 	}
 
+	if backupParams.Continue != "" && backupParams.StateFileDst != "" {
+		return fmt.Errorf("continue and state-file-dst are mutually exclusive")
+	}
+
 	if backupParams.Estimate {
 		// Estimate with filter not allowed.
 		if backupParams.PartitionList != "" ||

@@ -1,0 +1,136 @@
+name: Create Aerospike Backup Tools Pre Release
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-24.04
+    outputs:
+      upload_url: ${{ steps.create-release.outputs.upload_url }}
+    steps:
+      - name: Check if release exists
+        id: check-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const response = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: "${{ github.ref_name }}"
+              });
+
+              if (response.status === 200) {
+                console.log(`Release with tag exists.`);
+                core.setOutput('release-exists', 'true');
+              }
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`Release with tag does not exist.`);
+                core.setOutput('release-exists', 'false');
+              } else {
+                throw error;
+              }
+            }
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/create-release@v1
+        if: ${{ steps.check-release.outputs.release-exists == 'false'}}
+        id: create-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: true
+
+  build-docker-image:
+    needs:
+      - create-release
+    runs-on: ubuntu-latest
+    outputs:
+      image_version: ${{ steps.metadata.outputs.IMAGE_VERSION }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Get Metadata
+        id: metadata
+        run: |
+          GO_VERSION="$(curl -s 'https://go.dev/dl/?mode=json' | \
+            jq -r --arg ver "go$(grep '^go ' go.mod | cut -d ' ' -f2 | cut -d. -f1,2)" \
+              '.[] | select(.version | startswith($ver)) | .version' | \
+            sort -V | \
+            tail -n1 | \
+            cut -c3- | \
+            tr -d '\n')"
+          
+          IMAGE_VERSION=$(cat VERSION | cut -c 2-)
+          echo "IMAGE_VERSION=$IMAGE_VERSION" >> $GITHUB_ENV
+          echo "IMAGE_VERSION=$IMAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "GO_VERSION=$GO_VERSION" >> "$GITHUB_ENV"
+          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+          echo "ISO8601=$(LC_TIME=en_US.UTF-8 date "+%Y-%m-%dT%H:%M:%S%z")" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Login to JFrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+
+      - name: Login to JFrog Artifactory
+        uses: docker/login-action@v3
+        with:
+          registry: aerospike.jfrog.io
+          username: ${{ secrets.ARTIFACTORY_USER }}
+          password: ${{ secrets.ARTIFACTORY_TOKEN }}
+
+      - name: Build and Push Docker Image
+        env:
+          GIT_COMMIT_SHA: ${{ github.sha }}
+          GIT_BRANCH: ${{ github.ref }}
+          LATEST: false
+          TAG: ${{env.IMAGE_VERSION}}
+          VERSION: ${{env.VERSION}}
+          CONTEXT: ${{ github.workspace }}
+          ISO8601: ${{env.ISO8601}}
+          IMAGE_NAME: ${{env.IMAGE_NAME}}
+          GO_VERSION: ${{env.GO_VERSION}}
+          ARTIFACTORY_CONTAINER_DEV: ${{ vars.ARTIFACTORY_CONTAINER_DEV }}
+
+        run: |
+          jfrog docker buildx bake  \
+          --file ${{ github.workspace }}/scripts/docker-bake.hcl \
+          --metadata-file=build-metadata \
+          --progress plain \
+          --no-cache \
+          --push
+
+          jq -r '
+          .[] |
+          {
+            digest: .["containerimage.digest"],
+            names: (.["image.name"] | split(","))
+                     } |
+                     .digest
+            ' build-metadata > sha
+
+          echo artifact.aerospike.io/$ARTIFACTORY_CONTAINER_DEV/$IMAGE_NAME:$TAG@$(cat sha) > meta-info
+
+          jfrog rt build-docker-create \
+          --build-name=$IMAGE_NAME-container \
+          --build-number=$TAG \
+          --image-file ./meta-info \
+          $ARTIFACTORY_CONTAINER_DEV
+
+          jfrog rt build-collect-env $IMAGE_NAME-container $TAG
+          jfrog rt build-add-git $IMAGE_NAME-container $TAG
+          jfrog rt build-publish --detailed-summary $IMAGE_NAME-container $TAG

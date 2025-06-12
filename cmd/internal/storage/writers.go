@@ -62,7 +62,7 @@ func newWriter(
 ) (backup.Writer, error) {
 	directory, outputFile := getDirectoryOutputFile(params)
 	shouldClearTarget, continueBackup := getShouldCleanContinue(params)
-	opts := newWriterOpts(directory, outputFile, shouldClearTarget, continueBackup, params.IsXDR())
+	opts := newWriterOpts(directory, outputFile, shouldClearTarget, continueBackup, params.IsXDR(), logger)
 
 	logger.Info("initializing storage for writer",
 		slog.String("directory", directory),
@@ -134,9 +134,12 @@ func getShouldCleanContinue(params *config.BackupParams) (shouldClearTarget, con
 }
 
 func newWriterOpts(
-	directory, outputFile string,
-	shouldClearTarget, continueBackup bool,
+	directory,
+	outputFile string,
+	shouldClearTarget,
+	continueBackup,
 	isXDR bool,
+	logger *slog.Logger,
 ) []ioStorage.Opt {
 	opts := make([]ioStorage.Opt, 0)
 
@@ -161,6 +164,8 @@ func newWriterOpts(
 	} else {
 		opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
 	}
+
+	opts = append(opts, ioStorage.WithLogger(logger))
 
 	return opts
 }

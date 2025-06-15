@@ -15,12 +15,12 @@
 package backup
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/segmentio/asm/base64"
 )
 
 func handlePanic(errors chan<- error, logger *slog.Logger) {

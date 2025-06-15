@@ -14,7 +14,6 @@
 package xdr
 
 import (
-	"encoding/base64"
 	"errors"
 	"net"
 	"testing"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
+	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
 )
 

@@ -15,7 +15,6 @@
 package asb
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"math"
@@ -26,6 +25,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
 	"github.com/aerospike/backup-go/models"
+	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
 )
 

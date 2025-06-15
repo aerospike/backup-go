@@ -20,6 +20,8 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/aerospike/backup-go/cmd/asbackup/cmd"
 )
@@ -33,12 +35,15 @@ func main() {
 	// Initializing context with cancel for graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, os.Kill)
 
 	go func() {
 		sig := <-sigChan
 		log.Printf("stopping asbackup: %v\n", sig)
 		cancel()
+		// Don't hang if one of the routines is asleep. Wait 1 second and exit.
+		time.Sleep(time.Second)
+		os.Exit(1)
 	}()
 
 	// Return c to log errors properly.

@@ -17,11 +17,11 @@ package secret_agent
 
 import (
 	"crypto/tls"
-	"encoding/base64"
 	"fmt"
 	"time"
 
 	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
+	"github.com/segmentio/asm/base64"
 )
 
 const (

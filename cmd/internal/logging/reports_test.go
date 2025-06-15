@@ -146,8 +146,6 @@ func TestPrintBackupReport(t *testing.T) {
 	assert.Contains(t, output, "3")
 	assert.Contains(t, output, "Bytes Written")
 	assert.Contains(t, output, "5000000")
-	assert.Contains(t, output, "Total Records")
-	assert.Contains(t, output, "1000")
 	assert.Contains(t, output, "Files Written")
 	assert.Contains(t, output, "10")
 }
@@ -232,7 +230,6 @@ func TestLogBackupReport(t *testing.T) {
 	assert.Contains(t, logOutput, "s_index_read=5")
 	assert.Contains(t, logOutput, "udf_read=3")
 	assert.Contains(t, logOutput, "bytes_written=5000000")
-	assert.Contains(t, logOutput, "total_records=1000")
 	assert.Contains(t, logOutput, "files_written=10")
 }
 

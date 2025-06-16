@@ -63,7 +63,6 @@ func printBackupReport(stats *bModels.BackupStats, isXdr bool) {
 	fmt.Println()
 
 	printMetric("Bytes Written", stats.GetBytesWritten())
-	printMetric("Total Records", stats.TotalRecords.Load())
 	printMetric("Files Written", stats.GetFileCount())
 }
 
@@ -80,7 +79,6 @@ func logBackupReport(stats *bModels.BackupStats, isXdr bool, logger *slog.Logger
 		slog.Uint64("s_index_read", uint64(stats.GetSIndexes())),
 		slog.Uint64("udf_read", uint64(stats.GetUDFs())),
 		slog.Uint64("bytes_written", stats.GetBytesWritten()),
-		slog.Uint64("total_records", stats.TotalRecords.Load()),
 		slog.Uint64("files_written", stats.GetFileCount()),
 	)
 }

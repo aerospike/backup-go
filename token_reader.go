@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -46,12 +47,14 @@ func newTokenReader[T models.TokenConstraint](
 	}
 }
 
-func (tr *tokenReader[T]) Read() (T, error) {
+func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
 	for {
 		if tr.decoder != nil {
 			token, err := tr.decoder.NextToken()
 
 			switch {
+			case ctx.Err() != nil:
+				return nil, ctx.Err()
 			case err == nil:
 				return token, nil
 			case errors.Is(err, io.EOF):

@@ -23,6 +23,7 @@ import (
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,9 +31,13 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	t.Parallel()
 
 	readersMock := mocks.NewMockReader[*models.Token](t)
-	var mockCounter int
-	var counterMutex sync.Mutex
-	readersMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+	var (
+		mockCounter  int
+		counterMutex sync.Mutex
+	)
+	ctx := context.Background()
+
+	readersMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		counterMutex.Lock()
 		currentCount := mockCounter
 		if currentCount < testCount*testParallel {
@@ -55,11 +60,13 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		return mock
 	}
 
-	var mockCounterWrite int
-	var writeMutex sync.Mutex
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
+	var (
+		mockCounterWrite int
+		writeMutex       sync.Mutex
+	)
 
-	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writersMocks.EXPECT().Write(mock.Anything, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		writeMutex.Lock()
 		mockCounterWrite++
 		writeMutex.Unlock()
@@ -67,8 +74,6 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	})
 
 	writersMocks.EXPECT().Close().Return(nil)
-
-	ctx := context.Background()
 
 	readerSlice := make([]Reader[*models.Token], testParallel)
 	for i := range testParallel {
@@ -98,9 +103,13 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 	t.Parallel()
 
 	readersMock := mocks.NewMockReader[*models.Token](t)
-	var mockCounter int
-	var counterMutex sync.Mutex
-	readersMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+	var (
+		mockCounter  int
+		counterMutex sync.Mutex
+	)
+	ctx := context.Background()
+
+	readersMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		counterMutex.Lock()
 		currentCount := mockCounter
 		if currentCount < testCount {
@@ -125,7 +134,7 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
 	var mockCounterWrite int
 	var writeMutex sync.Mutex
-	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writersMocks.EXPECT().Write(mock.Anything, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		writeMutex.Lock()
 		currentCount := mockCounterWrite
 		if currentCount < testCount {
@@ -142,8 +151,6 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 		return 0, errTest
 	})
 	writersMocks.EXPECT().Close().Return(nil)
-
-	ctx := context.Background()
 
 	p, err := NewPipe(
 		newProcessorMock,

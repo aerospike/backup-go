@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"io"
 	"log/slog"
 
@@ -53,7 +54,10 @@ func NewSIndexReader(client sindexGetter, namespace string, logger *slog.Logger)
 }
 
 // Read reads the next secondary index from the SIndexGetter.
-func (r *SindexReader) Read() (*models.Token, error) {
+func (r *SindexReader) Read(ctx context.Context) (*models.Token, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	// grab all the sindexes on the first run
 	if r.sindexes == nil {
 		r.logger.Debug("fetching all secondary indexes")

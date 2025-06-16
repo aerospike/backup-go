@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/aerospike/backup-go/cmd/asrestore/cmd"
 )
@@ -33,7 +34,7 @@ func main() {
 	// Initializing context with cancel for graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, os.Kill)
 
 	go func() {
 		sig := <-sigChan

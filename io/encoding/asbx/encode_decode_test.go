@@ -16,13 +16,13 @@ package asbx
 
 import (
 	"bytes"
-	"encoding/base64"
 	"io"
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
+	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
 )
 

@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -38,15 +39,17 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 }
 
 // readPage reads the next record from pageRecord from the Aerospike database.
-func (r *RecordReader) readPage() (*models.Token, error) {
+func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
 	errChan := make(chan error)
 
 	if r.pageRecordsChan == nil {
 		r.pageRecordsChan = make(chan *pageRecord)
-		go r.startScanPaginated(errChan)
+		go r.startScanPaginated(ctx, errChan)
 	}
 
 	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	case err := <-errChan:
 		if err != nil {
 			return nil, err
@@ -78,7 +81,7 @@ func (r *RecordReader) readPage() (*models.Token, error) {
 }
 
 // startScanPaginated starts the scan for the RecordReader only for state save!
-func (r *RecordReader) startScanPaginated(localErrChan chan error) {
+func (r *RecordReader) startScanPaginated(ctx context.Context, localErrChan chan error) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
@@ -103,6 +106,9 @@ func (r *RecordReader) startScanPaginated(localErrChan chan error) {
 
 		for {
 			select {
+			case <-ctx.Done():
+				localErrChan <- ctx.Err()
+				return
 			case err, ok := <-errChan:
 				if !ok {
 					break

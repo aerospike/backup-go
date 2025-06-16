@@ -17,7 +17,6 @@ package asb
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	mRand "math/rand"
 	"reflect"
@@ -29,6 +28,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
 	"github.com/aerospike/backup-go/models"
+	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

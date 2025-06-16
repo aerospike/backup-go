@@ -376,7 +376,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		return err
 	}
 
-	// Assign, so we can get pl stats.
+	// Assign, so we can get pl metrics.
 	bh.pl.Store(pl)
 
 	return pl.Run(ctx)

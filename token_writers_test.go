@@ -25,6 +25,7 @@ import (
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipe/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -106,11 +107,11 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter := pipemocks.NewMockWriter[*models.Token](suite.T())
-	ctx := context.Background()
-	mockWriter.EXPECT().Write(ctx, models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
-	mockWriter.EXPECT().Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
-	mockWriter.EXPECT().Write(ctx, models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
-	mockWriter.EXPECT().Write(ctx, &models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
+
+	mockWriter.EXPECT().Write(mock.Anything, models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
+	mockWriter.EXPECT().Write(mock.Anything, models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(mock.Anything, models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(mock.Anything, &models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
 	mockWriter.EXPECT().Close().Return(nil)
 
 	mockStats := mocks.NewMockstatsSetterToken(suite.T())
@@ -119,6 +120,8 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
+
+	ctx := context.Background()
 
 	_, err := writer.Write(ctx, models.NewRecordToken(&models.Record{}, 0, nil))
 	suite.Nil(err)
@@ -138,13 +141,15 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 
 func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
 	mockWriter := pipemocks.NewMockWriter[*models.Token](suite.T())
-	ctx := context.Background()
-	mockWriter.EXPECT().Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
+
+	mockWriter.EXPECT().Write(mock.Anything, models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
 	mockStats := mocks.NewMockstatsSetterToken(suite.T())
 
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
+
+	ctx := context.Background()
 
 	_, err := writer.Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0))
 	suite.Error(err)

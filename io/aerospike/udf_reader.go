@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -52,7 +53,10 @@ func NewUDFReader(client udfGetter, logger *slog.Logger) *UdfReader {
 }
 
 // Read reads the next UDF from the UDFGetter.
-func (r *UdfReader) Read() (*models.Token, error) {
+func (r *UdfReader) Read(ctx context.Context) (*models.Token, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	// grab all the UDFs on the first run
 	if r.udfs == nil {
 		r.logger.Debug("fetching all UDFs")

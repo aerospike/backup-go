@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -111,7 +112,7 @@ func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
 type discardWriter[T models.TokenConstraint] struct{}
 
 // Write does nothing.
-func (w *discardWriter[T]) Write(_ T) (int, error) {
+func (w *discardWriter[T]) Write(_ context.Context, _ T) (int, error) {
 	return 0, nil
 }
 

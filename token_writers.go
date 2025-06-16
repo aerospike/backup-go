@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -56,8 +57,8 @@ func newWriterWithTokenStats[T models.TokenConstraint](
 	}
 }
 
-func (tw *tokenStatsWriter[T]) Write(data T) (int, error) {
-	n, err := tw.writer.Write(data)
+func (tw *tokenStatsWriter[T]) Write(ctx context.Context, data T) (int, error) {
+	n, err := tw.writer.Write(ctx, data)
 	if err != nil {
 		return 0, err
 	}
@@ -128,7 +129,11 @@ func newTokenWriter[T models.TokenConstraint](
 }
 
 // Write encodes v and writes it to the output.
-func (w *tokenWriter[T]) Write(v T) (int, error) {
+func (w *tokenWriter[T]) Write(ctx context.Context, v T) (int, error) {
+	if ctx.Err() != nil {
+		return 0, ctx.Err()
+	}
+
 	data, err := w.encoder.EncodeToken(v)
 	if err != nil {
 		return 0, fmt.Errorf("error encoding token: %w", err)
@@ -138,9 +143,14 @@ func (w *tokenWriter[T]) Write(v T) (int, error) {
 	t, ok := any(v).(*models.Token)
 	if ok {
 		if w.stateInfo != nil && t.Filter != nil {
-			// Set worker number.
+			// Set a worker number.
 			t.Filter.N = w.stateInfo.n
-			w.stateInfo.recordsStateChan <- *t.Filter
+			// Check context before process.
+			select {
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			case w.stateInfo.recordsStateChan <- *t.Filter:
+			}
 		}
 	}
 

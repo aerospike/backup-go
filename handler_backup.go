@@ -278,7 +278,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	tsProcessor := processors.NewVoidTimeSetter[*models.Token](bh.logger)
 
 	for {
-		t, err := recordReader.Read()
+		t, err := recordReader.Read(ctx)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break

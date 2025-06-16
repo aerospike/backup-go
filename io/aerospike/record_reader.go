@@ -130,16 +130,20 @@ func NewRecordReader(
 }
 
 // Read reads the next record from the Aerospike database.
-func (r *RecordReader) Read() (*models.Token, error) {
+func (r *RecordReader) Read(ctx context.Context) (*models.Token, error) {
 	// If pageSize is set, we use paginated read.
 	if r.config.pageSize > 0 {
-		return r.readPage()
+		return r.readPage(ctx)
 	}
 
-	return r.read()
+	return r.read(ctx)
 }
 
-func (r *RecordReader) read() (*models.Token, error) {
+func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	if !r.isScanStarted() {
 		scan, err := r.startScan()
 		if err != nil {

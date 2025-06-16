@@ -16,7 +16,6 @@ package backup
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -32,6 +31,7 @@ import (
 	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/tests"
+	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
 )
 

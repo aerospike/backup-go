@@ -88,7 +88,7 @@ func TestAerospikeRecordReader(t *testing.T) {
 	)
 	require.NotNil(t, reader)
 
-	v, err := reader.Read()
+	v, err := reader.Read(ctx)
 	require.Nil(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	require.Equal(t, expectedRecToken, v)
@@ -149,7 +149,7 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 	)
 	require.NotNil(t, reader)
 
-	v, err := reader.Read()
+	v, err := reader.Read(ctx)
 	require.NotNil(t, err)
 	require.Nil(t, v)
 	mockScanner.AssertExpectations(t)
@@ -194,7 +194,7 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 	)
 	require.NotNil(t, reader)
 
-	v, err := reader.Read()
+	v, err := reader.Read(ctx)
 	require.Equal(t, io.EOF, err)
 	require.Nil(t, v)
 	mockScanner.AssertExpectations(t)
@@ -234,7 +234,7 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 	)
 	require.NotNil(t, reader)
 
-	v, err := reader.Read()
+	v, err := reader.Read(ctx)
 	require.NotNil(t, err)
 	require.Nil(t, v)
 	mockScanner.AssertExpectations(t)
@@ -303,7 +303,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 	)
 	require.NotNil(t, reader)
 
-	v, err := reader.Read()
+	v, err := reader.Read(ctx)
 	require.Nil(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	require.Equal(t, expectedRecToken, v)
@@ -334,15 +334,17 @@ func TestSIndexReader(t *testing.T) {
 		expectedSIndexTokens = append(expectedSIndexTokens, models.NewSIndexToken(sindex, 0))
 	}
 
-	v, err := reader.Read()
+	ctx := context.Background()
+
+	v, err := reader.Read(ctx)
 	require.Nil(t, err)
 	require.Equal(t, v, expectedSIndexTokens[0])
 
-	v, err = reader.Read()
+	v, err = reader.Read(ctx)
 	require.Nil(t, err)
 	require.Equal(t, v, expectedSIndexTokens[1])
 
-	v, err = reader.Read()
+	v, err = reader.Read(ctx)
 	require.Equal(t, err, io.EOF)
 	require.Nil(t, v)
 
@@ -361,7 +363,7 @@ func TestSIndexReader(t *testing.T) {
 	reader = NewSIndexReader(mockSIndexGetter, namespace, slog.Default())
 	require.NotNil(t, reader)
 
-	v, err = reader.Read()
+	v, err = reader.Read(ctx)
 	require.NotNil(t, err)
 	require.Nil(t, v)
 
@@ -393,15 +395,17 @@ func TestUDFReader(t *testing.T) {
 		expectedUDFTokens = append(expectedUDFTokens, models.NewUDFToken(udf, 0))
 	}
 
-	v, err := reader.Read()
+	ctx := context.Background()
+
+	v, err := reader.Read(ctx)
 	require.Nil(t, err)
 	require.Equal(t, v, expectedUDFTokens[0])
 
-	v, err = reader.Read()
+	v, err = reader.Read(ctx)
 	require.Nil(t, err)
 	require.Equal(t, v, expectedUDFTokens[1])
 
-	v, err = reader.Read()
+	v, err = reader.Read(ctx)
 	require.Equal(t, err, io.EOF)
 	require.Nil(t, v)
 
@@ -420,7 +424,7 @@ func TestUDFReaderReadFailed(t *testing.T) {
 	reader := NewUDFReader(mockUDFGetter, slog.Default())
 	require.NotNil(t, reader)
 
-	v, err := reader.Read()
+	v, err := reader.Read(context.Background())
 	require.NotNil(t, err)
 	require.Nil(t, v)
 }

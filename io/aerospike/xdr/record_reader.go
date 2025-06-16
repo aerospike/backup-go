@@ -142,7 +142,7 @@ func NewRecordReader(
 }
 
 // Read reads the next record from the Aerospike database.
-func (r *RecordReader) Read() (*models.ASBXToken, error) {
+func (r *RecordReader) Read(ctx context.Context) (*models.ASBXToken, error) {
 	// Check if the server already started.
 	if !r.isRunning.Load() {
 		// If not started.
@@ -152,6 +152,8 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 
 		// Add timeout after start
 		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		case res, ok := <-r.results:
 			if !ok {
 				return nil, io.EOF
@@ -167,6 +169,8 @@ func (r *RecordReader) Read() (*models.ASBXToken, error) {
 	}
 
 	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	case res, ok := <-r.results:
 		if !ok {
 			r.logger.Debug("xdr scan finished")

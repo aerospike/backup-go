@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"testing"
@@ -55,7 +56,7 @@ func TestTokenReader_ReadSingleToken(t *testing.T) {
 
 	tr := newTokenReader(readersCh, logger, convertFn)
 
-	token, err := tr.Read()
+	token, err := tr.Read(context.Background())
 	assert.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.Equal(t, models.TokenTypeRecord, token.Type)
@@ -78,9 +79,10 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	}
 
 	tr := newTokenReader(readersCh, logger, convertFn)
+	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
-		token, err := tr.Read()
+		token, err := tr.Read(ctx)
 		assert.NoError(t, err)
 		assert.NotNil(t, token)
 		assert.Equal(t, models.TokenTypeRecord, token.Type)
@@ -89,7 +91,7 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	close(readersCh)
 	mockReader.On("Close").Return(nil).Once()
 
-	_, err := tr.Read()
+	_, err := tr.Read(ctx)
 	assert.Equal(t, io.EOF, err)
 
 	mockDecoder.AssertExpectations(t)
@@ -120,9 +122,10 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 	}
 
 	tr := newTokenReader(readersCh, logger, convertFn)
+	ctx := context.Background()
 
 	// Read from first decoder
-	token, err := tr.Read()
+	token, err := tr.Read(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.Equal(t, models.TokenTypeRecord, token.Type)
@@ -130,7 +133,7 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 	mockReader1.On("Close").Return(nil).Once()
 
 	// Read from second decoder
-	token, err = tr.Read()
+	token, err = tr.Read(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.Equal(t, models.TokenTypeUDF, token.Type)
@@ -147,7 +150,7 @@ func TestTokenReader_ReadFromClosedChannel(t *testing.T) {
 
 	tr := newTokenReader[*models.Token](readersCh, logger, nil)
 
-	token, err := tr.Read()
+	token, err := tr.Read(context.Background())
 	assert.Equal(t, io.EOF, err)
 	assert.Nil(t, token)
 }
@@ -168,7 +171,7 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 
 	tr := newTokenReader(readersCh, logger, convertFn)
 
-	token, err := tr.Read()
+	token, err := tr.Read(context.Background())
 	assert.Error(t, err)
 	assert.Equal(t, expectedErr, err)
 	assert.Nil(t, token)

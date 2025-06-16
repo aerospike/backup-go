@@ -16,6 +16,7 @@ package backup
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"log/slog"
 	"testing"
@@ -73,19 +74,21 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	writer := newTokenWriter[*models.Token](mockEncoder, &dst, slog.Default(), nil)
 	suite.NotNil(writer)
 
-	_, err := writer.Write(recToken)
+	ctx := context.Background()
+
+	_, err := writer.Write(ctx, recToken)
 	suite.Nil(err)
 	suite.Equal("encoded rec ", dst.String())
 
-	_, err = writer.Write(SIndexToken)
+	_, err = writer.Write(ctx, SIndexToken)
 	suite.Nil(err)
 	suite.Equal("encoded rec encoded sindex ", dst.String())
 
-	_, err = writer.Write(UDFToken)
+	_, err = writer.Write(ctx, UDFToken)
 	suite.Nil(err)
 	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
 
-	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
+	_, err = writer.Write(ctx, &models.Token{Type: models.TokenTypeInvalid})
 	suite.NotNil(err)
 	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
 
@@ -94,7 +97,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	}
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
-	_, err = writer.Write(failRecToken)
+	_, err = writer.Write(ctx, failRecToken)
 	suite.NotNil(err)
 
 	err = writer.Close()
@@ -103,10 +106,11 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter := pipemocks.NewMockWriter[*models.Token](suite.T())
-	mockWriter.EXPECT().Write(models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
-	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
-	mockWriter.EXPECT().Write(models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
-	mockWriter.EXPECT().Write(&models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
+	ctx := context.Background()
+	mockWriter.EXPECT().Write(ctx, models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
+	mockWriter.EXPECT().Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(ctx, models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(ctx, &models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
 	mockWriter.EXPECT().Close().Return(nil)
 
 	mockStats := mocks.NewMockstatsSetterToken(suite.T())
@@ -116,16 +120,16 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
-	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0, nil))
+	_, err := writer.Write(ctx, models.NewRecordToken(&models.Record{}, 0, nil))
 	suite.Nil(err)
 
-	_, err = writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))
+	_, err = writer.Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0))
 	suite.Nil(err)
 
-	_, err = writer.Write(models.NewUDFToken(&models.UDF{}, 0))
+	_, err = writer.Write(ctx, models.NewUDFToken(&models.UDF{}, 0))
 	suite.Nil(err)
 
-	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
+	_, err = writer.Write(ctx, &models.Token{Type: models.TokenTypeInvalid})
 	suite.NotNil(err)
 
 	err = writer.Close()
@@ -134,14 +138,15 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 
 func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
 	mockWriter := pipemocks.NewMockWriter[*models.Token](suite.T())
-	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
+	ctx := context.Background()
+	mockWriter.EXPECT().Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
 	mockStats := mocks.NewMockstatsSetterToken(suite.T())
 
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	suite.NotNil(writer)
 
-	_, err := writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))
+	_, err := writer.Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0))
 	suite.Error(err)
 }
 

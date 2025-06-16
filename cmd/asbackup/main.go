@@ -21,7 +21,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/aerospike/backup-go/cmd/asbackup/cmd"
 )
@@ -41,9 +40,6 @@ func main() {
 		sig := <-sigChan
 		log.Printf("stopping asbackup: %v\n", sig)
 		cancel()
-		// Don't hang if one of the routines is asleep. Wait 1 second and exit.
-		time.Sleep(time.Second)
-		os.Exit(1)
 	}()
 
 	// Return c to log errors properly.

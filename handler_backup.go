@@ -82,7 +82,7 @@ type BackupHandler struct {
 	// For graceful shutdown.
 	wg sync.WaitGroup
 
-	pl *pipe.Pipe[*models.Token]
+	pl atomic.Pointer[pipe.Pipe[*models.Token]]
 
 	// records per second collector.
 	rpsCollector *metrics.Collector
@@ -376,8 +376,8 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		return err
 	}
 
-	// Assign, so we can get pl stats.
-	bh.pl = pl
+	// Assign, so we can get pl metrics.
+	bh.pl.Store(pl)
 
 	return pl.Run(ctx)
 }
@@ -563,8 +563,10 @@ func (bh *BackupHandler) GetMetrics() *models.Metrics {
 	}
 
 	var pr, pw int
-	if bh.pl != nil {
-		pr, pw = bh.pl.GetMetrics()
+
+	pl := bh.pl.Load()
+	if pl != nil {
+		pr, pw = pl.GetMetrics()
 	}
 
 	return models.NewMetrics(

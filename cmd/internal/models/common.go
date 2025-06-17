@@ -14,24 +14,50 @@
 
 package models
 
+import "fmt"
+
 const DefaultChunkSize = 5 * 1024 * 1024
 
 // Common parameters are used by both backup and restore operations.
 type Common struct {
-	Directory        string
-	Namespace        string
-	SetList          string
-	BinList          string
-	Parallel         int
-	NoRecords        bool
-	NoIndexes        bool
-	NoUDFs           bool
-	RecordsPerSecond int
-	MaxRetries       int
-	TotalTimeout     int64
-	SocketTimeout    int64
+	Directory        string `yaml:"directory,omitempty"`
+	Namespace        string `yaml:"namespace,omitempty"`
+	SetList          string `yaml:"set-list,omitempty"`
+	BinList          string `yaml:"bin-list,omitempty"`
+	Parallel         int    `yaml:"parallel,omitempty"`
+	NoRecords        bool   `yaml:"no-records,omitempty"`
+	NoIndexes        bool   `yaml:"no-indexes,omitempty"`
+	NoUDFs           bool   `yaml:"no-udfs,omitempty"`
+	RecordsPerSecond int    `yaml:"records-per-second,omitempty"`
+	MaxRetries       int    `yaml:"max-retries,omitempty"`
+	TotalTimeout     int64  `yaml:"total-timeout,omitempty"`
+	SocketTimeout    int64  `yaml:"socket-timeout,omitempty"`
 
 	// Nice is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.
-	Nice int
+	Nice int `yaml:"nice,omitempty"`
+}
+
+func (c *Common) Validate() error {
+	if c == nil {
+		return nil
+	}
+
+	if c.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+
+	if c.TotalTimeout < 0 {
+		return fmt.Errorf("total-timeout must be non-negative")
+	}
+
+	if c.SocketTimeout < 0 {
+		return fmt.Errorf("socket-timeout must be non-negative")
+	}
+
+	if c.Parallel < 0 {
+		return fmt.Errorf("parallel must be non-negative")
+	}
+
+	return nil
 }

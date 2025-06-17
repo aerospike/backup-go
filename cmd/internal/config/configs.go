@@ -17,6 +17,7 @@ package config
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,45 @@ var (
 	expDateOnly = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	expDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2}$`)
 )
+
+// GetSecretAgent determines and returns the SecretAgentConfig from ConfigBackup or ConfigBackupXDR.
+// Returns nil if both are nil.
+func GetSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
+	switch {
+	case b != nil:
+		return b.SecretAgentConfig
+	case bxdr != nil:
+		return bxdr.SecretAgentConfig
+	default:
+		return nil
+	}
+}
+
+// ParseRacks parses a comma-separated string of rack IDs into a slice of positive integers.
+// Returns an error if any ID is invalid or exceeds the allowed maximum limit.
+func ParseRacks(racks string) ([]int, error) {
+	racksStringSlice := SplitByComma(racks)
+	racksIntSlice := make([]int, 0, len(racksStringSlice))
+
+	for i := range racksStringSlice {
+		rackID, err := strconv.Atoi(racksStringSlice[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse racks: %w", err)
+		}
+
+		if rackID < 0 {
+			return nil, fmt.Errorf("rack id %d invalid, should be positive number", rackID)
+		}
+
+		if rackID > MaxRack {
+			return nil, fmt.Errorf("rack id %d invalid, should not exceed %d", rackID, MaxRack)
+		}
+
+		racksIntSlice = append(racksIntSlice, rackID)
+	}
+
+	return racksIntSlice, nil
+}
 
 func newRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
 	nsArr := SplitByComma(n)
@@ -128,13 +168,13 @@ func newSecretAgentConfig(s *models.SecretAgent) *backup.SecretAgentConfig {
 	return c
 }
 
-func newScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, error) {
+func newScanPolicy(b *models.Backup) (*aerospike.ScanPolicy, error) {
 	p := aerospike.NewScanPolicy()
 	p.MaxRecords = b.MaxRecords
-	p.MaxRetries = c.MaxRetries
+	p.MaxRetries = b.MaxRetries
 	p.SleepBetweenRetries = time.Duration(b.SleepBetweenRetries) * time.Millisecond
-	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
-	p.SocketTimeout = time.Duration(c.SocketTimeout) * time.Millisecond
+	p.TotalTimeout = time.Duration(b.TotalTimeout) * time.Millisecond
+	p.SocketTimeout = time.Duration(b.SocketTimeout) * time.Millisecond
 	// If we selected racks we must set replica policy to aerospike.PREFER_RACK
 	if b.PreferRacks != "" {
 		p.ReplicaPolicy = aerospike.PREFER_RACK
@@ -156,17 +196,13 @@ func newScanPolicy(b *models.Backup, c *models.Common) (*aerospike.ScanPolicy, e
 	return p, nil
 }
 
-func newWritePolicy(r *models.Restore, c *models.Common) *aerospike.WritePolicy {
+func newWritePolicy(r *models.Restore) *aerospike.WritePolicy {
 	p := aerospike.NewWritePolicy(0, 0)
 
-	if c == nil {
-		return p
-	}
-
 	p.SendKey = true
-	p.MaxRetries = c.MaxRetries
-	p.TotalTimeout = time.Duration(c.TotalTimeout) * time.Millisecond
-	p.SocketTimeout = time.Duration(c.SocketTimeout) * time.Millisecond
+	p.MaxRetries = r.MaxRetries
+	p.TotalTimeout = time.Duration(r.TotalTimeout) * time.Millisecond
+	p.SocketTimeout = time.Duration(r.SocketTimeout) * time.Millisecond
 	p.RecordExistsAction = recordExistsAction(r.Replace, r.Uniq)
 	p.GenerationPolicy = aerospike.EXPECT_GEN_GT
 
@@ -211,17 +247,17 @@ func SplitByComma(s string) []string {
 	return strings.Split(s, ",")
 }
 
-func mapPartitionFilter(b *models.Backup, c *models.Common) ([]*aerospike.PartitionFilter, error) {
+func mapPartitionFilter(b *models.Backup) ([]*aerospike.PartitionFilter, error) {
 	switch {
 	case b.AfterDigest != "":
-		afterDigestFilter, err := backup.NewPartitionFilterAfterDigest(c.Namespace, b.AfterDigest)
+		afterDigestFilter, err := backup.NewPartitionFilterAfterDigest(b.Namespace, b.AfterDigest)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse after digest filter: %w", err)
 		}
 
 		return []*aerospike.PartitionFilter{afterDigestFilter}, nil
 	case b.PartitionList != "":
-		return backup.ParsePartitionFilterListString(c.Namespace, b.PartitionList)
+		return backup.ParsePartitionFilterListString(b.Namespace, b.PartitionList)
 	default:
 		return []*aerospike.PartitionFilter{backup.NewPartitionFilterAll()}, nil
 	}
@@ -255,15 +291,4 @@ func parseLocalTimeToUTC(timeString string) (time.Time, error) {
 	utcTime := localTime.UTC()
 
 	return utcTime, nil
-}
-
-func GetSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
-	switch {
-	case b != nil:
-		return b.SecretAgentConfig
-	case bxdr != nil:
-		return bxdr.SecretAgentConfig
-	default:
-		return nil
-	}
 }

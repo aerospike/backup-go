@@ -23,20 +23,20 @@ import (
 // GcpStorage represents the configuration for GCP storage integration.
 type GcpStorage struct {
 	// Path to file containing Service Account JSON Key.
-	KeyFile string
+	KeyFile string `yaml:"key-file,omitempty"`
 	// For GPC storage bucket is not part of the path as in S3.
 	// So we should set it separately.
-	BucketName string
+	BucketName string `yaml:"bucket-name,omitempty"`
 	// Alternative url.
 	// It is not recommended to use an alternate URL in a production environment.
-	Endpoint string
+	Endpoint string `yaml:"endpoint,omitempty"`
 
-	RetryMaxAttempts        int
-	RetryBackoffMaxSeconds  int
-	RetryBackoffInitSeconds int
-	RetryBackoffMultiplier  float64
+	RetryMaxAttempts        int     `yaml:"retry-max-attempts,omitempty"`
+	RetryBackoffMaxSeconds  int     `yaml:"retry-max-backoff,omitempty"`
+	RetryBackoffInitSeconds int     `yaml:"retry-init-backoff,omitempty"`
+	RetryBackoffMultiplier  float64 `yaml:"retry-backoff-multiplier,omitempty"`
 
-	ChunkSize int
+	ChunkSize int `yaml:"chunk-size,omitempty"`
 }
 
 // LoadSecrets tries to load field values from secret agent.
@@ -61,7 +61,7 @@ func (g *GcpStorage) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	return nil
 }
 
-// Validate internal validation for struct params.
+// Validate internal validation for struct backup.
 func (g *GcpStorage) Validate() error {
 	if g.BucketName == "" {
 		return fmt.Errorf("bucket name is required")

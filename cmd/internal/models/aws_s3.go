@@ -23,22 +23,22 @@ import (
 
 // AwsS3 represents the configuration for AWS S3 storage integration.
 type AwsS3 struct {
-	BucketName      string
-	Region          string
-	Profile         string
-	Endpoint        string
-	AccessKeyID     string
-	SecretAccessKey string
+	BucketName      string `yaml:"bucket-name,omitempty"`
+	Region          string `yaml:"region,omitempty"`
+	Profile         string `yaml:"profile,omitempty"`
+	Endpoint        string `yaml:"endpoint,omitempty"`
+	AccessKeyID     string `yaml:"access-key-id,omitempty"`
+	SecretAccessKey string `yaml:"secret-access-key,omitempty"`
 
-	StorageClass        string
-	AccessTier          string
-	RestorePollDuration int64
+	StorageClass        string `yaml:"storage-class,omitempty"`
+	AccessTier          string `yaml:"access-tier,omitempty"`
+	RestorePollDuration int64  `yaml:"rehydrate-poll-duration,omitempty"`
 
-	RetryMaxAttempts       int
-	RetryMaxBackoffSeconds int
-	RetryBackoffSeconds    int
+	RetryMaxAttempts       int `yaml:"retry-max-attempts,omitempty"`
+	RetryMaxBackoffSeconds int `yaml:"retry-max-backoff,omitempty"`
+	RetryBackoffSeconds    int `yaml:"retry-backoff,omitempty"`
 
-	ChunkSize int
+	ChunkSize int `yaml:"chunk-size,omitempty"`
 }
 
 // LoadSecrets tries to load field values from secret agent.
@@ -88,7 +88,7 @@ func (a *AwsS3) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	return nil
 }
 
-// Validate internal validation for struct params.
+// Validate internal validation for struct backup.
 func (a *AwsS3) Validate() error {
 	if a.BucketName == "" {
 		return fmt.Errorf("bucket name is required")
@@ -108,6 +108,10 @@ func (a *AwsS3) Validate() error {
 
 	if a.ChunkSize < 0 {
 		return fmt.Errorf("chunk size must be non-negative")
+	}
+
+	if a.RestorePollDuration < 1 {
+		return fmt.Errorf("restore poll duration can't be less than 1")
 	}
 
 	return nil

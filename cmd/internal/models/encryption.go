@@ -16,8 +16,8 @@ package models
 
 // Encryption contains flags that will be mapped to EncryptionPolicy for backup and restore operations.
 type Encryption struct {
-	Mode      string
-	KeyFile   string
-	KeyEnv    string
-	KeySecret string
+	Mode      string `yaml:"mode,omitempty"`
+	KeyFile   string `yaml:"key-file,omitempty"`
+	KeyEnv    string `yaml:"key-env,omitempty"`
+	KeySecret string `yaml:"key-secret,omitempty"`
 }

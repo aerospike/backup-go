@@ -19,7 +19,6 @@ import (
 	"log/slog"
 	"path"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/aerospike/aerospike-client-go/v8"
@@ -33,18 +32,55 @@ const MaxRack = 1000000
 
 // BackupParams contain backup parameters.
 type BackupParams struct {
-	App          *models.App
-	ClientConfig *client.AerospikeConfig
-	ClientPolicy *models.ClientPolicy
-	Backup       *models.Backup
-	BackupXDR    *models.BackupXDR
-	Common       *models.Common
-	Compression  *models.Compression
-	Encryption   *models.Encryption
-	SecretAgent  *models.SecretAgent
-	AwsS3        *models.AwsS3
-	GcpStorage   *models.GcpStorage
-	AzureBlob    *models.AzureBlob
+	App          *models.App             `yaml:"app,omitempty"`
+	ClientConfig *client.AerospikeConfig `yaml:"client-config,omitempty"`
+	ClientPolicy *models.ClientPolicy    `yaml:"client-policy,omitempty"`
+	Backup       *models.Backup          `yaml:"backup,omitempty"`
+	BackupXDR    *models.BackupXDR       `yaml:"backup-xdr,omitempty"`
+	Compression  *models.Compression     `yaml:"compression,omitempty"`
+	Encryption   *models.Encryption      `yaml:"encryption,omitempty"`
+	SecretAgent  *models.SecretAgent     `yaml:"secret-agent,omitempty"`
+	AwsS3        *models.AwsS3           `yaml:"aws,omitempty"`
+	GcpStorage   *models.GcpStorage      `yaml:"gcp,omitempty"`
+	AzureBlob    *models.AzureBlob       `yaml:"azure,omitempty"`
+}
+
+func NewBackupParams(
+	app *models.App,
+	clientConfig *client.AerospikeConfig,
+	clientPolicy *models.ClientPolicy,
+	backupScan *models.Backup,
+	backupXDR *models.BackupXDR,
+	compression *models.Compression,
+	encryption *models.Encryption,
+	secretAgent *models.SecretAgent,
+	awsS3 *models.AwsS3,
+	gcpStorage *models.GcpStorage,
+	azureBlob *models.AzureBlob,
+) (*BackupParams, error) {
+	// If we have a config file, load params from it.
+	if app.Config != "" {
+		var params BackupParams
+		if err := decodeFromFile(app.Config, &params); err != nil {
+			return nil, fmt.Errorf("failed to load config file %s: %w", app.Config, err)
+		}
+
+		return &params, nil
+	}
+
+	return &BackupParams{
+		App:          app,
+		ClientConfig: clientConfig,
+		ClientPolicy: clientPolicy,
+		Backup:       backupScan,
+		BackupXDR:    backupXDR,
+		Compression:  compression,
+		Encryption:   encryption,
+		SecretAgent:  secretAgent,
+		AwsS3:        awsS3,
+		GcpStorage:   gcpStorage,
+		AzureBlob:    azureBlob,
+	}, nil
 }
 
 // IsXDR determines if the backup configuration is an XDR backup by checking if BackupXDR is non-nil and Backup is nil.
@@ -97,38 +133,14 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 
 	switch params.IsXDR() {
 	case false:
-		backupConfig, err = NewBackupConfig(params)
+		backupConfig, err = newBackupConfig(params)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
 		}
 
-		logger.Info("initialized scan backup config",
-			slog.String("namespace", backupConfig.Namespace),
-			slog.String("encryption", params.Encryption.Mode),
-			slog.Int("compression", params.Compression.Level),
-			slog.String("filters", params.Backup.PartitionList),
-			slog.Any("nodes", backupConfig.NodeList),
-			slog.Any("sets", backupConfig.SetList),
-			slog.Any("bins", backupConfig.BinList),
-			slog.Any("rack", backupConfig.RackList),
-			slog.Any("parallel_node", backupConfig.ParallelNodes),
-			slog.Any("parallel_read", backupConfig.ParallelRead),
-			slog.Any("parallel_write", backupConfig.ParallelWrite),
-			slog.Bool("no_records", backupConfig.NoRecords),
-			slog.Bool("no_indexes", backupConfig.NoIndexes),
-			slog.Bool("no_udfs", backupConfig.NoUDFs),
-			slog.Int("records_per_second", backupConfig.RecordsPerSecond),
-			slog.Int("bandwidth", backupConfig.Bandwidth),
-			slog.Uint64("file_limit", backupConfig.FileLimit),
-			slog.Bool("compact", backupConfig.Compact),
-			slog.Bool("not_ttl_only", backupConfig.NoTTLOnly),
-			slog.String("state_file", backupConfig.StateFile),
-			slog.Bool("continue", backupConfig.Continue),
-			slog.Int64("page_size", backupConfig.PageSize),
-			slog.String("output_prefix", backupConfig.OutputFilePrefix),
-		)
+		logBackupConfig(logger, params, backupConfig)
 	case true:
-		backupXDRConfig = NewBackupXDRConfig(params)
+		backupXDRConfig = newBackupXDRConfig(params)
 
 		// On xdr backup we backup only uds and indexes.
 		backupConfig = backup.NewDefaultBackupConfig()
@@ -136,47 +148,31 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 		backupConfig.NoRecords = true
 		backupConfig.Namespace = backupXDRConfig.Namespace
 
-		logger.Info("initialized xdr backup config",
-			slog.String("namespace", backupXDRConfig.Namespace),
-			slog.String("encryption", params.Encryption.Mode),
-			slog.Int("compression", params.Compression.Level),
-			slog.Any("parallel_write", backupXDRConfig.ParallelWrite),
-			slog.Uint64("file_limit", backupXDRConfig.FileLimit),
-			slog.String("dc", backupXDRConfig.DC),
-			slog.String("local_address", backupXDRConfig.LocalAddress),
-			slog.Int("local_port", backupXDRConfig.LocalPort),
-			slog.String("rewind", backupXDRConfig.Rewind),
-			slog.Int("max_throughput", backupXDRConfig.MaxThroughput),
-			slog.Duration("read_timeout", backupXDRConfig.ReadTimeout),
-			slog.Duration("write_timeout", backupXDRConfig.WriteTimeout),
-			slog.Int("result_queue_size", backupXDRConfig.ResultQueueSize),
-			slog.Int("ack_queue_size", backupXDRConfig.AckQueueSize),
-			slog.Int("max_connections", backupXDRConfig.MaxConnections),
-		)
+		logXdrBackupConfig(logger, params, backupXDRConfig)
 	}
 
 	return backupConfig, backupXDRConfig, nil
 }
 
-// NewBackupConfig initializes and returns a configured instance of ConfigBackup based on the provided params.
+// newBackupConfig initializes and returns a configured instance of ConfigBackup based on the provided params.
 // This function sets various backup parameters including namespace, file limits, parallelism options, bandwidth,
 // compression, encryption, and partition filters. It returns an error if any validation or parsing fails.
-func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
+func newBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	c := backup.NewDefaultBackupConfig()
-	c.Namespace = params.Common.Namespace
-	c.SetList = SplitByComma(params.Common.SetList)
-	c.BinList = SplitByComma(params.Common.BinList)
-	c.NoRecords = params.Common.NoRecords
-	c.NoIndexes = params.Common.NoIndexes
-	c.RecordsPerSecond = params.Common.RecordsPerSecond
+	c.Namespace = params.Backup.Namespace
+	c.SetList = SplitByComma(params.Backup.SetList)
+	c.BinList = SplitByComma(params.Backup.BinList)
+	c.NoRecords = params.Backup.NoRecords
+	c.NoIndexes = params.Backup.NoIndexes
+	c.RecordsPerSecond = params.Backup.RecordsPerSecond
 	c.FileLimit = params.Backup.FileLimit
-	c.NoUDFs = params.Common.NoUDFs
+	c.NoUDFs = params.Backup.NoUDFs
 	// The original backup tools have a single parallelism configuration property.
 	// We may consider splitting the configuration in the future.
-	c.ParallelWrite = params.Common.Parallel
-	c.ParallelRead = params.Common.Parallel
+	c.ParallelWrite = params.Backup.Parallel
+	c.ParallelRead = params.Backup.Parallel
 	// As we set --nice in MiB we must convert it to bytes
-	c.Bandwidth = params.Common.Nice * 1024 * 1024
+	c.Bandwidth = params.Backup.Nice * 1024 * 1024
 	c.Compact = params.Backup.Compact
 	c.NoTTLOnly = params.Backup.NoTTLOnly
 	c.OutputFilePrefix = params.Backup.OutputFilePrefix
@@ -192,13 +188,13 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	}
 
 	if params.Backup.Continue != "" {
-		c.StateFile = path.Join(params.Common.Directory, params.Backup.Continue)
+		c.StateFile = path.Join(params.Backup.Directory, params.Backup.Continue)
 		c.Continue = true
 		c.PageSize = params.Backup.ScanPageSize
 	}
 
 	if params.Backup.StateFileDst != "" {
-		c.StateFile = path.Join(params.Common.Directory, params.Backup.StateFileDst)
+		c.StateFile = path.Join(params.Backup.Directory, params.Backup.StateFileDst)
 		c.PageSize = params.Backup.ScanPageSize
 	}
 
@@ -208,18 +204,18 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 		c.NodeList = SplitByComma(params.Backup.NodeList)
 	}
 
-	pf, err := mapPartitionFilter(params.Backup, params.Common)
+	pf, err := mapPartitionFilter(params.Backup)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := validatePartitionFilters(pf); err != nil {
+	if err := ValidatePartitionFilters(pf); err != nil {
 		return nil, err
 	}
 
 	c.PartitionFilters = pf
 
-	sp, err := newScanPolicy(params.Backup, params.Common)
+	sp, err := newScanPolicy(params.Backup)
 	if err != nil {
 		return nil, err
 	}
@@ -256,8 +252,8 @@ func NewBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 	return c, nil
 }
 
-// NewBackupXDRConfig creates a ConfigBackupXDR instance based on the provided backup parameters.
-func NewBackupXDRConfig(params *BackupParams) *backup.ConfigBackupXDR {
+// newBackupXDRConfig creates a ConfigBackupXDR instance based on the provided backup parameters.
+func newBackupXDRConfig(params *BackupParams) *backup.ConfigBackupXDR {
 	parallelWrite := runtime.NumCPU()
 	if params.BackupXDR.ParallelWrite > 0 {
 		parallelWrite = params.BackupXDR.ParallelWrite
@@ -297,28 +293,50 @@ func NewBackupXDRConfig(params *BackupParams) *backup.ConfigBackupXDR {
 	return c
 }
 
-// ParseRacks parses a comma-separated string of rack IDs into a slice of positive integers.
-// Returns an error if any ID is invalid or exceeds the allowed maximum limit.
-func ParseRacks(racks string) ([]int, error) {
-	racksStringSlice := SplitByComma(racks)
-	racksIntSlice := make([]int, 0, len(racksStringSlice))
+func logBackupConfig(logger *slog.Logger, params *BackupParams, backupConfig *backup.ConfigBackup) {
+	logger.Info("initialized scan backup config",
+		slog.String("namespace", backupConfig.Namespace),
+		slog.String("encryption", params.Encryption.Mode),
+		slog.Int("compression", params.Compression.Level),
+		slog.String("filters", params.Backup.PartitionList),
+		slog.Any("nodes", backupConfig.NodeList),
+		slog.Any("sets", backupConfig.SetList),
+		slog.Any("bins", backupConfig.BinList),
+		slog.Any("rack", backupConfig.RackList),
+		slog.Any("parallel_node", backupConfig.ParallelNodes),
+		slog.Any("parallel_read", backupConfig.ParallelRead),
+		slog.Any("parallel_write", backupConfig.ParallelWrite),
+		slog.Bool("no_records", backupConfig.NoRecords),
+		slog.Bool("no_indexes", backupConfig.NoIndexes),
+		slog.Bool("no_udfs", backupConfig.NoUDFs),
+		slog.Int("records_per_second", backupConfig.RecordsPerSecond),
+		slog.Int("bandwidth", backupConfig.Bandwidth),
+		slog.Uint64("file_limit", backupConfig.FileLimit),
+		slog.Bool("compact", backupConfig.Compact),
+		slog.Bool("not_ttl_only", backupConfig.NoTTLOnly),
+		slog.String("state_file", backupConfig.StateFile),
+		slog.Bool("continue", backupConfig.Continue),
+		slog.Int64("page_size", backupConfig.PageSize),
+		slog.String("output_prefix", backupConfig.OutputFilePrefix),
+	)
+}
 
-	for i := range racksStringSlice {
-		rackID, err := strconv.Atoi(racksStringSlice[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse racks: %w", err)
-		}
-
-		if rackID < 0 {
-			return nil, fmt.Errorf("rack id %d invalid, should be positive number", rackID)
-		}
-
-		if rackID > MaxRack {
-			return nil, fmt.Errorf("rack id %d invalid, should not exceed %d", rackID, MaxRack)
-		}
-
-		racksIntSlice = append(racksIntSlice, rackID)
-	}
-
-	return racksIntSlice, nil
+func logXdrBackupConfig(logger *slog.Logger, params *BackupParams, backupXDRConfig *backup.ConfigBackupXDR) {
+	logger.Info("initialized xdr backup config",
+		slog.String("namespace", backupXDRConfig.Namespace),
+		slog.String("encryption", params.Encryption.Mode),
+		slog.Int("compression", params.Compression.Level),
+		slog.Any("parallel_write", backupXDRConfig.ParallelWrite),
+		slog.Uint64("file_limit", backupXDRConfig.FileLimit),
+		slog.String("dc", backupXDRConfig.DC),
+		slog.String("local_address", backupXDRConfig.LocalAddress),
+		slog.Int("local_port", backupXDRConfig.LocalPort),
+		slog.String("rewind", backupXDRConfig.Rewind),
+		slog.Int("max_throughput", backupXDRConfig.MaxThroughput),
+		slog.Duration("read_timeout", backupXDRConfig.ReadTimeout),
+		slog.Duration("write_timeout", backupXDRConfig.WriteTimeout),
+		slog.Int("result_queue_size", backupXDRConfig.ResultQueueSize),
+		slog.Int("ack_queue_size", backupXDRConfig.AckQueueSize),
+		slog.Int("max_connections", backupXDRConfig.MaxConnections),
+	)
 }

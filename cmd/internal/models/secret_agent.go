@@ -16,10 +16,10 @@ package models
 
 // SecretAgent contains flags that will be mapped to SecretAgentConfig for backup and restore operations.
 type SecretAgent struct {
-	ConnectionType     string
-	Address            string
-	Port               int
-	TimeoutMillisecond int
-	CaFile             string
-	IsBase64           bool
+	ConnectionType     string `yaml:"connection-type,omitempty"`
+	Address            string `yaml:"address,omitempty"`
+	Port               int    `yaml:"port,omitempty"`
+	TimeoutMillisecond int    `yaml:"timeout-millisecond,omitempty"`
+	CaFile             string `yaml:"ca-file,omitempty"`
+	IsBase64           bool   `yaml:"is-base64,omitempty"`
 }

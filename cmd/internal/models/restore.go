@@ -14,6 +14,8 @@
 
 package models
 
+import "fmt"
+
 const (
 	RestoreModeAuto = "auto"
 	RestoreModeASB  = "asb"
@@ -22,31 +24,77 @@ const (
 
 // Restore contains flags that will be mapped to restore config.
 type Restore struct {
-	InputFile          string
-	DirectoryList      string
-	ParentDirectory    string
-	DisableBatchWrites bool
-	BatchSize          int
-	MaxAsyncBatches    int
+	Common
+
+	InputFile          string `yaml:"input-file,omitempty"`
+	DirectoryList      string `yaml:"directory-list,omitempty"`
+	ParentDirectory    string `yaml:"parent-directory,omitempty"`
+	DisableBatchWrites bool   `yaml:"disable-batch-writes,omitempty"`
+	BatchSize          int    `yaml:"batch-size,omitempty"`
+	MaxAsyncBatches    int    `yaml:"max-async-batches,omitempty"`
 	// For optimal performance, should be at least MaxAsyncBatches.
 	// This is applicable only to batch writes.
-	WarmUp            int
-	ExtraTTL          int64
-	IgnoreRecordError bool
-	Uniq              bool
-	Replace           bool
-	NoGeneration      bool
-	TimeOut           int64
+	WarmUp            int   `yaml:"warm-up,omitempty"`
+	ExtraTTL          int64 `yaml:"extra-ttl,omitempty"`
+	IgnoreRecordError bool  `yaml:"ignore-record-error,omitempty"`
+	Uniq              bool  `yaml:"uniq,omitempty"`
+	Replace           bool  `yaml:"replace,omitempty"`
+	NoGeneration      bool  `yaml:"no-generation,omitempty"`
+	TimeOut           int64 `yaml:"timeout,omitempty"`
 
-	RetryBaseTimeout int64
-	RetryMultiplier  float64
-	RetryMaxRetries  uint
+	RetryBaseTimeout int64   `yaml:"retry-base-timeout,omitempty"`
+	RetryMultiplier  float64 `yaml:"retry-multiplier,omitempty"`
+	RetryMaxRetries  uint    `yaml:"retry-max-retries,omitempty"`
 
-	Mode string
+	Mode string `yaml:"mode,omitempty"`
 
-	ValidateOnly bool
+	ValidateOnly bool `yaml:"validate-only,omitempty"`
 }
 
-func (restore *Restore) IsDirectoryRestore() bool {
-	return restore.DirectoryList == "" && restore.InputFile == ""
+func (r *Restore) IsDirectoryRestore() bool {
+	return r.DirectoryList == "" && r.InputFile == ""
+}
+
+func (r *Restore) Validate() error {
+	if r == nil {
+		return nil
+	}
+
+	switch r.Mode {
+	case RestoreModeAuto, RestoreModeASB, RestoreModeASBX:
+		// ok.
+	default:
+		return fmt.Errorf("invalid restore mode: %s", r.Mode)
+	}
+
+	if r.InputFile == "" &&
+		r.Directory == "" &&
+		r.DirectoryList == "" {
+		return fmt.Errorf("input file or directory required")
+	}
+
+	if r.Directory != "" && r.InputFile != "" {
+		return fmt.Errorf("only one of directory and input-file may be configured at the same time")
+	}
+
+	if r.DirectoryList != "" && (r.Directory != "" || r.InputFile != "") {
+		return fmt.Errorf("only one of directory, input-file and directory-list may be configured at the same time")
+	}
+
+	if r.ParentDirectory != "" && r.DirectoryList == "" {
+		return fmt.Errorf("must specify directory-list list")
+	}
+
+	if r.WarmUp < 0 {
+		return fmt.Errorf("warm-up must be non-negative")
+	}
+
+	if !r.ValidateOnly {
+		// Validate common backup only if restore is not in validate only mode.
+		if err := r.Common.Validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

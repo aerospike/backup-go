@@ -14,37 +14,101 @@
 
 package models
 
-import "crypto/tls"
+import (
+	"fmt"
+)
 
 // BackupXDR flags that will be mapped to xdr backup config.
 // (common for backup and restore flags are in Common).
 type BackupXDR struct {
-	Directory                    string
-	FileLimit                    uint64
-	RemoveFiles                  bool
-	ParallelWrite                int
-	DC                           string
-	LocalAddress                 string
-	LocalPort                    int
-	Namespace                    string
-	Rewind                       string
-	MaxThroughput                int
-	ReadTimeoutMilliseconds      int64
-	WriteTimeoutMilliseconds     int64
-	ResultQueueSize              int
-	AckQueueSize                 int
-	MaxConnections               int
-	InfoPolingPeriodMilliseconds int64
-	StartTimeoutMilliseconds     int64
+	Directory                    string `yaml:"directory,omitempty"`
+	FileLimit                    uint64 `yaml:"file-limit,omitempty"`
+	RemoveFiles                  bool   `yaml:"remove-files,omitempty"`
+	ParallelWrite                int    `yaml:"parallel-write,omitempty"`
+	DC                           string `yaml:"dc,omitempty"`
+	LocalAddress                 string `yaml:"local-address,omitempty"`
+	LocalPort                    int    `yaml:"local-port,omitempty"`
+	Namespace                    string `yaml:"namespace,omitempty"`
+	Rewind                       string `yaml:"rewind,omitempty"`
+	MaxThroughput                int    `yaml:"max-throughput,omitempty"`
+	ReadTimeoutMilliseconds      int64  `yaml:"read-timeout-milliseconds,omitempty"`
+	WriteTimeoutMilliseconds     int64  `yaml:"write-timeout-milliseconds,omitempty"`
+	ResultQueueSize              int    `yaml:"results-queue-size,omitempty"`
+	AckQueueSize                 int    `yaml:"ack-queue-size,omitempty"`
+	MaxConnections               int    `yaml:"max-connections,omitempty"`
+	InfoPolingPeriodMilliseconds int64  `yaml:"info-poling-period-milliseconds,omitempty"`
+	StartTimeoutMilliseconds     int64  `yaml:"start-timeout-milliseconds,omitempty"`
 
-	TLSConfig *tls.Config
+	StopXDR    bool `yaml:"stop-xdr,omitempty"`
+	UnblockMRT bool `yaml:"unblock-mrt,omitempty"`
 
-	StopXDR    bool
-	UnblockMRT bool
-
-	InfoMaxRetries                uint
-	InfoRetriesMultiplier         float64
-	InfoRetryIntervalMilliseconds int64
+	InfoMaxRetries                uint    `yaml:"info-max-retries,omitempty"`
+	InfoRetriesMultiplier         float64 `yaml:"info-retries-multiplier, omitempty"`
+	InfoRetryIntervalMilliseconds int64   `yaml:"info-retry-timeout,omitempty"`
 
 	Forward bool
+}
+
+func (b *BackupXDR) Validate() error {
+	if b == nil {
+		return nil
+	}
+
+	if b.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+
+	if b.DC == "" {
+		return fmt.Errorf("dc is required")
+	}
+
+	if b.LocalAddress == "" {
+		return fmt.Errorf("local address is required")
+	}
+
+	if b.ReadTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr read timeout can't be negative")
+	}
+
+	if b.WriteTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr write timeout can't be negative")
+	}
+
+	if b.InfoPolingPeriodMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info poling period can't be negative")
+	}
+
+	if b.StartTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr start timeout can't be negative")
+	}
+
+	if b.ResultQueueSize < 0 {
+		return fmt.Errorf("backup xdr result queue size can't be negative")
+	}
+
+	if b.AckQueueSize < 0 {
+		return fmt.Errorf("backup xdr ack queue size can't be negative")
+	}
+
+	if b.MaxConnections < 1 {
+		return fmt.Errorf("backup xdr max connections can't be less than 1")
+	}
+
+	if b.ParallelWrite < 0 {
+		return fmt.Errorf("backup xdr parallel write can't be negative")
+	}
+
+	if b.FileLimit < 1 {
+		return fmt.Errorf("backup xdr file limit can't be less than 1")
+	}
+
+	if b.InfoRetryIntervalMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info retry interval can't be negative")
+	}
+
+	if b.InfoRetriesMultiplier < 0 {
+		return fmt.Errorf("backup xdr info retries multiplier can't be negative")
+	}
+
+	return nil
 }

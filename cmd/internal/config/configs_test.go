@@ -21,6 +21,7 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
+	"github.com/aerospike/backup-go/cmd/internal/logging"
 	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -65,23 +66,23 @@ func TestMapBackupConfig_Success(t *testing.T) {
 			Compact:          true,
 			NodeList:         "node1,node2",
 			NoTTLOnly:        true,
-		},
-		Common: &models.Common{
-			Namespace:        "test-namespace",
-			SetList:          "set1,set2",
-			BinList:          "bin1,bin2",
-			NoRecords:        true,
-			NoIndexes:        false,
-			RecordsPerSecond: 1000,
-			Nice:             10,
-			Parallel:         5,
+			Common: models.Common{
+				Namespace:        "test-namespace",
+				SetList:          "set1,set2",
+				BinList:          "bin1,bin2",
+				NoRecords:        true,
+				NoIndexes:        false,
+				RecordsPerSecond: 1000,
+				Nice:             10,
+				Parallel:         5,
+			},
 		},
 		Compression: testCompression(),
 		Encryption:  testEncryption(),
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := NewBackupConfig(params)
+	config, err := newBackupConfig(params)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "test-namespace", config.Namespace)
@@ -128,16 +129,16 @@ func TestMapBackupConfig_InvalidModifiedBefore(t *testing.T) {
 		App: &models.App{},
 		Backup: &models.Backup{
 			ModifiedBefore: "invalid-date",
-		},
-		Common: &models.Common{
-			Namespace: "test-namespace",
+			Common: models.Common{
+				Namespace: "test-namespace",
+			},
 		},
 		Compression: testCompression(),
 		Encryption:  testEncryption(),
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := NewBackupConfig(params)
+	config, err := newBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified before date")
@@ -150,16 +151,16 @@ func TestMapBackupConfig_InvalidModifiedAfter(t *testing.T) {
 		App: &models.App{},
 		Backup: &models.Backup{
 			ModifiedAfter: "invalid-date",
-		},
-		Common: &models.Common{
-			Namespace: "test-namespace",
+			Common: models.Common{
+				Namespace: "test-namespace",
+			},
 		},
 		Compression: testCompression(),
 		Encryption:  testEncryption(),
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := NewBackupConfig(params)
+	config, err := newBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse modified after date")
@@ -172,16 +173,16 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 		App: &models.App{},
 		Backup: &models.Backup{
 			FilterExpression: "invalid-exp",
-		},
-		Common: &models.Common{
-			Namespace: "test-namespace",
+			Common: models.Common{
+				Namespace: "test-namespace",
+			},
 		},
 		Compression: testCompression(),
 		Encryption:  testEncryption(),
 		SecretAgent: testSecretAgent(),
 	}
 
-	config, err := NewBackupConfig(params)
+	config, err := newBackupConfig(params)
 	assert.Error(t, err)
 	assert.Nil(t, config)
 	assert.Contains(t, err.Error(), "failed to parse filter expression")
@@ -190,24 +191,25 @@ func TestMapBackupConfig_InvalidExpression(t *testing.T) {
 func TestMapRestoreConfig_Success(t *testing.T) {
 	t.Parallel()
 	params := &RestoreParams{
-		App:     &models.App{},
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Namespace:        "test-namespace",
-			SetList:          "set1,set2",
-			BinList:          "bin1,bin2",
-			NoRecords:        true,
-			NoIndexes:        false,
-			RecordsPerSecond: 1000,
-			Nice:             10,
-			Parallel:         5,
+		App: &models.App{},
+		Restore: &models.Restore{
+			Common: models.Common{
+				Namespace:        "test-namespace",
+				SetList:          "set1,set2",
+				BinList:          "bin1,bin2",
+				NoRecords:        true,
+				NoIndexes:        false,
+				RecordsPerSecond: 1000,
+				Nice:             10,
+				Parallel:         5,
+			},
 		},
 		Compression: testCompression(),
 		Encryption:  testEncryption(),
 		SecretAgent: testSecretAgent(),
 	}
-
-	config := NewRestoreConfig(params)
+	logger := logging.NewDefaultLogger()
+	config := NewRestoreConfig(params, logger)
 	assert.Equal(t, "test-namespace", *config.Namespace.Source)
 	assert.Equal(t, "test-namespace", *config.Namespace.Destination)
 	assert.ElementsMatch(t, []string{"set1", "set2"}, config.SetList)
@@ -360,13 +362,12 @@ func TestMapPartitionFilter_AfterDigest(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
 		AfterDigest: "AvDsV2KuSZHZugDBftnLxGpR+88=",
+		Common: models.Common{
+			Namespace: "test-namespace",
+		},
 	}
 
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-
-	filters, err := mapPartitionFilter(backupModel, commonModel)
+	filters, err := mapPartitionFilter(backupModel)
 	assert.NoError(t, err)
 	assert.NotNil(t, filters)
 	assert.Equal(t, 1, len(filters))
@@ -377,13 +378,12 @@ func TestMapPartitionFilter_PartitionList(t *testing.T) {
 	t.Parallel()
 	backupModel := &models.Backup{
 		PartitionList: "0-1024",
+		Common: models.Common{
+			Namespace: "test-namespace",
+		},
 	}
 
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
-	}
-
-	filters, err := mapPartitionFilter(backupModel, commonModel)
+	filters, err := mapPartitionFilter(backupModel)
 	assert.NoError(t, err)
 	assert.NotNil(t, filters)
 	assert.Equal(t, 1, len(filters))
@@ -392,13 +392,13 @@ func TestMapPartitionFilter_PartitionList(t *testing.T) {
 
 func TestMapPartitionFilter_NoFilters(t *testing.T) {
 	t.Parallel()
-	backupModel := &models.Backup{}
-
-	commonModel := &models.Common{
-		Namespace: "test-namespace",
+	backupModel := &models.Backup{
+		Common: models.Common{
+			Namespace: "test-namespace",
+		},
 	}
 
-	filters, err := mapPartitionFilter(backupModel, commonModel)
+	filters, err := mapPartitionFilter(backupModel)
 	assert.NoError(t, err)
 	assert.NotNil(t, filters)
 	assert.Equal(t, 1, len(filters))
@@ -416,16 +416,17 @@ func TestMapRestoreConfig_PartialConfig(t *testing.T) {
 			DisableBatchWrites: true,
 			BatchSize:          1000,
 			MaxAsyncBatches:    5,
-		},
-		Common: &models.Common{
-			Namespace: "test-namespace",
+			Common: models.Common{
+				Namespace: "test-namespace",
+			},
 		},
 		Compression: testCompression(),
 		Encryption:  testEncryption(),
 		SecretAgent: testSecretAgent(),
 	}
 
-	config := NewRestoreConfig(params)
+	logger := logging.NewDefaultLogger()
+	config := NewRestoreConfig(params, logger)
 	assert.Equal(t, int64(3600), config.ExtraTTL)
 	assert.True(t, config.IgnoreRecordError)
 	assert.True(t, config.DisableBatchWrites)
@@ -441,15 +442,13 @@ func TestMapScanPolicy_Success(t *testing.T) {
 		FilterExpression:    "k1EDpHRlc3Q=",
 		PreferRacks:         "rack1",
 		NoBins:              true,
+		Common: models.Common{
+			MaxRetries:    3,
+			TotalTimeout:  10000,
+			SocketTimeout: 3000,
+		},
 	}
-
-	commonModel := &models.Common{
-		MaxRetries:    3,
-		TotalTimeout:  10000,
-		SocketTimeout: 3000,
-	}
-
-	scanPolicy, err := newScanPolicy(backupModel, commonModel)
+	scanPolicy, err := newScanPolicy(backupModel)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(500), scanPolicy.MaxRecords)
 	assert.Equal(t, 3, scanPolicy.MaxRetries)
@@ -465,15 +464,14 @@ func TestMapWritePolicy_Success(t *testing.T) {
 	restoreModel := &models.Restore{
 		Replace: true,
 		Uniq:    false,
+		Common: models.Common{
+			MaxRetries:    3,
+			TotalTimeout:  5000,
+			SocketTimeout: 1500,
+		},
 	}
 
-	commonModel := &models.Common{
-		MaxRetries:    3,
-		TotalTimeout:  5000,
-		SocketTimeout: 1500,
-	}
-
-	writePolicy := newWritePolicy(restoreModel, commonModel)
+	writePolicy := newWritePolicy(restoreModel)
 	assert.Equal(t, aerospike.REPLACE, writePolicy.RecordExistsAction)
 	assert.Equal(t, 3, writePolicy.MaxRetries)
 	assert.Equal(t, 5000*time.Millisecond, writePolicy.TotalTimeout)
@@ -727,7 +725,7 @@ func TestMapBackupXDRConfig(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			config := NewBackupXDRConfig(tt.params)
+			config := newBackupXDRConfig(tt.params)
 			assert.NotNil(t, config)
 			tt.verify(t, config)
 		})
@@ -765,7 +763,7 @@ func TestMapScanPolicy_Errors(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := newScanPolicy(tt.backupModel, tt.commonModel)
+			got, err := newScanPolicy(tt.backupModel)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -811,7 +809,7 @@ func TestMapWritePolicy_ConfigurationCombinations(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := newWritePolicy(tt.restoreModel, tt.commonModel)
+			got := newWritePolicy(tt.restoreModel)
 			assert.Equal(t, tt.wantAction, got.RecordExistsAction)
 			assert.Equal(t, tt.wantGenPolicy, got.GenerationPolicy)
 			assert.True(t, got.SendKey)

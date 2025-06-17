@@ -105,11 +105,11 @@ func NewStateReader(
 	}
 
 	restoreParams := &config.RestoreParams{
-		Common: &models.Common{
-			Directory: params.Common.Directory,
-		},
 		Restore: &models.Restore{
 			InputFile: stateFile,
+			Common: models.Common{
+				Directory: params.Backup.Directory,
+			},
 		},
 	}
 
@@ -125,7 +125,7 @@ func newReader(
 	isXdr bool,
 	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
-	directory, inputFile := params.Common.Directory, params.Restore.InputFile
+	directory, inputFile := params.Restore.Directory, params.Restore.InputFile
 	parentDirectory, directoryList := params.Restore.ParentDirectory, params.Restore.DirectoryList
 
 	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr, logger)

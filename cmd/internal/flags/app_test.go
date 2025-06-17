@@ -32,6 +32,7 @@ func TestApp_NewFlagSet(t *testing.T) {
 		"--verbose",
 		"--log-level", "error",
 		"--log-json",
+		"--config", "config.yaml",
 	}
 
 	err := flagSet.Parse(args)
@@ -42,6 +43,7 @@ func TestApp_NewFlagSet(t *testing.T) {
 	assert.True(t, app.Verbose, "Verbose flag should be true when set")
 	assert.Equal(t, app.LogLevel, "error", "Log level flag should be error")
 	assert.True(t, app.LogJSON, "Log JSON flag should be true when set")
+	assert.Equal(t, app.Config, "config.yaml", "Config flag should be config.yaml")
 }
 
 func TestApp_NewFlagSet_DefaultValues(t *testing.T) {
@@ -58,4 +60,5 @@ func TestApp_NewFlagSet_DefaultValues(t *testing.T) {
 	assert.False(t, app.Verbose, "Verbose flag should default to false")
 	assert.Equal(t, app.LogLevel, "debug", "Log level flag should default be debug")
 	assert.False(t, app.LogJSON, "Log JSON flag should default to false")
+	assert.Equal(t, app.Config, "", "Config flag should default should be empty string")
 }

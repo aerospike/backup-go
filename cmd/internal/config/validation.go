@@ -22,134 +22,13 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/models"
 )
 
-func ValidateBackup(params *BackupParams) error {
-	if params.Backup != nil && params.Common != nil {
-		if params.Backup.OutputFile == "" && params.Common.Directory == "" && !params.Backup.Estimate {
-			return fmt.Errorf("output file or directory required")
-		}
-
-		if err := ValidateBackupParams(params.Backup, params.Common); err != nil {
-			return err
-		}
-
-		if err := ValidateCommonParams(params.Common); err != nil {
-			return err
-		}
-	}
-
-	if params.BackupXDR != nil {
-		if err := ValidateBackupXDRParams(params.BackupXDR); err != nil {
-			return err
-		}
-	}
-
-	if err := ValidateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ValidateBackupXDRParams(params *models.BackupXDR) error {
-	if params.ReadTimeoutMilliseconds < 0 {
-		return fmt.Errorf("backup xdr read timeout can't be negative")
-	}
-
-	if params.WriteTimeoutMilliseconds < 0 {
-		return fmt.Errorf("backup xdr write timeout can't be negative")
-	}
-
-	if params.InfoPolingPeriodMilliseconds < 0 {
-		return fmt.Errorf("backup xdr info poling period can't be negative")
-	}
-
-	if params.StartTimeoutMilliseconds < 0 {
-		return fmt.Errorf("backup xdr start timeout can't be negative")
-	}
-
-	if params.ResultQueueSize < 0 {
-		return fmt.Errorf("backup xdr result queue size can't be negative")
-	}
-
-	if params.AckQueueSize < 0 {
-		return fmt.Errorf("backup xdr ack queue size can't be negative")
-	}
-
-	if params.MaxConnections < 1 {
-		return fmt.Errorf("backup xdr max connections can't be less than 1")
-	}
-
-	if params.ParallelWrite < 0 {
-		return fmt.Errorf("backup xdr parallel write can't be negative")
-	}
-
-	if params.FileLimit < 1 {
-		return fmt.Errorf("backup xdr file limit can't be less than 1")
-	}
-
-	if params.InfoRetryIntervalMilliseconds < 0 {
-		return fmt.Errorf("backup xdr info retry interval can't be negative")
-	}
-
-	if params.InfoRetriesMultiplier < 0 {
-		return fmt.Errorf("backup xdr info retries multiplier can't be negative")
-	}
-
-	return nil
-}
-
-func ValidateRestore(params *RestoreParams) error {
-	if params.Restore != nil && params.Common != nil {
-		switch params.Restore.Mode {
-		case models.RestoreModeAuto, models.RestoreModeASB, models.RestoreModeASBX:
-			// ok.
-		default:
-			return fmt.Errorf("invalid restore mode: %s", params.Restore.Mode)
-		}
-
-		if params.Restore.InputFile == "" &&
-			params.Common.Directory == "" &&
-			params.Restore.DirectoryList == "" {
-			return fmt.Errorf("input file or directory required")
-		}
-
-		if err := ValidateRestoreParams(params.Restore, params.Common); err != nil {
-			return err
-		}
-
-		if !params.Restore.ValidateOnly {
-			// Validate common params only if restore is not in validate only mode.
-			if err := ValidateCommonParams(params.Common); err != nil {
-				return err
-			}
-		}
-	}
-
-	if err := ValidateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
-		return err
-	}
-
-	if params.AwsS3 != nil {
-		if params.AwsS3.RestorePollDuration < 1 {
-			return fmt.Errorf("restore poll duration can't be less than 1")
-		}
-	}
-
-	if params.AzureBlob != nil {
-		if params.AzureBlob.RestorePollDuration < 1 {
-			return fmt.Errorf("rehydrate poll duration can't be less than 1")
-		}
-	}
-
-	return nil
-}
-
-//nolint:gocyclo // Long validation function.
+//nolint:gocyclo // It is a long validation function.
 func ValidateStorages(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
 ) error {
+	// TODO: think how to rework this func. I want to get rid of it.
 	var count int
 
 	if awsS3 != nil && (awsS3.BucketName != "" || awsS3.Region != "" || awsS3.Profile != "" || awsS3.Endpoint != "") {
@@ -185,83 +64,7 @@ func ValidateStorages(
 	return nil
 }
 
-//nolint:gocyclo // It is a long validation function.
-func ValidateBackupParams(backupParams *models.Backup, commonParams *models.Common) error {
-	if backupParams == nil || commonParams == nil {
-		return fmt.Errorf("params can't be nil")
-	}
-
-	if commonParams.Directory != "" && backupParams.OutputFile != "" {
-		return fmt.Errorf("only one of output-file and directory may be configured at the same time")
-	}
-
-	// Only one filter is allowed.
-	if backupParams.AfterDigest != "" && backupParams.PartitionList != "" {
-		return fmt.Errorf("only one of after-digest or partition-list can be configured")
-	}
-
-	if (backupParams.Continue != "" || backupParams.Estimate || backupParams.StateFileDst != "") &&
-		(backupParams.ParallelNodes || backupParams.NodeList != "") {
-		return fmt.Errorf("saving states and calculating estimates is not possible in parallel node mode")
-	}
-
-	if backupParams.Continue != "" && backupParams.StateFileDst != "" {
-		return fmt.Errorf("continue and state-file-dst are mutually exclusive")
-	}
-
-	if backupParams.Estimate {
-		// Estimate with filter not allowed.
-		if backupParams.PartitionList != "" ||
-			backupParams.NodeList != "" ||
-			backupParams.AfterDigest != "" ||
-			backupParams.FilterExpression != "" ||
-			backupParams.ModifiedAfter != "" ||
-			backupParams.ModifiedBefore != "" ||
-			backupParams.NoTTLOnly {
-			return fmt.Errorf("estimate with any filter is not allowed")
-		}
-		// For estimate directory or file must not be set.
-		if backupParams.OutputFile != "" || commonParams.Directory != "" {
-			return fmt.Errorf("estimate with output-file or directory is not allowed")
-		}
-		// Check estimate samples size.
-		if backupParams.EstimateSamples < 0 {
-			return fmt.Errorf("estimate with estimate-samples < 0 is not allowed")
-		}
-	}
-
-	if !backupParams.Estimate && backupParams.OutputFile == "" && commonParams.Directory == "" {
-		return fmt.Errorf("must specify either output-file or directory")
-	}
-
-	if backupParams.NodeList != "" && backupParams.RackList != "" {
-		return fmt.Errorf("specify either rack-list or node-list, but not both")
-	}
-
-	return nil
-}
-
-func ValidateCommonParams(commonParams *models.Common) error {
-	if commonParams.Namespace == "" {
-		return fmt.Errorf("namespace is required")
-	}
-
-	if commonParams.TotalTimeout < 0 {
-		return fmt.Errorf("total-timeout must be non-negative")
-	}
-
-	if commonParams.SocketTimeout < 0 {
-		return fmt.Errorf("socket-timeout must be non-negative")
-	}
-
-	if commonParams.Parallel < 0 {
-		return fmt.Errorf("parallel must be non-negative")
-	}
-
-	return nil
-}
-
-func validatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) error {
+func ValidatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) error {
 	if len(partitionFilters) < 1 {
 		return nil
 	}
@@ -298,26 +101,6 @@ func validatePartitionFilters(partitionFilters []*aerospike.PartitionFilter) err
 			return fmt.Errorf("overlapping intervals: [%d, %d] and [%d, %d]",
 				intervals[i-1][0], prevEnd, currBegin, intervals[i][1])
 		}
-	}
-
-	return nil
-}
-
-func ValidateRestoreParams(restoreParams *models.Restore, commonParams *models.Common) error {
-	if commonParams.Directory != "" && restoreParams.InputFile != "" {
-		return fmt.Errorf("only one of directory and input-file may be configured at the same time")
-	}
-
-	if restoreParams.DirectoryList != "" && (commonParams.Directory != "" || restoreParams.InputFile != "") {
-		return fmt.Errorf("only one of directory, input-file and directory-list may be configured at the same time")
-	}
-
-	if restoreParams.ParentDirectory != "" && restoreParams.DirectoryList == "" {
-		return fmt.Errorf("must specify directory-list list")
-	}
-
-	if restoreParams.WarmUp < 0 {
-		return fmt.Errorf("warm-up must be non-negative")
 	}
 
 	return nil

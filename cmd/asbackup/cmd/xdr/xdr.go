@@ -25,6 +25,7 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/logging"
 	asFlags "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Cmd represents XDR sub command.
@@ -81,17 +82,7 @@ func NewCmd(
 	xdrCmd.Flags().AddFlagSet(backupXDRFlagSet)
 
 	// Beautify help and usage.
-	helpFunc := func() {
-		fmt.Println("Welcome to the Aerospike XDR backup CLI tool!")
-		fmt.Println("-----------------------------------------")
-		fmt.Println("\nUsage:")
-		fmt.Println("  asbackup xdr [flags]")
-		// Print section: XDR Flags
-		fmt.Println("\nXDR Backup Flags:")
-		fmt.Println("This sections replace Backup Flags section in main documentation." +
-			"\nAll other flags are valid for XDR backup.")
-		backupXDRFlagSet.PrintDefaults()
-	}
+	helpFunc := newHelpFunction(backupXDRFlagSet)
 
 	xdrCmd.SetUsageFunc(func(_ *cobra.Command) error {
 		helpFunc()
@@ -126,17 +117,21 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Init app.
-	asbParams := &config.BackupParams{
-		App:          c.flagsApp.GetApp(),
-		ClientConfig: c.flagsAerospike.NewAerospikeConfig(),
-		ClientPolicy: c.flagsClientPolicy.GetClientPolicy(),
-		BackupXDR:    c.flagsBackupXDR.GetBackupXDR(),
-		Compression:  c.flagsCompression.GetCompression(),
-		Encryption:   c.flagsEncryption.GetEncryption(),
-		SecretAgent:  c.flagsSecretAgent.GetSecretAgent(),
-		AwsS3:        c.flagsAws.GetAwsS3(),
-		GcpStorage:   c.flagsGcp.GetGcpStorage(),
-		AzureBlob:    c.flagsAzure.GetAzureBlob(),
+	asbParams, err := config.NewBackupParams(
+		c.flagsApp.GetApp(),
+		c.flagsAerospike.NewAerospikeConfig(),
+		c.flagsClientPolicy.GetClientPolicy(),
+		nil,
+		c.flagsBackupXDR.GetBackupXDR(),
+		c.flagsCompression.GetCompression(),
+		c.flagsEncryption.GetEncryption(),
+		c.flagsSecretAgent.GetSecretAgent(),
+		c.flagsAws.GetAwsS3(),
+		c.flagsGcp.GetGcpStorage(),
+		c.flagsAzure.GetAzureBlob(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize app: %w", err)
 	}
 
 	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
@@ -153,4 +148,18 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+func newHelpFunction(backupXDRFlagSet *pflag.FlagSet) func() {
+	return func() {
+		fmt.Println("Welcome to the Aerospike XDR backup CLI tool!")
+		fmt.Println("-----------------------------------------")
+		fmt.Println("\nUsage:")
+		fmt.Println("  asbackup xdr [flags]")
+		// Print section: XDR Flags
+		fmt.Println("\nXDR Backup Flags:")
+		fmt.Println("This sections replace Backup Flags section in main documentation." +
+			"\nAll other flags are valid for XDR backup.")
+		backupXDRFlagSet.PrintDefaults()
+	}
 }

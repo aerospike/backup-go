@@ -42,6 +42,7 @@ General Flags:
   -v, --verbose            Enable more detailed logging.
       --log-level string   Determine log level for --verbose output. Log levels are: debug, info, warn, error. (default "debug")
       --log-json           Set output in JSON format for parsing by external tools.
+      --config string      Path to YAML configuration file.
 
 Aerospike Client Flags:
   -h, --host host[:tls-name][:port][,...]                                                           The Aerospike host. (default 127.0.0.1)
@@ -318,4 +319,60 @@ Any Azure parameter can be retrieved from Secret Agent.
 --s3-connect-timeout        The AWS S3 client's connection timeout in milliseconds.
                             This is equivalent to cli-connect-timeout in the AWS CLI,
                             or connectTimeoutMS in the aws-sdk-cpp client configuration.                  
+```
+
+
+## Config example
+```yaml
+app:
+  help: false
+  version: false
+  log-level: debug
+  config: ""
+client-config:
+  seeds:
+    - host: 127.0.0.1
+      tlsname: ""
+      port: 3000
+  user: tester
+  password: psw
+  authmode: 0
+  tls: null
+client-policy:
+  timeout: 30000
+  login-timeout: 10000
+restore:
+  common:
+    directory: continue_test
+    namespace: source-ns1
+    max-retries: 5
+    total-timeout: 10000
+    socket-timeout: 10000
+  batch-size: 128
+  max-async-batches: 32
+  timeout: 10000
+  retry-base-timeout: 1000
+  retry-multiplier: 1
+  mode: auto
+compression:
+  mode: NONE
+  level: 3
+encryption: {}
+secret-agent:
+  connection-type: tcp
+aws:
+  rehydrate-poll-duration: 60000
+  retry-max-attempts: 100
+  retry-max-backoff: 90
+  retry-backoff: 60
+gcp:
+  retry-max-attempts: 100
+  retry-max-backoff: 90
+  retry-init-backoff: 60
+  retry-backoff-multiplier: 2
+azure:
+  rehydrate-poll-duration: 60000
+  retry-max-attempts: 100
+  retry-delay: 60
+  retry-max-delay: 90
 ```

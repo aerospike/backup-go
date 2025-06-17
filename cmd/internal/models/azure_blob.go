@@ -24,25 +24,25 @@ import (
 // AzureBlob represents the configuration for Azure Blob storage integration.
 type AzureBlob struct {
 	// Account name + key auth
-	AccountName string
-	AccountKey  string
+	AccountName string `yaml:"account-name,omitempty"`
+	AccountKey  string `yaml:"account-key,omitempty"`
 	// Azure Active directory
-	TenantID     string
-	ClientID     string
-	ClientSecret string
+	TenantID     string `yaml:"tenant-id,omitempty"`
+	ClientID     string `yaml:"client-id,omitempty"`
+	ClientSecret string `yaml:"client-secret,omitempty"`
 
-	Endpoint      string
-	ContainerName string
+	Endpoint      string `yaml:"endpoint,omitempty"`
+	ContainerName string `yaml:"container-name,omitempty"`
 
-	AccessTier          string
-	RestorePollDuration int64
+	AccessTier          string `yaml:"access-tier,omitempty"`
+	RestorePollDuration int64  `yaml:"rehydrate-poll-duration,omitempty"`
 
-	RetryMaxAttempts     int
-	RetryTimeoutSeconds  int
-	RetryDelaySeconds    int
-	RetryMaxDelaySeconds int
+	RetryMaxAttempts     int `yaml:"retry-max-attempts,omitempty"`
+	RetryTimeoutSeconds  int `yaml:"retry-timeout,omitempty"`
+	RetryDelaySeconds    int `yaml:"retry-delay,omitempty"`
+	RetryMaxDelaySeconds int `yaml:"retry-max-delay,omitempty"`
 
-	BlockSize int
+	BlockSize int `yaml:"block-size,omitempty"`
 }
 
 // LoadSecrets tries to load field values from secret agent.
@@ -92,7 +92,7 @@ func (a *AzureBlob) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	return nil
 }
 
-// Validate internal validation for struct params.
+// Validate internal validation for struct backup.
 func (a *AzureBlob) Validate() error {
 	if a.ContainerName == "" {
 		return fmt.Errorf("container name is required")
@@ -116,6 +116,10 @@ func (a *AzureBlob) Validate() error {
 
 	if a.BlockSize < 0 {
 		return fmt.Errorf("block size must be non-negative")
+	}
+
+	if a.RestorePollDuration < 1 {
+		return fmt.Errorf("rehydrate poll duration can't be less than 1")
 	}
 
 	return nil

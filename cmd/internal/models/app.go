@@ -18,9 +18,12 @@ package models
 type App struct {
 	Help    bool
 	Version bool
-	Verbose bool
+	Verbose bool `yaml:"verbose,omitempty"`
 	// Set log level for verbose output.
-	LogLevel string
+	LogLevel string `yaml:"log-level,omitempty"`
 	// Format logs as JSON, for parsing by external tools.
-	LogJSON bool
+	LogJSON bool `yaml:"log-json,omitempty"`
+
+	// Config file path.
+	Config string
 }

@@ -52,6 +52,7 @@ General Flags:
   -v, --verbose            Enable more detailed logging.
       --log-level string   Determine log level for --verbose output. Log levels are: debug, info, warn, error. (default "debug")
       --log-json           Set output in JSON format for parsing by external tools.
+      --config string      Path to YAML configuration file.
 
 Aerospike Client Flags:
   -h, --host host[:tls-name][:port][,...]                                                           The Aerospike host. (default 127.0.0.1)
@@ -315,8 +316,6 @@ Any Azure parameter can be retrieved from Secret Agent.
 
 --instance          Section with these instance is read. e.g in case instance `a` is specified
                     sections cluster_a, asbackup_a is read.
- 
---config-file       Read this file after default configuration file.
   
 --only-config-file  Read only this configuration file.
 
@@ -340,4 +339,63 @@ Any Azure parameter can be retrieved from Secret Agent.
 --s3-connect-timeout        The AWS S3 client's connection timeout in milliseconds.
                             This is equivalent to cli-connect-timeout in the AWS CLI,
                             or connectTimeoutMS in the aws-sdk-cpp client configuration.
+```
+
+## Config example
+```yaml
+app:
+    help: false
+    version: false
+    log-level: debug
+    config: ""
+client-config:
+    seeds:
+        - host: 127.0.0.1
+          tlsname: ""
+          port: 3000
+    user: some_user
+    password: some_password
+    authmode: 0
+    tls: null
+client-policy:
+    timeout: 30000
+    login-timeout: 10000
+backup:
+    common:
+        directory: continue_test
+        namespace: source-ns1
+        parallel: 1
+        max-retries: 5
+        socket-timeout: 10000
+    remove-files: true
+    file-limit: 262144000
+    sleep-between-retries: 5
+    estimate-samples: 10000
+    scan-page-size: 10000
+    info-max-retries: 3
+    info-retries-multiplier: 1
+    info-retry-timeout: 1000
+compression:
+    mode: NONE
+    level: 3
+encryption: {}
+secret-agent:
+    connection-type: tcp
+aws:
+    retry-max-attempts: 100
+    retry-max-backoff: 90
+    retry-backoff: 60
+    chunk-size: 5242880
+gcp:
+    retry-max-attempts: 100
+    retry-max-backoff: 90
+    retry-init-backoff: 60
+    retry-backoff-multiplier: 2
+    chunk-size: 5242880
+azure:
+    retry-max-attempts: 100
+    retry-delay: 60
+    retry-max-delay: 90
+    block-size: 5242880
+
 ```

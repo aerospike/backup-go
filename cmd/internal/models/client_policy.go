@@ -16,7 +16,7 @@ package models
 
 // ClientPolicy contains flags that will be mapped to ClientPolicy.
 type ClientPolicy struct {
-	Timeout      int64
-	IdleTimeout  int64
-	LoginTimeout int64
+	Timeout      int64 `yaml:"timeout,omitempty"`
+	IdleTimeout  int64 `yaml:"idle-timeout,omitempty"`
+	LoginTimeout int64 `yaml:"login-timeout,omitempty"`
 }

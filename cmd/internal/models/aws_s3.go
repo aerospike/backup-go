@@ -26,13 +26,13 @@ type AwsS3 struct {
 	BucketName      string `yaml:"bucket-name,omitempty"`
 	Region          string `yaml:"region,omitempty"`
 	Profile         string `yaml:"profile,omitempty"`
-	Endpoint        string `yaml:"endpoint,omitempty"`
+	Endpoint        string `yaml:"endpoint-override,omitempty"`
 	AccessKeyID     string `yaml:"access-key-id,omitempty"`
 	SecretAccessKey string `yaml:"secret-access-key,omitempty"`
 
 	StorageClass        string `yaml:"storage-class,omitempty"`
 	AccessTier          string `yaml:"access-tier,omitempty"`
-	RestorePollDuration int64  `yaml:"rehydrate-poll-duration,omitempty"`
+	RestorePollDuration int64  `yaml:"restore-poll-duration,omitempty"`
 
 	RetryMaxAttempts       int `yaml:"retry-max-attempts,omitempty"`
 	RetryMaxBackoffSeconds int `yaml:"retry-max-backoff,omitempty"`

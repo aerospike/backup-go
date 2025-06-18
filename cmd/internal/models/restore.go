@@ -24,7 +24,7 @@ const (
 
 // Restore contains flags that will be mapped to restore config.
 type Restore struct {
-	Common
+	Common `yaml:",inline"`
 
 	InputFile          string `yaml:"input-file,omitempty"`
 	DirectoryList      string `yaml:"directory-list,omitempty"`

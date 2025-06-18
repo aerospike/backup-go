@@ -19,7 +19,6 @@ import (
 )
 
 // BackupXDR flags that will be mapped to xdr backup config.
-// (common for backup and restore flags are in Common).
 type BackupXDR struct {
 	Directory                    string `yaml:"directory,omitempty"`
 	FileLimit                    uint64 `yaml:"file-limit,omitempty"`

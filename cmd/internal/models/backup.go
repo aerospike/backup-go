@@ -21,7 +21,7 @@ import (
 // Backup flags that will be mapped to (scan) backup config.
 // (common for backup and restore flags are in Common).
 type Backup struct {
-	Common
+	Common `yaml:",inline"`
 
 	OutputFile          string `yaml:"output-file,omitempty"`
 	RemoveFiles         bool   `yaml:"remove-files,omitempty"`

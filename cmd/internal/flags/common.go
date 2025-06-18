@@ -155,7 +155,7 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 			"If both this and --total-timeout are 0, there is no socket idle time limit.")
 	flagSet.IntVarP(&f.fields.Nice, "nice", "N",
 		0,
-		"The limits for read/write storage bandwidth in MiB/s")
+		"The limits for read/write storage bandwidth in MiB/s.")
 
 	return flagSet
 }

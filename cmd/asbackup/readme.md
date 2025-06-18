@@ -344,58 +344,299 @@ Any Azure parameter can be retrieved from Secret Agent.
 ## Config example
 ```yaml
 app:
-    help: false
-    version: false
-    log-level: debug
-    config: ""
+  # Enable more detailed logging.
+  verbose: false
+  # Determine log level for verbose output. Log levels are: debug, info, warn, error.
+  log-level: debug
+  # Set output in JSON format for parsing by external tools.
+  log-json: false
 client-config:
-    seeds:
-        - host: 127.0.0.1
-          tlsname: ""
-          port: 3000
-    user: some_user
-    password: some_password
-    authmode: 0
-    tls: null
+  seeds:
+    - host: 127.0.0.1
+      tlsname: ""
+      port: 3000
+  # The Aerospike user to use to connect to the Aerospike cluster.
+  user: some_login
+  # The Aerospike password to use to connect to the Aerospike cluster.
+  password: some_password
+  # The authentication mode used by the Aerospike server.
+  authmode: 0
+  # TlS Configuration.
+  tls: null
 client-policy:
-    timeout: 30000
-    login-timeout: 10000
+  # Initial host connection timeout duration. The timeout when opening a connection to the server host for the first time.
+  timeout: 30000
+  # Idle timeout. Every time a connection is used,
+  # its idle deadline will be extended by this duration. When this deadline is reached,
+  # the connection will be closed and discarded from the connection pool.
+  idle-timeout: 10000
+  # Specifies the login operation timeout for external authentication methods such as LDAP.
+  login-timeout: 10000
 backup:
-    common:
-        directory: continue_test
-        namespace: source-ns1
-        parallel: 1
-        max-retries: 5
-        socket-timeout: 10000
-    remove-files: true
-    file-limit: 262144000
-    sleep-between-retries: 5
-    estimate-samples: 10000
-    scan-page-size: 10000
-    info-max-retries: 3
-    info-retries-multiplier: 1
-    info-retry-timeout: 1000
+  # The directory that holds the backup files. Required, unless `output-file` or `estimate` is used.
+  directory: continue_test
+  # The namespace to be backed up. Required.
+  namespace: source-ns1
+  # The set(s) to be backed up. Accepts comma-separated values with no spaces 'set1,set2,set3'
+  # If multiple sets are being backed up, filter-exp cannot be used.
+  # If empty, include all sets.
+  set-list: set1,set2
+  # Only include the given bins in the backup. Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
+  # If empty include all bins.
+  bin-list: bin1,bin2
+  #  Maximum number of scan calls to run in parallel.
+  # If only one partition range is given, or the entire namespace is being backed up, the range
+  # of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
+  # filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
+  # partition filters. Accepts values from 1-1024 inclusive.
+  parallel: 1
+  # Don't back up any records.
+  no-records: false
+  # Don't back up any indexes.
+  no-indexes: false
+  # Don't back up any UDFs.
+  no-udfs: false
+  # Limit total returned records per second (rps).
+  # Do not apply rps limit if records-per-second is zero.
+  records-per-second: 0
+  # Maximum number of retries before aborting the current transaction.
+  max-retries: 5
+  # Total transaction timeout in milliseconds. 0 - no timeout.
+  total-timeout: 0
+  # Socket timeout in milliseconds. If this value is 0, it's set to total-timeout.
+  # If both this and total-timeout are 0, there is no socket idle time limit.
+  socket-timeout: 10000
+  # The limits for read/write storage bandwidth in MiB/s.
+  nice: 0
+  # Remove an existing backup file `output-file` or entire directory `directory` and replace with the new backup.
+  remove-files: true
+  # Remove existing backup file `output-file` or files `directory` without performing a backup.
+  remove-artifacts: false
+  # Backup to a single backup file. Use - for stdout. Required, unless `directory` or `estimate` is used.
+  output-file: ""
+  # Backup to a single backup file. Use - for stdout.
+  output-file-prefix: ""
+  # Rotate backup files when their size crosses the given value (in bytes). Only used when backing up to a directory.
+  file-limit: 262144000
+  # Do not include bin data in the backup. Use this flag for data sampling or troubleshooting.
+  # On restore all records, that don't contain bin data will be skipped.
+  no-bins: false
+  # Only include records that have no ttl set (persistent records).
+  no-ttl-only: false
+  # Backup records after record digest in record's partition plus all succeeding
+  # partitions. Used to resume backup with last record received from previous
+  # incomplete backup.
+  # This argument is mutually exclusive to partition-list.
+  # Format: Base64 encoded string
+  # Example: EjRWeJq83vEjRRI0VniavN7x
+  after-digest: ""
+  # <YYYY-MM-DD_HH:MM:SS>
+  # Perform an incremental backup; only include records
+  # that changed after the given date and time. The system's
+  # local timezone applies. If only HH:MM:SS is specified, then
+  # today's date is assumed as the date. If only YYYY-MM-DD is
+  # specified, then 00:00:00 (midnight) is assumed as the time.
+  modified-after: ""
+  # <YYYY-MM-DD_HH:MM:SS>
+  # Only include records that last changed before the given date and time.
+  # May combined with modified-after to specify a range.
+  modified-before: ""
+  # Base64 encoded expression. Use the encoded filter expression in each scan call,
+  # which can be used to do a partial backup. The expression to be used can be Base64
+  # encoded through any client. This argument is mutually exclusive with multi-set backup.
+  filter-exp: ""
+  # Specifies how to perform the query of the database run for each backup.
+  # By default, asbackup runs parallel workers for partitions.
+  # If this flag is set to true, asbackup launches parallel workers for nodes.
+  # The number of parallel workers is set by the `parallel`.
+  # This option is mutually exclusive with `continue` and `estimate`.
+  parallel-nodes: false
+  # <addr 1>:<port 1>[,<addr 2>:<port 2>[,...]]
+  # <node name 1>[,<node name 2>[,...]]
+  # To get the correct node address, use 'service-tls-std' if a database configured to use TLS
+  # and 'service-clear-std' info command if no TLS is configured.
+  # To get the node name, use the 'node:' info command.
+  # Back up the given cluster nodes only.
+  # The job is parallelized by number of nodes unless `parallel` is set less than nodes number.
+  # This argument is mutually exclusive with `partition-list` and `after-digest` parameters.
+  # Default: backup all nodes in the cluster
+  node-list: ""
+  # List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,
+  # individual partitions, or records after a specific digest within a single partition.
+  # This argument is mutually exclusive to after-digest.
+  # Filter: <begin partition>[-<partition count>]|<digest>
+  # begin partition: 0-4095
+  # partition count: 1-4096 Default: 1
+  # digest: Base64 encoded string
+  # Examples: 0-1000, 1000-1000, 2222, EjRWeJq83vEjRRI0VniavN7xI0U=
+  # Default: 0-4096 (all partitions)
+  partition-list: ""
+  # <rack id 1>[,<rack id 2>[,...]]
+  # A list of Aerospike Database rack IDs to prefer when reading records for a backup.
+  prefer-racks: ""
+  # <rack id 1>[,<rack id 2>[,...]]
+  # A list of Aerospike Database rack IDs to backup.
+  # Unlike prefer-racks, only specified racks will be backed up.
+  rack-list: ""
+  # The number of records approximately to back up. 0 - all records
+  max-records: 0
+  # The amount of milliseconds to sleep between retries after an error.
+  # This field is ignored when `max-retries` is zero.
+  sleep-between-retries: 5
+  # If true, do not apply base-64 encoding to BLOBs and instead write raw binary data,
+  # resulting in smaller backup files.
+  # Deprecated.
+  compact: false
+  # Estimate the backed-up record size from a random sample of
+  # 10,000 (default) records at 99.9999% confidence to estimate the full backup size.
+  # It ignores any filter: filter-exp, node-list, modified-after, modified-before, no-ttl-only,
+  # after-digest, partition-list
+  estimate: false
+  # The number of samples to take when running a backup estimate.
+  estimate-samples: 10000
+  # Name of a state file that will be saved in backup directory.
+  # Works only with file-limit parameter. As file-limit is reached and the file is closed,
+  # the current state will be saved. Works only for default and/or partition backup.
+  # Not work with parallel-nodes or nodelist
+  state-file-dst: ""
+  # Resumes an interrupted/failed backup from where it was left off, given the .state file
+  # that was generated from the interrupted/failed run.
+  # continue and state-file-dst are mutually exclusive.
+  continue: ""
+  # Number of records will be read on one iteration for continuation backup.
+  # Affects size if overlap on resuming backup after an error.
+  # Used only with state-file-dst or continue.
+  scan-page-size: 10000
+  # How many times to retry to send info commands before failing.
+  info-max-retries: 3
+  # Increases the delay between subsequent retry attempts.
+  # The actual delay is calculated as: info-retry-timeout * (info-retry-multiplier ^ attemptNumber)
+  info-retries-multiplier: 1
+  # Set the initial timeout for a retry in milliseconds when info commands are sent.
+  info-retry-timeout: 1000
 compression:
-    mode: NONE
-    level: 3
-encryption: {}
+  # Enables compressing of backup files using the specified compression algorithm.
+  # Supported compression algorithms are: zstd, none\n"+
+  # Set the zstd compression level via the compression-level option.
+  mode: NONE
+  # zstd compression level.
+  level: 3
+encryption:
+  # Enables encryption of backup files using the specified encryption algorithm.
+  # Supported encryption algorithms are: none, aes128, aes256.
+  # A private key must be given, either via the encryption-key-file option or
+  # the encryption-key-env option or the encryption-key-secret.
+  mode: none
+  # Grabs the encryption key from the given file, which must be in PEM format.
+  key-file: ""
+  # Grabs the encryption key from the given environment variable, which must be base-64 encoded.
+  key-env: ""
+  # Grabs the encryption key from secret-agent.
+  key-secret: ""
 secret-agent:
-    connection-type: tcp
+  # Secret Agent connection type, supported types: tcp, unix.
+  connection-type: tcp
+  # Secret Agent host for TCP connection or socket file path for UDS connection.
+  address: ""
+  # Secret Agent port (only for TCP connection).
+  port: 0
+  # Secret Agent connection and reading timeout.
+  timeout-millisecond: 0
+  # Path to ca file for encrypted connections.
+  ca-file: ""
+  # Whether Secret Agent responses are Base64 encoded.
+  is-base64: false
 aws:
-    retry-max-attempts: 100
-    retry-max-backoff: 90
-    retry-backoff: 60
-    chunk-size: 5242880
+  # Existing S3 bucket name
+  bucket-name: ""
+  # The S3 region that the bucket(s) exist in.
+  region: ""
+  # The S3 profile to use for credentials.
+  profile: ""
+  # An alternate url endpoint to send S3 API calls to.
+  endpoint-override: ""
+  # S3 access key id. If not set, profile auth info will be used.
+  access-key-id: ""
+  # S3 secret access key. If not set, profile auth info will be used.
+  secret-access-key: ""
+  # Apply storage class to backup files. Storage classes are:
+  # STANDARD,
+  # REDUCED_REDUNDANCY,
+  # STANDARD_IA,
+  # ONEZONE_IA,
+  # INTELLIGENT_TIERING,
+  # GLACIER,
+  # DEEP_ARCHIVE,
+  # OUTPOSTS,
+  # GLACIER_IR,
+  # SNOW,
+  # EXPRESS_ONEZONE
+  storage-class: ""
+  # If is set, tool will try to restore archived files to the specified tier.
+  # Tiers are: Standard, Bulk, Expedited.
+  access-tier: ""
+  # How often (in milliseconds) a backup client checks object status when restoring an archived object.
+  restore-poll-duration: 1000
+  # Maximum number of attempts that should be made in case of an error.
+  retry-max-attempts: 100
+  # Max backoff duration in seconds between retried attempts.
+  retry-max-backoff: 90
+  # Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts.
+  retry-backoff: 60
+  # Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
+  # the server in a single request. Objects smaller than the size will be sent in a single request,
+  # while larger objects will be split over multiple requests
+  chunk-size: 5242880
 gcp:
-    retry-max-attempts: 100
-    retry-max-backoff: 90
-    retry-init-backoff: 60
-    retry-backoff-multiplier: 2
-    chunk-size: 5242880
+  # Path to file containing service account JSON key.
+  key-file: ""
+  # Name of the Google cloud storage bucket.
+  bucket-name: ""
+  # An alternate url endpoint to send GCP API calls to.
+  endpoint-override: ""
+  # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
+  retry-max-attempts: 100
+  # Max backoff is the maximum value in seconds of the retry period.
+  retry-max-backoff: 90
+  # Initial backoff is the initial value in seconds of the retry period.
+  retry-init-backoff: 60
+  # Multiplier is the factor by which the retry period increases. It should be greater than 1.
+  retry-backoff-multiplier: 2
+  # Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
+  # the server in a single request. Objects smaller than the size will be sent in a single request,
+  # while larger objects will be split over multiple requests.
+  chunk-size: 5242880
 azure:
-    retry-max-attempts: 100
-    retry-delay: 60
-    retry-max-delay: 90
-    block-size: 5242880
-
+  # Azure account name for account name, key authorization.
+  account-name: ""
+  # Azure account key for account name, key authorization.
+  account-key: ""
+  # Azure tenant ID for Azure Active Directory authorization.
+  tenant-id: ""
+  # Azure client ID for Azure Active Directory authorization.
+  client-id: ""
+  # Azure client secret for Azure Active Directory authorization.
+  client-secret: ""
+  # Azure endpoint.
+  endpoint-override: ""
+  # Azure container Name.
+  container-name: ""
+  # Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
+  access-tier: ""
+  rehydrate-poll-duration: 100
+  # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
+  retry-max-attempts: 100
+  # Retry timeout in seconds indicates the maximum time allowed for any single try of an HTTP request.
+  # This is disabled by default. Specify a value greater than zero to enable.
+  # NOTE: Setting this to a small value might cause premature HTTP request time-outs.
+  retry-timeout: 10
+  # Retry delay specifies the initial amount of delay in seconds to use before retrying an operation.
+  # The value is used only if the HTTP response does not contain a Retry-After header.
+  # The delay increases exponentially with each retry up to the maximum specified by azure-retry-max-delay.
+  retry-delay: 60
+  # Max retry delay specifies the maximum delay in seconds allowed before retrying an operation.
+  # Typically the value is greater than or equal to the value specified in azure-retry-delay.
+  retry-max-delay: 90
+  # Block size defines the size of the buffer used during upload.
+  block-size: 5242880
 ```

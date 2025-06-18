@@ -29,7 +29,7 @@ type GcpStorage struct {
 	BucketName string `yaml:"bucket-name,omitempty"`
 	// Alternative url.
 	// It is not recommended to use an alternate URL in a production environment.
-	Endpoint string `yaml:"endpoint,omitempty"`
+	Endpoint string `yaml:"endpoint-override,omitempty"`
 
 	RetryMaxAttempts        int     `yaml:"retry-max-attempts,omitempty"`
 	RetryBackoffMaxSeconds  int     `yaml:"retry-max-backoff,omitempty"`

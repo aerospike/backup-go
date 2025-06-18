@@ -31,7 +31,7 @@ type AzureBlob struct {
 	ClientID     string `yaml:"client-id,omitempty"`
 	ClientSecret string `yaml:"client-secret,omitempty"`
 
-	Endpoint      string `yaml:"endpoint,omitempty"`
+	Endpoint      string `yaml:"endpoint-override,omitempty"`
 	ContainerName string `yaml:"container-name,omitempty"`
 
 	AccessTier          string `yaml:"access-tier,omitempty"`

@@ -20,7 +20,6 @@ jobs:
           LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
           echo "BUNDLE_VERSION=$LATEST_TAG" >> $GITHUB_ENV
           echo "BUNDLE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
-#          echo "BUNDLE_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Login to JFrog
         uses: jfrog/setup-jfrog-cli@v4
@@ -54,7 +53,6 @@ jobs:
           git fetch --tags --depth=1
           LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
           echo "TAG=$LATEST_TAG" >> $GITHUB_ENV
-#          echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
           echo "REPO_NAME=aerospike-backup-tools" >> $GITHUB_ENV
       - name: Promote to DockerHub
         env:

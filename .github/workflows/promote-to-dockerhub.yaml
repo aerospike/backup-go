@@ -62,12 +62,15 @@ jobs:
           TAG: ${{env.TAG}}
           REPO_NAME: ${{env.REPO_NAME}}
           ARTIFACTORY_CONTAINER_DEV: ${{ vars.ARTIFACTORY_CONTAINER_DEV }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_USERNAME: ${{ secrets.ARTIFACTORY_USER }}
+
         run: |
           set -euo pipefail
           
           url="https://aerospike.jfrog.io/artifactory/$ARTIFACTORY_CONTAINER_DEV/$REPO_NAME/$TAG/list.manifest.json"
-          amd64_digest="$(curl -sSL "$url" | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest')"
-          arm64_digest="$(curl -sSL "$url" | jq -r '.manifests[] | select(.platform.architecture == "arm64") | .digest')"
+          amd64_digest="$(curl -sSL -u$JF_USERNAME:$JF_ACCESS_TOKEN "$url" | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest')"
+          arm64_digest="$(curl -sSL -u$JF_USERNAME:$JF_ACCESS_TOKEN "$url" | jq -r '.manifests[] | select(.platform.architecture == "arm64") | .digest')"
           
           if [[ -z "$amd64_digest" || -z "$arm64_digest" ]]; then
             echo "Error: Could not resolve image digests."

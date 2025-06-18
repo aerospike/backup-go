@@ -66,11 +66,11 @@ func Test_BackupWithState(t *testing.T) {
 			InfoMaxRetries:                3,
 			InfoRetriesMultiplier:         1,
 			InfoRetryIntervalMilliseconds: 1000,
-		},
-		Common: &models.Common{
-			Directory: dir,
-			Namespace: testNamespace,
-			Parallel:  1,
+			Common: models.Common{
+				Directory: dir,
+				Namespace: testNamespace,
+				Parallel:  1,
+			},
 		},
 		Compression: &models.Compression{
 			Mode: backup.CompressNone,

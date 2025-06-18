@@ -48,9 +48,10 @@ func TestNewLocalReader(t *testing.T) {
 	dir := t.TempDir()
 
 	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
@@ -71,7 +72,6 @@ func TestNewLocalReader(t *testing.T) {
 		Restore: &models.Restore{
 			InputFile: dir + testFileNameASBX,
 		},
-		Common:     &models.Common{},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
 		AzureBlob:  &models.AzureBlob{},
@@ -84,7 +84,6 @@ func TestNewLocalReader(t *testing.T) {
 
 	params = &appConfig.RestoreParams{
 		Restore:    &models.Restore{},
-		Common:     &models.Common{},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
 		AzureBlob:  &models.AzureBlob{},
@@ -114,9 +113,10 @@ func TestNewS3Reader(t *testing.T) {
 	dir = strings.TrimPrefix(dir, "/")
 
 	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		AwsS3: &models.AwsS3{
 			BucketName:          testS3Bucket,
@@ -147,7 +147,6 @@ func TestNewS3Reader(t *testing.T) {
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		Common: &models.Common{},
 		AwsS3: &models.AwsS3{
 			BucketName: testS3Bucket,
 			Region:     testS3Region,
@@ -186,9 +185,10 @@ func TestNewGcpReader(t *testing.T) {
 	dir = strings.TrimPrefix(dir, "/")
 
 	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		GcpStorage: &models.GcpStorage{
 			BucketName: testBucket,
@@ -215,7 +215,6 @@ func TestNewGcpReader(t *testing.T) {
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		Common: &models.Common{},
 		GcpStorage: &models.GcpStorage{
 			BucketName: testBucket,
 			Endpoint:   testGcpEndpoint,
@@ -252,9 +251,10 @@ func TestNewAzureReader(t *testing.T) {
 	dir = strings.TrimPrefix(dir, "/")
 
 	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		AzureBlob: &models.AzureBlob{
 			AccountName:         testAzureAccountName,
@@ -285,7 +285,6 @@ func TestNewAzureReader(t *testing.T) {
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		Common: &models.Common{},
 		AzureBlob: &models.AzureBlob{
 			AccountName:   testAzureAccountName,
 			AccountKey:    testAzureAccountKey,

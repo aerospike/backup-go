@@ -1,4 +1,5 @@
 SHELL = bash
+NAME = aerospike-backup-tools
 WORKSPACE = $(shell pwd)
 VERSION := $(shell cat VERSION)
 MAINTAINER = "Aerospike <info@aerospike.com>"
@@ -9,25 +10,28 @@ LICENSE = "Apache License 2.0"
 
 # Go parameters
 GO ?= $(shell which go || echo "/usr/local/go/bin/go")
+NFPM ?= $(shell which nfpm)
 OS ?= $(shell $(GO) env GOOS)
 ARCH ?= $(shell $(GO) env GOARCH)
 REGISTRY ?= "docker.io"
 RH_REGISTRY ?= "registry.access.redhat.com"
 GIT_COMMIT:=$(shell git rev-parse HEAD)
-GOBUILD = GOOS=$(OS) GOARCH=$(ARCH) $(GO) build \
+GOBUILD = GOOS=$(OS) GOARCH=$(ARCH) CGO_ENABLED=0 $(GO) build \
 -ldflags="-X 'main.appVersion=$(VERSION)' -X 'main.commitHash=$(GIT_COMMIT)' -X 'main.buildTime=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')'"
 GOTEST = $(GO) test
 GOCLEAN = $(GO) clean
 GOBIN_VERSION = $(shell $(GO) version 2>/dev/null)
 NPROC := $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
 
+ARCHS=linux/amd64 linux/arm64
+PACKAGERS=deb rpm
 
 BACKUP_BINARY_NAME = asbackup
 RESTORE_BINARY_NAME = asrestore
 TARGET_DIR = $(WORKSPACE)/target
+PACKAGE_DIR= $(WORKSPACE)/scripts/package
 CMD_BACKUP_DIR = $(WORKSPACE)/cmd/$(BACKUP_BINARY_NAME)
 CMD_RESTORE_DIR = $(WORKSPACE)/cmd/$(RESTORE_BINARY_NAME)
-
 INSTALL_DIR ?= /usr/bin
 
 
@@ -44,8 +48,9 @@ coverage:
 
 .PHONY: clean
 clean:
-	$(GO) clean
 	rm -Rf $(TARGET_DIR)
+	@find . -type f -name 'nfpm-linux-*.yaml' -exec rm -v {} +
+
 
 # Install mockery for generating test mocks.
 .PHONY: mockery-install
@@ -79,7 +84,6 @@ docker-build:
 docker-buildx:
 	./scripts/docker-buildx.sh --tag $(TAG) --registry $(REGISTRY) --rh-registry $(RH_REGISTRY)
 
-# Build CLI tools.
 .PHONY: build
 build:
 	mkdir -p "$(TARGET_DIR)"
@@ -87,6 +91,46 @@ build:
 	$(GOBUILD) -o $(TARGET_DIR)/$(BACKUP_BINARY_NAME)_$(OS)_$(ARCH) $(CMD_BACKUP_DIR)
 	@echo "Building $(RESTORE_BINARY_NAME) with version $(VERSION)..."
 	$(GOBUILD) -o $(TARGET_DIR)/$(RESTORE_BINARY_NAME)_$(OS)_$(ARCH) $(CMD_RESTORE_DIR)
+
+.PHONY: buildx
+buildx:
+	@for arch in $(ARCHS); do \
+  		OS=$$(echo $$arch | cut -d/ -f1); \
+  		ARCH=$$(echo $$arch | cut -d/ -f2); \
+  		OS=$$OS ARCH=$$ARCH $(MAKE) build; \
+  	done
+
+.PHONY: packages
+packages: buildx
+	@for arch in $(ARCHS); do \
+  		OS=$$(echo $$arch | cut -d/ -f1); \
+  		ARCH=$$(echo $$arch | cut -d/ -f2); \
+		OS=$$OS ARCH=$$ARCH \
+		NAME=$(NAME) \
+		VERSION=$(VERSION) \
+		WORKSPACE=$(WORKSPACE) \
+		MAINTAINER=$(MAINTAINER) \
+		DESCRIPTION=$(DESCRIPTION) \
+		HOMEPAGE=$(HOMEPAGE) \
+		VENDOR=$(VENDOR) \
+		LICENSE=$(LICENSE) \
+		BACKUP_BINARY_NAME=$(BACKUP_BINARY_NAME) \
+		RESTORE_BINARY_NAME=$(RESTORE_BINARY_NAME) \
+		envsubst '$$OS $$ARCH $$NAME $$VERSION $$WORKSPACE $$MAINTAINER $$DESCRIPTION $$HOMEPAGE $$VENDOR $$LICENSE $$BACKUP_BINARY_NAME $$RESTORE_BINARY_NAME' \
+		< $(PACKAGE_DIR)/nfpm.tmpl.yaml > $(PACKAGE_DIR)/nfpm-$$OS-$$ARCH.yaml; \
+		for packager in $(PACKAGERS); do \
+			$(NFPM) package \
+			--config $(PACKAGE_DIR)/nfpm-$$OS-$$ARCH.yaml \
+			--packager $$(echo $$packager) \
+			--target $(TARGET_DIR); \
+			done; \
+  	done; \
+
+.PHONY: checksums
+checksums:
+	@find . -type f \
+		\( -name '*.deb' -o -name '*.rpm' \) \
+		-exec sh -c 'sha256sum "$$1" | cut -d" " -f1 > "$$1.sha256"' _ {} \;
 
 .PHONY: install
 install: build

@@ -83,8 +83,9 @@ target aerospike-backup-tools {
 
   context    = "${CONTEXT}"
   dockerfile = "Dockerfile"
-  platforms = split(",", "${PLATFORMS}")
+  platforms  = split(",", "${PLATFORMS}")
 
-  tags = tags("aerospike-backup-tools")
-  output = ["type=image,push=true"]
+  tags   = tags("aerospike-backup-tools")
+  output = ["type=image,push=true,provenance=false,sbom=false"]
 }
+

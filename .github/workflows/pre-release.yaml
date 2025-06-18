@@ -365,4 +365,4 @@ jobs:
           cat release-bundle-spec.json
 
           jfrog release-bundle-create "$BUNDLE_NAME" "$BUNDLE_VERSION" \
-          --spec release-bundle-spec.json --project="$JF_PROJECT" --signing-key="aerospike"§
+          --spec release-bundle-spec.json --project="$JF_PROJECT" --signing-key="aerospike"

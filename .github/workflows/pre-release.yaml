@@ -259,7 +259,7 @@ jobs:
           echo "GO_VERSION=$GO_VERSION" >> "$GITHUB_ENV"
           echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
           echo "ISO8601=$(LC_TIME=en_US.UTF-8 date "+%Y-%m-%dT%H:%M:%S%z")" >> $GITHUB_ENV
-          echo "IMAGE_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
 
       - name: Login to JFrog
         uses: jfrog/setup-jfrog-cli@ff5cb544114ffc152db9cea1cd3d5978d5074946 # v4.5.11

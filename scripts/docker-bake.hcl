@@ -86,6 +86,6 @@ target aerospike-backup-tools {
   platforms  = split(",", "${PLATFORMS}")
 
   tags   = tags("aerospike-backup-tools")
-  output = ["type=image,push=true,provenance=false,sbom=false"]
+  output = ["type=image,push=true"]
 }
 

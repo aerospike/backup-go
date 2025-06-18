@@ -1,9 +1,9 @@
 name: Promote Images to DockerHub
 on:
   workflow_dispatch:
-  release:
-    types:
-      - published
+#  release:
+#    types:
+#      - published
 
 jobs:
   promote-to-jfrog-prod-env:

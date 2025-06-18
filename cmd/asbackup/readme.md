@@ -42,7 +42,7 @@ make build
 Version artifacts are automatically built and uploaded under releases in GitHub.
 
 ## Supported flags
-```
+```bash
 Usage:
   asbackup [flags]
 
@@ -309,7 +309,7 @@ Any Azure parameter can be retrieved from Secret Agent.
 ```
 
 ## Unsupported flags
-```
+```bash
 --machine           Output machine-readable status updates to the given path, typically a FIFO.
 
 --no-config-file    Do not read any config file. Default: disabled
@@ -341,7 +341,7 @@ Any Azure parameter can be retrieved from Secret Agent.
                             or connectTimeoutMS in the aws-sdk-cpp client configuration.
 ```
 
-## Config example
+## Config explanation.
 ```yaml
 app:
   # Enable more detailed logging.
@@ -353,16 +353,31 @@ app:
 client-config:
   seeds:
     - host: 127.0.0.1
-      tlsname: ""
+      tls-name: ""
       port: 3000
   # The Aerospike user to use to connect to the Aerospike cluster.
   user: some_login
   # The Aerospike password to use to connect to the Aerospike cluster.
   password: some_password
-  # The authentication mode used by the Aerospike server.
-  authmode: 0
-  # TlS Configuration.
-  tls: null
+  # The authentication mode used by the Aerospike server: INTERNAL, EXTERNAL, PKI
+  authmode: ""
+  # Enable TLS authentication with Aerospike.
+  tls-enable: false
+  # The server TLS context to use to authenticate the connection to Aerospike.
+  tls-name: ""
+  # Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented
+  # at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.
+  tls-protocols: ""
+  # The CA used when connecting to Aerospike.
+  tls-ca-file: ""
+  # A path containing CAs for connecting to Aerospike.
+  tls-ca-path: ""
+  # The certificate file for mutual TLS authentication with Aerospike.
+  tls-cert-file: ""
+  # The key file used for mutual TLS authentication with Aerospike.
+  tls-key-file: ""
+  # The password used to decrypt the key file if encrypted.
+  tls-key-file-password: ""
 client-policy:
   # Initial host connection timeout duration. The timeout when opening a connection to the server host for the first time.
   timeout: 30000
@@ -384,7 +399,7 @@ backup:
   # Only include the given bins in the backup. Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
   # If empty include all bins.
   bin-list: bin1,bin2
-  #  Maximum number of scan calls to run in parallel.
+  # Maximum number of scan calls to run in parallel.
   # If only one partition range is given, or the entire namespace is being backed up, the range
   # of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
   # filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
@@ -572,11 +587,6 @@ aws:
   # SNOW,
   # EXPRESS_ONEZONE
   storage-class: ""
-  # If is set, tool will try to restore archived files to the specified tier.
-  # Tiers are: Standard, Bulk, Expedited.
-  access-tier: ""
-  # How often (in milliseconds) a backup client checks object status when restoring an archived object.
-  restore-poll-duration: 1000
   # Maximum number of attempts that should be made in case of an error.
   retry-max-attempts: 100
   # Max backoff duration in seconds between retried attempts.
@@ -623,7 +633,6 @@ azure:
   container-name: ""
   # Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
   access-tier: ""
-  rehydrate-poll-duration: 100
   # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
   retry-max-attempts: 100
   # Retry timeout in seconds indicates the maximum time allowed for any single try of an HTTP request.

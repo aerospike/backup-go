@@ -33,16 +33,19 @@ const MaxRack = 1000000
 // BackupParams contain backup parameters.
 type BackupParams struct {
 	App          *models.App             `yaml:"app,omitempty"`
-	ClientConfig *client.AerospikeConfig `yaml:"client-config,omitempty"`
-	ClientPolicy *models.ClientPolicy    `yaml:"client-policy,omitempty"`
-	Backup       *models.Backup          `yaml:"backup,omitempty"`
-	BackupXDR    *models.BackupXDR       `yaml:"backup-xdr,omitempty"`
-	Compression  *models.Compression     `yaml:"compression,omitempty"`
-	Encryption   *models.Encryption      `yaml:"encryption,omitempty"`
-	SecretAgent  *models.SecretAgent     `yaml:"secret-agent,omitempty"`
-	AwsS3        *models.AwsS3           `yaml:"aws,omitempty"`
-	GcpStorage   *models.GcpStorage      `yaml:"gcp,omitempty"`
-	AzureBlob    *models.AzureBlob       `yaml:"azure,omitempty"`
+	ClientConfig *client.AerospikeConfig `yaml:"-"`
+	// ClientAerospike is  wrapper for aerospike client params, to unmarshal YAML.
+	// Because ClientConfig can't be used because of TLS configuration.
+	ClientAerospike *models.ClientAerospike `yaml:"client-aerospike,omitempty"`
+	ClientPolicy    *models.ClientPolicy    `yaml:"client-policy,omitempty"`
+	Backup          *models.Backup          `yaml:"backup,omitempty"`
+	BackupXDR       *models.BackupXDR       `yaml:"backup-xdr,omitempty"`
+	Compression     *models.Compression     `yaml:"compression,omitempty"`
+	Encryption      *models.Encryption      `yaml:"encryption,omitempty"`
+	SecretAgent     *models.SecretAgent     `yaml:"secret-agent,omitempty"`
+	AwsS3           *models.AwsS3           `yaml:"aws,omitempty"`
+	GcpStorage      *models.GcpStorage      `yaml:"gcp,omitempty"`
+	AzureBlob       *models.AzureBlob       `yaml:"azure,omitempty"`
 }
 
 func NewBackupParams(
@@ -60,9 +63,18 @@ func NewBackupParams(
 ) (*BackupParams, error) {
 	// If we have a config file, load params from it.
 	if app.Config != "" {
-		var params BackupParams
-		if err := decodeFromFile(app.Config, &params); err != nil {
+		var (
+			params BackupParams
+			err    error
+		)
+
+		if err = decodeFromFile(app.Config, &params); err != nil {
 			return nil, fmt.Errorf("failed to load config file %s: %w", app.Config, err)
+		}
+		// Remap config back to ClientConfig.
+		params.ClientConfig, err = params.ClientAerospike.ToConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to remap config file from yaml %s: %w", app.Config, err)
 		}
 
 		return &params, nil

@@ -316,3 +316,53 @@ jobs:
           jfrog rt build-collect-env $IMAGE_NAME-container $TAG
           jfrog rt build-add-git $IMAGE_NAME-container $TAG
           jfrog rt build-publish --detailed-summary $IMAGE_NAME-container $TAG
+
+  create-release-bundle:
+    needs:
+      - create-release
+      - build-packages
+      - build-docker-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to JFrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+
+      - name: Get Metadata
+        run: |
+          echo "BUNDLE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
+
+      - name: Create release bundle
+        env:
+          BUNDLE_NAME: ${{env.BUNDLE_NAME}}
+          BUNDLE_VERSION: ${{ needs.build-packages.outputs.package_version }}
+          PACKAGE_VERSION: ${{ needs.build-packages.outputs.package_version }}
+          IMAGE_VERSION: ${{ needs.build-docker-image.outputs.image_version }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+        run: |
+          echo '{
+            "name": "'"$BUNDLE_NAME"'",
+            "version": "'"$BUNDLE_VERSION"'",
+            "files": [
+              {
+                "project": "'"$JF_PROJECT"'",
+                "build": "'"$BUNDLE_NAME"'-container/'"$IMAGE_VERSION"'"
+              },
+              {
+                "project": "'"$JF_PROJECT"'",
+                "build": "'"$BUNDLE_NAME"'-rpm/'"$PACKAGE_VERSION"'"
+              },
+              {
+                "project": "'"$JF_PROJECT"'",
+                "build": "'"$BUNDLE_NAME"'-deb/'"$PACKAGE_VERSION"'"
+              }
+            ]
+          }' > release-bundle-spec.json
+
+          cat release-bundle-spec.json
+
+          jfrog release-bundle-create "$BUNDLE_NAME" "$BUNDLE_VERSION" \
+          --spec release-bundle-spec.json --project="$JF_PROJECT" --signing-key="aerospike"§

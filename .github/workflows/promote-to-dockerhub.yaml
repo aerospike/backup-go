@@ -1,5 +1,8 @@
 name: Promote Images to DockerHub
 on:
+  push:
+    branches:
+      - APPS-1729-create-dockerfile-for-backup-cli-tool
   workflow_dispatch:
 #  release:
 #    types:

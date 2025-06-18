@@ -87,7 +87,7 @@ jobs:
           PACKAGE_VERSION=$(cat VERSION)
           echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
           echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
-          echo "PACKAGE_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+          echo "PACKAGE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
 
       - name: Login to JFrog
         uses: jfrog/setup-jfrog-cli@ff5cb544114ffc152db9cea1cd3d5978d5074946 #v4.5.11

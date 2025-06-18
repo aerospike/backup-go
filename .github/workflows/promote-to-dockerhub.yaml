@@ -96,3 +96,4 @@ jobs:
           docker manifest annotate "$multiarch_tag" "$arm64_tag" --arch arm64
           
           docker manifest push "$multiarch_tag"
+

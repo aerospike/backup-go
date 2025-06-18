@@ -1,0 +1,94 @@
+name: Promote Images to DockerHub
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+jobs:
+  promote-to-jfrog-prod-env:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Get Metadata
+        run: |
+          git fetch --tags --depth=1
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "BUNDLE_VERSION=$LATEST_TAG" >> $GITHUB_ENV
+          echo "BUNDLE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
+#          echo "BUNDLE_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Login to JFrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+
+      - name: Promote to JFrog STAGE Environment
+        run: |
+          jfrog release-bundle-promote "$BUNDLE_NAME" "$BUNDLE_VERSION" \
+          --signing-key="aerospike" --project="ecosystem" STAGE
+
+  promote-to-dockerhub:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Get Metadata
+        run: |
+          git fetch --tags --depth=1
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "TAG=$LATEST_TAG" >> $GITHUB_ENV
+#          echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+          echo "BUNDLE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
+      - name: Promote to DockerHub
+        env:
+          TAG: ${{env.TAG}}
+          REPO_NAME: ${{env.REPO_NAME}}
+          ARTIFACTORY_CONTAINER_DEV: ${{ vars.ARTIFACTORY_CONTAINER_DEV }}
+        run: |
+          set -euo pipefail
+          
+          url="https://aerospike.jfrog.io/artifactory/$ARTIFACTORY_CONTAINER_DEV/$REPO_NAME/$TAG/list.manifest.json"
+          amd64_digest="$(curl -sSL "$url" | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest')"
+          arm64_digest="$(curl -sSL "$url" | jq -r '.manifests[] | select(.platform.architecture == "arm64") | .digest')"
+          
+          if [[ -z "$amd64_digest" || -z "$arm64_digest" ]]; then
+            echo "Error: Could not resolve image digests."
+            exit 1
+          fi
+          
+          amd64_tag="davi17g/$REPO_NAME:$TAG-amd64"
+          arm64_tag="davi17g/$REPO_NAME:$TAG-arm64"
+          multiarch_tag="davi17g/$REPO_NAME:$TAG"
+          
+          docker pull "aerospike.jfrog.io/$ARTIFACTORY_CONTAINER_DEV/$REPO_NAME@$amd64_digest"
+          docker pull "aerospike.jfrog.io/$ARTIFACTORY_CONTAINER_DEV/$REPO_NAME@$arm64_digest"
+          
+          docker tag "aerospike.jfrog.io/$ARTIFACTORY_CONTAINER_DEV/$REPO_NAME@$amd64_digest" "$amd64_tag"
+          docker tag "aerospike.jfrog.io/$ARTIFACTORY_CONTAINER_DEV/$REPO_NAME@$arm64_digest" "$arm64_tag"
+          
+          docker push "$amd64_tag"
+          docker push "$arm64_tag"
+          
+          docker manifest create "$multiarch_tag"  "$amd64_tag" "$arm64_tag"
+          
+          docker manifest annotate "$multiarch_tag" "$amd64_tag" --arch amd64
+          docker manifest annotate "$multiarch_tag" "$arm64_tag" --arch arm64
+          
+          docker manifest push "$multiarch_tag"

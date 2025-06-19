@@ -31,13 +31,13 @@ const (
 
 // Reader describes data readers. To exit worker, the Reader must return io.EOF.
 type Reader[T models.TokenConstraint] interface {
-	Read() (T, error)
+	Read(ctx context.Context) (T, error)
 	Close()
 }
 
 // Writer describes data writers.
 type Writer[T models.TokenConstraint] interface {
-	Write(T) (n int, err error)
+	Write(context.Context, T) (n int, err error)
 	Close() (err error)
 }
 
@@ -82,7 +82,7 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				data, err := r.Read()
+				data, err := r.Read(ctx)
 				if err != nil {
 					if errors.Is(err, io.EOF) {
 						return nil
@@ -149,7 +149,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 					return nil
 				}
 
-				n, err := w.Write(data)
+				n, err := w.Write(ctx, data)
 				if err != nil {
 					return fmt.Errorf("failed to write data: %w", err)
 				}

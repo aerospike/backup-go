@@ -25,6 +25,7 @@ import (
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 )
@@ -54,7 +55,7 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 	readerMock := mocks.NewMockReader[*models.Token](t)
 
 	var mockCounter int
-	readerMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		if mockCounter < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
@@ -90,8 +91,9 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
+	ctx, cancel := context.WithCancel(context.Background())
 
-	readerMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		time.Sleep(testDealy)
 		return testToken(), nil
 	})
@@ -105,7 +107,6 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(testLongDelay)
 		cancel()
@@ -125,9 +126,10 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
+	ctx := context.Background()
 
 	var mockCounter int
-	readerMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		if mockCounter < testCount {
 			mockCounter++
 			time.Sleep(testDealy)
@@ -147,7 +149,7 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	require.NotNil(t, output)
 
 	go func() {
-		err := readChain.Run(context.Background())
+		err := readChain.Run(ctx)
 		require.ErrorIs(t, err, errTest)
 	}()
 
@@ -160,8 +162,9 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
+	ctx := context.Background()
 
-	readerMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		time.Sleep(testDealy)
 		return testToken(), nil
 	})
@@ -176,7 +179,7 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 	require.NotNil(t, output)
 
 	go func() {
-		err := readChain.Run(context.Background())
+		err := readChain.Run(ctx)
 		require.ErrorIs(t, err, errTest)
 	}()
 
@@ -189,9 +192,10 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
+	ctx := context.Background()
 
 	var mockCounterRead int
-	readerMock.EXPECT().Read().RunAndReturn(func() (*models.Token, error) {
+	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		if mockCounterRead < testCount*2 {
 			mockCounterRead++
 			time.Sleep(testDealy)
@@ -220,7 +224,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	require.NotNil(t, output)
 
 	go func() {
-		err := readChain.Run(context.Background())
+		err := readChain.Run(ctx)
 		require.NoError(t, err)
 	}()
 
@@ -233,9 +237,10 @@ func TestChains_WriterBackupChain(t *testing.T) {
 	t.Parallel()
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
+	ctx := context.Background()
 
 	var mockCounterWrite int
-	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		mockCounterWrite++
 		return testSize, nil
 	})
@@ -251,7 +256,7 @@ func TestChains_WriterBackupChain(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := writeChain.Run(context.Background())
+		err := writeChain.Run(ctx)
 		require.NoError(t, err)
 	}()
 
@@ -273,9 +278,10 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 	t.Parallel()
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	var mockCounterWrite int
-	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		mockCounterWrite++
 		return testSize, nil
 	})
@@ -289,7 +295,6 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(testLongDelay)
 		cancel()
@@ -316,8 +321,9 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 	t.Parallel()
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
+	ctx := context.Background()
 
-	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		return testSize, errTest
 	})
 
@@ -332,7 +338,7 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := writeChain.Run(context.Background())
+		err := writeChain.Run(ctx)
 		require.ErrorIs(t, err, errTest)
 	}()
 
@@ -353,8 +359,9 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 	t.Parallel()
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
+	ctx := context.Background()
 
-	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		return testSize, nil
 	})
 
@@ -369,7 +376,7 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := writeChain.Run(context.Background())
+		err := writeChain.Run(ctx)
 		fmt.Println(err)
 		require.ErrorIs(t, err, errTest)
 	}()
@@ -391,8 +398,9 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 	t.Parallel()
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
+	ctx := context.Background()
 
-	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		return testSize, errTest
 	})
 
@@ -407,7 +415,7 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := writeChain.Run(context.Background())
+		err := writeChain.Run(ctx)
 		fmt.Println(err)
 		require.ErrorIs(t, err, errTest)
 		require.ErrorContains(t, err, "write error")
@@ -431,8 +439,9 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 	t.Parallel()
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
+	ctx := context.Background()
 
-	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
+	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
 		return testSize, nil
 	})
 
@@ -449,7 +458,7 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := writeChain.Run(context.Background())
+		err := writeChain.Run(ctx)
 		fmt.Println(err)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "exceeds limiter's burst")

@@ -15,7 +15,6 @@
 package asinfo
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"math"
@@ -26,6 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
+	"github.com/segmentio/asm/base64"
 )
 
 const (

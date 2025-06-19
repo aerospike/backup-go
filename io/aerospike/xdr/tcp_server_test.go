@@ -16,7 +16,6 @@ package xdr
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net"
@@ -25,6 +24,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/internal/metrics"
+	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
 )
 

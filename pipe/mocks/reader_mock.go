@@ -5,6 +5,8 @@
 package mocks
 
 import (
+	"context"
+
 	"github.com/aerospike/backup-go/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -70,8 +72,8 @@ func (_c *MockReader_Close_Call[T]) RunAndReturn(run func()) *MockReader_Close_C
 }
 
 // Read provides a mock function for the type MockReader
-func (_mock *MockReader[T]) Read() (T, error) {
-	ret := _mock.Called()
+func (_mock *MockReader[T]) Read(ctx context.Context) (T, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Read")
@@ -79,18 +81,18 @@ func (_mock *MockReader[T]) Read() (T, error) {
 
 	var r0 T
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (T, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (T, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() T); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) T); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(T)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -103,13 +105,14 @@ type MockReader_Read_Call[T models.TokenConstraint] struct {
 }
 
 // Read is a helper method to define mock.On call
-func (_e *MockReader_Expecter[T]) Read() *MockReader_Read_Call[T] {
-	return &MockReader_Read_Call[T]{Call: _e.mock.On("Read")}
+//   - ctx
+func (_e *MockReader_Expecter[T]) Read(ctx interface{}) *MockReader_Read_Call[T] {
+	return &MockReader_Read_Call[T]{Call: _e.mock.On("Read", ctx)}
 }
 
-func (_c *MockReader_Read_Call[T]) Run(run func()) *MockReader_Read_Call[T] {
+func (_c *MockReader_Read_Call[T]) Run(run func(ctx context.Context)) *MockReader_Read_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -119,7 +122,7 @@ func (_c *MockReader_Read_Call[T]) Return(v T, err error) *MockReader_Read_Call[
 	return _c
 }
 
-func (_c *MockReader_Read_Call[T]) RunAndReturn(run func() (T, error)) *MockReader_Read_Call[T] {
+func (_c *MockReader_Read_Call[T]) RunAndReturn(run func(ctx context.Context) (T, error)) *MockReader_Read_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }

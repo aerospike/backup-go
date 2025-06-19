@@ -142,7 +142,8 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVarP(&f.Continue, "continue", "c",
 		"",
 		"Resumes an interrupted/failed backup from where it was left off, given the .state file\n"+
-			"that was generated from the interrupted/failed run.")
+			"that was generated from the interrupted/failed run.\n"+
+			"--continue and --state-file-dst are mutually exclusive.")
 	flagSet.StringVar(&f.StateFileDst, "state-file-dst",
 		"",
 		"Name of a state file that will be saved in backup --directory.\n"+

@@ -410,6 +410,18 @@ func TestValidateBackupParams(t *testing.T) {
 			wantErr:     true,
 			expectedErr: "specify either rack-list or node-list, but not both",
 		},
+		{
+			name: "Both continue and state-file-dst configured",
+			backupParams: &models.Backup{
+				Continue:     "state",
+				StateFileDst: "state",
+			},
+			commonParams: &models.Common{
+				Directory: "backup-dir",
+			},
+			wantErr:     true,
+			expectedErr: "continue and state-file-dst are mutually exclusive",
+		},
 	}
 
 	for _, tt := range tests {

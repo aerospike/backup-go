@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -66,6 +67,11 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 		parallelism = rw.config.MaxAsyncBatches
 	}
 
+	// If we need only validation, we create discard writers.
+	if rw.config.ValidateOnly {
+		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
+	}
+
 	useBatchWrites, err := rw.useBatchWrites()
 	if err != nil {
 		return nil, fmt.Errorf("failed to check batch writes: %w", err)
@@ -100,4 +106,31 @@ func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
 	infoClient := asinfo.NewInfoClientFromAerospike(rw.aerospikeClient, rw.config.InfoPolicy, rw.config.InfoRetryPolicy)
 
 	return infoClient.SupportsBatchWrite()
+}
+
+// discardWriter is a writer that does nothing. Used for backup files validation.
+type discardWriter[T models.TokenConstraint] struct{}
+
+// Write does nothing.
+func (w *discardWriter[T]) Write(_ context.Context, _ T) (int, error) {
+	return 0, nil
+}
+
+// Close does nothing.
+func (w *discardWriter[T]) Close() error {
+	return nil
+}
+
+// newDiscardWriters creates a slice of empty writers.
+func newDiscardWriters[T models.TokenConstraint](
+	parallelism int,
+	stats statsSetterToken,
+	logger *slog.Logger,
+) []pipe.Writer[T] {
+	dataWriters := make([]pipe.Writer[T], parallelism)
+	for i := 0; i < parallelism; i++ {
+		dataWriters[i] = newWriterWithTokenStats[T](&discardWriter[T]{}, stats, logger)
+	}
+
+	return dataWriters
 }

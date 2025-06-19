@@ -117,8 +117,11 @@ func ValidateRestore(params *RestoreParams) error {
 			return err
 		}
 
-		if err := ValidateCommonParams(params.Common); err != nil {
-			return err
+		if !params.Restore.ValidateOnly {
+			// Validate common params only if restore is not in validate only mode.
+			if err := ValidateCommonParams(params.Common); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -200,6 +203,10 @@ func ValidateBackupParams(backupParams *models.Backup, commonParams *models.Comm
 	if (backupParams.Continue != "" || backupParams.Estimate || backupParams.StateFileDst != "") &&
 		(backupParams.ParallelNodes || backupParams.NodeList != "") {
 		return fmt.Errorf("saving states and calculating estimates is not possible in parallel node mode")
+	}
+
+	if backupParams.Continue != "" && backupParams.StateFileDst != "" {
+		return fmt.Errorf("continue and state-file-dst are mutually exclusive")
 	}
 
 	if backupParams.Estimate {

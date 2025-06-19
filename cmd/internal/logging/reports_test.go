@@ -146,8 +146,6 @@ func TestPrintBackupReport(t *testing.T) {
 	assert.Contains(t, output, "3")
 	assert.Contains(t, output, "Bytes Written")
 	assert.Contains(t, output, "5000000")
-	assert.Contains(t, output, "Total Records")
-	assert.Contains(t, output, "1000")
 	assert.Contains(t, output, "Files Written")
 	assert.Contains(t, output, "10")
 }
@@ -232,7 +230,6 @@ func TestLogBackupReport(t *testing.T) {
 	assert.Contains(t, logOutput, "s_index_read=5")
 	assert.Contains(t, logOutput, "udf_read=3")
 	assert.Contains(t, logOutput, "bytes_written=5000000")
-	assert.Contains(t, logOutput, "total_records=1000")
 	assert.Contains(t, logOutput, "files_written=10")
 }
 
@@ -504,7 +501,7 @@ func TestPrintRestoreReport(t *testing.T) {
 	os.Stdout = w
 
 	// Call the function
-	printRestoreReport(stats)
+	printRestoreReport(stats, false)
 
 	// Close writer and restore stdout
 	w.Close()
@@ -574,7 +571,7 @@ func TestLogRestoreReport(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
 
 	// Call the function
-	logRestoreReport(stats, logger)
+	logRestoreReport(stats, logger, false)
 
 	// Verify log output
 	logOutput := buf.String()
@@ -626,7 +623,7 @@ func TestReportRestore(t *testing.T) {
 		os.Stdout = w
 
 		// Call the function
-		ReportRestore(stats, false, nil)
+		ReportRestore(stats, false, false, nil)
 
 		// Close writer and restore stdout
 		w.Close()
@@ -650,7 +647,7 @@ func TestReportRestore(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(&buf, nil))
 
 		// Call the function
-		ReportRestore(stats, true, logger)
+		ReportRestore(stats, false, true, logger)
 
 		// Verify log output
 		logOutput := buf.String()

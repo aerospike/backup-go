@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
@@ -47,9 +48,11 @@ type Cmd struct {
 	// backup flags.
 	flagsBackup *flags.Backup
 	flagsCommon *flags.Common
+
+	Logger *slog.Logger
 }
 
-func NewCmd(appVersion, commitHash string) *cobra.Command {
+func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 	c := &Cmd{
 		appVersion: appVersion,
 		commitHash: commitHash,
@@ -65,6 +68,8 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		flagsAws:          flags.NewAwsS3(flags.OperationBackup),
 		flagsGcp:          flags.NewGcpStorage(flags.OperationBackup),
 		flagsAzure:        flags.NewAzureBlob(flags.OperationBackup),
+		// First init default logger.
+		Logger: logging.NewDefaultLogger(),
 	}
 
 	rootCmd := &cobra.Command{
@@ -194,7 +199,7 @@ func NewCmd(appVersion, commitHash string) *cobra.Command {
 		helpFunc()
 	})
 
-	return rootCmd
+	return rootCmd, c
 }
 
 func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
@@ -208,7 +213,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// If no flags were passed, show help.
 	if cmd.Flags().NFlag() == 0 {
 		if err := cmd.Help(); err != nil {
-			return err
+			return fmt.Errorf("failed to load help: %w", err)
 		}
 
 		return nil
@@ -217,8 +222,10 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	// Init logger.
 	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
+	// After initialization replace logger.
+	c.Logger = logger
 
 	// Init app.
 	asbParams := &config.BackupParams{
@@ -237,10 +244,14 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 
 	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("backup initialization failed: %w", err)
 	}
 
-	return asb.Run(cmd.Context())
+	if err = asb.Run(cmd.Context()); err != nil {
+		return fmt.Errorf("backup failed: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Cmd) printVersion() {

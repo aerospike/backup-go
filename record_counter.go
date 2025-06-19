@@ -96,7 +96,7 @@ func (rc *recordCounter) countRecordsUsingScanByPartitions(ctx context.Context, 
 	recordReader := aerospike.NewRecordReader(ctx, rc.aerospikeClient, readerConfig, rc.logger)
 	defer recordReader.Close()
 
-	count, err := countRecords(recordReader)
+	count, err := countRecords(ctx, recordReader)
 	if err != nil {
 		return 0, err
 	}
@@ -119,7 +119,7 @@ func (rc *recordCounter) countRecordsUsingScanByNodes(ctx context.Context, scanP
 	recordReader := aerospike.NewRecordReader(ctx, rc.aerospikeClient, readerConfig, rc.logger)
 	defer recordReader.Close()
 
-	count, err := countRecords(recordReader)
+	count, err := countRecords(ctx, recordReader)
 	if err != nil {
 		return 0, err
 	}
@@ -128,11 +128,11 @@ func (rc *recordCounter) countRecordsUsingScanByNodes(ctx context.Context, scanP
 }
 
 // countRecords counts the records returned by the given reader.
-func countRecords(recordReader *aerospike.RecordReader) (uint64, error) {
+func countRecords(ctx context.Context, recordReader *aerospike.RecordReader) (uint64, error) {
 	var count uint64
 
 	for {
-		if _, err := recordReader.Read(); err != nil {
+		if _, err := recordReader.Read(ctx); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}

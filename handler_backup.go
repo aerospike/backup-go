@@ -35,18 +35,21 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// A Writer provides access to the backup storage.
-// Exported for integration tests.
+// Writer defines an interface for writing backup data to a storage provider.
+// Implementations, handling different storage types, are located within the io.storage package.
 type Writer interface {
 	// NewWriter returns new writer for backup logic to use. Each call creates
 	// a new writer, they might be working in parallel. Backup logic will close
 	// the writer after backup is done. Header func is executed on a writer
 	// after creation (on each one in case of multipart file).
 	NewWriter(ctx context.Context, filename string) (io.WriteCloser, error)
+
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
+
 	// RemoveFiles removes a backup file or files from directory.
 	RemoveFiles(ctx context.Context) error
+
 	// Remove removes a file or directory at the specified path from the backup storage.
 	// Returns an error if the operation fails.
 	Remove(ctx context.Context, path string) error
@@ -79,7 +82,7 @@ type BackupHandler struct {
 	// For graceful shutdown.
 	wg sync.WaitGroup
 
-	pl *pipe.Pipe[*models.Token]
+	pl atomic.Pointer[pipe.Pipe[*models.Token]]
 
 	// records per second collector.
 	rpsCollector *metrics.Collector
@@ -275,7 +278,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	tsProcessor := processors.NewVoidTimeSetter[*models.Token](bh.logger)
 
 	for {
-		t, err := recordReader.Read()
+		t, err := recordReader.Read(ctx)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
@@ -373,8 +376,8 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		return err
 	}
 
-	// Assign, so we can get pl stats.
-	bh.pl = pl
+	// Assign, so we can get pl metrics.
+	bh.pl.Store(pl)
 
 	return pl.Run(ctx)
 }
@@ -560,8 +563,10 @@ func (bh *BackupHandler) GetMetrics() *models.Metrics {
 	}
 
 	var pr, pw int
-	if bh.pl != nil {
-		pr, pw = bh.pl.GetMetrics()
+
+	pl := bh.pl.Load()
+	if pl != nil {
+		pr, pw = pl.GetMetrics()
 	}
 
 	return models.NewMetrics(

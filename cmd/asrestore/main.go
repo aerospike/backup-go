@@ -17,8 +17,10 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/aerospike/backup-go/cmd/asrestore/cmd"
 )
@@ -32,7 +34,7 @@ func main() {
 	// Initializing context with cancel for graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, os.Kill)
 
 	go func() {
 		sig := <-sigChan
@@ -40,8 +42,12 @@ func main() {
 		cancel()
 	}()
 
-	rootCmd := cmd.NewCmd(appVersion, commitHash)
+	// Return c to log errors properly.
+	rootCmd, c := cmd.NewCmd(appVersion, commitHash)
+	rootCmd.SilenceErrors = true
+
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		log.Fatal(err)
+		c.Logger.Error("failed to execute", slog.Any("error", err))
+		os.Exit(1)
 	}
 }

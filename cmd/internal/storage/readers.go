@@ -128,7 +128,7 @@ func newReader(
 	directory, inputFile := params.Common.Directory, params.Restore.InputFile
 	parentDirectory, directoryList := params.Restore.ParentDirectory, params.Restore.DirectoryList
 
-	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr)
+	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr, logger)
 
 	logger.Info("initializing storage for reader",
 		slog.String("directory", directory),
@@ -188,25 +188,29 @@ func newReaderOpts(
 	parentDirectory,
 	directoryList string,
 	isXDR bool,
+	logger *slog.Logger,
 ) []ioStorage.Opt {
 	opts := make([]ioStorage.Opt, 0)
 
-	// As we validate this fields in validation function, we can switch here.
+	// As we validate this field in validation function, we can switch here.
 	switch {
 	case directory != "":
 		opts = append(opts, ioStorage.WithDir(directory))
-		// Append Validator only for directory.
-		if isXDR {
-			opts = append(opts, ioStorage.WithValidator(asbx.NewValidator()), ioStorage.WithSorting())
-		} else {
-			opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
-		}
 	case inputFile != "":
 		opts = append(opts, ioStorage.WithFile(inputFile))
 	case directoryList != "":
 		dirList := prepareDirectoryList(parentDirectory, directoryList)
 		opts = append(opts, ioStorage.WithDirList(dirList))
 	}
+
+	// Append Validator always. As it is not applied to direct file reading.
+	if isXDR {
+		opts = append(opts, ioStorage.WithValidator(asbx.NewValidator()), ioStorage.WithSorting())
+	} else {
+		opts = append(opts, ioStorage.WithValidator(asb.NewValidator()))
+	}
+
+	opts = append(opts, ioStorage.WithLogger(logger))
 
 	return opts
 }

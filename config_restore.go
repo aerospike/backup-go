@@ -88,6 +88,8 @@ type ConfigRestore struct {
 	InfoRetryPolicy *models.RetryPolicy
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
+	// ValidateOnly indicates whether restore should only validate the backup files.
+	ValidateOnly bool
 }
 
 // NewDefaultRestoreConfig returns a new ConfigRestore with default values.

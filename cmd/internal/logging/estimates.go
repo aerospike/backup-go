@@ -91,7 +91,10 @@ func PrintRestoreEstimate(
 		select {
 		case <-ticker.C:
 			totalSize := getSize()
-			if totalSize == 0 {
+			switch totalSize {
+			case -1:
+				return
+			case 0:
 				continue
 			}
 
@@ -201,7 +204,10 @@ func PrintFilesNumber(
 		select {
 		case <-ticker.C:
 			num := getNumber()
-			if num == 0 {
+			switch num {
+			case -1:
+				return
+			case 0:
 				continue
 			}
 

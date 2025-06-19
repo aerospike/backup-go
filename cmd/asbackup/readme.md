@@ -189,6 +189,7 @@ Backup Flags:
       --estimate-samples int          The number of samples to take when running a backup estimate. (default 10000)
   -c, --continue string               Resumes an interrupted/failed backup from where it was left off, given the .state file
                                       that was generated from the interrupted/failed run.
+                                      --continue and --state-file-dst are mutually exclusive.
       --state-file-dst string         Name of a state file that will be saved in backup --directory.
                                       Works only with --file-limit parameter. As --file-limit is reached and the file is closed,
                                       the current state will be saved. Works only for default and/or partition backup.

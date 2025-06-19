@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	headerBackupReport   = "Backup report"
-	headerRestoreReport  = "Restore report"
-	headerEstimateReport = "Estimate report"
+	headerBackupReport     = "Backup report"
+	headerRestoreReport    = "Restore report"
+	headerEstimateReport   = "Estimate report"
+	headerValidationReport = "Validation report"
 )
 
 // ReportBackup prints the backup report.
@@ -62,7 +63,6 @@ func printBackupReport(stats *bModels.BackupStats, isXdr bool) {
 	fmt.Println()
 
 	printMetric("Bytes Written", stats.GetBytesWritten())
-	printMetric("Total Records", stats.TotalRecords.Load())
 	printMetric("Files Written", stats.GetFileCount())
 }
 
@@ -72,32 +72,36 @@ func logBackupReport(stats *bModels.BackupStats, isXdr bool, logger *slog.Logger
 		recordsMetric = "records_received"
 	}
 
-	logger.Info("backup report",
+	logger.Info(strings.ToLower(headerBackupReport),
 		slog.Time("start_time", stats.StartTime),
 		slog.Duration("duration", stats.GetDuration()),
 		slog.Uint64(recordsMetric, stats.GetReadRecords()),
 		slog.Uint64("s_index_read", uint64(stats.GetSIndexes())),
 		slog.Uint64("udf_read", uint64(stats.GetUDFs())),
 		slog.Uint64("bytes_written", stats.GetBytesWritten()),
-		slog.Uint64("total_records", stats.TotalRecords.Load()),
 		slog.Uint64("files_written", stats.GetFileCount()),
 	)
 }
 
 // ReportRestore prints the restore report.
 // if isJSON is true, it prints the report in JSON format, but logger must be passed
-func ReportRestore(stats *bModels.RestoreStats, isJSON bool, logger *slog.Logger) {
+func ReportRestore(stats *bModels.RestoreStats, isValidation, isJSON bool, logger *slog.Logger) {
 	if isJSON {
-		logRestoreReport(stats, logger)
+		logRestoreReport(stats, logger, isValidation)
 		return
 	}
 
-	printRestoreReport(stats)
+	printRestoreReport(stats, isValidation)
 }
 
-func printRestoreReport(stats *bModels.RestoreStats) {
-	fmt.Println(headerRestoreReport)
-	fmt.Println(strings.Repeat("-", len(headerRestoreReport)))
+func printRestoreReport(stats *bModels.RestoreStats, isValidation bool) {
+	header := headerRestoreReport
+	if isValidation {
+		header = headerValidationReport
+	}
+
+	fmt.Println(header)
+	fmt.Println(strings.Repeat("-", len(header)))
 
 	printMetric("Start Time", stats.StartTime.Format(time.RFC1123))
 	printMetric("Duration", stats.GetDuration())
@@ -110,16 +114,19 @@ func printRestoreReport(stats *bModels.RestoreStats) {
 
 	fmt.Println()
 
-	printMetric("Expired Records", stats.GetRecordsExpired())
-	printMetric("Skipped Records", stats.GetRecordsSkipped())
-	printMetric("Ignored Records", stats.GetRecordsIgnored())
-	printMetric("Fresher Records", stats.GetRecordsFresher())
-	printMetric("Existed Records", stats.GetRecordsExisted())
+	// For validation, we don't print the following metrics'
+	if !isValidation {
+		printMetric("Expired Records", stats.GetRecordsExpired())
+		printMetric("Skipped Records", stats.GetRecordsSkipped())
+		printMetric("Ignored Records", stats.GetRecordsIgnored())
+		printMetric("Fresher Records", stats.GetRecordsFresher())
+		printMetric("Existed Records", stats.GetRecordsExisted())
 
-	fmt.Println()
+		fmt.Println()
 
-	printMetric("Inserted Records", stats.GetRecordsInserted())
-	printMetric("In Doubt Errors", stats.GetErrorsInDoubt())
+		printMetric("Inserted Records", stats.GetRecordsInserted())
+		printMetric("In Doubt Errors", stats.GetErrorsInDoubt())
+	}
 
 	if stats.GetTotalBytesRead() > 0 {
 		// At the moment, we don't count the size of records.
@@ -127,22 +134,38 @@ func printRestoreReport(stats *bModels.RestoreStats) {
 	}
 }
 
-func logRestoreReport(stats *bModels.RestoreStats, logger *slog.Logger) {
-	logger.Info("restore report",
+func logRestoreReport(stats *bModels.RestoreStats, logger *slog.Logger, isValidation bool) {
+	header := strings.ToLower(headerRestoreReport)
+	if isValidation {
+		header = strings.ToLower(headerValidationReport)
+	}
+
+	logAttr := make([]any, 0)
+	logAttr = append(logAttr,
 		slog.Time("start_time", stats.StartTime),
 		slog.Duration("duration", stats.GetDuration()),
 		slog.Uint64("records_read", stats.GetReadRecords()),
 		slog.Uint64("s_index_read", uint64(stats.GetSIndexes())),
 		slog.Uint64("udf_read", uint64(stats.GetUDFs())),
-		slog.Uint64("expired_records", stats.GetRecordsExpired()),
-		slog.Uint64("skipped_records", stats.GetRecordsSkipped()),
-		slog.Uint64("ignored_records", stats.GetRecordsIgnored()),
-		slog.Uint64("fresher_records", stats.GetRecordsFresher()),
-		slog.Uint64("existed_records", stats.GetRecordsExisted()),
-		slog.Uint64("inserted_records", stats.GetRecordsInserted()),
-		slog.Uint64("in_doubt_errors", stats.GetErrorsInDoubt()),
+	)
+
+	if !isValidation {
+		logAttr = append(logAttr,
+			slog.Uint64("expired_records", stats.GetRecordsExpired()),
+			slog.Uint64("skipped_records", stats.GetRecordsSkipped()),
+			slog.Uint64("ignored_records", stats.GetRecordsIgnored()),
+			slog.Uint64("fresher_records", stats.GetRecordsFresher()),
+			slog.Uint64("existed_records", stats.GetRecordsExisted()),
+			slog.Uint64("inserted_records", stats.GetRecordsInserted()),
+			slog.Uint64("in_doubt_errors", stats.GetErrorsInDoubt()),
+		)
+	}
+
+	logAttr = append(logAttr,
 		slog.Uint64("total_bytes_read", stats.GetTotalBytesRead()),
 	)
+
+	logger.Info(header, logAttr...)
 }
 
 // ReportEstimate prints the estimate report.
@@ -165,7 +188,7 @@ func printEstimateReport(estimate uint64) {
 }
 
 func logEstimateReport(estimate uint64, logger *slog.Logger) {
-	logger.Info("estimate report",
+	logger.Info(strings.ToLower(headerEstimateReport),
 		slog.Uint64("file_size_bytes", estimate),
 	)
 }

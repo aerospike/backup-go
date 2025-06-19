@@ -584,6 +584,15 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 	for _, path := range r.PathList {
 		size, num, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
+			if r.Logger != nil {
+				r.Logger.Error("failed to calculate stats for path",
+					slog.String("path", path),
+					slog.Any("error", err),
+				)
+			}
+			// Save -1 to signal restore that calculation failed and no need to wait for estimates.
+			r.totalSize.Store(-1)
+			r.totalNumber.Store(-1)
 			// Skip calculation errors.
 			return
 		}

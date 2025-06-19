@@ -100,7 +100,7 @@ func TestRecordReader(t *testing.T) {
 	var counter atomic.Uint64
 	go func() {
 		for {
-			token, err := r.Read()
+			token, err := r.Read(ctx)
 			switch {
 			case err == nil:
 				require.Equal(t, testKeyString, token.Key.String())

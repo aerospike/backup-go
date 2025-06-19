@@ -1,6 +1,5 @@
 name: Promote Images to DockerHub
 on:
-  push:
   workflow_dispatch:
   release:
     types:

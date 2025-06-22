@@ -12,11 +12,11 @@ Binaries for various platforms are released alongside the library and can be fou
 [releases](https://github.com/aerospike/backup-go/releases).
 
 ## Backup Tools
-In addition to the core Go library, this repository currently includes the **  Aerospike Backup Tools ** 
+In addition to the core Go library, this repository currently includes the **Aerospike Backup Tools** 
 (such as `asbackup` and `asrestore`), which are built using this library. 
 These tools are planned to be moved to a separate repository in the future.  
-** For detailed usage, build instructions, and packaging options for the Aerospike Backup Tools, please refer to 
-[Aerospike Backup Tools Documentation](./docs/abt-usage-guide.md).
+**For detailed usage, build instructions, and packaging options for the Aerospike Backup Tools, please refer to 
+[Aerospike Backup Tools Documentation](./docs/abt-usage-guide.md).**
 
 ## Features
 

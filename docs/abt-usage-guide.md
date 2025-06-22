@@ -18,12 +18,12 @@ To **uninstall** the tools, run:
 make uninstall
 ```
 ### Build Docker Images
-** Build and push a multi-platform Docker image: **
+**Build and push a multi-platform Docker image:**
 ```bash
 DOCKER_USERNAME="<jforg-username>" DOCKER_PASSWORD="<jfrog-password>" TAG="<tag>" make docker-buildx 
 ```
 
-** Build a Docker image for local use: **
+**Build a Docker image for local use:**
 ```bash
 TAG="<tag>" make docker-build
 ```

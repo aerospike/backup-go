@@ -133,7 +133,7 @@ checksums:
 		-exec sh -c 'sha256sum "$$1" | cut -d" " -f1 > "$$1.sha256"' _ {} \;
 
 .PHONY: install
-install: build
+install:
 	install -m 0755 $(TARGET_DIR)/$(BACKUP_BINARY_NAME)_$(OS)_$(ARCH) $(INSTALL_DIR)/$(BACKUP_BINARY_NAME)
 	install -m 0755 $(TARGET_DIR)/$(RESTORE_BINARY_NAME)_$(OS)_$(ARCH) $(INSTALL_DIR)/$(RESTORE_BINARY_NAME)
 

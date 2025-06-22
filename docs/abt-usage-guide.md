@@ -1,6 +1,6 @@
 # Aerospike Backup Tools
 
-The Aerospike Backup Tools project is planned to be moved to a separate repository. For now,  
+The Aerospike Backup Tools project is planned to be moved to a separate repository. For now, 
 these tools are built from the root directory of the `backup-go` repository.
 
 ## Usage Guide

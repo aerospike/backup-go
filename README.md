@@ -11,6 +11,13 @@ built using this library. Refer to their respective README files for usage instr
 Binaries for various platforms are released alongside the library and can be found under
 [releases](https://github.com/aerospike/backup-go/releases).
 
+## Backup Tools
+In addition to the core Go library, this repository currently includes the **  Aerospike Backup Tools ** 
+(such as `asbackup` and `asrestore`), which are built using this library. 
+These tools are planned to be moved to a separate repository in the future.  
+** For detailed usage, build instructions, and packaging options for the Aerospike Backup Tools, please refer to 
+[Aerospike Backup Tools Documentation](./docs/abt-usage-guide.md).
+
 ## Features
 
 - Standard backup and restore operations
@@ -40,37 +47,7 @@ jobs, a handler is immediately returned that is used to check the job's status, 
 - **Writers/Readers**: Handle backup data I/O
 - **Configurations**: Define backup/restore behavior
 
-## Usage Guide
-
-### Build and Install
-
-To **build and install** `aerospike-backup-tools` from source, run:
-
-```bash
-make build && make install
-```
-
-To **uninstall** the tools, run:
-```bash
-make uninstall
-```
-### Build Docker Images
-** Build and push a multi-platform Docker image: **
-```bash
-DOCKER_USERNAME="<jforg-username>" DOCKER_PASSWORD="<jfrog-password>" TAG="<tag>" make docker-buildx 
-```
-
-** Build a Docker image for local use: **
-```bash
-TAG="<tag>" make docker-build
-```
-
-### Build Linux Packages
-To generate `.rpm` and `.deb` packages for supported Linux architectures (`linux/amd64`,`linux/arm64`) run:
-```bash
-make packages
-```
-The generated packages and their `sha256` checksum files will be located in the `/target` directory.
+## Usage
 
 ### Standard Backup
 

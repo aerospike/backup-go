@@ -100,7 +100,11 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 					return fmt.Errorf("failed to process data: %w", err)
 				}
 
-				output <- data
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case output <- data:
+				}
 			}
 		}
 	}

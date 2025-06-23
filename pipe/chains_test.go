@@ -122,6 +122,52 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	}
 }
 
+func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
+	t.Parallel()
+
+	readerMock := mocks.NewMockReader[*models.Token](t)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var mockCounter int
+	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
+		if mockCounter < testCount {
+			mockCounter++
+			time.Sleep(testDealy)
+			return testToken(), nil
+		}
+
+		return nil, errTest
+	})
+
+	readerMock.EXPECT().Close()
+
+	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
+
+	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	require.NotNil(t, readChain)
+	require.NotNil(t, output)
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		time.Sleep(testLongDelay)
+		cancel()
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := readChain.Run(ctx)
+		require.ErrorIs(t, err, context.Canceled)
+	}()
+
+	<-output
+
+	wg.Wait()
+}
+
 func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	t.Parallel()
 

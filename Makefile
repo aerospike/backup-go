@@ -14,7 +14,6 @@ NFPM ?= $(shell which nfpm)
 OS ?= $(shell $(GO) env GOOS)
 ARCH ?= $(shell $(GO) env GOARCH)
 REGISTRY ?= "docker.io"
-RH_REGISTRY ?= "registry.access.redhat.com"
 GIT_COMMIT:=$(shell git rev-parse HEAD)
 GOBUILD = GOOS=$(OS) GOARCH=$(ARCH) CGO_ENABLED=0 $(GO) build \
 -ldflags="-X 'main.appVersion=$(VERSION)' -X 'main.commitHash=$(GIT_COMMIT)' -X 'main.buildTime=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')'"
@@ -78,11 +77,11 @@ release-test:
 
 .PHONY: docker-build
 docker-build:
-	 DOCKER_BUILDKIT=1  docker build --progress=plain --tag aerospike/aerospike-backup-tools:$(TAG) --build-arg REGISTRY=$(REGISTRY) --build-arg RH_REGISTRY=$(RH_REGISTRY) --file $(WORKSPACE)/Dockerfile .
+	 DOCKER_BUILDKIT=1  docker build --progress=plain --tag aerospike/aerospike-backup-tools:$(TAG) --build-arg REGISTRY=$(REGISTRY) --file $(WORKSPACE)/Dockerfile .
 
 .PHONY: docker-buildx
 docker-buildx:
-	./scripts/docker-buildx.sh --tag $(TAG) --registry $(REGISTRY) --rh-registry $(RH_REGISTRY)
+	./scripts/docker-buildx.sh --tag $(TAG) --registry $(REGISTRY)
 
 .PHONY: build
 build:
@@ -141,3 +140,12 @@ install:
 uninstall:
 	@rm -f $(INSTALL_DIR)/$(BACKUP_BINARY_NAME)
 	@rm -f $(INSTALL_DIR)/$(RESTORE_BINARY_NAME)
+
+.PHONY: vulnerability-scan
+vulnerability-scan:
+	snyk test --all-projects --policy-path=$(WORKSPACE)/.snyk --severity-threshold=high
+
+.PHONY: vulnerability-scan-container
+vulnerability-scan-container:
+	TAG="latest" $(MAKE) docker-build
+	snyk container test aerospike/aerospike-backup-tools:latest --policy-path=$(WORKSPACE)/.snyk --file=Dockerfile --severity-threshold=high

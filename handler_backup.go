@@ -371,6 +371,8 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		dataWriters,
 		bh.limiter,
 		pipelineMode,
+		bh.config.PipeReaderBufferSize,
+		bh.config.PipeWriterBufferSize,
 	)
 	if err != nil {
 		return err
@@ -510,6 +512,8 @@ func (bh *BackupHandler) backupSIndexes(
 		[]pipe.Writer[*models.Token]{sindexWriter},
 		bh.limiter,
 		pipe.Fixed,
+		bh.config.PipeReaderBufferSize,
+		bh.config.PipeWriterBufferSize,
 	)
 	if err != nil {
 		return err
@@ -548,6 +552,8 @@ func (bh *BackupHandler) backupUDFs(
 		[]pipe.Writer[*models.Token]{udfWriter},
 		bh.limiter,
 		pipe.Fixed,
+		bh.config.PipeReaderBufferSize,
+		bh.config.PipeWriterBufferSize,
 	)
 	if err != nil {
 		return err

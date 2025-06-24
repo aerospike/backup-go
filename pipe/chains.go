@@ -24,11 +24,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const (
-	readerBufferSize = 4096
-	writerBufferSize = readerBufferSize
-)
-
 // Reader describes data readers. To exit worker, the Reader must return io.EOF.
 type Reader[T models.TokenConstraint] interface {
 	Read(ctx context.Context) (T, error)
@@ -61,7 +56,8 @@ func (c *Chain[T]) Run(ctx context.Context) error {
 // and communication channel for backup operation.
 //
 //nolint:gocritic // No need to give names to the result here.
-func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (*Chain[T], chan T) {
+func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T], readerBufferSize int,
+) (*Chain[T], chan T) {
 	output := make(chan T, readerBufferSize)
 	routine := newReaderRoutine(r, p, output)
 
@@ -114,7 +110,8 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 // and communication channel for backup operation.
 //
 //nolint:gocritic // No need to give names to the result here.
-func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter) (*Chain[T], chan T) {
+func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter, writerBufferSize int,
+) (*Chain[T], chan T) {
 	input := make(chan T, writerBufferSize)
 	routine := newWriterRoutine(w, input, limiter)
 

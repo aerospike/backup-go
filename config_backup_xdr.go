@@ -94,6 +94,9 @@ type ConfigBackupXDR struct {
 	Forward bool
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
+
+	PipeReaderBufferSize int
+	PipeWriterBufferSize int
 }
 
 // validate validates the ConfigBackupXDR.

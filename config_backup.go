@@ -131,6 +131,9 @@ type ConfigBackup struct {
 	InfoRetryPolicy *models.RetryPolicy
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
+
+	PipeReaderBufferSize int
+	PipeWriterBufferSize int
 }
 
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.

@@ -153,6 +153,12 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 	flagSet.IntVarP(&f.Nice, "nice", "N",
 		0,
 		"The limits for read/write storage bandwidth in MiB/s")
+	flagSet.IntVar(&f.PipeReaderBufferSize, "pipe-reader-buffer",
+		4096,
+		"Pipe buffer")
+	flagSet.IntVar(&f.PipeWriterBufferSize, "pipe-writer-buffer",
+		4096,
+		"Pipe buffer")
 
 	return flagSet
 }

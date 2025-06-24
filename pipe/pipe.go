@@ -37,9 +37,11 @@ func NewPipe[T models.TokenConstraint](
 	writers []Writer[T],
 	limiter *rate.Limiter,
 	strategy FanoutStrategy,
+	readerBufferSize,
+	writerBufferSize int,
 ) (*Pipe[T], error) {
-	readPool := NewReaderPool[T](readers, pc)
-	writePool := NewWriterPool[T](writers, limiter)
+	readPool := NewReaderPool[T](readers, pc, readerBufferSize)
+	writePool := NewWriterPool[T](writers, limiter, writerBufferSize)
 	// Swap channels!
 	// Output of readPool is an input of fanout.
 	// Input of writePool is an output of fanout.

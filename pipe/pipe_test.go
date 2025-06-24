@@ -86,6 +86,8 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
 		nil,
 		RoundRobin,
+		testBufferSize,
+		testBufferSize,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, p)
@@ -158,6 +160,8 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
 		nil,
 		Fixed,
+		testBufferSize,
+		testBufferSize,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, p)
@@ -182,6 +186,8 @@ func TestPipe_NewBackupPipeError(t *testing.T) {
 		nil,
 		nil,
 		Split,
+		testBufferSize,
+		testBufferSize,
 	)
 	require.ErrorContains(t, err, "failed to create fanout")
 	require.Nil(t, p)

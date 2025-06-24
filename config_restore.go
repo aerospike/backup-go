@@ -90,6 +90,9 @@ type ConfigRestore struct {
 	MetricsEnabled bool
 	// ValidateOnly indicates whether restore should only validate the backup files.
 	ValidateOnly bool
+
+	PipeReaderBufferSize int
+	PipeWriterBufferSize int
 }
 
 // NewDefaultRestoreConfig returns a new ConfigRestore with default values.

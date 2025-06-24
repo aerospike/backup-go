@@ -177,6 +177,8 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		dataWriters,
 		rh.limiter,
 		pipelineMode,
+		rh.config.PipeReaderBufferSize,
+		rh.config.PipeWriterBufferSize,
 	)
 	if err != nil {
 		return err

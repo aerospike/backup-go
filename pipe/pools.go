@@ -52,12 +52,13 @@ type ProcessorCreator[T models.TokenConstraint] func() Processor[T]
 
 // NewReaderPool returns a new pool of Reader and Processor chains for backup operations,
 // with the specified parallelism.
-func NewReaderPool[T models.TokenConstraint](readers []Reader[T], pc ProcessorCreator[T]) *Pool[T] {
+func NewReaderPool[T models.TokenConstraint](readers []Reader[T], pc ProcessorCreator[T], readerBufferSize int,
+) *Pool[T] {
 	chains := make([]*Chain[T], len(readers))
 	outputs := make([]chan T, len(readers))
 
 	for i := range readers {
-		chains[i], outputs[i] = NewReaderChain[T](readers[i], pc())
+		chains[i], outputs[i] = NewReaderChain[T](readers[i], pc(), readerBufferSize)
 	}
 
 	return &Pool[T]{
@@ -68,12 +69,13 @@ func NewReaderPool[T models.TokenConstraint](readers []Reader[T], pc ProcessorCr
 
 // NewWriterPool creates a new pool of Writer chains for backup operations,
 // with the specified parallelism and limiter.
-func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *rate.Limiter) *Pool[T] {
+func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *rate.Limiter, writerBufferSize int,
+) *Pool[T] {
 	chains := make([]*Chain[T], len(writers))
 	inputs := make([]chan T, len(writers))
 
 	for i := range writers {
-		chains[i], inputs[i] = NewWriterChain[T](writers[i], limiter)
+		chains[i], inputs[i] = NewWriterChain[T](writers[i], limiter, writerBufferSize)
 	}
 
 	return &Pool[T]{

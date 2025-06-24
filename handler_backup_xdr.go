@@ -186,6 +186,8 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 		writeWorkers,
 		nil,
 		pipe.Split,
+		bh.config.PipeReaderBufferSize,
+		bh.config.PipeWriterBufferSize,
 	)
 	if err != nil {
 		return err

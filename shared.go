@@ -44,7 +44,7 @@ func handlePanic(errors chan<- error, logger *slog.Logger) {
 	}
 }
 
-func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
+func doWork(errors chan<- error, done chan<- struct{}, logger *slog.Logger, work func() error) {
 	defer handlePanic(errors, logger)
 
 	logger.Debug("job starting")
@@ -58,6 +58,7 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 	}
 
 	logger.Debug("job done")
+	done <- struct{}{}
 }
 
 func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {

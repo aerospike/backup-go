@@ -74,6 +74,7 @@ type BackupHandler struct {
 	infoClient             *asinfo.InfoClient
 	scanLimiter            *semaphore.Weighted
 	errors                 chan error
+	done                   chan struct{}
 	id                     string
 
 	stats *models.BackupStats
@@ -189,6 +190,8 @@ func newBackupHandler(
 		stats:                  stats,
 		rpsCollector:           rpsCollector,
 		kbpsCollector:          kbpsCollector,
+		errors:                 make(chan error),
+		done:                   make(chan struct{}),
 	}
 
 	writerProcessor := newFileWriterProcessor[*models.Token](
@@ -216,10 +219,9 @@ func newBackupHandler(
 // currently this should only be run once.
 func (bh *BackupHandler) run() {
 	bh.wg.Add(1)
-	bh.errors = make(chan error, 1)
 	bh.stats.Start()
 
-	go doWork(bh.errors, bh.logger, func() error {
+	go doWork(bh.errors, bh.done, bh.logger, func() error {
 		defer bh.wg.Done()
 
 		return bh.backup(bh.ctx)
@@ -427,50 +429,46 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *BackupHandler) Wait(ctx context.Context) error {
-	// Define err, to check it on defer function.
-	// If the err is nil, we can remove the state file.
 	var err error
-	defer func() {
-		bh.stats.Stop()
-		bh.rpsCollector.Stop()
-		bh.kbpsCollector.Stop()
-
-		if err == nil && bh.state != nil {
-			// Clen only if err == nil and state is not nil.
-			if err = bh.state.cleanup(ctx); err != nil {
-				bh.logger.Error("failed to cleanup state", slog.Any("error", err))
-			}
-		}
-
-		close(bh.errors)
-	}()
 
 	select {
 	case <-bh.ctx.Done():
 		// When global context is done, wait until all routine finish their work properly.
 		// Global context - is context that was passed to Backup() method.
-		bh.wg.Wait()
-
-		err = ctx.Err()
-
-		return err
+		err = bh.ctx.Err()
 	case <-ctx.Done():
 		// When local context is done, we cancel global context.
 		// Then wait until all routines finish their work properly.
 		// Local context - is context that was passed to Wait() method.
 		bh.cancel()
-		bh.wg.Wait()
 
 		err = ctx.Err()
-
-		return err
 	case err = <-bh.errors:
 		// On error, we cancel global context.
 		// To stop all goroutines and prevent leaks.
 		bh.cancel()
-
-		return err
+	case <-bh.done: // Success
 	}
+
+	// Define err, to check it on defer function.
+	// If the err is nil, we can remove the state file.
+	if err == nil && bh.state != nil {
+		// Clen only if err == nil and state is not nil.
+		if err = bh.state.cleanup(ctx); err != nil {
+			bh.logger.Error("failed to cleanup state", slog.Any("error", err))
+		}
+	}
+
+	// Wait when all routines ended.
+	bh.wg.Wait()
+
+	// Clean.
+	bh.stats.Stop()
+	bh.rpsCollector.Stop()
+	bh.kbpsCollector.Stop()
+	close(bh.errors)
+
+	return err
 }
 
 func (bh *BackupHandler) backupSIndexes(

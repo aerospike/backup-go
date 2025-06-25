@@ -46,6 +46,7 @@ type HandlerBackupXDR struct {
 	logger *slog.Logger
 
 	errors chan error
+	done   chan struct{}
 	// For graceful shutdown.
 	wg sync.WaitGroup
 
@@ -131,7 +132,8 @@ func newBackupXDRHandler(
 		infoClient:      infoClient,
 		stats:           stats,
 		logger:          logger,
-		errors:          make(chan error, 1),
+		errors:          make(chan error),
+		done:            make(chan struct{}),
 		rpsCollector:    rpsCollector,
 		kbpsCollector:   kbpsCollector,
 	}
@@ -143,7 +145,7 @@ func (bh *HandlerBackupXDR) run() {
 	bh.wg.Add(1)
 	bh.stats.Start()
 
-	go doWork(bh.errors, bh.logger, func() error {
+	go doWork(bh.errors, bh.done, bh.logger, func() error {
 		defer bh.wg.Done()
 
 		return bh.backup(bh.ctx)
@@ -198,35 +200,37 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
-	defer func() {
-		bh.stats.Stop()
-		bh.rpsCollector.Stop()
-		bh.kbpsCollector.Stop()
-		close(bh.errors)
-	}()
+	var err error
 
 	select {
 	case <-bh.ctx.Done():
 		// When global context is done, wait until all routines finish their work properly.
 		// Global context - is context that was passed to Backup() method.
-		bh.wg.Wait()
-
-		return bh.ctx.Err()
+		err = bh.ctx.Err()
 	case <-ctx.Done():
 		// When local context is done, we cancel global context.
 		// Then wait until all routines finish their work properly.
 		// Local context - is context that was passed to Wait() method.
 		bh.cancel()
-		bh.wg.Wait()
 
-		return ctx.Err()
-	case err := <-bh.errors:
+		err = ctx.Err()
+	case err = <-bh.errors:
 		// On error, we cancel global context.
 		// To stop all goroutines and prevent leaks.
 		bh.cancel()
-
-		return err
+	case <-bh.done: // Success
 	}
+
+	// Wait when all routines ended.
+	bh.wg.Wait()
+
+	// Clean.
+	bh.stats.Stop()
+	bh.rpsCollector.Stop()
+	bh.kbpsCollector.Stop()
+	close(bh.errors)
+
+	return err
 }
 
 // GetStats returns the stats of the backup job.

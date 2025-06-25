@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
@@ -74,6 +75,10 @@ type RestoreHandler[T models.TokenConstraint] struct {
 
 	id     string
 	errors chan error
+	done   chan struct{}
+
+	// For graceful shutdown.
+	wg sync.WaitGroup
 }
 
 // newRestoreHandler creates a new RestoreHandler.
@@ -139,15 +144,19 @@ func newRestoreHandler[T models.TokenConstraint](
 		logger:         logger,
 		limiter:        makeBandwidthLimiter(config.Bandwidth),
 		errors:         errorsCh,
+		done:           make(chan struct{}),
 		rpsCollector:   rpsCollector,
 		kbpsCollector:  kbpsCollector,
 	}
 }
 
 func (rh *RestoreHandler[T]) run() {
+	rh.wg.Add(1)
 	rh.stats.Start()
 
-	go doWork(rh.errors, rh.logger, func() error {
+	go doWork(rh.errors, rh.done, rh.logger, func() error {
+		defer rh.wg.Done()
+
 		return rh.restore(rh.ctx)
 	})
 }
@@ -227,28 +236,33 @@ func (rh *RestoreHandler[T]) GetStats() *models.RestoreStats {
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
 func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
-	defer func() {
-		rh.stats.Stop()
-		rh.rpsCollector.Stop()
-		rh.kbpsCollector.Stop()
-		close(rh.errors)
-	}()
+	var err error
 
 	select {
 	case <-rh.ctx.Done():
 		// Wait for global context.
-		return rh.ctx.Err()
+		err = rh.ctx.Err()
 	case <-ctx.Done():
 		// Process local context.
 		rh.cancel()
-		return ctx.Err()
-	case err := <-rh.errors:
+
+		err = ctx.Err()
+	case err = <-rh.errors:
 		// On error, we cancel global context.
 		// To stop all goroutines and prevent leaks.
 		rh.cancel()
-
-		return err
+	case <-rh.done: // Success
 	}
+
+	// Wait when all routines ended.
+	rh.wg.Wait()
+
+	rh.stats.Stop()
+	rh.rpsCollector.Stop()
+	rh.kbpsCollector.Stop()
+	close(rh.errors)
+
+	return err
 }
 
 // GetMetrics returns the metrics of the restore job.

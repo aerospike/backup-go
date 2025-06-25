@@ -232,6 +232,7 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 		rh.stats.Stop()
 		rh.rpsCollector.Stop()
 		rh.kbpsCollector.Stop()
+		close(rh.errors)
 	}()
 
 	select {

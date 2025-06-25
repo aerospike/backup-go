@@ -203,6 +203,7 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 		bh.stats.Stop()
 		bh.rpsCollector.Stop()
 		bh.kbpsCollector.Stop()
+		close(bh.errors)
 	}()
 
 	select {

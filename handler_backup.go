@@ -450,6 +450,8 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 				bh.logger.Error("failed to cleanup state", slog.Any("error", err))
 			}
 		}
+
+		close(bh.errors)
 	}()
 
 	select {

@@ -124,7 +124,6 @@ func newRestoreHandler[T models.TokenConstraint](
 		aerospikeClient,
 		config,
 		stats,
-		makeBandwidthLimiter(config.Bandwidth),
 		rpsCollector,
 		logger,
 	)

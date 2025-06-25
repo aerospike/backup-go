@@ -114,7 +114,6 @@ func newBackupXDRHandler(
 		config.CompressionPolicy,
 		nil,
 		stats,
-		nil,
 		kbpsCollector,
 		config.FileLimit,
 		config.ParallelWrite,

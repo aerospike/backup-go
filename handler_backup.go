@@ -201,7 +201,6 @@ func newBackupHandler(
 		config.CompressionPolicy,
 		state,
 		stats,
-		limiter,
 		kbpsCollector,
 		config.FileLimit,
 		config.ParallelWrite,
@@ -398,14 +397,6 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 			logger.Error("failed to close backup file", "error", err)
 		}
 	}
-}
-
-func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
-	if bandwidth > 0 {
-		return rate.NewLimiter(rate.Limit(bandwidth), bandwidth)
-	}
-
-	return nil
 }
 
 func (bh *BackupHandler) backupSIndexesAndUDFs(

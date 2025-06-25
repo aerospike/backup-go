@@ -197,7 +197,7 @@ func (r *Reader) streamDirectory(
 		})
 
 		if err != nil {
-			errorsCh <- fmt.Errorf("failed to list objects: %w", err)
+			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to list objects: %w", err))
 			return
 		}
 
@@ -236,12 +236,12 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to check object availability: %w", err)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
 		return
 	}
 
 	if state != objStatusAvailable {
-		errorsCh <- fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path))
 		return
 	}
 
@@ -261,7 +261,7 @@ func (r *Reader) openObject(
 		}
 
 		// We check *p.Key == nil in the beginning.
-		errorsCh <- fmt.Errorf("failed to open file %s: %w", path, err)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
 
 		return
 	}

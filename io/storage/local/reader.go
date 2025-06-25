@@ -102,7 +102,7 @@ func (r *Reader) StreamFiles(
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(path)
 				if err != nil {
-					errorsCh <- err
+					ioStorage.ErrToChan(ctx, errorsCh, err)
 					return
 				}
 			}
@@ -120,13 +120,13 @@ func (r *Reader) streamDirectory(
 ) {
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to read path %s: %w", path, err)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read path %s: %w", path, err))
 		return
 	}
 
 	for _, file := range fileInfo {
 		if err = ctx.Err(); err != nil {
-			errorsCh <- err
+			ioStorage.ErrToChan(ctx, errorsCh, err)
 			return
 		}
 
@@ -145,7 +145,7 @@ func (r *Reader) streamDirectory(
 		// Skip empty files.
 		info, err := file.Info()
 		if err != nil {
-			errorsCh <- fmt.Errorf("failed to get file info %s: %w", filePath, err)
+			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s: %w", filePath, err))
 			return
 		}
 
@@ -166,7 +166,7 @@ func (r *Reader) streamDirectory(
 
 		reader, err = os.Open(filePath)
 		if err != nil {
-			errorsCh <- fmt.Errorf("failed to open %s: %w", filePath, err)
+			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filePath, err))
 			return
 		}
 
@@ -179,13 +179,13 @@ func (r *Reader) streamDirectory(
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
 	if ctx.Err() != nil {
-		errorsCh <- ctx.Err()
+		ioStorage.ErrToChan(ctx, errorsCh, ctx.Err())
 		return
 	}
 
 	reader, err := os.Open(filename)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to open %s: %w", filename, err)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filename, err))
 		return
 	}
 

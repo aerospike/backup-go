@@ -237,7 +237,6 @@ func (rh *RestoreHandler[T]) GetStats() *models.RestoreStats {
 // Wait waits for the restore job to complete and returns an error if the job failed.
 func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	var err error
-	defer close(rh.errors)
 
 	select {
 	case <-rh.ctx.Done():

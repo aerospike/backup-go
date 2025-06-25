@@ -201,7 +201,6 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 	var err error
-	defer close(bh.errors)
 
 	select {
 	case <-bh.ctx.Done():

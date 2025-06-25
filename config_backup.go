@@ -238,5 +238,9 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
 	}
 
+	if c.ScanPolicy.ReplicaPolicy == a.PREFER_RACK && (len(c.RackList) != 0 || len(c.NodeList) != 0) {
+		return fmt.Errorf("racks list or nodes list are not supported with PREFER_RACK replica policy")
+	}
+
 	return nil
 }

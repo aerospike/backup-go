@@ -430,6 +430,7 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *BackupHandler) Wait(ctx context.Context) error {
 	var err error
+	defer close(bh.errors)
 
 	select {
 	case <-bh.ctx.Done():
@@ -466,7 +467,6 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	bh.stats.Stop()
 	bh.rpsCollector.Stop()
 	bh.kbpsCollector.Stop()
-	close(bh.errors)
 
 	return err
 }

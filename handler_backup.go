@@ -450,7 +450,9 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	case <-bh.done: // Success
 	}
 
-	// Define err, to check it on defer function.
+	// Wait when all routines ended.
+	bh.wg.Wait()
+
 	// If the err is nil, we can remove the state file.
 	if err == nil && bh.state != nil {
 		// Clen only if err == nil and state is not nil.
@@ -458,9 +460,6 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 			bh.logger.Error("failed to cleanup state", slog.Any("error", err))
 		}
 	}
-
-	// Wait when all routines ended.
-	bh.wg.Wait()
 
 	// Clean.
 	bh.stats.Stop()

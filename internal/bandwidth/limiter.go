@@ -20,15 +20,23 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// DefaultLimit is 8 mb as aerospike record size is limited with 8mb.
+const DefaultLimit = 8 * 1024 * 1024
+
 // Limiter wrapper around standard go bandwidth.
 type Limiter struct {
 	*rate.Limiter
 	bandwidth int
 }
 
-// NewLimiter returns new bandwidth bandwidth.
-func NewLimiter(bandwidth int) *Limiter {
-	if bandwidth > 0 {
+// NewLimiter returns new bandwidth limiter.
+func NewLimiter(limit int) *Limiter {
+	if limit > 0 {
+		bandwidth := DefaultLimit
+		if limit > DefaultLimit {
+			bandwidth = limit
+		}
+
 		return &Limiter{
 			rate.NewLimiter(rate.Limit(bandwidth), bandwidth),
 			bandwidth,
@@ -38,14 +46,7 @@ func NewLimiter(bandwidth int) *Limiter {
 	return nil
 }
 
-// WaitBurst adjusts the limiter burst capacity dynamically and
-// blocks until the required tokens are available or context ends.
-func (l *Limiter) WaitBurst(ctx context.Context, n int) error {
-	// Limiter is initialized with limit and burst == bandwidth.
-	// So we check if n is exceeded bandwidth value, we dynamically set burst.
-	if n > l.bandwidth {
-		l.SetBurst(n)
-	}
-
+// Wait blocks until lim permits n events to happen.
+func (l *Limiter) Wait(ctx context.Context, n int) error {
 	return l.WaitN(ctx, n)
 }

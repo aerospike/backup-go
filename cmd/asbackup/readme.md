@@ -129,7 +129,7 @@ Backup Flags:
   -D, --after-digest string           Backup records after record digest in record's partition plus all succeeding
                                       partitions. Used to resume backup with last record received from previous
                                       incomplete backup.
-                                      This argument is mutually exclusive to partition-list.
+                                      This argument is mutually exclusive with partition-list.
                                       Format: Base64 encoded string
                                       Example: EjRWeJq83vEjRRI0VniavN7xI0U=
                                       
@@ -163,7 +163,7 @@ Backup Flags:
                                       Default: backup all nodes in the cluster
   -X, --partition-list string         List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,
                                       individual partitions, or records after a specific digest within a single partition.
-                                      This argument is mutually exclusive to after-digest.
+                                      This argument is mutually exclusive with after-digest.
                                       Filter: <begin partition>[-<partition count>]|<digest>
                                       begin partition: 0-4095
                                       partition count: 1-4096 Default: 1
@@ -173,11 +173,11 @@ Backup Flags:
                                       
       --prefer-racks string           <rack id 1>[,<rack id 2>[,...]]
                                       A list of Aerospike Database rack IDs to prefer when reading records for a backup.
-                                      This argument is mutually exclusive to --rack-list and --node-list.
+                                      This argument is mutually exclusive with --rack-list and --node-list.
       --rack-list string              <rack id 1>[,<rack id 2>[,...]]
                                       A list of Aerospike Database rack IDs to backup.
                                       Unlike --prefer-racks, only specified racks will be backed up.
-                                      This argument is mutually exclusive to --prefer-racks and --node-list.
+                                      This argument is mutually exclusive with --prefer-racks and --node-list.
   -M, --max-records int               The number of records approximately to back up. 0 - all records
       --sleep-between-retries int     The amount of milliseconds to sleep between retries after an error.
                                       This field is ignored when --max-retries is zero. (default 5)

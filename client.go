@@ -121,7 +121,7 @@ func WithLogger(logger *slog.Logger) ClientOpt {
 	}
 }
 
-// WithScanLimiter sets the scan bandwidth for the [Client].
+// WithScanLimiter sets the scan limiter for the [Client].
 func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 	return func(c *Client) {
 		c.scanLimiter = sem

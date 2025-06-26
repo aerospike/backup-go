@@ -77,7 +77,11 @@ release-test:
 
 .PHONY: docker-build
 docker-build:
-	 DOCKER_BUILDKIT=1  docker build --progress=plain --tag aerospike/aerospike-backup-tools:$(TAG) --build-arg REGISTRY=$(REGISTRY) --file $(WORKSPACE)/Dockerfile .
+	 DOCKER_BUILDKIT=1  docker build \
+ 	--progress=plain \
+ 	--tag aerospike/aerospike-backup-tools:$(TAG) \
+ 	--build-arg REGISTRY=$(REGISTRY) \
+ 	--file $(WORKSPACE)/Dockerfile .
 
 .PHONY: docker-buildx
 docker-buildx:
@@ -148,4 +152,7 @@ vulnerability-scan:
 .PHONY: vulnerability-scan-container
 vulnerability-scan-container:
 	TAG="latest" $(MAKE) docker-build
-	snyk container test aerospike/aerospike-backup-tools:latest --policy-path=$(WORKSPACE)/.snyk --file=Dockerfile --severity-threshold=high
+	snyk container test aerospike/aerospike-backup-service:latest \
+	--policy-path=$(WORKSPACE)/.snyk \
+	--file=Dockerfile \
+	--severity-threshold=high

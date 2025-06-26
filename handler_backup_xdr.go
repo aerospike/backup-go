@@ -132,8 +132,8 @@ func newBackupXDRHandler(
 		infoClient:      infoClient,
 		stats:           stats,
 		logger:          logger,
-		errors:          make(chan error),
-		done:            make(chan struct{}),
+		errors:          make(chan error, 1),
+		done:            make(chan struct{}, 1),
 		rpsCollector:    rpsCollector,
 		kbpsCollector:   kbpsCollector,
 	}
@@ -225,9 +225,7 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 	bh.wg.Wait()
 
 	// Clean.
-	bh.stats.Stop()
-	bh.rpsCollector.Stop()
-	bh.kbpsCollector.Stop()
+	bh.stopStatsMetrics()
 
 	return err
 }
@@ -253,4 +251,12 @@ func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
 		bh.rpsCollector.GetLastResult(),
 		bh.kbpsCollector.GetLastResult(),
 	)
+}
+
+// stopStatsMetrics stops the collection of stats and metrics for the backup job,
+// including BackupStats, RPS, and KBPS tracking.
+func (bh *HandlerBackupXDR) stopStatsMetrics() {
+	bh.stats.Stop()
+	bh.rpsCollector.Stop()
+	bh.kbpsCollector.Stop()
 }

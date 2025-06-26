@@ -111,7 +111,7 @@ func newBackupHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
-	limiter := makeBandwidthLimiter(config.Bandwidth)
+	limiter := newBandwidthLimiter(config.Bandwidth)
 
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
@@ -190,8 +190,8 @@ func newBackupHandler(
 		stats:                  stats,
 		rpsCollector:           rpsCollector,
 		kbpsCollector:          kbpsCollector,
-		errors:                 make(chan error),
-		done:                   make(chan struct{}),
+		errors:                 make(chan error, 1),
+		done:                   make(chan struct{}, 1),
 	}
 
 	writerProcessor := newFileWriterProcessor[*models.Token](
@@ -462,9 +462,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	}
 
 	// Clean.
-	bh.stats.Stop()
-	bh.rpsCollector.Stop()
-	bh.kbpsCollector.Stop()
+	bh.stopStatsMetrics()
 
 	return err
 }
@@ -573,4 +571,12 @@ func (bh *BackupHandler) stateSuffixGenerator() string {
 	}
 
 	return suffix
+}
+
+// stopStatsMetrics stops the collection of stats and metrics for the backup job,
+// including BackupStats, RPS, and KBPS tracking.
+func (bh *BackupHandler) stopStatsMetrics() {
+	bh.stats.Stop()
+	bh.rpsCollector.Stop()
+	bh.kbpsCollector.Stop()
 }

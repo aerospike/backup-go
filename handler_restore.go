@@ -98,7 +98,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	// Channel for transferring readers.
 	readersCh := make(chan models.File)
 	// Channel for processing errors from readers or writers.
-	errorsCh := make(chan error)
+	errorsCh := make(chan error, 1)
 
 	stats := models.NewRestoreStats()
 	rpsCollector := metrics.NewCollector(
@@ -142,9 +142,9 @@ func newRestoreHandler[T models.TokenConstraint](
 		stats:          stats,
 		id:             id,
 		logger:         logger,
-		limiter:        makeBandwidthLimiter(config.Bandwidth),
+		limiter:        newBandwidthLimiter(config.Bandwidth),
 		errors:         errorsCh,
-		done:           make(chan struct{}),
+		done:           make(chan struct{}, 1),
 		rpsCollector:   rpsCollector,
 		kbpsCollector:  kbpsCollector,
 	}
@@ -257,9 +257,7 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	// Wait when all routines ended.
 	rh.wg.Wait()
 
-	rh.stats.Stop()
-	rh.rpsCollector.Stop()
-	rh.kbpsCollector.Stop()
+	rh.stopStatsMetrics()
 
 	return err
 }
@@ -280,4 +278,12 @@ func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 		rh.rpsCollector.GetLastResult(),
 		rh.kbpsCollector.GetLastResult(),
 	)
+}
+
+// stopStatsMetrics stops the collection of stats and metrics for the restore job,
+// including RestoreStats, RPS, and KBPS tracking.
+func (rh *RestoreHandler[T]) stopStatsMetrics() {
+	rh.stats.Stop()
+	rh.rpsCollector.Stop()
+	rh.kbpsCollector.Stop()
 }

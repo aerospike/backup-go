@@ -94,7 +94,7 @@ func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 	return key, nil
 }
 
-func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
+func newBandwidthLimiter(bandwidth int) *rate.Limiter {
 	if bandwidth > 0 {
 		return rate.NewLimiter(rate.Limit(bandwidth), limiterMaxBurst)
 	}

@@ -27,6 +27,9 @@ FROM ${REGISTRY}/alpine:latest
 ARG TARGETOS
 ARG TARGETARCH
 
+RUN apk update &&  \
+    apk upgrade --no-cache
+
 RUN apk add --no-cache shadow && \
     addgroup -g 65532 -S abgroup && \
     adduser -S -u 65532 -G abgroup -h /home/abuser abuser

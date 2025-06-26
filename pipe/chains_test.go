@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -493,7 +493,7 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 
 	writerMock.EXPECT().Close().Return(nil)
 
-	limiter := rate.NewLimiter(rate.Limit(testLimit), testLimit)
+	limiter := bandwidth.NewLimiter(testLimit)
 
 	writeChain, input := NewWriterChain[*models.Token](writerMock, limiter)
 	require.NotNil(t, writeChain)
@@ -507,7 +507,7 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 		err := writeChain.Run(ctx)
 		fmt.Println(err)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "exceeds limiter's burst")
+		require.ErrorContains(t, err, "exceeds bandwidth's burst")
 	}()
 
 	go func() {

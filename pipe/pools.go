@@ -17,9 +17,9 @@ package pipe
 import (
 	"context"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
 )
 
 // Pool is a pool of chains.
@@ -67,8 +67,8 @@ func NewReaderPool[T models.TokenConstraint](readers []Reader[T], pc ProcessorCr
 }
 
 // NewWriterPool creates a new pool of Writer chains for backup operations,
-// with the specified parallelism and limiter.
-func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *rate.Limiter) *Pool[T] {
+// with the specified parallelism and bandwidth.
+func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *bandwidth.Limiter) *Pool[T] {
 	chains := make([]*Chain[T], len(writers))
 	inputs := make([]chan T, len(writers))
 

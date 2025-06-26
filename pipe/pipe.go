@@ -18,9 +18,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
 )
 
 // Pipe is running and managing everything.
@@ -35,7 +35,7 @@ func NewPipe[T models.TokenConstraint](
 	pc ProcessorCreator[T],
 	readers []Reader[T],
 	writers []Writer[T],
-	limiter *rate.Limiter,
+	limiter *bandwidth.Limiter,
 	strategy FanoutStrategy,
 ) (*Pipe[T], error) {
 	readPool := NewReaderPool[T](readers, pc)

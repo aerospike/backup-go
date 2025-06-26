@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
@@ -32,7 +33,6 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
-	"golang.org/x/time/rate"
 )
 
 // Writer defines an interface for writing backup data to a storage provider.
@@ -70,7 +70,7 @@ type BackupHandler struct {
 
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
-	limiter                *rate.Limiter
+	limiter                *bandwidth.Limiter
 	infoClient             *asinfo.InfoClient
 	scanLimiter            *semaphore.Weighted
 	errors                 chan error
@@ -110,8 +110,6 @@ func newBackupHandler(
 
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
-
-	limiter := newBandwidthLimiter(config.Bandwidth)
 
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
@@ -183,7 +181,7 @@ func newBackupHandler(
 		encoder:                encoder,
 		readerProcessor:        readerProcessor,
 		recordCounter:          recCounter,
-		limiter:                limiter,
+		limiter:                bandwidth.NewLimiter(config.Bandwidth),
 		infoClient:             infoCLient,
 		scanLimiter:            scanLimiter,
 		state:                  state,

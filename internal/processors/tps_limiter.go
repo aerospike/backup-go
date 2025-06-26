@@ -29,7 +29,7 @@ type tpsLimiter[T models.TokenConstraint] struct {
 	tps     int
 }
 
-// NewTPSLimiter Create a new TPS limiter.
+// NewTPSLimiter Create a new TPS bandwidth.
 // n — allowed  number of tokens per second, n = 0 means no limit.
 func NewTPSLimiter[T models.TokenConstraint](ctx context.Context, n int) processor[T] {
 	if n == 0 {

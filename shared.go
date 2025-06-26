@@ -21,10 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/segmentio/asm/base64"
-	"golang.org/x/time/rate"
 )
-
-const limiterMaxBurst = 8 * 1024 * 1024 // 8MB as max record size.
 
 func handlePanic(errors chan<- error, logger *slog.Logger) {
 	if r := recover(); r != nil {
@@ -92,12 +89,4 @@ func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 	}
 
 	return key, nil
-}
-
-func newBandwidthLimiter(bandwidth int) *rate.Limiter {
-	if bandwidth > 0 {
-		return rate.NewLimiter(rate.Limit(bandwidth), bandwidth)
-	}
-
-	return nil
 }

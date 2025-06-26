@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -114,7 +114,7 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 // and communication channel for backup operation.
 //
 //nolint:gocritic // No need to give names to the result here.
-func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter) (*Chain[T], chan T) {
+func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *bandwidth.Limiter) (*Chain[T], chan T) {
 	input := make(chan T, writerBufferSize)
 	routine := newWriterRoutine(w, input, limiter)
 
@@ -124,7 +124,7 @@ func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *rate.Limiter
 }
 
 // newWriterRoutine returns a function that will be executed in goroutine to process a writer.
-func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, limiter *rate.Limiter,
+func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, limiter *bandwidth.Limiter,
 ) func(context.Context) error {
 	// Notice!
 	// It is important to return func with `(err error)`,
@@ -161,7 +161,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 				if limiter != nil {
 					limiter.SetBurst(n)
 
-					if err := limiter.WaitN(ctx, n); err != nil {
+					if err := limiter.WaitBurst(ctx, n); err != nil {
 						return fmt.Errorf("failed to limit data write: %w", err)
 					}
 				}

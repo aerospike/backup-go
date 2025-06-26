@@ -20,13 +20,13 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
-	"golang.org/x/time/rate"
 )
 
 // StreamingReader defines an interface for accessing backup file data from a storage provider.
@@ -67,7 +67,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	stats          *models.RestoreStats
 
 	logger  *slog.Logger
-	limiter *rate.Limiter
+	limiter *bandwidth.Limiter
 
 	pl            *pipe.Pipe[T]
 	rpsCollector  *metrics.Collector
@@ -142,7 +142,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		stats:          stats,
 		id:             id,
 		logger:         logger,
-		limiter:        newBandwidthLimiter(config.Bandwidth),
+		limiter:        bandwidth.NewLimiter(config.Bandwidth),
 		errors:         errorsCh,
 		done:           make(chan struct{}, 1),
 		rpsCollector:   rpsCollector,

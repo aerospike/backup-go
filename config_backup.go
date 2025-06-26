@@ -55,7 +55,7 @@ type ConfigBackup struct {
 	// Used to resume backup with last record received from previous incomplete backup.
 	// This parameter will overwrite PartitionFilters.Begin value.
 	// Can't be used in full backup mode.
-	// This parameter is mutually exclusive to partition-list (not implemented).
+	// This parameter is mutually exclusive with partition-list (not implemented).
 	// Format: base64 encoded string.
 	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
 	PartitionFilters []*a.PartitionFilter
@@ -68,7 +68,7 @@ type ConfigBackup struct {
 	// To get the node name, use the 'node:' info command.
 	// Backup the given cluster nodes only.
 	// If it is set, ParallelNodes automatically set to true.
-	// This argument is mutually exclusive to partition-list/AfterDigest arguments.
+	// This argument is mutually exclusive with partition-list/AfterDigest arguments.
 	NodeList []string
 	// SetList is the Aerospike set to back up (optional, given an empty list,
 	// all sets will be backed up).
@@ -236,6 +236,10 @@ func (c *ConfigBackup) validate() error {
 
 	if c.EncoderType != EncoderTypeASB {
 		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
+	}
+
+	if c.ScanPolicy.ReplicaPolicy == a.PREFER_RACK && (len(c.RackList) != 0 || len(c.NodeList) != 0) {
+		return fmt.Errorf("racks list or nodes list are not supported with PREFER_RACK replica policy")
 	}
 
 	return nil

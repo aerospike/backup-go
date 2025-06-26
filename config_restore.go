@@ -57,7 +57,7 @@ type ConfigRestore struct {
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
 	// Limits restore bandwidth (bytes per second).
-	// The minimal limit is 8MB/s.
+	// The lower bound is 8Mb (maximum size of the Aerospike record).
 	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
 	// Don't restore any records.

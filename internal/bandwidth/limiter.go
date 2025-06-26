@@ -20,8 +20,12 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// DefaultLimit is 8 mb as aerospike record size is limited with 8mb.
-const DefaultLimit = 8 * 1024 * 1024
+const (
+	// DefaultLimit is 8 mb as aerospike record size is limited with 8mb.
+	DefaultLimit = 8 * 1024 * 1024
+	// metaOverhead approximate size of record's metadata: namespace, set name, key, etc.
+	metaOverhead = 10_000
+)
 
 // Limiter wrapper around standard go bandwidth.
 type Limiter struct {
@@ -32,8 +36,8 @@ type Limiter struct {
 // NewLimiter returns new bandwidth limiter.
 func NewLimiter(limit int) *Limiter {
 	if limit > 0 {
-		bandwidth := DefaultLimit
-		if limit > DefaultLimit {
+		bandwidth := DefaultLimit + metaOverhead
+		if limit > bandwidth {
 			bandwidth = limit
 		}
 

@@ -118,7 +118,7 @@ func newWriter(
 
 func getDirectoryOutputFile(params *config.BackupParams) (directory, outputFile string) {
 	if params.Backup != nil {
-		return params.Common.Directory, params.Backup.OutputFile
+		return params.Backup.Directory, params.Backup.OutputFile
 	}
 	// Xdr backup.
 	return params.BackupXDR.Directory, ""

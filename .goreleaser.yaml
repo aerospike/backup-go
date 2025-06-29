@@ -70,7 +70,7 @@ archives:
 
 release:
   prerelease: false
-  draft: true
+#  draft: true
   make_latest: false
   replace_existing_artifacts: true
   mode: prepend

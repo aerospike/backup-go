@@ -21,13 +21,13 @@ import (
 )
 
 const (
-	// DefaultLimit is 8 mb as aerospike record size is limited with 8mb.
+	// DefaultLimit represents the minimum allowed bandwidth, constrained by the maximum record size (8 Mb).
 	DefaultLimit = 8 * 1024 * 1024
-	// metaOverhead approximate size of record's metadata: namespace, set name, key, etc.
-	metaOverhead = 10_000
+	// metaOverhead represents an approximate size of record's metadata: namespace, set name, key, etc.
+	metaOverhead = 10 * 1024
 )
 
-// Limiter wrapper around standard go bandwidth.
+// Limiter wrapper around standard rate.Limiter.
 type Limiter struct {
 	*rate.Limiter
 	bandwidth int

@@ -116,6 +116,7 @@ Backup Flags:
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
                                  If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
+                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
   -r, --remove-files                  Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.
       --remove-artifacts              Remove existing backup file (-o) or files (-d) without performing a backup.
   -o, --output-file string            Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.

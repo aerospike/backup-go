@@ -181,14 +181,14 @@ func (r *Reader) streamDirectory(
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			errorsCh <- fmt.Errorf("failed to get next page: %w", err)
+			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get next page: %w", err))
 
 			return
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				errorsCh <- fmt.Errorf("failed to get object attributes for %s", path)
+				ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get object attributes for %s", path))
 
 				return
 			}
@@ -222,12 +222,12 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		errorsCh <- fmt.Errorf("failed to check object availability: %w", err)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
 		return
 	}
 
 	if state != objStatusAvailable {
-		errorsCh <- fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path))
 		return
 	}
 
@@ -239,7 +239,7 @@ func (r *Reader) openObject(
 			return
 		}
 
-		errorsCh <- fmt.Errorf("failed to open file %s: %w", path, err)
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
 
 		return
 	}

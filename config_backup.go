@@ -19,6 +19,7 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -100,6 +101,7 @@ type ConfigBackup struct {
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
 	// Limits backup bandwidth (bytes per second).
+	// The lower bound is 8MiB (maximum size of the Aerospike record).
 	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
@@ -198,6 +200,10 @@ func (c *ConfigBackup) validate() error {
 
 	if c.Bandwidth < 0 {
 		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
+	}
+
+	if c.Bandwidth != 0 && c.Bandwidth < bandwidth.DefaultLimit {
+		return fmt.Errorf("bandwidth value must be greater than %d, got %d", bandwidth.DefaultLimit, c.Bandwidth)
 	}
 
 	if c.StateFile != "" && c.PageSize == 0 {

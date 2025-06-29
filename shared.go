@@ -41,11 +41,7 @@ func handlePanic(errors chan<- error, logger *slog.Logger) {
 	}
 }
 
-func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
-	// NOTE: order is important here
-	// if we close the errors chan before we handle the panic,
-	// the panic handler will attempt to send on a closed channel
-	defer close(errors)
+func doWork(errors chan<- error, done chan<- struct{}, logger *slog.Logger, work func() error) {
 	defer handlePanic(errors, logger)
 
 	logger.Debug("job starting")
@@ -59,6 +55,7 @@ func doWork(errors chan<- error, logger *slog.Logger, work func() error) {
 	}
 
 	logger.Debug("job done")
+	done <- struct{}{}
 }
 
 func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {

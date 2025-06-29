@@ -18,14 +18,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
-	"golang.org/x/time/rate"
 )
 
 // StreamingReader defines an interface for accessing backup file data from a storage provider.
@@ -66,7 +67,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	stats          *models.RestoreStats
 
 	logger  *slog.Logger
-	limiter *rate.Limiter
+	limiter *bandwidth.Limiter
 
 	pl            *pipe.Pipe[T]
 	rpsCollector  *metrics.Collector
@@ -74,6 +75,10 @@ type RestoreHandler[T models.TokenConstraint] struct {
 
 	id     string
 	errors chan error
+	done   chan struct{}
+
+	// For graceful shutdown.
+	wg sync.WaitGroup
 }
 
 // newRestoreHandler creates a new RestoreHandler.
@@ -93,7 +98,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	// Channel for transferring readers.
 	readersCh := make(chan models.File)
 	// Channel for processing errors from readers or writers.
-	errorsCh := make(chan error)
+	errorsCh := make(chan error, 1)
 
 	stats := models.NewRestoreStats()
 	rpsCollector := metrics.NewCollector(
@@ -124,7 +129,6 @@ func newRestoreHandler[T models.TokenConstraint](
 		aerospikeClient,
 		config,
 		stats,
-		makeBandwidthLimiter(config.Bandwidth),
 		rpsCollector,
 		logger,
 	)
@@ -138,17 +142,21 @@ func newRestoreHandler[T models.TokenConstraint](
 		stats:          stats,
 		id:             id,
 		logger:         logger,
-		limiter:        makeBandwidthLimiter(config.Bandwidth),
+		limiter:        bandwidth.NewLimiter(config.Bandwidth),
 		errors:         errorsCh,
+		done:           make(chan struct{}, 1),
 		rpsCollector:   rpsCollector,
 		kbpsCollector:  kbpsCollector,
 	}
 }
 
 func (rh *RestoreHandler[T]) run() {
+	rh.wg.Add(1)
 	rh.stats.Start()
 
-	go doWork(rh.errors, rh.logger, func() error {
+	go doWork(rh.errors, rh.done, rh.logger, func() error {
+		defer rh.wg.Done()
+
 		return rh.restore(rh.ctx)
 	})
 }
@@ -228,27 +236,30 @@ func (rh *RestoreHandler[T]) GetStats() *models.RestoreStats {
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
 func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
-	defer func() {
-		rh.stats.Stop()
-		rh.rpsCollector.Stop()
-		rh.kbpsCollector.Stop()
-	}()
+	var err error
 
 	select {
 	case <-rh.ctx.Done():
 		// Wait for global context.
-		return rh.ctx.Err()
+		err = rh.ctx.Err()
 	case <-ctx.Done():
 		// Process local context.
 		rh.cancel()
-		return ctx.Err()
-	case err := <-rh.errors:
+
+		err = ctx.Err()
+	case err = <-rh.errors:
 		// On error, we cancel global context.
 		// To stop all goroutines and prevent leaks.
 		rh.cancel()
-
-		return err
+	case <-rh.done: // Success
 	}
+
+	// Wait when all routines ended.
+	rh.wg.Wait()
+
+	rh.stopStatsMetrics()
+
+	return err
 }
 
 // GetMetrics returns the metrics of the restore job.
@@ -267,4 +278,12 @@ func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 		rh.rpsCollector.GetLastResult(),
 		rh.kbpsCollector.GetLastResult(),
 	)
+}
+
+// stopStatsMetrics stops the collection of stats and metrics for the restore job,
+// including RestoreStats, RPS, and KBPS tracking.
+func (rh *RestoreHandler[T]) stopStatsMetrics() {
+	rh.stats.Stop()
+	rh.rpsCollector.Stop()
+	rh.kbpsCollector.Stop()
 }

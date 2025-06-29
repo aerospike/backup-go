@@ -69,10 +69,10 @@ archives:
       - "asrestore"
 
 release:
-  prerelease: true
+  prerelease: false
   make_latest: false
   replace_existing_artifacts: true
-  mode: prepend
+  mode: upload
   header: |
     ## Release {{ .Version }} ({{ .Date }})
     - asbackup (CLI tool)

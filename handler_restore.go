@@ -151,13 +151,20 @@ func newRestoreHandler[T models.TokenConstraint](
 }
 
 func (rh *RestoreHandler[T]) run() {
+	slog.Info("wg.Add", slog.Any("id", rh.id))
 	rh.wg.Add(1)
 	rh.stats.Start()
 
 	go doWork(rh.errors, rh.done, rh.logger, func() error {
-		defer rh.wg.Done()
+		defer func() {
+			slog.Info("wg.Done", slog.Any("id", rh.id))
+			rh.wg.Done()
+		}()
 
-		return rh.restore(rh.ctx)
+		slog.Warn("start restore", slog.Any("id", rh.id))
+		err := rh.restore(rh.ctx)
+		slog.Warn("restore done", slog.Any("err", err), slog.Any("id", rh.id))
+		return err
 	})
 }
 

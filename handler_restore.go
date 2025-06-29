@@ -250,12 +250,15 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	case err = <-rh.errors:
 		// On error, we cancel global context.
 		// To stop all goroutines and prevent leaks.
+		slog.Warn("Error", slog.Any("err", err))
 		rh.cancel()
 	case <-rh.done: // Success
 	}
 
 	// Wait when all routines ended.
+	slog.Warn("before wait", slog.Any("err", err))
 	rh.wg.Wait()
+	slog.Warn("after wait", slog.Any("err", err))
 
 	rh.stopStatsMetrics()
 

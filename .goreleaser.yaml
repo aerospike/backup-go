@@ -38,8 +38,8 @@ archives:
   - id: "asbackup"
     formats:  [ 'tar.gz' ]
     name_template: >-
-      {{ .Binary }}_{{ .Version }}_
-      {{- title .Os }}_
+      {{ .Binary }}-{{ .Version }}-
+      {{- title .Os }}-
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
@@ -54,8 +54,8 @@ archives:
   - id: "asrestore"
     formats:  [ 'tar.gz' ]
     name_template: >-
-      {{ .Binary }}_{{ .Version }}_
-      {{- title .Os }}_
+      {{ .Binary }}-{{ .Version }}-
+      {{- title .Os }}-
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
@@ -70,6 +70,7 @@ archives:
 
 release:
   prerelease: false
+  draft: true
   make_latest: false
   replace_existing_artifacts: true
   mode: prepend
@@ -83,4 +84,23 @@ changelog:
   disable: true
 
 checksum:
-  name_template: "checksums.txt"
+  name_template: "{{ .Binary }}_{{ .Version }}.sha256"
+  per_archive: true
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    cmd: gpg
+    args:
+      - --batch
+      - --armor
+      - --yes
+      - -u
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - --output
+      - "${artifact}.asc"
+      - --detach-sign
+      - "${artifact}"
+    signature: "${artifact}.asc"
+    env:
+      - GPG_FINGERPRINT={{ .Env.GPG_FINGERPRINT }}

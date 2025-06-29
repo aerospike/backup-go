@@ -85,7 +85,7 @@ changelog:
 
 checksum:
   name_template: "{{ .Binary }}_{{ .Version }}.sha256"
-  per_archive: true
+  split: true
   algorithm: sha256
 
 signs:

@@ -84,7 +84,7 @@ changelog:
   disable: true
 
 checksum:
-  name_template: "{{ .Binary }}_{{ .Version }}.sha256"
+  name_template: "{{ .ArtifactName }}.sha256"
   split: true
   algorithm: sha256
 
@@ -103,4 +103,4 @@ signs:
       - "${artifact}"
     signature: "${artifact}.asc"
     env:
-      - GPG_FINGERPRINT={{ .Env.GPG_FINGERPRINT }}
+      - GPG_FINGERPRINT

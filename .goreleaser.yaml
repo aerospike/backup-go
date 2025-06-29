@@ -72,12 +72,12 @@ release:
   prerelease: false
   make_latest: false
   replace_existing_artifacts: true
-  mode: upload
-  header: |
-    ## Release {{ .Version }} ({{ .Date }})
-    - asbackup (CLI tool)
-    - asrestore (CLI tool)
-    - backup-go (library)
+  mode: "replace"
+#  header: |
+#    ## Release {{ .Version }} ({{ .Date }})
+#    - asbackup (CLI tool)
+#    - asrestore (CLI tool)
+#    - backup-go (library)
 
 changelog:
   disable: true

@@ -72,7 +72,7 @@ release:
   prerelease: false
   make_latest: false
   replace_existing_artifacts: true
-  mode: "replace"
+  mode: replace
 #  header: |
 #    ## Release {{ .Version }} ({{ .Date }})
 #    - asbackup (CLI tool)

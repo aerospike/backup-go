@@ -34,35 +34,36 @@ jobs:
       - goreleaser
     runs-on: ubuntu-24.04
     outputs:
-      upload_url: ${{ steps.create-release.outputs.upload_url }}
+      upload_url: ${{ steps.fetch-upload-url.outputs.upload_url || steps.check-release.outputs.upload_url }}
     steps:
       - name: Check if release exists
         id: check-release
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
+            let release;
             try {
-              const response = await github.rest.repos.getReleaseByTag({
+              release = await github.rest.repos.getReleaseByTag({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 tag: "${{ github.ref_name }}"
               });
-
-              if (response.status === 200) {
-                console.log(`Release with tag exists.`);
-                core.setOutput('release-exists', 'true');
-              }
+              core.setOutput('release-exists', 'true');
             } catch (error) {
               if (error.status === 404) {
-                console.log(`Release with tag does not exist.`);
                 core.setOutput('release-exists', 'false');
               } else {
                 throw error;
               }
             }
+
+            if (release) {
+              core.setOutput('upload_url', release.data.upload_url);
+            }
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1.1.4
-        if: ${{ steps.check-release.outputs.release-exists == 'false'}}
+        if: ${{ steps.check-release.outputs.release-exists == 'false' }}
         id: create-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -71,6 +72,20 @@ jobs:
           release_name: ${{ github.ref_name }}
           draft: true
           prerelease: true
+
+      - name: Get upload_url for new release
+        if: ${{ steps.check-release.outputs.release-exists == 'false' }}
+        id: fetch-upload-url
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: "${{ github.ref_name }}"
+            });
+            core.setOutput('upload_url', release.data.upload_url);
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-packages:
     needs:

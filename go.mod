@@ -2,6 +2,8 @@ module github.com/aerospike/backup-go
 
 go 1.23.0
 
+toolchain go1.24.4
+
 require (
 	cloud.google.com/go/storage v1.53.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0

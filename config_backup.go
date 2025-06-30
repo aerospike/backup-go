@@ -102,6 +102,9 @@ type ConfigBackup struct {
 	RecordsPerSecond int
 	// Limits backup bandwidth (bytes per second).
 	// The lower bound is 8MiB (maximum size of the Aerospike record).
+	// Limit value is calculated using the formula:
+	// Bandwidth * base64ratio + metaOverhead
+	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
 	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
 	// File size limit (in bytes) for the backup. If a backup file exceeds this

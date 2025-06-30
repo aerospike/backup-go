@@ -24,7 +24,9 @@ const (
 	// DefaultLimit represents the minimum allowed bandwidth, constrained by the maximum record size (8 Mb).
 	DefaultLimit = 8 * 1024 * 1024
 	// metaOverhead represents an approximate size of record's metadata: namespace, set name, key, etc.
-	metaOverhead = 10 * 1024
+	metaOverhead = 16 * 1024
+	// base64Ratio defines the multiplier to account for size expansion when encoding data using Base64.
+	base64Ratio = 1.34
 )
 
 // Limiter wrapper around standard rate.Limiter.
@@ -36,10 +38,7 @@ type Limiter struct {
 // NewLimiter returns new bandwidth limiter.
 func NewLimiter(limit int) *Limiter {
 	if limit > 0 {
-		bandwidth := DefaultLimit + metaOverhead
-		if limit > bandwidth {
-			bandwidth = limit
-		}
+		bandwidth := newBandwidth(limit)
 
 		return &Limiter{
 			rate.NewLimiter(rate.Limit(bandwidth), bandwidth),
@@ -53,4 +52,16 @@ func NewLimiter(limit int) *Limiter {
 // Wait blocks until lim permits n events to happen.
 func (l *Limiter) Wait(ctx context.Context, n int) error {
 	return l.WaitN(ctx, n)
+}
+
+// newBandwidth returns calculted value for
+func newBandwidth(limit int) int {
+	bandwidth := DefaultLimit
+	if limit > bandwidth {
+		bandwidth = limit
+	}
+
+	bandwidth = int(float64(bandwidth)*base64Ratio) + metaOverhead
+
+	return bandwidth
 }

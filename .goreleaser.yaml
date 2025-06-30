@@ -69,7 +69,7 @@ archives:
       - "asrestore"
 
 release:
-  prerelease: false
+  prerelease: true
   make_latest: false
   replace_existing_artifacts: true
   mode: prepend

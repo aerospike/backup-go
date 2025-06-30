@@ -33,7 +33,7 @@ import (
 const (
 	testCount     = 5
 	testSize      = 10
-	testSizeErr   = 10 * 1024 * 1024
+	testSizeErr   = 100 * 1024 * 1024
 	testDealy     = 100 * time.Millisecond
 	testLongDelay = 300 * time.Millisecond
 	testLimit     = 1

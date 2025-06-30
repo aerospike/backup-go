@@ -1,7 +1,7 @@
 name: Create Aerospike Backup Tools Pre Release
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 

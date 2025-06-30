@@ -202,7 +202,7 @@ type ConfigBackup struct {
     // Used to resume backup with last record received from previous incomplete backup.
     // This parameter will overwrite PartitionFilters.Begin value.
     // Can't be used in full backup mode.
-    // This parameter is mutually exclusive to partition-list (not implemented).
+    // This parameter is mutually exclusive with partition-list (not implemented).
     // Format: base64 encoded string.
     // Example: EjRWeJq83vEjRRI0VniavN7xI0U=
     PartitionFilters []*a.PartitionFilter
@@ -213,7 +213,7 @@ type ConfigBackup struct {
     // <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]
     // Backup the given cluster nodes only.
     // If it is set, ParallelNodes automatically set to true.
-    // This argument is mutually exclusive to partition-list/AfterDigest arguments.
+    // This argument is mutually exclusive with partition-list/AfterDigest arguments.
     NodeList []string
     // SetList is the Aerospike set to back up (optional, given an empty list,
     // all sets will be backed up).

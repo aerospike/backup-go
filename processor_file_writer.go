@@ -30,7 +30,6 @@ import (
 	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"golang.org/x/time/rate"
 )
 
 // fileWriterProcessor configures and creates file writers pipelines.
@@ -45,7 +44,6 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	compressionPolicy *CompressionPolicy
 	state             *State
 	stats             *models.BackupStats
-	limiter           *rate.Limiter
 	kbpsCollector     *metrics.Collector
 
 	fileLimit uint64
@@ -65,7 +63,6 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	compressionPolicy *CompressionPolicy,
 	state *State,
 	stats *models.BackupStats,
-	limiter *rate.Limiter,
 	kbpsCollector *metrics.Collector,
 	fileLimit uint64,
 	parallel int,
@@ -83,7 +80,6 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		compressionPolicy: compressionPolicy,
 		state:             state,
 		stats:             stats,
-		limiter:           limiter,
 		kbpsCollector:     kbpsCollector,
 		fileLimit:         fileLimit,
 		parallel:          parallel,

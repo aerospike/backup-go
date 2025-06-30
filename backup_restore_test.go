@@ -1408,7 +1408,7 @@ func TestBackupContinuation(t *testing.T) {
 	t.Parallel()
 	const (
 		setName       = "testBackupContinuation"
-		totalRecords  = 900
+		totalRecords  = 9000
 		testStateFile = "test_state_file"
 	)
 
@@ -1428,7 +1428,7 @@ func TestBackupContinuation(t *testing.T) {
 		require.NoError(t, err)
 		stateFile := path.Join(testFolder, testStateFile)
 
-		ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
 		t.Log("first backup")
 		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 		require.NoError(t, err)
@@ -1475,7 +1475,6 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 
 	backupCfg.StateFile = testStateFile
 	backupCfg.FileLimit = 10
-	backupCfg.Bandwidth = 100000
 	backupCfg.PageSize = 1
 
 	backupClient, err := NewClient(asClient, WithID("test_client"))

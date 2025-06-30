@@ -116,6 +116,7 @@ Backup Flags:
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
                                  If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
   -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
+                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
   -r, --remove-files                  Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.
       --remove-artifacts              Remove existing backup file (-o) or files (-d) without performing a backup.
   -o, --output-file string            Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.
@@ -129,7 +130,7 @@ Backup Flags:
   -D, --after-digest string           Backup records after record digest in record's partition plus all succeeding
                                       partitions. Used to resume backup with last record received from previous
                                       incomplete backup.
-                                      This argument is mutually exclusive to partition-list.
+                                      This argument is mutually exclusive with partition-list.
                                       Format: Base64 encoded string
                                       Example: EjRWeJq83vEjRRI0VniavN7xI0U=
                                       
@@ -159,11 +160,11 @@ Backup Flags:
                                       To get the node name, use the 'node:' info command.
                                       Back up the given cluster nodes only.
                                       The job is parallelized by number of nodes unless --parallel is set less than nodes number.
-                                      This argument is mutually exclusive with --partition-list and --after-digest arguments.
+                                      This argument is mutually exclusive with --partition-list, --after-digest, --rack-list, --prefer-racks arguments.
                                       Default: backup all nodes in the cluster
   -X, --partition-list string         List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,
                                       individual partitions, or records after a specific digest within a single partition.
-                                      This argument is mutually exclusive to after-digest.
+                                      This argument is mutually exclusive with after-digest.
                                       Filter: <begin partition>[-<partition count>]|<digest>
                                       begin partition: 0-4095
                                       partition count: 1-4096 Default: 1
@@ -173,9 +174,11 @@ Backup Flags:
                                       
       --prefer-racks string           <rack id 1>[,<rack id 2>[,...]]
                                       A list of Aerospike Database rack IDs to prefer when reading records for a backup.
+                                      This argument is mutually exclusive with --rack-list and --node-list.
       --rack-list string              <rack id 1>[,<rack id 2>[,...]]
                                       A list of Aerospike Database rack IDs to backup.
                                       Unlike --prefer-racks, only specified racks will be backed up.
+                                      This argument is mutually exclusive with --prefer-racks and --node-list.
   -M, --max-records int               The number of records approximately to back up. 0 - all records
       --sleep-between-retries int     The amount of milliseconds to sleep between retries after an error.
                                       This field is ignored when --max-retries is zero. (default 5)

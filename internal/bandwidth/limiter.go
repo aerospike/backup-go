@@ -17,33 +17,19 @@ package bandwidth
 import (
 	"context"
 
-	"golang.org/x/time/rate"
+	"github.com/juju/ratelimit"
 )
 
-const (
-	// DefaultLimit represents the minimum allowed bandwidth, constrained by the maximum record size (8 Mb).
-	DefaultLimit = 8 * 1024 * 1024
-	// metaOverhead represents an approximate size of record's metadata: namespace, set name, key, etc.
-	metaOverhead = 10 * 1024
-)
-
-// Limiter wrapper around standard rate.Limiter.
+// Limiter wrapper around juju rateLimiter.
 type Limiter struct {
-	*rate.Limiter
-	bandwidth int
+	b *ratelimit.Bucket
 }
 
 // NewLimiter returns new bandwidth limiter.
-func NewLimiter(limit int) *Limiter {
+func NewLimiter(limit int64) *Limiter {
 	if limit > 0 {
-		bandwidth := DefaultLimit + metaOverhead
-		if limit > bandwidth {
-			bandwidth = limit
-		}
-
 		return &Limiter{
-			rate.NewLimiter(rate.Limit(bandwidth), bandwidth),
-			bandwidth,
+			ratelimit.NewBucketWithRate(float64(limit), limit),
 		}
 	}
 
@@ -52,5 +38,11 @@ func NewLimiter(limit int) *Limiter {
 
 // Wait blocks until lim permits n events to happen.
 func (l *Limiter) Wait(ctx context.Context, n int) error {
-	return l.WaitN(ctx, n)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	l.b.Wait(int64(n))
+
+	return nil
 }

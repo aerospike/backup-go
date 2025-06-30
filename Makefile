@@ -1,7 +1,7 @@
 SHELL = bash
 NAME = aerospike-backup-tools
 WORKSPACE = $(shell pwd)
-VERSION := $(shell cat VERSION)
+VERSION ?= $(shell cat VERSION)
 MAINTAINER = "Aerospike <info@aerospike.com>"
 DESCRIPTION = "Aerospike Backup Tools"
 HOMEPAGE = "https://www.aerospike.com"

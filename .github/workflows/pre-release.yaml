@@ -1,0 +1,413 @@
+name: Create Aerospike Backup Tools Pre Release
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.23.x'
+
+      - name: Import GPG key
+        id: import-gpg
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+        with:
+          gpg_private_key: ${{ secrets.GPG_SECRET_KEY }}
+          passphrase: ${{ secrets.GPG_PASS }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6.3.0
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import-gpg.outputs.fingerprint }}
+
+  create-release:
+    needs:
+      - goreleaser
+    runs-on: ubuntu-24.04
+    outputs:
+      upload_url: ${{ steps.fetch-upload-url.outputs.upload_url || steps.check-release.outputs.upload_url }}
+    steps:
+      - name: Check if release exists
+        id: check-release
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            let release;
+            try {
+              release = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: "${{ github.ref_name }}"
+              });
+              core.setOutput('release-exists', 'true');
+            } catch (error) {
+              if (error.status === 404) {
+                core.setOutput('release-exists', 'false');
+              } else {
+                throw error;
+              }
+            }
+
+            if (release) {
+              core.setOutput('upload_url', release.data.upload_url);
+            }
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1.1.4
+        if: ${{ steps.check-release.outputs.release-exists == 'false' }}
+        id: create-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: true
+
+      - name: Get upload_url for new release
+        if: ${{ steps.check-release.outputs.release-exists == 'false' }}
+        id: fetch-upload-url
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: "${{ github.ref_name }}"
+            });
+            core.setOutput('upload_url', release.data.upload_url);
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-packages:
+    needs:
+      - create-release
+    runs-on: ubuntu-22.04
+    outputs:
+      package_version: ${{ steps.metadata.outputs.PACKAGE_VERSION }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.23.x'
+
+      - name: setup GPG
+        uses: aerospike/shared-workflows/.github/actions/setup-gpg@dda8173aca1f1e73f95267572a7d3849cd00f1b8 # v1.0.0
+        with:
+          gpg-private-key: ${{ secrets.GPG_SECRET_KEY }}
+          gpg-public-key: ${{ secrets.GPG_PUBLIC_KEY }}
+          gpg-key-pass: ${{ secrets.GPG_PASS }}
+          gpg-key-name: 'aerospike-inc'
+
+      - name: Install Dependencies
+        run: |
+          go install "github.com/goreleaser/nfpm/v2/cmd/nfpm@latest"
+          sudo apt-get update && sudo apt-get install -y dpkg-dev dpkg-sig
+
+      - name: Get Metadata
+        id: metadata
+        run: |
+          PACKAGE_VERSION=$(cat VERSION)
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "PACKAGE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
+
+      - name: Login to JFrog
+        uses: jfrog/setup-jfrog-cli@ff5cb544114ffc152db9cea1cd3d5978d5074946 #v4.5.11
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+
+      - name: Build Packages
+        run: |
+          make packages
+
+      - name: Find files matching "*.rpm" "*.deb"
+        run: |
+          RPM_ASSET_LIST=$(find . -type f \( -name "*.rpm" \) | tr '\n' ',')
+          DEB_ASSET_LIST=$(find . -type f \( -name "*.deb" \) | tr '\n' ',')
+          echo "RPM_ASSET_LIST=$RPM_ASSET_LIST" >> $GITHUB_ENV
+          echo "DEB_ASSET_LIST=$DEB_ASSET_LIST" >> $GITHUB_ENV
+
+      - name: Sign RPM Packages
+        env:
+          GPG_TTY: no-tty
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASS }}
+
+        run: |
+          IFS=',' read -r -a asset_array <<< "$RPM_ASSET_LIST"
+          for file in "${asset_array[@]}"; do
+            echo "file is: ${file}"
+            rpm --addsign "${file}"
+            OUTPUT=$(rpm --checksig "${file}")
+            if [[ "$OUTPUT" =~ 'digests signatures OK' ]]; then
+              echo "Successfully GPG Signed $file"
+            else
+              echo "GPG Signing $file has failed."
+              exit 1
+            fi
+          done
+
+      - name: Sign DEB Packages
+        env:
+          GPG_TTY: no-tty
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASS }}
+        run: |
+          IFS=',' read -r -a asset_array <<< "$DEB_ASSET_LIST"
+          for file in "${asset_array[@]}"; do
+            dpkg-sig --sign builder "${file}"
+            OUTPUT=$(dpkg-sig --verify "${file}")
+            if [[ "$OUTPUT" =~ 'GOODSIG _gpgbuilder' ]]; then
+              echo "Successfully GPG Signed $file"
+            else
+              echo "GPG Signing $file has failed."
+              exit 1
+            fi
+           done
+
+      - name: Create checksums
+        run: |
+          make checksums
+          CHECKSUMS_ASSET_LIST=$(find . -type f \( -name "*.sha256" \) | tr '\n' ',')
+          echo "CHECKSUMS_ASSET_LIST=$CHECKSUMS_ASSET_LIST" >> $GITHUB_ENV
+
+      - name: Sign checksums
+        env:
+          GPG_TTY: no-tty
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASS }}
+        run: |
+          IFS=',' read -r -a asset_array <<< "$CHECKSUMS_ASSET_LIST"
+          for file in "${asset_array[@]}"; do
+            gpg --detach-sign --no-tty --batch --yes --output "${file}.asc" --passphrase "$GPG_PASSPHRASE" "${file}"
+            gpg --verify "${file}.asc" "${file}" &>/dev/null
+            RETURN_CODE=$?
+            if [ ! "$RETURN_CODE" = 0 ]; then
+              echo "GPG Signing of $file has failed."
+              exit 1
+            else
+              echo "Successfully GPG Signed $file"
+            fi
+          done
+          ASC_ASSET_LIST=$(find . -type f \( -name "*.asc" \) | tr '\n' ',')
+          echo "ASC_ASSET_LIST=$ASC_ASSET_LIST" >> $GITHUB_ENV
+
+      - name: Upload Assets to Github Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          upload_url="$(echo "${{ needs.create-release.outputs.upload_url }}" | sed 's/\(assets\).*/\1/')"
+          ASSET_LIST="${RPM_ASSET_LIST%,},${DEB_ASSET_LIST%,},${CHECKSUMS_ASSET_LIST%,},${ASC_ASSET_LIST%,}"
+          ASSET_LIST="${ASSET_LIST#,}"
+          IFS=',' read -r -a asset_array <<< "$ASSET_LIST"
+          for file in "${asset_array[@]}"; do
+            curl -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Content-Type: $(file -b --mime-type $file)" \
+            "$upload_url?name=$(basename $file)" \
+            --data-binary "@$file"
+          done
+
+      - name: Upload RPM Packages to Jfrog
+        env:
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+          ARTIFACTORY_RPM_DEV: ${{ vars.ARTIFACTORY_RPM_DEV }}
+
+        run: |
+          IFS=',' read -r -a asset_array <<< "$RPM_ASSET_LIST"
+          for file in "${asset_array[@]}"; do
+            arch=$(rpm -q --qf "%{ARCH}" -p "$file")
+
+            jfrog rt upload "$file" "$ARTIFACTORY_RPM_DEV/$PACKAGE_NAME/$PACKAGE_VERSION/$(basename $file)" \
+            --build-name=$PACKAGE_NAME-rpm --build-number=$PACKAGE_VERSION \
+            --target-props "rpm.distribution=stable;rpm.component=main;rpm.architecture=$arch"
+          done
+
+          jfrog rt build-collect-env "$PACKAGE_NAME-rpm" "$PACKAGE_VERSION"
+          jfrog rt build-add-git  "$PACKAGE_NAME-rpm" "$PACKAGE_VERSION"
+          jfrog rt build-publish  "$PACKAGE_NAME-rpm" "$PACKAGE_VERSION"
+
+      - name: Upload DEB Packages to Jfrog
+        env:
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+          ARTIFACTORY_DEB_DEV: ${{ vars.ARTIFACTORY_DEB_DEV }}
+        run: |
+          IFS=',' read -r -a asset_array <<< "$DEB_ASSET_LIST"
+          for file in "${asset_array[@]}"; do
+            arch=$(dpkg --info "$file" | grep 'Architecture' | awk '{print $2}')
+            jfrog rt upload "$file" "$ARTIFACTORY_DEB_DEV/$PACKAGE_NAME/$PACKAGE_VERSION/$(basename $file)" \
+            --build-name=$PACKAGE_NAME-deb \
+            --build-number=$PACKAGE_VERSION \
+            --target-props "deb.distribution=stable;deb.component=main;deb.architecture=${arch}" \
+            --deb "stable/main/${arch}"
+          done
+
+          jfrog rt build-collect-env "$PACKAGE_NAME-deb" "$PACKAGE_VERSION"
+          jfrog rt build-add-git  "$PACKAGE_NAME-deb" "$PACKAGE_VERSION"
+          jfrog rt build-publish  "$PACKAGE_NAME-deb" "$PACKAGE_VERSION"
+
+  build-docker-image:
+    needs:
+      - create-release
+    runs-on: ubuntu-24.04
+    outputs:
+      image_version: ${{ steps.metadata.outputs.IMAGE_VERSION }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@18ce135bb5112fa8ce4ed6c17ab05699d7f3a5e0 # v3.11.0
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+      - name: Get Metadata
+        id: metadata
+        run: |
+          GO_VERSION="$(curl -s 'https://go.dev/dl/?mode=json' | \
+            jq -r --arg ver "go$(grep '^go ' go.mod | cut -d ' ' -f2 | cut -d. -f1,2)" \
+              '.[] | select(.version | startswith($ver)) | .version' | \
+            sort -V | \
+            tail -n1 | \
+            cut -c3- | \
+            tr -d '\n')"
+          
+          IMAGE_VERSION=$(cat VERSION | cut -c 2-)
+          echo "IMAGE_VERSION=$IMAGE_VERSION" >> $GITHUB_ENV
+          echo "IMAGE_VERSION=$IMAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "GO_VERSION=$GO_VERSION" >> "$GITHUB_ENV"
+          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+          echo "ISO8601=$(LC_TIME=en_US.UTF-8 date "+%Y-%m-%dT%H:%M:%S%z")" >> $GITHUB_ENV
+          echo "IMAGE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
+
+      - name: Login to JFrog
+        uses: jfrog/setup-jfrog-cli@ff5cb544114ffc152db9cea1cd3d5978d5074946 # v4.5.11
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+
+      - name: Login to JFrog Artifactory
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: aerospike.jfrog.io
+          username: ${{ secrets.ARTIFACTORY_USER }}
+          password: ${{ secrets.ARTIFACTORY_TOKEN }}
+
+      - name: Build and Push Docker Image
+        env:
+          GIT_COMMIT_SHA: ${{ github.sha }}
+          GIT_BRANCH: ${{ github.ref }}
+          LATEST: false
+          TAG: ${{env.IMAGE_VERSION}}
+          VERSION: ${{env.VERSION}}
+          CONTEXT: ${{ github.workspace }}
+          ISO8601: ${{env.ISO8601}}
+          IMAGE_NAME: ${{env.IMAGE_NAME}}
+          GO_VERSION: ${{env.GO_VERSION}}
+          ARTIFACTORY_CONTAINER_DEV: ${{ vars.ARTIFACTORY_CONTAINER_DEV }}
+
+        run: |
+          jfrog docker buildx bake  \
+          --file ${{ github.workspace }}/scripts/docker-bake.hcl \
+          --metadata-file=build-metadata \
+          --progress plain \
+          --no-cache \
+          --push
+
+          jq -r '
+          .[] |
+          {
+            digest: .["containerimage.digest"],
+            names: (.["image.name"] | split(","))
+                     } |
+                     .digest
+            ' build-metadata > sha
+
+          echo artifact.aerospike.io/$ARTIFACTORY_CONTAINER_DEV/$IMAGE_NAME:$TAG@$(cat sha) > meta-info
+
+          jfrog rt build-docker-create \
+          --build-name=$IMAGE_NAME-container \
+          --build-number=$TAG \
+          --image-file ./meta-info \
+          $ARTIFACTORY_CONTAINER_DEV
+
+          jfrog rt build-collect-env $IMAGE_NAME-container $TAG
+          jfrog rt build-add-git $IMAGE_NAME-container $TAG
+          jfrog rt build-publish --detailed-summary $IMAGE_NAME-container $TAG
+
+  create-release-bundle:
+    needs:
+      - create-release
+      - build-packages
+      - build-docker-image
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Login to JFrog
+        uses: jfrog/setup-jfrog-cli@ff5cb544114ffc152db9cea1cd3d5978d5074946 #v4.5.11
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+
+      - name: Get Metadata
+        run: |
+          echo "BUNDLE_NAME=aerospike-backup-tools" >> $GITHUB_ENV
+
+      - name: Create release bundle
+        env:
+          BUNDLE_NAME: ${{env.BUNDLE_NAME}}
+          BUNDLE_VERSION: ${{ needs.build-packages.outputs.package_version }}
+          PACKAGE_VERSION: ${{ needs.build-packages.outputs.package_version }}
+          IMAGE_VERSION: ${{ needs.build-docker-image.outputs.image_version }}
+          JF_PROJECT: ${{ vars.JFROG_CLI_BUILD_PROJECT }}
+        run: |
+          echo '{
+            "name": "'"$BUNDLE_NAME"'",
+            "version": "'"$BUNDLE_VERSION"'",
+            "files": [
+              {
+                "project": "'"$JF_PROJECT"'",
+                "build": "'"$BUNDLE_NAME"'-container/'"$IMAGE_VERSION"'"
+              },
+              {
+                "project": "'"$JF_PROJECT"'",
+                "build": "'"$BUNDLE_NAME"'-rpm/'"$PACKAGE_VERSION"'"
+              },
+              {
+                "project": "'"$JF_PROJECT"'",
+                "build": "'"$BUNDLE_NAME"'-deb/'"$PACKAGE_VERSION"'"
+              }
+            ]
+          }' > release-bundle-spec.json
+
+          cat release-bundle-spec.json
+
+          jfrog release-bundle-create "$BUNDLE_NAME" "$BUNDLE_VERSION" \
+          --spec release-bundle-spec.json --project="$JF_PROJECT" --signing-key="aerospike"

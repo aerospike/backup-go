@@ -5,7 +5,7 @@ REGISTRY="docker.io"
 RH_REGISTRY="registry.access.redhat.com"
 TAG_LATEST=false
 TAG=""
-PLATFORMS="linux/amd64,linux/arm64"
+PLATFORMS=""
 
 
 POSITIONAL_ARGS=()
@@ -28,6 +28,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --platforms)
     PLATFORMS="$2"
+    PLATFORMS="$(echo "$PLATFORMS" | xargs)"
+    if [[ "$PLATFORMS" == *" "* ]]; then
+        PLATFORMS="${PLATFORMS// /,}"
+    fi
     shift
     shift
     ;;

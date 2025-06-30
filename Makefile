@@ -22,8 +22,11 @@ GOCLEAN = $(GO) clean
 GOBIN_VERSION = $(shell $(GO) version 2>/dev/null)
 NPROC := $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
 
-ARCHS=linux/amd64 linux/arm64
-PACKAGERS=deb rpm
+ARCHS ?= linux/amd64 linux/arm64
+PACKAGERS ?= deb rpm
+
+IMAGE_TAG ?= test
+IMAGE_REPO ?= aerospike/aerospike-backup-tools
 
 BACKUP_BINARY_NAME = asbackup
 RESTORE_BINARY_NAME = asrestore
@@ -77,15 +80,15 @@ release-test:
 
 .PHONY: docker-build
 docker-build:
-	 DOCKER_BUILDKIT=1  docker build \
+	 DOCKER_BUILDKIT=1 docker build \
  	--progress=plain \
- 	--tag aerospike/aerospike-backup-tools:$(TAG) \
+ 	--tag $(IMAGE_REPO):$(IMAGE_TAG) \
  	--build-arg REGISTRY=$(REGISTRY) \
  	--file $(WORKSPACE)/Dockerfile .
 
 .PHONY: docker-buildx
 docker-buildx:
-	./scripts/docker-buildx.sh --tag $(TAG) --registry $(REGISTRY)
+	./scripts/docker-buildx.sh --tag $(IMAGE_TAG) --registry $(REGISTRY) --platforms "$(ARCHS)"
 
 .PHONY: build
 build:
@@ -151,8 +154,7 @@ vulnerability-scan:
 
 .PHONY: vulnerability-scan-container
 vulnerability-scan-container:
-	TAG="latest" $(MAKE) docker-build
-	snyk container test aerospike/aerospike-backup-service:latest \
+	snyk container test $(IMAGE_REPO):$(IMAGE_TAG) \
 	--policy-path=$(WORKSPACE)/.snyk \
 	--file=Dockerfile \
 	--severity-threshold=high

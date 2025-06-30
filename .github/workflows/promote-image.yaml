@@ -1,4 +1,4 @@
-name: Promote Images to DockerHub
+name: Promote Image
 on:
   workflow_dispatch:
   release:

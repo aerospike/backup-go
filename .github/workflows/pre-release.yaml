@@ -23,7 +23,7 @@ jobs:
           go-version: '1.23.x'
 
       - name: Import GPG key
-        id: import_gpg
+        id: import-gpg
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
         with:
           gpg_private_key: ${{ secrets.GPG_SECRET_KEY }}
@@ -37,7 +37,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_FINGERPRINT: ${{ steps.import-gpg.outputs.fingerprint }}
 
   create-release:
     needs:
@@ -146,7 +146,7 @@ jobs:
         run: |
           make packages
 
-      - name: Find files matching "*.rpm" "*.deb""
+      - name: Find files matching "*.rpm" "*.deb"
         run: |
           RPM_ASSET_LIST=$(find . -type f \( -name "*.rpm" \) | tr '\n' ',')
           DEB_ASSET_LIST=$(find . -type f \( -name "*.deb" \) | tr '\n' ',')
@@ -163,12 +163,10 @@ jobs:
           for file in "${asset_array[@]}"; do
             echo "file is: ${file}"
             rpm --addsign "${file}"
-            echo "here"
             OUTPUT=$(rpm --checksig "${file}")
             if [[ "$OUTPUT" =~ 'digests signatures OK' ]]; then
               echo "Successfully GPG Signed $file"
             else
-              echo "$OUTPUT"
               echo "GPG Signing $file has failed."
               exit 1
             fi
@@ -186,7 +184,6 @@ jobs:
             if [[ "$OUTPUT" =~ 'GOODSIG _gpgbuilder' ]]; then
               echo "Successfully GPG Signed $file"
             else
-              echo "$OUTPUT"
               echo "GPG Signing $file has failed."
               exit 1
             fi

@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	// DefaultLimit represents the minimum allowed bandwidth, constrained by the maximum record size (8 Mb).
-	DefaultLimit = 8 * 1024 * 1024
+	// MinLimit represents the minimum allowed bandwidth, constrained by the maximum record size (8 Mb).
+	MinLimit = 8 * 1024 * 1024
 	// metaOverhead represents an approximate size of record's metadata: namespace, set name, key, etc.
 	metaOverhead = 16 * 1024
 	// base64Ratio defines the multiplier to account for size expansion when encoding data using Base64.
@@ -54,9 +54,9 @@ func (l *Limiter) Wait(ctx context.Context, n int) error {
 	return l.WaitN(ctx, n)
 }
 
-// newBandwidth returns calculted value for
+// newBandwidth returns a calculated value for bandwidth.
 func newBandwidth(limit int) int {
-	bandwidth := DefaultLimit
+	bandwidth := MinLimit
 	if limit > bandwidth {
 		bandwidth = limit
 	}

@@ -102,7 +102,7 @@ type ConfigBackup struct {
 	RecordsPerSecond int
 	// Limits backup bandwidth (bytes per second).
 	// The lower bound is 8MiB (maximum size of the Aerospike record).
-	// Limit value is calculated using the formula:
+	// Effective limit value is calculated using the formula:
 	// Bandwidth * base64ratio + metaOverhead
 	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
 	// Will not apply rps limit if Bandwidth is zero (default).
@@ -205,8 +205,8 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
 	}
 
-	if c.Bandwidth != 0 && c.Bandwidth < bandwidth.DefaultLimit {
-		return fmt.Errorf("bandwidth value must be greater than %d, got %d", bandwidth.DefaultLimit, c.Bandwidth)
+	if c.Bandwidth != 0 && c.Bandwidth < bandwidth.MinLimit {
+		return fmt.Errorf("bandwidth value must be greater than %d, got %d", bandwidth.MinLimit, c.Bandwidth)
 	}
 
 	if c.StateFile != "" && c.PageSize == 0 {

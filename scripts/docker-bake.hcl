@@ -37,7 +37,7 @@ variable HUB {
 }
 
 variable PLATFORMS {
-  default = null
+  default = "linux/amd64,linux/arm64"
 }
 
 variable REGISTRY {

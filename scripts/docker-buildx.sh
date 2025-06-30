@@ -5,7 +5,7 @@ REGISTRY="docker.io"
 RH_REGISTRY="registry.access.redhat.com"
 TAG_LATEST=false
 TAG=""
-PLATFORMS=""
+PLATFORMS="linux/amd64,linux/arm64"
 
 
 POSITIONAL_ARGS=()

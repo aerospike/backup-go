@@ -19,7 +19,6 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -203,10 +202,6 @@ func (c *ConfigBackup) validate() error {
 
 	if c.Bandwidth < 0 {
 		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
-	}
-
-	if c.Bandwidth != 0 && c.Bandwidth < bandwidth.MinLimit {
-		return fmt.Errorf("bandwidth value must be greater than %d, got %d", bandwidth.MinLimit, c.Bandwidth)
 	}
 
 	if c.StateFile != "" && c.PageSize == 0 {

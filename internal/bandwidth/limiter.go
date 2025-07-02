@@ -16,8 +16,7 @@ package bandwidth
 
 import (
 	"context"
-
-	"golang.org/x/time/rate"
+	"time"
 )
 
 const (
@@ -31,18 +30,17 @@ const (
 
 // Limiter wrapper around standard rate.Limiter.
 type Limiter struct {
-	*rate.Limiter
+	*Bucket
 	bandwidth int
 }
 
 // NewLimiter returns new bandwidth limiter.
 func NewLimiter(limit int) *Limiter {
 	if limit > 0 {
-		bandwidth := newBandwidth(limit)
-
+		// bandwidth := newBandwidth(limit)
 		return &Limiter{
-			rate.NewLimiter(rate.Limit(bandwidth), bandwidth),
-			bandwidth,
+			NewBucket(int64(limit), time.Second),
+			limit,
 		}
 	}
 
@@ -51,7 +49,9 @@ func NewLimiter(limit int) *Limiter {
 
 // Wait blocks until lim permits n events to happen.
 func (l *Limiter) Wait(ctx context.Context, n int) error {
-	return l.WaitN(ctx, n)
+	l.Bucket.Wait(int64(n))
+
+	return nil
 }
 
 // newBandwidth returns a calculated value for bandwidth.

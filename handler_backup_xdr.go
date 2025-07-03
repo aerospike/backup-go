@@ -225,7 +225,7 @@ func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
 	bh.wg.Wait()
 
 	// Clean.
-	bh.stopStatsMetrics()
+	bh.cleanup()
 
 	return err
 }
@@ -253,9 +253,9 @@ func (bh *HandlerBackupXDR) GetMetrics() *models.Metrics {
 	)
 }
 
-// stopStatsMetrics stops the collection of stats and metrics for the backup job,
+// cleanup stops the collection of stats and metrics for the backup job,
 // including BackupStats, RPS, and KBPS tracking.
-func (bh *HandlerBackupXDR) stopStatsMetrics() {
+func (bh *HandlerBackupXDR) cleanup() {
 	bh.stats.Stop()
 	bh.rpsCollector.Stop()
 	bh.kbpsCollector.Stop()

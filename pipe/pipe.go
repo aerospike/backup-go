@@ -82,3 +82,19 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 func (p *Pipe[T]) GetMetrics() (in, out int) {
 	return p.fanout.GetMetrics()
 }
+
+func (p *Pipe[T]) Close() {
+	if p.readPool != nil {
+		p.readPool.Close()
+		p.readPool = nil
+	}
+
+	if p.writePool != nil {
+		p.writePool.Close()
+		p.writePool = nil
+	}
+
+	if p.fanout != nil {
+		p.fanout = nil
+	}
+}

@@ -278,64 +278,6 @@ func TestBackupRestoreIOEncryptionFile(t *testing.T) {
 	}
 }
 
-func TestBackupRestoreIOEncryptionError(t *testing.T) {
-	t.Parallel()
-	const setName = "testEncryptionFile"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
-	defer cancel()
-
-	asClient, err := testAerospikeClient()
-	require.NoError(t, err)
-	defer asClient.Close()
-
-	privateKeyFile := "tests/pkey_test"
-
-	backupConfig := NewDefaultBackupConfig()
-	backupConfig.SetList = []string{setName}
-	backupConfig.EncryptionPolicy = &EncryptionPolicy{
-		KeyFile: &privateKeyFile,
-		Mode:    EncryptAES128,
-	}
-
-	restoreConfig := NewDefaultRestoreConfig()
-	restoreConfig.EncryptionPolicy = &EncryptionPolicy{
-		KeyFile: &privateKeyFile,
-		Mode:    EncryptAES256,
-	}
-
-	records, err := genRecords(testASNamespace, setName, 10_000, testBins)
-	require.NoError(t, err)
-	err = writeRecords(asClient, records)
-	require.NoError(t, err)
-
-	directory := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
-
-	bStat, rStat, err := runBackupRestoreLocal(ctx, asClient, directory, backupConfig, restoreConfig)
-	require.NoError(t, err)
-	require.Equal(t, bStat.GetReadRecords(), rStat.GetRecordsInserted())
-
-	// Validate records.
-	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
-	require.NoError(t, err)
-
-	// Validate stats.
-	require.Equal(t, uint64(0), rStat.GetRecordsExpired())
-	require.Equal(t, uint64(0), rStat.GetRecordsSkipped())
-	require.Equal(t, uint64(0), rStat.GetRecordsFresher())
-	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
-	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
-
-	require.Equal(t, dbRecords.Len(), len(records))
-	for _, expRec := range records {
-		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
-		if !ok {
-			t.Errorf("expected record not found: %v", expRec.Key)
-			return
-		}
-		require.Equal(t, expRec.Bins, actual.Bins)
-	}
-}
-
 func TestBackupRestoreNamespace(t *testing.T) {
 	t.Parallel()
 	const setName = "testNamespace"

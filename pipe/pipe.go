@@ -87,6 +87,7 @@ func (p *Pipe[T]) GetMetrics() (in, out int) {
 	return 0, 0
 }
 
+// Close clean memory for GC.
 func (p *Pipe[T]) Close() {
 	if p.readPool != nil {
 		p.readPool.Close()

@@ -582,4 +582,6 @@ func (bh *BackupHandler) cleanup() {
 	if pl != nil {
 		pl.Close()
 	}
+
+	bh.pl.Swap(nil)
 }

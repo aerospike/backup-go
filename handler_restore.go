@@ -294,4 +294,6 @@ func (rh *RestoreHandler[T]) cleanup() {
 	if pl != nil {
 		pl.Close()
 	}
+
+	rh.pl.Swap(nil)
 }

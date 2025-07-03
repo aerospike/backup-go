@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -69,7 +70,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	logger  *slog.Logger
 	limiter *bandwidth.Limiter
 
-	pl            *pipe.Pipe[T]
+	pl            atomic.Pointer[pipe.Pipe[T]]
 	rpsCollector  *metrics.Collector
 	kbpsCollector *metrics.Collector
 
@@ -191,7 +192,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 	}
 
 	// Assign, so we can get pl stats.
-	rh.pl = pl
+	rh.pl.Store(pl)
 
 	return pl.Run(ctx)
 }
@@ -257,7 +258,7 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 	// Wait when all routines ended.
 	rh.wg.Wait()
 
-	rh.stopStatsMetrics()
+	rh.cleanup()
 
 	return err
 }
@@ -269,8 +270,10 @@ func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 	}
 
 	var pr, pw int
-	if rh.pl != nil {
-		pr, pw = rh.pl.GetMetrics()
+
+	pl := rh.pl.Load()
+	if pl != nil {
+		pr, pw = pl.GetMetrics()
 	}
 
 	return models.NewMetrics(
@@ -280,10 +283,17 @@ func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 	)
 }
 
-// stopStatsMetrics stops the collection of stats and metrics for the restore job,
+// cleanup stops the collection of stats and metrics for the restore job,
 // including RestoreStats, RPS, and KBPS tracking.
-func (rh *RestoreHandler[T]) stopStatsMetrics() {
+func (rh *RestoreHandler[T]) cleanup() {
 	rh.stats.Stop()
 	rh.rpsCollector.Stop()
 	rh.kbpsCollector.Stop()
+
+	pl := rh.pl.Load()
+	if pl != nil {
+		pl.Close()
+	}
+
+	rh.pl.Swap(nil)
 }

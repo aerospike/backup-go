@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	readerBufferSize = 4096
+	readerBufferSize = 256
 	writerBufferSize = readerBufferSize
 )
 

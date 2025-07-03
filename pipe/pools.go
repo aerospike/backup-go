@@ -81,3 +81,11 @@ func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *bandw
 		Inputs: inputs,
 	}
 }
+
+// Close closing channels and cleaning links.
+func (p *Pool[T]) Close() {
+	// Nullify objects, so GC can free this memory.
+	p.Chains = nil
+	p.Inputs = nil
+	p.Outputs = nil
+}

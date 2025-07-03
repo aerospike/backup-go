@@ -460,7 +460,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	}
 
 	// Clean.
-	bh.stopStatsMetrics()
+	bh.cleanup()
 
 	return err
 }
@@ -571,10 +571,17 @@ func (bh *BackupHandler) stateSuffixGenerator() string {
 	return suffix
 }
 
-// stopStatsMetrics stops the collection of stats and metrics for the backup job,
+// cleanup stops the collection of stats and metrics for the backup job,
 // including BackupStats, RPS, and KBPS tracking.
-func (bh *BackupHandler) stopStatsMetrics() {
+func (bh *BackupHandler) cleanup() {
 	bh.stats.Stop()
 	bh.rpsCollector.Stop()
 	bh.kbpsCollector.Stop()
+
+	pl := bh.pl.Load()
+	if pl != nil {
+		pl.Close()
+	}
+
+	bh.pl.Swap(nil)
 }

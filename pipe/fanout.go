@@ -174,12 +174,16 @@ func (f *Fanout[T]) splitFunc(token T) int {
 
 // GetMetrics returns the accumulated length for input and output channels.
 func (f *Fanout[T]) GetMetrics() (in, out int) {
-	for _, input := range f.Inputs {
-		in += len(input)
+	if f.Inputs != nil {
+		for _, input := range f.Inputs {
+			in += len(input)
+		}
 	}
 
-	for _, output := range f.Outputs {
-		out += len(output)
+	if f.Outputs != nil {
+		for _, output := range f.Outputs {
+			out += len(output)
+		}
 	}
 
 	return in, out

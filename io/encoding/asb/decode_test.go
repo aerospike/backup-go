@@ -2893,7 +2893,7 @@ func Test_readUntilAny(t *testing.T) {
 func Test_readNBytes(t *testing.T) {
 	type args struct {
 		src *countingReader
-		n   int
+		n   int64
 	}
 	tests := []struct {
 		name    string

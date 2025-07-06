@@ -53,15 +53,3 @@ func (l *Limiter) Wait(ctx context.Context, n int) error {
 
 	return nil
 }
-
-// newBandwidth returns a calculated value for bandwidth.
-func newBandwidth(limit int) int {
-	bandwidth := MinLimit
-	if limit > bandwidth {
-		bandwidth = limit
-	}
-
-	bandwidth = int(float64(bandwidth)*base64Ratio) + metaOverhead
-
-	return bandwidth
-}

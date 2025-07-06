@@ -80,5 +80,26 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 // GetMetrics returns the accumulated length for input and output channels.
 func (p *Pipe[T]) GetMetrics() (in, out int) {
-	return p.fanout.GetMetrics()
+	if p.fanout != nil {
+		return p.fanout.GetMetrics()
+	}
+
+	return 0, 0
+}
+
+// Close clean memory for GC.
+func (p *Pipe[T]) Close() {
+	if p.readPool != nil {
+		p.readPool.Close()
+		p.readPool = nil
+	}
+
+	if p.writePool != nil {
+		p.writePool.Close()
+		p.writePool = nil
+	}
+
+	if p.fanout != nil {
+		p.fanout = nil
+	}
 }

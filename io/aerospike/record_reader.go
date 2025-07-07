@@ -136,14 +136,10 @@ func (r *RecordReader) Read(ctx context.Context) (*models.Token, error) {
 		return r.readPage(ctx)
 	}
 
-	return r.read(ctx)
+	return r.read()
 }
 
-func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-
+func (r *RecordReader) read() (*models.Token, error) {
 	if !r.isScanStarted() {
 		scan, err := r.startScan()
 		if err != nil {

@@ -136,10 +136,10 @@ func (r *RecordReader) Read(ctx context.Context) (*models.Token, error) {
 		return r.readPage(ctx)
 	}
 
-	return r.read()
+	return r.read(ctx)
 }
 
-func (r *RecordReader) read() (*models.Token, error) {
+func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 	if !r.isScanStarted() {
 		scan, err := r.startScan()
 		if err != nil {
@@ -149,26 +149,30 @@ func (r *RecordReader) read() (*models.Token, error) {
 		r.scanResult = scan
 	}
 
-	res, active := <-r.scanResult.Results()
-	if !active {
-		r.logger.Debug("scan finished")
-		return nil, io.EOF
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res, active := <-r.scanResult.Results():
+		if !active {
+			r.logger.Debug("scan finished")
+			return nil, io.EOF
+		}
+
+		if res.Err != nil {
+			r.logger.Error("error reading record", "error", res.Err)
+			return nil, res.Err
+		}
+
+		rec := models.Record{
+			Record: res.Record,
+		}
+
+		recToken := models.NewRecordToken(&rec, 0, nil)
+
+		r.config.rpsCollector.Increment()
+
+		return recToken, nil
 	}
-
-	if res.Err != nil {
-		r.logger.Error("error reading record", "error", res.Err)
-		return nil, res.Err
-	}
-
-	rec := models.Record{
-		Record: res.Record,
-	}
-
-	recToken := models.NewRecordToken(&rec, 0, nil)
-
-	r.config.rpsCollector.Increment()
-
-	return recToken, nil
 }
 
 // Close cancels the Aerospike scan used to read records if it was started.

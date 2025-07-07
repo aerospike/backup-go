@@ -6,9 +6,6 @@ permissions:
 
 on:
   workflow_dispatch:
-  release:
-    types:
-      - published
 
 jobs:
   promote-to-jfrog-prod-env:

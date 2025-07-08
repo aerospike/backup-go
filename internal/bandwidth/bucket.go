@@ -2,6 +2,7 @@ package bandwidth
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -10,84 +11,142 @@ type Bucket struct {
 	mu sync.Mutex
 
 	// Maximum tokens in the bucket
-	limit int64
-
+	limit         int64
+	nanosPerToken int64
 	// Time interval for refilling the bucket
 	interval time.Duration
 
 	// Current available tokens
 	tokens int64
-
 	// Last time we leaked tokens
-	lastLeak time.Time
+	lastLeakNano int64
 }
 
 // NewBucket creates a new rate limiter with the specified limit and interval
 func NewBucket(limit int64, interval time.Duration) *Bucket {
+	now := time.Now().UnixNano()
 	return &Bucket{
-		limit:    limit,
-		interval: interval,
-		tokens:   limit,
-		lastLeak: time.Now(),
+		limit:         limit,
+		nanosPerToken: interval.Nanoseconds() / limit,
+		interval:      interval,
+		tokens:        limit,
+		lastLeakNano:  now,
 	}
 }
 
 // Wait blocks until n tokens are available
-// It allows waiting for amounts larger than the limit
-func (rl *Bucket) Wait(n int64) {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
+func (b *Bucket) Wait(n int64) {
+	// Fast path: try to get tokens without slow operations
+	for {
+		if b.tryAcquire(n) {
+			return
+		}
 
-	// Leak tokens.
-	rl.leak()
+		// Need to wait - use slow path
+		b.slowWait(n)
+		return
+	}
+}
 
-	// If we have enough tokens, use them and return.
-	if rl.tokens >= n {
-		rl.tokens -= n
+// tryAcquire attempts to acquire n tokens using only atomic operations
+func (b *Bucket) tryAcquire(n int64) bool {
+	// First, try to leak tokens
+	b.atomicLeak()
+
+	// Try to consume tokens
+	for {
+		currentTokens := atomic.LoadInt64(&b.tokens)
+		if currentTokens < n {
+			return false // Not enough tokens
+		}
+
+		if atomic.CompareAndSwapInt64(&b.tokens, currentTokens, currentTokens-n) {
+			return true // Success!
+		}
+		// CAS failed, retry
+	}
+}
+
+// atomicLeak updates tokens based on elapsed time using atomic operations
+func (b *Bucket) atomicLeak() {
+	now := time.Now().UnixNano()
+
+	for {
+		lastLeak := atomic.LoadInt64(&b.lastLeakNano)
+		elapsedNanos := now - lastLeak
+
+		// No time passed
+		if elapsedNanos <= 0 {
+			return
+		}
+
+		// Less than one token worth of time
+		tokensToAdd := elapsedNanos / b.nanosPerToken
+		if tokensToAdd <= 0 {
+			return
+		}
+
+		// Calculate new leak time
+		newLeakTime := lastLeak + (tokensToAdd * b.nanosPerToken)
+
+		// Try to update leak time first
+		if !atomic.CompareAndSwapInt64(&b.lastLeakNano, lastLeak, newLeakTime) {
+			continue
+		}
+
+		// Successfully updated leak time, now update tokens
+		for {
+			currentTokens := atomic.LoadInt64(&b.tokens)
+			newTokens := currentTokens + tokensToAdd
+			if newTokens > b.limit {
+				newTokens = b.limit
+			}
+
+			if atomic.CompareAndSwapInt64(&b.tokens, currentTokens, newTokens) {
+				// ok
+				return
+			}
+		}
+	}
+}
+
+// slowWait handles cases where we need to actually wait
+func (b *Bucket) slowWait(n int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Double-check after acquiring lock
+	if b.tryAcquire(n) {
 		return
 	}
 
-	// If we don't have enough tokens, calculate the waiting time.
-	tokensNeeded := n - rl.tokens
+	// Calculate how long we need to wait
+	currentTokens := atomic.LoadInt64(&b.tokens)
+	tokensNeeded := n - currentTokens
 
-	// Calculate how many full intervals we need to wait.
-	// Each interval adds `limit` tokens.
-	intervalsToWait := tokensNeeded / rl.limit
-
-	// If we need a partial interval, add one more.
-	if tokensNeeded%rl.limit > 0 {
-		intervalsToWait++
-	}
-
-	// Calculate the exact wait duration.
-	totalWait := time.Duration(intervalsToWait) * rl.interval
-
-	// Wait.
-	time.Sleep(totalWait)
-
-	// After waiting, leak tokens again.
-	rl.leak()
-	rl.tokens -= n
-}
-
-// leak updates the token count, according to leak.
-func (rl *Bucket) leak() {
-	now := time.Now()
-	elapsed := now.Sub(rl.lastLeak)
-
-	// Calculate how many full intervals have passed.
-	intervals := int64(elapsed / rl.interval)
-
-	if intervals > 0 {
-		// Add tokens for each full interval.
-		rl.tokens += intervals * rl.limit
-
-		// Don't overflow the bucket.
-		if rl.tokens > rl.limit {
-			rl.tokens = rl.limit
+	// For big requests (larger than limit), calculate intervals needed
+	if n > b.limit {
+		intervalsToWait := tokensNeeded / b.limit
+		if tokensNeeded%b.limit > 0 {
+			intervalsToWait++
 		}
+		waitTime := time.Duration(intervalsToWait) * b.interval
 
-		// Update last leak time to the start of the current interval.
-		rl.lastLeak = rl.lastLeak.Add(time.Duration(intervals) * rl.interval)
+		time.Sleep(waitTime)
+
+		// After sleep, set the exact state
+		now := time.Now().UnixNano()
+		atomic.StoreInt64(&b.lastLeakNano, now)
+		atomic.StoreInt64(&b.tokens, b.limit-n)
+		return
 	}
+
+	// For normal requests, wait for needed tokens
+	waitTime := time.Duration(tokensNeeded * b.nanosPerToken)
+	time.Sleep(waitTime)
+
+	// Update state after sleep
+	now := time.Now().UnixNano()
+	atomic.StoreInt64(&b.lastLeakNano, now)
+	atomic.StoreInt64(&b.tokens, b.limit-n)
 }

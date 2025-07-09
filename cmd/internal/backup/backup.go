@@ -63,7 +63,15 @@ func NewService(
 	logger *slog.Logger,
 ) (*Service, error) {
 	// Validations.
-	if err := config.ValidateBackup(params); err != nil {
+	if err := params.Backup.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := params.BackupXDR.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := config.ValidateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
 		return nil, err
 	}
 

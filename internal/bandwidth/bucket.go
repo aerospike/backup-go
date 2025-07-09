@@ -19,37 +19,40 @@ import (
 	"time"
 )
 
-// Bucket implements a thread-safe leaky bucket rate limiter
+// Bucket implements a thread-safe leaky bucket rate limiter.
 type Bucket struct {
 	// mu to make bucket thread safe.
 	// As bucket is used for limiting speed, one mutex won't affect speed.
 	mu sync.Mutex
 
-	// Maximum tokens in the bucket
+	// Maximum tokens in the bucket.
 	limit int64
 
-	// Time interval for refilling the bucket
-	interval time.Duration
+	// Rate at which tokens are added (tokens per nanosecond).
+	rate float64
 
-	// Current available tokens
-	tokens int64
+	// Current available tokens (can be fractional for precise calculations).
+	tokens float64
 
-	// Last time we leaked tokens
+	// Last time we leaked tokens.
 	lastLeak time.Time
 }
 
-// NewBucket creates a new rate limiter with the specified limit and interval
+// NewBucket creates a new rate limiter with the specified limit and interval.
 func NewBucket(limit int64, interval time.Duration) *Bucket {
+	// Calculate rate as tokens per nanosecond for precise calculations.
+	rate := float64(limit) / float64(interval.Nanoseconds())
+
 	return &Bucket{
 		limit:    limit,
-		interval: interval,
-		tokens:   limit,
+		rate:     rate,
+		tokens:   float64(limit),
 		lastLeak: time.Now(),
 	}
 }
 
-// Wait blocks until n tokens are available
-// It allows waiting for amounts larger than the limit
+// Wait blocks until n tokens are available.
+// It allows waiting for amounts larger than the limit.
 func (rl *Bucket) Wait(n int64) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -58,52 +61,40 @@ func (rl *Bucket) Wait(n int64) {
 	rl.leak()
 
 	// If we have enough tokens, use them and return.
-	if rl.tokens >= n {
-		rl.tokens -= n
+	if rl.tokens >= float64(n) {
+		rl.tokens -= float64(n)
 		return
 	}
 
-	// If we don't have enough tokens, calculate the waiting time.
-	tokensNeeded := n - rl.tokens
+	// Calculate exact time needed to accumulate required tokens.
+	tokensNeeded := float64(n) - rl.tokens
+	waitDuration := time.Duration(tokensNeeded / rl.rate)
 
-	// Calculate how many full intervals we need to wait.
-	// Each interval adds `limit` tokens.
-	intervalsToWait := tokensNeeded / rl.limit
+	// Wait for exact duration.
+	time.Sleep(waitDuration)
 
-	// If we need a partial interval, add one more.
-	if tokensNeeded%rl.limit > 0 {
-		intervalsToWait++
-	}
-
-	// Calculate the exact wait duration.
-	totalWait := time.Duration(intervalsToWait) * rl.interval
-
-	// Wait.
-	time.Sleep(totalWait)
-
-	// After waiting, leak tokens again.
+	// After waiting, leak tokens again and consume.
 	rl.leak()
-	rl.tokens -= n
+	rl.tokens -= float64(n)
 }
 
-// leak updates the token count, according to leak.
+// leak updates the token count based on elapsed time.
 func (rl *Bucket) leak() {
 	now := time.Now()
 	elapsed := now.Sub(rl.lastLeak)
 
-	// Calculate how many full intervals have passed.
-	intervals := int64(elapsed / rl.interval)
+	// Calculate exact tokens to add based on elapsed time.
+	tokensToAdd := rl.rate * float64(elapsed.Nanoseconds())
 
-	if intervals > 0 {
-		// Add tokens for each full interval.
-		rl.tokens += intervals * rl.limit
+	if tokensToAdd > 0 {
+		rl.tokens += tokensToAdd
 
 		// Don't overflow the bucket.
-		if rl.tokens > rl.limit {
-			rl.tokens = rl.limit
+		if rl.tokens > float64(rl.limit) {
+			rl.tokens = float64(rl.limit)
 		}
 
-		// Update last leak time to the start of the current interval.
-		rl.lastLeak = rl.lastLeak.Add(time.Duration(intervals) * rl.interval)
+		// Update last leak time to current time.
+		rl.lastLeak = now
 	}
 }

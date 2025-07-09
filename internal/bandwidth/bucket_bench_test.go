@@ -52,6 +52,7 @@ func BenchmarkSingleToken(b *testing.B) {
 			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
+					//nolint:errcheck // No need to check error on benchmark.
 					limiter.Wait(ctx)
 				}
 			})
@@ -86,6 +87,7 @@ func BenchmarkBatchTokens(b *testing.B) {
 			ctx := context.Background()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				//nolint:errcheck // No need to check error on benchmark.
 				limiter.WaitN(ctx, int(tt.batchSize))
 			}
 		})
@@ -138,6 +140,7 @@ func BenchmarkHighConcurrency(b *testing.B) {
 				go func() {
 					defer wg.Done()
 					for j := 0; j < opsPerGoroutine; j++ {
+						//nolint:errcheck // No need to check error on benchmark.
 						limiter.Wait(ctx)
 					}
 				}()
@@ -206,9 +209,10 @@ func BenchmarkTimingAccuracy(b *testing.B) {
 			start := time.Now()
 
 			for i := 0; i < int(tt.limit); i++ {
+				//nolint:errcheck // No need to check error on benchmark.
 				limiter.Wait(ctx)
 			}
-
+			//nolint:errcheck // No need to check error on benchmark.
 			limiter.Wait(ctx)
 			elapsed := time.Since(start)
 
@@ -250,6 +254,7 @@ func BenchmarkBurstTraffic(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				for j := 0; j < tt.burstCount; j++ {
+					//nolint:errcheck // No need to check error on benchmark.
 					limiter.WaitN(ctx, int(tt.burstSize))
 				}
 			}

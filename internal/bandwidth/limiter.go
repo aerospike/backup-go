@@ -18,15 +18,6 @@ import (
 	"time"
 )
 
-const (
-	// MinLimit represents the minimum allowed bandwidth, constrained by the maximum record size (8 Mb).
-	MinLimit = 8 * 1024 * 1024
-	// metaOverhead represents an approximate size of record's metadata: namespace, set name, key, etc.
-	metaOverhead = 16 * 1024
-	// base64Ratio defines the multiplier to account for size expansion when encoding data using Base64.
-	base64Ratio = 1.34
-)
-
 // Limiter wrapper around standard rate.Limiter.
 type Limiter struct {
 	*Bucket
@@ -35,7 +26,6 @@ type Limiter struct {
 // NewLimiter returns new bandwidth limiter.
 func NewLimiter(limit int64) *Limiter {
 	if limit > 0 {
-		// bandwidth := newBandwidth(limit)
 		return &Limiter{
 			NewBucket(limit, time.Second),
 		}

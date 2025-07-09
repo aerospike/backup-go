@@ -61,7 +61,7 @@ type ConfigRestore struct {
 	// Bandwidth * base64ratio + metaOverhead
 	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
 	// Will not apply rps limit if Bandwidth is zero (default).
-	Bandwidth int
+	Bandwidth int64
 	// Don't restore any records.
 	NoRecords bool
 	// Don't restore any secondary indexes.

@@ -105,7 +105,7 @@ type ConfigBackup struct {
 	// Bandwidth * base64ratio + metaOverhead
 	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
 	// Will not apply rps limit if Bandwidth is zero (default).
-	Bandwidth int
+	Bandwidth int64
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
 	FileLimit uint64

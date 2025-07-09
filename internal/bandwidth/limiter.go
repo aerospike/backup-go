@@ -15,7 +15,6 @@
 package bandwidth
 
 import (
-	"context"
 	"time"
 )
 
@@ -31,25 +30,21 @@ const (
 // Limiter wrapper around standard rate.Limiter.
 type Limiter struct {
 	*Bucket
-	bandwidth int
 }
 
 // NewLimiter returns new bandwidth limiter.
-func NewLimiter(limit int) *Limiter {
+func NewLimiter(limit int64) *Limiter {
 	if limit > 0 {
 		// bandwidth := newBandwidth(limit)
 		return &Limiter{
-			NewBucket(int64(limit), time.Second),
-			limit,
+			NewBucket(limit, time.Second),
 		}
 	}
 
 	return nil
 }
 
-// Wait blocks until lim permits n events to happen.
-func (l *Limiter) Wait(ctx context.Context, n int) error {
+// Wait blocks until limiter permits n events to happen.
+func (l *Limiter) Wait(n int) {
 	l.Bucket.Wait(int64(n))
-
-	return nil
 }

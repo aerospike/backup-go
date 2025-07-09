@@ -132,15 +132,26 @@ func NewRestoreConfig(params *RestoreParams, logger *slog.Logger) *backup.Config
 }
 
 func logRestoreConfig(logger *slog.Logger, params *RestoreParams, restoreConfig *backup.ConfigRestore) {
+	encryptionMode := "none"
+	if params.Encryption != nil {
+		encryptionMode = params.Encryption.Mode
+	}
+
+	compressLevel := 0
+	if params.Compression != nil {
+		compressLevel = params.Compression.Level
+	}
+
 	logger.Info("initialized restore config",
 		slog.Any("namespace_source", *restoreConfig.Namespace.Source),
 		slog.Any("namespace_destination", *restoreConfig.Namespace.Destination),
-		slog.String("encryption", params.Encryption.Mode),
-		slog.Int("compression", params.Compression.Level),
+		slog.String("encryption", encryptionMode),
+		slog.Int("compression", compressLevel),
 		slog.Any("retry", *restoreConfig.RetryPolicy),
 		slog.Any("sets", restoreConfig.SetList),
 		slog.Any("bins", restoreConfig.BinList),
 		slog.Int("parallel", restoreConfig.Parallel),
+		slog.Int("bandwidth", restoreConfig.Bandwidth),
 		slog.Bool("no_records", restoreConfig.NoRecords),
 		slog.Bool("no_indexes", restoreConfig.NoIndexes),
 		slog.Bool("no_udfs", restoreConfig.NoUDFs),

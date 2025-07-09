@@ -323,7 +323,7 @@ Any Azure parameter can be retrieved from Secret Agent.
 ```
 
 
-## Config explanation.
+## Config explanation
 ```yaml
 app:
   # Enable more detailed logging.
@@ -332,7 +332,7 @@ app:
   log-level: debug
   # Set output in JSON format for parsing by external tools.
   log-json: false
-client-config:
+client-aerospike:
   seeds:
     - host: 127.0.0.1
       tls-name: ""
@@ -342,7 +342,7 @@ client-config:
   # The Aerospike password to use to connect to the Aerospike cluster.
   password: some_password
   # The authentication mode used by the Aerospike server: INTERNAL, EXTERNAL, PKI
-  authmode: ""
+  auth: ""
   # Enable TLS authentication with Aerospike.
   tls-enable: false
   # The server TLS context to use to authenticate the connection to Aerospike.

@@ -306,10 +306,20 @@ func newBackupXDRConfig(params *BackupParams) *backup.ConfigBackupXDR {
 }
 
 func logBackupConfig(logger *slog.Logger, params *BackupParams, backupConfig *backup.ConfigBackup) {
+	encryptionMode := "none"
+	if params.Encryption != nil {
+		encryptionMode = params.Encryption.Mode
+	}
+
+	compressLevel := 0
+	if params.Compression != nil {
+		compressLevel = params.Compression.Level
+	}
+
 	logger.Info("initialized scan backup config",
 		slog.String("namespace", backupConfig.Namespace),
-		slog.String("encryption", params.Encryption.Mode),
-		slog.Int("compression", params.Compression.Level),
+		slog.String("encryption", encryptionMode),
+		slog.Int("compression", compressLevel),
 		slog.String("filters", params.Backup.PartitionList),
 		slog.Any("nodes", backupConfig.NodeList),
 		slog.Any("sets", backupConfig.SetList),

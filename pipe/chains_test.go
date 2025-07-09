@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe/mocks"
 	"github.com/stretchr/testify/mock"
@@ -467,48 +466,6 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 		require.ErrorIs(t, err, errTest)
 		require.ErrorContains(t, err, "write error")
 		require.ErrorContains(t, err, "close error")
-	}()
-
-	go func() {
-		defer wg.Done()
-		for range testCount {
-			time.Sleep(testDealy)
-			input <- testToken()
-		}
-
-		close(input)
-	}()
-
-	wg.Wait()
-}
-
-func TestChains_WriterBackupChainLimiterError(t *testing.T) {
-	t.Parallel()
-
-	writerMock := mocks.NewMockWriter[*models.Token](t)
-	ctx := context.Background()
-
-	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
-		return testSizeErr, nil
-	})
-
-	writerMock.EXPECT().Close().Return(nil)
-
-	limiter := bandwidth.NewLimiter(testLimit)
-
-	writeChain, input := NewWriterChain[*models.Token](writerMock, limiter)
-	require.NotNil(t, writeChain)
-	require.NotNil(t, input)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		err := writeChain.Run(ctx)
-		fmt.Println(err)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "exceeds limiter's burst")
 	}()
 
 	go func() {

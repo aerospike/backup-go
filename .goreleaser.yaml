@@ -18,7 +18,7 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X 'main.appVersion={{.Version}}' -X 'main.commitHash={{.Commit}}'
+      - -s -w -X 'main.appVersion={{.Version}}' -X 'main.commitHash={{.Commit}}' -X 'main.buildTime={{.Date}}'
   - id: "asrestore"
     main: cmd/asrestore/main.go
     binary: "asrestore"
@@ -32,14 +32,14 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X 'main.appVersion={{.Version}}' -X 'main.commitHash={{.Commit}}'
+      - -s -w -X 'main.appVersion={{.Version}}' -X 'main.commitHash={{.Commit}}' -X 'main.buildTime={{.Date}}'
 
 archives:
   - id: "asbackup"
     formats:  [ 'tar.gz' ]
     name_template: >-
-      {{ .Binary }}_{{ .Version }}_
-      {{- title .Os }}_
+      {{ .Binary }}-{{ .Version }}-
+      {{- title .Os }}-
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
@@ -54,8 +54,8 @@ archives:
   - id: "asrestore"
     formats:  [ 'tar.gz' ]
     name_template: >-
-      {{ .Binary }}_{{ .Version }}_
-      {{- title .Os }}_
+      {{ .Binary }}-{{ .Version }}-
+      {{- title .Os }}-
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
@@ -83,4 +83,23 @@ changelog:
   disable: true
 
 checksum:
-  name_template: "checksums.txt"
+  name_template: "{{ .ArtifactName }}.sha256"
+  split: true
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    cmd: gpg
+    args:
+      - --batch
+      - --armor
+      - --yes
+      - -u
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - --output
+      - "${artifact}.asc"
+      - --detach-sign
+      - "${artifact}"
+    signature: "${artifact}.asc"
+    env:
+      - GPG_FINGERPRINT

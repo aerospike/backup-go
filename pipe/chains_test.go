@@ -23,16 +23,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 )
 
 const (
 	testCount     = 5
 	testSize      = 10
+	testSizeErr   = 100 * 1024 * 1024
 	testDealy     = 100 * time.Millisecond
 	testLongDelay = 300 * time.Millisecond
 	testLimit     = 1
@@ -120,6 +121,52 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
+}
+
+func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
+	t.Parallel()
+
+	readerMock := mocks.NewMockReader[*models.Token](t)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var mockCounter int
+	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
+		if mockCounter < testCount {
+			mockCounter++
+			time.Sleep(testDealy)
+			return testToken(), nil
+		}
+
+		return nil, errTest
+	})
+
+	readerMock.EXPECT().Close()
+
+	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
+
+	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	require.NotNil(t, readChain)
+	require.NotNil(t, output)
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		time.Sleep(testLongDelay)
+		cancel()
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := readChain.Run(ctx)
+		require.ErrorIs(t, err, context.Canceled)
+	}()
+
+	<-output
+
+	wg.Wait()
 }
 
 func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
@@ -442,12 +489,12 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 	ctx := context.Background()
 
 	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
-		return testSize, nil
+		return testSizeErr, nil
 	})
 
 	writerMock.EXPECT().Close().Return(nil)
 
-	limiter := rate.NewLimiter(rate.Limit(testLimit), testLimit)
+	limiter := bandwidth.NewLimiter(testLimit)
 
 	writeChain, input := NewWriterChain[*models.Token](writerMock, limiter)
 	require.NotNil(t, writeChain)

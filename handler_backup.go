@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
@@ -32,7 +33,6 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
-	"golang.org/x/time/rate"
 )
 
 // Writer defines an interface for writing backup data to a storage provider.
@@ -70,10 +70,11 @@ type BackupHandler struct {
 
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
-	limiter                *rate.Limiter
+	limiter                *bandwidth.Limiter
 	infoClient             *asinfo.InfoClient
 	scanLimiter            *semaphore.Weighted
 	errors                 chan error
+	done                   chan struct{}
 	id                     string
 
 	stats *models.BackupStats
@@ -109,8 +110,6 @@ func newBackupHandler(
 
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
-
-	limiter := makeBandwidthLimiter(config.Bandwidth)
 
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
@@ -182,13 +181,15 @@ func newBackupHandler(
 		encoder:                encoder,
 		readerProcessor:        readerProcessor,
 		recordCounter:          recCounter,
-		limiter:                limiter,
+		limiter:                bandwidth.NewLimiter(config.Bandwidth),
 		infoClient:             infoCLient,
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  stats,
 		rpsCollector:           rpsCollector,
 		kbpsCollector:          kbpsCollector,
+		errors:                 make(chan error, 1),
+		done:                   make(chan struct{}, 1),
 	}
 
 	writerProcessor := newFileWriterProcessor[*models.Token](
@@ -201,7 +202,6 @@ func newBackupHandler(
 		config.CompressionPolicy,
 		state,
 		stats,
-		limiter,
 		kbpsCollector,
 		config.FileLimit,
 		config.ParallelWrite,
@@ -217,10 +217,9 @@ func newBackupHandler(
 // currently this should only be run once.
 func (bh *BackupHandler) run() {
 	bh.wg.Add(1)
-	bh.errors = make(chan error, 1)
 	bh.stats.Start()
 
-	go doWork(bh.errors, bh.logger, func() error {
+	go doWork(bh.errors, bh.done, bh.logger, func() error {
 		defer bh.wg.Done()
 
 		return bh.backup(bh.ctx)
@@ -400,14 +399,6 @@ func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
 	}
 }
 
-func makeBandwidthLimiter(bandwidth int) *rate.Limiter {
-	if bandwidth > 0 {
-		return rate.NewLimiter(rate.Limit(bandwidth), bandwidth)
-	}
-
-	return nil
-}
-
 func (bh *BackupHandler) backupSIndexesAndUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
@@ -436,48 +427,42 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *BackupHandler) Wait(ctx context.Context) error {
-	// Define err, to check it on defer function.
-	// If the err is nil, we can remove the state file.
 	var err error
-	defer func() {
-		bh.stats.Stop()
-		bh.rpsCollector.Stop()
-		bh.kbpsCollector.Stop()
-
-		if err == nil && bh.state != nil {
-			// Clen only if err == nil and state is not nil.
-			if err = bh.state.cleanup(ctx); err != nil {
-				bh.logger.Error("failed to cleanup state", slog.Any("error", err))
-			}
-		}
-	}()
 
 	select {
 	case <-bh.ctx.Done():
 		// When global context is done, wait until all routine finish their work properly.
 		// Global context - is context that was passed to Backup() method.
-		bh.wg.Wait()
-
-		err = ctx.Err()
-
-		return err
+		err = bh.ctx.Err()
 	case <-ctx.Done():
 		// When local context is done, we cancel global context.
 		// Then wait until all routines finish their work properly.
 		// Local context - is context that was passed to Wait() method.
 		bh.cancel()
-		bh.wg.Wait()
 
 		err = ctx.Err()
-
-		return err
 	case err = <-bh.errors:
 		// On error, we cancel global context.
 		// To stop all goroutines and prevent leaks.
 		bh.cancel()
-
-		return err
+	case <-bh.done: // Success
 	}
+
+	// Wait when all routines ended.
+	bh.wg.Wait()
+
+	// If the err is nil, we can remove the state file.
+	if err == nil && bh.state != nil {
+		// Clen only if err == nil and state is not nil.
+		if err = bh.state.cleanup(ctx); err != nil {
+			bh.logger.Error("failed to cleanup state", slog.Any("error", err))
+		}
+	}
+
+	// Clean.
+	bh.cleanup()
+
+	return err
 }
 
 func (bh *BackupHandler) backupSIndexes(
@@ -584,4 +569,19 @@ func (bh *BackupHandler) stateSuffixGenerator() string {
 	}
 
 	return suffix
+}
+
+// cleanup stops the collection of stats and metrics for the backup job,
+// including BackupStats, RPS, and KBPS tracking.
+func (bh *BackupHandler) cleanup() {
+	bh.stats.Stop()
+	bh.rpsCollector.Stop()
+	bh.kbpsCollector.Stop()
+
+	pl := bh.pl.Load()
+	if pl != nil {
+		pl.Close()
+	}
+
+	bh.pl.Swap(nil)
 }

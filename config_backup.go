@@ -19,6 +19,7 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -55,7 +56,7 @@ type ConfigBackup struct {
 	// Used to resume backup with last record received from previous incomplete backup.
 	// This parameter will overwrite PartitionFilters.Begin value.
 	// Can't be used in full backup mode.
-	// This parameter is mutually exclusive to partition-list (not implemented).
+	// This parameter is mutually exclusive with partition-list (not implemented).
 	// Format: base64 encoded string.
 	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
 	PartitionFilters []*a.PartitionFilter
@@ -68,7 +69,7 @@ type ConfigBackup struct {
 	// To get the node name, use the 'node:' info command.
 	// Backup the given cluster nodes only.
 	// If it is set, ParallelNodes automatically set to true.
-	// This argument is mutually exclusive to partition-list/AfterDigest arguments.
+	// This argument is mutually exclusive with partition-list/AfterDigest arguments.
 	NodeList []string
 	// SetList is the Aerospike set to back up (optional, given an empty list,
 	// all sets will be backed up).
@@ -100,6 +101,10 @@ type ConfigBackup struct {
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
 	// Limits backup bandwidth (bytes per second).
+	// The lower bound is 8MiB (maximum size of the Aerospike record).
+	// Effective limit value is calculated using the formula:
+	// Bandwidth * base64ratio + metaOverhead
+	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
 	// Will not apply rps limit if Bandwidth is zero (default).
 	Bandwidth int
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
@@ -200,6 +205,10 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("bandwidth value must not be negative, got %d", c.Bandwidth)
 	}
 
+	if c.Bandwidth != 0 && c.Bandwidth < bandwidth.MinLimit {
+		return fmt.Errorf("bandwidth value must be greater than %d, got %d", bandwidth.MinLimit, c.Bandwidth)
+	}
+
 	if c.StateFile != "" && c.PageSize == 0 {
 		return fmt.Errorf("page size must be set if saving state to state file is enabled")
 	}
@@ -236,6 +245,10 @@ func (c *ConfigBackup) validate() error {
 
 	if c.EncoderType != EncoderTypeASB {
 		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
+	}
+
+	if c.ScanPolicy.ReplicaPolicy == a.PREFER_RACK && (len(c.RackList) != 0 || len(c.NodeList) != 0) {
+		return fmt.Errorf("racks list or nodes list are not supported with PREFER_RACK replica policy")
 	}
 
 	return nil

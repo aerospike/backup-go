@@ -103,10 +103,10 @@ func newLineError(lineType string, err error) error {
 type positionTracker struct {
 	fileName string
 	offset   uint64
-	line     int
-	column   int
+	line     int64
+	column   int64
 	prevByte byte
-	prevCol  int
+	prevCol  int64
 }
 
 // countingReader represents a wrapper for fast reading.
@@ -595,7 +595,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	content, err := _readNBytes(r.reader, int(length))
+	content, err := _readNBytes(r.reader, int64(length))
 	if err != nil {
 		return nil, err
 	}
@@ -1166,10 +1166,10 @@ func _readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) 
 		return nil, err
 	}
 
-	return _readBlockDecodeBase64(src, int(size))
+	return _readBlockDecodeBase64(src, int64(size))
 }
 
-func _readBlockDecodeBase64(src *countingReader, n int) ([]byte, error) {
+func _readBlockDecodeBase64(src *countingReader, n int64) ([]byte, error) {
 	data, err := _readNBytes(src, n)
 	if err != nil {
 		return nil, err
@@ -1231,7 +1231,7 @@ func _readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return _readNBytes(src, int(length))
+	return _readNBytes(src, int64(length))
 }
 
 func _readBool(src *countingReader) (bool, error) {
@@ -1349,11 +1349,11 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 	return nil, errors.New("token larger than max size")
 }
 
-func _readNBytes(src *countingReader, n int) ([]byte, error) {
+func _readNBytes(src *countingReader, n int64) ([]byte, error) {
 	buf := bigBufPool.Get().([]byte)
 
 	// Ensure the buffer is large enough
-	if cap(buf) < n {
+	if int64(cap(buf)) < n {
 		// If the buffer is too small, create a new one with sufficient capacity
 		buf = make([]byte, n)
 	} else {
@@ -1374,7 +1374,7 @@ func _readNBytes(src *countingReader, n int) ([]byte, error) {
 		// Us bytes.Count for fast counting of newlines.
 		newlineCount := bytes.Count(buf, []byte{asbNewLine})
 		// Increase counter.
-		src.tracker.line += newlineCount
+		src.tracker.line += int64(newlineCount)
 
 		if newlineCount > 0 {
 			src.tracker.column = 0
@@ -1417,7 +1417,7 @@ func _expectAnyChar(src *countingReader, chars []byte) error {
 }
 
 func _expectToken(src *countingReader, token string) error {
-	data, err := _readNBytes(src, len(token))
+	data, err := _readNBytes(src, int64(len(token)))
 	if err != nil {
 		return err
 	}

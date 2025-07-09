@@ -59,7 +59,7 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 		"Backup records after record digest in record's partition plus all succeeding\n"+
 			"partitions. Used to resume backup with last record received from previous\n"+
 			"incomplete backup.\n"+
-			"This argument is mutually exclusive to partition-list.\n"+
+			"This argument is mutually exclusive with partition-list.\n"+
 			"Format: Base64 encoded string\n"+
 			"Example: EjRWeJq83vEjRRI0VniavN7xI0U=\n")
 	flagSet.StringVarP(&f.ModifiedAfter, "modified-after", "a",
@@ -96,13 +96,14 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 			"To get the node name, use the 'node:' info command.\n"+
 			"Back up the given cluster nodes only.\n"+
 			"The job is parallelized by number of nodes unless --parallel is set less than nodes number.\n"+
-			"This argument is mutually exclusive with --partition-list and --after-digest arguments.\n"+
+			"This argument is mutually exclusive with --partition-list, --after-digest, --rack-list, --prefer-racks"+
+			" arguments.\n"+
 			"Default: backup all nodes in the cluster")
 	flagSet.StringVarP(&f.PartitionList, "partition-list", "X",
 		"",
 		"List of partitions <filter[,<filter>[...]]> to back up. Partition filters can be ranges,\n"+
 			"individual partitions, or records after a specific digest within a single partition.\n"+
-			"This argument is mutually exclusive to after-digest.\n"+
+			"This argument is mutually exclusive with after-digest.\n"+
 			"Filter: <begin partition>[-<partition count>]|<digest>\n"+
 			"begin partition: 0-4095\n"+
 			"partition count: 1-4096 Default: 1\n"+
@@ -112,12 +113,14 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.StringVar(&f.PreferRacks, "prefer-racks",
 		"",
 		"<rack id 1>[,<rack id 2>[,...]]\n"+
-			"A list of Aerospike Database rack IDs to prefer when reading records for a backup.")
+			"A list of Aerospike Database rack IDs to prefer when reading records for a backup.\n"+
+			"This argument is mutually exclusive with --rack-list and --node-list.")
 	flagSet.StringVar(&f.RackList, "rack-list",
 		"",
 		"<rack id 1>[,<rack id 2>[,...]]\n"+
 			"A list of Aerospike Database rack IDs to backup.\n"+
-			"Unlike --prefer-racks, only specified racks will be backed up.")
+			"Unlike --prefer-racks, only specified racks will be backed up.\n"+
+			"This argument is mutually exclusive with --prefer-racks and --node-list.")
 	flagSet.Int64VarP(&f.MaxRecords, "max-records", "M",
 		0,
 		"The number of records approximately to back up. 0 - all records")

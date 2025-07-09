@@ -24,14 +24,12 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"golang.org/x/time/rate"
 )
 
 type recordWriterProcessor[T models.TokenConstraint] struct {
 	aerospikeClient  AerospikeClient
 	config           *ConfigRestore
 	stats            *models.RestoreStats
-	limiter          *rate.Limiter
 	metricsCollector *metrics.Collector
 
 	logger *slog.Logger
@@ -41,7 +39,6 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
 	config *ConfigRestore,
 	stats *models.RestoreStats,
-	limiter *rate.Limiter,
 	metricsCollector *metrics.Collector,
 	logger *slog.Logger,
 ) *recordWriterProcessor[T] {
@@ -51,7 +48,6 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 		aerospikeClient:  aerospikeClient,
 		config:           config,
 		stats:            stats,
-		limiter:          limiter,
 		metricsCollector: metricsCollector,
 		logger:           logger,
 	}

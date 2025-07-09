@@ -123,7 +123,7 @@ func (r *Reader) StreamFiles(
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(ctx, path)
 				if err != nil {
-					errorsCh <- err
+					ioStorage.ErrToChan(ctx, errorsCh, err)
 					return
 				}
 			}
@@ -149,8 +149,8 @@ func (r *Reader) streamDirectory(
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				errorsCh <- fmt.Errorf("failed to read object attributes from bucket %s: %w",
-					r.bucketName, err)
+				ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+					r.bucketName, err))
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
 			// subsequent calls will return the same error. To continue iteration, a new
@@ -191,7 +191,8 @@ func (r *Reader) openObject(
 		if errors.Is(err, storage.ErrObjectNotExist) && skipNotFound {
 			return
 		}
-		errorsCh <- fmt.Errorf("failed to open directory file %s: %w", path, err)
+
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open directory file %s: %w", path, err))
 
 		return
 	}

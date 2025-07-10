@@ -34,4 +34,7 @@ type Common struct {
 	// Nice is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.
 	Nice int
+
+	PipeReaderBufferSize int
+	PipeWriterBufferSize int
 }

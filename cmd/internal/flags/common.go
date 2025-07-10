@@ -154,6 +154,12 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		0,
 		"The limits for read/write storage bandwidth in MiB/s.\n"+
 			"The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).")
+	flagSet.IntVar(&f.PipeReaderBufferSize, "pipe-reader-buffer",
+		4096,
+		"Pipe buffer")
+	flagSet.IntVar(&f.PipeWriterBufferSize, "pipe-writer-buffer",
+		4096,
+		"Pipe buffer")
 
 	return flagSet
 }

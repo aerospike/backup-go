@@ -23,16 +23,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 )
 
 const (
 	testCount      = 5
 	testSize       = 10
+	testSizeErr    = 100 * 1024 * 1024
 	testDealy      = 100 * time.Millisecond
 	testLongDelay  = 300 * time.Millisecond
 	testLimit      = 1
@@ -489,12 +490,12 @@ func TestChains_WriterBackupChainLimiterError(t *testing.T) {
 	ctx := context.Background()
 
 	writerMock.EXPECT().Write(ctx, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
-		return testSize, nil
+		return testSizeErr, nil
 	})
 
 	writerMock.EXPECT().Close().Return(nil)
 
-	limiter := rate.NewLimiter(rate.Limit(testLimit), testLimit)
+	limiter := bandwidth.NewLimiter(testLimit)
 
 	writeChain, input := NewWriterChain[*models.Token](writerMock, limiter, testBufferSize)
 	require.NotNil(t, writeChain)

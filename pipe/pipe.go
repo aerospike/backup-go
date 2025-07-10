@@ -18,9 +18,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
 )
 
 // Pipe is running and managing everything.
@@ -35,7 +35,7 @@ func NewPipe[T models.TokenConstraint](
 	pc ProcessorCreator[T],
 	readers []Reader[T],
 	writers []Writer[T],
-	limiter *rate.Limiter,
+	limiter *bandwidth.Limiter,
 	strategy FanoutStrategy,
 	readerBufferSize,
 	writerBufferSize int,
@@ -82,5 +82,26 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 // GetMetrics returns the accumulated length for input and output channels.
 func (p *Pipe[T]) GetMetrics() (in, out int) {
-	return p.fanout.GetMetrics()
+	if p.fanout != nil {
+		return p.fanout.GetMetrics()
+	}
+
+	return 0, 0
+}
+
+// Close clean memory for GC.
+func (p *Pipe[T]) Close() {
+	if p.readPool != nil {
+		p.readPool.Close()
+		p.readPool = nil
+	}
+
+	if p.writePool != nil {
+		p.writePool.Close()
+		p.writePool = nil
+	}
+
+	if p.fanout != nil {
+		p.fanout = nil
+	}
 }

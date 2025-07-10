@@ -134,11 +134,7 @@ func newRecordWriter(
 }
 
 // Write writes the types from the models package to an Aerospike DB.
-func (rw *RestoreWriter[T]) Write(ctx context.Context, data T) (int, error) {
-	if ctx.Err() != nil {
-		return 0, ctx.Err()
-	}
-
+func (rw *RestoreWriter[T]) Write(_ context.Context, data T) (int, error) {
 	switch v := any(data).(type) {
 	case *models.ASBXToken:
 		// Logic for ASBXToken

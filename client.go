@@ -285,7 +285,11 @@ func (c *Client) Restore(
 
 	switch config.EncoderType {
 	case EncoderTypeASB:
-		handler := newRestoreHandler[*models.Token](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler, err := newRestoreHandler[*models.Token](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create restore handler: %w", err)
+		}
+
 		handler.run()
 
 		return handler, nil
@@ -294,7 +298,11 @@ func (c *Client) Restore(
 			return nil, fmt.Errorf("failed to validate restore config: %w", err)
 		}
 
-		handler := newRestoreHandler[*models.ASBXToken](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler, err := newRestoreHandler[*models.ASBXToken](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create restore handler: %w", err)
+		}
+
 		handler.run()
 
 		return handler, nil

@@ -15,6 +15,7 @@
 package bandwidth
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -39,7 +40,14 @@ type Bucket struct {
 }
 
 // NewBucket creates a new rate limiter with the specified limit and interval.
-func NewBucket(limit int64, interval time.Duration) *Bucket {
+func NewBucket(limit int64, interval time.Duration) (*Bucket, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than 0")
+	}
+
+	if interval <= 0 {
+		return nil, fmt.Errorf("interval must be greater than 0")
+	}
 	// Calculate rate as tokens per nanosecond for precise calculations.
 	rate := float64(limit) / float64(interval.Nanoseconds())
 
@@ -48,12 +56,16 @@ func NewBucket(limit int64, interval time.Duration) *Bucket {
 		rate:     rate,
 		tokens:   float64(limit),
 		lastLeak: time.Now(),
-	}
+	}, nil
 }
 
 // Wait blocks until n tokens are available.
 // It allows waiting for amounts larger than the limit.
 func (rl *Bucket) Wait(n int64) {
+	if n < 1 {
+		return
+	}
+
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 

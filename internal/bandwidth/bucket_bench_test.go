@@ -37,7 +37,7 @@ func BenchmarkSingleToken(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run("CustomBucket_"+tt.name, func(b *testing.B) {
-			bucket := NewBucket(tt.limit, tt.interval)
+			bucket, _ := NewBucket(tt.limit, tt.interval)
 			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
@@ -75,7 +75,7 @@ func BenchmarkBatchTokens(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run("CustomBucket_"+tt.name, func(b *testing.B) {
-			bucket := NewBucket(tt.limit, tt.interval)
+			bucket, _ := NewBucket(tt.limit, tt.interval)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				bucket.Wait(tt.batchSize)
@@ -109,7 +109,7 @@ func BenchmarkHighConcurrency(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run("CustomBucket_"+tt.name, func(b *testing.B) {
-			bucket := NewBucket(tt.limit, tt.interval)
+			bucket, _ := NewBucket(tt.limit, tt.interval)
 			b.ResetTimer()
 
 			var wg sync.WaitGroup
@@ -191,7 +191,7 @@ func BenchmarkTimingAccuracy(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run("CustomBucket_"+tt.name, func(b *testing.B) {
-			bucket := NewBucket(tt.limit, tt.interval)
+			bucket, _ := NewBucket(tt.limit, tt.interval)
 			start := time.Now()
 
 			bucket.Wait(tt.limit)
@@ -237,7 +237,7 @@ func BenchmarkBurstTraffic(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run("CustomBucket_"+tt.name, func(b *testing.B) {
-			bucket := NewBucket(tt.limit, tt.interval)
+			bucket, _ := NewBucket(tt.limit, tt.interval)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {

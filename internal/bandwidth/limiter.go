@@ -24,14 +24,19 @@ type Limiter struct {
 }
 
 // NewLimiter returns new bandwidth limiter.
-func NewLimiter(limit int64) *Limiter {
+func NewLimiter(limit int64) (*Limiter, error) {
 	if limit > 0 {
-		return &Limiter{
-			NewBucket(limit, time.Second),
+		b, err := NewBucket(limit, time.Second)
+		if err != nil {
+			return nil, err
 		}
+
+		return &Limiter{
+			b,
+		}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 // Wait blocks until limiter permits n events to happen.

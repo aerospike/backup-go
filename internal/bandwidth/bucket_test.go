@@ -30,7 +30,8 @@ func TestBucket_WaitBig(t *testing.T) {
 		limit = 100
 	)
 
-	l := NewBucket(limit, time.Second)
+	l, err := NewBucket(limit, time.Second)
+	require.NoError(t, err)
 	tn := time.Now()
 	l.Wait(limit * rate)
 	ts := time.Since(tn)
@@ -46,7 +47,8 @@ func TestBucket_WaitSmall(t *testing.T) {
 		limit = 100
 	)
 
-	l := NewBucket(limit, time.Second)
+	l, err := NewBucket(limit, time.Second)
+	require.NoError(t, err)
 	tn := time.Now()
 
 	for range 15 {
@@ -66,7 +68,8 @@ func TestBucket_WaitAsync(t *testing.T) {
 		limit = 100
 	)
 
-	l := NewBucket(limit, time.Second)
+	l, err := NewBucket(limit, time.Second)
+	require.NoError(t, err)
 	tn := time.Now()
 
 	var wg sync.WaitGroup
@@ -86,4 +89,16 @@ func TestBucket_WaitAsync(t *testing.T) {
 	ts := time.Since(tn)
 
 	require.InDelta(t, 5, ts.Seconds(), 1)
+}
+
+func TestBucket_Err(t *testing.T) {
+	t.Parallel()
+
+	l, err := NewBucket(-1, time.Second)
+	require.Nil(t, l)
+	require.ErrorContains(t, err, "limit must be greater than 0")
+
+	l, err = NewBucket(1, -1)
+	require.Nil(t, l)
+	require.ErrorContains(t, err, "interval must be greater than 0")
 }

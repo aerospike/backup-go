@@ -196,6 +196,7 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Deco
 	}
 
 	asb.header, err = asb.readHeader()
+
 	switch {
 	case err == nil: // ok
 	case errors.Is(err, errInvalidToken):

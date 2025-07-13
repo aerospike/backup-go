@@ -29,8 +29,8 @@ type RestoreParams struct {
 	ClientConfig *client.AerospikeConfig `yaml:"-,omitempty"`
 	// ClientAerospike is  wrapper for aerospike client params, to unmarshal YAML.
 	// Because ClientConfig can't be used because of TLS configuration.
-	ClientAerospike *models.ClientAerospike `yaml:"client-aerospike,omitempty"`
-	ClientPolicy    *models.ClientPolicy    `yaml:"client-policy,omitempty"`
+	ClientAerospike *models.ClientAerospike `yaml:"cluster,omitempty"`
+	ClientPolicy    *models.ClientPolicy    `yaml:"-,omitempty"`
 	Restore         *models.Restore         `yaml:"restore,omitempty"`
 	Compression     *models.Compression     `yaml:"compression,omitempty"`
 	Encryption      *models.Encryption      `yaml:"encryption,omitempty"`
@@ -67,6 +67,8 @@ func NewRestoreParams(
 		if err != nil {
 			return nil, fmt.Errorf("failed to remap config file from yaml %s: %w", app.Config, err)
 		}
+
+		params.ClientPolicy = params.ClientAerospike.ToClientPolicy()
 
 		return &params, nil
 	}

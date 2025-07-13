@@ -26,19 +26,30 @@ import (
 type ClientAerospike struct {
 	Seeds []HostTLSPort `yaml:"seeds,omitempty"`
 
-	User           string `yaml:"user,omitempty"`
-	Password       string `yaml:"password,omitempty"`
-	AuthMode       string `yaml:"auth,omitempty"`
-	TLSEnable      bool   `yaml:"tls-enable,omitempty"`
-	TLSName        string `yaml:"tls-name,omitempty"`
-	TLSProtocols   string `yaml:"tls-protocols,omitempty"`
-	TLSRootCAFile  string `yaml:"tls-ca-file,omitempty"`
-	TLSRootCAPath  string `yaml:"tls-ca-path,omitempty"`
-	TLSCertFile    string `yaml:"tls-cert-file,omitempty"`
-	TLSKeyFile     string `yaml:"tls-key-file,omitempty"`
-	TLSKeyFilePass string `yaml:"tls-key-file-password,omitempty"`
+	User     string `yaml:"user,omitempty"`
+	Password string `yaml:"password,omitempty"`
+	AuthMode string `yaml:"auth,omitempty"`
+
+	Timeout      int64 `yaml:"client-timeout,omitempty"`
+	IdleTimeout  int64 `yaml:"client-idle-timeout,omitempty"`
+	LoginTimeout int64 `yaml:"client-login-timeout,omitempty"`
+
+	TLS TLSConfig `yaml:"tls,omitempty"`
 }
 
+// TLSConfig represents the configuration for enabling TLS with fields for certificates and protocols.
+type TLSConfig struct {
+	Enable      bool   `yaml:"enable,omitempty"`
+	Name        string `yaml:"name,omitempty"`
+	Protocols   string `yaml:"protocols,omitempty"`
+	RootCAFile  string `yaml:"ca-file,omitempty"`
+	RootCAPath  string `yaml:"ca-path,omitempty"`
+	CertFile    string `yaml:"cert-file,omitempty"`
+	KeyFile     string `yaml:"key-file,omitempty"`
+	KeyFilePass string `yaml:"key-file-password,omitempty"`
+}
+
+// HostTLSPort defines a structure to represent a host with TLS name and port configuration.
 type HostTLSPort struct {
 	Host    string `yaml:"host,omitempty"`
 	TLSName string `yaml:"tls-name,omitempty"`
@@ -101,61 +112,70 @@ func (c *ClientAerospike) ToConfig() (*client.AerospikeConfig, error) {
 		f.AuthMode = authMode
 	}
 
-	f.TLSEnable = c.TLSEnable
-	f.TLSName = c.TLSName
+	f.TLSEnable = c.TLS.Enable
+	f.TLSName = c.TLS.Name
 
-	if c.TLSProtocols != "" {
+	if c.TLS.Protocols != "" {
 		var tlsProtocols flags.TLSProtocolsFlag
-		if err := tlsProtocols.Set(c.TLSProtocols); err != nil {
+		if err := tlsProtocols.Set(c.TLS.Protocols); err != nil {
 			return nil, fmt.Errorf("failed to set tls protocols: %w", err)
 		}
 
 		f.TLSProtocols = tlsProtocols
 	}
 
-	if c.TLSRootCAFile != "" {
+	if c.TLS.RootCAFile != "" {
 		var tlsRootCaFile flags.CertFlag
 
-		if err := tlsRootCaFile.Set(c.TLSRootCAFile); err != nil {
+		if err := tlsRootCaFile.Set(c.TLS.RootCAFile); err != nil {
 			return nil, fmt.Errorf("failed to set tls root ca file: %w", err)
 		}
 
 		f.TLSRootCAFile = tlsRootCaFile
 	}
 
-	if c.TLSRootCAPath != "" {
+	if c.TLS.RootCAPath != "" {
 		var tlsRootCaPath flags.CertPathFlag
 
-		if err := tlsRootCaPath.Set(c.TLSRootCAPath); err != nil {
+		if err := tlsRootCaPath.Set(c.TLS.RootCAPath); err != nil {
 			return nil, fmt.Errorf("failed to set tls root ca path: %w", err)
 		}
 
 		f.TLSRootCAPath = tlsRootCaPath
 	}
 
-	if c.TLSCertFile != "" {
+	if c.TLS.CertFile != "" {
 		var tlsCertFile flags.CertFlag
 
-		if err := tlsCertFile.Set(c.TLSCertFile); err != nil {
+		if err := tlsCertFile.Set(c.TLS.CertFile); err != nil {
 			return nil, fmt.Errorf("failed to set tls cert file: %w", err)
 		}
 
 		f.TLSCertFile = tlsCertFile
 	}
 
-	if c.TLSKeyFile != "" {
+	if c.TLS.KeyFile != "" {
 		var tlsKeyFile flags.CertFlag
-		if err := tlsKeyFile.Set(c.TLSKeyFile); err != nil {
+		if err := tlsKeyFile.Set(c.TLS.KeyFile); err != nil {
 			return nil, fmt.Errorf("failed to set tls key file: %w", err)
 		}
 	}
 
-	if c.TLSKeyFilePass != "" {
+	if c.TLS.KeyFilePass != "" {
 		var tlsKeyFilePass flags.PasswordFlag
-		if err := tlsKeyFilePass.Set(c.TLSKeyFilePass); err != nil {
+		if err := tlsKeyFilePass.Set(c.TLS.KeyFilePass); err != nil {
 			return nil, fmt.Errorf("failed to set tls key file password: %w", err)
 		}
 	}
 
 	return f.NewAerospikeConfig(), nil
+}
+
+// ToClientPolicy return client policy.
+func (c *ClientAerospike) ToClientPolicy() *ClientPolicy {
+	return &ClientPolicy{
+		Timeout:      c.Timeout,
+		IdleTimeout:  c.IdleTimeout,
+		LoginTimeout: c.LoginTimeout,
+	}
 }

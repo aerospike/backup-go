@@ -332,7 +332,7 @@ app:
   log-level: debug
   # Set output in JSON format for parsing by external tools.
   log-json: false
-client-aerospike:
+cluster:
   seeds:
     - host: 127.0.0.1
       tls-name: ""

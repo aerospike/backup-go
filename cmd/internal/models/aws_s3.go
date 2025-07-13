@@ -23,20 +23,20 @@ import (
 
 // AwsS3 represents the configuration for AWS S3 storage integration.
 type AwsS3 struct {
-	BucketName      string `yaml:"bucket-name,omitempty"`
-	Region          string `yaml:"region,omitempty"`
-	Profile         string `yaml:"profile,omitempty"`
-	Endpoint        string `yaml:"endpoint-override,omitempty"`
-	AccessKeyID     string `yaml:"access-key-id,omitempty"`
-	SecretAccessKey string `yaml:"secret-access-key,omitempty"`
+	BucketName      string
+	Region          string
+	Profile         string
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
 
-	StorageClass        string `yaml:"storage-class,omitempty"`
-	AccessTier          string `yaml:"access-tier,omitempty"`
-	RestorePollDuration int64  `yaml:"restore-poll-duration,omitempty"`
+	StorageClass        string
+	AccessTier          string
+	RestorePollDuration int64
 
-	RetryMaxAttempts       int `yaml:"retry-max-attempts,omitempty"`
-	RetryMaxBackoffSeconds int `yaml:"retry-max-backoff,omitempty"`
-	RetryBackoffSeconds    int `yaml:"retry-backoff,omitempty"`
+	RetryMaxAttempts       int
+	RetryMaxBackoffSeconds int
+	RetryBackoffSeconds    int
 
 	ChunkSize int `yaml:"chunk-size,omitempty"`
 }

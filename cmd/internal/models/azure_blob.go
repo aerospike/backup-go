@@ -24,23 +24,23 @@ import (
 // AzureBlob represents the configuration for Azure Blob storage integration.
 type AzureBlob struct {
 	// Account name + key auth
-	AccountName string `yaml:"account-name,omitempty"`
-	AccountKey  string `yaml:"account-key,omitempty"`
+	AccountName string
+	AccountKey  string
 	// Azure Active directory
-	TenantID     string `yaml:"tenant-id,omitempty"`
-	ClientID     string `yaml:"client-id,omitempty"`
-	ClientSecret string `yaml:"client-secret,omitempty"`
+	TenantID     string
+	ClientID     string
+	ClientSecret string
 
-	Endpoint      string `yaml:"endpoint-override,omitempty"`
-	ContainerName string `yaml:"container-name,omitempty"`
+	Endpoint      string
+	ContainerName string
 
-	AccessTier          string `yaml:"access-tier,omitempty"`
-	RestorePollDuration int64  `yaml:"rehydrate-poll-duration,omitempty"`
+	AccessTier          string
+	RestorePollDuration int64
 
-	RetryMaxAttempts     int `yaml:"retry-max-attempts,omitempty"`
-	RetryTimeoutSeconds  int `yaml:"retry-timeout,omitempty"`
-	RetryDelaySeconds    int `yaml:"retry-delay,omitempty"`
-	RetryMaxDelaySeconds int `yaml:"retry-max-delay,omitempty"`
+	RetryMaxAttempts     int
+	RetryTimeoutSeconds  int
+	RetryDelaySeconds    int
+	RetryMaxDelaySeconds int
 
 	BlockSize int `yaml:"block-size,omitempty"`
 }

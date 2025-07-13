@@ -21,36 +21,36 @@ import (
 // Backup flags that will be mapped to (scan) backup config.
 // (common for backup and restore flags are in Common).
 type Backup struct {
-	Common `yaml:",inline"`
+	Common
 
-	OutputFile          string `yaml:"output-file,omitempty"`
-	RemoveFiles         bool   `yaml:"remove-files,omitempty"`
-	ModifiedBefore      string `yaml:"modified-before,omitempty"`
-	ModifiedAfter       string `yaml:"modified-after,omitempty"`
-	FileLimit           uint64 `yaml:"file-limit,omitempty"`
-	AfterDigest         string `yaml:"after-digest,omitempty"`
-	MaxRecords          int64  `yaml:"max-records,omitempty"`
-	NoBins              bool   `yaml:"no-bins,omitempty"`
-	SleepBetweenRetries int    `yaml:"sleep-between-retries,omitempty"`
-	FilterExpression    string `yaml:"filter-exp,omitempty"`
-	ParallelNodes       bool   `yaml:"parallel-nodes,omitempty"`
-	RemoveArtifacts     bool   `yaml:"remove-artifacts,omitempty"`
-	Compact             bool   `yaml:"compact,omitempty"`
-	NodeList            string `yaml:"node-list,omitempty"`
-	NoTTLOnly           bool   `yaml:"no-ttl-only,omitempty"`
-	PreferRacks         string `yaml:"prefer-racks,omitempty"`
-	PartitionList       string `yaml:"partition-list,omitempty"`
-	Estimate            bool   `yaml:"estimate,omitempty"`
-	EstimateSamples     int64  `yaml:"estimate-samples,omitempty"`
-	StateFileDst        string `yaml:"state-file-dst,omitempty"`
-	Continue            string `yaml:"continue,omitempty"`
-	ScanPageSize        int64  `yaml:"scan-page-size,omitempty"`
-	OutputFilePrefix    string `yaml:"output-file-prefix,omitempty"`
-	RackList            string `yaml:"rack-list,omitempty"`
+	OutputFile          string
+	RemoveFiles         bool
+	ModifiedBefore      string
+	ModifiedAfter       string
+	FileLimit           uint64
+	AfterDigest         string
+	MaxRecords          int64
+	NoBins              bool
+	SleepBetweenRetries int
+	FilterExpression    string
+	ParallelNodes       bool
+	RemoveArtifacts     bool
+	Compact             bool
+	NodeList            string
+	NoTTLOnly           bool
+	PreferRacks         string
+	PartitionList       string
+	Estimate            bool
+	EstimateSamples     int64
+	StateFileDst        string
+	Continue            string
+	ScanPageSize        int64
+	OutputFilePrefix    string
+	RackList            string
 
-	InfoMaxRetries                uint    `yaml:"info-max-retries,omitempty"`
-	InfoRetriesMultiplier         float64 `yaml:"info-retries-multiplier,omitempty"`
-	InfoRetryIntervalMilliseconds int64   `yaml:"info-retry-timeout,omitempty"`
+	InfoMaxRetries                uint
+	InfoRetriesMultiplier         float64
+	InfoRetryIntervalMilliseconds int64
 }
 
 // ShouldClearTarget check if we should clean target directory.

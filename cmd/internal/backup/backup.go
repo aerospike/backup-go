@@ -81,7 +81,7 @@ func NewService(
 		return nil, err
 	}
 
-	secretAgent := config.GetSecretAgent(backupConfig, backupXDRConfig)
+	secretAgent := config.NewSecretAgent(backupConfig, backupXDRConfig)
 
 	// We don't need a writer for estimates.
 	var writer backup.Writer

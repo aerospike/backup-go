@@ -34,9 +34,9 @@ var (
 	expDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2}$`)
 )
 
-// GetSecretAgent determines and returns the SecretAgentConfig from ConfigBackup or ConfigBackupXDR.
+// NewSecretAgent determines and returns the SecretAgentConfig from ConfigBackup or ConfigBackupXDR.
 // Returns nil if both are nil.
-func GetSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
+func NewSecretAgent(b *backup.ConfigBackup, bxdr *backup.ConfigBackupXDR) *backup.SecretAgentConfig {
 	switch {
 	case b != nil:
 		return b.SecretAgentConfig
@@ -224,14 +224,14 @@ func recordExistsAction(replace, unique bool) aerospike.RecordExistsAction {
 	}
 }
 
-func mapInfoPolicy(timeOut int64) *aerospike.InfoPolicy {
+func newInfoPolicy(timeOut int64) *aerospike.InfoPolicy {
 	p := aerospike.NewInfoPolicy()
 	p.Timeout = time.Duration(timeOut) * time.Millisecond
 
 	return p
 }
 
-func mapRetryPolicy(retryBaseTimeout int64, retryMultiplier float64, retryMaxRetries uint) *bModels.RetryPolicy {
+func newRetryPolicy(retryBaseTimeout int64, retryMultiplier float64, retryMaxRetries uint) *bModels.RetryPolicy {
 	return bModels.NewRetryPolicy(
 		time.Duration(retryBaseTimeout)*time.Millisecond,
 		retryMultiplier,

@@ -16,14 +16,14 @@ package models
 
 // App contains the global application flags.
 type App struct {
-	Help    bool `yaml:"-"`
-	Version bool `yaml:"-"`
-	Verbose bool `yaml:"verbose,omitempty"`
+	Help    bool
+	Version bool
+	Verbose bool
 	// Set log level for verbose output.
-	LogLevel string `yaml:"log-level,omitempty"`
+	LogLevel string
 	// Format logs as JSON, for parsing by external tools.
-	LogJSON bool `yaml:"log-json,omitempty"`
+	LogJSON bool
 
 	// Config file path.
-	Config string `yaml:"-"`
+	Config string
 }

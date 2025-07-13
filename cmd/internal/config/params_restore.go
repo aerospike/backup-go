@@ -106,7 +106,7 @@ func NewRestoreConfig(params *RestoreParams, logger *slog.Logger) *backup.Config
 	c.RecordsPerSecond = params.Restore.RecordsPerSecond
 	c.Parallel = parallel
 	c.WritePolicy = newWritePolicy(params.Restore)
-	c.InfoPolicy = mapInfoPolicy(params.Restore.TimeOut)
+	c.InfoPolicy = newInfoPolicy(params.Restore.TimeOut)
 	// As we set --nice in MiB we must convert it to bytes
 	c.Bandwidth = params.Restore.Nice * 1024 * 1024
 	c.ExtraTTL = params.Restore.ExtraTTL
@@ -119,7 +119,7 @@ func NewRestoreConfig(params *RestoreParams, logger *slog.Logger) *backup.Config
 	c.CompressionPolicy = newCompressionPolicy(params.Compression)
 	c.EncryptionPolicy = newEncryptionPolicy(params.Encryption)
 	c.SecretAgentConfig = newSecretAgentConfig(params.SecretAgent)
-	c.RetryPolicy = mapRetryPolicy(
+	c.RetryPolicy = newRetryPolicy(
 		params.Restore.RetryBaseTimeout,
 		params.Restore.RetryMultiplier,
 		params.Restore.RetryMaxRetries,

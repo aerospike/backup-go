@@ -23,20 +23,20 @@ import (
 // GcpStorage represents the configuration for GCP storage integration.
 type GcpStorage struct {
 	// Path to file containing Service Account JSON Key.
-	KeyFile string `yaml:"key-file,omitempty"`
+	KeyFile string
 	// For GPC storage bucket is not part of the path as in S3.
 	// So we should set it separately.
-	BucketName string `yaml:"bucket-name,omitempty"`
+	BucketName string
 	// Alternative url.
 	// It is not recommended to use an alternate URL in a production environment.
-	Endpoint string `yaml:"endpoint-override,omitempty"`
+	Endpoint string
 
-	RetryMaxAttempts        int     `yaml:"retry-max-attempts,omitempty"`
-	RetryBackoffMaxSeconds  int     `yaml:"retry-max-backoff,omitempty"`
-	RetryBackoffInitSeconds int     `yaml:"retry-init-backoff,omitempty"`
-	RetryBackoffMultiplier  float64 `yaml:"retry-backoff-multiplier,omitempty"`
+	RetryMaxAttempts        int
+	RetryBackoffMaxSeconds  int
+	RetryBackoffInitSeconds int
+	RetryBackoffMultiplier  float64
 
-	ChunkSize int `yaml:"chunk-size,omitempty"`
+	ChunkSize int
 }
 
 // LoadSecrets tries to load field values from secret agent.

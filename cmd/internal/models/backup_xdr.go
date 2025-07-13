@@ -20,30 +20,30 @@ import (
 
 // BackupXDR flags that will be mapped to xdr backup config.
 type BackupXDR struct {
-	Directory                    string `yaml:"directory,omitempty"`
-	FileLimit                    uint64 `yaml:"file-limit,omitempty"`
-	RemoveFiles                  bool   `yaml:"remove-files,omitempty"`
-	ParallelWrite                int    `yaml:"parallel-write,omitempty"`
-	DC                           string `yaml:"dc,omitempty"`
-	LocalAddress                 string `yaml:"local-address,omitempty"`
-	LocalPort                    int    `yaml:"local-port,omitempty"`
-	Namespace                    string `yaml:"namespace,omitempty"`
-	Rewind                       string `yaml:"rewind,omitempty"`
-	MaxThroughput                int    `yaml:"max-throughput,omitempty"`
-	ReadTimeoutMilliseconds      int64  `yaml:"read-timeout-milliseconds,omitempty"`
-	WriteTimeoutMilliseconds     int64  `yaml:"write-timeout-milliseconds,omitempty"`
-	ResultQueueSize              int    `yaml:"results-queue-size,omitempty"`
-	AckQueueSize                 int    `yaml:"ack-queue-size,omitempty"`
-	MaxConnections               int    `yaml:"max-connections,omitempty"`
-	InfoPolingPeriodMilliseconds int64  `yaml:"info-poling-period-milliseconds,omitempty"`
-	StartTimeoutMilliseconds     int64  `yaml:"start-timeout-milliseconds,omitempty"`
+	Directory                    string
+	FileLimit                    uint64
+	RemoveFiles                  bool
+	ParallelWrite                int
+	DC                           string
+	LocalAddress                 string
+	LocalPort                    int
+	Namespace                    string
+	Rewind                       string
+	MaxThroughput                int
+	ReadTimeoutMilliseconds      int64
+	WriteTimeoutMilliseconds     int64
+	ResultQueueSize              int
+	AckQueueSize                 int
+	MaxConnections               int
+	InfoPolingPeriodMilliseconds int64
+	StartTimeoutMilliseconds     int64
 
 	StopXDR    bool `yaml:"stop-xdr,omitempty"`
 	UnblockMRT bool `yaml:"unblock-mrt,omitempty"`
 
-	InfoMaxRetries                uint    `yaml:"info-max-retries,omitempty"`
-	InfoRetriesMultiplier         float64 `yaml:"info-retries-multiplier, omitempty"`
-	InfoRetryIntervalMilliseconds int64   `yaml:"info-retry-timeout,omitempty"`
+	InfoMaxRetries                uint
+	InfoRetriesMultiplier         float64
+	InfoRetryIntervalMilliseconds int64
 
 	Forward bool
 }

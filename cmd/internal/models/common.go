@@ -20,22 +20,22 @@ const DefaultChunkSize = 5 * 1024 * 1024
 
 // Common parameters are used by both backup and restore operations.
 type Common struct {
-	Directory        string `yaml:"directory,omitempty"`
-	Namespace        string `yaml:"namespace,omitempty"`
-	SetList          string `yaml:"set-list,omitempty"`
-	BinList          string `yaml:"bin-list,omitempty"`
-	Parallel         int    `yaml:"parallel,omitempty"`
-	NoRecords        bool   `yaml:"no-records,omitempty"`
-	NoIndexes        bool   `yaml:"no-indexes,omitempty"`
-	NoUDFs           bool   `yaml:"no-udfs,omitempty"`
-	RecordsPerSecond int    `yaml:"records-per-second,omitempty"`
-	MaxRetries       int    `yaml:"max-retries,omitempty"`
-	TotalTimeout     int64  `yaml:"total-timeout,omitempty"`
-	SocketTimeout    int64  `yaml:"socket-timeout,omitempty"`
+	Directory        string
+	Namespace        string
+	SetList          string
+	BinList          string
+	Parallel         int
+	NoRecords        bool
+	NoIndexes        bool
+	NoUDFs           bool
+	RecordsPerSecond int
+	MaxRetries       int
+	TotalTimeout     int64
+	SocketTimeout    int64
 
 	// Nice is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.
-	Nice int `yaml:"nice,omitempty"`
+	Nice int
 }
 
 func (c *Common) Validate() error {

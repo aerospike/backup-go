@@ -32,21 +32,21 @@ const MaxRack = 1000000
 
 // BackupParams contain backup parameters.
 type BackupParams struct {
-	App          *models.App             `yaml:"app,omitempty"`
-	ClientConfig *client.AerospikeConfig `yaml:"-"`
+	App          *models.App
+	ClientConfig *client.AerospikeConfig
 	// ClientAerospike is wrapper for aerospike client params, to unmarshal YAML.
 	// Because ClientConfig can't be used because of TLS configuration.
-	ClientAerospike *models.ClientAerospike `yaml:"cluster,omitempty"`
+	ClientAerospike *models.ClientAerospike
 	// Client policy is a part of ClientAerospike, so no need for yaml tag.
-	ClientPolicy *models.ClientPolicy `yaml:"-,omitempty"`
-	Backup       *models.Backup       `yaml:"backup,omitempty"`
-	BackupXDR    *models.BackupXDR    `yaml:"backup-xdr,omitempty"`
-	Compression  *models.Compression  `yaml:"compression,omitempty"`
-	Encryption   *models.Encryption   `yaml:"encryption,omitempty"`
-	SecretAgent  *models.SecretAgent  `yaml:"secret-agent,omitempty"`
-	AwsS3        *models.AwsS3        `yaml:"aws,omitempty"`
-	GcpStorage   *models.GcpStorage   `yaml:"gcp,omitempty"`
-	AzureBlob    *models.AzureBlob    `yaml:"azure,omitempty"`
+	ClientPolicy *models.ClientPolicy
+	Backup       *models.Backup
+	BackupXDR    *models.BackupXDR
+	Compression  *models.Compression
+	Encryption   *models.Encryption
+	SecretAgent  *models.SecretAgent
+	AwsS3        *models.AwsS3
+	GcpStorage   *models.GcpStorage
+	AzureBlob    *models.AzureBlob
 }
 
 func NewBackupParams(
@@ -258,7 +258,7 @@ func newBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 		c.ModAfter = &modAfterTime
 	}
 
-	c.InfoRetryPolicy = mapRetryPolicy(
+	c.InfoRetryPolicy = newRetryPolicy(
 		params.Backup.InfoRetryIntervalMilliseconds,
 		params.Backup.InfoRetriesMultiplier,
 		params.Backup.InfoMaxRetries,
@@ -295,7 +295,7 @@ func newBackupXDRConfig(params *BackupParams) *backup.ConfigBackupXDR {
 		MaxConnections:    params.BackupXDR.MaxConnections,
 		InfoPolingPeriod:  time.Duration(params.BackupXDR.InfoPolingPeriodMilliseconds) * time.Millisecond,
 		StartTimeout:      time.Duration(params.BackupXDR.StartTimeoutMilliseconds) * time.Millisecond,
-		InfoRetryPolicy: mapRetryPolicy(
+		InfoRetryPolicy: newRetryPolicy(
 			params.BackupXDR.InfoRetryIntervalMilliseconds,
 			params.BackupXDR.InfoRetriesMultiplier,
 			params.BackupXDR.InfoMaxRetries,

@@ -24,31 +24,31 @@ const (
 
 // Restore contains flags that will be mapped to restore config.
 type Restore struct {
-	Common `yaml:",inline"`
+	Common
 
-	InputFile          string `yaml:"input-file,omitempty"`
-	DirectoryList      string `yaml:"directory-list,omitempty"`
-	ParentDirectory    string `yaml:"parent-directory,omitempty"`
-	DisableBatchWrites bool   `yaml:"disable-batch-writes,omitempty"`
-	BatchSize          int    `yaml:"batch-size,omitempty"`
-	MaxAsyncBatches    int    `yaml:"max-async-batches,omitempty"`
+	InputFile          string
+	DirectoryList      string
+	ParentDirectory    string
+	DisableBatchWrites bool
+	BatchSize          int
+	MaxAsyncBatches    int
 	// For optimal performance, should be at least MaxAsyncBatches.
 	// This is applicable only to batch writes.
-	WarmUp            int   `yaml:"warm-up,omitempty"`
-	ExtraTTL          int64 `yaml:"extra-ttl,omitempty"`
-	IgnoreRecordError bool  `yaml:"ignore-record-error,omitempty"`
-	Uniq              bool  `yaml:"uniq,omitempty"`
-	Replace           bool  `yaml:"replace,omitempty"`
-	NoGeneration      bool  `yaml:"no-generation,omitempty"`
-	TimeOut           int64 `yaml:"timeout,omitempty"`
+	WarmUp            int
+	ExtraTTL          int64
+	IgnoreRecordError bool
+	Uniq              bool
+	Replace           bool
+	NoGeneration      bool
+	TimeOut           int64
 
-	RetryBaseTimeout int64   `yaml:"retry-base-timeout,omitempty"`
-	RetryMultiplier  float64 `yaml:"retry-multiplier,omitempty"`
-	RetryMaxRetries  uint    `yaml:"retry-max-retries,omitempty"`
+	RetryBaseTimeout int64
+	RetryMultiplier  float64
+	RetryMaxRetries  uint
 
-	Mode string `yaml:"mode,omitempty"`
+	Mode string
 
-	ValidateOnly bool `yaml:"validate-only,omitempty"`
+	ValidateOnly bool
 }
 
 func (r *Restore) IsDirectoryRestore() bool {

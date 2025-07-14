@@ -42,7 +42,7 @@ type AzureBlob struct {
 	RetryDelaySeconds    int
 	RetryMaxDelaySeconds int
 
-	BlockSize int `yaml:"block-size,omitempty"`
+	BlockSize int
 }
 
 // LoadSecrets tries to load field values from secret agent.

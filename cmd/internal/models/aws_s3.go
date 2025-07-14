@@ -38,7 +38,7 @@ type AwsS3 struct {
 	RetryMaxBackoffSeconds int
 	RetryBackoffSeconds    int
 
-	ChunkSize int `yaml:"chunk-size,omitempty"`
+	ChunkSize int
 }
 
 // LoadSecrets tries to load field values from secret agent.

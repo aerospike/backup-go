@@ -47,7 +47,7 @@ func TestNewLocalReader(t *testing.T) {
 
 	dir := t.TempDir()
 
-	params := &appConfig.RestoreParams{
+	params := &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			Common: models.Common{
 				Directory: dir,
@@ -68,7 +68,7 @@ func TestNewLocalReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileNameASBX,
 		},
@@ -82,7 +82,7 @@ func TestNewLocalReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore:    &models.Restore{},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
@@ -112,7 +112,7 @@ func TestNewS3Reader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &appConfig.RestoreParams{
+	params := &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			Common: models.Common{
 				Directory: dir,
@@ -143,7 +143,7 @@ func TestNewS3Reader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
@@ -184,7 +184,7 @@ func TestNewGcpReader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &appConfig.RestoreParams{
+	params := &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			Common: models.Common{
 				Directory: dir,
@@ -211,7 +211,7 @@ func TestNewGcpReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testGcpType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
@@ -250,7 +250,7 @@ func TestNewAzureReader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &appConfig.RestoreParams{
+	params := &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			Common: models.Common{
 				Directory: dir,
@@ -281,7 +281,7 @@ func TestNewAzureReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},

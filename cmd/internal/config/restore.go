@@ -24,23 +24,25 @@ import (
 	"github.com/aerospike/tools-common-go/client"
 )
 
-type RestoreParams struct {
-	App          *models.App             `yaml:"app,omitempty"`
-	ClientConfig *client.AerospikeConfig `yaml:"-,omitempty"`
-	// ClientAerospike is  wrapper for aerospike client params, to unmarshal YAML.
-	// Because ClientConfig can't be used because of TLS configuration.
-	ClientAerospike *models.ClientAerospike `yaml:"cluster,omitempty"`
-	ClientPolicy    *models.ClientPolicy    `yaml:"-,omitempty"`
-	Restore         *models.Restore         `yaml:"restore,omitempty"`
-	Compression     *models.Compression     `yaml:"compression,omitempty"`
-	Encryption      *models.Encryption      `yaml:"encryption,omitempty"`
-	SecretAgent     *models.SecretAgent     `yaml:"secret-agent,omitempty"`
-	AwsS3           *models.AwsS3           `yaml:"aws,omitempty"`
-	GcpStorage      *models.GcpStorage      `yaml:"gcp,omitempty"`
-	AzureBlob       *models.AzureBlob       `yaml:"azure,omitempty"`
+// RestoreServiceConfig contains configuration settings for the restore service,
+// including client, restore, and storage details.
+type RestoreServiceConfig struct {
+	App          *models.App
+	ClientConfig *client.AerospikeConfig
+	ClientPolicy *models.ClientPolicy
+	Restore      *models.Restore
+	Compression  *models.Compression
+	Encryption   *models.Encryption
+	SecretAgent  *models.SecretAgent
+	AwsS3        *models.AwsS3
+	GcpStorage   *models.GcpStorage
+	AzureBlob    *models.AzureBlob
 }
 
-func NewRestoreParams(
+// NewRestoreServiceConfig creates and returns a new RestoreServiceConfig initialized with the provided parameters.
+// If a config file path is specified in the app, parameters are loaded from the file instead.
+// Returns an error if the config file cannot be loaded or parsed.
+func NewRestoreServiceConfig(
 	app *models.App,
 	clientConfig *client.AerospikeConfig,
 	clientPolicy *models.ClientPolicy,
@@ -51,29 +53,18 @@ func NewRestoreParams(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
-) (*RestoreParams, error) {
-	// If we have a config file, load params from it.
-	if app.Config != "" {
-		var (
-			params RestoreParams
-			err    error
-		)
-
-		if err = decodeFromFile(app.Config, &params); err != nil {
-			return nil, fmt.Errorf("failed to load config file %s: %w", app.Config, err)
-		}
-		// Remap config back to ClientConfig.
-		params.ClientConfig, err = params.ClientAerospike.ToConfig()
+) (*RestoreServiceConfig, error) {
+	// If we have a config file, load serviceConfig from it.
+	if app.ConfigFilePath != "" {
+		serviceConfig, err := decodeRestoreServiceConfig(app.ConfigFilePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to remap config file from yaml %s: %w", app.Config, err)
+			return nil, fmt.Errorf("failed to load config file %s: %w", app.ConfigFilePath, err)
 		}
 
-		params.ClientPolicy = params.ClientAerospike.ToClientPolicy()
-
-		return &params, nil
+		return serviceConfig, nil
 	}
 
-	return &RestoreParams{
+	return &RestoreServiceConfig{
 		App:          app,
 		ClientConfig: clientConfig,
 		ClientPolicy: clientPolicy,
@@ -88,52 +79,52 @@ func NewRestoreParams(
 }
 
 // NewRestoreConfig creates and returns a new ConfigRestore object, initialized with given restore parameters.
-func NewRestoreConfig(params *RestoreParams, logger *slog.Logger) *backup.ConfigRestore {
+func NewRestoreConfig(serviceConfig *RestoreServiceConfig, logger *slog.Logger) *backup.ConfigRestore {
 	logger.Info("initializing restore config")
 
 	parallel := runtime.NumCPU()
-	if params.Restore.Parallel > 0 {
-		parallel = params.Restore.Parallel
+	if serviceConfig.Restore.Parallel > 0 {
+		parallel = serviceConfig.Restore.Parallel
 	}
 
 	c := backup.NewDefaultRestoreConfig()
-	c.Namespace = newRestoreNamespace(params.Restore.Namespace)
-	c.SetList = SplitByComma(params.Restore.SetList)
-	c.BinList = SplitByComma(params.Restore.BinList)
-	c.NoRecords = params.Restore.NoRecords
-	c.NoIndexes = params.Restore.NoIndexes
-	c.NoUDFs = params.Restore.NoUDFs
-	c.RecordsPerSecond = params.Restore.RecordsPerSecond
+	c.Namespace = newRestoreNamespace(serviceConfig.Restore.Namespace)
+	c.SetList = SplitByComma(serviceConfig.Restore.SetList)
+	c.BinList = SplitByComma(serviceConfig.Restore.BinList)
+	c.NoRecords = serviceConfig.Restore.NoRecords
+	c.NoIndexes = serviceConfig.Restore.NoIndexes
+	c.NoUDFs = serviceConfig.Restore.NoUDFs
+	c.RecordsPerSecond = serviceConfig.Restore.RecordsPerSecond
 	c.Parallel = parallel
-	c.WritePolicy = newWritePolicy(params.Restore)
-	c.InfoPolicy = newInfoPolicy(params.Restore.TimeOut)
+	c.WritePolicy = newWritePolicy(serviceConfig.Restore)
+	c.InfoPolicy = newInfoPolicy(serviceConfig.Restore.TimeOut)
 	// As we set --nice in MiB we must convert it to bytes
-	c.Bandwidth = params.Restore.Nice * 1024 * 1024
-	c.ExtraTTL = params.Restore.ExtraTTL
-	c.IgnoreRecordError = params.Restore.IgnoreRecordError
-	c.DisableBatchWrites = params.Restore.DisableBatchWrites
-	c.BatchSize = params.Restore.BatchSize
-	c.MaxAsyncBatches = params.Restore.MaxAsyncBatches
+	c.Bandwidth = serviceConfig.Restore.Nice * 1024 * 1024
+	c.ExtraTTL = serviceConfig.Restore.ExtraTTL
+	c.IgnoreRecordError = serviceConfig.Restore.IgnoreRecordError
+	c.DisableBatchWrites = serviceConfig.Restore.DisableBatchWrites
+	c.BatchSize = serviceConfig.Restore.BatchSize
+	c.MaxAsyncBatches = serviceConfig.Restore.MaxAsyncBatches
 	c.MetricsEnabled = true
 
-	c.CompressionPolicy = newCompressionPolicy(params.Compression)
-	c.EncryptionPolicy = newEncryptionPolicy(params.Encryption)
-	c.SecretAgentConfig = newSecretAgentConfig(params.SecretAgent)
+	c.CompressionPolicy = newCompressionPolicy(serviceConfig.Compression)
+	c.EncryptionPolicy = newEncryptionPolicy(serviceConfig.Encryption)
+	c.SecretAgentConfig = newSecretAgentConfig(serviceConfig.SecretAgent)
 	c.RetryPolicy = newRetryPolicy(
-		params.Restore.RetryBaseTimeout,
-		params.Restore.RetryMultiplier,
-		params.Restore.RetryMaxRetries,
+		serviceConfig.Restore.RetryBaseTimeout,
+		serviceConfig.Restore.RetryMultiplier,
+		serviceConfig.Restore.RetryMaxRetries,
 	)
-	c.ValidateOnly = params.Restore.ValidateOnly
+	c.ValidateOnly = serviceConfig.Restore.ValidateOnly
 
 	if !c.ValidateOnly {
-		logRestoreConfig(logger, params, c)
+		logRestoreConfig(logger, serviceConfig, c)
 	}
 
 	return c
 }
 
-func logRestoreConfig(logger *slog.Logger, params *RestoreParams, restoreConfig *backup.ConfigRestore) {
+func logRestoreConfig(logger *slog.Logger, params *RestoreServiceConfig, restoreConfig *backup.ConfigRestore) {
 	encryptionMode := "none"
 	if params.Encryption != nil {
 		encryptionMode = params.Encryption.Mode

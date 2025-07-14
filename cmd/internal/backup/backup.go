@@ -59,7 +59,7 @@ type Service struct {
 // configuring all necessary components for a backup process.
 func NewService(
 	ctx context.Context,
-	params *config.BackupParams,
+	params *config.BackupServiceConfig,
 	logger *slog.Logger,
 ) (*Service, error) {
 	// Validations.

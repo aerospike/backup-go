@@ -164,7 +164,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	c.Logger = logger
 
 	// Init app.
-	asrParams, err := config.NewRestoreParams(
+	serviceConfig, err := config.NewRestoreServiceConfig(
 		c.flagsApp.GetApp(),
 		c.flagsAerospike.NewAerospikeConfig(),
 		c.flagsClientPolicy.GetClientPolicy(),
@@ -181,11 +181,11 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	logMsg := "restore"
-	if asrParams.Restore.ValidateOnly {
+	if serviceConfig.Restore.ValidateOnly {
 		logMsg = "validation"
 	}
 
-	asr, err := restore.NewService(cmd.Context(), asrParams, logger)
+	asr, err := restore.NewService(cmd.Context(), serviceConfig, logger)
 	if err != nil {
 		return fmt.Errorf("%s initialization failed: %w", logMsg, err)
 	}

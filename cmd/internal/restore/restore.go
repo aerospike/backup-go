@@ -50,7 +50,7 @@ type Service struct {
 // configuring all necessary components for a restore process.
 func NewService(
 	ctx context.Context,
-	params *config.RestoreParams,
+	params *config.RestoreServiceConfig,
 	logger *slog.Logger,
 ) (*Service, error) {
 	var (

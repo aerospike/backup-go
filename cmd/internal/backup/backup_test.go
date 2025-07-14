@@ -45,7 +45,7 @@ func Test_BackupWithState(t *testing.T) {
 	dir := t.TempDir()
 	hostPort := client.NewDefaultHostTLSPort()
 
-	asbParams := &config.BackupParams{
+	asbParams := &config.BackupServiceConfig{
 		App: &models.App{},
 		ClientConfig: &client.AerospikeConfig{
 			Seeds: client.HostTLSPortSlice{

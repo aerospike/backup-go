@@ -73,6 +73,10 @@ func ParseRacks(racks string) ([]int, error) {
 	return racksIntSlice, nil
 }
 
+// newRestoreNamespace creates and returns a RestoreNamespaceConfig with source and destination namespaces
+// derived from input. Accepts a comma-separated string. If one namespace is provided,
+// it sets both source and destination to the same value.
+// Returns nil if invalid input (e.g., more than two namespaces) is provided.
 func newRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
 	nsArr := SplitByComma(n)
 
@@ -93,6 +97,7 @@ func newRestoreNamespace(n string) *backup.RestoreNamespaceConfig {
 	}
 }
 
+// newCompressionPolicy maps a Compression model to a CompressionPolicy. Returns nil if the input is nil or invalid.
 func newCompressionPolicy(c *models.Compression) *backup.CompressionPolicy {
 	if c == nil {
 		return nil
@@ -239,6 +244,7 @@ func newRetryPolicy(retryBaseTimeout int64, retryMultiplier float64, retryMaxRet
 	)
 }
 
+// SplitByComma splits a comma-separated string into a slice of strings. Returns nil if the input string is empty.
 func SplitByComma(s string) []string {
 	if s == "" {
 		return nil

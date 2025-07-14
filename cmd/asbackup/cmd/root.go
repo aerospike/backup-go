@@ -176,7 +176,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 	c.Logger = logger
 
 	// Init app.
-	asbParams, err := config.NewBackupParams(
+	serviceConfig, err := config.NewBackupServiceConfig(
 		c.flagsApp.GetApp(),
 		c.flagsAerospike.NewAerospikeConfig(),
 		c.flagsClientPolicy.GetClientPolicy(),
@@ -193,7 +193,7 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to initialize app: %w", err)
 	}
 
-	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
+	asb, err := backup.NewService(cmd.Context(), serviceConfig, logger)
 	if err != nil {
 		return fmt.Errorf("backup initialization failed: %w", err)
 	}

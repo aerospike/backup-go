@@ -34,10 +34,10 @@ import (
 	"github.com/aerospike/backup-go/io/storage/local"
 )
 
-// NewRestoreReader creates and returns a reader based on the restore mode specified in RestoreParams.
+// NewRestoreReader creates and returns a reader based on the restore mode specified in RestoreServiceConfig.
 func NewRestoreReader(
 	ctx context.Context,
-	params *config.RestoreParams,
+	params *config.RestoreServiceConfig,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (reader, xdrReader backup.StreamingReader, err error) {
@@ -89,7 +89,7 @@ func NewRestoreReader(
 // NewStateReader initialize reader for a state file.
 func NewStateReader(
 	ctx context.Context,
-	params *config.BackupParams,
+	params *config.BackupServiceConfig,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
@@ -104,7 +104,7 @@ func NewStateReader(
 		stateFile = params.Backup.Continue
 	}
 
-	restoreParams := &config.RestoreParams{
+	restoreParams := &config.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: stateFile,
 			Common: models.Common{
@@ -120,7 +120,7 @@ func NewStateReader(
 
 func newReader(
 	ctx context.Context,
-	params *config.RestoreParams,
+	params *config.RestoreServiceConfig,
 	sa *backup.SecretAgentConfig,
 	isXdr bool,
 	logger *slog.Logger,

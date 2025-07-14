@@ -35,7 +35,7 @@ import (
 // based on the provided parameters or cleans up artifacts if required.
 func NewBackupWriter(
 	ctx context.Context,
-	params *config.BackupParams,
+	params *config.BackupServiceConfig,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (backup.Writer, error) {
@@ -56,7 +56,7 @@ func NewBackupWriter(
 
 func newWriter(
 	ctx context.Context,
-	params *config.BackupParams,
+	params *config.BackupServiceConfig,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (backup.Writer, error) {
@@ -116,7 +116,7 @@ func newWriter(
 	}
 }
 
-func getDirectoryOutputFile(params *config.BackupParams) (directory, outputFile string) {
+func getDirectoryOutputFile(params *config.BackupServiceConfig) (directory, outputFile string) {
 	if params.Backup != nil {
 		return params.Backup.Directory, params.Backup.OutputFile
 	}
@@ -124,7 +124,7 @@ func getDirectoryOutputFile(params *config.BackupParams) (directory, outputFile 
 	return params.BackupXDR.Directory, ""
 }
 
-func getShouldCleanContinue(params *config.BackupParams) (shouldClearTarget, continueBackup bool) {
+func getShouldCleanContinue(params *config.BackupServiceConfig) (shouldClearTarget, continueBackup bool) {
 	if params.Backup != nil {
 		return params.Backup.ShouldClearTarget(), params.Backup.Continue != ""
 	}

@@ -38,8 +38,8 @@ type BackupXDR struct {
 	InfoPolingPeriodMilliseconds int64
 	StartTimeoutMilliseconds     int64
 
-	StopXDR    bool `yaml:"stop-xdr,omitempty"`
-	UnblockMRT bool `yaml:"unblock-mrt,omitempty"`
+	StopXDR    bool
+	UnblockMRT bool
 
 	InfoMaxRetries                uint
 	InfoRetriesMultiplier         float64

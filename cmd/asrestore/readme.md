@@ -343,32 +343,32 @@ cluster:
   password: some_password
   # The authentication mode used by the Aerospike server: INTERNAL, EXTERNAL, PKI
   auth: ""
-  # Enable TLS authentication with Aerospike.
-  tls-enable: false
-  # The server TLS context to use to authenticate the connection to Aerospike.
-  tls-name: ""
-  # Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented
-  # at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.
-  tls-protocols: ""
-  # The CA used when connecting to Aerospike.
-  tls-ca-file: ""
-  # A path containing CAs for connecting to Aerospike.
-  tls-ca-path: ""
-  # The certificate file for mutual TLS authentication with Aerospike.
-  tls-cert-file: ""
-  # The key file used for mutual TLS authentication with Aerospike.
-  tls-key-file: ""
-  # The password used to decrypt the key file if encrypted.
-  tls-key-file-password: ""
-client-policy:
   # Initial host connection timeout duration. The timeout when opening a connection to the server host for the first time.
-  timeout: 30000
+  client-timeout: 30000
   # Idle timeout. Every time a connection is used,
   # its idle deadline will be extended by this duration. When this deadline is reached,
   # the connection will be closed and discarded from the connection pool.
-  idle-timeout: 10000
+  client-idle-timeout: 10000
   # Specifies the login operation timeout for external authentication methods such as LDAP.
-  login-timeout: 10000
+  client-login-timeout: 10000
+  tls:
+    # Enable TLS authentication with Aerospike.
+    enable: false
+    # The server TLS context to use to authenticate the connection to Aerospike.
+    name: ""
+    # Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented
+    # at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.
+    protocols: ""
+    # The CA used when connecting to Aerospike.
+    ca-file: ""
+    # A path containing CAs for connecting to Aerospike.
+    ca-path: ""
+    # The certificate file for mutual TLS authentication with Aerospike.
+    cert-file: ""
+    # The key file used for mutual TLS authentication with Aerospike.
+    key-file: ""
+    # The password used to decrypt the key file if encrypted.
+    key-file-password: ""
 restore:
   # The directory that holds the backup files. Required, unless --input-file is used.
   directory: continue_test
@@ -497,7 +497,6 @@ restore:
   mode: "auto"
   # Validate backup files without restoring.
   validate-only: false
-
 compression:
   # Enables decompressing of backup files using the specified compression algorithm.
   # This must match the compression mode used when backing up the data.
@@ -533,73 +532,76 @@ secret-agent:
   # Whether Secret Agent responses are Base64 encoded.
   is-base64: false
 aws:
-  # Existing S3 bucket name
-  bucket-name: ""
-  # The S3 region that the bucket(s) exist in.
-  region: ""
-  # The S3 profile to use for credentials.
-  profile: ""
-  # An alternate url endpoint to send S3 API calls to.
-  endpoint-override: ""
-  # S3 access key id. If not set, profile auth info will be used.
-  access-key-id: ""
-  # S3 secret access key. If not set, profile auth info will be used.
-  secret-access-key: ""
-  # If is set, tool will try to restore archived files to the specified tier.
-  # Tiers are: Standard, Bulk, Expedited.
-  access-tier: ""
-  # How often (in milliseconds) a backup client checks object status when restoring an archived object.
-  restore-poll-duration: 1000
-  # Maximum number of attempts that should be made in case of an error.
-  retry-max-attempts: 100
-  # Max backoff duration in seconds between retried attempts.
-  retry-max-backoff: 90
-  # Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts.
-  retry-backoff: 60
+  s3:
+      # Existing S3 bucket name
+      bucket-name: ""
+      # The S3 region that the bucket(s) exist in.
+      region: ""
+      # The S3 profile to use for credentials.
+      profile: ""
+      # An alternate url endpoint to send S3 API calls to.
+      endpoint-override: ""
+      # S3 access key id. If not set, profile auth info will be used.
+      access-key-id: ""
+      # S3 secret access key. If not set, profile auth info will be used.
+      secret-access-key: ""
+      # If is set, tool will try to restore archived files to the specified tier.
+      # Tiers are: Standard, Bulk, Expedited.
+      access-tier: ""
+      # How often (in milliseconds) a backup client checks object status when restoring an archived object.
+      restore-poll-duration: 1000
+      # Maximum number of attempts that should be made in case of an error.
+      retry-max-attempts: 100
+      # Max backoff duration in seconds between retried attempts.
+      retry-max-backoff: 90
+      # Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts.
+      retry-backoff: 60
 gcp:
-  # Path to file containing service account JSON key.
-  key-file: ""
-  # Name of the Google cloud storage bucket.
-  bucket-name: ""
-  # An alternate url endpoint to send GCP API calls to.
-  endpoint-override: ""
-  # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
-  retry-max-attempts: 100
-  # Max backoff is the maximum value in seconds of the retry period.
-  retry-max-backoff: 90
-  # Initial backoff is the initial value in seconds of the retry period.
-  retry-init-backoff: 60
-  # Multiplier is the factor by which the retry period increases. It should be greater than 1.
-  retry-backoff-multiplier: 2
+  storage:
+      # Path to file containing service account JSON key.
+      key-file: ""
+      # Name of the Google cloud storage bucket.
+      bucket-name: ""
+      # An alternate url endpoint to send GCP API calls to.
+      endpoint-override: ""
+      # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
+      retry-max-attempts: 100
+      # Max backoff is the maximum value in seconds of the retry period.
+      retry-max-backoff: 90
+      # Initial backoff is the initial value in seconds of the retry period.
+      retry-init-backoff: 60
+      # Multiplier is the factor by which the retry period increases. It should be greater than 1.
+      retry-backoff-multiplier: 2
 azure:
-  # Azure account name for account name, key authorization.
-  account-name: ""
-  # Azure account key for account name, key authorization.
-  account-key: ""
-  # Azure tenant ID for Azure Active Directory authorization.
-  tenant-id: ""
-  # Azure client ID for Azure Active Directory authorization.
-  client-id: ""
-  # Azure client secret for Azure Active Directory authorization.
-  client-secret: ""
-  # Azure endpoint.
-  endpoint-override: ""
-  # Azure container Name.
-  container-name: ""
-  # Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
-  access-tier: ""
-  rehydrate-poll-duration: 100
-  # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
-  retry-max-attempts: 100
-  # Retry timeout in seconds indicates the maximum time allowed for any single try of an HTTP request.
-  # This is disabled by default. Specify a value greater than zero to enable.
-  # NOTE: Setting this to a small value might cause premature HTTP request time-outs.
-  retry-timeout: 10
-  # Retry delay specifies the initial amount of delay in seconds to use before retrying an operation.
-  # The value is used only if the HTTP response does not contain a Retry-After header.
-  # The delay increases exponentially with each retry up to the maximum specified by azure-retry-max-delay.
-  retry-delay: 60
-  # Max retry delay specifies the maximum delay in seconds allowed before retrying an operation.
-  # Typically the value is greater than or equal to the value specified in azure-retry-delay.
-  retry-max-delay: 90
+  blob:
+      # Azure account name for account name, key authorization.
+      account-name: ""
+      # Azure account key for account name, key authorization.
+      account-key: ""
+      # Azure tenant ID for Azure Active Directory authorization.
+      tenant-id: ""
+      # Azure client ID for Azure Active Directory authorization.
+      client-id: ""
+      # Azure client secret for Azure Active Directory authorization.
+      client-secret: ""
+      # Azure endpoint.
+      endpoint-override: ""
+      # Azure container Name.
+      container-name: ""
+      # Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
+      access-tier: ""
+      rehydrate-poll-duration: 100
+      # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
+      retry-max-attempts: 100
+      # Retry timeout in seconds indicates the maximum time allowed for any single try of an HTTP request.
+      # This is disabled by default. Specify a value greater than zero to enable.
+      # NOTE: Setting this to a small value might cause premature HTTP request time-outs.
+      retry-timeout: 10
+      # Retry delay specifies the initial amount of delay in seconds to use before retrying an operation.
+      # The value is used only if the HTTP response does not contain a Retry-After header.
+      # The delay increases exponentially with each retry up to the maximum specified by azure-retry-max-delay.
+      retry-delay: 60
+      # Max retry delay specifies the maximum delay in seconds allowed before retrying an operation.
+      # Typically the value is greater than or equal to the value specified in azure-retry-delay.
+      retry-max-delay: 90
 ```

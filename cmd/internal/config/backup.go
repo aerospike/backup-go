@@ -30,14 +30,11 @@ import (
 // MaxRack max number of racks that can exist.
 const MaxRack = 1000000
 
-// BackupParams contain backup parameters.
-type BackupParams struct {
+// BackupServiceConfig represents the configuration structure for the backup service
+// involving various policies and integrations.
+type BackupServiceConfig struct {
 	App          *models.App
 	ClientConfig *client.AerospikeConfig
-	// ClientAerospike is wrapper for aerospike client params, to unmarshal YAML.
-	// Because ClientConfig can't be used because of TLS configuration.
-	ClientAerospike *models.ClientAerospike
-	// Client policy is a part of ClientAerospike, so no need for yaml tag.
 	ClientPolicy *models.ClientPolicy
 	Backup       *models.Backup
 	BackupXDR    *models.BackupXDR
@@ -49,7 +46,10 @@ type BackupParams struct {
 	AzureBlob    *models.AzureBlob
 }
 
-func NewBackupParams(
+// NewBackupServiceConfig initializes and returns a BackupServiceConfig struct
+// with the provided configuration components. It optionally loads configuration from a file
+// if specified in the app.ConfigFilePath.
+func NewBackupServiceConfig(
 	app *models.App,
 	clientConfig *client.AerospikeConfig,
 	clientPolicy *models.ClientPolicy,
@@ -61,29 +61,18 @@ func NewBackupParams(
 	awsS3 *models.AwsS3,
 	gcpStorage *models.GcpStorage,
 	azureBlob *models.AzureBlob,
-) (*BackupParams, error) {
-	// If we have a config file, load params from it.
-	if app.Config != "" {
-		var (
-			params BackupParams
-			err    error
-		)
-
-		if err = decodeFromFile(app.Config, &params); err != nil {
-			return nil, fmt.Errorf("failed to load config file %s: %w", app.Config, err)
-		}
-		// Remap config back to ClientConfig.
-		params.ClientConfig, err = params.ClientAerospike.ToConfig()
+) (*BackupServiceConfig, error) {
+	// If we have a config file, load serviceConfig from it.
+	if app.ConfigFilePath != "" {
+		serviceConfig, err := decodeBackupServiceConfig(app.ConfigFilePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to remap config file from yaml %s: %w", app.Config, err)
+			return nil, fmt.Errorf("failed to load config file %s: %w", app.ConfigFilePath, err)
 		}
 
-		params.ClientPolicy = params.ClientAerospike.ToClientPolicy()
-
-		return &params, nil
+		return serviceConfig, nil
 	}
 
-	return &BackupParams{
+	return &BackupServiceConfig{
 		App:          app,
 		ClientConfig: clientConfig,
 		ClientPolicy: clientPolicy,
@@ -99,30 +88,30 @@ func NewBackupParams(
 }
 
 // IsXDR determines if the backup configuration is an XDR backup by checking if BackupXDR is non-nil and Backup is nil.
-func (p *BackupParams) IsXDR() bool {
+func (p *BackupServiceConfig) IsXDR() bool {
 	return p.BackupXDR != nil && p.Backup == nil
 }
 
 // IsContinue determines if the backup configuration is a continue backup
 // by checking if Backup is non-nil and Continue is non-empty.
-func (p *BackupParams) IsContinue() bool {
+func (p *BackupServiceConfig) IsContinue() bool {
 	return p.Backup != nil && p.Backup.Continue != ""
 }
 
 // IsStopXDR checks if the backup operation should stop XDR by verifying that BackupXDR is non-nil and StopXDR is true.
-func (p *BackupParams) IsStopXDR() bool {
+func (p *BackupServiceConfig) IsStopXDR() bool {
 	return p.BackupXDR != nil && p.BackupXDR.StopXDR
 }
 
 // IsUnblockMRT checks if the backup operation should unblock MRT writes
 // by verifying that BackupXDR is non-nil and UnblockMRT is true.
-func (p *BackupParams) IsUnblockMRT() bool {
+func (p *BackupServiceConfig) IsUnblockMRT() bool {
 	return p.BackupXDR != nil && p.BackupXDR.UnblockMRT
 }
 
 // SkipWriterInit checks if the backup operation should skip writer initialization
 // by verifying that Backup is non-nil and Estimate is false.
-func (p *BackupParams) SkipWriterInit() bool {
+func (p *BackupServiceConfig) SkipWriterInit() bool {
 	if p.Backup != nil {
 		return !p.Backup.Estimate
 	}
@@ -136,7 +125,7 @@ func (p *BackupParams) SkipWriterInit() bool {
 // compression, encryption, and partition filters. It returns an error if any validation or parsing fails.
 // If the backup is an XDR backup, it will return a ConfigBackupXDR object.
 // Otherwise, it will return a ConfigBackup object.
-func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
+func NewBackupConfigs(serviceConfig *BackupServiceConfig, logger *slog.Logger,
 ) (*backup.ConfigBackup, *backup.ConfigBackupXDR, error) {
 	var (
 		backupConfig    *backup.ConfigBackup
@@ -146,16 +135,16 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 
 	logger.Info("initializing backup config")
 
-	switch params.IsXDR() {
+	switch serviceConfig.IsXDR() {
 	case false:
-		backupConfig, err = newBackupConfig(params)
+		backupConfig, err = newBackupConfig(serviceConfig)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to map backup config: %w", err)
 		}
 
-		logBackupConfig(logger, params, backupConfig)
+		logBackupConfig(logger, serviceConfig, backupConfig)
 	case true:
-		backupXDRConfig = newBackupXDRConfig(params)
+		backupXDRConfig = newBackupXDRConfig(serviceConfig)
 
 		// On xdr backup we backup only uds and indexes.
 		backupConfig = backup.NewDefaultBackupConfig()
@@ -163,7 +152,7 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 		backupConfig.NoRecords = true
 		backupConfig.Namespace = backupXDRConfig.Namespace
 
-		logXdrBackupConfig(logger, params, backupXDRConfig)
+		logXdrBackupConfig(logger, serviceConfig, backupXDRConfig)
 	}
 
 	return backupConfig, backupXDRConfig, nil
@@ -172,7 +161,7 @@ func NewBackupConfigs(params *BackupParams, logger *slog.Logger,
 // newBackupConfig initializes and returns a configured instance of ConfigBackup based on the provided params.
 // This function sets various backup parameters including namespace, file limits, parallelism options, bandwidth,
 // compression, encryption, and partition filters. It returns an error if any validation or parsing fails.
-func newBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
+func newBackupConfig(params *BackupServiceConfig) (*backup.ConfigBackup, error) {
 	c := backup.NewDefaultBackupConfig()
 	c.Namespace = params.Backup.Namespace
 	c.SetList = SplitByComma(params.Backup.SetList)
@@ -268,7 +257,7 @@ func newBackupConfig(params *BackupParams) (*backup.ConfigBackup, error) {
 }
 
 // newBackupXDRConfig creates a ConfigBackupXDR instance based on the provided backup parameters.
-func newBackupXDRConfig(params *BackupParams) *backup.ConfigBackupXDR {
+func newBackupXDRConfig(params *BackupServiceConfig) *backup.ConfigBackupXDR {
 	parallelWrite := runtime.NumCPU()
 	if params.BackupXDR.ParallelWrite > 0 {
 		parallelWrite = params.BackupXDR.ParallelWrite
@@ -308,7 +297,7 @@ func newBackupXDRConfig(params *BackupParams) *backup.ConfigBackupXDR {
 	return c
 }
 
-func logBackupConfig(logger *slog.Logger, params *BackupParams, backupConfig *backup.ConfigBackup) {
+func logBackupConfig(logger *slog.Logger, params *BackupServiceConfig, backupConfig *backup.ConfigBackup) {
 	encryptionMode := "none"
 	if params.Encryption != nil {
 		encryptionMode = params.Encryption.Mode
@@ -346,7 +335,7 @@ func logBackupConfig(logger *slog.Logger, params *BackupParams, backupConfig *ba
 	)
 }
 
-func logXdrBackupConfig(logger *slog.Logger, params *BackupParams, backupXDRConfig *backup.ConfigBackupXDR) {
+func logXdrBackupConfig(logger *slog.Logger, params *BackupServiceConfig, backupXDRConfig *backup.ConfigBackupXDR) {
 	logger.Info("initialized xdr backup config",
 		slog.String("namespace", backupXDRConfig.Namespace),
 		slog.String("encryption", params.Encryption.Mode),

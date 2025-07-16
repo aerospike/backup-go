@@ -258,7 +258,7 @@ Any AWS parameter can be retrieved from Secret Agent.
                                       SNOW,
                                       EXPRESS_ONEZONE.
       --s3-chunk-size int             Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
-                                      the server in a single request. Objects smaller than the size will be sent in a single request,
+                                      the storage in a single request. Objects smaller than the size will be sent in a single request,
                                       while larger objects will be split over multiple requests. (default 5242880)
       --s3-retry-max-attempts int     Maximum number of attempts that should be made in case of an error. (default 100)
       --s3-retry-max-backoff int      Max backoff duration in seconds between retried attempts. (default 90)
@@ -273,7 +273,7 @@ Any GCP parameter can be retrieved from Secret Agent.
       --gcp-bucket-name string               Name of the Google cloud storage bucket.
       --gcp-endpoint-override string         An alternate url endpoint to send GCP API calls to.
       --gcp-chunk-size int                   Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
-                                             the server in a single request. Objects smaller than the size will be sent in a single request,
+                                             the storage in a single request. Objects smaller than the size will be sent in a single request,
                                              while larger objects will be split over multiple requests. (default 5242880)
       --gcp-retry-max-attempts int           Max retries specifies the maximum number of attempts a failed operation will be retried
                                              before producing an error. (default 100)
@@ -344,7 +344,7 @@ Any Azure parameter can be retrieved from Secret Agent.
                             or connectTimeoutMS in the aws-sdk-cpp client configuration.
 ```
 
-## Config explanation
+## Configuration file schema with default values
 ```yaml
 app:
   # Enable more detailed logging.
@@ -598,7 +598,7 @@ aws:
     # Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts.
     retry-backoff: 60
     # Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
-    # the server in a single request. Objects smaller than the size will be sent in a single request,
+    # the storage in a single request. Objects smaller than the size will be sent in a single request,
     # while larger objects will be split over multiple requests
     chunk-size: 5242880
 gcp:
@@ -618,7 +618,7 @@ gcp:
     # Multiplier is the factor by which the retry period increases. It should be greater than 1.
     retry-backoff-multiplier: 2
     # Chunk size controls the maximum number of bytes of the object that the app will attempt to send to
-    # the server in a single request. Objects smaller than the size will be sent in a single request,
+    # the storage in a single request. Objects smaller than the size will be sent in a single request,
     # while larger objects will be split over multiple requests.
     chunk-size: 5242880
 azure:

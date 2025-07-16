@@ -77,7 +77,7 @@ func (f *AwsS3) NewFlagSet() *pflag.FlagSet {
 		flagSet.IntVar(&f.ChunkSize, "s3-chunk-size",
 			models.DefaultChunkSize,
 			"Chunk size controls the maximum number of bytes of the object that the app will attempt to send to\n"+
-				"the server in a single request. Objects smaller than the size will be sent in a single request,\n"+
+				"the storage in a single request. Objects smaller than the size will be sent in a single request,\n"+
 				"while larger objects will be split over multiple requests.")
 	case OperationRestore:
 		flagSet.StringVar(&f.AccessTier, "s3-tier",

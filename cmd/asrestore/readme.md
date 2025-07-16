@@ -85,20 +85,19 @@ Aerospike Client Flags:
 
 Restore Flags:
   -d, --directory string         The directory that holds the backup files. Required, unless --input-file is used.
-  -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
-                                 Restoring to different namespace is incompatible with --mode=asbx.
+  -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns.
   -s, --set string               Only restore the given sets from the backup.
                                  Default: restore all sets.
-                                 Incompatible with --mode=asbx.
+                                 
   -B, --bin-list string          Only restore the given bins in the backup.
                                  If empty, include all bins.
-                                 Incompatible with --mode=asbx.
+                                 
   -R, --no-records               Don't restore any records.
-                                 Incompatible with --mode=asbx.
+                                 
   -I, --no-indexes               Don't restore any secondary indexes.
-                                 Incompatible with --mode=asbx.
+                                 
       --no-udfs                  Don't restore any UDFs.
-                                 Incompatible with --mode=asbx.
+                                 
   -w, --parallel int             The number of restore threads. Accepts values from 1-1024 inclusive.
                                  If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
   -L, --records-per-second int   Limit total returned records per second (rps).
@@ -111,16 +110,16 @@ Restore Flags:
                                  The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
   -i, --input-file string         Restore from a single backup file. Use - for stdin.
                                   Required, unless --directory or --directory-list is used.
-                                  Incompatible with --mode=asbx.
+                                  
       --directory-list string     A comma-separated list of paths to directories that hold the backup files. Required,
                                   unless -i or -d is used. The paths may not contain commas.
                                   Example: 'asrestore --directory-list /path/to/dir1/,/path/to/dir2'
-                                  Incompatible with --mode=asbx.
+                                  
       --parent-directory string   A common root path for all paths used in --directory-list.
                                   This path is prepended to all entries in --directory-list.
                                   Example: 'asrestore --parent-directory /common/root/path
                                   --directory-list /path/to/dir1/,/path/to/dir2'
-                                  Incompatible with --mode=asbx.
+                                  
   -u, --unique                    Skip modifying records that already exist in the namespace.
   -r, --replace                   Fully replace records that already exist in the namespace.
                                   This option still performs a generation check by default and needs to be combined with the -g option
@@ -140,28 +139,26 @@ Restore Flags:
                                   By default, the cluster is checked for batch write support. Only set this flag if you explicitly
                                   don't want batch writes to be used or if asrestore is failing to work because it cannot recognize
                                   that batch writes are disabled.
-                                  Incompatible with --mode=asbx.
+                                  
       --max-async-batches int     To send data to Aerospike Database, asrestore creates write workers that work in parallel.
                                   This value is the number of workers that form batches and send them to the database.
                                   For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,
                                   and each record is uploaded individually.
                                   The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.
-                                  Incompatible with --mode=asbx. (default 32)
+                                   (default 32)
       --warm-up int               Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.
                                   By default is calculated as (--max-async-batches + 1), as one connection per node is reserved
                                   for tend operations and is not used for transactions.
-                                  Incompatible with --mode=asbx.
+                                  
       --batch-size int            The max allowed number of records to simultaneously upload to Aerospike.
                                   Default is 128 with batch writes enabled. If you disable batch writes,
                                   this flag is superseded because each worker sends writes one by one.
                                   All three batch flags are linked. If --disable-batch-writes=false,
                                   asrestore uses batch write workers to send data to the database.
                                   Asrestore creates a number of workers equal to --max-async-batches that work in parallel,
-                                  and form and send a number of records equal to --batch-size to the database.
-                                  Incompatible with --mode=asbx. (default 128)
+                                  and form and send a number of records equal to --batch-size to the database. (default 128)
       --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
                                   recorded void-time.
-                                  Incompatible with --mode=asbx.
   -T, --timeout int               Set the timeout (ms) for asinfo commands sent from asrestore to the database.
                                   The info commands are to check version, get indexes, get udfs, count records, and check batch write support. (default 10000)
       --retry-base-timeout int    Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database
@@ -179,10 +176,6 @@ Restore Flags:
                                   The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
       --retry-max-retries uint    Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.
                                   The default is 0, indicating no retries will be performed
-      --mode string               Restore mode: auto, asb, asbx. According to this parameter different restore processes wil be started.
-                                  auto - starts restoring from both .asb and .asbx files.
-                                  asb - restore only .asb backup files.
-                                  asbx - restore only .asbx backup files. (default "auto")
       --validate                  Validate backup files without restoring.
 
 Compression Flags:
@@ -323,7 +316,7 @@ Any Azure parameter can be retrieved from Secret Agent.
 ```
 
 
-## Config explanation
+## Configuration file schema with default values
 ```yaml
 app:
   # Enable more detailed logging.
@@ -370,18 +363,15 @@ cluster:
     # The password used to decrypt the key file if encrypted.
     key-file-password: ""
 restore:
-  # The directory that holds the backup files. Required, unless --input-file is used.
+  # The directory that holds the backup files. Required, unless input-file is used.
   directory: continue_test
   # Used to restore to a different namespace. Example: source-ns,destination-ns
-  # Restoring to different namespace is incompatible with --mode=asbx.
   namespace: source-ns1
   # Only restore the given sets from the backup.
   # Default: restore all sets.
-  # Incompatible with --mode=asbx.
   set-list: set1,set2
   # Only restore the given bins in the backup.
   # If empty, include all bins.
-  # Incompatible with --mode=asbx.
   bin-list: bin1,bin2
   # The number of restore threads. Accepts values from 1-1024 inclusive.
   # If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
@@ -405,50 +395,42 @@ restore:
   # The limits for read/write storage bandwidth in MiB/s.
   nice: 0
   # Restore from a single backup file. Use - for stdin.
-  # Required, unless --directory or --directory-list is used.
-  # Incompatible with --mode=asbx.
+  # Required, unless directory or directory-list is used.
   input-file: ""
   # A comma-separated list of paths to directories that hold the backup files. Required,
   # unless -i or -d is used. The paths may not contain commas.
-  # Example: 'asrestore --directory-list /path/to/dir1/,/path/to/dir2'
-  # Incompatible with --mode=asbx.
+  # Example: 'asrestore directory-list /path/to/dir1/,/path/to/dir2'
   directory-list: ""
-  # A common root path for all paths used in --directory-list.
-  # This path is prepended to all entries in --directory-list.
-  # Example: 'asrestore --parent-directory /common/root/path
-  # --directory-list /path/to/dir1/,/path/to/dir2'
-  # Incompatible with --mode=asbx.
+  # A common root path for all paths used in directory-list.
+  # This path is prepended to all entries in directory-list.
+  # Example: 'asrestore parent-directory /common/root/path
+  # directory-list /path/to/dir1/,/path/to/dir2'
   parent-directory: ""
   # Disables the use of batch writes when restoring records to the Aerospike cluster.
   # By default, the cluster is checked for batch write support. Only set this flag if you explicitly
   # don't want batch writes to be used or if asrestore is failing to work because it cannot recognize
   # that batch writes are disabled.
-  # Incompatible with --mode=asbx.
   disable-batch-writes: false
   # The max allowed number of records to simultaneously upload to Aerospike.
   # Default is 128 with batch writes enabled. If you disable batch writes,
   # this flag is superseded because each worker sends writes one by one.
-  # All three batch flags are linked. If --disable-batch-writes=false,
+  # All three batch flags are linked. If disable-batch-writes=false,
   # asrestore uses batch write workers to send data to the database.
-  # Asrestore creates a number of workers equal to --max-async-batches that work in parallel,
-  # and form and send a number of records equal to --batch-size to the database.
-  # Incompatible with --mode=asbx.
+  # Asrestore creates a number of workers equal to max-async-batches that work in parallel,
+  # and form and send a number of records equal to batch-size to the database.
   batch-size: 128
   # To send data to Aerospike Database, asrestore creates write workers that work in parallel.
   # This value is the number of workers that form batches and send them to the database.
   # For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,
   # and each record is uploaded individually.
   # The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.
-  # Incompatible with --mode=asbx.
   max-async-batches: 32
   # Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.
   # By default is calculated as (--max-async-batches + 1), as one connection per node is reserved
   # for tend operations and is not used for transactions.
-  # Incompatible with --mode=asbx.
   warm-up: 0
   # For records with expirable void-times, add N seconds of extra-ttl to the
   # recorded void-time.
-  # Incompatible with --mode=asbx.
   extra-ttl: 0
   # Ignore errors specific to records, not UDFs or indexes. The errors are:
   # AEROSPIKE_RECORD_TOO_BIG,
@@ -461,11 +443,11 @@ restore:
   # By default, these errors are not ignored and asrestore terminates.
   ignore-record-error: false
   # Skip modifying records that already exist in the namespace.
-  uniq: false
+  unique: false
   # Fully replace records that already exist in the namespace.
   # This option still performs a generation check by default and needs to be combined with the -g option
   # if you do not want to perform a generation check.
-  # This option is mutually exclusive with --unique.
+  # This option is mutually exclusive with unique.
   replace: false
   # Don't check the generation of records that already exist in the namespace.
   no-generation: false
@@ -481,20 +463,15 @@ restore:
   # AEROSPIKE_SERVER_NOT_AVAILABLE,
   # AEROSPIKE_BATCH_FAILED,
   # AEROSPIKE_MAX_ERROR_RATE.
-  # This base timeout value is also used as the interval multiplied by --retry-multiplier to increase
+  # This base timeout value is also used as the interval multiplied by retry-multiplier to increase
   # the timeout value between retry attempts.
   retry-base-timeout: 1000
-  # Increases the delay between subsequent retry attempts for the errors listed under --retry-base-timeout.
+  # Increases the delay between subsequent retry attempts for the errors listed under retry-base-timeout.
   # The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)
   retry-multiplier: 1
-  # Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.
+  # Set the maximum number of retry attempts for the errors listed under retry-base-timeout.
   # The default is 0, indicating no retries will be performed
   retry-max-retries: 1
-  # Restore mode: auto, asb, asbx. According to this parameter different restore processes wil be started.
-  # auto - starts restoring from both .asb and .asbx files.
-  # asb - restore only .asb backup files.
-  # asbx - restore only .asbx backup files.
-  mode: "auto"
   # Validate backup files without restoring.
   validate-only: false
 compression:

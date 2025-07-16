@@ -26,8 +26,7 @@ const (
 	OperationRestore
 
 	descNamespaceBackup  = "The namespace to be backed up. Required."
-	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns\n" +
-		"Restoring to different namespace is incompatible with --mode=asbx."
+	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns"
 
 	descDirectoryBackup  = "The directory that holds the backup files. Required, unless -o or -e is used."
 	descDirectoryRestore = "The directory that holds the backup files. Required, unless --input-file is used."
@@ -36,24 +35,22 @@ const (
 		"If multiple sets are being backed up, filter-exp cannot be used.\n" +
 		"If empty, include all sets."
 	descSetListRestore = "Only restore the given sets from the backup.\n" +
-		"Default: restore all sets.\n" +
-		"Incompatible with --mode=asbx."
+		"Default: restore all sets."
 
 	descBinListBackup = "Only include the given bins in the backup.\n" +
 		"Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'\n" +
 		"If empty include all bins."
 	descBinListRestore = "Only restore the given bins in the backup.\n" +
-		"If empty, include all bins.\n" +
-		"Incompatible with --mode=asbx."
+		"If empty, include all bins."
 
 	descNoRecordsBackup  = "Don't back up any records."
-	descNoRecordsRestore = "Don't restore any records.\nIncompatible with --mode=asbx."
+	descNoRecordsRestore = "Don't restore any records."
 
 	descNoIndexesBackup  = "Don't back up any indexes."
-	descNoIndexesRestore = "Don't restore any secondary indexes.\nIncompatible with --mode=asbx."
+	descNoIndexesRestore = "Don't restore any secondary indexes."
 
 	descNoUDFsBackup  = "Don't back up any UDFs."
-	descNoUDFsRestore = "Don't restore any UDFs.\nIncompatible with --mode=asbx."
+	descNoUDFsRestore = "Don't restore any UDFs."
 
 	descParallelBackup = "Maximum number of scan calls to run in parallel.\n" +
 		"If only one partition range is given, or the entire namespace is being backed up, the range\n" +

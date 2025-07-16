@@ -15,6 +15,8 @@
 package dto
 
 import (
+	"strings"
+
 	"github.com/aerospike/backup-go/cmd/internal/models"
 )
 
@@ -23,37 +25,37 @@ type Restore struct {
 	App     App     `yaml:"app"`
 	Cluster Cluster `yaml:"cluster"`
 	Restore struct {
-		Directory          string  `yaml:"directory"`
-		Namespace          string  `yaml:"namespace"`
-		SetList            string  `yaml:"set-list"`
-		BinList            string  `yaml:"bin-list"`
-		Parallel           int     `yaml:"parallel"`
-		NoRecords          bool    `yaml:"no-records"`
-		NoIndexes          bool    `yaml:"no-indexes"`
-		NoUDFs             bool    `yaml:"no-udfs"`
-		RecordsPerSecond   int     `yaml:"records-per-second"`
-		MaxRetries         int     `yaml:"max-retries"`
-		TotalTimeout       int64   `yaml:"total-timeout"`
-		SocketTimeout      int64   `yaml:"socket-timeout"`
-		Nice               int     `yaml:"nice"`
-		InputFile          string  `yaml:"input-file"`
-		DirectoryList      string  `yaml:"directory-list"`
-		ParentDirectory    string  `yaml:"parent-directory"`
-		DisableBatchWrites bool    `yaml:"disable-batch-writes"`
-		BatchSize          int     `yaml:"batch-size"`
-		MaxAsyncBatches    int     `yaml:"max-async-batches"`
-		WarmUp             int     `yaml:"warm-up"`
-		ExtraTTL           int64   `yaml:"extra-ttl"`
-		IgnoreRecordError  bool    `yaml:"ignore-record-error"`
-		Uniq               bool    `yaml:"uniq"`
-		Replace            bool    `yaml:"replace"`
-		NoGeneration       bool    `yaml:"no-generation"`
-		TimeOut            int64   `yaml:"timeout"`
-		RetryBaseTimeout   int64   `yaml:"retry-base-timeout"`
-		RetryMultiplier    float64 `yaml:"retry-multiplier"`
-		RetryMaxRetries    uint    `yaml:"retry-max-retries"`
-		Mode               string  `yaml:"mode"`
-		ValidateOnly       bool    `yaml:"validate-only"`
+		Directory          string   `yaml:"directory"`
+		Namespace          string   `yaml:"namespace"`
+		SetList            []string `yaml:"set-list"`
+		BinList            []string `yaml:"bin-list"`
+		Parallel           int      `yaml:"parallel"`
+		NoRecords          bool     `yaml:"no-records"`
+		NoIndexes          bool     `yaml:"no-indexes"`
+		NoUDFs             bool     `yaml:"no-udfs"`
+		RecordsPerSecond   int      `yaml:"records-per-second"`
+		MaxRetries         int      `yaml:"max-retries"`
+		TotalTimeout       int64    `yaml:"total-timeout"`
+		SocketTimeout      int64    `yaml:"socket-timeout"`
+		Nice               int      `yaml:"nice"`
+		InputFile          string   `yaml:"input-file"`
+		DirectoryList      []string `yaml:"directory-list"`
+		ParentDirectory    string   `yaml:"parent-directory"`
+		DisableBatchWrites bool     `yaml:"disable-batch-writes"`
+		BatchSize          int      `yaml:"batch-size"`
+		MaxAsyncBatches    int      `yaml:"max-async-batches"`
+		WarmUp             int      `yaml:"warm-up"`
+		ExtraTTL           int64    `yaml:"extra-ttl"`
+		IgnoreRecordError  bool     `yaml:"ignore-record-error"`
+		Uniq               bool     `yaml:"unique"`
+		Replace            bool     `yaml:"replace"`
+		NoGeneration       bool     `yaml:"no-generation"`
+		TimeOut            int64    `yaml:"timeout"`
+		RetryBaseTimeout   int64    `yaml:"retry-base-timeout"`
+		RetryMultiplier    float64  `yaml:"retry-multiplier"`
+		RetryMaxRetries    uint     `yaml:"retry-max-retries"`
+		Mode               string   `yaml:"mode"`
+		ValidateOnly       bool     `yaml:"validate-only"`
 	} `yaml:"restore"`
 	Compression Compression `yaml:"compression"`
 	Encryption  Encryption  `yaml:"encryption"`
@@ -74,8 +76,8 @@ func (r *Restore) ToModelRestore() *models.Restore {
 		Common: models.Common{
 			Directory:        r.Restore.Directory,
 			Namespace:        r.Restore.Namespace,
-			SetList:          r.Restore.SetList,
-			BinList:          r.Restore.BinList,
+			SetList:          strings.Join(r.Restore.SetList, ","),
+			BinList:          strings.Join(r.Restore.BinList, ","),
 			Parallel:         r.Restore.Parallel,
 			NoRecords:        r.Restore.NoRecords,
 			NoIndexes:        r.Restore.NoIndexes,
@@ -87,7 +89,7 @@ func (r *Restore) ToModelRestore() *models.Restore {
 			Nice:             r.Restore.Nice,
 		},
 		InputFile:          r.Restore.InputFile,
-		DirectoryList:      r.Restore.DirectoryList,
+		DirectoryList:      strings.Join(r.Restore.DirectoryList, ","),
 		ParentDirectory:    r.Restore.ParentDirectory,
 		DisableBatchWrites: r.Restore.DisableBatchWrites,
 		BatchSize:          r.Restore.BatchSize,

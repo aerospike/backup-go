@@ -376,11 +376,11 @@ restore:
   # The number of restore threads. Accepts values from 1-1024 inclusive.
   # If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
   parallel: 1
-  # Don't restore any records.
+  # Will not restore any records if set to true.
   no-records: false
-  # Don't restore any indexes.
+  # Will not restore any indexes if set to true.
   no-indexes: false
-  # Don't restore any UDFs.
+  # Will not restore any UDFs if set to true.
   no-udfs: false
   # Limit total returned records per second (rps).
   # Do not apply rps limit if records-per-second is zero.

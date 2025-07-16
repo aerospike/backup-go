@@ -124,6 +124,7 @@ func (f *Restore) NewFlagSet() *pflag.FlagSet {
 		"Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.\n"+
 			"The default is 0, indicating no retries will be performed")
 
+	// Disabled mode flag until .asbx support will be added.
 	// flagSet.StringVar(&f.Mode, "mode",
 	// 	"auto",
 	// 	"Restore mode: auto, asb. According to this parameter different restore processes wil be started.\n"+

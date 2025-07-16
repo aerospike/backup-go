@@ -408,11 +408,11 @@ backup:
   # filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
   # partition filters. Accepts values from 1-1024 inclusive.
   parallel: 1
-  # Don't back up any records.
+  # Will not back up any records if set to true.
   no-records: false
-  # Don't back up any indexes.
+  # Will not back up any indexes if set to true.
   no-indexes: false
-  # Don't back up any UDFs.
+  # Will not back up any UDFs if set to true.
   no-udfs: false
   # Limit total returned records per second (rps).
   # Do not apply rps limit if records-per-second is zero.
@@ -432,7 +432,7 @@ backup:
   remove-artifacts: false
   # Backup to a single backup file. Use - for stdout. Required, unless `directory` or `estimate` is used.
   output-file: ""
-  # Backup to a single backup file. Use - for stdout.
+  # When using directory parameter, prepend a prefix to the names of the generated files.
   output-file-prefix: ""
   # Rotate backup files when their size crosses the given value (in bytes). Only used when backing up to a directory.
   file-limit: 262144000
@@ -501,10 +501,6 @@ backup:
   # The amount of milliseconds to sleep between retries after an error.
   # This field is ignored when `max-retries` is zero.
   sleep-between-retries: 5
-  # If true, do not apply base-64 encoding to BLOBs and instead write raw binary data,
-  # resulting in smaller backup files.
-  # Deprecated.
-  compact: false
   # Estimate the backed-up record size from a random sample of
   # 10,000 (default) records at 99.9999% confidence to estimate the full backup size.
   # It ignores any filter: filter-exp, node-list, modified-after, modified-before, no-ttl-only,
@@ -536,7 +532,7 @@ compression:
   # Enables compressing of backup files using the specified compression algorithm.
   # Supported compression algorithms are: zstd, none\n"+
   # Set the zstd compression level via the compression-level option.
-  mode: NONE
+  mode: zstd
   # zstd compression level.
   level: 3
 encryption:
@@ -544,7 +540,7 @@ encryption:
   # Supported encryption algorithms are: none, aes128, aes256.
   # A private key must be given, either via the encryption-key-file option or
   # the encryption-key-env option or the encryption-key-secret.
-  mode: none
+  mode: aes128
   # Grabs the encryption key from the given file, which must be in PEM format.
   key-file: ""
   # Grabs the encryption key from the given environment variable, which must be base-64 encoded.

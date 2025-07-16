@@ -59,11 +59,19 @@ type Service struct {
 // configuring all necessary components for a backup process.
 func NewService(
 	ctx context.Context,
-	params *config.BackupParams,
+	params *config.BackupServiceConfig,
 	logger *slog.Logger,
 ) (*Service, error) {
 	// Validations.
-	if err := config.ValidateBackup(params); err != nil {
+	if err := params.Backup.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := params.BackupXDR.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := config.ValidateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
 		return nil, err
 	}
 
@@ -73,7 +81,7 @@ func NewService(
 		return nil, err
 	}
 
-	secretAgent := config.GetSecretAgent(backupConfig, backupXDRConfig)
+	secretAgent := config.NewSecretAgent(backupConfig, backupXDRConfig)
 
 	// We don't need a writer for estimates.
 	var writer backup.Writer

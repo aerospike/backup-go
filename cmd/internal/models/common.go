@@ -14,6 +14,8 @@
 
 package models
 
+import "fmt"
+
 const DefaultChunkSize = 5 * 1024 * 1024
 
 // Common parameters are used by both backup and restore operations.
@@ -34,4 +36,28 @@ type Common struct {
 	// Nice is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.
 	Nice int
+}
+
+func (c *Common) Validate() error {
+	if c == nil {
+		return nil
+	}
+
+	if c.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+
+	if c.TotalTimeout < 0 {
+		return fmt.Errorf("total-timeout must be non-negative")
+	}
+
+	if c.SocketTimeout < 0 {
+		return fmt.Errorf("socket-timeout must be non-negative")
+	}
+
+	if c.Parallel < 0 {
+		return fmt.Errorf("parallel must be non-negative")
+	}
+
+	return nil
 }

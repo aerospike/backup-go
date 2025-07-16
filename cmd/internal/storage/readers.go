@@ -34,10 +34,10 @@ import (
 	"github.com/aerospike/backup-go/io/storage/local"
 )
 
-// NewRestoreReader creates and returns a reader based on the restore mode specified in RestoreParams.
+// NewRestoreReader creates and returns a reader based on the restore mode specified in RestoreServiceConfig.
 func NewRestoreReader(
 	ctx context.Context,
-	params *config.RestoreParams,
+	params *config.RestoreServiceConfig,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (reader, xdrReader backup.StreamingReader, err error) {
@@ -89,7 +89,7 @@ func NewRestoreReader(
 // NewStateReader initialize reader for a state file.
 func NewStateReader(
 	ctx context.Context,
-	params *config.BackupParams,
+	params *config.BackupServiceConfig,
 	sa *backup.SecretAgentConfig,
 	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
@@ -104,12 +104,12 @@ func NewStateReader(
 		stateFile = params.Backup.Continue
 	}
 
-	restoreParams := &config.RestoreParams{
-		Common: &models.Common{
-			Directory: params.Common.Directory,
-		},
+	restoreParams := &config.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: stateFile,
+			Common: models.Common{
+				Directory: params.Backup.Directory,
+			},
 		},
 	}
 
@@ -120,12 +120,12 @@ func NewStateReader(
 
 func newReader(
 	ctx context.Context,
-	params *config.RestoreParams,
+	params *config.RestoreServiceConfig,
 	sa *backup.SecretAgentConfig,
 	isXdr bool,
 	logger *slog.Logger,
 ) (backup.StreamingReader, error) {
-	directory, inputFile := params.Common.Directory, params.Restore.InputFile
+	directory, inputFile := params.Restore.Directory, params.Restore.InputFile
 	parentDirectory, directoryList := params.Restore.ParentDirectory, params.Restore.DirectoryList
 
 	opts := newReaderOpts(directory, inputFile, parentDirectory, directoryList, isXdr, logger)

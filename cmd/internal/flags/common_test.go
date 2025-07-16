@@ -17,12 +17,15 @@ package flags
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/cmd/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCommon_NewFlagSet(t *testing.T) {
 	t.Parallel()
-	common := NewCommon(OperationBackup)
+
+	var fields models.Common
+	common := NewCommon(&fields, OperationBackup)
 
 	flagSet := common.NewFlagSet()
 
@@ -62,7 +65,9 @@ func TestCommon_NewFlagSet(t *testing.T) {
 
 func TestCommon_NewFlagSet_DefaultValues(t *testing.T) {
 	t.Parallel()
-	common := NewCommon(OperationRestore)
+
+	var fields models.Common
+	common := NewCommon(&fields, OperationRestore)
 
 	flagSet := common.NewFlagSet()
 

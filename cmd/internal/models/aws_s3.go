@@ -88,7 +88,7 @@ func (a *AwsS3) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	return nil
 }
 
-// Validate internal validation for struct params.
+// Validate internal validation for struct backup.
 func (a *AwsS3) Validate() error {
 	if a.BucketName == "" {
 		return fmt.Errorf("bucket name is required")
@@ -108,6 +108,10 @@ func (a *AwsS3) Validate() error {
 
 	if a.ChunkSize < 0 {
 		return fmt.Errorf("chunk size must be non-negative")
+	}
+
+	if a.RestorePollDuration < 1 {
+		return fmt.Errorf("restore poll duration can't be less than 1")
 	}
 
 	return nil

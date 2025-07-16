@@ -23,4 +23,7 @@ type App struct {
 	LogLevel string
 	// Format logs as JSON, for parsing by external tools.
 	LogJSON bool
+
+	// ConfigFilePath file path.
+	ConfigFilePath string
 }

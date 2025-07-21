@@ -39,7 +39,7 @@ INSTALL_DIR ?= /usr/bin
 
 .PHONY: test
 test:
-	go test -parallel $(NPROC) -timeout=5m -count=1 -v ./...
+	go test -parallel $(NPROC) -race -timeout=5m -count=1 -v ./...
 
 .PHONY: coverage
 coverage:

@@ -38,7 +38,6 @@ type asbEncoderTestSuite struct {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
-	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
@@ -69,7 +68,6 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
-	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -91,7 +89,6 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
-	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -118,7 +115,6 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
-	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -132,7 +128,6 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeRecord() {
-	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	var recExpr int64 = 10
@@ -161,7 +156,6 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 }
 
 func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
-	suite.T().Parallel()
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	sindex := &models.SIndex{
@@ -183,7 +177,6 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 }
 
 func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
-	suite.T().Parallel()
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
 	encoder := NewEncoder[*models.Token]("test", false)

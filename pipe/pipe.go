@@ -30,7 +30,7 @@ type Pipe[T models.TokenConstraint] struct {
 	fanout    *Fanout[T]
 }
 
-// NewPipe creates cew backup pipeline.
+// NewPipe creates a new backup/restore pipeline.
 func NewPipe[T models.TokenConstraint](
 	pc ProcessorCreator[T],
 	readers []Reader[T],

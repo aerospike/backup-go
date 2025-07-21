@@ -39,11 +39,11 @@ INSTALL_DIR ?= /usr/bin
 
 .PHONY: test
 test:
-	go test -parallel $(NPROC) -race -timeout=5m -count=1 -v ./...
+	go test -parallel $(NPROC) -timeout=5m -count=1 -v ./...
 
 .PHONY: coverage
 coverage:
-	$(GO) test -parallel $(NPROC) -timeout=5m -count=1 ./... -coverprofile to_filter.cov -coverpkg ./...
+	$(GO) test -parallel $(NPROC) -race -timeout=5m -count=1 ./... -coverprofile to_filter.cov -coverpkg ./...
 	grep -v "test\|mocks" to_filter.cov > coverage.cov
 	rm -f to_filter.cov
 	$(GO) tool cover -func coverage.cov

@@ -31,6 +31,8 @@ import (
 
 const supportedVersion = "3.1"
 
+var errInvalidToken = errors.New("invalid token")
+
 // The following sync.Pool instances provide optimized memory reuse
 // for byte slices of varying capacities.
 var (
@@ -194,8 +196,15 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Deco
 	}
 
 	asb.header, err = asb.readHeader()
-	if err != nil {
-		return nil, fmt.Errorf("error while reading header: %w", err)
+
+	switch {
+	case err == nil: // ok
+	case errors.Is(err, errInvalidToken):
+		return nil, fmt.Errorf("error while reading %s header: %w. "+
+			"This may happen if the file was compressed/encrypted and the restore config does not"+
+			" contain the proper compression/encryption policy, or the file is corrupted", fileName, err)
+	default:
+		return nil, fmt.Errorf("error while reading %s header: %w", fileName, err)
 	}
 
 	if asb.header.Version != supportedVersion {
@@ -1426,7 +1435,7 @@ func _expectToken(src *countingReader, token string) error {
 	returnBigBuffer(data)
 
 	if result != token {
-		return fmt.Errorf("invalid token, read %s, expected %s", string(data), token)
+		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, string(data), token)
 	}
 
 	return nil

@@ -35,7 +35,7 @@ type Common struct {
 
 	// Nice is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.
-	Nice int
+	Nice int64
 }
 
 func (c *Common) Validate() error {

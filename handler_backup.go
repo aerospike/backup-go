@@ -170,6 +170,12 @@ func newBackupHandler(
 
 	recCounter := newRecordCounter(ac, infoCLient, config, readerProcessor, logger)
 
+	limiter, err := bandwidth.NewLimiter(config.Bandwidth)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
+	}
+
 	bh := &BackupHandler{
 		ctx:                    ctx,
 		cancel:                 cancel,
@@ -181,7 +187,7 @@ func newBackupHandler(
 		encoder:                encoder,
 		readerProcessor:        readerProcessor,
 		recordCounter:          recCounter,
-		limiter:                bandwidth.NewLimiter(config.Bandwidth),
+		limiter:                limiter,
 		infoClient:             infoCLient,
 		scanLimiter:            scanLimiter,
 		state:                  state,

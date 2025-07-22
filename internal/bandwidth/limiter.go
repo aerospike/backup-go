@@ -15,53 +15,31 @@
 package bandwidth
 
 import (
-	"context"
-
-	"golang.org/x/time/rate"
-)
-
-const (
-	// MinLimit represents the minimum allowed bandwidth, constrained by the maximum record size (8 Mb).
-	MinLimit = 8 * 1024 * 1024
-	// metaOverhead represents an approximate size of record's metadata: namespace, set name, key, etc.
-	metaOverhead = 16 * 1024
-	// base64Ratio defines the multiplier to account for size expansion when encoding data using Base64.
-	base64Ratio = 1.34
+	"time"
 )
 
 // Limiter wrapper around standard rate.Limiter.
 type Limiter struct {
-	*rate.Limiter
-	bandwidth int
+	*Bucket
 }
 
 // NewLimiter returns new bandwidth limiter.
-func NewLimiter(limit int) *Limiter {
+func NewLimiter(limit int64) (*Limiter, error) {
 	if limit > 0 {
-		bandwidth := newBandwidth(limit)
+		b, err := NewBucket(limit, time.Second)
+		if err != nil {
+			return nil, err
+		}
 
 		return &Limiter{
-			rate.NewLimiter(rate.Limit(bandwidth), bandwidth),
-			bandwidth,
-		}
+			b,
+		}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
-// Wait blocks until lim permits n events to happen.
-func (l *Limiter) Wait(ctx context.Context, n int) error {
-	return l.WaitN(ctx, n)
-}
-
-// newBandwidth returns a calculated value for bandwidth.
-func newBandwidth(limit int) int {
-	bandwidth := MinLimit
-	if limit > bandwidth {
-		bandwidth = limit
-	}
-
-	bandwidth = int(float64(bandwidth)*base64Ratio) + metaOverhead
-
-	return bandwidth
+// Wait blocks until limiter permits n events to happen.
+func (l *Limiter) Wait(n int) {
+	l.Bucket.Wait(int64(n))
 }

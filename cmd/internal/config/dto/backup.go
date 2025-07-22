@@ -37,7 +37,7 @@ type Backup struct {
 		MaxRetries                    int      `yaml:"max-retries"`
 		TotalTimeout                  int64    `yaml:"total-timeout"`
 		SocketTimeout                 int64    `yaml:"socket-timeout"`
-		Nice                          int      `yaml:"nice"`
+		Nice                          int64    `yaml:"nice"`
 		OutputFile                    string   `yaml:"output-file"`
 		RemoveFiles                   bool     `yaml:"remove-files"`
 		ModifiedBefore                string   `yaml:"modified-before"`

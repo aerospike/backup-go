@@ -37,7 +37,7 @@ type Restore struct {
 		MaxRetries         int      `yaml:"max-retries"`
 		TotalTimeout       int64    `yaml:"total-timeout"`
 		SocketTimeout      int64    `yaml:"socket-timeout"`
-		Nice               int      `yaml:"nice"`
+		Nice               int64    `yaml:"nice"`
 		InputFile          string   `yaml:"input-file"`
 		DirectoryList      []string `yaml:"directory-list"`
 		ParentDirectory    string   `yaml:"parent-directory"`

@@ -89,7 +89,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,
-) *RestoreHandler[T] {
+) (*RestoreHandler[T], error) {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id)
@@ -102,6 +102,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	errorsCh := make(chan error, 1)
 
 	stats := models.NewRestoreStats()
+
 	rpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
@@ -109,6 +110,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		metricMessage,
 		config.MetricsEnabled,
 	)
+
 	kbpsCollector := metrics.NewCollector(
 		ctx,
 		logger,
@@ -134,6 +136,12 @@ func newRestoreHandler[T models.TokenConstraint](
 		logger,
 	)
 
+	limiter, err := bandwidth.NewLimiter(config.Bandwidth)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
+	}
+
 	return &RestoreHandler[T]{
 		ctx:            ctx,
 		cancel:         cancel,
@@ -143,12 +151,12 @@ func newRestoreHandler[T models.TokenConstraint](
 		stats:          stats,
 		id:             id,
 		logger:         logger,
-		limiter:        bandwidth.NewLimiter(config.Bandwidth),
+		limiter:        limiter,
 		errors:         errorsCh,
 		done:           make(chan struct{}, 1),
 		rpsCollector:   rpsCollector,
 		kbpsCollector:  kbpsCollector,
-	}
+	}, nil
 }
 
 func (rh *RestoreHandler[T]) run() {

@@ -324,7 +324,7 @@ func logBackupConfig(logger *slog.Logger, params *BackupServiceConfig, backupCon
 		slog.Bool("no_indexes", backupConfig.NoIndexes),
 		slog.Bool("no_udfs", backupConfig.NoUDFs),
 		slog.Int("records_per_second", backupConfig.RecordsPerSecond),
-		slog.Int("bandwidth", backupConfig.Bandwidth),
+		slog.Int64("bandwidth", backupConfig.Bandwidth),
 		slog.Uint64("file_limit", backupConfig.FileLimit),
 		slog.Bool("compact", backupConfig.Compact),
 		slog.Bool("not_ttl_only", backupConfig.NoTTLOnly),

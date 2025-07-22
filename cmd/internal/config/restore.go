@@ -144,7 +144,7 @@ func logRestoreConfig(logger *slog.Logger, params *RestoreServiceConfig, restore
 		slog.Any("sets", restoreConfig.SetList),
 		slog.Any("bins", restoreConfig.BinList),
 		slog.Int("parallel", restoreConfig.Parallel),
-		slog.Int("bandwidth", restoreConfig.Bandwidth),
+		slog.Int64("bandwidth", restoreConfig.Bandwidth),
 		slog.Bool("no_records", restoreConfig.NoRecords),
 		slog.Bool("no_indexes", restoreConfig.NoIndexes),
 		slog.Bool("no_udfs", restoreConfig.NoUDFs),

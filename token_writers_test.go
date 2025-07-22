@@ -26,14 +26,12 @@ import (
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipe/mocks"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type writersTestSuite struct {
-	suite.Suite
-}
+func TestTokenWriter(t *testing.T) {
+	t.Parallel()
 
-func (suite *writersTestSuite) TestTokenWriter() {
 	namespace := "test"
 	set := ""
 
@@ -65,7 +63,7 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-	mockEncoder := mocks.NewMockEncoder[*models.Token](suite.T())
+	mockEncoder := mocks.NewMockEncoder[*models.Token](t)
 	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
 	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)
@@ -73,25 +71,25 @@ func (suite *writersTestSuite) TestTokenWriter() {
 
 	dst := bytes.Buffer{}
 	writer := newTokenWriter[*models.Token](mockEncoder, &dst, slog.Default(), nil)
-	suite.NotNil(writer)
+	require.NotNil(t, writer)
 
 	ctx := context.Background()
 
 	_, err := writer.Write(ctx, recToken)
-	suite.Nil(err)
-	suite.Equal("encoded rec ", dst.String())
+	require.NoError(t, err)
+	require.Equal(t, "encoded rec ", dst.String())
 
 	_, err = writer.Write(ctx, SIndexToken)
-	suite.Nil(err)
-	suite.Equal("encoded rec encoded sindex ", dst.String())
+	require.NoError(t, err)
+	require.Equal(t, "encoded rec encoded sindex ", dst.String())
 
 	_, err = writer.Write(ctx, UDFToken)
-	suite.Nil(err)
-	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
+	require.NoError(t, err)
+	require.Equal(t, "encoded rec encoded sindex encoded udf ", dst.String())
 
 	_, err = writer.Write(ctx, &models.Token{Type: models.TokenTypeInvalid})
-	suite.NotNil(err)
-	suite.Equal("encoded rec encoded sindex encoded udf ", dst.String())
+	require.NotNil(t, err)
+	require.Equal(t, "encoded rec encoded sindex encoded udf ", dst.String())
 
 	failRec := &models.Record{
 		Record: &a.Record{},
@@ -99,14 +97,16 @@ func (suite *writersTestSuite) TestTokenWriter() {
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	_, err = writer.Write(ctx, failRecToken)
-	suite.NotNil(err)
+	require.NotNil(t, err)
 
 	err = writer.Close()
-	suite.Nil(err)
+	require.NoError(t, err)
 }
 
-func (suite *writersTestSuite) TestTokenStatsWriter() {
-	mockWriter := pipemocks.NewMockWriter[*models.Token](suite.T())
+func TestTokenStatsWriter(t *testing.T) {
+	t.Parallel()
+
+	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
 
 	mockWriter.EXPECT().Write(mock.Anything, models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
 	mockWriter.EXPECT().Write(mock.Anything, models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
@@ -114,47 +114,45 @@ func (suite *writersTestSuite) TestTokenStatsWriter() {
 	mockWriter.EXPECT().Write(mock.Anything, &models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
 	mockWriter.EXPECT().Close().Return(nil)
 
-	mockStats := mocks.NewMockstatsSetterToken(suite.T())
+	mockStats := mocks.NewMockstatsSetterToken(t)
 	mockStats.EXPECT().AddUDFs(uint32(1))
 	mockStats.EXPECT().AddSIndexes(uint32(1))
 
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
-	suite.NotNil(writer)
+	require.NotNil(t, writer)
 
 	ctx := context.Background()
 
 	_, err := writer.Write(ctx, models.NewRecordToken(&models.Record{}, 0, nil))
-	suite.Nil(err)
+	require.NoError(t, err)
 
 	_, err = writer.Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0))
-	suite.Nil(err)
+	require.NoError(t, err)
 
 	_, err = writer.Write(ctx, models.NewUDFToken(&models.UDF{}, 0))
-	suite.Nil(err)
+	require.NoError(t, err)
 
 	_, err = writer.Write(ctx, &models.Token{Type: models.TokenTypeInvalid})
-	suite.NotNil(err)
+	require.NotNil(t, err)
 
 	err = writer.Close()
-	suite.Nil(err)
+	require.NoError(t, err)
 }
 
-func (suite *writersTestSuite) TestTokenStatsWriterWriterFailed() {
-	mockWriter := pipemocks.NewMockWriter[*models.Token](suite.T())
+func TestTokenStatsWriterWriterFailed(t *testing.T) {
+	t.Parallel()
+
+	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
 
 	mockWriter.EXPECT().Write(mock.Anything, models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
-	mockStats := mocks.NewMockstatsSetterToken(suite.T())
+	mockStats := mocks.NewMockstatsSetterToken(t)
 
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
-	suite.NotNil(writer)
+	require.NotNil(t, writer)
 
 	ctx := context.Background()
 
 	_, err := writer.Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0))
-	suite.Error(err)
-}
-
-func TestWriters(t *testing.T) {
-	suite.Run(t, new(writersTestSuite))
+	require.Error(t, err)
 }

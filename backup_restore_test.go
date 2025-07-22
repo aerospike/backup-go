@@ -1405,7 +1405,6 @@ func TestBackupEstimate(t *testing.T) {
 }
 
 func TestBackupContinuation(t *testing.T) {
-	t.Parallel()
 	const (
 		setName       = "testBackupContinuation"
 		totalRecords  = 9000

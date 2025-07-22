@@ -33,9 +33,9 @@ type Common struct {
 	TotalTimeout     int64
 	SocketTimeout    int64
 
-	// Nice is mapped to config.Bandwidth
+	// BandwidthLimit is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.
-	Nice int64
+	BandwidthLimit int64
 }
 
 func (c *Common) Validate() error {

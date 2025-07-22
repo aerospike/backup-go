@@ -84,30 +84,25 @@ Aerospike Client Flags:
       --client-login-timeout int   Specifies the login operation timeout for external authentication methods such as LDAP. (default 10000)
 
 Restore Flags:
-  -d, --directory string         The directory that holds the backup files. Required, unless --input-file is used.
-  -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns.
-  -s, --set string               Only restore the given sets from the backup.
-                                 Default: restore all sets.
-                                 
-  -B, --bin-list string          Only restore the given bins in the backup.
-                                 If empty, include all bins.
-                                 
-  -R, --no-records               Don't restore any records.
-                                 
-  -I, --no-indexes               Don't restore any secondary indexes.
-                                 
-      --no-udfs                  Don't restore any UDFs.
-                                 
-  -w, --parallel int             The number of restore threads. Accepts values from 1-1024 inclusive.
-                                 If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
-  -L, --records-per-second int   Limit total returned records per second (rps).
-                                 Do not apply rps limit if records-per-second is zero.
-      --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
-      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
-      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
-                                 If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
-  -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
-                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
+  -d, --directory string              The directory that holds the backup files. Required, unless --input-file is used.
+  -n, --namespace string              Used to restore to a different namespace. Example: source-ns,destination-ns
+  -s, --set string                    Only restore the given sets from the backup.
+                                      Default: restore all sets.
+  -B, --bin-list string               Only restore the given bins in the backup.
+                                      If empty, include all bins.
+  -R, --no-records                    Don't restore any records.
+  -I, --no-indexes                    Don't restore any secondary indexes.
+      --no-udfs                       Don't restore any UDFs.
+  -w, --parallel int                  The number of restore threads. Accepts values from 1-1024 inclusive.
+                                      If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
+  -L, --records-per-second int        Limit total returned records per second (rps).
+                                      Do not apply rps limit if records-per-second is zero.
+      --max-retries int               Maximum number of retries before aborting the current transaction. (default 5)
+      --total-timeout int             Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
+      --socket-timeout int            Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
+                                      If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
+  -N, --storage-bandwidth-limit int   The limits for read/write storage bandwidth in MiB/s.
+                                      The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
   -i, --input-file string         Restore from a single backup file. Use - for stdin.
                                   Required, unless --directory or --directory-list is used.
                                   
@@ -156,9 +151,11 @@ Restore Flags:
                                   All three batch flags are linked. If --disable-batch-writes=false,
                                   asrestore uses batch write workers to send data to the database.
                                   Asrestore creates a number of workers equal to --max-async-batches that work in parallel,
-                                  and form and send a number of records equal to --batch-size to the database. (default 128)
+                                  and form and send a number of records equal to --batch-size to the database.
+                                   (default 128)
       --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
                                   recorded void-time.
+                                  
   -T, --timeout int               Set the timeout (ms) for asinfo commands sent from asrestore to the database.
                                   The info commands are to check version, get indexes, get udfs, count records, and check batch write support. (default 10000)
       --retry-base-timeout int    Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database
@@ -345,9 +342,7 @@ cluster:
   # Specifies the login operation timeout for external authentication methods such as LDAP.
   client-login-timeout: 10000
   tls:
-    # Enable TLS authentication with Aerospike.
-    enable: false
-    # The default TLS name used to authenticate each TLS socket connection.
+    # TLS name used to authenticate each TLS socket connection to a database.
     name: ""
     # Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented
     # at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.
@@ -369,10 +364,14 @@ restore:
   namespace: source-ns1
   # Only restore the given sets from the backup.
   # Default: restore all sets.
-  set-list: set1,set2
+  set-list:
+    - "set1"
+    - "set2"
   # Only restore the given bins in the backup.
   # If empty, include all bins.
-  bin-list: bin1,bin2
+  bin-list: 
+    - "bin1"
+    - "bin2"
   # The number of restore threads. Accepts values from 1-1024 inclusive.
   # If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
   parallel: 1
@@ -393,14 +392,16 @@ restore:
   # If both this and total-timeout are 0, there is no socket idle time limit.
   socket-timeout: 10000
   # The limits for read/write storage bandwidth in MiB/s.
-  nice: 0
+  storage-bandwidth-limit: 0
   # Restore from a single backup file. Use - for stdin.
   # Required, unless directory or directory-list is used.
   input-file: ""
   # A comma-separated list of paths to directories that hold the backup files. Required,
   # unless -i or -d is used. The paths may not contain commas.
   # Example: 'asrestore directory-list /path/to/dir1/,/path/to/dir2'
-  directory-list: ""
+  directory-list: 
+    - "dir1"
+    - "dir2"
   # A common root path for all paths used in directory-list.
   # This path is prepended to all entries in directory-list.
   # Example: 'asrestore parent-directory /common/root/path

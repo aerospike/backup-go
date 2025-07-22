@@ -37,7 +37,7 @@ type Backup struct {
 		MaxRetries                    int      `yaml:"max-retries"`
 		TotalTimeout                  int64    `yaml:"total-timeout"`
 		SocketTimeout                 int64    `yaml:"socket-timeout"`
-		Nice                          int64    `yaml:"nice"`
+		BandwidthLimit                int64    `yaml:"storage-bandwidth-limit"`
 		OutputFile                    string   `yaml:"output-file"`
 		RemoveFiles                   bool     `yaml:"remove-files"`
 		ModifiedBefore                string   `yaml:"modified-before"`
@@ -95,7 +95,7 @@ func (b *Backup) ToModelBackup() *models.Backup {
 			MaxRetries:       b.Backup.MaxRetries,
 			TotalTimeout:     b.Backup.TotalTimeout,
 			SocketTimeout:    b.Backup.SocketTimeout,
-			Nice:             b.Backup.Nice,
+			BandwidthLimit:   b.Backup.BandwidthLimit,
 		},
 		OutputFile:                    b.Backup.OutputFile,
 		RemoveFiles:                   b.Backup.RemoveFiles,

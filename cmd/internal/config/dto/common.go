@@ -53,7 +53,6 @@ type Cluster struct {
 	ClientIdleTimeout  int64  `yaml:"client-idle-timeout"`
 	ClientLoginTimeout int64  `yaml:"client-login-timeout"`
 	TLS                struct {
-		Enable          bool   `yaml:"enable"`
 		Name            string `yaml:"name"`
 		Protocols       string `yaml:"protocols"`
 		CaFile          string `yaml:"ca-file"`
@@ -116,7 +115,10 @@ func (c *Cluster) ToAerospikeConfig() (*client.AerospikeConfig, error) {
 		f.AuthMode = authMode
 	}
 
-	f.TLSEnable = c.TLS.Enable
+	if c.TLS.Name != "" {
+		f.TLSEnable = true
+	}
+
 	f.TLSName = c.TLS.Name
 
 	if c.TLS.Protocols != "" {
@@ -125,6 +127,7 @@ func (c *Cluster) ToAerospikeConfig() (*client.AerospikeConfig, error) {
 			return nil, fmt.Errorf("failed to set tls protocols: %w", err)
 		}
 
+		f.TLSEnable = true
 		f.TLSProtocols = tlsProtocols
 	}
 
@@ -135,6 +138,7 @@ func (c *Cluster) ToAerospikeConfig() (*client.AerospikeConfig, error) {
 			return nil, fmt.Errorf("failed to set tls root ca file: %w", err)
 		}
 
+		f.TLSEnable = true
 		f.TLSRootCAFile = tlsRootCaFile
 	}
 
@@ -145,6 +149,7 @@ func (c *Cluster) ToAerospikeConfig() (*client.AerospikeConfig, error) {
 			return nil, fmt.Errorf("failed to set tls root ca path: %w", err)
 		}
 
+		f.TLSEnable = true
 		f.TLSRootCAPath = tlsRootCaPath
 	}
 
@@ -155,6 +160,7 @@ func (c *Cluster) ToAerospikeConfig() (*client.AerospikeConfig, error) {
 			return nil, fmt.Errorf("failed to set tls cert file: %w", err)
 		}
 
+		f.TLSEnable = true
 		f.TLSCertFile = tlsCertFile
 	}
 
@@ -163,6 +169,8 @@ func (c *Cluster) ToAerospikeConfig() (*client.AerospikeConfig, error) {
 		if err := tlsKeyFile.Set(c.TLS.KeyFile); err != nil {
 			return nil, fmt.Errorf("failed to set tls key file: %w", err)
 		}
+
+		f.TLSEnable = true
 	}
 
 	if c.TLS.KeyFilePassword != "" {
@@ -170,6 +178,8 @@ func (c *Cluster) ToAerospikeConfig() (*client.AerospikeConfig, error) {
 		if err := tlsKeyFilePass.Set(c.TLS.KeyFilePassword); err != nil {
 			return nil, fmt.Errorf("failed to set tls key file password: %w", err)
 		}
+
+		f.TLSEnable = true
 	}
 
 	return f.NewAerospikeConfig(), nil

@@ -375,7 +375,7 @@ cluster:
   tls:
     # Enable TLS authentication with Aerospike.
     enable: false
-    # The server TLS context to use to authenticate the connection to Aerospike.
+    # The default TLS name used to authenticate each TLS socket connection.
     name: ""
     # Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented
     # at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.

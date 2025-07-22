@@ -94,30 +94,33 @@ Aerospike Client Flags:
       --client-login-timeout int   Specifies the login operation timeout for external authentication methods such as LDAP. (default 10000)
 
 Backup Flags:
-  -d, --directory string              The directory that holds the backup files. Required, unless -o or -e is used.
-  -n, --namespace string              The namespace to be backed up. Required.
-  -s, --set string                    The set(s) to be backed up. Accepts comma-separated values with no spaces: 'set1,set2,set3'
-                                      If multiple sets are being backed up, filter-exp cannot be used.
-                                      If empty, include all sets.
-  -B, --bin-list string               Only include the given bins in the backup.
-                                      Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
-                                      If empty include all bins.
-  -R, --no-records                    Don't back up any records.
-  -I, --no-indexes                    Don't back up any indexes.
-      --no-udfs                       Don't back up any UDFs.
-  -w, --parallel int                  Maximum number of scan calls to run in parallel.
-                                      If only one partition range is given, or the entire namespace is being backed up, the range
-                                      of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
-                                      filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
-                                      partition filters. Accepts values from 1-1024 inclusive. (default 1)
-  -L, --records-per-second int        Limit total returned records per second (rps).
-                                      Do not apply rps limit if records-per-second is zero.
-      --max-retries int               Maximum number of retries before aborting the current transaction. (default 5)
-      --total-timeout int             Total transaction timeout in milliseconds. 0 - no timeout.
-      --socket-timeout int            Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
-                                      If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
-  -N, --storage-bandwidth-limit int   The limits for read/write storage bandwidth in MiB/s.
-                                      The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
+  -d, --directory string         The directory that holds the backup files. Required, unless -o or -e is used.
+  -n, --namespace string         The namespace to be backed up. Required.
+  -s, --set string               The set(s) to be backed up. Accepts comma-separated values with no spaces: 'set1,set2,set3'
+                                 If multiple sets are being backed up, filter-exp cannot be used.
+                                 If empty, include all sets.
+  -B, --bin-list string          Only include the given bins in the backup.
+                                 Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'
+                                 If empty include all bins.
+  -R, --no-records               Don't back up any records.
+  -I, --no-indexes               Don't back up any indexes.
+      --no-udfs                  Don't back up any UDFs.
+  -w, --parallel int             Maximum number of scan calls to run in parallel.
+                                 If only one partition range is given, or the entire namespace is being backed up, the range
+                                 of partitions will be evenly divided by this number to be processed in parallel. Otherwise, each
+                                 filter cannot be parallelized individually, so you may only achieve as much parallelism as there are
+                                 partition filters. Accepts values from 1-1024 inclusive. (default 1)
+  -L, --records-per-second int   Limit total returned records per second (rps).
+                                 Do not apply rps limit if records-per-second is zero.
+      --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
+      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout.
+      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
+                                 If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
+  -N, --nice int                 Deprecated, use --bandwidth instead.
+                                 The limits for read/write storage bandwidth in MiB/s.
+                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
+      --bandwidth int            The limits for read/write storage bandwidth in MiB/s.
+                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
   -r, --remove-files                  Remove an existing backup file (-o) or entire directory (-d) and replace with the new backup.
       --remove-artifacts              Remove existing backup file (-o) or files (-d) without performing a backup.
   -o, --output-file string            Backup to a single backup file. Use - for stdout. Required, unless -d or -e is used.

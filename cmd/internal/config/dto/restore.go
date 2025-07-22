@@ -37,7 +37,7 @@ type Restore struct {
 		MaxRetries         int      `yaml:"max-retries"`
 		TotalTimeout       int64    `yaml:"total-timeout"`
 		SocketTimeout      int64    `yaml:"socket-timeout"`
-		BandwidthLimit     int64    `yaml:"storage-bandwidth-limit"`
+		Bandwidth          int64    `yaml:"bandwidth"`
 		InputFile          string   `yaml:"input-file"`
 		DirectoryList      []string `yaml:"directory-list"`
 		ParentDirectory    string   `yaml:"parent-directory"`
@@ -86,7 +86,7 @@ func (r *Restore) ToModelRestore() *models.Restore {
 			MaxRetries:       r.Restore.MaxRetries,
 			TotalTimeout:     r.Restore.TotalTimeout,
 			SocketTimeout:    r.Restore.SocketTimeout,
-			BandwidthLimit:   r.Restore.BandwidthLimit,
+			Bandwidth:        r.Restore.Bandwidth,
 		},
 		InputFile:          r.Restore.InputFile,
 		DirectoryList:      strings.Join(r.Restore.DirectoryList, ","),

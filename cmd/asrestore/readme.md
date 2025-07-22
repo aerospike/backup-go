@@ -84,25 +84,28 @@ Aerospike Client Flags:
       --client-login-timeout int   Specifies the login operation timeout for external authentication methods such as LDAP. (default 10000)
 
 Restore Flags:
-  -d, --directory string              The directory that holds the backup files. Required, unless --input-file is used.
-  -n, --namespace string              Used to restore to a different namespace. Example: source-ns,destination-ns
-  -s, --set string                    Only restore the given sets from the backup.
-                                      Default: restore all sets.
-  -B, --bin-list string               Only restore the given bins in the backup.
-                                      If empty, include all bins.
-  -R, --no-records                    Don't restore any records.
-  -I, --no-indexes                    Don't restore any secondary indexes.
-      --no-udfs                       Don't restore any UDFs.
-  -w, --parallel int                  The number of restore threads. Accepts values from 1-1024 inclusive.
-                                      If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
-  -L, --records-per-second int        Limit total returned records per second (rps).
-                                      Do not apply rps limit if records-per-second is zero.
-      --max-retries int               Maximum number of retries before aborting the current transaction. (default 5)
-      --total-timeout int             Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
-      --socket-timeout int            Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
-                                      If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
-  -N, --storage-bandwidth-limit int   The limits for read/write storage bandwidth in MiB/s.
-                                      The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
+  -d, --directory string         The directory that holds the backup files. Required, unless --input-file is used.
+  -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
+  -s, --set string               Only restore the given sets from the backup.
+                                 Default: restore all sets.
+  -B, --bin-list string          Only restore the given bins in the backup.
+                                 If empty, include all bins.
+  -R, --no-records               Don't restore any records.
+  -I, --no-indexes               Don't restore any secondary indexes.
+      --no-udfs                  Don't restore any UDFs.
+  -w, --parallel int             The number of restore threads. Accepts values from 1-1024 inclusive.
+                                 If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
+  -L, --records-per-second int   Limit total returned records per second (rps).
+                                 Do not apply rps limit if records-per-second is zero.
+      --max-retries int          Maximum number of retries before aborting the current transaction. (default 5)
+      --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
+      --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
+                                 If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
+  -N, --nice int                 Deprecated, use --bandwidth instead.
+                                 The limits for read/write storage bandwidth in MiB/s.
+                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
+      --bandwidth int            The limits for read/write storage bandwidth in MiB/s.
+                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
   -i, --input-file string         Restore from a single backup file. Use - for stdin.
                                   Required, unless --directory or --directory-list is used.
                                   
@@ -392,7 +395,7 @@ restore:
   # If both this and total-timeout are 0, there is no socket idle time limit.
   socket-timeout: 10000
   # The limits for read/write storage bandwidth in MiB/s.
-  storage-bandwidth-limit: 0
+  bandwidth: 0
   # Restore from a single backup file. Use - for stdin.
   # Required, unless directory or directory-list is used.
   input-file: ""

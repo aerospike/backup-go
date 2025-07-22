@@ -150,7 +150,12 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		10000,
 		"Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.\n"+
 			"If both this and --total-timeout are 0, there is no socket idle time limit.")
-	flagSet.Int64VarP(&f.fields.BandwidthLimit, "storage-bandwidth-limit", "N",
+	flagSet.Int64VarP(&f.fields.Bandwidth, "nice", "N",
+		0,
+		"Deprecated, use --bandwidth instead.\n"+
+			"The limits for read/write storage bandwidth in MiB/s.\n"+
+			"The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).")
+	flagSet.Int64Var(&f.fields.Bandwidth, "bandwidth",
 		0,
 		"The limits for read/write storage bandwidth in MiB/s.\n"+
 			"The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).")

@@ -33,9 +33,9 @@ type Common struct {
 	TotalTimeout     int64
 	SocketTimeout    int64
 
-	// BandwidthLimit is mapped to config.Bandwidth
+	// Bandwidth is mapped to config.Bandwidth
 	// Is set in MiB then converted to bytes.
-	BandwidthLimit int64
+	Bandwidth int64
 }
 
 func (c *Common) Validate() error {

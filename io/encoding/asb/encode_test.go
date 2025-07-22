@@ -30,20 +30,16 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type asbEncoderTestSuite struct {
-	suite.Suite
-}
+func TestEncodeTokenRecord(t *testing.T) {
+	t.Parallel()
 
-func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
-	if aerr != nil {
-		suite.FailNow("unexpected error: %v", aerr)
-	}
+	require.NoError(t, aerr)
 
 	token := &models.Token{
 		Type: models.TokenTypeRecord,
@@ -59,15 +55,17 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenRecord() {
 
 	buff := &bytes.Buffer{}
 	_, err := encoder.encodeRecord(token.Record, buff)
-	suite.Assert().NoError(err)
+	require.NoError(t, err)
 	expected := bytes.Clone(buff.Bytes())
 
 	actual, err := encoder.EncodeToken(token)
-	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, actual)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
-func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
+func TestEncodeTokenUDF(t *testing.T) {
+	t.Parallel()
+
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -80,15 +78,17 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenUDF() {
 	}
 	buff := &bytes.Buffer{}
 	_, err := encoder.encodeUDF(token.UDF, buff)
-	suite.NoError(err)
+	require.NoError(t, err)
 	expected := buff.Bytes()
 
 	actual, err := encoder.EncodeToken(token)
-	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, actual)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
-func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
+func TestEncodeTokenSIndex(t *testing.T) {
+	t.Parallel()
+
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -106,15 +106,17 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenSIndex() {
 
 	buff := &bytes.Buffer{}
 	_, err := encoder.encodeSIndex(token.SIndex, buff)
-	suite.Assert().NoError(err)
+	require.NoError(t, err)
 	expected := buff.Bytes()
 
 	actual, err := encoder.EncodeToken(token)
-	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, actual)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
-func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
+func TestEncodeTokenInvalid(t *testing.T) {
+	t.Parallel()
+
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	token := &models.Token{
@@ -123,11 +125,13 @@ func (suite *asbEncoderTestSuite) TestEncodeTokenInvalid() {
 
 	token.Type = models.TokenTypeInvalid
 	actual, err := encoder.EncodeToken(token)
-	suite.Assert().Error(err)
-	suite.Assert().Nil(actual)
+	require.Error(t, err)
+	require.Nil(t, actual)
 }
 
-func (suite *asbEncoderTestSuite) TestEncodeRecord() {
+func TestEncodeRecord(t *testing.T) {
+	t.Parallel()
+
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	var recExpr int64 = 10
@@ -149,13 +153,15 @@ func (suite *asbEncoderTestSuite) TestEncodeRecord() {
 
 	buff := &bytes.Buffer{}
 	n, err := encoder.encodeRecord(rec, buff)
-	suite.Assert().NoError(err)
+	require.NoError(t, err)
 	actual := buff.Bytes()
-	suite.Assert().Equal(len(actual), n)
-	suite.Assert().Equal(expected, string(actual))
+	require.Equal(t, len(actual), n)
+	require.Equal(t, expected, string(actual))
 }
 
-func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
+func TestEncodeSIndex(t *testing.T) {
+	t.Parallel()
+
 	encoder := NewEncoder[*models.Token]("test", false)
 
 	sindex := &models.SIndex{
@@ -171,26 +177,23 @@ func (suite *asbEncoderTestSuite) TestEncodeSIndex() {
 	expected := []byte("* i ns  name N 1 bin S\n")
 	buff := &bytes.Buffer{}
 	n, err := encoder.encodeSIndex(sindex, buff)
-	suite.Assert().Equal(len(expected), n)
-	suite.Assert().NoError(err)
-	suite.Assert().Equal(expected, buff.Bytes())
+	require.Equal(t, len(expected), n)
+	require.NoError(t, err)
+	require.Equal(t, expected, buff.Bytes())
 }
 
-func (suite *asbEncoderTestSuite) TestGetHeaderFirst() {
+func TestGetHeaderFirst(t *testing.T) {
+	t.Parallel()
+
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
 	encoder := NewEncoder[*models.Token]("test", false)
 	firstHeader := encoder.GetHeader(0)
-	suite.Assert().Equal(expected, string(firstHeader))
+	require.Equal(t, expected, string(firstHeader))
 
 	secondExpected := "Version 3.1\n# namespace test\n"
 	secondHeader := encoder.GetHeader(0)
-	suite.Assert().Equal(secondExpected, string(secondHeader))
-}
-
-func TestASBEncoderTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(asbEncoderTestSuite))
+	require.Equal(t, secondExpected, string(secondHeader))
 }
 
 func Test_escapeASBS(t *testing.T) {

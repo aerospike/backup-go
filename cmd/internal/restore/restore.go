@@ -87,6 +87,7 @@ func NewService(
 			slog.Int("max_asynx_batches", restoreConfig.MaxAsyncBatches),
 			slog.Int64("extra_ttl", restoreConfig.ExtraTTL),
 			slog.Bool("ignore_records_error", restoreConfig.IgnoreRecordError),
+			slog.Int64("bandwidth", restoreConfig.Bandwidth),
 		)
 
 		warmUp := GetWarmUp(params.Restore.WarmUp, params.Restore.MaxAsyncBatches)

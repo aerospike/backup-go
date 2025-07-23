@@ -142,17 +142,17 @@ func (f *Backup) NewFlagSet() *pflag.FlagSet {
 	flagSet.Int64Var(&f.EstimateSamples, "estimate-samples",
 		10000,
 		"The number of samples to take when running a backup estimate.")
-	flagSet.StringVarP(&f.Continue, "continue", "c",
-		"",
-		"Resumes an interrupted/failed backup from where it was left off, given the .state file\n"+
-			"that was generated from the interrupted/failed run.\n"+
-			"--continue and --state-file-dst are mutually exclusive.")
 	flagSet.StringVar(&f.StateFileDst, "state-file-dst",
 		"",
 		"Name of a state file that will be saved in backup --directory.\n"+
 			"Works only with --file-limit parameter. As --file-limit is reached and the file is closed,\n"+
 			"the current state will be saved. Works only for default and/or partition backup.\n"+
 			"Not work with --parallel-nodes or --node--list.")
+	flagSet.StringVarP(&f.Continue, "continue", "c",
+		"",
+		"Resumes an interrupted/failed backup from where it was left off, given the .state file\n"+
+			"that was generated from the interrupted/failed run.\n"+
+			"--continue and --state-file-dst are mutually exclusive.")
 	flagSet.Int64Var(&f.ScanPageSize, "scan-page-size",
 		10000,
 		"Number of records will be read on one iteration for continuation backup.\n"+

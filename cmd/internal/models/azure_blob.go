@@ -118,5 +118,9 @@ func (a *AzureBlob) Validate() error {
 		return fmt.Errorf("block size must be non-negative")
 	}
 
+	if a.RestorePollDuration < 1 {
+		return fmt.Errorf("rehydrate poll duration can't be less than 1")
+	}
+
 	return nil
 }

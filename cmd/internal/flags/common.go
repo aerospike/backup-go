@@ -26,8 +26,7 @@ const (
 	OperationRestore
 
 	descNamespaceBackup  = "The namespace to be backed up. Required."
-	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns\n" +
-		"Restoring to different namespace is incompatible with --mode=asbx."
+	descNamespaceRestore = "Used to restore to a different namespace. Example: source-ns,destination-ns"
 
 	descDirectoryBackup  = "The directory that holds the backup files. Required, unless -o or -e is used."
 	descDirectoryRestore = "The directory that holds the backup files. Required, unless --input-file is used."
@@ -36,24 +35,22 @@ const (
 		"If multiple sets are being backed up, filter-exp cannot be used.\n" +
 		"If empty, include all sets."
 	descSetListRestore = "Only restore the given sets from the backup.\n" +
-		"Default: restore all sets.\n" +
-		"Incompatible with --mode=asbx."
+		"Default: restore all sets."
 
 	descBinListBackup = "Only include the given bins in the backup.\n" +
 		"Accepts comma-separated values with no spaces: 'bin1,bin2,bin3'\n" +
 		"If empty include all bins."
 	descBinListRestore = "Only restore the given bins in the backup.\n" +
-		"If empty, include all bins.\n" +
-		"Incompatible with --mode=asbx."
+		"If empty, include all bins."
 
 	descNoRecordsBackup  = "Don't back up any records."
-	descNoRecordsRestore = "Don't restore any records.\nIncompatible with --mode=asbx."
+	descNoRecordsRestore = "Don't restore any records."
 
 	descNoIndexesBackup  = "Don't back up any indexes."
-	descNoIndexesRestore = "Don't restore any secondary indexes.\nIncompatible with --mode=asbx."
+	descNoIndexesRestore = "Don't restore any secondary indexes."
 
 	descNoUDFsBackup  = "Don't back up any UDFs."
-	descNoUDFsRestore = "Don't restore any UDFs.\nIncompatible with --mode=asbx."
+	descNoUDFsRestore = "Don't restore any UDFs."
 
 	descParallelBackup = "Maximum number of scan calls to run in parallel.\n" +
 		"If only one partition range is given, or the entire namespace is being backed up, the range\n" +
@@ -70,11 +67,14 @@ const (
 type Common struct {
 	// operation: backup or restore, to form correct documentation.
 	operation int
-	models.Common
+	fields    *models.Common
 }
 
-func NewCommon(operation int) *Common {
-	return &Common{operation: operation}
+func NewCommon(fields *models.Common, operation int) *Common {
+	return &Common{
+		fields:    fields,
+		operation: operation,
+	}
 }
 
 func (f *Common) NewFlagSet() *pflag.FlagSet {
@@ -112,52 +112,56 @@ func (f *Common) NewFlagSet() *pflag.FlagSet {
 		defaultParallel = 0
 	}
 
-	flagSet.StringVarP(&f.Directory, "directory", "d",
+	flagSet.StringVarP(&f.fields.Directory, "directory", "d",
 		"",
 		descDirectory)
-	flagSet.StringVarP(&f.Namespace, "namespace", "n",
+	flagSet.StringVarP(&f.fields.Namespace, "namespace", "n",
 		"",
 		descNamespace)
-	flagSet.StringVarP(&f.SetList, "set", "s",
+	flagSet.StringVarP(&f.fields.SetList, "set", "s",
 		"",
 		descSetList)
-	flagSet.StringVarP(&f.BinList, "bin-list", "B",
+	flagSet.StringVarP(&f.fields.BinList, "bin-list", "B",
 		"",
 		descBinList)
-	flagSet.BoolVarP(&f.NoRecords, "no-records", "R",
+	flagSet.BoolVarP(&f.fields.NoRecords, "no-records", "R",
 		false,
 		descNoRecords)
-	flagSet.BoolVarP(&f.NoIndexes, "no-indexes", "I",
+	flagSet.BoolVarP(&f.fields.NoIndexes, "no-indexes", "I",
 		false,
 		descNoIndexes)
-	flagSet.BoolVar(&f.NoUDFs, "no-udfs",
+	flagSet.BoolVar(&f.fields.NoUDFs, "no-udfs",
 		false,
 		descNoUDFs)
-	flagSet.IntVarP(&f.Parallel, "parallel", "w",
+	flagSet.IntVarP(&f.fields.Parallel, "parallel", "w",
 		defaultParallel,
 		descParallel)
-	flagSet.IntVarP(&f.RecordsPerSecond, "records-per-second", "L",
+	flagSet.IntVarP(&f.fields.RecordsPerSecond, "records-per-second", "L",
 		0,
 		"Limit total returned records per second (rps).\n"+
 			"Do not apply rps limit if records-per-second is zero.")
-	flagSet.IntVar(&f.MaxRetries, "max-retries",
+	flagSet.IntVar(&f.fields.MaxRetries, "max-retries",
 		5,
 		"Maximum number of retries before aborting the current transaction.")
-	flagSet.Int64Var(&f.TotalTimeout, "total-timeout",
+	flagSet.Int64Var(&f.fields.TotalTimeout, "total-timeout",
 		defaultTotalTimeout,
 		"Total transaction timeout in milliseconds. 0 - no timeout.")
-	flagSet.Int64Var(&f.SocketTimeout, "socket-timeout",
+	flagSet.Int64Var(&f.fields.SocketTimeout, "socket-timeout",
 		10000,
 		"Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.\n"+
 			"If both this and --total-timeout are 0, there is no socket idle time limit.")
-	flagSet.Int64VarP(&f.Nice, "nice", "N",
+	flagSet.Int64Var(&f.fields.Bandwidth, "nice",
 		0,
 		"The limits for read/write storage bandwidth in MiB/s.\n"+
-			"The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).")
+			"Default is 0 (no limit).")
+	flagSet.Int64VarP(&f.fields.Bandwidth, "bandwidth", "N",
+		0,
+		"The limits for read/write storage bandwidth in MiB/s.\n"+
+			"Default is 0 (no limit).")
 
 	return flagSet
 }
 
 func (f *Common) GetCommon() *models.Common {
-	return &f.Common
+	return f.fields
 }

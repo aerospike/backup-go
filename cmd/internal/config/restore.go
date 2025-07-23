@@ -15,6 +15,8 @@
 package config
 
 import (
+	"fmt"
+	"log/slog"
 	"runtime"
 
 	"github.com/aerospike/backup-go"
@@ -22,12 +24,13 @@ import (
 	"github.com/aerospike/tools-common-go/client"
 )
 
-type RestoreParams struct {
+// RestoreServiceConfig contains configuration settings for the restore service,
+// including client, restore, and storage details.
+type RestoreServiceConfig struct {
 	App          *models.App
 	ClientConfig *client.AerospikeConfig
 	ClientPolicy *models.ClientPolicy
 	Restore      *models.Restore
-	Common       *models.Common
 	Compression  *models.Compression
 	Encryption   *models.Encryption
 	SecretAgent  *models.SecretAgent
@@ -36,42 +39,119 @@ type RestoreParams struct {
 	AzureBlob    *models.AzureBlob
 }
 
+// NewRestoreServiceConfig creates and returns a new RestoreServiceConfig initialized with the provided parameters.
+// If a config file path is specified in the app, parameters are loaded from the file instead.
+// Returns an error if the config file cannot be loaded or parsed.
+func NewRestoreServiceConfig(
+	app *models.App,
+	clientConfig *client.AerospikeConfig,
+	clientPolicy *models.ClientPolicy,
+	restore *models.Restore,
+	compression *models.Compression,
+	encryption *models.Encryption,
+	secretAgent *models.SecretAgent,
+	awsS3 *models.AwsS3,
+	gcpStorage *models.GcpStorage,
+	azureBlob *models.AzureBlob,
+) (*RestoreServiceConfig, error) {
+	// If we have a config file, load serviceConfig from it.
+	if app.ConfigFilePath != "" {
+		serviceConfig, err := decodeRestoreServiceConfig(app.ConfigFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config file %s: %w", app.ConfigFilePath, err)
+		}
+
+		return serviceConfig, nil
+	}
+
+	return &RestoreServiceConfig{
+		App:          app,
+		ClientConfig: clientConfig,
+		ClientPolicy: clientPolicy,
+		Restore:      restore,
+		Compression:  compression,
+		Encryption:   encryption,
+		SecretAgent:  secretAgent,
+		AwsS3:        awsS3,
+		GcpStorage:   gcpStorage,
+		AzureBlob:    azureBlob,
+	}, nil
+}
+
 // NewRestoreConfig creates and returns a new ConfigRestore object, initialized with given restore parameters.
-func NewRestoreConfig(params *RestoreParams) *backup.ConfigRestore {
+func NewRestoreConfig(serviceConfig *RestoreServiceConfig, logger *slog.Logger) *backup.ConfigRestore {
+	logger.Info("initializing restore config")
+
 	parallel := runtime.NumCPU()
-	if params.Common.Parallel > 0 {
-		parallel = params.Common.Parallel
+	if serviceConfig.Restore.Parallel > 0 {
+		parallel = serviceConfig.Restore.Parallel
 	}
 
 	c := backup.NewDefaultRestoreConfig()
-	c.Namespace = newRestoreNamespace(params.Common.Namespace)
-	c.SetList = SplitByComma(params.Common.SetList)
-	c.BinList = SplitByComma(params.Common.BinList)
-	c.NoRecords = params.Common.NoRecords
-	c.NoIndexes = params.Common.NoIndexes
-	c.NoUDFs = params.Common.NoUDFs
-	c.RecordsPerSecond = params.Common.RecordsPerSecond
+	c.Namespace = newRestoreNamespace(serviceConfig.Restore.Namespace)
+	c.SetList = SplitByComma(serviceConfig.Restore.SetList)
+	c.BinList = SplitByComma(serviceConfig.Restore.BinList)
+	c.NoRecords = serviceConfig.Restore.NoRecords
+	c.NoIndexes = serviceConfig.Restore.NoIndexes
+	c.NoUDFs = serviceConfig.Restore.NoUDFs
+	c.RecordsPerSecond = serviceConfig.Restore.RecordsPerSecond
 	c.Parallel = parallel
-	c.WritePolicy = newWritePolicy(params.Restore, params.Common)
-	c.InfoPolicy = mapInfoPolicy(params.Restore.TimeOut)
-	// As we set --nice in MiB we must convert it to bytes
-	c.Bandwidth = params.Common.Nice * 1024 * 1024
-	c.ExtraTTL = params.Restore.ExtraTTL
-	c.IgnoreRecordError = params.Restore.IgnoreRecordError
-	c.DisableBatchWrites = params.Restore.DisableBatchWrites
-	c.BatchSize = params.Restore.BatchSize
-	c.MaxAsyncBatches = params.Restore.MaxAsyncBatches
+	c.WritePolicy = newWritePolicy(serviceConfig.Restore)
+	c.InfoPolicy = newInfoPolicy(serviceConfig.Restore.TimeOut)
+	// As we set --bandwidth in MiB we must convert it to bytes
+	c.Bandwidth = serviceConfig.Restore.Bandwidth * 1024 * 1024
+	c.ExtraTTL = serviceConfig.Restore.ExtraTTL
+	c.IgnoreRecordError = serviceConfig.Restore.IgnoreRecordError
+	c.DisableBatchWrites = serviceConfig.Restore.DisableBatchWrites
+	c.BatchSize = serviceConfig.Restore.BatchSize
+	c.MaxAsyncBatches = serviceConfig.Restore.MaxAsyncBatches
 	c.MetricsEnabled = true
 
-	c.CompressionPolicy = newCompressionPolicy(params.Compression)
-	c.EncryptionPolicy = newEncryptionPolicy(params.Encryption)
-	c.SecretAgentConfig = newSecretAgentConfig(params.SecretAgent)
-	c.RetryPolicy = mapRetryPolicy(
-		params.Restore.RetryBaseTimeout,
-		params.Restore.RetryMultiplier,
-		params.Restore.RetryMaxRetries,
+	c.CompressionPolicy = newCompressionPolicy(serviceConfig.Compression)
+	c.EncryptionPolicy = newEncryptionPolicy(serviceConfig.Encryption)
+	c.SecretAgentConfig = newSecretAgentConfig(serviceConfig.SecretAgent)
+	c.RetryPolicy = newRetryPolicy(
+		serviceConfig.Restore.RetryBaseTimeout,
+		serviceConfig.Restore.RetryMultiplier,
+		serviceConfig.Restore.RetryMaxRetries,
 	)
-	c.ValidateOnly = params.Restore.ValidateOnly
+	c.ValidateOnly = serviceConfig.Restore.ValidateOnly
+
+	if !c.ValidateOnly {
+		logRestoreConfig(logger, serviceConfig, c)
+	}
 
 	return c
+}
+
+func logRestoreConfig(logger *slog.Logger, params *RestoreServiceConfig, restoreConfig *backup.ConfigRestore) {
+	encryptionMode := "none"
+	if params.Encryption != nil {
+		encryptionMode = params.Encryption.Mode
+	}
+
+	compressLevel := 0
+	if params.Compression != nil {
+		compressLevel = params.Compression.Level
+	}
+
+	logger.Info("initialized restore config",
+		slog.Any("namespace_source", *restoreConfig.Namespace.Source),
+		slog.Any("namespace_destination", *restoreConfig.Namespace.Destination),
+		slog.String("encryption", encryptionMode),
+		slog.Int("compression", compressLevel),
+		slog.Any("retry", *restoreConfig.RetryPolicy),
+		slog.Any("sets", restoreConfig.SetList),
+		slog.Any("bins", restoreConfig.BinList),
+		slog.Int("parallel", restoreConfig.Parallel),
+		slog.Int64("bandwidth", restoreConfig.Bandwidth),
+		slog.Bool("no_records", restoreConfig.NoRecords),
+		slog.Bool("no_indexes", restoreConfig.NoIndexes),
+		slog.Bool("no_udfs", restoreConfig.NoUDFs),
+		slog.Bool("disable_batch_writes", restoreConfig.DisableBatchWrites),
+		slog.Int("batch_size", restoreConfig.BatchSize),
+		slog.Int("max_asynx_batches", restoreConfig.MaxAsyncBatches),
+		slog.Int64("extra_ttl", restoreConfig.ExtraTTL),
+		slog.Bool("ignore_records_error", restoreConfig.IgnoreRecordError),
+	)
 }

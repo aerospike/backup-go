@@ -14,10 +14,11 @@
 
 package models
 
-import "crypto/tls"
+import (
+	"fmt"
+)
 
 // BackupXDR flags that will be mapped to xdr backup config.
-// (common for backup and restore flags are in Common).
 type BackupXDR struct {
 	Directory                    string
 	FileLimit                    uint64
@@ -37,8 +38,6 @@ type BackupXDR struct {
 	InfoPolingPeriodMilliseconds int64
 	StartTimeoutMilliseconds     int64
 
-	TLSConfig *tls.Config
-
 	StopXDR    bool
 	UnblockMRT bool
 
@@ -47,4 +46,68 @@ type BackupXDR struct {
 	InfoRetryIntervalMilliseconds int64
 
 	Forward bool
+}
+
+func (b *BackupXDR) Validate() error {
+	if b == nil {
+		return nil
+	}
+
+	if b.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+
+	if b.DC == "" {
+		return fmt.Errorf("dc is required")
+	}
+
+	if b.LocalAddress == "" {
+		return fmt.Errorf("local address is required")
+	}
+
+	if b.ReadTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr read timeout can't be negative")
+	}
+
+	if b.WriteTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr write timeout can't be negative")
+	}
+
+	if b.InfoPolingPeriodMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info poling period can't be negative")
+	}
+
+	if b.StartTimeoutMilliseconds < 0 {
+		return fmt.Errorf("backup xdr start timeout can't be negative")
+	}
+
+	if b.ResultQueueSize < 0 {
+		return fmt.Errorf("backup xdr result queue size can't be negative")
+	}
+
+	if b.AckQueueSize < 0 {
+		return fmt.Errorf("backup xdr ack queue size can't be negative")
+	}
+
+	if b.MaxConnections < 1 {
+		return fmt.Errorf("backup xdr max connections can't be less than 1")
+	}
+
+	if b.ParallelWrite < 0 {
+		return fmt.Errorf("backup xdr parallel write can't be negative")
+	}
+
+	if b.FileLimit < 1 {
+		return fmt.Errorf("backup xdr file limit can't be less than 1")
+	}
+
+	if b.InfoRetryIntervalMilliseconds < 0 {
+		return fmt.Errorf("backup xdr info retry interval can't be negative")
+	}
+
+	if b.InfoRetriesMultiplier < 0 {
+		return fmt.Errorf("backup xdr info retries multiplier can't be negative")
+	}
+
+	return nil
 }

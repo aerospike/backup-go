@@ -16,7 +16,9 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
+	"strings"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
@@ -24,9 +26,13 @@ import (
 	"github.com/aerospike/backup-go/cmd/internal/logging"
 	asFlags "github.com/aerospike/tools-common-go/flags"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
-const VersionDev = "dev"
+const (
+	VersionDev     = "dev"
+	welcomeMessage = "Welcome to the Aerospike backup CLI tool!"
+)
 
 // Cmd represents the base command when called without any subcommands
 type Cmd struct {
@@ -60,7 +66,6 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 		flagsApp:          flags.NewApp(),
 		flagsAerospike:    asFlags.NewDefaultAerospikeFlags(),
 		flagsClientPolicy: flags.NewClientPolicy(),
-		flagsCommon:       flags.NewCommon(flags.OperationBackup),
 		flagsBackup:       flags.NewBackup(),
 		flagsCompression:  flags.NewCompression(flags.OperationBackup),
 		flagsEncryption:   flags.NewEncryption(flags.OperationBackup),
@@ -71,10 +76,12 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 		// First init default logger.
 		Logger: logging.NewDefaultLogger(),
 	}
+	c.flagsCommon = flags.NewCommon(&c.flagsBackup.Common, flags.OperationBackup)
 
 	rootCmd := &cobra.Command{
 		Use:   "asbackup",
 		Short: "Aerospike backup CLI tool",
+		Long:  welcomeMessage,
 		RunE:  c.run,
 	}
 
@@ -123,10 +130,119 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 	rootCmd.PersistentFlags().AddFlagSet(gcpFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(azureFlagSet)
 
+	// Deprecated fields.
+	if err := rootCmd.Flags().MarkDeprecated("nice", "use --bandwidth instead"); err != nil {
+		log.Fatal(err)
+	}
+
+	rootCmd.Flags().Lookup("nice").Hidden = false
+
 	// Beautify help and usage.
-	helpFunc := func() {
-		fmt.Println("Welcome to the Aerospike backup CLI tool!")
-		fmt.Println("-----------------------------------------")
+	helpFunc := newHelpFunction(
+		appFlagSet,
+		aerospikeFlagSet,
+		clientPolicyFlagSet,
+		commonFlagSet,
+		backupFlagSet,
+		compressionFlagSet,
+		encryptionFlagSet,
+		secretAgentFlagSet,
+		awsFlagSet,
+		gcpFlagSet,
+		azureFlagSet,
+	)
+
+	rootCmd.SetUsageFunc(func(_ *cobra.Command) error {
+		helpFunc()
+		return nil
+	})
+	rootCmd.SetHelpFunc(func(_ *cobra.Command, _ []string) {
+		helpFunc()
+	})
+
+	return rootCmd, c
+}
+
+func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
+	// Show version.
+	if c.flagsApp.Version {
+		c.printVersion()
+
+		return nil
+	}
+
+	// If no flags were passed, show help.
+	if cmd.Flags().NFlag() == 0 {
+		if err := cmd.Help(); err != nil {
+			return fmt.Errorf("failed to load help: %w", err)
+		}
+
+		return nil
+	}
+
+	// Init logger.
+	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	// After initialization replace logger.
+	c.Logger = logger
+
+	// Init app.
+	serviceConfig, err := config.NewBackupServiceConfig(
+		c.flagsApp.GetApp(),
+		c.flagsAerospike.NewAerospikeConfig(),
+		c.flagsClientPolicy.GetClientPolicy(),
+		c.flagsBackup.GetBackup(),
+		nil,
+		c.flagsCompression.GetCompression(),
+		c.flagsEncryption.GetEncryption(),
+		c.flagsSecretAgent.GetSecretAgent(),
+		c.flagsAws.GetAwsS3(),
+		c.flagsGcp.GetGcpStorage(),
+		c.flagsAzure.GetAzureBlob(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize app: %w", err)
+	}
+
+	asb, err := backup.NewService(cmd.Context(), serviceConfig, logger)
+	if err != nil {
+		return fmt.Errorf("backup initialization failed: %w", err)
+	}
+
+	if err = asb.Run(cmd.Context()); err != nil {
+		return fmt.Errorf("backup failed: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Cmd) printVersion() {
+	version := c.appVersion
+	if c.appVersion == VersionDev {
+		version += " (" + c.commitHash + ")"
+	}
+
+	fmt.Printf("version: %s\n", version)
+}
+
+func newHelpFunction(
+	appFlagSet,
+	aerospikeFlagSet,
+	clientPolicyFlagSet,
+	commonFlagSet,
+	backupFlagSet,
+	compressionFlagSet,
+	encryptionFlagSet,
+	secretAgentFlagSet,
+	awsFlagSet,
+	gcpFlagSet,
+	azureFlagSet *pflag.FlagSet,
+) func() {
+	return func() {
+		fmt.Println(welcomeMessage)
+		fmt.Println(strings.Repeat("-", len(welcomeMessage)))
 		fmt.Println("\nUsage:")
 		fmt.Println("  asbackup [flags]")
 
@@ -190,75 +306,4 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 			"Any Azure parameter can be retrieved from Secret Agent.")
 		azureFlagSet.PrintDefaults()
 	}
-
-	rootCmd.SetUsageFunc(func(_ *cobra.Command) error {
-		helpFunc()
-		return nil
-	})
-	rootCmd.SetHelpFunc(func(_ *cobra.Command, _ []string) {
-		helpFunc()
-	})
-
-	return rootCmd, c
-}
-
-func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
-	// Show version.
-	if c.flagsApp.Version {
-		c.printVersion()
-
-		return nil
-	}
-
-	// If no flags were passed, show help.
-	if cmd.Flags().NFlag() == 0 {
-		if err := cmd.Help(); err != nil {
-			return fmt.Errorf("failed to load help: %w", err)
-		}
-
-		return nil
-	}
-
-	// Init logger.
-	logger, err := logging.NewLogger(c.flagsApp.LogLevel, c.flagsApp.Verbose, c.flagsApp.LogJSON)
-	if err != nil {
-		return fmt.Errorf("failed to initialize logger: %w", err)
-	}
-	// After initialization replace logger.
-	c.Logger = logger
-
-	// Init app.
-	asbParams := &config.BackupParams{
-		App:          c.flagsApp.GetApp(),
-		ClientConfig: c.flagsAerospike.NewAerospikeConfig(),
-		ClientPolicy: c.flagsClientPolicy.GetClientPolicy(),
-		Backup:       c.flagsBackup.GetBackup(),
-		Common:       c.flagsCommon.GetCommon(),
-		Compression:  c.flagsCompression.GetCompression(),
-		Encryption:   c.flagsEncryption.GetEncryption(),
-		SecretAgent:  c.flagsSecretAgent.GetSecretAgent(),
-		AwsS3:        c.flagsAws.GetAwsS3(),
-		GcpStorage:   c.flagsGcp.GetGcpStorage(),
-		AzureBlob:    c.flagsAzure.GetAzureBlob(),
-	}
-
-	asb, err := backup.NewService(cmd.Context(), asbParams, logger)
-	if err != nil {
-		return fmt.Errorf("backup initialization failed: %w", err)
-	}
-
-	if err = asb.Run(cmd.Context()); err != nil {
-		return fmt.Errorf("backup failed: %w", err)
-	}
-
-	return nil
-}
-
-func (c *Cmd) printVersion() {
-	version := c.appVersion
-	if c.appVersion == VersionDev {
-		version += " (" + c.commitHash + ")"
-	}
-
-	fmt.Printf("version: %s\n", version)
 }

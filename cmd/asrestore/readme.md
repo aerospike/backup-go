@@ -42,6 +42,7 @@ General Flags:
   -v, --verbose            Enable more detailed logging.
       --log-level string   Determine log level for --verbose output. Log levels are: debug, info, warn, error. (default "debug")
       --log-json           Set output in JSON format for parsing by external tools.
+      --config string      Path to YAML configuration file.
 
 Aerospike Client Flags:
   -h, --host host[:tls-name][:port][,...]                                                           The Aerospike host. (default 127.0.0.1)
@@ -85,19 +86,13 @@ Aerospike Client Flags:
 Restore Flags:
   -d, --directory string         The directory that holds the backup files. Required, unless --input-file is used.
   -n, --namespace string         Used to restore to a different namespace. Example: source-ns,destination-ns
-                                 Restoring to different namespace is incompatible with --mode=asbx.
   -s, --set string               Only restore the given sets from the backup.
                                  Default: restore all sets.
-                                 Incompatible with --mode=asbx.
   -B, --bin-list string          Only restore the given bins in the backup.
                                  If empty, include all bins.
-                                 Incompatible with --mode=asbx.
   -R, --no-records               Don't restore any records.
-                                 Incompatible with --mode=asbx.
   -I, --no-indexes               Don't restore any secondary indexes.
-                                 Incompatible with --mode=asbx.
       --no-udfs                  Don't restore any UDFs.
-                                 Incompatible with --mode=asbx.
   -w, --parallel int             The number of restore threads. Accepts values from 1-1024 inclusive.
                                  If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
   -L, --records-per-second int   Limit total returned records per second (rps).
@@ -106,20 +101,22 @@ Restore Flags:
       --total-timeout int        Total transaction timeout in milliseconds. 0 - no timeout. (default 10000)
       --socket-timeout int       Socket timeout in milliseconds. If this value is 0, it's set to --total-timeout.
                                  If both this and --total-timeout are 0, there is no socket idle time limit. (default 10000)
-  -N, --nice int                 The limits for read/write storage bandwidth in MiB/s
-                                 The lower bound is 8MiB (maximum size of the Aerospike record). Default is 0 (no limit).
+      --nice int                 The limits for read/write storage bandwidth in MiB/s.
+                                 Default is 0 (no limit). (DEPRECATED: use --bandwidth instead)
+  -N, --bandwidth int            The limits for read/write storage bandwidth in MiB/s.
+                                 Default is 0 (no limit).
   -i, --input-file string         Restore from a single backup file. Use - for stdin.
                                   Required, unless --directory or --directory-list is used.
-                                  Incompatible with --mode=asbx.
+                                  
       --directory-list string     A comma-separated list of paths to directories that hold the backup files. Required,
                                   unless -i or -d is used. The paths may not contain commas.
                                   Example: 'asrestore --directory-list /path/to/dir1/,/path/to/dir2'
-                                  Incompatible with --mode=asbx.
+                                  
       --parent-directory string   A common root path for all paths used in --directory-list.
                                   This path is prepended to all entries in --directory-list.
                                   Example: 'asrestore --parent-directory /common/root/path
                                   --directory-list /path/to/dir1/,/path/to/dir2'
-                                  Incompatible with --mode=asbx.
+                                  
   -u, --unique                    Skip modifying records that already exist in the namespace.
   -r, --replace                   Fully replace records that already exist in the namespace.
                                   This option still performs a generation check by default and needs to be combined with the -g option
@@ -139,17 +136,17 @@ Restore Flags:
                                   By default, the cluster is checked for batch write support. Only set this flag if you explicitly
                                   don't want batch writes to be used or if asrestore is failing to work because it cannot recognize
                                   that batch writes are disabled.
-                                  Incompatible with --mode=asbx.
+                                  
       --max-async-batches int     To send data to Aerospike Database, asrestore creates write workers that work in parallel.
                                   This value is the number of workers that form batches and send them to the database.
                                   For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,
                                   and each record is uploaded individually.
                                   The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.
-                                  Incompatible with --mode=asbx. (default 32)
+                                   (default 32)
       --warm-up int               Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.
                                   By default is calculated as (--max-async-batches + 1), as one connection per node is reserved
                                   for tend operations and is not used for transactions.
-                                  Incompatible with --mode=asbx.
+                                  
       --batch-size int            The max allowed number of records to simultaneously upload to Aerospike.
                                   Default is 128 with batch writes enabled. If you disable batch writes,
                                   this flag is superseded because each worker sends writes one by one.
@@ -157,10 +154,10 @@ Restore Flags:
                                   asrestore uses batch write workers to send data to the database.
                                   Asrestore creates a number of workers equal to --max-async-batches that work in parallel,
                                   and form and send a number of records equal to --batch-size to the database.
-                                  Incompatible with --mode=asbx. (default 128)
+                                   (default 128)
       --extra-ttl int             For records with expirable void-times, add N seconds of extra-ttl to the
                                   recorded void-time.
-                                  Incompatible with --mode=asbx.
+                                  
   -T, --timeout int               Set the timeout (ms) for asinfo commands sent from asrestore to the database.
                                   The info commands are to check version, get indexes, get udfs, count records, and check batch write support. (default 10000)
       --retry-base-timeout int    Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database
@@ -178,10 +175,6 @@ Restore Flags:
                                   The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber) (default 1)
       --retry-max-retries uint    Set the maximum number of retry attempts for the errors listed under --retry-base-timeout.
                                   The default is 0, indicating no retries will be performed
-      --mode string               Restore mode: auto, asb, asbx. According to this parameter different restore processes wil be started.
-                                  auto - starts restoring from both .asb and .asbx files.
-                                  asb - restore only .asb backup files.
-                                  asbx - restore only .asbx backup files. (default "auto")
       --validate                  Validate backup files without restoring.
 
 Compression Flags:
@@ -319,4 +312,276 @@ Any Azure parameter can be retrieved from Secret Agent.
 --s3-connect-timeout        The AWS S3 client's connection timeout in milliseconds.
                             This is equivalent to cli-connect-timeout in the AWS CLI,
                             or connectTimeoutMS in the aws-sdk-cpp client configuration.                  
+```
+
+
+## Configuration file schema with default values
+```yaml
+app:
+  # Enable more detailed logging.
+  verbose: false
+  # Determine log level for verbose output. Log levels are: debug, info, warn, error.
+  log-level: debug
+  # Set output in JSON format for parsing by external tools.
+  log-json: false
+cluster:
+  seeds:
+    - host: 127.0.0.1
+      tls-name: ""
+      port: 3000
+  # The Aerospike user to use to connect to the Aerospike cluster.
+  user: some_login
+  # The Aerospike password to use to connect to the Aerospike cluster.
+  password: some_password
+  # The authentication mode used by the Aerospike server: INTERNAL, EXTERNAL, PKI
+  auth: ""
+  # Initial host connection timeout duration. The timeout when opening a connection to the server host for the first time.
+  client-timeout: 30000
+  # Idle timeout. Every time a connection is used,
+  # its idle deadline will be extended by this duration. When this deadline is reached,
+  # the connection will be closed and discarded from the connection pool.
+  client-idle-timeout: 10000
+  # Specifies the login operation timeout for external authentication methods such as LDAP.
+  client-login-timeout: 10000
+  tls:
+    # TLS name used to authenticate each TLS socket connection to a database.
+    name: ""
+    # Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented
+    # at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.
+    protocols: ""
+    # The CA used when connecting to Aerospike.
+    ca-file: ""
+    # A path containing CAs for connecting to Aerospike.
+    ca-path: ""
+    # The certificate file for mutual TLS authentication with Aerospike.
+    cert-file: ""
+    # The key file used for mutual TLS authentication with Aerospike.
+    key-file: ""
+    # The password used to decrypt the key file if encrypted.
+    key-file-password: ""
+restore:
+  # The directory that holds the backup files. Required, unless input-file is used.
+  directory: continue_test
+  # Used to restore to a different namespace. Example: source-ns,destination-ns
+  namespace: source-ns1
+  # Only restore the given sets from the backup.
+  # Default: restore all sets.
+  set-list:
+    - "set1"
+    - "set2"
+  # Only restore the given bins in the backup.
+  # If empty, include all bins.
+  bin-list: 
+    - "bin1"
+    - "bin2"
+  # The number of restore threads. Accepts values from 1-1024 inclusive.
+  # If not set, the default value is automatically calculated and appears as the number of CPUs on your machine.
+  parallel: 1
+  # Will not restore any records if set to true.
+  no-records: false
+  # Will not restore any indexes if set to true.
+  no-indexes: false
+  # Will not restore any UDFs if set to true.
+  no-udfs: false
+  # Limit total returned records per second (rps).
+  # Do not apply rps limit if records-per-second is zero.
+  records-per-second: 0
+  # Maximum number of retries before aborting the current transaction.
+  max-retries: 5
+  # Total transaction timeout in milliseconds. 0 - no timeout.
+  total-timeout: 0
+  # Socket timeout in milliseconds. If this value is 0, it's set to total-timeout.
+  # If both this and total-timeout are 0, there is no socket idle time limit.
+  socket-timeout: 10000
+  # The limits for read/write storage bandwidth in MiB/s.
+  bandwidth: 0
+  # Restore from a single backup file. Use - for stdin.
+  # Required, unless directory or directory-list is used.
+  input-file: ""
+  # A comma-separated list of paths to directories that hold the backup files. Required,
+  # unless -i or -d is used. The paths may not contain commas.
+  # Example: 'asrestore directory-list /path/to/dir1/,/path/to/dir2'
+  directory-list: 
+    - "dir1"
+    - "dir2"
+  # A common root path for all paths used in directory-list.
+  # This path is prepended to all entries in directory-list.
+  # Example: 'asrestore parent-directory /common/root/path
+  # directory-list /path/to/dir1/,/path/to/dir2'
+  parent-directory: ""
+  # Disables the use of batch writes when restoring records to the Aerospike cluster.
+  # By default, the cluster is checked for batch write support. Only set this flag if you explicitly
+  # don't want batch writes to be used or if asrestore is failing to work because it cannot recognize
+  # that batch writes are disabled.
+  disable-batch-writes: false
+  # The max allowed number of records to simultaneously upload to Aerospike.
+  # Default is 128 with batch writes enabled. If you disable batch writes,
+  # this flag is superseded because each worker sends writes one by one.
+  # All three batch flags are linked. If disable-batch-writes=false,
+  # asrestore uses batch write workers to send data to the database.
+  # Asrestore creates a number of workers equal to max-async-batches that work in parallel,
+  # and form and send a number of records equal to batch-size to the database.
+  batch-size: 128
+  # To send data to Aerospike Database, asrestore creates write workers that work in parallel.
+  # This value is the number of workers that form batches and send them to the database.
+  # For Aerospike Database versions prior to 6.0, 'batches' are only a logical grouping of records,
+  # and each record is uploaded individually.
+  # The true max number of async Aerospike calls would then be <max-async-batches> * <batch-size>.
+  max-async-batches: 32
+  # Warm Up fills the connection pool with connections for all nodes. This is necessary for batch restore.
+  # By default is calculated as (--max-async-batches + 1), as one connection per node is reserved
+  # for tend operations and is not used for transactions.
+  warm-up: 0
+  # For records with expirable void-times, add N seconds of extra-ttl to the
+  # recorded void-time.
+  extra-ttl: 0
+  # Ignore errors specific to records, not UDFs or indexes. The errors are:
+  # AEROSPIKE_RECORD_TOO_BIG,
+  # AEROSPIKE_KEY_MISMATCH,
+  # AEROSPIKE_BIN_NAME_TOO_LONG,
+  # AEROSPIKE_ALWAYS_FORBIDDEN,
+  # AEROSPIKE_FAIL_FORBIDDEN,
+  # AEROSPIKE_BIN_TYPE_ERROR,
+  # AEROSPIKE_BIN_NOT_FOUND.
+  # By default, these errors are not ignored and asrestore terminates.
+  ignore-record-error: false
+  # Skip modifying records that already exist in the namespace.
+  unique: false
+  # Fully replace records that already exist in the namespace.
+  # This option still performs a generation check by default and needs to be combined with the -g option
+  # if you do not want to perform a generation check.
+  # This option is mutually exclusive with unique.
+  replace: false
+  # Don't check the generation of records that already exist in the namespace.
+  no-generation: false
+  # Set the timeout (ms) for asinfo commands sent from asrestore to the database.
+  # The info commands are to check version, get indexes, get udfs, count records, and check batch write support.
+  timeout: 10000
+  # Set the initial timeout for a retry in milliseconds when data is sent to the Aerospike database
+  # during a restore. This retry sequence is triggered by the following non-critical errors:
+  # AEROSPIKE_NO_AVAILABLE_CONNECTIONS_TO_NODE,
+  # AEROSPIKE_TIMEOUT,
+  # AEROSPIKE_DEVICE_OVERLOAD,
+  # AEROSPIKE_NETWORK_ERROR,
+  # AEROSPIKE_SERVER_NOT_AVAILABLE,
+  # AEROSPIKE_BATCH_FAILED,
+  # AEROSPIKE_MAX_ERROR_RATE.
+  # This base timeout value is also used as the interval multiplied by retry-multiplier to increase
+  # the timeout value between retry attempts.
+  retry-base-timeout: 1000
+  # Increases the delay between subsequent retry attempts for the errors listed under retry-base-timeout.
+  # The actual delay is calculated as: retry-base-timeout * (retry-multiplier ^ attemptNumber)
+  retry-multiplier: 1
+  # Set the maximum number of retry attempts for the errors listed under retry-base-timeout.
+  # The default is 0, indicating no retries will be performed
+  retry-max-retries: 1
+  # Validate backup files without restoring.
+  validate-only: false
+compression:
+  # Enables decompressing of backup files using the specified compression algorithm.
+  # This must match the compression mode used when backing up the data.
+  # Supported compression algorithms are: zstd, none
+  # Set the zstd compression level via the compression-level option.
+  mode: NONE
+  # zstd compression level.
+  level: 3
+encryption:
+  # Enables decryption of backup files using the specified encryption algorithm.
+  # This must match the encryption mode used when backing up the data.
+  # Supported encryption algorithms are: none, aes128, aes256.
+  # A private key must be given, either via the encryption-key-file option or
+  # the encryption-key-env option or the encryption-key-secret.
+  mode: none
+  # Grabs the encryption key from the given file, which must be in PEM format.
+  key-file: ""
+  # Grabs the encryption key from the given environment variable, which must be base-64 encoded.
+  key-env: ""
+  # Grabs the encryption key from secret-agent.
+  key-secret: ""
+secret-agent:
+  # Secret Agent connection type, supported types: tcp, unix.
+  connection-type: tcp
+  # Secret Agent host for TCP connection or socket file path for UDS connection.
+  address: ""
+  # Secret Agent port (only for TCP connection).
+  port: 0
+  # Secret Agent connection and reading timeout.
+  timeout-millisecond: 0
+  # Path to ca file for encrypted connections.
+  ca-file: ""
+  # Whether Secret Agent responses are Base64 encoded.
+  is-base64: false
+aws:
+  s3:
+      # Existing S3 bucket name
+      bucket-name: ""
+      # The S3 region that the bucket(s) exist in.
+      region: ""
+      # The S3 profile to use for credentials.
+      profile: ""
+      # An alternate url endpoint to send S3 API calls to.
+      endpoint-override: ""
+      # S3 access key id. If not set, profile auth info will be used.
+      access-key-id: ""
+      # S3 secret access key. If not set, profile auth info will be used.
+      secret-access-key: ""
+      # If is set, tool will try to restore archived files to the specified tier.
+      # Tiers are: Standard, Bulk, Expedited.
+      access-tier: ""
+      # How often (in milliseconds) a backup client checks object status when restoring an archived object.
+      restore-poll-duration: 1000
+      # Maximum number of attempts that should be made in case of an error.
+      retry-max-attempts: 100
+      # Max backoff duration in seconds between retried attempts.
+      retry-max-backoff: 90
+      # Provides the backoff in seconds strategy the retryer will use to determine the delay between retry attempts.
+      retry-backoff: 60
+gcp:
+  storage:
+      # Path to file containing service account JSON key.
+      key-file: ""
+      # Name of the Google cloud storage bucket.
+      bucket-name: ""
+      # An alternate url endpoint to send GCP API calls to.
+      endpoint-override: ""
+      # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
+      retry-max-attempts: 100
+      # Max backoff is the maximum value in seconds of the retry period.
+      retry-max-backoff: 90
+      # Initial backoff is the initial value in seconds of the retry period.
+      retry-init-backoff: 60
+      # Multiplier is the factor by which the retry period increases. It should be greater than 1.
+      retry-backoff-multiplier: 2
+azure:
+  blob:
+      # Azure account name for account name, key authorization.
+      account-name: ""
+      # Azure account key for account name, key authorization.
+      account-key: ""
+      # Azure tenant ID for Azure Active Directory authorization.
+      tenant-id: ""
+      # Azure client ID for Azure Active Directory authorization.
+      client-id: ""
+      # Azure client secret for Azure Active Directory authorization.
+      client-secret: ""
+      # Azure endpoint.
+      endpoint-override: ""
+      # Azure container Name.
+      container-name: ""
+      # Tiers are: Archive, Cold, Cool, Hot, P10, P15, P20, P30, P4, P40, P50, P6, P60, P70, P80, Premium.
+      access-tier: ""
+      rehydrate-poll-duration: 100
+      # Max retries specifies the maximum number of attempts a failed operation will be retried before producing an error.
+      retry-max-attempts: 100
+      # Retry timeout in seconds indicates the maximum time allowed for any single try of an HTTP request.
+      # This is disabled by default. Specify a value greater than zero to enable.
+      # NOTE: Setting this to a small value might cause premature HTTP request time-outs.
+      retry-timeout: 10
+      # Retry delay specifies the initial amount of delay in seconds to use before retrying an operation.
+      # The value is used only if the HTTP response does not contain a Retry-After header.
+      # The delay increases exponentially with each retry up to the maximum specified by azure-retry-max-delay.
+      retry-delay: 60
+      # Max retry delay specifies the maximum delay in seconds allowed before retrying an operation.
+      # Typically the value is greater than or equal to the value specified in azure-retry-delay.
+      retry-max-delay: 90
 ```

@@ -43,6 +43,9 @@ func (f *App) NewFlagSet() *pflag.FlagSet {
 	flagSet.BoolVar(&f.LogJSON, "log-json",
 		false,
 		"Set output in JSON format for parsing by external tools.")
+	flagSet.StringVar(&f.ConfigFilePath, "config",
+		"",
+		"Path to YAML configuration file.")
 
 	return flagSet
 }

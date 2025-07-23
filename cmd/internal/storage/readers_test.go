@@ -47,10 +47,11 @@ func TestNewLocalReader(t *testing.T) {
 
 	dir := t.TempDir()
 
-	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+	params := &appConfig.RestoreServiceConfig{
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
@@ -67,11 +68,10 @@ func TestNewLocalReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileNameASBX,
 		},
-		Common:     &models.Common{},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
 		AzureBlob:  &models.AzureBlob{},
@@ -82,9 +82,8 @@ func TestNewLocalReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testLocalType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore:    &models.Restore{},
-		Common:     &models.Common{},
 		AwsS3:      &models.AwsS3{},
 		GcpStorage: &models.GcpStorage{},
 		AzureBlob:  &models.AzureBlob{},
@@ -113,10 +112,11 @@ func TestNewS3Reader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+	params := &appConfig.RestoreServiceConfig{
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		AwsS3: &models.AwsS3{
 			BucketName:          testS3Bucket,
@@ -143,11 +143,10 @@ func TestNewS3Reader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testS3Type, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		Common: &models.Common{},
 		AwsS3: &models.AwsS3{
 			BucketName: testS3Bucket,
 			Region:     testS3Region,
@@ -185,10 +184,11 @@ func TestNewGcpReader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+	params := &appConfig.RestoreServiceConfig{
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		GcpStorage: &models.GcpStorage{
 			BucketName: testBucket,
@@ -211,11 +211,10 @@ func TestNewGcpReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testGcpType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		Common: &models.Common{},
 		GcpStorage: &models.GcpStorage{
 			BucketName: testBucket,
 			Endpoint:   testGcpEndpoint,
@@ -251,10 +250,11 @@ func TestNewAzureReader(t *testing.T) {
 	dir := t.TempDir()
 	dir = strings.TrimPrefix(dir, "/")
 
-	params := &appConfig.RestoreParams{
-		Restore: &models.Restore{},
-		Common: &models.Common{
-			Directory: dir,
+	params := &appConfig.RestoreServiceConfig{
+		Restore: &models.Restore{
+			Common: models.Common{
+				Directory: dir,
+			},
 		},
 		AzureBlob: &models.AzureBlob{
 			AccountName:         testAzureAccountName,
@@ -281,11 +281,10 @@ func TestNewAzureReader(t *testing.T) {
 	assert.NotNil(t, reader)
 	assert.Equal(t, testAzureType, reader.GetType())
 
-	params = &appConfig.RestoreParams{
+	params = &appConfig.RestoreServiceConfig{
 		Restore: &models.Restore{
 			InputFile: dir + testFileName,
 		},
-		Common: &models.Common{},
 		AzureBlob: &models.AzureBlob{
 			AccountName:   testAzureAccountName,
 			AccountKey:    testAzureAccountKey,

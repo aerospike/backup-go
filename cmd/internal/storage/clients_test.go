@@ -194,7 +194,7 @@ func TestParseRacks(t *testing.T) {
 			racks:       "1,-2,3",
 			expected:    nil,
 			expectError: true,
-			errorText:   "rack id -2 invalid, should be positive number",
+			errorText:   "rack id -2 invalid, should be non-negative number",
 		},
 		{
 			name:        "Invalid Rack - Exceeds MaxRack",

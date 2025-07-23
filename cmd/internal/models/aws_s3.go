@@ -110,5 +110,9 @@ func (a *AwsS3) Validate() error {
 		return fmt.Errorf("chunk size must be non-negative")
 	}
 
+	if a.RestorePollDuration < 1 {
+		return fmt.Errorf("restore poll duration can't be less than 1")
+	}
+
 	return nil
 }

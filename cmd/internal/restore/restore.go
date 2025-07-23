@@ -50,7 +50,7 @@ type Service struct {
 // configuring all necessary components for a restore process.
 func NewService(
 	ctx context.Context,
-	params *config.RestoreParams,
+	params *config.RestoreServiceConfig,
 	logger *slog.Logger,
 ) (*Service, error) {
 	var (
@@ -59,37 +59,19 @@ func NewService(
 	)
 
 	// Validations.
-	if err := config.ValidateRestore(params); err != nil {
+	if err := params.Restore.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := config.ValidateStorages(params.AwsS3, params.GcpStorage, params.AzureBlob); err != nil {
 		return nil, err
 	}
 
 	// Initializations.
-	logger.Info("initializing restore config")
-
-	restoreConfig := config.NewRestoreConfig(params)
+	restoreConfig := config.NewRestoreConfig(params, logger)
 
 	// Skip this part on validation.
 	if !restoreConfig.ValidateOnly {
-		logger.Info("initialized restore config",
-			slog.Any("namespace_source", *restoreConfig.Namespace.Source),
-			slog.Any("namespace_destination", *restoreConfig.Namespace.Destination),
-			slog.String("encryption", params.Encryption.Mode),
-			slog.Int("compression", params.Compression.Level),
-			slog.Any("retry", *restoreConfig.RetryPolicy),
-			slog.Any("sets", restoreConfig.SetList),
-			slog.Any("bins", restoreConfig.BinList),
-			slog.Int("parallel", restoreConfig.Parallel),
-			slog.Bool("no_records", restoreConfig.NoRecords),
-			slog.Bool("no_indexes", restoreConfig.NoIndexes),
-			slog.Bool("no_udfs", restoreConfig.NoUDFs),
-			slog.Bool("disable_batch_writes", restoreConfig.DisableBatchWrites),
-			slog.Int("batch_size", restoreConfig.BatchSize),
-			slog.Int("max_asynx_batches", restoreConfig.MaxAsyncBatches),
-			slog.Int64("extra_ttl", restoreConfig.ExtraTTL),
-			slog.Bool("ignore_records_error", restoreConfig.IgnoreRecordError),
-			slog.Int64("bandwidth", restoreConfig.Bandwidth),
-		)
-
 		warmUp := GetWarmUp(params.Restore.WarmUp, params.Restore.MaxAsyncBatches)
 		logger.Debug("warm up is set", slog.Int("value", warmUp))
 

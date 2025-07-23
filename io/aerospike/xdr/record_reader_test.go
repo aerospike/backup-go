@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/io/aerospike/xdr/mocks"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

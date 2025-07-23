@@ -19,11 +19,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/xdr"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"golang.org/x/sync/semaphore"
 )
 

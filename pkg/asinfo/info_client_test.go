@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/asinfo/mocks"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
 )

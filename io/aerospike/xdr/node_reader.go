@@ -23,8 +23,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/asinfo"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 )
 
 const (

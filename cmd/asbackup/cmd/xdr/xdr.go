@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"strings"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
@@ -27,6 +28,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
+
+const welcomeMessage = "Welcome to the Aerospike MRT backup CLI tool!"
 
 // Cmd represents XDR sub command.
 type Cmd struct {
@@ -72,6 +75,7 @@ func NewCmd(
 	xdrCmd := &cobra.Command{
 		Use:   "xdr",
 		Short: "Aerospike XDR backup CLI tool",
+		Long:  welcomeMessage,
 		RunE:  c.run,
 	}
 
@@ -152,8 +156,8 @@ func (c *Cmd) run(cmd *cobra.Command, _ []string) error {
 
 func newHelpFunction(backupXDRFlagSet *pflag.FlagSet) func() {
 	return func() {
-		fmt.Println("Welcome to the Aerospike XDR backup CLI tool!")
-		fmt.Println("-----------------------------------------")
+		fmt.Println(welcomeMessage)
+		fmt.Println(strings.Repeat("-", len(welcomeMessage)))
 		fmt.Println("\nUsage:")
 		fmt.Println("  asbackup xdr [flags]")
 		// Print section: XDR Flags

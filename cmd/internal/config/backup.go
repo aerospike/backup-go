@@ -175,7 +175,7 @@ func newBackupConfig(params *BackupServiceConfig) (*backup.ConfigBackup, error) 
 	// We may consider splitting the configuration in the future.
 	c.ParallelWrite = params.Backup.Parallel
 	c.ParallelRead = params.Backup.Parallel
-	// As we set --storage-bandwidth-limit in MiB we must convert it to bytes
+	// As we set --bandwidth in MiB we must convert it to bytes
 	c.Bandwidth = params.Backup.Bandwidth * 1024 * 1024
 	c.Compact = params.Backup.Compact
 	c.NoTTLOnly = params.Backup.NoTTLOnly

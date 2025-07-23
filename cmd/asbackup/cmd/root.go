@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"strings"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
 	"github.com/aerospike/backup-go/cmd/internal/config"
@@ -28,7 +29,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const VersionDev = "dev"
+const (
+	VersionDev     = "dev"
+	welcomeMessage = "Welcome to the Aerospike backup CLI tool!"
+)
 
 // Cmd represents the base command when called without any subcommands
 type Cmd struct {
@@ -77,6 +81,7 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 	rootCmd := &cobra.Command{
 		Use:   "asbackup",
 		Short: "Aerospike backup CLI tool",
+		Long:  welcomeMessage,
 		RunE:  c.run,
 	}
 
@@ -236,8 +241,8 @@ func newHelpFunction(
 	azureFlagSet *pflag.FlagSet,
 ) func() {
 	return func() {
-		fmt.Println("Welcome to the Aerospike backup CLI tool!")
-		fmt.Println("-----------------------------------------")
+		fmt.Println(welcomeMessage)
+		fmt.Println(strings.Repeat("-", len(welcomeMessage)))
 		fmt.Println("\nUsage:")
 		fmt.Println("  asbackup [flags]")
 

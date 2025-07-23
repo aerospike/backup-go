@@ -60,7 +60,7 @@ func ParseRacks(racks string) ([]int, error) {
 		}
 
 		if rackID < 0 {
-			return nil, fmt.Errorf("rack id %d invalid, should be positive number", rackID)
+			return nil, fmt.Errorf("rack id %d invalid, should be non-negative number", rackID)
 		}
 
 		if rackID > MaxRack {

@@ -61,7 +61,7 @@ func (g *GcpStorage) LoadSecrets(cfg *backup.SecretAgentConfig) error {
 	return nil
 }
 
-// Validate internal validation for struct backup.
+// Validate internal validation for struct params.
 func (g *GcpStorage) Validate() error {
 	if g.BucketName == "" {
 		return fmt.Errorf("bucket name is required")

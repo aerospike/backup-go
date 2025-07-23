@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"strings"
 
 	"github.com/aerospike/backup-go/cmd/internal/config"
 	"github.com/aerospike/backup-go/cmd/internal/flags"
@@ -28,7 +29,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const VersionDev = "dev"
+const (
+	VersionDev     = "dev"
+	welcomeMessage = "Welcome to the Aerospike restore CLI tool!"
+)
 
 // Cmd represents the base command when called without any subcommands
 type Cmd struct {
@@ -78,7 +82,7 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 	rootCmd := &cobra.Command{
 		Use:   "asrestore",
 		Short: "Aerospike restore CLI tool",
-		Long:  "Welcome to the Aerospike restore CLI tool!",
+		Long:  welcomeMessage,
 		RunE:  c.run,
 	}
 
@@ -228,8 +232,8 @@ func newHelpFunction(
 	azureFlagSet *pflag.FlagSet,
 ) func() {
 	return func() {
-		fmt.Println("Welcome to the Aerospike restore CLI tool!")
-		fmt.Println("-----------------------------------------")
+		fmt.Println(welcomeMessage)
+		fmt.Println(strings.Repeat("-", len(welcomeMessage)))
 
 		// Commented until XDR will be released.
 		// fmt.Println("The restore tool automatically identifies and " +

@@ -98,7 +98,7 @@ func NewRestoreConfig(serviceConfig *RestoreServiceConfig, logger *slog.Logger) 
 	c.Parallel = parallel
 	c.WritePolicy = newWritePolicy(serviceConfig.Restore)
 	c.InfoPolicy = newInfoPolicy(serviceConfig.Restore.TimeOut)
-	// As we set --storage-bandwidth-limit in MiB we must convert it to bytes
+	// As we set --bandwidth in MiB we must convert it to bytes
 	c.Bandwidth = serviceConfig.Restore.Bandwidth * 1024 * 1024
 	c.ExtraTTL = serviceConfig.Restore.ExtraTTL
 	c.IgnoreRecordError = serviceConfig.Restore.IgnoreRecordError

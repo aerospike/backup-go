@@ -24,6 +24,6 @@ type App struct {
 	// Format logs as JSON, for parsing by external tools.
 	LogJSON bool
 
-	// ConfigFilePath file path.
+	// ConfigFilePath is the path to the file used for tool configuration.
 	ConfigFilePath string
 }

@@ -8,6 +8,8 @@ HOMEPAGE = "https://www.aerospike.com"
 VENDOR = "Aerospike INC"
 LICENSE = "Apache License 2.0"
 
+NPROC := $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
+
 IMAGE_TAG ?= test
 IMAGE_REPO ?= aerospike/aerospike-backup-tools
 

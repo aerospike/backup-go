@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/aerospike/backup-go/cmd/internal/backup"
@@ -123,6 +124,13 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 	rootCmd.PersistentFlags().AddFlagSet(awsFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(gcpFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(azureFlagSet)
+
+	// Deprecated fields.
+	if err := rootCmd.Flags().MarkDeprecated("nice", "use --bandwidth instead"); err != nil {
+		log.Fatal(err)
+	}
+
+	rootCmd.Flags().Lookup("nice").Hidden = false
 
 	// Beautify help and usage.
 	helpFunc := newHelpFunction(

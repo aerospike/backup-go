@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/aerospike/backup-go/cmd/internal/config"
@@ -111,6 +112,13 @@ func NewCmd(appVersion, commitHash string) (*cobra.Command, *Cmd) {
 	rootCmd.PersistentFlags().AddFlagSet(awsFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(gcpFlagSet)
 	rootCmd.PersistentFlags().AddFlagSet(azureFlagSet)
+
+	// Deprecated fields.
+	if err := rootCmd.Flags().MarkDeprecated("nice", "use --bandwidth instead"); err != nil {
+		log.Fatal(err)
+	}
+
+	rootCmd.Flags().Lookup("nice").Hidden = false
 
 	// Beautify help and usage.
 	helpFunc := newHelpFunction(
@@ -223,11 +231,12 @@ func newHelpFunction(
 		fmt.Println("Welcome to the Aerospike restore CLI tool!")
 		fmt.Println("-----------------------------------------")
 
-		fmt.Println("The restore tool automatically identifies and " +
-			"restores ASB and ASBX backup files found in the specified folder.")
-		fmt.Println("You can set restore mode manually with --mode flag. " +
-			"Flags that are incompatible with restore mode,")
-		fmt.Println("are also incompatible in automatic mode (when mode is not set).")
+		// Commented until XDR will be released.
+		// fmt.Println("The restore tool automatically identifies and " +
+		// 	"restores ASB and ASBX backup files found in the specified folder.")
+		// fmt.Println("You can set restore mode manually with --mode flag. " +
+		// 	"Flags that are incompatible with restore mode,")
+		// fmt.Println("are also incompatible in automatic mode (when mode is not set).")
 
 		fmt.Println("\nUsage:")
 		fmt.Println("  asrestore [flags]")

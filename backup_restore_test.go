@@ -1407,7 +1407,7 @@ func TestBackupEstimate(t *testing.T) {
 func TestBackupContinuation(t *testing.T) {
 	const (
 		setName       = "testBackupContinuation"
-		totalRecords  = 9000
+		totalRecords  = 900
 		testStateFile = "test_state_file"
 	)
 
@@ -1471,6 +1471,7 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	backupCfg.SetList = []string{setName}
 	backupCfg.ParallelRead = 1
 	backupCfg.ParallelWrite = 1
+	backupCfg.Bandwidth = 100000
 
 	backupCfg.StateFile = testStateFile
 	backupCfg.FileLimit = 10

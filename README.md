@@ -6,18 +6,6 @@
 A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data, with support for both standard and
 transactionally consistent backups.
 
-The repository includes the [asbackup](./cmd/asbackup) and [asrestore](./cmd/asrestore) CLI tools,
-built using this library. Refer to their respective README files for usage instructions.
-Binaries for various platforms are released alongside the library and can be found under
-[releases](https://github.com/aerospike/backup-go/releases).
-
-## Backup CLI Tools
-This repository currently hosts the Golang port of the [asbackup](./cmd/asbackup) and
-[asrestore](./cmd/asrestore) Aerospike Backup Tools, which are built using this library.
-These tools are planned to be moved to a separate repository in the future.  
-For build instructions and packaging options, refer to the
-[Aerospike Backup Tools](./docs/backup-tools-usage-guide.md) user guide.
-
 ## Features
 
 - Standard backup and restore operations

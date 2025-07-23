@@ -25,11 +25,11 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/aerospike/backup-go/tests"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"

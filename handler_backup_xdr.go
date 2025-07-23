@@ -20,12 +20,12 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/google/uuid"
 )
 

@@ -8,6 +8,7 @@ HOMEPAGE = "https://www.aerospike.com"
 VENDOR = "Aerospike INC"
 LICENSE = "Apache License 2.0"
 
+GO ?= $(shell which go || echo "/usr/local/go/bin/go")
 NPROC := $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
 
 IMAGE_TAG ?= test

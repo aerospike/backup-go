@@ -175,8 +175,6 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 
 	writeWorkers := bh.writerProcessor.newDataWriters(backupWriters)
 
-	defer closeWriters(backupWriters, bh.logger)
-
 	proc := newDataProcessor(
 		processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
 	)

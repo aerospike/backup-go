@@ -433,10 +433,12 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 	select {
 	case <-bh.ctx.Done():
+		bh.logger.Debug("wait, global context is done")
 		// When global context is done, wait until all routine finish their work properly.
 		// Global context - is context that was passed to Backup() method.
 		err = bh.ctx.Err()
 	case <-ctx.Done():
+		bh.logger.Debug("wait, local context is done")
 		// When local context is done, we cancel global context.
 		// Then wait until all routines finish their work properly.
 		// Local context - is context that was passed to Wait() method.
@@ -444,12 +446,15 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 		err = ctx.Err()
 	case err = <-bh.errors:
+		bh.logger.Debug("wait, got error from backup", slog.Any("error", err))
 		// On error, we cancel global context.
 		// To stop all goroutines and prevent leaks.
 		bh.cancel()
 	case <-bh.done: // Success
+		bh.logger.Debug("wait, success")
 	}
 
+	bh.logger.Debug("waiting for backup to finish")
 	// Wait when all routines ended.
 	bh.wg.Wait()
 
@@ -461,8 +466,11 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 		}
 	}
 
+	bh.logger.Debug("start cleanup")
 	// Clean.
 	bh.cleanup()
+
+	bh.logger.Debug("finalizing backup")
 
 	return err
 }

@@ -222,6 +222,7 @@ func (w *s3Writer) uploadPart() error {
 }
 
 func (w *s3Writer) Close() error {
+	fmt.Println("+++++++++++++++++CLOSE")
 	if w.closed {
 		return os.ErrClosed
 	}

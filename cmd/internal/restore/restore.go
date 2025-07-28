@@ -58,6 +58,7 @@ func NewService(
 		err             error
 	)
 
+	params.Restore.Mode = models.RestoreModeASB
 	// Validations.
 	if err := params.Restore.Validate(); err != nil {
 		return nil, err

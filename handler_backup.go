@@ -226,7 +226,9 @@ func (bh *BackupHandler) run() {
 	bh.stats.Start()
 
 	go doWork(bh.errors, bh.done, bh.logger, func() error {
+		defer bh.logger.Debug("finish do work")
 		defer bh.wg.Done()
+		defer bh.logger.Debug("start exiting do work")
 
 		return bh.backup(bh.ctx)
 	})
@@ -310,6 +312,8 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 }
 
 func (bh *BackupHandler) backup(ctx context.Context) error {
+	defer bh.logger.Debug("exiting backup")
+
 	backupWriters, err := bh.writerProcessor.newWriters(ctx)
 	if err != nil {
 		return err

@@ -159,6 +159,8 @@ func (w *tokenWriter[T]) Write(ctx context.Context, v T) (int, error) {
 
 // Close releases resources associated with the tokenWriter and ensures the underlying writer is properly closed.
 func (w *tokenWriter[T]) Close() error {
+	w.logger.Debug("try to close token writer")
+
 	if err := w.output.Close(); err != nil {
 		return fmt.Errorf("failed to close token writer: %w", err)
 	}

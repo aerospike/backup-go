@@ -6,7 +6,7 @@
 A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data, with support for both standard and
 transactionally consistent backups.
 
-## Official applications built using this library:
+## Official tools powered by this library
 - [Aerospike Backup Service](https://github.com/aerospike/aerospike-backup-service)
 - [Aerospike Backup CLI](https://github.com/aerospike/aerospike-backup-cli)
 

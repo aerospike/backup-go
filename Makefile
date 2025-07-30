@@ -1,11 +1,7 @@
 SHELL = bash
 WORKSPACE = $(shell pwd)
-
 GO ?= $(shell which go || echo "/usr/local/go/bin/go")
 NPROC := $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
-
-IMAGE_TAG ?= test
-IMAGE_REPO ?= aerospike/aerospike-backup-tools
 
 .PHONY: test
 test:
@@ -35,14 +31,3 @@ mocks-generate: mockery-install
 mocks-clean:
 	@echo "Cleaning up all 'mocks' directories..."
 	@find . -type d -name 'mocks' -exec rm -rf {} +
-
-.PHONY: vulnerability-scan
-vulnerability-scan:
-	snyk test --all-projects --policy-path=$(WORKSPACE)/.snyk --severity-threshold=high
-
-.PHONY: vulnerability-scan-container
-vulnerability-scan-container:
-	snyk container test $(IMAGE_REPO):$(IMAGE_TAG) \
-	--policy-path=$(WORKSPACE)/.snyk \
-	--file=Dockerfile \
-	--severity-threshold=high

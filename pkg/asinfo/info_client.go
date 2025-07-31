@@ -934,7 +934,7 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 
 		si.Expression = val
 	}
-	
+
 	return si, nil
 }
 

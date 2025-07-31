@@ -68,7 +68,17 @@ func (r *SindexReader) Read(ctx context.Context) (*models.Token, error) {
 		}
 
 		r.sindexes = make(chan *models.SIndex, len(sindexes))
+
 		for _, sindex := range sindexes {
+			if sindex.Expression != "" {
+				r.logger.Warn("skipping secondary index with expression",
+					slog.String("namespace", sindex.Namespace),
+					slog.String("set", sindex.Set),
+					slog.String("name", sindex.Name),
+					slog.String("expression", sindex.Expression),
+				)
+			}
+
 			r.sindexes <- sindex
 		}
 	}

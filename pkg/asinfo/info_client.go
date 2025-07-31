@@ -926,6 +926,17 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 		return nil, fmt.Errorf("sindex missing bin")
 	}
 
+	// Set index expression value
+	if val, ok := sindexMap["exp"]; ok {
+		if strings.EqualFold(val, "null") {
+			val = ""
+		}
+
+		si.Expression = val
+	} else {
+		return nil, fmt.Errorf("sindex missing namespace")
+	}
+
 	return si, nil
 }
 

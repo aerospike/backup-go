@@ -74,7 +74,7 @@ func (r *SindexReader) Read(ctx context.Context) (*models.Token, error) {
 				r.logger.Warn("skipping secondary index with expression",
 					slog.String("namespace", sindex.Namespace),
 					slog.String("set", sindex.Set),
-					slog.String("name", sindex.Name),
+					slog.String("index", sindex.Name),
 					slog.String("expression", sindex.Expression),
 				)
 			}

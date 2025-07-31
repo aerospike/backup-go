@@ -933,10 +933,8 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 		}
 
 		si.Expression = val
-	} else {
-		return nil, fmt.Errorf("sindex missing namespace")
 	}
-
+	
 	return si, nil
 }
 

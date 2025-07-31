@@ -71,12 +71,14 @@ func (r *SindexReader) Read(ctx context.Context) (*models.Token, error) {
 
 		for _, sindex := range sindexes {
 			if sindex.Expression != "" {
-				r.logger.Warn("skipping secondary index with expression",
+				r.logger.Warn("skipped secondary index with expression",
 					slog.String("namespace", sindex.Namespace),
 					slog.String("set", sindex.Set),
 					slog.String("index", sindex.Name),
 					slog.String("expression", sindex.Expression),
 				)
+
+				continue
 			}
 
 			r.sindexes <- sindex

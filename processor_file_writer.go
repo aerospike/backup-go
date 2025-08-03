@@ -87,7 +87,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	}
 }
 
-// newDataWriters returns a pipeline writing workers for writers.
+// newDataWriters returns initialized pipeline workers for write operations.
 func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser) []pipe.Writer[T] {
 	dataWriters := make([]pipe.Writer[T], len(writers))
 

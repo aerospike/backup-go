@@ -479,7 +479,7 @@ func (bh *BackupHandler) backupSIndexes(
 		newTokenWriter(
 			bh.encoder,
 			writer,
-			bh.logger,
+			bh.logger.With(slog.String("writer", "sindex")),
 			stInfo,
 		),
 	)
@@ -517,7 +517,7 @@ func (bh *BackupHandler) backupUDFs(
 		newTokenWriter(
 			bh.encoder,
 			writer,
-			bh.logger,
+			bh.logger.With(slog.String("writer", "udf")),
 			stInfo,
 		),
 	)

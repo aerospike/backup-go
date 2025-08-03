@@ -5,7 +5,7 @@
 package mocks
 
 import (
-	"github.com/aerospike/backup-go/internal/asinfo"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	mock "github.com/stretchr/testify/mock"
 )
 

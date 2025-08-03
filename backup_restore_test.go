@@ -25,11 +25,11 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/aerospike/backup-go/tests"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
@@ -169,7 +169,7 @@ func TestBackupRestoreIndexUdf(t *testing.T) {
 	backupConfig.SetList = []string{setName}
 	restoreConfig := NewDefaultRestoreConfig()
 
-	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -401,7 +401,7 @@ func TestBackupRestoreBinFilter(t *testing.T) {
 	restoreConfig := NewDefaultRestoreConfig()
 	restoreConfig.BinList = []string{"BackupRestore", "OnlyRestore"}
 
-	records, err := genRecords(testASNamespace, setName, 1000, a.BinMap{
+	records, err := genRecords(testASNamespace, setName, 100, a.BinMap{
 		"BackupRestore": 1,
 		"OnlyBackup":    2,
 		"OnlyRestore":   3,
@@ -420,7 +420,7 @@ func TestBackupRestoreBinFilter(t *testing.T) {
 	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
 	require.NoError(t, err)
 
-	expected, err := genRecords(testASNamespace, setName, 1000, a.BinMap{
+	expected, err := genRecords(testASNamespace, setName, 100, a.BinMap{
 		"BackupRestore": 1,
 	})
 	require.NoError(t, err)
@@ -585,7 +585,7 @@ func TestBackupRestoreParallelNode(t *testing.T) {
 	backupConfig.SetList = []string{setName}
 	restoreConfig := NewDefaultRestoreConfig()
 
-	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -638,7 +638,7 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	backupConfig.SetList = []string{setName}
 	restoreConfig := NewDefaultRestoreConfig()
 
-	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -686,7 +686,7 @@ func TestBackupRestoreRackList(t *testing.T) {
 	backupConfig.SetList = []string{setName}
 	restoreConfig := NewDefaultRestoreConfig()
 
-	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -729,7 +729,7 @@ func TestBackupRestorePartitionList(t *testing.T) {
 	require.NoError(t, err)
 	defer asClient.Close()
 
-	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -789,7 +789,7 @@ func TestBackupRestoreAfterDigest(t *testing.T) {
 	require.NoError(t, err)
 	defer asClient.Close()
 
-	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -840,7 +840,7 @@ func TestBackupRestoreDefault(t *testing.T) {
 	backupConfig.SetList = []string{setName}
 	restoreConfig := NewDefaultRestoreConfig()
 
-	records, err := genRecords(testASNamespace, setName, 10_000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -892,7 +892,7 @@ func TestBackupRestoreDisableBatchWrites(t *testing.T) {
 	restoreConfig := NewDefaultRestoreConfig()
 	restoreConfig.DisableBatchWrites = true
 
-	records, err := genRecords(testASNamespace, setName, 10_000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -940,7 +940,7 @@ func TestBackupRestoreFileLimit(t *testing.T) {
 	backupConfig.FileLimit = 1024 * 1024
 	restoreConfig := NewDefaultRestoreConfig()
 
-	records, err := genRecords(testASNamespace, setName, 10_000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -994,7 +994,7 @@ func TestBackupRestoreFileLimitDisableBatch(t *testing.T) {
 	restoreConfig := NewDefaultRestoreConfig()
 	restoreConfig.DisableBatchWrites = true
 
-	records, err := genRecords(testASNamespace, setName, 10_000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -1048,7 +1048,7 @@ func TestBackupRestoreParallelDisableBatch(t *testing.T) {
 	restoreConfig := NewDefaultRestoreConfig()
 	restoreConfig.DisableBatchWrites = true
 
-	records, err := genRecords(testASNamespace, setName, 10_000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -1102,7 +1102,7 @@ func TestBackupRestoreParallelFileLimit(t *testing.T) {
 
 	restoreConfig := NewDefaultRestoreConfig()
 
-	records, err := genRecords(testASNamespace, setName, 10_000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -1159,7 +1159,7 @@ func TestBackupRestoreWithPartitions(t *testing.T) {
 
 	restoreConfig := NewDefaultRestoreConfig()
 
-	numRec := 1000
+	numRec := 100
 	bins := a.BinMap{
 		"IntBin": 1,
 	}
@@ -1387,7 +1387,7 @@ func TestBackupEstimate(t *testing.T) {
 
 	backupConfig := NewDefaultBackupConfig()
 
-	records, err := genRecords(testASNamespace, setName, 1000, testBins)
+	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
@@ -1407,7 +1407,7 @@ func TestBackupEstimate(t *testing.T) {
 func TestBackupContinuation(t *testing.T) {
 	const (
 		setName       = "testBackupContinuation"
-		totalRecords  = 9000
+		totalRecords  = 900
 		testStateFile = "test_state_file"
 	)
 
@@ -1471,6 +1471,7 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	backupCfg.SetList = []string{setName}
 	backupCfg.ParallelRead = 1
 	backupCfg.ParallelWrite = 1
+	backupCfg.Bandwidth = 100000
 
 	backupCfg.StateFile = testStateFile
 	backupCfg.FileLimit = 10

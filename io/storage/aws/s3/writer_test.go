@@ -18,7 +18,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -54,6 +56,10 @@ type WriterSuite struct {
 
 func (s *WriterSuite) SetupSuite() {
 	defer s.suiteWg.Done() // Signal that setup is complete
+
+	err := createAwsCredentials()
+	s.Require().NoError(err)
+
 	ctx := context.Background()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
@@ -73,6 +79,36 @@ func TestWriterSuite(t *testing.T) {
 	s := new(WriterSuite)
 	s.suiteWg.Add(1)
 	suite.Run(t, s)
+}
+
+func createAwsCredentials() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("error getting home directory: %w", err)
+	}
+
+	awsDir := filepath.Join(home, ".aws")
+	err = os.MkdirAll(awsDir, 0o700)
+	if err != nil {
+		return fmt.Errorf("error creating .aws directory: %w", err)
+	}
+
+	filePath := filepath.Join(awsDir, "credentials")
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		credentialsFileBytes := []byte(`[minio]
+aws_access_key_id = minioadmin
+aws_secret_access_key = minioadminpassword`)
+
+		err = os.WriteFile(filePath, credentialsFileBytes, 0o600)
+		if err != nil {
+			return fmt.Errorf("error writing ~/.aws/credentials file: %w", err)
+		}
+
+		fmt.Println("Credentials file created successfully!")
+	}
+
+	return nil
 }
 
 func fillWriterTestData(ctx context.Context, client *s3.Client) error {

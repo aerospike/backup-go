@@ -24,9 +24,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/asinfo"
 	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 )
 
 // After that delay, we start to poll stats from db.

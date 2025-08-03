@@ -63,11 +63,12 @@ type SIndexPath struct {
 }
 
 type SIndex struct {
-	Namespace string
-	Set       string
-	Name      string
-	Path      SIndexPath
-	IndexType SIndexType
+	Namespace  string
+	Set        string
+	Name       string
+	Path       SIndexPath
+	IndexType  SIndexType
+	Expression string
 }
 
 type UDFType byte

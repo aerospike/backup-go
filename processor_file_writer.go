@@ -103,12 +103,7 @@ func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser) []pip
 // createDataWriter creates a single data writer with state info if available.
 func (fw *fileWriterProcessor[T]) createDataWriter(writer io.WriteCloser, n int) pipe.Writer[T] {
 	sInfo := fw.getStateInfo(n)
-	tWriter := newTokenWriter(
-		fw.encoder,
-		writer,
-		fw.logger.With(slog.String("writer", fmt.Sprintf("%d", n))),
-		sInfo,
-	)
+	tWriter := newTokenWriter(fw.encoder, writer, fw.logger.With(slog.Int("writer", n)), sInfo)
 
 	return newWriterWithTokenStats(tWriter, fw.stats, fw.logger)
 }

@@ -87,25 +87,34 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	}
 }
 
-// newWriteWorkers returns a pipeline writing workers' for writers.
-func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser,
-) []pipe.Writer[T] {
+// newDataWriters returns initialized pipeline workers for write operations.
+func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser) []pipe.Writer[T] {
 	dataWriters := make([]pipe.Writer[T], len(writers))
 
 	for i, writer := range writers {
-		var dataWriter pipe.Writer[T] = newTokenWriter(fw.encoder, writer, fw.logger, nil)
-
-		if fw.state != nil {
-			stInfo := newStateInfo(fw.state.RecordsStateChan, i)
-			dataWriter = newTokenWriter(fw.encoder, writer, fw.logger, stInfo)
-		}
-
-		dataWriters[i] = newWriterWithTokenStats(dataWriter, fw.stats, fw.logger)
+		dataWriters[i] = fw.createDataWriter(writer, i)
 	}
 
-	fw.logger.Debug("created new data writer", slog.Int("writersNumber", len(writers)))
+	fw.logger.Debug("created data writers", slog.Int("count", len(writers)))
 
 	return dataWriters
+}
+
+// createDataWriter creates a single data writer with state info if available.
+func (fw *fileWriterProcessor[T]) createDataWriter(writer io.WriteCloser, n int) pipe.Writer[T] {
+	sInfo := fw.getStateInfo(n)
+	tWriter := newTokenWriter(fw.encoder, writer, fw.logger.With(slog.Int("writer", n)), sInfo)
+
+	return newWriterWithTokenStats(tWriter, fw.stats, fw.logger)
+}
+
+// getStateInfo returns state info for the given index if state is available.
+func (fw *fileWriterProcessor[T]) getStateInfo(n int) *stateInfo {
+	if fw.state == nil {
+		return nil
+	}
+
+	return newStateInfo(fw.state.RecordsStateChan, n)
 }
 
 // newWriters returns a slice of configured writers.

@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"strings"
@@ -156,6 +157,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		buffer:     new(bytes.Buffer),
 		partNumber: 1,
 		chunkSize:  w.ChunkSize,
+		logger:     w.Logger,
 	}, nil
 }
 
@@ -177,6 +179,7 @@ type s3Writer struct {
 	chunkSize      int
 	partNumber     int32
 	closed         bool
+	logger         *slog.Logger
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)

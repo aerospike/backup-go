@@ -317,8 +317,6 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 
 	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
 
-	defer closeWriters(backupWriters, bh.logger)
-
 	// backup secondary indexes and UDFs on the first writer
 	// this is done to match the behavior of the
 	// backup c tool and keep the backup files more consistent
@@ -397,18 +395,13 @@ func (bh *BackupHandler) countRecords(ctx context.Context) {
 	bh.stats.TotalRecords.Store(records)
 }
 
-func closeWriters(backupWriters []io.WriteCloser, logger *slog.Logger) {
-	for _, w := range backupWriters {
-		if err := w.Close(); err != nil {
-			logger.Error("failed to close backup file", "error", err)
-		}
-	}
-}
-
 func (bh *BackupHandler) backupSIndexesAndUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
 ) error {
+	// The original writer is wrapped to disable closing after writing metadata.
+	writer = newNoCloseWriter(writer)
+
 	if !bh.config.NoIndexes {
 		err := bh.backupSIndexes(ctx, writer)
 		if err != nil {
@@ -473,7 +466,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 
 func (bh *BackupHandler) backupSIndexes(
 	ctx context.Context,
-	writer io.Writer,
+	writer io.WriteCloser,
 ) error {
 	dataReader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
 
@@ -486,7 +479,7 @@ func (bh *BackupHandler) backupSIndexes(
 		newTokenWriter(
 			bh.encoder,
 			writer,
-			bh.logger,
+			bh.logger.With(slog.String("writer", "sindex")),
 			stInfo,
 		),
 	)
@@ -503,7 +496,7 @@ func (bh *BackupHandler) backupSIndexes(
 		pipe.Fixed,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create sindex pipeline: %w", err)
 	}
 
 	return sindexPipeline.Run(ctx)
@@ -511,7 +504,7 @@ func (bh *BackupHandler) backupSIndexes(
 
 func (bh *BackupHandler) backupUDFs(
 	ctx context.Context,
-	writer io.Writer,
+	writer io.WriteCloser,
 ) error {
 	dataReader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
 
@@ -524,7 +517,7 @@ func (bh *BackupHandler) backupUDFs(
 		newTokenWriter(
 			bh.encoder,
 			writer,
-			bh.logger,
+			bh.logger.With(slog.String("writer", "udf")),
 			stInfo,
 		),
 	)
@@ -541,7 +534,7 @@ func (bh *BackupHandler) backupUDFs(
 		pipe.Fixed,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create udf pipeline: %w", err)
 	}
 
 	return udfPipeline.Run(ctx)

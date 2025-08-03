@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"testing"
 
@@ -28,6 +29,18 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+type bufferWriteCloser struct {
+	*bytes.Buffer
+}
+
+func (bwc *bufferWriteCloser) Close() error {
+	return nil // no-op
+}
+
+func newBufferWriteCloser(buf *bytes.Buffer) io.WriteCloser {
+	return &bufferWriteCloser{Buffer: buf}
+}
 
 func TestTokenWriter(t *testing.T) {
 	t.Parallel()
@@ -69,27 +82,28 @@ func TestTokenWriter(t *testing.T) {
 	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)
 	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
-	dst := bytes.Buffer{}
-	writer := newTokenWriter[*models.Token](mockEncoder, &dst, slog.Default(), nil)
+	b := bytes.Buffer{}
+	dst := newBufferWriteCloser(&b)
+	writer := newTokenWriter[*models.Token](mockEncoder, dst, slog.Default(), nil)
 	require.NotNil(t, writer)
 
 	ctx := context.Background()
 
 	_, err := writer.Write(ctx, recToken)
 	require.NoError(t, err)
-	require.Equal(t, "encoded rec ", dst.String())
+	require.Equal(t, "encoded rec ", b.String())
 
 	_, err = writer.Write(ctx, SIndexToken)
 	require.NoError(t, err)
-	require.Equal(t, "encoded rec encoded sindex ", dst.String())
+	require.Equal(t, "encoded rec encoded sindex ", b.String())
 
 	_, err = writer.Write(ctx, UDFToken)
 	require.NoError(t, err)
-	require.Equal(t, "encoded rec encoded sindex encoded udf ", dst.String())
+	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
 
 	_, err = writer.Write(ctx, &models.Token{Type: models.TokenTypeInvalid})
 	require.NotNil(t, err)
-	require.Equal(t, "encoded rec encoded sindex encoded udf ", dst.String())
+	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
 
 	failRec := &models.Record{
 		Record: &a.Record{},

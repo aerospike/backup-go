@@ -35,6 +35,7 @@ type statsSetterToken interface {
 	AddSIndexes(uint32)
 }
 
+// tokenStatsWriter is used to count UDFs and SIndexes.
 type tokenStatsWriter[T models.TokenConstraint] struct {
 	writer pipe.Writer[T]
 	stats  statsSetterToken
@@ -81,7 +82,6 @@ func (tw *tokenStatsWriter[T]) Write(ctx context.Context, data T) (int, error) {
 }
 
 func (tw *tokenStatsWriter[T]) Close() error {
-	tw.logger.Debug("closed token stats writer")
 	return tw.writer.Close()
 }
 
@@ -90,7 +90,7 @@ func (tw *tokenStatsWriter[T]) Close() error {
 // to an io.Writer. It uses an Encoder to encode the data.
 type tokenWriter[T models.TokenConstraint] struct {
 	encoder   Encoder[T]
-	output    io.Writer
+	output    io.WriteCloser
 	logger    *slog.Logger
 	stateInfo *stateInfo
 }
@@ -112,7 +112,7 @@ func newStateInfo(recordsStateChan chan<- models.PartitionFilterSerialized, n in
 // newTokenWriter creates a new tokenWriter.
 func newTokenWriter[T models.TokenConstraint](
 	encoder Encoder[T],
-	output io.Writer,
+	output io.WriteCloser,
 	logger *slog.Logger,
 	stateInfo *stateInfo,
 ) *tokenWriter[T] {
@@ -157,9 +157,38 @@ func (w *tokenWriter[T]) Write(ctx context.Context, v T) (int, error) {
 	return w.output.Write(data)
 }
 
-// Close satisfies the DataWriter interface
-// but is a no-op for the tokenWriter.
+// Close releases resources associated with the tokenWriter and ensures the underlying writer is properly closed.
 func (w *tokenWriter[T]) Close() error {
+	w.logger.Debug("try to close token writer")
+
+	if err := w.output.Close(); err != nil {
+		return fmt.Errorf("failed to close token writer: %w", err)
+	}
+
 	w.logger.Debug("closed token writer")
+
+	return nil
+}
+
+// noCloseWriter wraps an io.Writer and provides a no-op Close method.
+// It is used when writing UDF and SIndexes to the first file.
+type noCloseWriter struct {
+	writer io.Writer
+}
+
+// newNoCloseWriter wraps an io.Writer, disabling the Close operation while preserving Write functionality.
+func newNoCloseWriter(w io.Writer) io.WriteCloser {
+	return &noCloseWriter{
+		writer: w,
+	}
+}
+
+// Write writes bytes to the underlying writer.
+func (w *noCloseWriter) Write(p []byte) (n int, err error) {
+	return w.writer.Write(p)
+}
+
+// Close is a no-op for noCloseWriter.
+func (w *noCloseWriter) Close() error {
 	return nil
 }

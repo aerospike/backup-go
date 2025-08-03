@@ -399,6 +399,7 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
 ) error {
+	// The original writer is wrapped to disable closing after writing metadata.
 	writer = newNoCloseWriter(writer)
 
 	if !bh.config.NoIndexes {

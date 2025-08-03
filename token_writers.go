@@ -35,7 +35,7 @@ type statsSetterToken interface {
 	AddSIndexes(uint32)
 }
 
-// tokenStatsWriter used to count UDFs and SIndexes.
+// tokenStatsWriter is used to count UDFs and SIndexes.
 type tokenStatsWriter[T models.TokenConstraint] struct {
 	writer pipe.Writer[T]
 	stats  statsSetterToken
@@ -170,7 +170,8 @@ func (w *tokenWriter[T]) Close() error {
 	return nil
 }
 
-// noCloseWriter used not to close writer after writing UDF and SIndexes to the first file.
+// noCloseWriter wraps an io.Writer and provides a no-op Close method.
+// It is used when writing UDF and SIndexes to the first file.
 type noCloseWriter struct {
 	writer io.Writer
 }
@@ -182,12 +183,12 @@ func newNoCloseWriter(w io.Writer) io.WriteCloser {
 	}
 }
 
-// Write writes bytes to writer.
+// Write writes bytes to the underlying writer.
 func (w *noCloseWriter) Write(p []byte) (n int, err error) {
 	return w.writer.Write(p)
 }
 
-// Close no op func to satisfy interface.
+// Close is a no-op for noCloseWriter.
 func (w *noCloseWriter) Close() error {
 	return nil
 }

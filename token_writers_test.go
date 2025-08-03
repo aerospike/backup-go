@@ -38,7 +38,7 @@ func (bwc *bufferWriteCloser) Close() error {
 	return nil // no-op
 }
 
-func NewBufferWriteCloser(buf *bytes.Buffer) io.WriteCloser {
+func newBufferWriteCloser(buf *bytes.Buffer) io.WriteCloser {
 	return &bufferWriteCloser{Buffer: buf}
 }
 
@@ -83,7 +83,7 @@ func TestTokenWriter(t *testing.T) {
 	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
 
 	b := bytes.Buffer{}
-	dst := NewBufferWriteCloser(&b)
+	dst := newBufferWriteCloser(&b)
 	writer := newTokenWriter[*models.Token](mockEncoder, dst, slog.Default(), nil)
 	require.NotNil(t, writer)
 

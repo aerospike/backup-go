@@ -170,17 +170,9 @@ func (w *tokenWriter[T]) Close() error {
 	return nil
 }
 
-// noCloseWriter used not to close writer after writing UDF and SIndexes to first file.
+// noCloseWriter used not to close writer after writing UDF and SIndexes to the first file.
 type noCloseWriter struct {
 	writer io.Writer
-}
-
-func (w *noCloseWriter) Write(p []byte) (n int, err error) {
-	return w.writer.Write(p)
-}
-
-func (w *noCloseWriter) Close() error {
-	return nil
 }
 
 // newNoCloseWriter wraps an io.Writer, disabling the Close operation while preserving Write functionality.
@@ -188,4 +180,14 @@ func newNoCloseWriter(w io.Writer) io.WriteCloser {
 	return &noCloseWriter{
 		writer: w,
 	}
+}
+
+// Write writes bytes to writer.
+func (w *noCloseWriter) Write(p []byte) (n int, err error) {
+	return w.writer.Write(p)
+}
+
+// Close no op func to satisfy interface.
+func (w *noCloseWriter) Close() error {
+	return nil
 }

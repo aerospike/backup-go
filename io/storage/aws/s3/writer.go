@@ -225,10 +225,6 @@ func (w *s3Writer) uploadPart() error {
 }
 
 func (w *s3Writer) Close() error {
-	if w.logger != nil {
-		w.logger.Debug("s3, start closing writer")
-	}
-
 	if w.closed {
 		return os.ErrClosed
 	}
@@ -254,10 +250,6 @@ func (w *s3Writer) Close() error {
 	}
 
 	w.closed = true
-
-	if w.logger != nil {
-		w.logger.Debug("s3, finish closing writer")
-	}
 
 	return nil
 }

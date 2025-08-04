@@ -1177,7 +1177,7 @@ func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]infoMap, error) {
 	for i, object := range objects {
 		data, err := parseInfoObject(object, pairSep, kvSep)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse info object: %s: %w", object, err)
 		}
 
 		info[i] = data

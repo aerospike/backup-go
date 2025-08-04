@@ -760,7 +760,12 @@ func getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*mo
 		return nil, fmt.Errorf("failed to get sindexes: %w", err)
 	}
 
-	return parseSIndexes(response[cmd])
+	cmdResp, err := parseResultResponse(cmd, response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
+	}
+
+	return parseSIndexes(cmdResp)
 }
 
 func buildSindexCmd(namespace string, getCtx bool) string {
@@ -946,7 +951,12 @@ func getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF, error) {
 		return nil, fmt.Errorf("failed to list UDFs: %w", aerr)
 	}
 
-	udfList, err := parseUDFListResponse(response[cmd])
+	cmdResp, err := parseResultResponse(cmd, response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse udf-list response: %w", err)
+	}
+
+	udfList, err := parseUDFListResponse(cmdResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse udf-list info response: %w", err)
 	}
@@ -983,12 +993,12 @@ func getUDF(node infoGetter, name string, policy *a.InfoPolicy) (*models.UDF, er
 		return nil, fmt.Errorf("udf-get info command failed: %w", aerr)
 	}
 
-	udfInfo, ok := response[cmd]
-	if !ok {
-		return nil, fmt.Errorf("command %s info response missing", cmd)
+	cmdResp, err := parseResultResponse(cmd, response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse udf response: %w", err)
 	}
 
-	udf, err := parseUDFResponse(udfInfo)
+	udf, err := parseUDFResponse(cmdResp)
 	if err != nil {
 		return nil, err
 	}
@@ -1177,7 +1187,7 @@ func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]infoMap, error) {
 	for i, object := range objects {
 		data, err := parseInfoObject(object, pairSep, kvSep)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse info object: %s: %w", object, err)
+			return nil, err
 		}
 
 		info[i] = data

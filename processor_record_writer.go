@@ -99,7 +99,14 @@ func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
 		return false, nil
 	}
 
-	infoClient := asinfo.NewInfoClientFromAerospike(rw.aerospikeClient, rw.config.InfoPolicy, rw.config.InfoRetryPolicy)
+	infoClient, err := asinfo.NewClient(
+		rw.aerospikeClient,
+		rw.config.InfoPolicy,
+		rw.config.InfoRetryPolicy,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to create info client: %w", err)
+	}
 
 	return infoClient.SupportsBatchWrite()
 }

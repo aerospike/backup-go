@@ -780,14 +780,14 @@ func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
 func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (AerospikeVersion, error) {
 	cmd := ic.cmdDict[cmdIDBuild]
 
-	versionResp, err := conn.RequestInfo(policy, cmd)
-	if err != nil {
-		return AerospikeVersion{}, err
+	versionResp, aErr := conn.RequestInfo(policy, cmd)
+	if aErr != nil {
+		return AerospikeVersion{}, aErr
 	}
 
-	versionStr, ok := versionResp[cmd]
-	if !ok {
-		return AerospikeVersion{}, fmt.Errorf("failed to get Aerospike version, info response missing 'build' key")
+	versionStr, err := parseResultResponse(cmd, versionResp)
+	if err != nil {
+		return AerospikeVersion{}, fmt.Errorf("failed to parse get version dc response: %w", err)
 	}
 
 	return parseAerospikeVersion(versionStr)

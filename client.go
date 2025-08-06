@@ -247,7 +247,10 @@ func (c *Client) BackupXDR(
 		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
 	}
 
-	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
+	handler, err := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup handler: %w", err)
+	}
 
 	handler.run()
 

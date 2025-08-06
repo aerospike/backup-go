@@ -71,7 +71,7 @@ type BackupHandler struct {
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *bandwidth.Limiter
-	infoClient             *asinfo.InfoClient
+	infoClient             *asinfo.Client
 	scanLimiter            *semaphore.Weighted
 	errors                 chan error
 	done                   chan struct{}
@@ -156,7 +156,11 @@ func newBackupHandler(
 		config.MetricsEnabled,
 	)
 
-	infoCLient := asinfo.NewInfoClientFromAerospike(ac, config.InfoPolicy, config.InfoRetryPolicy)
+	infoCLient, err := asinfo.NewClient(ac, config.InfoPolicy, config.InfoRetryPolicy)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create info client: %w", err)
+	}
 
 	readerProcessor := newRecordReaderProcessor[*models.Token](
 		config,

@@ -32,7 +32,7 @@ type recordReaderProcessorXDR[T models.TokenConstraint] struct {
 	xdrConfig *ConfigBackupXDR
 	// add scanConfig in the future.
 	aerospikeClient AerospikeClient
-	infoClient      *asinfo.InfoClient
+	infoClient      *asinfo.Client
 	state           *State
 	scanLimiter     *semaphore.Weighted
 	rpsCollector    *metrics.Collector
@@ -44,7 +44,7 @@ type recordReaderProcessorXDR[T models.TokenConstraint] struct {
 func newRecordReaderProcessorXDR[T models.TokenConstraint](
 	xdrConfig *ConfigBackupXDR,
 	aerospikeClient AerospikeClient,
-	infoClient *asinfo.InfoClient,
+	infoClient *asinfo.Client,
 	state *State,
 	scanLimiter *semaphore.Weighted,
 	rpsCollector *metrics.Collector,

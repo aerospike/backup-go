@@ -778,7 +778,8 @@ func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
 }
 
 func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (AerospikeVersion, error) {
-	cmd := ic.cmdDict[cmdIDBuild]
+	// As we need to check version before we form dict, this command will be loaded directly.
+	cmd := cmdBuild
 
 	versionResp, aErr := conn.RequestInfo(policy, cmd)
 	if aErr != nil {

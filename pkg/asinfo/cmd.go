@@ -41,6 +41,7 @@ const commandsNumber = 19
 
 // Old commands for db version < versionLast
 const (
+	// cmdBuild as we need to check version before we form dict, this command will be called directly.
 	cmdBuild                = "build"
 	cmdSetsOfNamespace      = "sets/%s"
 	cmdNamespaceInfo        = "namespace/%s"

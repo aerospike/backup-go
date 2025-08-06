@@ -291,7 +291,7 @@ func TestBackupRestoreNamespace(t *testing.T) {
 	defer asClient.Close()
 
 	backupConfig := NewDefaultBackupConfig()
-	backupConfig.Namespace = "[efdwe"
+	backupConfig.Namespace = testASNamespace
 	backupConfig.SetList = []string{setName}
 
 	ns := testASNamespace

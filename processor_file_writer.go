@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
 	"github.com/aerospike/backup-go/io/encryption"
+	"github.com/aerospike/backup-go/io/instrumental"
 	"github.com/aerospike/backup-go/io/lazy"
 	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
@@ -165,11 +166,13 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix st
 		return nil, fmt.Errorf("failed to create storage writer: %w", err)
 	}
 
+	instrumentalWriter := instrumental.NewWriter(storageWriter)
+
 	// Apply encryption (if it is enabled).
 	encryptedWriter, err := newEncryptionWriter(
 		fw.encryptionPolicy,
 		fw.secretAgentConfig,
-		counter.NewWriter(storageWriter, &fw.stats.BytesWritten, sizeCounter),
+		counter.NewWriter(instrumentalWriter, &fw.stats.BytesWritten, sizeCounter),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set encryption: %w", err)

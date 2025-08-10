@@ -1809,8 +1809,6 @@ func Test_parseInfoObject(t *testing.T) {
 }
 
 func TestClient_EnableDisableXDR(t *testing.T) {
-	t.Parallel()
-
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
@@ -1942,8 +1940,6 @@ func TestClient_GetRecordCount(t *testing.T) {
 }
 
 func TestClient_XDR(t *testing.T) {
-	t.Parallel()
-
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
@@ -2045,10 +2041,6 @@ func TestClient_GetStatus(t *testing.T) {
 }
 
 func TestClient_GetDCsList(t *testing.T) {
-	t.Parallel()
-
-	const dc = "testDcList"
-
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
@@ -2058,14 +2050,14 @@ func TestClient_GetDCsList(t *testing.T) {
 	node, err := ic.cluster.GetRandomNode()
 	require.NoError(t, err)
 
-	err = ic.createXDRDC(node.GetName(), dc)
+	err = ic.createXDRDC(node.GetName(), testASDC)
 	require.NoError(t, err)
 
 	result, err := ic.GetDCsList()
 	require.NoError(t, err)
 
-	err = ic.deleteXDRDC(node.GetName(), dc)
+	err = ic.deleteXDRDC(node.GetName(), testASDC)
 	require.NoError(t, err)
 
-	require.Equal(t, []string{dc}, result)
+	require.Equal(t, []string{testASDC}, result)
 }

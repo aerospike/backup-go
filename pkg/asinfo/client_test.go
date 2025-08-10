@@ -2001,7 +2001,7 @@ func TestClient_GetNamespacesList(t *testing.T) {
 	result, err := ic.GetNamespacesList()
 	require.NoError(t, err)
 
-	require.Equal(t, testASNamespace, result)
+	require.Equal(t, []string{testASNamespace}, result)
 }
 
 func TestClient_GetStatus(t *testing.T) {

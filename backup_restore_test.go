@@ -214,9 +214,9 @@ func TestBackupRestoreIndexUdf(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
 	// Validate sindexes.
-	infoCLient, err := testInfoClient(asClient)
+	infoClient, err := testInfoClient(asClient)
 	require.NoError(t, err)
-	dbIndexes, err := readAllSIndexes(infoCLient, testASNamespace)
+	dbIndexes, err := readAllSIndexes(infoClient, testASNamespace)
 	require.NoError(t, err)
 	require.EqualValues(t, indexes, dbIndexes)
 }

@@ -16,6 +16,8 @@ package asinfo
 
 const (
 	cmdIDBuild = iota
+	cmdIDStatus
+	cmdIDNamespaces
 	cmdIDSetsOfNamespace
 	cmdIDNamespaceInfo
 	cmdIDRack
@@ -29,11 +31,12 @@ const (
 	cmdIDCreateXDRNode
 	cmdIDCreateXDRNamespace
 	cmdIDDeleteXDRDC
-	cmdIDGetStats
+	cmdIDGetXDRStats
 	cmdIDBlockMRTWrites
 	cmdIDUnBlockMRTWrites
 	cmdIDSetXDRMaxThroughput
 	cmdIDSetXDRForward
+	cmdIDGetConfigXDR
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
@@ -43,6 +46,8 @@ const commandsNumber = 19
 const (
 	// cmdBuild as we need to check version before we form dict, this command will be called directly.
 	cmdBuild               = "build"
+	cmdStatus              = "status"
+	cmdNamespaces          = "namespaces"
 	cmdSetsOfNamespace     = "sets/%s"
 	cmdNamespaceInfo       = "namespace/%s"
 	cmdRack                = "racks:"
@@ -55,11 +60,12 @@ const (
 	cmdCreateXDRNode       = "set-config:context=xdr;dc=%s;node-address-port=%s;action=add"
 	cmdCreateXDRNamespace  = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
 	cmdDeleteXDRDC         = "set-config:context=xdr;dc=%s;action=delete"
-	cmdGetStats            = "get-stats:context=xdr;dc=%s;namespace=%s"
+	cmdGetXDRStats         = "get-stats:context=xdr;dc=%s;namespace=%s"
 	cmdBlockMRTWrites      = "set-config:context=namespace;namespace=%s;disable-mrt-writes=true"
 	cmdUnBlockMRTWrites    = "set-config:context=namespace;namespace=%s;disable-mrt-writes=false"
 	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
+	cmdGetConfigXDR        = "get-config:context=xdr"
 
 	// Deprecated commands:
 
@@ -75,6 +81,8 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 	cmds := make(map[int]string, commandsNumber)
 
 	cmds[cmdIDBuild] = cmdBuild
+	cmds[cmdIDStatus] = cmdStatus
+	cmds[cmdIDNamespaces] = cmdNamespaces
 	cmds[cmdIDSetsOfNamespace] = cmdSetsOfNamespace
 	cmds[cmdIDNamespaceInfo] = cmdNamespaceInfo
 	cmds[cmdIDRack] = cmdRack
@@ -88,11 +96,12 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 	cmds[cmdIDCreateXDRNode] = cmdCreateXDRNode
 	cmds[cmdIDCreateXDRNamespace] = cmdCreateXDRNamespace
 	cmds[cmdIDDeleteXDRDC] = cmdDeleteXDRDC
-	cmds[cmdIDGetStats] = cmdGetStats
+	cmds[cmdIDGetXDRStats] = cmdGetXDRStats
 	cmds[cmdIDBlockMRTWrites] = cmdBlockMRTWrites
 	cmds[cmdIDUnBlockMRTWrites] = cmdUnBlockMRTWrites
 	cmds[cmdIDSetXDRMaxThroughput] = cmdSetXDRMaxThroughput
 	cmds[cmdIDSetXDRForward] = cmdSetXDRForward
+	cmds[cmdIDGetConfigXDR] = cmdGetConfigXDR
 
 	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList

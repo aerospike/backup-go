@@ -24,6 +24,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
 	"github.com/segmentio/asm/base64"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,12 +39,22 @@ const (
 	testSetInfo         = "info_set"
 )
 
-func newMockAerospikeClient(t *testing.T) aerospikeClient {
+func newNodeGetterMock(t *testing.T) nodeGetter {
 	t.Helper()
-	mockASClient := mocks.NewMockaerospikeClient(t)
-	mockASClient.On("Cluster").Return(&a.Cluster{})
+	mockNodeGetter := mocks.NewMocknodeGetter(t)
+	mockNodeGetter.On("GetRandomNode").Return(&a.Node{}, nil)
+	mockNodeGetter.On("GetNodeByName", mock.Anything).Return(&a.Node{}, nil)
+	mockNodeGetter.On("GetNodes").Return([]*a.Node{{}})
 
-	return mockASClient
+	return mockNodeGetter
+}
+
+func newClient() (*a.Client, a.Error) {
+	asPolicy := a.NewClientPolicy()
+	asPolicy.User = testASLoginPassword
+	asPolicy.Password = testASLoginPassword
+
+	return a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
 }
 
 func Test_parseAerospikeVersion(t *testing.T) {
@@ -314,7 +325,7 @@ func Test_buildSindexCmd(t *testing.T) {
 		},
 	}
 
-	ic, err := NewClient(newMockAerospikeClient(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(newNodeGetterMock(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -1037,7 +1048,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 		},
 	}
 
-	ic, err := NewClient(newMockAerospikeClient(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(newNodeGetterMock(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -1147,7 +1158,7 @@ func Test_getSIndexes(t *testing.T) {
 		},
 	}
 
-	ic, err := NewClient(newMockAerospikeClient(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(newNodeGetterMock(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -1551,7 +1562,7 @@ func Test_getUDF(t *testing.T) {
 		},
 	}
 
-	ic, err := NewClient(newMockAerospikeClient(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(newNodeGetterMock(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -1647,7 +1658,7 @@ func Test_getUDFs(t *testing.T) {
 		},
 	}
 
-	ic, err := NewClient(newMockAerospikeClient(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(newNodeGetterMock(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -1723,7 +1734,7 @@ func TestGetRecordCount(t *testing.T) {
 		},
 	}
 
-	ic, err := NewClient(newMockAerospikeClient(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(newNodeGetterMock(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -1772,16 +1783,13 @@ func Test_parseInfoObject(t *testing.T) {
 	}
 }
 
-func TestInfoCommander_EnableDisableXDR(t *testing.T) {
+func TestClient_EnableDisableXDR(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -1796,15 +1804,13 @@ func TestInfoCommander_EnableDisableXDR(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
+func TestClient_BlockUnblockMRTWrites(t *testing.T) {
 	t.Parallel()
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -1814,7 +1820,7 @@ func TestInfoCommander_BlockUnblockMRTWrites(t *testing.T) {
 	_ = ic.UnBlockMRTWrites(nodes[0], testASNamespace)
 }
 
-func TestInfoCommander_parseResultResponse(t *testing.T) {
+func TestClient_parseResultResponse(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -1871,64 +1877,52 @@ func TestInfoCommander_parseResultResponse(t *testing.T) {
 	}
 }
 
-func TestInfoCommander_GetSIndexes(t *testing.T) {
+func TestClient_GetSIndexes(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	_, err = ic.GetSIndexes(testASNamespace)
 	require.NoError(t, err)
 }
 
-func TestInfoCommander_GetUDFs(t *testing.T) {
+func TestClient_GetUDFs(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	_, err = ic.GetUDFs()
 	require.NoError(t, err)
 }
 
-func TestInfoCommander_GetRecordCount(t *testing.T) {
+func TestClient_GetRecordCount(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	_, err = ic.GetRecordCount(testASNamespace, nil)
 	require.NoError(t, err)
 }
 
-func TestInfoCommander_XDR(t *testing.T) {
+func TestClient_XDR(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -1943,13 +1937,10 @@ func TestInfoCommander_XDR(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestInfoCommander_GetSets(t *testing.T) {
+func TestClient_GetSets(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
 	wp := a.NewWritePolicy(0, 0)
@@ -1959,7 +1950,7 @@ func TestInfoCommander_GetSets(t *testing.T) {
 	aerr = client.PutBins(wp, k, b)
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	result, err := ic.GetSetsList(testASNamespace)
@@ -1968,16 +1959,13 @@ func TestInfoCommander_GetSets(t *testing.T) {
 	require.Greater(t, len(result), 1)
 }
 
-func TestInfoCommander_getRackNodes(t *testing.T) {
+func TestClient_getRackNodes(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	res, err := ic.getRackNodes(0)
@@ -1986,16 +1974,13 @@ func TestInfoCommander_getRackNodes(t *testing.T) {
 	fmt.Println(res)
 }
 
-func TestInfoCommander_getService(t *testing.T) {
+func TestClient_getService(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -2004,20 +1989,58 @@ func TestInfoCommander_getService(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestInfoCommander_GetService(t *testing.T) {
+func TestClient_GetNamespacesList(t *testing.T) {
 	t.Parallel()
 
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-	client, aerr := a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
+	client, aerr := newClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	nodes := ic.GetNodesNames()
-
-	_, err = ic.GetService(nodes[0])
+	result, err := ic.GetNamespacesList()
 	require.NoError(t, err)
+
+	require.Equal(t, testASNamespace, result)
+}
+
+func TestClient_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	client, aerr := newClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	result, err := ic.GetStatus()
+	require.NoError(t, err)
+
+	require.Equal(t, "ok", result)
+}
+
+func TestClient_GetDCsList(t *testing.T) {
+	t.Parallel()
+
+	const dc = "testDcList"
+
+	client, aerr := newClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	node, err := ic.cluster.GetRandomNode()
+	require.NoError(t, err)
+
+	err = ic.createXDRDC(node.GetName(), dc)
+	require.NoError(t, err)
+
+	result, err := ic.GetDCsList()
+	require.NoError(t, err)
+
+	err = ic.deleteXDRDC(node.GetName(), dc)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{dc}, result)
 }

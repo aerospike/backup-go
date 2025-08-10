@@ -156,7 +156,7 @@ func newBackupHandler(
 		config.MetricsEnabled,
 	)
 
-	infoClient, err := asinfo.NewClient(ac, config.InfoPolicy, config.InfoRetryPolicy)
+	infoClient, err := asinfo.NewClient(ac.Cluster(), config.InfoPolicy, config.InfoRetryPolicy)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create info client: %w", err)

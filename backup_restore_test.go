@@ -78,7 +78,7 @@ func testAerospikeClient() (*a.Client, error) {
 }
 
 func testInfoClient(client *a.Client) (*asinfo.Client, error) {
-	return asinfo.NewClient(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	return asinfo.NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 }
 
 func runBackupRestoreLocal(
@@ -631,7 +631,7 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	defer asClient.Close()
 
 	nodes := asClient.GetNodes()
-	ic, err := asinfo.NewClient(asClient, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := asinfo.NewClient(asClient.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 	nodeServiceAddress, err := ic.GetService(nodes[0].GetName())
 	require.NoError(t, err)

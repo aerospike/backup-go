@@ -100,7 +100,7 @@ func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
 	}
 
 	infoClient, err := asinfo.NewClient(
-		rw.aerospikeClient,
+		rw.aerospikeClient.Cluster(),
 		rw.config.InfoPolicy,
 		rw.config.InfoRetryPolicy,
 	)

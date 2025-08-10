@@ -89,14 +89,16 @@ type infoGetter interface {
 	RequestInfo(infoPolicy *a.InfoPolicy, commands ...string) (map[string]string, a.Error)
 }
 
-type aerospikeClient interface {
-	Cluster() *a.Cluster
+type nodeGetter interface {
+	GetRandomNode() (*a.Node, a.Error)
+	GetNodeByName(name string) (*a.Node, a.Error)
+	GetNodes() []*a.Node
 }
 
 // Client manages asinfo interactions with an Aerospike cluster, handling policies, retry logic, and command operations.
 type Client struct {
 	policy      *a.InfoPolicy
-	cluster     *a.Cluster
+	cluster     nodeGetter
 	retryPolicy *models.RetryPolicy
 	cmdDict     map[int]string
 }
@@ -104,7 +106,7 @@ type Client struct {
 // NewClient initializes and returns a new asinfo Client instance with the provided Aerospike client,
 // policy, and retry policy.
 func NewClient(
-	aeroClient aerospikeClient,
+	cluster nodeGetter,
 	policy *a.InfoPolicy,
 	retryPolicy *models.RetryPolicy,
 ) (*Client, error) {
@@ -113,7 +115,7 @@ func NewClient(
 	}
 
 	ic := &Client{
-		cluster:     aeroClient.Cluster(),
+		cluster:     cluster,
 		policy:      policy,
 		retryPolicy: retryPolicy,
 	}
@@ -637,7 +639,7 @@ type Stats struct {
 // GetStats requests node statistics like recoveries, lag, etc.
 // returns Stats struct.
 func (ic *Client) GetStats(nodeName, dc, namespace string) (Stats, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDGetStats], dc, namespace)
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDGetXDRStats], dc, namespace)
 
 	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
@@ -724,6 +726,77 @@ func (ic *Client) getService(node, cmd string) (string, error) {
 	}
 
 	return result, nil
+}
+
+// GetNamespacesList returns list of namespaces.
+func (ic *Client) GetNamespacesList() ([]string, error) {
+	cmd := ic.cmdDict[cmdIDNamespaces]
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed get namespaces list: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse namespaces list response: %w", err)
+	}
+
+	return strings.Split(result, ";"), nil
+}
+
+// GetStatus returns cluster status.
+func (ic *Client) GetStatus() (string, error) {
+	cmd := ic.cmdDict[cmdIDStatus]
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed get status info: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse status response: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetDCsList returns list of DCs
+func (ic *Client) GetDCsList() ([]string, error) {
+	cmd := ic.cmdDict[cmdIDGetConfigXDR]
+
+	resp, err := ic.GetInfo(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed get DCs list: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DCs list result response: %w", err)
+	}
+
+	fmt.Println(result)
+
+	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DCs list info response: %w", err)
+	}
+
+	dcs := make([]string, 0)
+
+	for _, rec := range infoResponse {
+		val, ok := rec["dcs"]
+		if !ok {
+			continue
+		}
+
+		dcs = append(dcs, val)
+	}
+
+	fmt.Println(infoResponse)
+
+	return dcs, nil
 }
 
 // ***** Utility functions *****

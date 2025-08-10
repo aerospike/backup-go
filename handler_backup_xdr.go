@@ -77,7 +77,7 @@ func newBackupXDRHandler(
 
 	stats := models.NewBackupStats()
 
-	infoClient, err := asinfo.NewClient(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
+	infoClient, err := asinfo.NewClient(aerospikeClient.Cluster(), config.InfoPolicy, config.InfoRetryPolicy)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create info client: %w", err)

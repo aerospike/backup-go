@@ -42,25 +42,28 @@ const commandsNumber = 19
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
 	// cmdBuild as we need to check version before we form dict, this command will be called directly.
-	cmdBuild                = "build"
-	cmdSetsOfNamespace      = "sets/%s"
-	cmdNamespaceInfo        = "namespace/%s"
-	cmdRack                 = "racks:"
-	cmdServiceClearStd      = "service-clear-std"
-	cmdServiceTLSStd        = "service-tls-std"
+	cmdBuild               = "build"
+	cmdSetsOfNamespace     = "sets/%s"
+	cmdNamespaceInfo       = "namespace/%s"
+	cmdRack                = "racks:"
+	cmdServiceClearStd     = "service-clear-std"
+	cmdServiceTLSStd       = "service-tls-std"
+	cmdUdfList             = "udf-list"
+	cmdUdfGetFilename      = "udf-get:filename=%s"
+	cmdCreateXDRDC         = "set-config:context=xdr;dc=%s;action=create"
+	cmdCreateConnector     = "set-config:context=xdr;dc=%s;connector=true"
+	cmdCreateXDRNode       = "set-config:context=xdr;dc=%s;node-address-port=%s;action=add"
+	cmdCreateXDRNamespace  = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
+	cmdDeleteXDRDC         = "set-config:context=xdr;dc=%s;action=delete"
+	cmdGetStats            = "get-stats:context=xdr;dc=%s;namespace=%s"
+	cmdBlockMRTWrites      = "set-config:context=namespace;namespace=%s;disable-mrt-writes=true"
+	cmdUnBlockMRTWrites    = "set-config:context=namespace;namespace=%s;disable-mrt-writes=false"
+	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
+	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
+
+	// Deprecated commands:
+
 	cmdSindexListDeprecated = "sindex-list:ns=%s"
-	cmdUdfList              = "udf-list"
-	cmdUdfGetFilename       = "udf-get:filename=%s"
-	cmdCreateXDRDC          = "set-config:context=xdr;dc=%s;action=create"
-	cmdCreateConnector      = "set-config:context=xdr;dc=%s;connector=true"
-	cmdCreateXDRNode        = "set-config:context=xdr;dc=%s;node-address-port=%s;action=add"
-	cmdCreateXDRNamespace   = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
-	cmdDeleteXDRDC          = "set-config:context=xdr;dc=%s;action=delete"
-	cmdGetStats             = "get-stats:context=xdr;dc=%s;namespace=%s"
-	cmdBlockMRTWrites       = "set-config:context=namespace;namespace=%s;disable-mrt-writes=true"
-	cmdUnBlockMRTWrites     = "set-config:context=namespace;namespace=%s;disable-mrt-writes=false"
-	cmdSetXDRMaxThroughput  = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
-	cmdSetXDRForward        = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 )
 
 // New commands for db version >= AerospikeVersionRecentInfoCommands

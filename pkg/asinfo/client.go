@@ -89,7 +89,8 @@ type infoGetter interface {
 	RequestInfo(infoPolicy *a.InfoPolicy, commands ...string) (map[string]string, a.Error)
 }
 
-type nodeGetter interface {
+// NodeGetter describes aerospike.Cluster object.
+type NodeGetter interface {
 	GetRandomNode() (*a.Node, a.Error)
 	GetNodeByName(name string) (*a.Node, a.Error)
 	GetNodes() []*a.Node
@@ -98,7 +99,7 @@ type nodeGetter interface {
 // Client manages asinfo interactions with an Aerospike cluster, handling policies, retry logic, and command operations.
 type Client struct {
 	policy      *a.InfoPolicy
-	cluster     nodeGetter
+	cluster     NodeGetter
 	retryPolicy *models.RetryPolicy
 	cmdDict     map[int]string
 }
@@ -106,7 +107,7 @@ type Client struct {
 // NewClient initializes and returns a new asinfo Client instance with the provided Aerospike client,
 // policy, and retry policy.
 func NewClient(
-	cluster nodeGetter,
+	cluster NodeGetter,
 	policy *a.InfoPolicy,
 	retryPolicy *models.RetryPolicy,
 ) (*Client, error) {
@@ -224,16 +225,12 @@ func (ic *Client) GetUDFs() ([]*models.UDF, error) {
 func (ic *Client) SupportsBatchWrite() (bool, error) {
 	var supports bool
 
-	err := executeWithRetry(ic.retryPolicy, func() error {
-		version, err := ic.GetVersion()
-		if err != nil {
-			return fmt.Errorf("failed to get aerospike version: %w", err)
-		}
+	version, err := ic.GetVersion()
+	if err != nil {
+		return false, fmt.Errorf("failed to get aerospike version: %w", err)
+	}
 
-		supports = version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites)
-
-		return nil
-	})
+	supports = version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites)
 
 	return supports, err
 }
@@ -861,7 +858,7 @@ func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (Ae
 
 	versionStr, err := parseResultResponse(cmd, versionResp)
 	if err != nil {
-		return AerospikeVersion{}, fmt.Errorf("failed to parse get version dc response: %w", err)
+		return AerospikeVersion{}, fmt.Errorf("failed to parse get version response: %s: %w", versionResp, err)
 	}
 
 	return parseAerospikeVersion(versionStr)

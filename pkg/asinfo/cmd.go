@@ -39,7 +39,7 @@ const (
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
 const commandsNumber = 19
 
-// Old commands for db version < versionLast
+// Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
 	// cmdBuild as we need to check version before we form dict, this command will be called directly.
 	cmdBuild                = "build"
@@ -63,7 +63,7 @@ const (
 	cmdSetXDRForward        = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 )
 
-// New commands for db version > versionLast
+// New commands for db version >= AerospikeVersionRecentInfoCommands
 const (
 	cmdSindexList = "sindex-list:namespace=%s"
 )

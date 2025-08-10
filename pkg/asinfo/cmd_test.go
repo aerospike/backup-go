@@ -34,12 +34,14 @@ func TestNewCmdDict(t *testing.T) {
 			expectedLength: commandsNumber,
 			expectedCmds: map[int]string{
 				cmdIDBuild:               cmdBuild,
+				cmdIDStatus:              cmdStatus,
+				cmdIDNamespaces:          cmdNamespaces,
 				cmdIDSetsOfNamespace:     cmdSetsOfNamespace,
 				cmdIDNamespaceInfo:       cmdNamespaceInfo,
 				cmdIDRack:                cmdRack,
 				cmdIDServiceClearStd:     cmdServiceClearStd,
 				cmdIDServiceTLSStd:       cmdServiceTLSStd,
-				cmdIDSindexList:          cmdSindexListDeprecated, // deprecated version
+				cmdIDSindexList:          cmdSindexListDeprecated, // Deprecated version.
 				cmdIDUdfList:             cmdUdfList,
 				cmdIDUdfGetFilename:      cmdUdfGetFilename,
 				cmdIDCreateXDRDC:         cmdCreateXDRDC,
@@ -52,6 +54,7 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDUnBlockMRTWrites:    cmdUnBlockMRTWrites,
 				cmdIDSetXDRMaxThroughput: cmdSetXDRMaxThroughput,
 				cmdIDSetXDRForward:       cmdSetXDRForward,
+				cmdIDGetConfigXDR:        cmdGetConfigXDR,
 			},
 		},
 		{
@@ -60,12 +63,14 @@ func TestNewCmdDict(t *testing.T) {
 			expectedLength: commandsNumber,
 			expectedCmds: map[int]string{
 				cmdIDBuild:               cmdBuild,
+				cmdIDStatus:              cmdStatus,
+				cmdIDNamespaces:          cmdNamespaces,
 				cmdIDSetsOfNamespace:     cmdSetsOfNamespace,
 				cmdIDNamespaceInfo:       cmdNamespaceInfo,
 				cmdIDRack:                cmdRack,
 				cmdIDServiceClearStd:     cmdServiceClearStd,
 				cmdIDServiceTLSStd:       cmdServiceTLSStd,
-				cmdIDSindexList:          cmdSindexList, // new version
+				cmdIDSindexList:          cmdSindexList, // New version.
 				cmdIDUdfList:             cmdUdfList,
 				cmdIDUdfGetFilename:      cmdUdfGetFilename,
 				cmdIDCreateXDRDC:         cmdCreateXDRDC,
@@ -78,6 +83,7 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDUnBlockMRTWrites:    cmdUnBlockMRTWrites,
 				cmdIDSetXDRMaxThroughput: cmdSetXDRMaxThroughput,
 				cmdIDSetXDRForward:       cmdSetXDRForward,
+				cmdIDGetConfigXDR:        cmdGetConfigXDR,
 			},
 		},
 	}

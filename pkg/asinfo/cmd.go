@@ -91,7 +91,7 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 	cmds[cmdIDSetXDRMaxThroughput] = cmdSetXDRMaxThroughput
 	cmds[cmdIDSetXDRForward] = cmdSetXDRForward
 
-	if version.IsGreaterOrEqual(AerospikeVersionSupportStandardCommands) {
+	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList
 	}
 

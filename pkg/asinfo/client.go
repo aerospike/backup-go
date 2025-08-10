@@ -44,9 +44,9 @@ type AerospikeVersion struct {
 var (
 	AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
 	AerospikeVersionSupportsBatchWrites   = AerospikeVersion{6, 0, 0}
-	// AerospikeVersionSupportStandardCommands after this version all commands should use
+	// AerospikeVersionRecentInfoCommands after this version, all commands should use
 	// `namespace` parameter instead of `ns` or `id`.
-	AerospikeVersionSupportStandardCommands = AerospikeVersion{8, 1, 0}
+	AerospikeVersionRecentInfoCommands = AerospikeVersion{8, 1, 0}
 )
 
 var (

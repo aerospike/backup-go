@@ -56,7 +56,7 @@ func TestNewCmdDict(t *testing.T) {
 		},
 		{
 			name:           "version greater or equal to versionLast uses new commands",
-			version:        AerospikeVersionSupportStandardCommands,
+			version:        AerospikeVersionRecentInfoCommands,
 			expectedLength: commandsNumber,
 			expectedCmds: map[int]string{
 				cmdIDBuild:               cmdBuild,

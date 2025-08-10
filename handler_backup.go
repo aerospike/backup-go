@@ -156,7 +156,7 @@ func newBackupHandler(
 		config.MetricsEnabled,
 	)
 
-	infoCLient, err := asinfo.NewClient(ac, config.InfoPolicy, config.InfoRetryPolicy)
+	infoClient, err := asinfo.NewClient(ac, config.InfoPolicy, config.InfoRetryPolicy)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create info client: %w", err)
@@ -165,14 +165,14 @@ func newBackupHandler(
 	readerProcessor := newRecordReaderProcessor[*models.Token](
 		config,
 		ac,
-		infoCLient,
+		infoClient,
 		state,
 		scanLimiter,
 		rpsCollector,
 		logger,
 	)
 
-	recCounter := newRecordCounter(ac, infoCLient, config, readerProcessor, logger)
+	recCounter := newRecordCounter(ac, infoClient, config, readerProcessor, logger)
 
 	limiter, err := bandwidth.NewLimiter(config.Bandwidth)
 	if err != nil {
@@ -192,7 +192,7 @@ func newBackupHandler(
 		readerProcessor:        readerProcessor,
 		recordCounter:          recCounter,
 		limiter:                limiter,
-		infoClient:             infoCLient,
+		infoClient:             infoClient,
 		scanLimiter:            scanLimiter,
 		state:                  state,
 		stats:                  stats,

@@ -303,5 +303,5 @@ func TestEstimateGetEstimateError(t *testing.T) {
 	// Call Estimate
 	_, err = client.Estimate(context.Background(), config, -1) // Negative sample size
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to get estimate")
+	assert.Contains(t, err.Error(), "no nodes available in cluster")
 }

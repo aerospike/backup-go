@@ -1284,7 +1284,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 
 	testAeroClient, aerr := testAerospikeClient()
 	require.NoError(t, aerr)
-	testAeroClient.Close()
+
 	backupClient, err := NewClient(testAeroClient, WithID("test_client"))
 	require.NoError(t, err)
 
@@ -1303,6 +1303,8 @@ func TestRestoreExpiredRecords(t *testing.T) {
 	require.NotNil(t, statsRestore)
 	require.Equal(t, uint64(numRec), statsRestore.GetReadRecords())
 	require.Equal(t, uint64(numRec), statsRestore.GetRecordsExpired())
+
+	testAeroClient.Close()
 }
 
 func TestBackupContextCancel(t *testing.T) {

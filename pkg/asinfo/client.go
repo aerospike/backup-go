@@ -98,10 +98,11 @@ type NodeGetter interface {
 
 // Client manages asinfo interactions with an Aerospike cluster, handling policies, retry logic, and command operations.
 type Client struct {
-	policy      *a.InfoPolicy
 	cluster     NodeGetter
+	policy      *a.InfoPolicy
 	retryPolicy *models.RetryPolicy
 	cmdDict     map[int]string
+	version     AerospikeVersion
 }
 
 // NewClient initializes and returns a new asinfo Client instance with the provided Aerospike client,
@@ -127,6 +128,7 @@ func NewClient(
 	}
 
 	ic.cmdDict = newCmdDict(v)
+	ic.version = v
 
 	return ic, nil
 }
@@ -162,24 +164,36 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 	return result, nil
 }
 
+// GetVersion returns lowest node version from cluster.
 func (ic *Client) GetVersion() (AerospikeVersion, error) {
-	var (
-		version AerospikeVersion
-		err     error
-	)
+	nodes := ic.cluster.GetNodes()
+	if len(nodes) == 0 {
+		return AerospikeVersion{}, fmt.Errorf("no nodes available in cluster")
+	}
 
-	err = executeWithRetry(ic.retryPolicy, func() error {
-		node, aErr := ic.cluster.GetRandomNode()
-		if aErr != nil {
-			return aErr.Unwrap()
+	var lowestVersion AerospikeVersion
+
+	for i, node := range nodes {
+		var currentVersion AerospikeVersion
+
+		err := executeWithRetry(ic.retryPolicy, func() error {
+			var retryErr error
+			currentVersion, retryErr = ic.getAerospikeVersion(node, ic.policy)
+
+			return retryErr
+		})
+
+		if err != nil {
+			return AerospikeVersion{}, fmt.Errorf("failed to get version from node %v: %w", node, err)
 		}
 
-		version, err = ic.getAerospikeVersion(node, ic.policy)
+		// For the first iteration or if the current version is greater we overwrite lowestVersion.
+		if i == 0 || lowestVersion.IsGreater(currentVersion) {
+			lowestVersion = currentVersion
+		}
+	}
 
-		return err
-	})
-
-	return version, err
+	return lowestVersion, nil
 }
 
 func (ic *Client) GetSIndexes(namespace string) ([]*models.SIndex, error) {
@@ -222,17 +236,8 @@ func (ic *Client) GetUDFs() ([]*models.UDF, error) {
 	return udfs, err
 }
 
-func (ic *Client) SupportsBatchWrite() (bool, error) {
-	var supports bool
-
-	version, err := ic.GetVersion()
-	if err != nil {
-		return false, fmt.Errorf("failed to get aerospike version: %w", err)
-	}
-
-	supports = version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites)
-
-	return supports, err
+func (ic *Client) SupportsBatchWrite() bool {
+	return ic.version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites)
 }
 
 // GetRecordCount counts number of records in given namespace and sets.
@@ -759,7 +764,7 @@ func (ic *Client) GetStatus() (string, error) {
 	return result, nil
 }
 
-// GetDCsList returns list of DCs
+// GetDCsList returns list of XDR DCs.
 func (ic *Client) GetDCsList() ([]string, error) {
 	cmd := ic.cmdDict[cmdIDGetConfigXDR]
 
@@ -772,8 +777,6 @@ func (ic *Client) GetDCsList() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DCs list result response: %w", err)
 	}
-
-	fmt.Println(result)
 
 	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
@@ -790,8 +793,6 @@ func (ic *Client) GetDCsList() ([]string, error) {
 
 		dcs = append(dcs, val)
 	}
-
-	fmt.Println(infoResponse)
 
 	return dcs, nil
 }

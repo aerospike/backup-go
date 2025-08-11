@@ -249,7 +249,7 @@ func (c *Client) BackupXDR(
 
 	handler, err := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create backup handler: %w", err)
+		return nil, fmt.Errorf("failed to create backup xdr handler: %w", err)
 	}
 
 	handler.run()
@@ -343,7 +343,7 @@ func (c *Client) Estimate(
 
 	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, nil, c.scanLimiter)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create backup handler: %w", err)
+		return 0, fmt.Errorf("failed to create estimate handler: %w", err)
 	}
 
 	result, err := handler.getEstimate(ctx, estimateSamples)

@@ -16,7 +16,6 @@ package backup
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -134,7 +133,6 @@ type Client struct {
 	// Retry policy for info commands.
 	infoRetryPolicy *models.RetryPolicy
 	id              string
-	validateOnly    bool
 }
 
 // ClientOpt is a functional option that allows configuring the [Client].
@@ -170,13 +168,6 @@ func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 	}
 }
 
-// WithValidateOnly create a backup client for backup files validation. Without Aerospike connection.
-func WithValidateOnly() ClientOpt {
-	return func(c *Client) {
-		c.validateOnly = true
-	}
-}
-
 // NewClient creates a new backup client.
 //   - ac is the aerospike client to use for backup and restore operations.
 //
@@ -199,23 +190,19 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 		opt(client)
 	}
 
-	if ac == nil && !client.validateOnly {
-		return nil, errors.New("aerospike client pointer is nil")
-	}
-
 	// Further customization after applying options
 	client.logger = client.logger.WithGroup("backup")
 	client.logger = logging.WithClient(client.logger, client.id)
 
-	client.infoPolicy = client.getUsableInfoPolicy(client.infoPolicy)
-	client.infoRetryPolicy = client.getUsableInfoRetryPolicy(client.infoRetryPolicy)
-
-	if err := client.infoRetryPolicy.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid info retry policy: %w", err)
-	}
-
 	// On backup files validation, we don't have an aerospike client, so we can't initialize an info client.
-	if !client.validateOnly {
+	if ac != nil {
+		client.infoPolicy = client.getUsableInfoPolicy(client.infoPolicy)
+		client.infoRetryPolicy = client.getUsableInfoRetryPolicy(client.infoRetryPolicy)
+
+		if err := client.infoRetryPolicy.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid info retry policy: %w", err)
+		}
+
 		infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create info client: %w", err)
@@ -286,6 +273,10 @@ func (c *Client) Backup(
 		return nil, fmt.Errorf("backup config required")
 	}
 
+	if c.aerospikeClient == nil {
+		return nil, fmt.Errorf("aerospike client can't be nil")
+	}
+
 	// copy the policies so we don't modify the original
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
@@ -325,6 +316,10 @@ func (c *Client) BackupXDR(
 		return nil, fmt.Errorf("xdr backup config required")
 	}
 
+	if c.aerospikeClient == nil {
+		return nil, fmt.Errorf("aerospike client can't be nil")
+	}
+
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
 	}
@@ -355,6 +350,10 @@ func (c *Client) Restore(
 ) (Restorer, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")
+	}
+
+	if c.aerospikeClient == nil && !config.ValidateOnly {
+		return nil, fmt.Errorf("aerospike client can't be nil")
 	}
 
 	// copy the policies so we don't modify the original
@@ -428,6 +427,10 @@ func (c *Client) Estimate(
 	estimateSamples int64) (uint64, error) {
 	if config == nil {
 		return 0, fmt.Errorf("backup config required")
+	}
+
+	if c.aerospikeClient == nil {
+		return 0, fmt.Errorf("aerospike client can't be nil")
 	}
 
 	// copy the policies so we don't modify the original

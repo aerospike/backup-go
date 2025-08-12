@@ -28,13 +28,6 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-func TestNilClient(t *testing.T) {
-	t.Parallel()
-
-	_, err := NewClient(nil)
-	assert.Error(t, err, "aerospike client is required")
-}
-
 func TestClientOptions(t *testing.T) {
 	t.Parallel()
 
@@ -329,4 +322,58 @@ func TestEstimateGetEstimateError(t *testing.T) {
 	_, err = client.Estimate(context.Background(), config, -1) // Negative sample size
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "samples records number is negative")
+}
+
+func TestNilClientBackup(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigBackup{
+		Namespace: "test",
+	}
+
+	_, err = c.Backup(context.Background(), config, &mocks.MockWriter{}, &mocks.MockStreamingReader{})
+	assert.Error(t, err, "aerospike client can't be nil")
+}
+
+func TestNilClientBackupXdr(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigBackupXDR{
+		Namespace: "test",
+	}
+
+	_, err = c.BackupXDR(context.Background(), config, &mocks.MockWriter{})
+	assert.Error(t, err, "aerospike client can't be nil")
+}
+
+func TestNilClientRestore(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigRestore{}
+
+	_, err = c.Restore(context.Background(), config, &mocks.MockStreamingReader{})
+	assert.Error(t, err, "aerospike client can't be nil")
+}
+
+func TestNilClientEstimates(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigBackup{
+		Namespace: "test",
+	}
+
+	_, err = c.Estimate(context.Background(), config, 100)
+	assert.Error(t, err, "aerospike client can't be nil")
 }

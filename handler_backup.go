@@ -233,6 +233,10 @@ func (bh *BackupHandler) run() {
 
 // getEstimate calculates backup size estimate.
 func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (uint64, error) {
+	if recordsNumber < 0 {
+		return 0, fmt.Errorf("samples records number is negative")
+	}
+
 	totalCount, err := bh.infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count records: %w", err)

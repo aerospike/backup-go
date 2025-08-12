@@ -10,9 +10,9 @@ packages:
       exclude-subpkg-regex:
         - ClientOpt
       pkgname: mocks
-  github.com/aerospike/backup-go/internal/asinfo:
+  github.com/aerospike/backup-go/pkg/asinfo:
     config:
-      dir: ./internal/asinfo/mocks
+      dir: ./pkg/asinfo/mocks
       pkgname: mocks
   github.com/aerospike/backup-go/io/aerospike:
     config:

@@ -40,7 +40,7 @@ type HandlerBackupXDR struct {
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
 	encoder         Encoder[*models.ASBXToken]
 	config          *ConfigBackupXDR
-	infoClient      *asinfo.InfoClient
+	infoClient      *asinfo.Client
 	stats           *models.BackupStats
 
 	logger *slog.Logger
@@ -65,7 +65,7 @@ func newBackupXDRHandler(
 	aerospikeClient AerospikeClient,
 	writer Writer,
 	logger *slog.Logger,
-) *HandlerBackupXDR {
+) (*HandlerBackupXDR, error) {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
@@ -77,7 +77,11 @@ func newBackupXDRHandler(
 
 	stats := models.NewBackupStats()
 
-	infoClient := asinfo.NewInfoClientFromAerospike(aerospikeClient, config.InfoPolicy, config.InfoRetryPolicy)
+	infoClient, err := asinfo.NewClient(aerospikeClient.Cluster(), config.InfoPolicy, config.InfoRetryPolicy)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create info client: %w", err)
+	}
 
 	rpsCollector := metrics.NewCollector(
 		ctx,
@@ -136,7 +140,7 @@ func newBackupXDRHandler(
 		done:            make(chan struct{}, 1),
 		rpsCollector:    rpsCollector,
 		kbpsCollector:   kbpsCollector,
-	}
+	}, nil
 }
 
 // run runs the backup job.

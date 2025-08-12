@@ -77,8 +77,8 @@ func testAerospikeClient() (*a.Client, error) {
 	)
 }
 
-func testInfoClient(client *a.Client) *asinfo.InfoClient {
-	return asinfo.NewInfoClientFromAerospike(client, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+func testInfoClient(client *a.Client) (*asinfo.Client, error) {
+	return asinfo.NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 }
 
 func runBackupRestoreLocal(
@@ -214,8 +214,9 @@ func TestBackupRestoreIndexUdf(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
 	// Validate sindexes.
-	infoCLient := testInfoClient(asClient)
-	dbIndexes, err := readAllSIndexes(infoCLient, testASNamespace)
+	infoClient, err := testInfoClient(asClient)
+	require.NoError(t, err)
+	dbIndexes, err := readAllSIndexes(infoClient, testASNamespace)
 	require.NoError(t, err)
 	require.EqualValues(t, indexes, dbIndexes)
 }
@@ -290,6 +291,7 @@ func TestBackupRestoreNamespace(t *testing.T) {
 	defer asClient.Close()
 
 	backupConfig := NewDefaultBackupConfig()
+	backupConfig.Namespace = testASNamespace
 	backupConfig.SetList = []string{setName}
 
 	ns := testASNamespace
@@ -629,7 +631,8 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	defer asClient.Close()
 
 	nodes := asClient.GetNodes()
-	ic := asinfo.NewInfoClientFromAerospike(asClient, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := asinfo.NewClient(asClient.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
 	nodeServiceAddress, err := ic.GetService(nodes[0].GetName())
 	require.NoError(t, err)
 
@@ -1281,7 +1284,8 @@ func TestRestoreExpiredRecords(t *testing.T) {
 
 	testAeroClient, aerr := testAerospikeClient()
 	require.NoError(t, aerr)
-	testAeroClient.Close()
+	defer testAeroClient.Close()
+
 	backupClient, err := NewClient(testAeroClient, WithID("test_client"))
 	require.NoError(t, err)
 
@@ -1803,7 +1807,7 @@ func getIndexType(sindex *models.SIndex) (a.IndexType, error) {
 	return "", fmt.Errorf("invalid sindex bin type: %c", sindex.Path.BinType)
 }
 
-func readAllSIndexes(client *asinfo.InfoClient, namespace string) ([]*models.SIndex, error) {
+func readAllSIndexes(client *asinfo.Client, namespace string) ([]*models.SIndex, error) {
 	return client.GetSIndexes(namespace)
 }
 

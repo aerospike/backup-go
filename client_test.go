@@ -335,7 +335,7 @@ func TestNilClientBackup(t *testing.T) {
 	}
 
 	_, err = c.Backup(context.Background(), config, &mocks.MockWriter{}, &mocks.MockStreamingReader{})
-	assert.Error(t, err, "aerospike client can't be nil")
+	assert.Error(t, err, "aerospike client is nil")
 }
 
 func TestNilClientBackupXdr(t *testing.T) {
@@ -349,7 +349,7 @@ func TestNilClientBackupXdr(t *testing.T) {
 	}
 
 	_, err = c.BackupXDR(context.Background(), config, &mocks.MockWriter{})
-	assert.Error(t, err, "aerospike client can't be nil")
+	assert.Error(t, err, "aerospike client is nil")
 }
 
 func TestNilClientRestore(t *testing.T) {
@@ -361,7 +361,7 @@ func TestNilClientRestore(t *testing.T) {
 	config := &ConfigRestore{}
 
 	_, err = c.Restore(context.Background(), config, &mocks.MockStreamingReader{})
-	assert.Error(t, err, "aerospike client can't be nil")
+	assert.Error(t, err, "aerospike client is nil")
 }
 
 func TestNilClientEstimates(t *testing.T) {
@@ -375,5 +375,5 @@ func TestNilClientEstimates(t *testing.T) {
 	}
 
 	_, err = c.Estimate(context.Background(), config, 100)
-	assert.Error(t, err, "aerospike client can't be nil")
+	assert.Error(t, err, "aerospike client is nil")
 }

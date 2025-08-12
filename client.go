@@ -161,6 +161,7 @@ func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 }
 
 // WithInfoPolicies sets the infoPolicy and RetryPolicy for info commands on the [Client].
+// Pass in nil for default values.
 func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 	return func(c *Client) {
 		c.infoPolicy = ip
@@ -174,8 +175,8 @@ func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 // options:
 //   - [WithID] to set an identifier for the client.
 //   - [WithLogger] to set a logger that this client will log to.
-//   - [WithScanLimiter] to set a semaphore that is used to limit number of
-//     concurrent scans.
+//   - [WithScanLimiter] to set a semaphore that is used to limit number of concurrent scans.
+//   - [WithInfoPolicies] to set infoPolicy and RetryPolicy for info commands
 func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	// Initialize the Client with default values
 	client := &Client{
@@ -274,7 +275,7 @@ func (c *Client) Backup(
 	}
 
 	if c.aerospikeClient == nil {
-		return nil, fmt.Errorf("aerospike client can't be nil")
+		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
 	// copy the policies so we don't modify the original
@@ -317,7 +318,7 @@ func (c *Client) BackupXDR(
 	}
 
 	if c.aerospikeClient == nil {
-		return nil, fmt.Errorf("aerospike client can't be nil")
+		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
 	if err := config.validate(); err != nil {
@@ -353,7 +354,7 @@ func (c *Client) Restore(
 	}
 
 	if c.aerospikeClient == nil && !config.ValidateOnly {
-		return nil, fmt.Errorf("aerospike client can't be nil")
+		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
 	// copy the policies so we don't modify the original
@@ -430,7 +431,7 @@ func (c *Client) Estimate(
 	}
 
 	if c.aerospikeClient == nil {
-		return 0, fmt.Errorf("aerospike client can't be nil")
+		return 0, fmt.Errorf("aerospike client is nil")
 	}
 
 	// copy the policies so we don't modify the original

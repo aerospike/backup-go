@@ -206,12 +206,15 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 		return nil, fmt.Errorf("invalid info retry policy: %w", err)
 	}
 
-	infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create info client: %w", err)
-	}
+	// On backup files validation, we don't have an aerospike client, so we can't initialize an info client.
+	if ac != nil {
+		infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create info client: %w", err)
+		}
 
-	client.infoClient = infoClient
+		client.infoClient = infoClient
+	}
 
 	return client, nil
 }

@@ -134,6 +134,7 @@ type Client struct {
 	// Retry policy for info commands.
 	infoRetryPolicy *models.RetryPolicy
 	id              string
+	validateOnly    bool
 }
 
 // ClientOpt is a functional option that allows configuring the [Client].
@@ -169,6 +170,13 @@ func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 	}
 }
 
+// WithValidateOnly create a backup client for backup files validation. Without Aerospike connection.
+func WithValidateOnly() ClientOpt {
+	return func(c *Client) {
+		c.validateOnly = true
+	}
+}
+
 // NewClient creates a new backup client.
 //   - ac is the aerospike client to use for backup and restore operations.
 //
@@ -178,10 +186,6 @@ func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 //   - [WithScanLimiter] to set a semaphore that is used to limit number of
 //     concurrent scans.
 func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
-	if ac == nil {
-		return nil, errors.New("aerospike client pointer is nil")
-	}
-
 	// Initialize the Client with default values
 	client := &Client{
 		aerospikeClient: ac,
@@ -193,6 +197,10 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	// Apply all options to the Client
 	for _, opt := range opts {
 		opt(client)
+	}
+
+	if ac == nil && !client.validateOnly {
+		return nil, errors.New("aerospike client pointer is nil")
 	}
 
 	// Further customization after applying options
@@ -207,7 +215,7 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	}
 
 	// On backup files validation, we don't have an aerospike client, so we can't initialize an info client.
-	if ac != nil {
+	if !client.validateOnly {
 		infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create info client: %w", err)

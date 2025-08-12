@@ -63,7 +63,8 @@ type AerospikeClient interface {
 	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
 }
 
-// InfoGetter is an interface that abstracts methods for retrieving cluster information and performing cluster operations.
+// InfoGetter is an interface that abstracts methods for retrieving cluster information
+// and performing cluster operations.
 type InfoGetter interface {
 	GetRecordCount(namespace string, sets []string) (uint64, error)
 	GetRackNodes(rackID int) ([]string, error)

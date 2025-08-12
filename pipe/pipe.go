@@ -17,6 +17,7 @@ package pipe
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
@@ -28,6 +29,8 @@ type Pipe[T models.TokenConstraint] struct {
 	readPool  *Pool[T]
 	writePool *Pool[T]
 	fanout    *Fanout[T]
+	// Mutex used to avoid race condition on metrics check after a pipeline was stopped.
+	fanMu sync.Mutex
 }
 
 // NewPipe creates a new backup/restore pipeline.
@@ -80,6 +83,10 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 // GetMetrics returns the accumulated length for input and output channels.
 func (p *Pipe[T]) GetMetrics() (in, out int) {
+	// Lock before reading metrics from fanout.
+	p.fanMu.Lock()
+	defer p.fanMu.Unlock()
+
 	if p.fanout != nil {
 		return p.fanout.GetMetrics()
 	}
@@ -98,6 +105,9 @@ func (p *Pipe[T]) Close() {
 		p.writePool.Close()
 		p.writePool = nil
 	}
+	// Lock before nullifying fanout.
+	p.fanMu.Lock()
+	defer p.fanMu.Unlock()
 
 	if p.fanout != nil {
 		p.fanout = nil

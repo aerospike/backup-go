@@ -241,7 +241,7 @@ func TestParsePartitionFilterListString_Err(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to parse partition filter")
 }
 
-func TestSplitPartitionRange_Err(t *testing.T) {
+func TestSplitPartitionRange_ErrNumPartLessWorkers(t *testing.T) {
 	t.Parallel()
 
 	partitionFilter := &aerospike.PartitionFilter{Begin: 0, Count: 4}
@@ -250,5 +250,21 @@ func TestSplitPartitionRange_Err(t *testing.T) {
 	result, err := splitPartitionRange(partitionFilter, numWorkers)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "number of workers is less than partition filter count, cannot split partitions")
+	assert.Contains(t, err.Error(), "number of partitions is less than workers number, cannot split partitions")
+}
+
+func TestSplitPartition_ErrNumWorkersLess1(t *testing.T) {
+	t.Parallel()
+
+	partitionFilters := []*aerospike.PartitionFilter{
+		{Begin: 0, Count: 10},
+		{Begin: 10, Count: 5},
+		{Begin: 20, Count: 15},
+	}
+	numWorkers := 0
+
+	result, err := splitPartitions(partitionFilters, numWorkers)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "number of workers is less than 1, cannot split partition filters")
 }

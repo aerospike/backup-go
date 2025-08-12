@@ -79,7 +79,11 @@ func NewPartitionFilterAll() *a.PartitionFilter {
 
 // splitPartitions splits the partitions to groups.
 func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
-	if numWorkers < 1 || numWorkers < len(partitionFilters) {
+	if numWorkers < 1 {
+		return nil, fmt.Errorf("number of workers is less than 1, cannot split partition filters")
+	}
+
+	if numWorkers < len(partitionFilters) {
 		return nil, fmt.Errorf("number of workers is less than partition filters, cannot split partition filters")
 	}
 
@@ -172,7 +176,7 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 // splitPartitionRange splits one range filter to numWorkers.
 func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
 	if partitionFilters.Count < numWorkers {
-		return nil, fmt.Errorf("number of workers is less than partition filter count, cannot split partitions")
+		return nil, fmt.Errorf("number of partitions is less than workers number, cannot split partitions")
 	}
 
 	result := make([]*a.PartitionFilter, numWorkers)

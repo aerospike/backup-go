@@ -63,6 +63,7 @@ type AerospikeClient interface {
 	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
 }
 
+// InfoGetter is an interface that abstracts methods for retrieving cluster information and performing cluster operations.
 type InfoGetter interface {
 	GetRecordCount(namespace string, sets []string) (uint64, error)
 	GetRackNodes(rackID int) ([]string, error)
@@ -126,11 +127,11 @@ type Client struct {
 	infoClient      InfoGetter
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
-	// InfoPolicy applies to Aerospike Info requests made during backup and
+	// infoPolicy applies to Aerospike Info requests made during backup and
 	// restore. If nil, the Aerospike client's default policy will be used.
-	InfoPolicy *a.InfoPolicy
+	infoPolicy *a.InfoPolicy
 	// Retry policy for info commands.
-	InfoRetryPolicy *models.RetryPolicy
+	infoRetryPolicy *models.RetryPolicy
 	id              string
 }
 
@@ -159,11 +160,11 @@ func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 	}
 }
 
-// WithInfoPolicies sets the InfoPolicy and RetryPolicy for info commands on the [Client].
+// WithInfoPolicies sets the infoPolicy and RetryPolicy for info commands on the [Client].
 func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 	return func(c *Client) {
-		c.InfoPolicy = ip
-		c.InfoRetryPolicy = rp
+		c.infoPolicy = ip
+		c.infoRetryPolicy = rp
 	}
 }
 
@@ -197,14 +198,14 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	client.logger = client.logger.WithGroup("backup")
 	client.logger = logging.WithClient(client.logger, client.id)
 
-	client.InfoPolicy = client.getUsableInfoPolicy(client.InfoPolicy)
-	client.InfoRetryPolicy = client.getUsableInfoRetryPolicy(client.InfoRetryPolicy)
+	client.infoPolicy = client.getUsableInfoPolicy(client.infoPolicy)
+	client.infoRetryPolicy = client.getUsableInfoRetryPolicy(client.infoRetryPolicy)
 
-	if err := client.InfoRetryPolicy.Validate(); err != nil {
+	if err := client.infoRetryPolicy.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid info retry policy: %w", err)
 	}
 
-	infoClient, err := asinfo.NewClient(ac.Cluster(), client.InfoPolicy, client.InfoRetryPolicy)
+	infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create info client: %w", err)
 	}

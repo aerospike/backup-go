@@ -31,7 +31,7 @@ import (
 // Notice! At the moment works only with *models.Token type.
 type recordCounter struct {
 	aerospikeClient AerospikeClient
-	infoClient      infoGetter
+	infoClient      InfoGetter
 	config          *ConfigBackup
 	readerProcessor *recordReaderProcessor[*models.Token]
 
@@ -40,7 +40,7 @@ type recordCounter struct {
 
 func newRecordCounter(
 	aerospikeClient AerospikeClient,
-	infoClient infoGetter,
+	infoClient InfoGetter,
 	config *ConfigBackup,
 	readerProcessor *recordReaderProcessor[*models.Token],
 	logger *slog.Logger,
@@ -54,7 +54,7 @@ func newRecordCounter(
 	}
 }
 
-func (rc *recordCounter) countRecords(ctx context.Context, infoClient infoGetter) (uint64, error) {
+func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter) (uint64, error) {
 	if rc.config.withoutFilter() {
 		return rc.countUsingInfoClient(infoClient)
 	}
@@ -62,7 +62,7 @@ func (rc *recordCounter) countRecords(ctx context.Context, infoClient infoGetter
 	return rc.countRecordsUsingScan(ctx)
 }
 
-func (rc *recordCounter) countUsingInfoClient(infoClient infoGetter) (uint64, error) {
+func (rc *recordCounter) countUsingInfoClient(infoClient InfoGetter) (uint64, error) {
 	totalRecordCount, err := infoClient.GetRecordCount(rc.config.Namespace, rc.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get record count: %w", err)

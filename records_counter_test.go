@@ -83,7 +83,7 @@ func TestCountUsingInfoClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockInfoClient := mocks.NewMockinfoGetter(t)
+			mockInfoClient := mocks.NewMockInfoGetter(t)
 			mockInfoClient.On("GetRecordCount", tt.namespace, []string{"set1"}).Return(tt.recordCount, tt.infoError)
 
 			handler := &recordCounter{

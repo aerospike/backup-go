@@ -27,7 +27,6 @@ import (
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/google/uuid"
 )
 
@@ -90,7 +89,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,
-	infoClient *asinfo.Client,
+	infoClient InfoGetter,
 ) (*RestoreHandler[T], error) {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())

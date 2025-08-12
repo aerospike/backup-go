@@ -30,7 +30,6 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 )
@@ -71,7 +70,7 @@ type BackupHandler struct {
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *bandwidth.Limiter
-	infoClient             *asinfo.Client
+	infoClient             InfoGetter
 	scanLimiter            *semaphore.Weighted
 	errors                 chan error
 	done                   chan struct{}
@@ -100,7 +99,7 @@ func newBackupHandler(
 	writer Writer,
 	reader StreamingReader,
 	scanLimiter *semaphore.Weighted,
-	infoClient *asinfo.Client,
+	infoClient InfoGetter,
 ) (*BackupHandler, error) {
 	id := uuid.NewString()
 	// For estimates calculations, a writer will be nil.

@@ -25,7 +25,6 @@ import (
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/google/uuid"
 )
 
@@ -40,7 +39,7 @@ type HandlerBackupXDR struct {
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
 	encoder         Encoder[*models.ASBXToken]
 	config          *ConfigBackupXDR
-	infoClient      *asinfo.Client
+	infoClient      InfoGetter
 	stats           *models.BackupStats
 
 	logger *slog.Logger
@@ -65,7 +64,7 @@ func newBackupXDRHandler(
 	aerospikeClient AerospikeClient,
 	writer Writer,
 	logger *slog.Logger,
-	infoClient *asinfo.Client,
+	infoClient InfoGetter,
 ) *HandlerBackupXDR {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())

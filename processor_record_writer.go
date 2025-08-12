@@ -23,7 +23,6 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 )
 
 type recordWriterProcessor[T models.TokenConstraint] struct {
@@ -31,7 +30,7 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 	config           *ConfigRestore
 	stats            *models.RestoreStats
 	metricsCollector *metrics.Collector
-	infoClient       *asinfo.Client
+	infoClient       InfoGetter
 
 	logger *slog.Logger
 }
@@ -41,7 +40,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	config *ConfigRestore,
 	stats *models.RestoreStats,
 	metricsCollector *metrics.Collector,
-	infoClient *asinfo.Client,
+	infoClient InfoGetter,
 	logger *slog.Logger,
 ) *recordWriterProcessor[T] {
 	logger.Debug("created new records writer processor")

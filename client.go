@@ -63,10 +63,24 @@ type AerospikeClient interface {
 	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
 }
 
-type infoGetter interface {
+type InfoGetter interface {
 	GetRecordCount(namespace string, sets []string) (uint64, error)
 	GetRackNodes(rackID int) ([]string, error)
 	GetService(node string) (string, error)
+	GetVersion() (asinfo.AerospikeVersion, error)
+	GetSIndexes(namespace string) ([]*models.SIndex, error)
+	GetUDFs() ([]*models.UDF, error)
+	SupportsBatchWrite() (bool, error)
+	StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
+	StopXDR(nodeName, dc string) error
+	BlockMRTWrites(nodeName, namespace string) error
+	UnBlockMRTWrites(nodeName, namespace string) error
+	GetNodesNames() []string
+	GetSetsList(namespace string) ([]string, error)
+	GetStats(nodeName, dc, namespace string) (asinfo.Stats, error)
+	GetNamespacesList() ([]string, error)
+	GetStatus() (string, error)
+	GetDCsList() ([]string, error)
 }
 
 // Client is the main entry point for the backup package.
@@ -109,7 +123,7 @@ type infoGetter interface {
 //	}
 type Client struct {
 	aerospikeClient AerospikeClient
-	infoClient      *asinfo.Client
+	infoClient      InfoGetter
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
 	// InfoPolicy applies to Aerospike Info requests made during backup and
@@ -385,7 +399,7 @@ func (c *Client) AerospikeClient() AerospikeClient {
 }
 
 // InfoClient returns the underlying info client.
-func (c *Client) InfoClient() *asinfo.Client {
+func (c *Client) InfoClient() InfoGetter {
 	return c.infoClient
 }
 

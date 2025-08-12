@@ -25,6 +25,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -60,6 +61,12 @@ type AerospikeClient interface {
 	Close()
 	GetNodes() []*a.Node
 	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
+}
+
+type infoGetter interface {
+	GetRecordCount(namespace string, sets []string) (uint64, error)
+	GetRackNodes(rackID int) ([]string, error)
+	GetService(node string) (string, error)
 }
 
 // Client is the main entry point for the backup package.
@@ -98,8 +105,14 @@ type AerospikeClient interface {
 //	}
 type Client struct {
 	aerospikeClient AerospikeClient
+	infoClient      *asinfo.Client
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
+	// InfoPolicy applies to Aerospike Info requests made during backup and
+	// restore. If nil, the Aerospike client's default policy will be used.
+	InfoPolicy *a.InfoPolicy
+	// Retry policy for info commands.
+	InfoRetryPolicy *models.RetryPolicy
 	id              string
 }
 
@@ -125,6 +138,14 @@ func WithLogger(logger *slog.Logger) ClientOpt {
 func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 	return func(c *Client) {
 		c.scanLimiter = sem
+	}
+}
+
+// WithInfoPolicies sets the InfoPolicy and RetryPolicy for info commands on the [Client].
+func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
+	return func(c *Client) {
+		c.InfoPolicy = ip
+		c.InfoRetryPolicy = rp
 	}
 }
 
@@ -158,12 +179,37 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	client.logger = client.logger.WithGroup("backup")
 	client.logger = logging.WithClient(client.logger, client.id)
 
+	client.InfoPolicy = client.getUsableInfoPolicy(client.InfoPolicy)
+	client.InfoRetryPolicy = client.getUsableInfoRetryPolicy(client.InfoRetryPolicy)
+
+	if err := client.InfoRetryPolicy.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid info retry policy: %w", err)
+	}
+
+	infoClient, err := asinfo.NewClient(ac.Cluster(), client.InfoPolicy, client.InfoRetryPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create info client: %w", err)
+	}
+
+	client.infoClient = infoClient
+
 	return client, nil
 }
 
 func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 	if p == nil {
 		dp := c.aerospikeClient.GetDefaultInfoPolicy()
+		cp := *dp
+
+		return &cp
+	}
+
+	return p
+}
+
+func (c *Client) getUsableInfoRetryPolicy(p *models.RetryPolicy) *models.RetryPolicy {
+	if p == nil {
+		dp := models.NewDefaultRetryPolicy()
 		cp := *dp
 
 		return &cp
@@ -210,14 +256,22 @@ func (c *Client) Backup(
 	}
 
 	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, reader, c.scanLimiter)
+	handler, err := newBackupHandler(
+		ctx,
+		config,
+		c.aerospikeClient,
+		c.logger,
+		writer,
+		reader,
+		c.scanLimiter,
+		c.infoClient,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup handler: %w", err)
 	}
@@ -240,17 +294,11 @@ func (c *Client) BackupXDR(
 		return nil, fmt.Errorf("xdr backup config required")
 	}
 
-	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
-
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
 	}
 
-	handler, err := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup xdr handler: %w", err)
-	}
+	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient)
 
 	handler.run()
 
@@ -279,7 +327,6 @@ func (c *Client) Restore(
 	}
 
 	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
 
 	if err := config.validate(); err != nil {
@@ -288,7 +335,14 @@ func (c *Client) Restore(
 
 	switch config.EncoderType {
 	case EncoderTypeASB:
-		handler, err := newRestoreHandler[*models.Token](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler, err := newRestoreHandler[*models.Token](
+			ctx,
+			config,
+			c.aerospikeClient,
+			c.logger,
+			streamingReader,
+			c.infoClient,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create restore handler: %w", err)
 		}
@@ -301,7 +355,14 @@ func (c *Client) Restore(
 			return nil, fmt.Errorf("failed to validate restore config: %w", err)
 		}
 
-		handler, err := newRestoreHandler[*models.ASBXToken](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler, err := newRestoreHandler[*models.ASBXToken](
+			ctx,
+			config,
+			c.aerospikeClient,
+			c.logger,
+			streamingReader,
+			c.infoClient,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create restore handler: %w", err)
 		}
@@ -319,6 +380,11 @@ func (c *Client) AerospikeClient() AerospikeClient {
 	return c.aerospikeClient
 }
 
+// InfoClient returns the underlying info client.
+func (c *Client) InfoClient() *asinfo.Client {
+	return c.infoClient
+}
+
 // Estimate calculates the backup size from a random sample of estimateSamples records number.
 // It counts total records for backup, selects sample records,
 // and interpolates the size of sample on total records count according to parallelism and compression.
@@ -334,14 +400,22 @@ func (c *Client) Estimate(
 	}
 
 	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
 		return 0, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, nil, c.scanLimiter)
+	handler, err := newBackupHandler(
+		ctx,
+		config,
+		c.aerospikeClient,
+		c.logger,
+		nil,
+		nil,
+		c.scanLimiter,
+		c.infoClient,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create estimate handler: %w", err)
 	}

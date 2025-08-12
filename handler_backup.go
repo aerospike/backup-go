@@ -100,6 +100,7 @@ func newBackupHandler(
 	writer Writer,
 	reader StreamingReader,
 	scanLimiter *semaphore.Weighted,
+	infoClient *asinfo.Client,
 ) (*BackupHandler, error) {
 	id := uuid.NewString()
 	// For estimates calculations, a writer will be nil.
@@ -155,12 +156,6 @@ func newBackupHandler(
 		metricMessage,
 		config.MetricsEnabled,
 	)
-
-	infoClient, err := asinfo.NewClient(ac.Cluster(), config.InfoPolicy, config.InfoRetryPolicy)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to create info client: %w", err)
-	}
 
 	readerProcessor := newRecordReaderProcessor[*models.Token](
 		config,

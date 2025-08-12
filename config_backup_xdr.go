@@ -20,18 +20,12 @@ import (
 	"regexp"
 	"strconv"
 	"time"
-
-	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/models"
 )
 
 var expDCName = regexp.MustCompile(`^[a-zA-Z0-9_\-$]+$`)
 
 // ConfigBackupXDR contains configuration for the xdr backup operation.
 type ConfigBackupXDR struct {
-	// InfoPolicy applies to Aerospike Info requests made during backup and
-	// restore. If nil, the Aerospike client's default policy will be used.
-	InfoPolicy *a.InfoPolicy
 	// Encryption details.
 	EncryptionPolicy *EncryptionPolicy
 	// Compression details.
@@ -86,8 +80,6 @@ type ConfigBackupXDR struct {
 	// If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
 	// This situation can occur if the LocalAddress and LocalPort options are misconfigured.
 	StartTimeout time.Duration
-	// Retry policy for info commands.
-	InfoRetryPolicy *models.RetryPolicy
 	// By default XDR writes that originated from another XDR are not forwarded to the specified destination
 	// datacenters. Setting this parameter to true sends writes that originated from another XDR to the specified
 	// destination datacenters.
@@ -166,10 +158,6 @@ func (c *ConfigBackupXDR) validate() error {
 
 	if err := c.SecretAgentConfig.validate(); err != nil {
 		return fmt.Errorf("secret agent invalid: %w", err)
-	}
-
-	if err := c.InfoRetryPolicy.Validate(); err != nil {
-		return fmt.Errorf("invalid info retry policy: %w", err)
 	}
 
 	if c.EncoderType != EncoderTypeASBX {

@@ -24,9 +24,6 @@ import (
 
 // ConfigBackup contains configuration for the backup operation.
 type ConfigBackup struct {
-	// InfoPolicy applies to Aerospike Info requests made during backup and
-	// restore. If nil, the Aerospike client's default policy will be used.
-	InfoPolicy *a.InfoPolicy
 	// ScanPolicy applies to Aerospike scan operations made during backup and
 	// restore. If nil, the Aerospike client's default policy will be used.
 	ScanPolicy *a.ScanPolicy
@@ -131,8 +128,6 @@ type ConfigBackup struct {
 	PageSize int64
 	// When using directory parameter, prepend a prefix to the names of the generated files.
 	OutputFilePrefix string
-	// Retry policy for info commands.
-	InfoRetryPolicy *models.RetryPolicy
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
 }
@@ -232,10 +227,6 @@ func (c *ConfigBackup) validate() error {
 		if c.SetList[i] == models.MonitorRecordsSetName {
 			return fmt.Errorf("mrt monitor set is not allowed for backup")
 		}
-	}
-
-	if err := c.InfoRetryPolicy.Validate(); err != nil {
-		return fmt.Errorf("invalid info retry policy: %w", err)
 	}
 
 	if c.EncoderType != EncoderTypeASB {

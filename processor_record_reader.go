@@ -28,12 +28,6 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-type infoGetter interface {
-	GetRecordCount(namespace string, sets []string) (uint64, error)
-	GetRackNodes(rackID int) ([]string, error)
-	GetService(node string) (string, error)
-}
-
 // recordReaderProcessorXDR configures and creates record readers pipelines.
 type recordReaderProcessor[T models.TokenConstraint] struct {
 	config *ConfigBackup

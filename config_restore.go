@@ -23,9 +23,6 @@ import (
 
 // ConfigRestore contains configuration for the restore operation.
 type ConfigRestore struct {
-	// InfoPolicy applies to Aerospike Info requests made during backup and restore
-	// If nil, the Aerospike client's default policy will be used.
-	InfoPolicy *a.InfoPolicy
 	// WritePolicy applies to Aerospike write operations made during backup and restore
 	// If nil, the Aerospike client's default policy will be used.
 	WritePolicy *a.WritePolicy
@@ -88,8 +85,6 @@ type ConfigRestore struct {
 	// By default, such errors are not ignored and restore terminates.
 	// Not applicable for XDR restore.
 	IgnoreRecordError bool
-	// Retry policy for info commands.
-	InfoRetryPolicy *models.RetryPolicy
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
 	// ValidateOnly indicates whether restore should only validate the backup files.

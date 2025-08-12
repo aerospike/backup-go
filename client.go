@@ -83,7 +83,11 @@ type infoGetter interface {
 //		// handle error
 //	}
 //
-//	writers, err := backup.NewWriterLocalDir("backups_folder", false)
+//	writers, err := local.NewWriter(
+//		ctx,
+//		ioStorage.WithRemoveFiles(),
+//		ioStorage.WithDir("backups_folder"),
+//	)
 //	if err != nil {
 //		// handle error
 //	}

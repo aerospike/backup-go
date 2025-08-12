@@ -22,8 +22,10 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -38,10 +40,15 @@ func TestClientOptions(t *testing.T) {
 	sem := semaphore.NewWeighted(10)
 	id := "ID"
 
-	client, err := NewClient(&mocks.MockAerospikeClient{},
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(
+		testAeroClient,
 		WithID(id),
 		WithLogger(logger),
 		WithScanLimiter(sem),
+		WithInfoPolicies(&a.InfoPolicy{}, models.NewDefaultRetryPolicy()),
 	)
 
 	assert.NoError(t, err)

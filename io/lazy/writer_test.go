@@ -25,7 +25,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testFileName = "test"
+const (
+	testFileName   = "test"
+	testFilePrefix = "prefix"
+)
 
 func TestLazyWriter(t *testing.T) {
 	t.Parallel()
@@ -41,7 +44,7 @@ func TestLazyWriter(t *testing.T) {
 		return file, nil
 	}
 
-	writer, err := NewWriter(ctx, 1, openFunc)
+	writer, err := NewWriter(ctx, testFilePrefix, 1, openFunc)
 	require.NoError(t, err)
 
 	// Check that file not exist.

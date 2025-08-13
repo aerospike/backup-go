@@ -147,10 +147,10 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, fileLimi
 	}
 
 	if fileLimit > 0 {
-		return sized.NewWriter(ctx, n, saveCommandChan, fileLimit, fw.configureWriter)
+		return sized.NewWriter(ctx, fw.prefixGenerator(), n, saveCommandChan, fileLimit, fw.configureWriter)
 	}
 
-	return lazy.NewWriter(ctx, n, fw.configureWriter)
+	return lazy.NewWriter(ctx, fw.prefixGenerator(), n, fw.configureWriter)
 }
 
 // configureWriter returns configured writer.

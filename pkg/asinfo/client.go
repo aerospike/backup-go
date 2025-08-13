@@ -81,10 +81,8 @@ func (av AerospikeVersion) IsGreaterOrEqual(other AerospikeVersion) bool {
 	return av.IsGreater(other) || av == other
 }
 
-// infoGetter defines the methods for doing info requests
-// with the Aerospike database.
-//
-//go:generate mockery --name InfoGetter
+// infoGetter defines the methods for doing info requests with the Aerospike database.
+// Is used for tests.
 type infoGetter interface {
 	RequestInfo(infoPolicy *a.InfoPolicy, commands ...string) (map[string]string, a.Error)
 }
@@ -102,7 +100,6 @@ type Client struct {
 	policy      *a.InfoPolicy
 	retryPolicy *models.RetryPolicy
 	cmdDict     map[int]string
-	version     AerospikeVersion
 }
 
 // NewClient initializes and returns a new asinfo Client instance with the provided Aerospike client,
@@ -128,7 +125,6 @@ func NewClient(
 	}
 
 	ic.cmdDict = newCmdDict(v)
-	ic.version = v
 
 	return ic, nil
 }
@@ -236,8 +232,13 @@ func (ic *Client) GetUDFs() ([]*models.UDF, error) {
 	return udfs, err
 }
 
-func (ic *Client) SupportsBatchWrite() bool {
-	return ic.version.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites)
+func (ic *Client) SupportsBatchWrite() (bool, error) {
+	v, err := ic.GetVersion()
+	if err != nil {
+		return false, fmt.Errorf("failed to get aerospike version: %w", err)
+	}
+
+	return v.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
 }
 
 // GetRecordCount counts number of records in given namespace and sets.

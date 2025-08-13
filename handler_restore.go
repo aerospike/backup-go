@@ -89,6 +89,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,
+	infoClient InfoGetter,
 ) (*RestoreHandler[T], error) {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
@@ -133,6 +134,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		config,
 		stats,
 		rpsCollector,
+		infoClient,
 		logger,
 	)
 

@@ -76,10 +76,7 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 	)
 	s.Require().NoError(err)
 
-	ip := a.NewInfoPolicy()
-
 	backupCfg := &ConfigBackupXDR{
-		InfoPolicy:        ip,
 		EncryptionPolicy:  nil,
 		CompressionPolicy: nil,
 		SecretAgentConfig: nil,

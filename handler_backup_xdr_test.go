@@ -152,10 +152,7 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 	)
 	s.Require().NoError(err)
 
-	ip := a.NewInfoPolicy()
-
 	backupCfg := &ConfigBackupXDR{
-		InfoPolicy:        ip,
 		EncryptionPolicy:  nil,
 		CompressionPolicy: nil,
 		SecretAgentConfig: nil,
@@ -206,10 +203,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 	)
 	s.Require().NoError(err)
 
-	ip := a.NewInfoPolicy()
-
 	backupCfg := &ConfigBackupXDR{
-		InfoPolicy:        ip,
 		EncryptionPolicy:  nil,
 		CompressionPolicy: nil,
 		SecretAgentConfig: nil,

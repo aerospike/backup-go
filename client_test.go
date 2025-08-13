@@ -22,26 +22,29 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 )
 
-func TestNilClient(t *testing.T) {
-	_, err := NewClient(nil)
-	assert.Error(t, err, "aerospike client is required")
-}
-
 func TestClientOptions(t *testing.T) {
+	t.Parallel()
+
 	var logBuffer strings.Builder
 	logger := slog.New(slog.NewTextHandler(&logBuffer, nil))
 	sem := semaphore.NewWeighted(10)
 	id := "ID"
 
-	client, err := NewClient(&mocks.MockAerospikeClient{},
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(
+		testAeroClient,
 		WithID(id),
 		WithLogger(logger),
 		WithScanLimiter(sem),
+		WithInfoPolicies(&a.InfoPolicy{}, models.NewDefaultRetryPolicy()),
 	)
 
 	assert.NoError(t, err)
@@ -54,8 +57,12 @@ func TestClientOptions(t *testing.T) {
 
 // Negative test cases for Backup method
 func TestBackupNilConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	client, err := NewClient(mockAerospikeClient)
+	t.Parallel()
+
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	_, err = client.Backup(context.Background(), nil, &mocks.MockWriter{}, &mocks.MockStreamingReader{})
@@ -64,11 +71,12 @@ func TestBackupNilConfig(t *testing.T) {
 }
 
 func TestBackupNilWriter(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultScanPolicy").Return(&a.ScanPolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	config := &ConfigBackup{
@@ -82,11 +90,12 @@ func TestBackupNilWriter(t *testing.T) {
 }
 
 func TestBackupInvalidConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultScanPolicy").Return(&a.ScanPolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create an invalid config (missing namespace)
@@ -98,11 +107,12 @@ func TestBackupInvalidConfig(t *testing.T) {
 }
 
 func TestBackupInvalidParallelRead(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultScanPolicy").Return(&a.ScanPolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create an invalid config with invalid ParallelRead
@@ -119,8 +129,12 @@ func TestBackupInvalidParallelRead(t *testing.T) {
 
 // Negative test cases for BackupXDR method
 func TestBackupXDRNilConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	client, err := NewClient(mockAerospikeClient)
+	t.Parallel()
+
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	_, err = client.BackupXDR(context.Background(), nil, &mocks.MockWriter{})
@@ -129,10 +143,12 @@ func TestBackupXDRNilConfig(t *testing.T) {
 }
 
 func TestBackupXDRNilWriter(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	config := &ConfigBackupXDR{
@@ -146,10 +162,12 @@ func TestBackupXDRNilWriter(t *testing.T) {
 }
 
 func TestBackupXDRInvalidConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create an invalid config (missing DC name)
@@ -162,8 +180,12 @@ func TestBackupXDRInvalidConfig(t *testing.T) {
 
 // Negative test cases for Restore method
 func TestRestoreNilConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	client, err := NewClient(mockAerospikeClient)
+	t.Parallel()
+
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	_, err = client.Restore(context.Background(), nil, &mocks.MockStreamingReader{})
@@ -172,11 +194,12 @@ func TestRestoreNilConfig(t *testing.T) {
 }
 
 func TestRestoreNilStreamingReader(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultWritePolicy").Return(&a.WritePolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	config := &ConfigRestore{
@@ -190,11 +213,12 @@ func TestRestoreNilStreamingReader(t *testing.T) {
 }
 
 func TestRestoreInvalidConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultWritePolicy").Return(&a.WritePolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create an invalid config (invalid encoder type)
@@ -208,11 +232,12 @@ func TestRestoreInvalidConfig(t *testing.T) {
 }
 
 func TestRestoreInvalidEncoderType(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultWritePolicy").Return(&a.WritePolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create a config with an invalid encoder type
@@ -226,11 +251,12 @@ func TestRestoreInvalidEncoderType(t *testing.T) {
 }
 
 func TestRestoreASBXValidationError(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultWritePolicy").Return(&a.WritePolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create a config with ASBX encoder type but missing required fields
@@ -246,8 +272,12 @@ func TestRestoreASBXValidationError(t *testing.T) {
 
 // Negative test cases for Estimate method
 func TestEstimateNilConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	client, err := NewClient(mockAerospikeClient)
+	t.Parallel()
+
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	_, err = client.Estimate(context.Background(), nil, 100)
@@ -256,11 +286,12 @@ func TestEstimateNilConfig(t *testing.T) {
 }
 
 func TestEstimateInvalidConfig(t *testing.T) {
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultScanPolicy").Return(&a.ScanPolicy{})
+	t.Parallel()
 
-	client, err := NewClient(mockAerospikeClient)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
+
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create an invalid config (missing namespace)
@@ -272,21 +303,12 @@ func TestEstimateInvalidConfig(t *testing.T) {
 }
 
 func TestEstimateGetEstimateError(t *testing.T) {
-	// Mock the AerospikeClient
-	mockAerospikeClient := &mocks.MockAerospikeClient{}
-	mockAerospikeClient.On("GetDefaultInfoPolicy").Return(&a.InfoPolicy{})
-	mockAerospikeClient.On("GetDefaultScanPolicy").Return(&a.ScanPolicy{})
+	t.Parallel()
 
-	// Create a mock cluster
-	mockCluster := &a.Cluster{}
-	mockAerospikeClient.On("Cluster").Return(mockCluster)
+	testAeroClient, aerr := testAerospikeClient()
+	require.NoError(t, aerr)
 
-	// Mock a node
-	mockNode := &a.Node{}
-	mockAerospikeClient.On("GetNodes").Return([]*a.Node{mockNode})
-
-	// Create a client with the mock
-	client, err := NewClient(mockAerospikeClient)
+	client, err := NewClient(testAeroClient)
 	assert.NoError(t, err)
 
 	// Create a valid config
@@ -296,12 +318,62 @@ func TestEstimateGetEstimateError(t *testing.T) {
 		ParallelWrite: 1, // Set a valid value to pass validation
 	}
 
-	// Mock the cluster info response to cause an error in getEstimate
-	mockAerospikeClient.On("ScanNode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, a.ErrInvalidParam)
-
 	// Call Estimate
 	_, err = client.Estimate(context.Background(), config, -1) // Negative sample size
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no nodes available in cluster")
+	assert.Contains(t, err.Error(), "samples records number is negative")
+}
+
+func TestNilClientBackup(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigBackup{
+		Namespace: "test",
+	}
+
+	_, err = c.Backup(context.Background(), config, &mocks.MockWriter{}, &mocks.MockStreamingReader{})
+	assert.Error(t, err, "aerospike client is nil")
+}
+
+func TestNilClientBackupXdr(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigBackupXDR{
+		Namespace: "test",
+	}
+
+	_, err = c.BackupXDR(context.Background(), config, &mocks.MockWriter{})
+	assert.Error(t, err, "aerospike client is nil")
+}
+
+func TestNilClientRestore(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigRestore{}
+
+	_, err = c.Restore(context.Background(), config, &mocks.MockStreamingReader{})
+	assert.Error(t, err, "aerospike client is nil")
+}
+
+func TestNilClientEstimates(t *testing.T) {
+	t.Parallel()
+
+	c, err := NewClient(nil)
+	assert.NoError(t, err)
+
+	config := &ConfigBackup{
+		Namespace: "test",
+	}
+
+	_, err = c.Estimate(context.Background(), config, 100)
+	assert.Error(t, err, "aerospike client is nil")
 }

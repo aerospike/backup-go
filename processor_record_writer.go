@@ -23,7 +23,6 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 )
 
 type recordWriterProcessor[T models.TokenConstraint] struct {
@@ -31,6 +30,7 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 	config           *ConfigRestore
 	stats            *models.RestoreStats
 	metricsCollector *metrics.Collector
+	infoClient       InfoGetter
 
 	logger *slog.Logger
 }
@@ -40,6 +40,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	config *ConfigRestore,
 	stats *models.RestoreStats,
 	metricsCollector *metrics.Collector,
+	infoClient InfoGetter,
 	logger *slog.Logger,
 ) *recordWriterProcessor[T] {
 	logger.Debug("created new records writer processor")
@@ -49,6 +50,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 		config:           config,
 		stats:            stats,
 		metricsCollector: metricsCollector,
+		infoClient:       infoClient,
 		logger:           logger,
 	}
 }
@@ -99,16 +101,7 @@ func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
 		return false, nil
 	}
 
-	infoClient, err := asinfo.NewClient(
-		rw.aerospikeClient.Cluster(),
-		rw.config.InfoPolicy,
-		rw.config.InfoRetryPolicy,
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to create info client: %w", err)
-	}
-
-	return infoClient.SupportsBatchWrite(), nil
+	return rw.infoClient.SupportsBatchWrite()
 }
 
 // discardWriter is a writer that does nothing. Used for backup files validation.

@@ -25,7 +25,6 @@ import (
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/google/uuid"
 )
 
@@ -40,7 +39,7 @@ type HandlerBackupXDR struct {
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
 	encoder         Encoder[*models.ASBXToken]
 	config          *ConfigBackupXDR
-	infoClient      *asinfo.Client
+	infoClient      InfoGetter
 	stats           *models.BackupStats
 
 	logger *slog.Logger
@@ -65,7 +64,8 @@ func newBackupXDRHandler(
 	aerospikeClient AerospikeClient,
 	writer Writer,
 	logger *slog.Logger,
-) (*HandlerBackupXDR, error) {
+	infoClient InfoGetter,
+) *HandlerBackupXDR {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
@@ -76,12 +76,6 @@ func newBackupXDRHandler(
 	encoder := NewEncoder[*models.ASBXToken](config.EncoderType, config.Namespace, false)
 
 	stats := models.NewBackupStats()
-
-	infoClient, err := asinfo.NewClient(aerospikeClient.Cluster(), config.InfoPolicy, config.InfoRetryPolicy)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to create info client: %w", err)
-	}
 
 	rpsCollector := metrics.NewCollector(
 		ctx,
@@ -140,7 +134,7 @@ func newBackupXDRHandler(
 		done:            make(chan struct{}, 1),
 		rpsCollector:    rpsCollector,
 		kbpsCollector:   kbpsCollector,
-	}, nil
+	}
 }
 
 // run runs the backup job.

@@ -24,22 +24,15 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	"golang.org/x/sync/semaphore"
 )
-
-type infoGetter interface {
-	GetRecordCount(namespace string, sets []string) (uint64, error)
-	GetRackNodes(rackID int) ([]string, error)
-	GetService(node string) (string, error)
-}
 
 // recordReaderProcessorXDR configures and creates record readers pipelines.
 type recordReaderProcessor[T models.TokenConstraint] struct {
 	config *ConfigBackup
 	// add scanConfig in the future.
 	aerospikeClient AerospikeClient
-	infoClient      *asinfo.Client
+	infoClient      InfoGetter
 	state           *State
 	scanLimiter     *semaphore.Weighted
 	rpsCollector    *metrics.Collector
@@ -51,7 +44,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 func newRecordReaderProcessor[T models.TokenConstraint](
 	config *ConfigBackup,
 	aerospikeClient AerospikeClient,
-	infoClient *asinfo.Client,
+	infoClient InfoGetter,
 	state *State,
 	scanLimiter *semaphore.Weighted,
 	rpsCollector *metrics.Collector,

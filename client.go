@@ -16,7 +16,6 @@ package backup
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -25,6 +24,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -62,6 +62,28 @@ type AerospikeClient interface {
 	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
 }
 
+// InfoGetter is an interface that abstracts methods for retrieving cluster information
+// and performing cluster operations.
+type InfoGetter interface {
+	GetRecordCount(namespace string, sets []string) (uint64, error)
+	GetRackNodes(rackID int) ([]string, error)
+	GetService(node string) (string, error)
+	GetVersion() (asinfo.AerospikeVersion, error)
+	GetSIndexes(namespace string) ([]*models.SIndex, error)
+	GetUDFs() ([]*models.UDF, error)
+	SupportsBatchWrite() (bool, error)
+	StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
+	StopXDR(nodeName, dc string) error
+	BlockMRTWrites(nodeName, namespace string) error
+	UnBlockMRTWrites(nodeName, namespace string) error
+	GetNodesNames() []string
+	GetSetsList(namespace string) ([]string, error)
+	GetStats(nodeName, dc, namespace string) (asinfo.Stats, error)
+	GetNamespacesList() ([]string, error)
+	GetStatus() (string, error)
+	GetDCsList() ([]string, error)
+}
+
 // Client is the main entry point for the backup package.
 // It wraps an aerospike client and provides methods to start backup and restore operations.
 // Example usage:
@@ -76,7 +98,11 @@ type AerospikeClient interface {
 //		// handle error
 //	}
 //
-//	writers, err := backup.NewWriterLocalDir("backups_folder", false)
+//	writers, err := local.NewWriter(
+//		ctx,
+//		ioStorage.WithRemoveFiles(),
+//		ioStorage.WithDir("backups_folder"),
+//	)
 //	if err != nil {
 //		// handle error
 //	}
@@ -98,8 +124,14 @@ type AerospikeClient interface {
 //	}
 type Client struct {
 	aerospikeClient AerospikeClient
+	infoClient      InfoGetter
 	logger          *slog.Logger
 	scanLimiter     *semaphore.Weighted
+	// infoPolicy applies to Aerospike Info requests made during backup and
+	// restore. If nil, the Aerospike client's default policy will be used.
+	infoPolicy *a.InfoPolicy
+	// Retry policy for info commands.
+	infoRetryPolicy *models.RetryPolicy
 	id              string
 }
 
@@ -128,19 +160,24 @@ func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
 	}
 }
 
+// WithInfoPolicies sets the infoPolicy and RetryPolicy for info commands on the [Client].
+// Pass in nil for default values.
+func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
+	return func(c *Client) {
+		c.infoPolicy = ip
+		c.infoRetryPolicy = rp
+	}
+}
+
 // NewClient creates a new backup client.
 //   - ac is the aerospike client to use for backup and restore operations.
 //
 // options:
 //   - [WithID] to set an identifier for the client.
 //   - [WithLogger] to set a logger that this client will log to.
-//   - [WithScanLimiter] to set a semaphore that is used to limit number of
-//     concurrent scans.
+//   - [WithScanLimiter] to set a semaphore that is used to limit number of concurrent scans.
+//   - [WithInfoPolicies] to set InfoPolicy and RetryPolicy for info commands.
 func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
-	if ac == nil {
-		return nil, errors.New("aerospike client pointer is nil")
-	}
-
 	// Initialize the Client with default values
 	client := &Client{
 		aerospikeClient: ac,
@@ -158,12 +195,40 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	client.logger = client.logger.WithGroup("backup")
 	client.logger = logging.WithClient(client.logger, client.id)
 
+	// Initialize the info client only if the Aerospike client is available.
+	if ac != nil {
+		client.infoPolicy = client.getUsableInfoPolicy(client.infoPolicy)
+		client.infoRetryPolicy = client.getUsableInfoRetryPolicy(client.infoRetryPolicy)
+
+		if err := client.infoRetryPolicy.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid info retry policy: %w", err)
+		}
+
+		infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create info client: %w", err)
+		}
+
+		client.infoClient = infoClient
+	}
+
 	return client, nil
 }
 
 func (c *Client) getUsableInfoPolicy(p *a.InfoPolicy) *a.InfoPolicy {
 	if p == nil {
 		dp := c.aerospikeClient.GetDefaultInfoPolicy()
+		cp := *dp
+
+		return &cp
+	}
+
+	return p
+}
+
+func (c *Client) getUsableInfoRetryPolicy(p *models.RetryPolicy) *models.RetryPolicy {
+	if p == nil {
+		dp := models.NewDefaultRetryPolicy()
 		cp := *dp
 
 		return &cp
@@ -209,15 +274,27 @@ func (c *Client) Backup(
 		return nil, fmt.Errorf("backup config required")
 	}
 
+	if c.aerospikeClient == nil {
+		return nil, fmt.Errorf("aerospike client is nil")
+	}
+
 	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, writer, reader, c.scanLimiter)
+	handler, err := newBackupHandler(
+		ctx,
+		config,
+		c.aerospikeClient,
+		c.logger,
+		writer,
+		reader,
+		c.scanLimiter,
+		c.infoClient,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup handler: %w", err)
 	}
@@ -240,17 +317,15 @@ func (c *Client) BackupXDR(
 		return nil, fmt.Errorf("xdr backup config required")
 	}
 
-	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
+	if c.aerospikeClient == nil {
+		return nil, fmt.Errorf("aerospike client is nil")
+	}
 
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
 	}
 
-	handler, err := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup xdr handler: %w", err)
-	}
+	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient)
 
 	handler.run()
 
@@ -278,8 +353,11 @@ func (c *Client) Restore(
 		return nil, fmt.Errorf("restore config required")
 	}
 
+	if c.aerospikeClient == nil && !config.ValidateOnly {
+		return nil, fmt.Errorf("aerospike client is nil")
+	}
+
 	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
 
 	if err := config.validate(); err != nil {
@@ -288,7 +366,14 @@ func (c *Client) Restore(
 
 	switch config.EncoderType {
 	case EncoderTypeASB:
-		handler, err := newRestoreHandler[*models.Token](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler, err := newRestoreHandler[*models.Token](
+			ctx,
+			config,
+			c.aerospikeClient,
+			c.logger,
+			streamingReader,
+			c.infoClient,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create restore handler: %w", err)
 		}
@@ -301,7 +386,14 @@ func (c *Client) Restore(
 			return nil, fmt.Errorf("failed to validate restore config: %w", err)
 		}
 
-		handler, err := newRestoreHandler[*models.ASBXToken](ctx, config, c.aerospikeClient, c.logger, streamingReader)
+		handler, err := newRestoreHandler[*models.ASBXToken](
+			ctx,
+			config,
+			c.aerospikeClient,
+			c.logger,
+			streamingReader,
+			c.infoClient,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create restore handler: %w", err)
 		}
@@ -319,6 +411,11 @@ func (c *Client) AerospikeClient() AerospikeClient {
 	return c.aerospikeClient
 }
 
+// InfoClient returns the underlying info client.
+func (c *Client) InfoClient() InfoGetter {
+	return c.infoClient
+}
+
 // Estimate calculates the backup size from a random sample of estimateSamples records number.
 // It counts total records for backup, selects sample records,
 // and interpolates the size of sample on total records count according to parallelism and compression.
@@ -333,15 +430,27 @@ func (c *Client) Estimate(
 		return 0, fmt.Errorf("backup config required")
 	}
 
+	if c.aerospikeClient == nil {
+		return 0, fmt.Errorf("aerospike client is nil")
+	}
+
 	// copy the policies so we don't modify the original
-	config.InfoPolicy = c.getUsableInfoPolicy(config.InfoPolicy)
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
 		return 0, fmt.Errorf("failed to validate backup config: %w", err)
 	}
 
-	handler, err := newBackupHandler(ctx, config, c.aerospikeClient, c.logger, nil, nil, c.scanLimiter)
+	handler, err := newBackupHandler(
+		ctx,
+		config,
+		c.aerospikeClient,
+		c.logger,
+		nil,
+		nil,
+		c.scanLimiter,
+		c.infoClient,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create estimate handler: %w", err)
 	}

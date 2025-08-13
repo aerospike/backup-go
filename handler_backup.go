@@ -30,7 +30,6 @@ import (
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 )
@@ -71,7 +70,7 @@ type BackupHandler struct {
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *bandwidth.Limiter
-	infoClient             *asinfo.Client
+	infoClient             InfoGetter
 	scanLimiter            *semaphore.Weighted
 	errors                 chan error
 	done                   chan struct{}
@@ -100,6 +99,7 @@ func newBackupHandler(
 	writer Writer,
 	reader StreamingReader,
 	scanLimiter *semaphore.Weighted,
+	infoClient InfoGetter,
 ) (*BackupHandler, error) {
 	id := uuid.NewString()
 	// For estimates calculations, a writer will be nil.
@@ -155,12 +155,6 @@ func newBackupHandler(
 		metricMessage,
 		config.MetricsEnabled,
 	)
-
-	infoClient, err := asinfo.NewClient(ac.Cluster(), config.InfoPolicy, config.InfoRetryPolicy)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to create info client: %w", err)
-	}
 
 	readerProcessor := newRecordReaderProcessor[*models.Token](
 		config,
@@ -238,6 +232,10 @@ func (bh *BackupHandler) run() {
 
 // getEstimate calculates backup size estimate.
 func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (uint64, error) {
+	if recordsNumber < 0 {
+		return 0, fmt.Errorf("samples records number is negative")
+	}
+
 	totalCount, err := bh.infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count records: %w", err)

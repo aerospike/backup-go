@@ -207,6 +207,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 		if r.config.scanLimiter != nil {
 			err := r.config.scanLimiter.Acquire(r.ctx, 1)
 			if err != nil {
+				r.logger.Debug("failed to acquire scan limiter", "error", err)
 				r.errChan <- fmt.Errorf("failed to acquire scan limiter: %w", err)
 				return
 			}
@@ -273,9 +274,6 @@ func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets 
 
 // startScan starts the scan for the RecordReader.
 func (r *RecordReader) startScan(ctx context.Context) {
-	// Close channels after scan complete.
-	defer close(r.recordSets)
-
 	// Prepare scan policy.
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
@@ -299,12 +297,13 @@ func (r *RecordReader) startScan(ctx context.Context) {
 		r.errChan <- fmt.Errorf("invalid scan parameters")
 		return
 	}
+
+	// Close channels after scan complete.
+	close(r.recordSets)
 }
 
 // processScanResults processes the scan results from recordSets and sends them to the resultChan.
 func (r *RecordReader) processScanResults(ctx context.Context) {
-	defer close(r.resultChan)
-
 	// Iterate over all data sets.
 	for recordSet := range r.recordSets {
 		// Iterate over all records in a set.
@@ -320,6 +319,9 @@ func (r *RecordReader) processScanResults(ctx context.Context) {
 			r.config.scanLimiter.Release(1)
 		}
 	}
+
+	r.logger.Debug("recordSets processed")
+	close(r.resultChan)
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {

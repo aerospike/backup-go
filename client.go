@@ -176,7 +176,7 @@ func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 //   - [WithID] to set an identifier for the client.
 //   - [WithLogger] to set a logger that this client will log to.
 //   - [WithScanLimiter] to set a semaphore that is used to limit number of concurrent scans.
-//   - [WithInfoPolicies] to set InfoPolicy and RetryPolicy for info commands
+//   - [WithInfoPolicies] to set InfoPolicy and RetryPolicy for info commands.
 func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	// Initialize the Client with default values
 	client := &Client{

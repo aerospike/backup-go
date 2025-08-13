@@ -206,6 +206,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 		// Limit scans if limiter is configured.
 		if r.config.scanLimiter != nil {
 			err := r.config.scanLimiter.Acquire(r.ctx, 1)
+			r.logger.Debug("acquired: 1")
 			if err != nil {
 				select {
 				case <-r.ctx.Done():
@@ -340,6 +341,7 @@ func (r *RecordReader) processScanResults(ctx context.Context) {
 
 		if r.config.scanLimiter != nil {
 			r.config.scanLimiter.Release(1)
+			r.logger.Debug("released: 1")
 		}
 	}
 

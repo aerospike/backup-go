@@ -216,6 +216,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 			}
 		}
 
+		// ATTENTION!!! COPY PARTITION FILTER FOR EACH SCAN!!!
 		pf := *r.config.partitionFilter
 
 		// Scan partitions.

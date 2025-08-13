@@ -105,6 +105,7 @@ type scanner interface {
 // *models.Token.
 type RecordReader struct {
 	ctx    context.Context
+	cancel context.CancelFunc
 	client scanner
 	logger *slog.Logger
 	config *RecordReaderConfig
@@ -132,14 +133,17 @@ func NewRecordReader(
 		setsNum = 1
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &RecordReader{
 		ctx:        ctx,
+		cancel:     cancel,
 		config:     cfg,
 		client:     client,
 		logger:     logger,
 		recordSets: make(chan *a.Recordset, setsNum),
 		resultChan: make(chan *a.Result, resultChanSize),
-		errChan:    make(chan error, 1),
+		errChan:    make(chan error, 10),
 	}
 }
 
@@ -163,6 +167,7 @@ func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 		return nil, ctx.Err()
 	case err := <-r.errChan:
 		// serve errors.
+		r.cancel()
 		return nil, err
 	case res, ok := <-r.resultChan:
 		if !ok {
@@ -172,6 +177,7 @@ func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 
 		if res.Err != nil {
 			r.logger.Error("error reading record", "error", res.Err)
+			r.cancel()
 			return nil, res.Err
 		}
 
@@ -189,7 +195,6 @@ func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 
 // Close cancels the Aerospike scan used to read records if it was started.
 func (r *RecordReader) Close() {
-	close(r.errChan)
 	// We close everything in another place, so this is no-op close.
 	r.logger.Debug("closed aerospike record reader")
 }

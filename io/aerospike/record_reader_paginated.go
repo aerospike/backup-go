@@ -90,15 +90,15 @@ func (r *RecordReader) startScanPaginated(ctx context.Context, localErrChan chan
 		setsToScan = []string{""}
 	}
 
-	if r.config.scanLimiter != nil {
-		err := r.config.scanLimiter.Acquire(r.ctx, int64(len(setsToScan)))
-		if err != nil {
-			localErrChan <- err
-			return
-		}
-	}
-
 	for _, set := range setsToScan {
+		if r.config.scanLimiter != nil {
+			err := r.config.scanLimiter.Acquire(r.ctx, 1)
+			if err != nil {
+				localErrChan <- err
+				return
+			}
+		}
+
 		resultChan, errChan := r.streamPartitionPages(
 			&scanPolicy,
 			set,
@@ -187,6 +187,10 @@ func (r *RecordReader) streamPartitionPages(
 
 			if aErr = recSet.Close(); aErr != nil {
 				errChan <- fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
+			}
+
+			if r.config.scanLimiter != nil {
+				r.config.scanLimiter.Release(1)
 			}
 
 			resultChan <- result

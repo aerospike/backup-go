@@ -216,10 +216,12 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 			}
 		}
 
+		pf := *r.config.partitionFilter
+
 		// Scan partitions.
 		recSet, err := r.client.ScanPartitions(
 			p,
-			r.config.partitionFilter,
+			&pf,
 			r.config.namespace,
 			set,
 			r.config.binList...,

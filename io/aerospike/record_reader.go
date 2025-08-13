@@ -201,7 +201,7 @@ func (r *RecordReader) Close() {
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *RecordReader) startPartitionScan(ctx context.Context, p a.ScanPolicy, sets []string) {
+func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, sets []string) {
 	for _, set := range sets {
 		// Limit scans if limiter is configured.
 		if r.config.scanLimiter != nil {
@@ -218,7 +218,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p a.ScanPolicy, s
 
 		// Scan partitions.
 		recSet, err := r.client.ScanPartitions(
-			&p,
+			p,
 			r.config.partitionFilter,
 			r.config.namespace,
 			set,
@@ -245,7 +245,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p a.ScanPolicy, s
 }
 
 // startNodeScan initiates a node-based scan for each specified set using the provided scan policy and nodes.
-func (r *RecordReader) startNodeScan(ctx context.Context, p a.ScanPolicy, sets []string, nodes []*a.Node) {
+func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets []string, nodes []*a.Node) {
 	for _, set := range sets {
 		// Each node will have it own scan
 		for i := range nodes {
@@ -264,7 +264,7 @@ func (r *RecordReader) startNodeScan(ctx context.Context, p a.ScanPolicy, sets [
 
 			// Scan nodes.
 			recSet, err := r.client.ScanNode(
-				&p,
+				p,
 				nodes[i],
 				r.config.namespace,
 				set,
@@ -307,9 +307,9 @@ func (r *RecordReader) startScan(ctx context.Context) {
 	// Run scans according to config.
 	switch {
 	case len(r.config.nodes) > 0:
-		r.startNodeScan(ctx, scanPolicy, setsToScan, r.config.nodes)
+		r.startNodeScan(ctx, &scanPolicy, setsToScan, r.config.nodes)
 	case r.config.partitionFilter != nil:
-		r.startPartitionScan(ctx, scanPolicy, setsToScan)
+		r.startPartitionScan(ctx, &scanPolicy, setsToScan)
 	default:
 		select {
 		case <-r.ctx.Done():
@@ -326,22 +326,23 @@ func (r *RecordReader) startScan(ctx context.Context) {
 
 // processScanResults processes the scan results from recordSets and sends them to the resultChan.
 func (r *RecordReader) processScanResults(ctx context.Context) {
-	var i int
+	var i, j int
 	// Iterate over all data sets.
 	for recordSet := range r.recordSets {
 		i++
 		// Iterate over all records in a set.
 		for res := range recordSet.Results() {
+			j++
 			select {
 			case <-ctx.Done():
 				return
 			case r.resultChan <- res:
 			}
 		}
-
+		r.logger.Debug("!!!!!!!!!!!res from set", slog.Int("set", i), slog.Int("records", j))
 		if r.config.scanLimiter != nil {
 			r.config.scanLimiter.Release(1)
-			r.logger.Debug("released: 1")
+			r.logger.Debug("acquired: 1")
 		}
 	}
 

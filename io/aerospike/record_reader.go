@@ -143,7 +143,7 @@ func NewRecordReader(
 		logger:     logger,
 		recordSets: make(chan *a.Recordset, setsNum),
 		resultChan: make(chan *a.Result, resultChanSize),
-		errChan:    make(chan error, 10),
+		errChan:    make(chan error, 1),
 	}
 }
 
@@ -195,7 +195,8 @@ func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 
 // Close cancels the Aerospike scan used to read records if it was started.
 func (r *RecordReader) Close() {
-	// We close everything in another place, so this is no-op close.
+	close(r.errChan)
+
 	r.logger.Debug("closed aerospike record reader")
 }
 

@@ -146,17 +146,19 @@ func (r *RecordReader) streamPartitionPages(
 	resultChan = make(chan []*pageRecord)
 	errChan = make(chan error)
 
+	pf := *r.config.partitionFilter
+
 	go func() {
 		// For one iteration, we scan 1 pageRecord.
 		for {
-			curFilter, err := models.NewPartitionFilterSerialized(r.config.partitionFilter)
+			curFilter, err := models.NewPartitionFilterSerialized(&pf)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to serialize partition filter: %w", err)
 			}
 
 			recSet, aErr := r.client.ScanPartitions(
 				scanPolicy,
-				r.config.partitionFilter,
+				&pf,
 				r.config.namespace,
 				set,
 				r.config.binList...,

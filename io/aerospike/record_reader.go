@@ -208,7 +208,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 			err := r.config.scanLimiter.Acquire(r.ctx, 1)
 			if err != nil {
 				select {
-				case <-ctx.Done():
+				case <-r.ctx.Done():
 					return
 				case r.errChan <- fmt.Errorf("failed to acquire scan limiter: %w", err):
 				}
@@ -225,7 +225,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 		)
 		if err != nil {
 			select {
-			case <-ctx.Done():
+			case <-r.ctx.Done():
 				return
 			case r.errChan <- fmt.Errorf("failed to scan partitions: %w", err):
 			}
@@ -235,7 +235,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 
 		// Check context to exit properly.
 		select {
-		case <-ctx.Done():
+		case <-r.ctx.Done():
 			return
 		case r.recordSets <- recSet: // ok
 			r.logger.Debug("scanned SET", slog.String("name", set))
@@ -253,7 +253,7 @@ func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets 
 				err := r.config.scanLimiter.Acquire(r.ctx, 1)
 				if err != nil {
 					select {
-					case <-ctx.Done():
+					case <-r.ctx.Done():
 						return
 					case r.errChan <- fmt.Errorf("failed to acquire scan limiter: %w", err):
 					}
@@ -271,7 +271,7 @@ func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets 
 			)
 			if err != nil {
 				select {
-				case <-ctx.Done():
+				case <-r.ctx.Done():
 					return
 				case r.errChan <- fmt.Errorf("failed to scan nodes: %w", err):
 				}
@@ -311,7 +311,7 @@ func (r *RecordReader) startScan(ctx context.Context) {
 		r.startPartitionScan(ctx, &scanPolicy, setsToScan)
 	default:
 		select {
-		case <-ctx.Done():
+		case <-r.ctx.Done():
 			return
 		case r.errChan <- fmt.Errorf("invalid scan parameters"):
 		}

@@ -326,10 +326,11 @@ func (r *RecordReader) startScan(ctx context.Context) {
 
 // processScanResults processes the scan results from recordSets and sends them to the resultChan.
 func (r *RecordReader) processScanResults(ctx context.Context) {
-	var i, j int
+	var i int
 	// Iterate over all data sets.
 	for recordSet := range r.recordSets {
 		i++
+		var j int
 		// Iterate over all records in a set.
 		for res := range recordSet.Results() {
 			j++

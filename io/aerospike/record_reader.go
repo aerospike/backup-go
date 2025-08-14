@@ -392,20 +392,12 @@ func (r *RecordReader) processRecords(ctx context.Context, set *a.Recordset) {
 		}
 	}()
 
-	for {
+	for res := range set.Results() {
+		// Sending to results.
 		select {
 		case <-ctx.Done():
 			return
-		case res, ok := <-set.Results():
-			if !ok {
-				return
-			}
-			// Sending to results.
-			select {
-			case <-ctx.Done():
-				return
-			case r.resultChan <- res:
-			}
+		case r.resultChan <- res:
 		}
 	}
 }

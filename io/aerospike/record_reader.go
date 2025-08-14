@@ -217,10 +217,8 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 	errGroup, ctx := errgroup.WithContext(ctx)
 
 	for _, set := range sets {
-		setName := set // Avoiding clouseress.
-
 		errGroup.Go(func() error {
-			return r.scanPartitionsSet(ctx, p, setName)
+			return r.scanPartitionsSet(ctx, p, set)
 		})
 	}
 
@@ -228,14 +226,14 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 }
 
 func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, set string) error {
-	// Limit scans if limiter is configured.
+	// Acquire the semaphore if the scan limiter is configured.
 	if r.config.scanLimiter != nil {
 		err := r.config.scanLimiter.Acquire(ctx, 1)
 		if err != nil {
 			return fmt.Errorf("failed to acquire scan limiter: %w", err)
 		}
 
-		r.logger.Debug("acquired scan limiter 1")
+		r.logger.Debug("acquired scan limiter")
 	}
 
 	// Each scan requires a copy of the partition filter.
@@ -250,7 +248,7 @@ func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, s
 		r.config.binList...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to scan partitions: %w", err)
+		return fmt.Errorf("failed to scan partitions %d-%d: %w", pf.Begin, pf.Count, err)
 	}
 
 	// Check context to exit properly.
@@ -258,7 +256,11 @@ func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, s
 	case <-ctx.Done():
 		return ctx.Err()
 	case r.recordSets <- recSet: // ok
-		r.logger.Debug("set prepared to scan", slog.String("set", set))
+		r.logger.Debug("partitions recordset sent for processing",
+			slog.String("set", set),
+			slog.Int("begin", pf.Begin),
+			slog.Int("count", pf.Count),
+		)
 	}
 
 	return nil
@@ -268,16 +270,11 @@ func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, s
 func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets []string, nodes []*a.Node) error {
 	errGroup, ctx := errgroup.WithContext(ctx)
 
-	for i := range sets {
-		// Avoiding clouseress.
-		ci := i
+	for _, set := range sets {
 		// Each node will have its own scan
-		for j := range nodes {
-			// Avoiding clouseress.
-			cj := j
-
+		for _, node := range nodes {
 			errGroup.Go(func() error {
-				return r.scanPartitionsNode(ctx, nodes[cj], p, sets[ci])
+				return r.scanPartitionsNode(ctx, node, p, set)
 			})
 		}
 	}
@@ -286,15 +283,17 @@ func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets 
 }
 
 func (r *RecordReader) scanPartitionsNode(ctx context.Context, node *a.Node, p *a.ScanPolicy, set string) error {
-	// Limit scans if limiter is configured.
+	// Acquire the semaphore if the scan limiter is configured.
 	if r.config.scanLimiter != nil {
 		err := r.config.scanLimiter.Acquire(ctx, 1)
 		if err != nil {
 			return fmt.Errorf("failed to acquire scan limiter: %w", err)
 		}
+
+		r.logger.Debug("acquired scan limiter")
 	}
 
-	// Scan nodes.
+	// Scan the node.
 	recSet, err := r.client.ScanNode(
 		p,
 		node,
@@ -303,7 +302,7 @@ func (r *RecordReader) scanPartitionsNode(ctx context.Context, node *a.Node, p *
 		r.config.binList...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to scan nodes: %w", err)
+		return fmt.Errorf("failed to scan the node %s: %w", node.GetName(), err)
 	}
 
 	// Check context to exit properly.
@@ -311,7 +310,7 @@ func (r *RecordReader) scanPartitionsNode(ctx context.Context, node *a.Node, p *
 	case <-ctx.Done():
 		return ctx.Err()
 	case r.recordSets <- recSet: // ok
-		r.logger.Debug("set prepared to scan on node",
+		r.logger.Debug("node recordset sent for processing",
 			slog.String("set", set),
 			slog.String("node", node.GetName()),
 		)
@@ -359,7 +358,7 @@ func (r *RecordReader) startScan(ctx context.Context) {
 func (r *RecordReader) processRecordSets(ctx context.Context) {
 	var wg sync.WaitGroup
 
-	// Order of this defers is important.
+	// The order of the following defer statements is crucial.
 	defer close(r.resultChan)
 	defer wg.Wait()
 
@@ -392,7 +391,7 @@ func (r *RecordReader) processRecords(set *a.Recordset) {
 	// Release limiter.
 	if r.config.scanLimiter != nil {
 		r.config.scanLimiter.Release(1)
-		r.logger.Debug("released scan limiter 1")
+		r.logger.Debug("scan limiter released")
 	}
 }
 

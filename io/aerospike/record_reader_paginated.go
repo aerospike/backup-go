@@ -40,7 +40,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
-	errChan := make(chan error)
+	errChan := make(chan error, 10)
 
 	if r.pageRecordsChan == nil {
 		r.pageRecordsChan = make(chan *pageRecord)
@@ -97,6 +97,8 @@ func (r *RecordReader) startScanPaginated(ctx context.Context, localErrChan chan
 				localErrChan <- err
 				return
 			}
+
+			r.logger.Debug("acquired scan limiter")
 		}
 
 		resultChan, errChan := r.streamPartitionPages(
@@ -194,6 +196,7 @@ func (r *RecordReader) streamPartitionPages(
 
 			if r.config.scanLimiter != nil {
 				r.config.scanLimiter.Release(1)
+				r.logger.Debug("scan limiter released")
 			}
 
 			resultChan <- result

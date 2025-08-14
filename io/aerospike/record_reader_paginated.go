@@ -40,7 +40,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
-	errChan := make(chan error, 10)
+	errChan := make(chan error, 1)
 
 	if r.pageRecordsChan == nil {
 		r.pageRecordsChan = make(chan *pageRecord)

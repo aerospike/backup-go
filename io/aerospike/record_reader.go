@@ -150,7 +150,7 @@ func NewRecordReader(
 		logger:     logger,
 		recordSets: make(chan *a.Recordset, recordSetsSize),
 		resultChan: make(chan *a.Result, resultChanSize*setsNum),
-		errChan:    make(chan error, 10),
+		errChan:    make(chan error, 1),
 	}
 }
 
@@ -248,7 +248,7 @@ func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, s
 		r.config.binList...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to scan partitions %d-%d: %w", pf.Begin, pf.Count, err)
+		return fmt.Errorf("failed to scan set %s partitions %d-%d: %w", set, pf.Begin, pf.Count, err)
 	}
 
 	// Check context to exit properly.
@@ -302,7 +302,7 @@ func (r *RecordReader) scanPartitionsNode(ctx context.Context, node *a.Node, p *
 		r.config.binList...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to scan the node %s: %w", node.GetName(), err)
+		return fmt.Errorf("failed to scan set %s on the node %s: %w", set, node.GetName(), err)
 	}
 
 	// Check context to exit properly.

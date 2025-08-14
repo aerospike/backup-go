@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -208,40 +209,53 @@ func (r *RecordReader) Close() {
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *RecordReader) startPartitionScan(p *a.ScanPolicy, sets []string) error {
+func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, sets []string) error {
+	errGroup, ctx := errgroup.WithContext(ctx)
+
 	for _, set := range sets {
-		// Limit scans if limiter is configured.
-		if r.config.scanLimiter != nil {
-			err := r.config.scanLimiter.Acquire(r.ctx, 1)
-			if err != nil {
-				return fmt.Errorf("failed to acquire scan limiter: %w", err)
-			}
+		setName := set // Avoiding clouseress.
+		errGroup.Go(func() error {
+			return r.scanPartitionsSet(ctx, p, setName)
+		})
+	}
 
-			r.logger.Debug("acquired scan limiter 1")
-		}
+	return errGroup.Wait()
+}
 
-		// Each scan requires a copy of the partition filter.
-		pf := *r.config.partitionFilter
-
-		// Scan partitions.
-		recSet, err := r.client.ScanPartitions(
-			p,
-			&pf,
-			r.config.namespace,
-			set,
-			r.config.binList...,
-		)
+func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, set string) error {
+	// Limit scans if limiter is configured.
+	if r.config.scanLimiter != nil {
+		err := r.config.scanLimiter.Acquire(ctx, 1)
 		if err != nil {
-			return fmt.Errorf("failed to scan partitions: %w", err)
+			return fmt.Errorf("failed to acquire scan limiter: %w", err)
 		}
 
-		// Check context to exit properly.
-		select {
-		case <-r.ctx.Done():
-			return r.ctx.Err()
-		case r.recordSets <- recSet: // ok
-			r.logger.Debug("set prepared to scan", slog.String("set", set))
-		}
+		r.logger.Debug("acquired scan limiter 1")
+	}
+
+	// Each scan requires a copy of the partition filter.
+	pf := *r.config.partitionFilter
+
+	// Scan partitions.
+	recSet, err := r.client.ScanPartitions(
+		p,
+		&pf,
+		r.config.namespace,
+		set,
+		r.config.binList...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to scan partitions: %w", err)
+	}
+
+	// Check context to exit properly.
+	select {
+	case <-r.ctx.Done():
+		return r.ctx.Err()
+	case <-ctx.Done():
+		return ctx.Err()
+	case r.recordSets <- recSet: // ok
+		r.logger.Debug("set prepared to scan", slog.String("set", set))
 	}
 
 	return nil
@@ -309,7 +323,7 @@ func (r *RecordReader) startScan(ctx context.Context) {
 	case len(r.config.nodes) > 0:
 		err = r.startNodeScan(&scanPolicy, setsToScan, r.config.nodes)
 	case r.config.partitionFilter != nil:
-		err = r.startPartitionScan(&scanPolicy, setsToScan)
+		err = r.startPartitionScan(ctx, &scanPolicy, setsToScan)
 	default:
 		err = fmt.Errorf("invalid scan parameters")
 	}

@@ -384,17 +384,15 @@ func (r *RecordReader) processRecordSets(ctx context.Context) {
 
 // processRecords processing records set.
 func (r *RecordReader) processRecords(set *a.Recordset) {
-	// Release limiter on any error. or just on exit.
-	defer func() {
-		if r.config.scanLimiter != nil {
-			r.config.scanLimiter.Release(1)
-			r.logger.Debug("released scan limiter 1")
-		}
-	}()
-
-	// No context checking here, because it slows down the scan.
+	// No context checking here because it slows down the scan.
 	for res := range set.Results() {
 		r.resultChan <- res
+	}
+
+	// Release limiter.
+	if r.config.scanLimiter != nil {
+		r.config.scanLimiter.Release(1)
+		r.logger.Debug("released scan limiter 1")
 	}
 }
 

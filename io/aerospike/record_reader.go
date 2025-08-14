@@ -325,7 +325,11 @@ func (r *RecordReader) startScan(ctx context.Context) {
 
 // processRecordSets processes the scan results from recordSets and sends them to the resultChan.
 func (r *RecordReader) processRecordSets(ctx context.Context) {
+	var wg sync.WaitGroup
+
+	// Order of this defers is important.
 	defer close(r.resultChan)
+	defer wg.Wait()
 
 	for {
 		select {
@@ -335,8 +339,13 @@ func (r *RecordReader) processRecordSets(ctx context.Context) {
 			if !ok {
 				return
 			}
+			// Add to wait group before starting processing.
+			wg.Add(1)
 
-			r.processRecords(ctx, set)
+			go func(set *a.Recordset) {
+				defer wg.Done()
+				r.processRecords(ctx, set)
+			}(set)
 		}
 	}
 }

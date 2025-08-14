@@ -191,6 +191,7 @@ func (r *RecordReader) Close() {
 
 // startScan starts the scan for the RecordReader.
 func (r *RecordReader) startScan() (*recordSets, error) {
+	r.logger.Debug("+++++++++++++++++starting scan")
 	scanPolicy := *r.config.scanPolicy
 
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
@@ -228,9 +229,11 @@ func (r *RecordReader) startScan() (*recordSets, error) {
 
 			scans = append(scans, recSets...)
 		case r.config.partitionFilter != nil:
+			pf := *r.config.partitionFilter
+
 			recSet, err = r.client.ScanPartitions(
 				&scanPolicy,
-				r.config.partitionFilter,
+				&pf,
 				r.config.namespace,
 				set,
 				r.config.binList...,

@@ -29,6 +29,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+// resultChanSize is the size of the channel used to send scan results.
 const resultChanSize = 256
 
 // RecordReaderConfig represents the configuration for scanning Aerospike records.
@@ -126,14 +127,19 @@ func NewRecordReader(
 ) *RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
-	logger.Debug("created new aerospike record reader")
+	ctx, cancel := context.WithCancel(ctx)
 
 	setsNum := len(cfg.setList)
 	if len(cfg.setList) == 0 {
 		setsNum = 1
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	recordSetsSize := setsNum
+	if len(cfg.nodes) > 0 {
+		recordSetsSize = len(cfg.nodes) * setsNum
+	}
+
+	logger.Debug("created new aerospike record reader")
 
 	return &RecordReader{
 		ctx:        ctx,
@@ -141,9 +147,9 @@ func NewRecordReader(
 		config:     cfg,
 		client:     client,
 		logger:     logger,
-		recordSets: make(chan *a.Recordset, setsNum),
+		recordSets: make(chan *a.Recordset, recordSetsSize),
 		resultChan: make(chan *a.Result, resultChanSize),
-		errChan:    make(chan error, 1),
+		errChan:    make(chan error, 10),
 	}
 }
 
@@ -198,29 +204,23 @@ func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 
 // Close cancels the Aerospike scan used to read records if it was started.
 func (r *RecordReader) Close() {
-	close(r.errChan)
-
 	r.logger.Debug("closed aerospike record reader")
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *RecordReader) startPartitionScan(p *a.ScanPolicy, sets []string) {
+func (r *RecordReader) startPartitionScan(p *a.ScanPolicy, sets []string) error {
 	for _, set := range sets {
 		// Limit scans if limiter is configured.
 		if r.config.scanLimiter != nil {
 			err := r.config.scanLimiter.Acquire(r.ctx, 1)
 			if err != nil {
-				select {
-				case <-r.ctx.Done():
-					return
-				case r.errChan <- fmt.Errorf("failed to acquire scan limiter: %w", err):
-				}
+				return fmt.Errorf("failed to acquire scan limiter: %w", err)
 			}
 
-			r.logger.Debug("acquired")
+			r.logger.Debug("acquired scan limiter 1")
 		}
 
-		// ATTENTION!!! COPY PARTITION FILTER FOR EACH SCAN!!!
+		// Each scan requires a copy of the partition filter.
 		pf := *r.config.partitionFilter
 
 		// Scan partitions.
@@ -232,70 +232,60 @@ func (r *RecordReader) startPartitionScan(p *a.ScanPolicy, sets []string) {
 			r.config.binList...,
 		)
 		if err != nil {
-			select {
-			case <-r.ctx.Done():
-				return
-			case r.errChan <- fmt.Errorf("failed to scan partitions: %w", err):
-			}
-
-			return
+			return fmt.Errorf("failed to scan partitions: %w", err)
 		}
 
 		// Check context to exit properly.
 		select {
 		case <-r.ctx.Done():
-			return
+			return r.ctx.Err()
 		case r.recordSets <- recSet: // ok
-			r.logger.Debug("scanned SET", slog.String("name", set))
+			r.logger.Debug("set prepared to scan", slog.String("set", set))
 		}
 	}
+
+	return nil
 }
 
 // startNodeScan initiates a node-based scan for each specified set using the provided scan policy and nodes.
-func (r *RecordReader) startNodeScan(p *a.ScanPolicy, sets []string, nodes []*a.Node) {
+func (r *RecordReader) startNodeScan(p *a.ScanPolicy, sets []string, nodes []*a.Node) error {
 	for _, set := range sets {
-		// Each node will have it own scan
-		for i := range nodes {
+		// Each node will have its own scan
+		for _, node := range nodes {
 			// Limit scans if limiter is configured.
 			if r.config.scanLimiter != nil {
 				err := r.config.scanLimiter.Acquire(r.ctx, 1)
 				if err != nil {
-					select {
-					case <-r.ctx.Done():
-						return
-					case r.errChan <- fmt.Errorf("failed to acquire scan limiter: %w", err):
-					}
-
-					return
+					return fmt.Errorf("failed to acquire scan limiter: %w", err)
 				}
 			}
 
 			// Scan nodes.
 			recSet, err := r.client.ScanNode(
 				p,
-				nodes[i],
+				node,
 				r.config.namespace,
 				set,
 				r.config.binList...,
 			)
 			if err != nil {
-				select {
-				case <-r.ctx.Done():
-					return
-				case r.errChan <- fmt.Errorf("failed to scan nodes: %w", err):
-				}
-
-				return
+				return fmt.Errorf("failed to scan nodes: %w", err)
 			}
 
 			// Check context to exit properly.
 			select {
 			case <-r.ctx.Done():
-				return
+				return r.ctx.Err()
 			case r.recordSets <- recSet: // ok
+				r.logger.Debug("set prepared to scan on node",
+					slog.String("set", set),
+					slog.String("node", node.GetName()),
+				)
 			}
 		}
 	}
+
+	return nil
 }
 
 // startScan starts the scan for the RecordReader.
@@ -311,22 +301,21 @@ func (r *RecordReader) startScan(ctx context.Context) {
 	}
 
 	// Start processing results.
-	go r.processScanResults(ctx)
+	go r.processRecordSets(ctx)
 
+	var err error
 	// Run scans according to config.
 	switch {
 	case len(r.config.nodes) > 0:
-		r.startNodeScan(&scanPolicy, setsToScan, r.config.nodes)
+		err = r.startNodeScan(&scanPolicy, setsToScan, r.config.nodes)
 	case r.config.partitionFilter != nil:
-		r.startPartitionScan(&scanPolicy, setsToScan)
+		err = r.startPartitionScan(&scanPolicy, setsToScan)
 	default:
-		select {
-		case <-r.ctx.Done():
-			return
-		case r.errChan <- fmt.Errorf("invalid scan parameters"):
-		}
+		err = fmt.Errorf("invalid scan parameters")
+	}
 
-		return
+	if err != nil {
+		r.errChan <- err
 	}
 
 	// Close channels after scan complete.
@@ -334,25 +323,59 @@ func (r *RecordReader) startScan(ctx context.Context) {
 	close(r.recordSets)
 }
 
-// processScanResults processes the scan results from recordSets and sends them to the resultChan.
-func (r *RecordReader) processScanResults(ctx context.Context) {
-	// Iterate over all data sets.
-	for recordSet := range r.recordSets {
-		// Iterate over all records in a set.
-		for res := range recordSet.Results() {
+// processRecordSets processes the scan results from recordSets and sends them to the resultChan.
+func (r *RecordReader) processRecordSets(ctx context.Context) {
+	var wg sync.WaitGroup
+
+	// Order of this defers is important.
+	defer close(r.resultChan)
+	defer wg.Wait()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case set, ok := <-r.recordSets:
+			if !ok {
+				return
+			}
+			// Add to wait group before starting processing.
+			wg.Add(1)
+
+			go func(set *a.Recordset) {
+				defer wg.Done()
+				r.processRecords(ctx, set)
+			}(set)
+		}
+	}
+}
+
+// processRecords processing records set.
+func (r *RecordReader) processRecords(ctx context.Context, set *a.Recordset) {
+	// Release limiter on any error. or just on exit.
+	defer func() {
+		if r.config.scanLimiter != nil {
+			r.config.scanLimiter.Release(1)
+			r.logger.Debug("released scan limiter 1")
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case res, ok := <-set.Results():
+			if !ok {
+				return
+			}
+			// Sending to results.
 			select {
 			case <-ctx.Done():
 				return
 			case r.resultChan <- res:
 			}
 		}
-
-		if r.config.scanLimiter != nil {
-			r.config.scanLimiter.Release(1)
-		}
 	}
-
-	close(r.resultChan)
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {

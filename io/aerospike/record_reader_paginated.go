@@ -146,6 +146,7 @@ func (r *RecordReader) streamPartitionPages(
 	resultChan = make(chan []*pageRecord)
 	errChan = make(chan error)
 
+	// Each scan requires a copy of the partition filter.
 	pf := *r.config.partitionFilter
 
 	go func() {

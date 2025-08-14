@@ -392,6 +392,7 @@ func (r *RecordReader) processRecords(set *a.Recordset) {
 		}
 	}()
 
+	// No context checking here, because it slows down the scan.
 	for res := range set.Results() {
 		r.resultChan <- res
 	}

@@ -40,7 +40,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 
 	if r.pageRecordsChan == nil {
 		r.pageRecordsChan = make(chan *pageRecord)
@@ -90,15 +90,17 @@ func (r *RecordReader) startScanPaginated(ctx context.Context, localErrChan chan
 		setsToScan = []string{""}
 	}
 
-	if r.config.scanLimiter != nil {
-		err := r.config.scanLimiter.Acquire(r.ctx, int64(len(setsToScan)))
-		if err != nil {
-			localErrChan <- err
-			return
-		}
-	}
-
 	for _, set := range setsToScan {
+		if r.config.scanLimiter != nil {
+			err := r.config.scanLimiter.Acquire(r.ctx, 1)
+			if err != nil {
+				localErrChan <- err
+				return
+			}
+
+			r.logger.Debug("acquired scan limiter")
+		}
+
 		resultChan, errChan := r.streamPartitionPages(
 			&scanPolicy,
 			set,
@@ -146,17 +148,20 @@ func (r *RecordReader) streamPartitionPages(
 	resultChan = make(chan []*pageRecord)
 	errChan = make(chan error)
 
+	// Each scan requires a copy of the partition filter.
+	pf := *r.config.partitionFilter
+
 	go func() {
 		// For one iteration, we scan 1 pageRecord.
 		for {
-			curFilter, err := models.NewPartitionFilterSerialized(r.config.partitionFilter)
+			curFilter, err := models.NewPartitionFilterSerialized(&pf)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to serialize partition filter: %w", err)
 			}
 
 			recSet, aErr := r.client.ScanPartitions(
 				scanPolicy,
-				r.config.partitionFilter,
+				&pf,
 				r.config.namespace,
 				set,
 				r.config.binList...,
@@ -187,6 +192,11 @@ func (r *RecordReader) streamPartitionPages(
 
 			if aErr = recSet.Close(); aErr != nil {
 				errChan <- fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
+			}
+
+			if r.config.scanLimiter != nil {
+				r.config.scanLimiter.Release(1)
+				r.logger.Debug("scan limiter released")
 			}
 
 			resultChan <- result

@@ -30,6 +30,9 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+// resultChanSize is the size of the channel used to send scan results.
+const resultChanSize = 1024
+
 // RecordReaderConfig represents the configuration for scanning Aerospike records.
 type RecordReaderConfig struct {
 	timeBounds      models.TimeBounds
@@ -127,6 +130,16 @@ func NewRecordReader(
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	ctx, cancel := context.WithCancel(ctx)
 
+	setsNum := len(cfg.setList)
+	if len(cfg.setList) == 0 {
+		setsNum = 1
+	}
+
+	recordSetsSize := setsNum
+	if len(cfg.nodes) > 0 {
+		recordSetsSize = len(cfg.nodes) * setsNum
+	}
+
 	logger.Debug("created new aerospike record reader")
 
 	return &RecordReader{
@@ -135,9 +148,9 @@ func NewRecordReader(
 		config:     cfg,
 		client:     client,
 		logger:     logger,
-		recordSets: make(chan *a.Recordset),
-		resultChan: make(chan *a.Result),
-		errChan:    make(chan error),
+		recordSets: make(chan *a.Recordset, recordSetsSize),
+		resultChan: make(chan *a.Result, resultChanSize*setsNum),
+		errChan:    make(chan error, 10),
 	}
 }
 

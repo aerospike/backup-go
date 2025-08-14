@@ -376,14 +376,14 @@ func (r *RecordReader) processRecordSets(ctx context.Context) {
 
 			go func(set *a.Recordset) {
 				defer wg.Done()
-				r.processRecords(ctx, set)
+				r.processRecords(set)
 			}(set)
 		}
 	}
 }
 
 // processRecords processing records set.
-func (r *RecordReader) processRecords(ctx context.Context, set *a.Recordset) {
+func (r *RecordReader) processRecords(set *a.Recordset) {
 	// Release limiter on any error. or just on exit.
 	defer func() {
 		if r.config.scanLimiter != nil {
@@ -393,12 +393,7 @@ func (r *RecordReader) processRecords(ctx context.Context, set *a.Recordset) {
 	}()
 
 	for res := range set.Results() {
-		// Sending to results.
-		select {
-		case <-ctx.Done():
-			return
-		case r.resultChan <- res:
-		}
+		r.resultChan <- res
 	}
 }
 

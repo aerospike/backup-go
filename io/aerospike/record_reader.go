@@ -149,7 +149,7 @@ func NewRecordReader(
 		client:     client,
 		logger:     logger,
 		recordSets: make(chan *a.Recordset, recordSetsSize),
-		resultChan: make(chan *a.Result, resultChanSize),
+		resultChan: make(chan *a.Result, resultChanSize*setsNum),
 		errChan:    make(chan error, 10),
 	}
 }
@@ -166,14 +166,18 @@ func (r *RecordReader) Read(ctx context.Context) (*models.Token, error) {
 
 func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
+		// Start scan with the global context.
 		go r.startScan(r.ctx)
 	})
 
 	select {
 	case <-ctx.Done():
+		// If the local context is canceled, we cancel the global context.
 		r.cancel()
 
 		return nil, ctx.Err()
+	case <-r.ctx.Done():
+		return nil, r.ctx.Err()
 	case err := <-r.errChan:
 		// serve errors.
 		r.cancel()
@@ -214,6 +218,7 @@ func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, 
 
 	for _, set := range sets {
 		setName := set // Avoiding clouseress.
+
 		errGroup.Go(func() error {
 			return r.scanPartitionsSet(ctx, p, setName)
 		})
@@ -250,8 +255,6 @@ func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, s
 
 	// Check context to exit properly.
 	select {
-	case <-r.ctx.Done():
-		return r.ctx.Err()
 	case <-ctx.Done():
 		return ctx.Err()
 	case r.recordSets <- recSet: // ok
@@ -262,41 +265,56 @@ func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, s
 }
 
 // startNodeScan initiates a node-based scan for each specified set using the provided scan policy and nodes.
-func (r *RecordReader) startNodeScan(p *a.ScanPolicy, sets []string, nodes []*a.Node) error {
-	for _, set := range sets {
+func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets []string, nodes []*a.Node) error {
+	errGroup, ctx := errgroup.WithContext(ctx)
+
+	for i := range sets {
+		// Avoiding clouseress.
+		ci := i
 		// Each node will have its own scan
-		for _, node := range nodes {
-			// Limit scans if limiter is configured.
-			if r.config.scanLimiter != nil {
-				err := r.config.scanLimiter.Acquire(r.ctx, 1)
-				if err != nil {
-					return fmt.Errorf("failed to acquire scan limiter: %w", err)
-				}
-			}
+		for j := range nodes {
+			// Avoiding clouseress.
+			cj := j
 
-			// Scan nodes.
-			recSet, err := r.client.ScanNode(
-				p,
-				node,
-				r.config.namespace,
-				set,
-				r.config.binList...,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to scan nodes: %w", err)
-			}
-
-			// Check context to exit properly.
-			select {
-			case <-r.ctx.Done():
-				return r.ctx.Err()
-			case r.recordSets <- recSet: // ok
-				r.logger.Debug("set prepared to scan on node",
-					slog.String("set", set),
-					slog.String("node", node.GetName()),
-				)
-			}
+			errGroup.Go(func() error {
+				return r.scanPartitionsNode(ctx, nodes[cj], p, sets[ci])
+			})
 		}
+	}
+
+	return errGroup.Wait()
+}
+
+func (r *RecordReader) scanPartitionsNode(ctx context.Context, node *a.Node, p *a.ScanPolicy, set string) error {
+	// Limit scans if limiter is configured.
+	if r.config.scanLimiter != nil {
+		err := r.config.scanLimiter.Acquire(ctx, 1)
+		if err != nil {
+			return fmt.Errorf("failed to acquire scan limiter: %w", err)
+		}
+	}
+
+	// Scan nodes.
+	recSet, err := r.client.ScanNode(
+		p,
+		node,
+		r.config.namespace,
+		set,
+		r.config.binList...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to scan nodes: %w", err)
+	}
+
+	// Check context to exit properly.
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case r.recordSets <- recSet: // ok
+		r.logger.Debug("set prepared to scan on node",
+			slog.String("set", set),
+			slog.String("node", node.GetName()),
+		)
 	}
 
 	return nil
@@ -321,7 +339,7 @@ func (r *RecordReader) startScan(ctx context.Context) {
 	// Run scans according to config.
 	switch {
 	case len(r.config.nodes) > 0:
-		err = r.startNodeScan(&scanPolicy, setsToScan, r.config.nodes)
+		err = r.startNodeScan(ctx, &scanPolicy, setsToScan, r.config.nodes)
 	case r.config.partitionFilter != nil:
 		err = r.startPartitionScan(ctx, &scanPolicy, setsToScan)
 	default:

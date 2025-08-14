@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testFilePrefix = "prefix"
+
 type mockWriteCloser struct {
 	io.Writer
 	closed     bool
@@ -56,7 +58,7 @@ func Test_writeCloserSized(t *testing.T) {
 		return writer2, nil
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -112,7 +114,7 @@ func Test_writeCloserSized_WithSaveCommandChan(t *testing.T) {
 		return writer2, nil
 	}
 
-	wcs, err := NewWriter(context.Background(), 5, saveCommandChan, 10, open)
+	wcs, err := NewWriter(context.Background(), testFilePrefix, 5, saveCommandChan, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -152,7 +154,7 @@ func Test_writeCloserSized_CloseError(t *testing.T) {
 		return nil, fmt.Errorf("should not be called")
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -175,7 +177,7 @@ func Test_writeCloserSized_OpenError(t *testing.T) {
 		return nil, fmt.Errorf("open error")
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -191,7 +193,7 @@ func Test_writeCloserSized_CloseNilWriter(t *testing.T) {
 		return nil, fmt.Errorf("open error")
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 

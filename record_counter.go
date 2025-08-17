@@ -130,7 +130,7 @@ func (rc *recordCounter) countRecordsUsingScanByNodes(ctx context.Context, scanP
 }
 
 // countRecords counts the records returned by the given reader.
-func countRecords(ctx context.Context, recordReader *aerospike.RecordReader) (uint64, error) {
+func countRecords(ctx context.Context, recordReader aerospike.RecordReader) (uint64, error) {
 	var count uint64
 
 	for {

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/aerospike-client-go/v8/types"
@@ -31,6 +32,42 @@ type pageRecord struct {
 	filter *models.PartitionFilterSerialized
 }
 
+type PaginatedRecordReader struct {
+	ctx             context.Context
+	cancel          context.CancelFunc
+	client          scanner
+	logger          *slog.Logger
+	config          *RecordReaderConfig
+	pageRecordsChan chan *pageRecord
+	errChan         chan error
+	scanOnce        sync.Once
+	recodsetCloser  RecordsetCloser
+}
+
+func (r *PaginatedRecordReader) Close() {
+}
+
+func NewPaginatedRecordReader(
+	ctx context.Context,
+	scaner scanner,
+	cfg *RecordReaderConfig,
+	logger *slog.Logger,
+	closer RecordsetCloser,
+	cancel context.CancelFunc,
+) *PaginatedRecordReader {
+	return &PaginatedRecordReader{
+		ctx:             ctx,
+		cancel:          cancel,
+		client:          scaner,
+		logger:          logger,
+		config:          cfg,
+		pageRecordsChan: make(chan *pageRecord),
+		errChan:         make(chan error, 1),
+		scanOnce:        sync.Once{},
+		recodsetCloser:  closer,
+	}
+}
+
 func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *pageRecord {
 	return &pageRecord{
 		result: result,
@@ -39,13 +76,12 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 }
 
 // readPage reads the next record from pageRecord from the Aerospike database.
-func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
+func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	errChan := make(chan error, 1)
 
-	if r.pageRecordsChan == nil {
-		r.pageRecordsChan = make(chan *pageRecord)
+	r.scanOnce.Do(func() {
 		go r.startScanPaginated(ctx, errChan)
-	}
+	})
 
 	select {
 	case <-ctx.Done():
@@ -81,7 +117,7 @@ func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
 }
 
 // startScanPaginated starts the scan for the RecordReader only for state save!
-func (r *RecordReader) startScanPaginated(ctx context.Context, localErrChan chan error) {
+func (r *PaginatedRecordReader) startScanPaginated(ctx context.Context, localErrChan chan error) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
@@ -138,7 +174,7 @@ func (r *RecordReader) startScanPaginated(ctx context.Context, localErrChan chan
 }
 
 // streamPartitionPages reads the whole pageRecord and sends it to the resultChan.
-func (r *RecordReader) streamPartitionPages(
+func (r *PaginatedRecordReader) streamPartitionPages(
 	scanPolicy *a.ScanPolicy,
 	set string,
 ) (resultChan chan []*pageRecord, errChan chan error) {

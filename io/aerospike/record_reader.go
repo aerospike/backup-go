@@ -100,24 +100,24 @@ type scanner interface {
 	) (*a.Recordset, a.Error)
 }
 
+type RecordReader interface {
+	Read(ctx context.Context) (*models.Token, error)
+	Close()
+}
+
 // scanProducer is a function that initiates a scan and returns a channel from which the scan results can be read.
 type scanProducer func() (*a.Recordset, a.Error)
 
-// RecordReader satisfies the pipeline DataReader interface.
-// It reads records from an Aerospike database and returns them as
-// *models.Token.
-type RecordReader struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	client scanner
-	logger *slog.Logger
-	config *RecordReaderConfig
-	// pageRecordsChan chan is initialized only if pageSize > 0.
-	pageRecordsChan chan *pageRecord
-	resultChan      chan *a.Result
-	errChan         chan error
-	scanOnce        sync.Once
-	recodsetCloser  RecordsetCloser
+type SingleRecordReader struct {
+	ctx            context.Context
+	cancel         context.CancelFunc
+	client         scanner
+	logger         *slog.Logger
+	config         *RecordReaderConfig
+	resultChan     chan *a.Result
+	errChan        chan error
+	scanOnce       sync.Once
+	recodsetCloser RecordsetCloser
 }
 
 // RecordsetCloser is an interface for closing Aerospike recordsets.
@@ -144,14 +144,28 @@ func NewRecordReader(
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
 	recodsetCloser RecordsetCloser,
-) *RecordReader {
+) RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	ctx, cancel := context.WithCancel(ctx)
 
 	logger.Debug("created new aerospike record reader")
+	if cfg.pageSize > 0 {
+		return NewPaginatedRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
+	}
 
-	return &RecordReader{
+	return NewSingleRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
+}
+
+func NewSingleRecordReader(
+	ctx context.Context,
+	client scanner,
+	cfg *RecordReaderConfig,
+	logger *slog.Logger,
+	recodsetCloser RecordsetCloser,
+	cancel context.CancelFunc,
+) *SingleRecordReader {
+	return &SingleRecordReader{
 		ctx:            ctx,
 		cancel:         cancel,
 		config:         cfg,
@@ -163,17 +177,7 @@ func NewRecordReader(
 	}
 }
 
-// Read reads the next record from the Aerospike database.
-func (r *RecordReader) Read(ctx context.Context) (*models.Token, error) {
-	// If pageSize is set, we use paginated read.
-	if r.config.pageSize > 0 {
-		return r.readPage(ctx)
-	}
-
-	return r.read(ctx)
-}
-
-func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
+func (r *SingleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
 		// Start scan with the global context.
 		go r.startScan(r.ctx)
@@ -217,12 +221,12 @@ func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 }
 
 // Close cancels the Aerospike scan used to read records if it was started.
-func (r *RecordReader) Close() {
+func (r *SingleRecordReader) Close() {
 	r.logger.Debug("closed aerospike record reader")
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *RecordReader) startScan(ctx context.Context) {
+func (r *SingleRecordReader) startScan(ctx context.Context) {
 	defer close(r.resultChan)
 
 	// Generate the list of all scan tasks.
@@ -246,7 +250,7 @@ func (r *RecordReader) startScan(ctx context.Context) {
 // executeProducer runs a single scan task. It acquires a semaphore,
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
-func (r *RecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
+func (r *SingleRecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -275,7 +279,7 @@ func (r *RecordReader) executeProducer(ctx context.Context, producer scanProduce
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.
-func (r *RecordReader) generateProducers() ([]scanProducer, error) {
+func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
@@ -326,7 +330,7 @@ func (r *RecordReader) generateProducers() ([]scanProducer, error) {
 }
 
 // shuffleProducers randomizes the order of the producers slice to avoid overloading a single node.
-func (r *RecordReader) shuffleProducers(producers []scanProducer) {
+func (r *SingleRecordReader) shuffleProducers(producers []scanProducer) {
 	rand.Shuffle(len(producers), func(i, j int) {
 		producers[i], producers[j] = producers[j], producers[i]
 	})

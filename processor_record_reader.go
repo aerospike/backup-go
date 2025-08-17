@@ -112,6 +112,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForPartition(
 			rr.aerospikeClient,
 			recordReaderConfig,
 			rr.logger,
+			aerospike.NewRecordsetCloser(),
 		)
 
 		readers[i] = recordReader
@@ -154,6 +155,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForNodes(
 			rr.aerospikeClient,
 			recordReaderConfig,
 			rr.logger,
+			aerospike.NewRecordsetCloser(),
 		)
 
 		readers[i] = recordReader

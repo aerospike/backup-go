@@ -101,7 +101,7 @@ type scanner interface {
 }
 
 // scanProducer is a function that initiates a scan and returns a channel from which the scan results can be read.
-type scanProducer func() (<-chan *a.Result, error)
+type scanProducer func() (*a.Recordset, a.Error)
 
 // RecordReader satisfies the pipeline DataReader interface.
 // It reads records from an Aerospike database and returns them as
@@ -117,6 +117,24 @@ type RecordReader struct {
 	resultChan      chan *a.Result
 	errChan         chan error
 	scanOnce        sync.Once
+	recodsetCloser  RecordsetCloser
+}
+
+// RecordsetCloser is an interface for closing Aerospike recordsets.
+// It is required because scanner interacted return concrete type Recordset that is impossible to mock.
+type RecordsetCloser interface {
+	Close(recordset *a.Recordset) a.Error
+}
+
+func NewRecordsetCloser() RecordsetCloser {
+	return &RecordsetCloserImpl{}
+}
+
+type RecordsetCloserImpl struct {
+}
+
+func (r *RecordsetCloserImpl) Close(recordset *a.Recordset) a.Error {
+	return recordset.Close()
 }
 
 // NewRecordReader creates a new RecordReader.
@@ -125,6 +143,7 @@ func NewRecordReader(
 	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
+	recodsetCloser RecordsetCloser,
 ) *RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
@@ -133,13 +152,14 @@ func NewRecordReader(
 	logger.Debug("created new aerospike record reader")
 
 	return &RecordReader{
-		ctx:        ctx,
-		cancel:     cancel,
-		config:     cfg,
-		client:     client,
-		logger:     logger,
-		resultChan: make(chan *a.Result, resultChanSize),
-		errChan:    make(chan error, 1),
+		ctx:            ctx,
+		cancel:         cancel,
+		config:         cfg,
+		client:         client,
+		logger:         logger,
+		resultChan:     make(chan *a.Result, resultChanSize),
+		errChan:        make(chan error, 1),
+		recodsetCloser: recodsetCloser,
 	}
 }
 
@@ -240,18 +260,18 @@ func (r *RecordReader) executeProducer(ctx context.Context, producer scanProduce
 
 	// Call the producer function. This starts the actual Aerospike scan
 	// and returns a channel for its results.
-	resultsChan, err := producer()
+	recordset, err := producer()
 	if err != nil {
 		return fmt.Errorf("scan producer failed: %w", err)
 	}
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
-	for res := range resultsChan {
+	for res := range recordset.Results() {
 		r.resultChan <- res
 	}
 
-	return nil
+	return r.recodsetCloser.Close(recordset)
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.
@@ -272,17 +292,12 @@ func (r *RecordReader) generateProducers() ([]scanProducer, error) {
 			for _, set := range setsToScan {
 				// Capture loop variables to ensure the lambda uses the correct values.
 				capturedNode, capturedSet := node, set
-				producer := func() (<-chan *a.Result, error) {
+				producer := func() (*a.Recordset, a.Error) {
 					r.logger.Debug("starting node scan",
 						slog.String("set", capturedSet),
 						slog.String("node", capturedNode.GetName()))
 
-					recSet, err := r.client.ScanNode(&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
-					if err != nil {
-						return nil, err
-					}
-
-					return recSet.Results(), nil
+					return r.client.ScanNode(&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
 				}
 				producers = append(producers, producer)
 			}
@@ -291,7 +306,7 @@ func (r *RecordReader) generateProducers() ([]scanProducer, error) {
 		// Partition Scan Mode
 		for _, set := range setsToScan {
 			capturedSet := set
-			producer := func() (<-chan *a.Result, error) {
+			producer := func() (*a.Recordset, a.Error) {
 				// Each scan requires a fresh copy of the partition filter.
 				pf := *r.config.partitionFilter
 				r.logger.Debug("starting partition scan",
@@ -299,12 +314,7 @@ func (r *RecordReader) generateProducers() ([]scanProducer, error) {
 					slog.Int("begin", pf.Begin),
 					slog.Int("count", pf.Count))
 
-				recSet, err := r.client.ScanPartitions(&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
-				if err != nil {
-					return nil, err
-				}
-
-				return recSet.Results(), nil
+				return r.client.ScanPartitions(&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
 			}
 			producers = append(producers, producer)
 		}

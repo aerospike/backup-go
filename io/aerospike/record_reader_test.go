@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"reflect"
 	"testing"
+	"time"
 	"unsafe"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -58,6 +59,7 @@ func TestAerospikeRecordReader(t *testing.T) {
 		Record: rec,
 	}
 	mockResults <- mockRes
+	close(mockResults)
 	setFieldValue(mockRecordSet, "records", mockResults)
 
 	mockScanner := mocks.NewMockscanner(t)
@@ -73,6 +75,10 @@ func TestAerospikeRecordReader(t *testing.T) {
 
 	ctx := context.Background()
 
+	closer := mocks.NewMockRecordsetCloser(t)
+	closer.EXPECT().Close(mockRecordSet).Return(nil)
+	defer closer.AssertExpectations(t)
+
 	reader := NewRecordReader(
 		ctx,
 		mockScanner,
@@ -85,10 +91,12 @@ func TestAerospikeRecordReader(t *testing.T) {
 				testMetricMessage, true),
 		},
 		slog.Default(),
+		closer,
 	)
 	require.NotNil(t, reader)
 
 	v, err := reader.Read(ctx)
+	time.Sleep(100 * time.Millisecond)
 	require.Nil(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	require.Equal(t, expectedRecToken, v)
@@ -119,6 +127,7 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 		Err:    a.ErrInvalidParam,
 	}
 	mockResults <- mockRes
+	close(mockResults)
 	setFieldValue(mockRecordSet, "records", mockResults)
 
 	mockScanner := mocks.NewMockscanner(t)
@@ -134,6 +143,10 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 
 	ctx := context.Background()
 
+	closer := mocks.NewMockRecordsetCloser(t)
+	closer.EXPECT().Close(mockRecordSet).Return(nil)
+	defer closer.AssertExpectations(t)
+
 	reader := NewRecordReader(
 		ctx,
 		mockScanner,
@@ -146,6 +159,7 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 				testMetricMessage, true),
 		},
 		slog.Default(),
+		closer,
 	)
 	require.NotNil(t, reader)
 
@@ -179,6 +193,10 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 	)
 	ctx := context.Background()
 
+	closer := mocks.NewMockRecordsetCloser(t)
+	closer.EXPECT().Close(mockRecordSet).Return(nil)
+	defer closer.AssertExpectations(t)
+
 	reader := NewRecordReader(
 		ctx,
 		mockScanner,
@@ -191,6 +209,7 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 				testMetricMessage, true),
 		},
 		slog.Default(),
+		closer,
 	)
 	require.NotNil(t, reader)
 
@@ -219,6 +238,9 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 
 	ctx := context.Background()
 
+	closer := mocks.NewMockRecordsetCloser(t)
+	defer closer.AssertExpectations(t)
+
 	reader := NewRecordReader(
 		ctx,
 		mockScanner,
@@ -231,6 +253,7 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 				testMetricMessage, true),
 		},
 		slog.Default(),
+		closer,
 	)
 	require.NotNil(t, reader)
 
@@ -266,6 +289,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 		Record: rec,
 	}
 	mockResults <- mockRes
+	close(mockResults)
 	setFieldValue(mockRecordSet, "records", mockResults)
 
 	policy := a.NewScanPolicy()
@@ -287,6 +311,9 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 	)
 
 	ctx := context.Background()
+	closer := mocks.NewMockRecordsetCloser(t)
+	closer.EXPECT().Close(mockRecordSet).Return(nil)
+	defer closer.AssertExpectations(t)
 
 	reader := NewRecordReader(
 		ctx,
@@ -300,6 +327,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 				testMetricMessage, true),
 		},
 		slog.Default(),
+		closer,
 	)
 	require.NotNil(t, reader)
 

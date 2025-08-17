@@ -93,7 +93,8 @@ func (rc *recordCounter) countRecordsUsingScanByPartitions(ctx context.Context, 
 	partitionFilter := randomPartition(rc.config.PartitionFilters)
 	readerConfig := rc.readerProcessor.recordReaderConfigForPartitions(partitionFilter, scanPolicy)
 
-	recordReader := aerospike.NewRecordReader(ctx, rc.aerospikeClient, readerConfig, rc.logger)
+	recordReader := aerospike.NewRecordReader(
+		ctx, rc.aerospikeClient, readerConfig, rc.logger, aerospike.NewRecordsetCloser())
 	defer recordReader.Close()
 
 	count, err := countRecords(ctx, recordReader)
@@ -116,7 +117,8 @@ func (rc *recordCounter) countRecordsUsingScanByNodes(ctx context.Context, scanP
 	randomNode := []*a.Node{nodes[randomIndex]}
 	readerConfig := rc.readerProcessor.recordReaderConfigForNode(randomNode, scanPolicy)
 
-	recordReader := aerospike.NewRecordReader(ctx, rc.aerospikeClient, readerConfig, rc.logger)
+	recordReader := aerospike.NewRecordReader(
+		ctx, rc.aerospikeClient, readerConfig, rc.logger, aerospike.NewRecordsetCloser())
 	defer recordReader.Close()
 
 	count, err := countRecords(ctx, recordReader)

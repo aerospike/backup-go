@@ -198,7 +198,7 @@ func (r *RecordReader) read(ctx context.Context) (*models.Token, error) {
 		}
 
 		if res.Err != nil {
-			r.logger.Error("error reading record", "error", res.Err)
+			r.logger.Error("error reading record", slog.Any("error", res.Err))
 			r.cancel()
 
 			return nil, res.Err

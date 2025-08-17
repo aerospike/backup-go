@@ -130,11 +130,6 @@ func NewRecordReader(
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	ctx, cancel := context.WithCancel(ctx)
 
-	setsNum := len(cfg.setList)
-	if setsNum == 0 {
-		setsNum = 1
-	}
-
 	logger.Debug("created new aerospike record reader")
 
 	return &RecordReader{
@@ -251,6 +246,7 @@ func (r *RecordReader) executeProducer(ctx context.Context, producer scanProduce
 	}
 
 	// Drain all results from this specific scan.
+	// No context checking here because it slows down the scan.
 	for res := range resultsChan {
 		r.resultChan <- res
 	}

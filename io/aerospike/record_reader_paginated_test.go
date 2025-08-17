@@ -15,16 +15,14 @@
 package aerospike
 
 import (
+	"context"
 	"io"
 	"log/slog"
+	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
-
-	"context"
-	"testing"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -189,7 +187,6 @@ func TestAerospikeRecordReaderPaginatedRecordError(t *testing.T) {
 }
 
 func TestAerospikeRecordReaderPaginatedScanFailed(t *testing.T) {
-
 	namespace := "test"
 	set := ""
 	pageSize := int64(1)

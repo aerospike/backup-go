@@ -27,7 +27,7 @@ import (
 type Writer struct {
 	ctx    context.Context // stored internally to be used by the Write method
 	writer io.WriteCloser
-	open   func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error)
+	open   func(context.Context, int, *atomic.Uint64) (io.WriteCloser, error)
 
 	limit uint64
 	// Number of writer, for saving state.
@@ -35,18 +35,16 @@ type Writer struct {
 	saveCommandChan chan int
 	// File size counter.
 	sizeCounter atomic.Uint64
-	prefix      string
 }
 
 // NewWriter creates a new Writer with a size limit.
 // limit must be greater than 0.
 func NewWriter(
 	ctx context.Context,
-	prefix string,
 	n int,
 	saveCommandChan chan int,
 	limit uint64,
-	open func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error),
+	open func(context.Context, int, *atomic.Uint64) (io.WriteCloser, error),
 ) (*Writer, error) {
 	return &Writer{
 		ctx:             ctx,
@@ -54,7 +52,6 @@ func NewWriter(
 		open:            open,
 		n:               n,
 		saveCommandChan: saveCommandChan,
-		prefix:          prefix,
 	}, nil
 }
 
@@ -76,7 +73,7 @@ func (f *Writer) Write(p []byte) (n int, err error) {
 		// reset counter.
 		f.sizeCounter.Store(0)
 
-		f.writer, err = f.open(f.ctx, fmt.Sprintf("%s%d_", f.prefix, f.n), &f.sizeCounter)
+		f.writer, err = f.open(f.ctx, f.n, &f.sizeCounter)
 		if err != nil {
 			return 0, fmt.Errorf("failed to open writer: %w", err)
 		}

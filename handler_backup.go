@@ -197,7 +197,7 @@ func newBackupHandler(
 	}
 
 	writerProcessor := newFileWriterProcessor[*models.Token](
-		bh.filePrefixGenerator,
+		bh.config.OutputFilePrefix,
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,
@@ -570,11 +570,6 @@ func (bh *BackupHandler) stateSuffixGenerator() string {
 	}
 
 	return suffix
-}
-
-// filePrefixGenerator generates and returns the file prefix from the backup configuration.
-func (bh *BackupHandler) filePrefixGenerator() string {
-	return bh.config.OutputFilePrefix
 }
 
 // cleanup stops the collection of stats and metrics for the backup job,

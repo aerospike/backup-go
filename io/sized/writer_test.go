@@ -25,8 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testFilePrefix = "prefix"
-
 type mockWriteCloser struct {
 	io.Writer
 	closed     bool
@@ -43,7 +41,7 @@ func Test_writeCloserSized(t *testing.T) {
 	var writer1 *mockWriteCloser
 	var writer2 *mockWriteCloser
 
-	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ int, _ *atomic.Uint64) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer: &bytes.Buffer{},
@@ -58,7 +56,7 @@ func Test_writeCloserSized(t *testing.T) {
 		return writer2, nil
 	}
 
-	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -99,7 +97,7 @@ func Test_writeCloserSized_WithSaveCommandChan(t *testing.T) {
 
 	saveCommandChan := make(chan int, 1)
 
-	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ int, _ *atomic.Uint64) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer: &bytes.Buffer{},
@@ -114,7 +112,7 @@ func Test_writeCloserSized_WithSaveCommandChan(t *testing.T) {
 		return writer2, nil
 	}
 
-	wcs, err := NewWriter(context.Background(), testFilePrefix, 5, saveCommandChan, 10, open)
+	wcs, err := NewWriter(context.Background(), 5, saveCommandChan, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -142,7 +140,7 @@ func Test_writeCloserSized_CloseError(t *testing.T) {
 	t.Parallel()
 	var writer1 *mockWriteCloser
 
-	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ int, _ *atomic.Uint64) (io.WriteCloser, error) {
 		if writer1 == nil {
 			writer1 = &mockWriteCloser{
 				Writer:     &bytes.Buffer{},
@@ -154,7 +152,7 @@ func Test_writeCloserSized_CloseError(t *testing.T) {
 		return nil, fmt.Errorf("should not be called")
 	}
 
-	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -173,11 +171,11 @@ func Test_writeCloserSized_CloseError(t *testing.T) {
 func Test_writeCloserSized_OpenError(t *testing.T) {
 	t.Parallel()
 
-	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ int, _ *atomic.Uint64) (io.WriteCloser, error) {
 		return nil, fmt.Errorf("open error")
 	}
 
-	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 
@@ -189,11 +187,11 @@ func Test_writeCloserSized_OpenError(t *testing.T) {
 func Test_writeCloserSized_CloseNilWriter(t *testing.T) {
 	t.Parallel()
 
-	open := func(_ context.Context, _ string, _ *atomic.Uint64) (io.WriteCloser, error) {
+	open := func(_ context.Context, _ int, _ *atomic.Uint64) (io.WriteCloser, error) {
 		return nil, fmt.Errorf("open error")
 	}
 
-	wcs, err := NewWriter(context.Background(), testFilePrefix, 1, nil, 10, open)
+	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
 	require.Nil(t, err)
 

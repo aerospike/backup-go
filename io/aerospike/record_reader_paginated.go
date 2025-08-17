@@ -108,7 +108,8 @@ func (r *RecordReader) startScanPaginated(ctx context.Context) {
 	}
 }
 
-// paginatedScanProducer is a function that initiates a paginated scan and returns a channel from which the scan results can be read.
+// paginatedScanProducer is a function that initiates a paginated scan
+// and returns a channel from which the scan results can be read.
 type paginatedScanProducer func() (<-chan *pageRecord, error)
 
 // executePaginatedProducer runs a single paginated scan task.
@@ -157,7 +158,7 @@ func (r *RecordReader) generatePaginatedProducers() ([]paginatedScanProducer, er
 		setsToScan = []string{""} // Scan the entire namespace if no sets are specified.
 	}
 
-	var producers []paginatedScanProducer
+	var producers = make([]paginatedScanProducer, 0, len(setsToScan))
 
 	for _, set := range setsToScan {
 		capturedSet := set

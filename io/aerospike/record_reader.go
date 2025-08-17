@@ -232,6 +232,10 @@ func (r *RecordReader) startScan(ctx context.Context) {
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
 func (r *RecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	if r.config.scanLimiter != nil {
 		if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
 			return fmt.Errorf("failed to acquire scan limiter: %w", err)
@@ -248,14 +252,7 @@ func (r *RecordReader) executeProducer(ctx context.Context, producer scanProduce
 
 	// Drain all results from this specific scan.
 	for res := range resultsChan {
-		select {
-		case r.resultChan <- res:
-			// Result successfully forwarded to the reader.
-		case <-ctx.Done():
-			// The reader's context was canceled, so we stop processing.
-			r.logger.Debug("context cancelled during record processing")
-			return ctx.Err()
-		}
+		r.resultChan <- res
 	}
 
 	return nil
@@ -280,7 +277,9 @@ func (r *RecordReader) generateProducers() ([]scanProducer, error) {
 				// Capture loop variables to ensure the lambda uses the correct values.
 				capturedNode, capturedSet := node, set
 				producer := func() (<-chan *a.Result, error) {
-					r.logger.Debug("starting node scan", "set", capturedSet, "node", capturedNode.GetName())
+					r.logger.Debug("starting node scan",
+						slog.String("set", capturedSet),
+						slog.String("node", capturedNode.GetName()))
 
 					recSet, err := r.client.ScanNode(&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
 					if err != nil {
@@ -299,7 +298,10 @@ func (r *RecordReader) generateProducers() ([]scanProducer, error) {
 			producer := func() (<-chan *a.Result, error) {
 				// Each scan requires a fresh copy of the partition filter.
 				pf := *r.config.partitionFilter
-				r.logger.Debug("starting partition scan", "set", capturedSet, "begin", pf.Begin, "count", pf.Count)
+				r.logger.Debug("starting partition scan",
+					slog.String("set", capturedSet),
+					slog.Int("begin", pf.Begin),
+					slog.Int("count", pf.Count))
 
 				recSet, err := r.client.ScanPartitions(&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
 				if err != nil {

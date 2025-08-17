@@ -16,9 +16,11 @@ package aerospike
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -26,7 +28,6 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -82,9 +83,6 @@ func NewRecordReaderConfig(namespace string,
 }
 
 // scanner is an interface for scanning Aerospike records.
-// The Aerospike go client satisfies this interface.
-//
-//go:generate mockery --name scanner
 type scanner interface {
 	ScanPartitions(
 		scanPolicy *a.ScanPolicy,
@@ -102,6 +100,9 @@ type scanner interface {
 	) (*a.Recordset, a.Error)
 }
 
+// scanProducer is a function that initiates a scan and returns a channel from which the scan results can be read.
+type scanProducer func() (<-chan *a.Result, error)
+
 // RecordReader satisfies the pipeline DataReader interface.
 // It reads records from an Aerospike database and returns them as
 // *models.Token.
@@ -113,7 +114,6 @@ type RecordReader struct {
 	config *RecordReaderConfig
 	// pageRecordsChan chan is initialized only if pageSize > 0.
 	pageRecordsChan chan *pageRecord
-	recordSets      chan *a.Recordset
 	resultChan      chan *a.Result
 	errChan         chan error
 	scanOnce        sync.Once
@@ -131,13 +131,8 @@ func NewRecordReader(
 	ctx, cancel := context.WithCancel(ctx)
 
 	setsNum := len(cfg.setList)
-	if len(cfg.setList) == 0 {
+	if setsNum == 0 {
 		setsNum = 1
-	}
-
-	recordSetsSize := setsNum
-	if len(cfg.nodes) > 0 {
-		recordSetsSize = len(cfg.nodes) * setsNum
 	}
 
 	logger.Debug("created new aerospike record reader")
@@ -148,7 +143,6 @@ func NewRecordReader(
 		config:     cfg,
 		client:     client,
 		logger:     logger,
-		recordSets: make(chan *a.Recordset, recordSetsSize),
 		resultChan: make(chan *a.Result, resultChanSize*setsNum),
 		errChan:    make(chan error, 1),
 	}
@@ -213,186 +207,121 @@ func (r *RecordReader) Close() {
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *RecordReader) startPartitionScan(ctx context.Context, p *a.ScanPolicy, sets []string) error {
-	errGroup, ctx := errgroup.WithContext(ctx)
-
-	for _, set := range sets {
-		errGroup.Go(func() error {
-			return r.scanPartitionsSet(ctx, p, set)
-		})
-	}
-
-	return errGroup.Wait()
-}
-
-func (r *RecordReader) scanPartitionsSet(ctx context.Context, p *a.ScanPolicy, set string) error {
-	// Acquire the semaphore if the scan limiter is configured.
-	if r.config.scanLimiter != nil {
-		err := r.config.scanLimiter.Acquire(ctx, 1)
-		if err != nil {
-			return fmt.Errorf("failed to acquire scan limiter: %w", err)
-		}
-
-		r.logger.Debug("acquired scan limiter")
-	}
-
-	// Each scan requires a copy of the partition filter.
-	pf := *r.config.partitionFilter
-
-	// Scan partitions.
-	recSet, err := r.client.ScanPartitions(
-		p,
-		&pf,
-		r.config.namespace,
-		set,
-		r.config.binList...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to scan set %s partitions %d-%d: %w", set, pf.Begin, pf.Count, err)
-	}
-
-	// Check context to exit properly.
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case r.recordSets <- recSet: // ok
-		r.logger.Debug("partitions recordset sent for processing",
-			slog.String("set", set),
-			slog.Int("begin", pf.Begin),
-			slog.Int("count", pf.Count),
-		)
-	}
-
-	return nil
-}
-
-// startNodeScan initiates a node-based scan for each specified set using the provided scan policy and nodes.
-func (r *RecordReader) startNodeScan(ctx context.Context, p *a.ScanPolicy, sets []string, nodes []*a.Node) error {
-	errGroup, ctx := errgroup.WithContext(ctx)
-
-	for _, set := range sets {
-		// Each node will have its own scan
-		for _, node := range nodes {
-			errGroup.Go(func() error {
-				return r.scanPartitionsNode(ctx, node, p, set)
-			})
-		}
-	}
-
-	return errGroup.Wait()
-}
-
-func (r *RecordReader) scanPartitionsNode(ctx context.Context, node *a.Node, p *a.ScanPolicy, set string) error {
-	// Acquire the semaphore if the scan limiter is configured.
-	if r.config.scanLimiter != nil {
-		err := r.config.scanLimiter.Acquire(ctx, 1)
-		if err != nil {
-			return fmt.Errorf("failed to acquire scan limiter: %w", err)
-		}
-
-		r.logger.Debug("acquired scan limiter")
-	}
-
-	// Scan the node.
-	recSet, err := r.client.ScanNode(
-		p,
-		node,
-		r.config.namespace,
-		set,
-		r.config.binList...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to scan set %s on the node %s: %w", set, node.GetName(), err)
-	}
-
-	// Check context to exit properly.
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case r.recordSets <- recSet: // ok
-		r.logger.Debug("node recordset sent for processing",
-			slog.String("set", set),
-			slog.String("node", node.GetName()),
-		)
-	}
-
-	return nil
-}
-
-// startScan starts the scan for the RecordReader.
 func (r *RecordReader) startScan(ctx context.Context) {
-	// Prepare scan policy.
+	defer close(r.resultChan)
+
+	// Generate the list of all scan tasks.
+	producers, err := r.generateProducers()
+	if err != nil {
+		r.errChan <- err
+		return
+	}
+
+	r.shuffleProducers(producers)
+
+	// Execute the tasks sequentially.
+	for _, producer := range producers {
+		if err := r.executeProducer(ctx, producer); err != nil {
+			r.errChan <- err
+			return
+		}
+	}
+}
+
+// executeProducer runs a single scan task. It acquires a semaphore,
+// calls the producer function to start the scan, and drains all results
+// from the returned channel before releasing the semaphore.
+func (r *RecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
+	if r.config.scanLimiter != nil {
+		if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
+			return fmt.Errorf("failed to acquire scan limiter: %w", err)
+		}
+		defer r.config.scanLimiter.Release(1) // Semaphore is released in the same function
+	}
+
+	// Call the producer function. This starts the actual Aerospike scan
+	// and returns a channel for its results.
+	resultsChan, err := producer()
+	if err != nil {
+		return fmt.Errorf("scan producer failed: %w", err)
+	}
+
+	// Drain all results from this specific scan.
+	for res := range resultsChan {
+		select {
+		case r.resultChan <- res:
+			// Result successfully forwarded to the reader.
+		case <-ctx.Done():
+			// The reader's context was canceled, so we stop processing.
+			r.logger.Debug("context cancelled during record processing")
+			return ctx.Err()
+		}
+	}
+
+	return nil
+}
+
+// generateProducers creates a list of scan-producing functions based on the reader's configuration.
+func (r *RecordReader) generateProducers() ([]scanProducer, error) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
-	// Prepare set list.
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {
-		setsToScan = []string{""}
+		setsToScan = []string{""} // Scan the entire namespace if no sets are specified.
 	}
 
-	// Start processing results.
-	go r.processRecordSets(ctx)
+	var producers []scanProducer
 
-	var err error
-	// Run scans according to config.
 	switch {
 	case len(r.config.nodes) > 0:
-		err = r.startNodeScan(ctx, &scanPolicy, setsToScan, r.config.nodes)
-	case r.config.partitionFilter != nil:
-		err = r.startPartitionScan(ctx, &scanPolicy, setsToScan)
-	default:
-		err = fmt.Errorf("invalid scan parameters")
-	}
+		for _, node := range r.config.nodes {
+			for _, set := range setsToScan {
+				// Capture loop variables to ensure the lambda uses the correct values.
+				capturedNode, capturedSet := node, set
+				producer := func() (<-chan *a.Result, error) {
+					r.logger.Debug("starting node scan", "set", capturedSet, "node", capturedNode.GetName())
 
-	if err != nil {
-		r.errChan <- err
-	}
+					recSet, err := r.client.ScanNode(&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
+					if err != nil {
+						return nil, err
+					}
 
-	// Close channels after scan complete.
-	r.logger.Debug("closing record sets")
-	close(r.recordSets)
-}
-
-// processRecordSets processes the scan results from recordSets and sends them to the resultChan.
-func (r *RecordReader) processRecordSets(ctx context.Context) {
-	var wg sync.WaitGroup
-
-	// The order of the following defer statements is crucial.
-	defer close(r.resultChan)
-	defer wg.Wait()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case set, ok := <-r.recordSets:
-			if !ok {
-				return
+					return recSet.Results(), nil
+				}
+				producers = append(producers, producer)
 			}
-			// Add to wait group before starting processing.
-			wg.Add(1)
-
-			go func(set *a.Recordset) {
-				defer wg.Done()
-				r.processRecords(set)
-			}(set)
 		}
+	case r.config.partitionFilter != nil:
+		// Partition Scan Mode
+		for _, set := range setsToScan {
+			capturedSet := set
+			producer := func() (<-chan *a.Result, error) {
+				// Each scan requires a fresh copy of the partition filter.
+				pf := *r.config.partitionFilter
+				r.logger.Debug("starting partition scan", "set", capturedSet, "begin", pf.Begin, "count", pf.Count)
+
+				recSet, err := r.client.ScanPartitions(&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
+				if err != nil {
+					return nil, err
+				}
+
+				return recSet.Results(), nil
+			}
+			producers = append(producers, producer)
+		}
+	default:
+		return nil, errors.New("invalid scan parameters: either nodes or partitionFilter must be specified")
 	}
+
+	return producers, nil
 }
 
-// processRecords processing records set.
-func (r *RecordReader) processRecords(set *a.Recordset) {
-	// No context checking here because it slows down the scan.
-	for res := range set.Results() {
-		r.resultChan <- res
-	}
-
-	// Release limiter.
-	if r.config.scanLimiter != nil {
-		r.config.scanLimiter.Release(1)
-		r.logger.Debug("scan limiter released")
-	}
+// shuffleProducers randomizes the order of the producers slice to avoid overloading a single node.
+func (r *RecordReader) shuffleProducers(producers []scanProducer) {
+	rand.Shuffle(len(producers), func(i, j int) {
+		producers[i], producers[j] = producers[j], producers[i]
+	})
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {

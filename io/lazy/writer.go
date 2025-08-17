@@ -25,14 +25,15 @@ import (
 type Writer struct {
 	ctx    context.Context // stored internally to be used by the Write method
 	writer io.WriteCloser
-	open   func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error)
+	open   func(context.Context, int, *atomic.Uint64) (io.WriteCloser, error)
 	n      int
 }
 
 // NewWriter creates a new lazy Writer.
-func NewWriter(ctx context.Context,
+func NewWriter(
+	ctx context.Context,
 	n int,
-	open func(context.Context, string, *atomic.Uint64) (io.WriteCloser, error),
+	open func(context.Context, int, *atomic.Uint64) (io.WriteCloser, error),
 ) (*Writer, error) {
 	return &Writer{
 		ctx:  ctx,
@@ -43,7 +44,7 @@ func NewWriter(ctx context.Context,
 
 func (f *Writer) Write(p []byte) (n int, err error) {
 	if f.writer == nil {
-		f.writer, err = f.open(f.ctx, fmt.Sprintf("%d_", f.n), nil)
+		f.writer, err = f.open(f.ctx, f.n, nil)
 		if err != nil {
 			return 0, fmt.Errorf("failed to open writer: %w", err)
 		}

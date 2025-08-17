@@ -143,7 +143,7 @@ func NewRecordReader(
 		config:     cfg,
 		client:     client,
 		logger:     logger,
-		resultChan: make(chan *a.Result, resultChanSize*setsNum),
+		resultChan: make(chan *a.Result, resultChanSize),
 		errChan:    make(chan error, 1),
 	}
 }

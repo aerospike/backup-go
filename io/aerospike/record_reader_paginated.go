@@ -194,6 +194,11 @@ func (r *RecordReader) streamPartitionPages(
 				errChan <- fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
 			}
 
+			if r.config.scanLimiter != nil {
+				r.config.scanLimiter.Release(1)
+				r.logger.Debug("scan limiter released")
+			}
+
 			resultChan <- result
 			// If there were no records on the pageRecord, we think that it was last pageRecord and exit.
 			if counter == 0 {

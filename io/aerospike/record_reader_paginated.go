@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
+	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/aerospike-client-go/v8/types"
@@ -97,8 +97,6 @@ func (r *RecordReader) startScanPaginated(ctx context.Context) {
 		return
 	}
 
-	r.shufflePaginatedProducers(producers)
-
 	// Execute the tasks sequentially.
 	for _, producer := range producers {
 		if err := r.executePaginatedProducer(ctx, producer); err != nil {
@@ -146,7 +144,7 @@ func (r *RecordReader) executePaginatedProducer(ctx context.Context, producer pa
 // generatePaginatedProducers creates a list of paginated scan-producing functions based on the reader's configuration.
 func (r *RecordReader) generatePaginatedProducers() ([]paginatedScanProducer, error) {
 	if r.config.partitionFilter == nil {
-		return nil, fmt.Errorf("paginated scan requires partitionFilter")
+		return nil, fmt.Errorf("paginated scan requires partition filter")
 	}
 
 	scanPolicy := *r.config.scanPolicy
@@ -171,13 +169,6 @@ func (r *RecordReader) generatePaginatedProducers() ([]paginatedScanProducer, er
 	return producers, nil
 }
 
-// shufflePaginatedProducers randomizes the order of the paginated producers slice.
-func (r *RecordReader) shufflePaginatedProducers(producers []paginatedScanProducer) {
-	rand.Shuffle(len(producers), func(i, j int) {
-		producers[i], producers[j] = producers[j], producers[i]
-	})
-}
-
 // streamPartitionPages performs paginated scanning for a single set.
 func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string) (<-chan *pageRecord, error) {
 	resultChan := make(chan *pageRecord, resultChanSize)
@@ -188,13 +179,15 @@ func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string
 		// Each scan requires a copy of the partition filter.
 		pf := *r.config.partitionFilter
 
-		r.logger.Debug("starting paginated partition scan", "set", set, "begin", pf.Begin, "count", pf.Count)
+		r.logger.Debug("starting paginated partition scan", slog.String("set", set),
+			slog.Int("begin", pf.Begin),
+			slog.Int("count", pf.Count))
 
 		// Continue scanning pages until no more records are found.
 		for {
 			curFilter, err := models.NewPartitionFilterSerialized(&pf)
 			if err != nil {
-				r.logger.Error("failed to serialize partition filter", "error", err)
+				r.logger.Error("failed to serialize partition filter", slog.Any("error", err))
 				return
 			}
 
@@ -206,7 +199,7 @@ func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string
 				r.config.binList...,
 			)
 			if aErr != nil {
-				r.logger.Error("failed to scan partitions", "error", aErr)
+				r.logger.Error("failed to scan partitions", slog.Any("error", aErr))
 				return
 			}
 
@@ -219,7 +212,7 @@ func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string
 				if res.Err != nil {
 					// Ignore last page errors.
 					if !res.Err.Matches(types.INVALID_NODE_ERROR) {
-						r.logger.Error("error reading paginated record", "error", res.Err)
+						r.logger.Error("error reading paginated record", slog.Any("error", res.Err))
 					}
 
 					continue
@@ -236,13 +229,13 @@ func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string
 			}
 
 			if aErr = r.recodsetCloser.Close(recSet); aErr != nil {
-				r.logger.Error("failed to close record set", "error", aErr)
+				r.logger.Error("failed to close record set", slog.Any("error", aErr))
 				return
 			}
 
 			// If there were no records on this page, we've reached the end.
 			if recordCount == 0 {
-				r.logger.Debug("paginated scan completed", "set", set)
+				r.logger.Debug("paginated scan completed", slog.String("set", set))
 				return
 			}
 		}

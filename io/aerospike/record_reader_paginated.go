@@ -70,6 +70,7 @@ func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
 		if res.result.Err != nil {
 			r.logger.Error("error reading paginated record", "error", res.result.Err)
 			r.cancel()
+
 			return nil, res.result.Err
 		}
 
@@ -219,6 +220,7 @@ func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string
 					if !res.Err.Matches(types.INVALID_NODE_ERROR) {
 						r.logger.Error("error reading paginated record", "error", res.Err)
 					}
+
 					continue
 				}
 

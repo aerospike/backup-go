@@ -40,26 +40,23 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
-	r.scanOnce.Do(func() {
-		// Initialize paginated channel and start scan with the global context.
-		r.pageRecordsChan = make(chan *pageRecord, resultChanSize)
-		go r.startScanPaginated(r.ctx)
-	})
+	errChan := make(chan error, 1)
+
+	if r.pageRecordsChan == nil {
+		r.pageRecordsChan = make(chan *pageRecord)
+		go r.startScanPaginated(ctx, errChan)
+	}
 
 	select {
 	case <-ctx.Done():
-		// If the local context is canceled, we cancel the global context.
-		r.cancel()
 		return nil, ctx.Err()
-	case <-r.ctx.Done():
-		return nil, r.ctx.Err()
-	case err := <-r.errChan:
-		// serve errors.
-		r.cancel()
-		return nil, err
-	case res, ok := <-r.pageRecordsChan:
-		if !ok {
-			r.logger.Debug("paginated scan finished")
+	case err := <-errChan:
+		if err != nil {
+			return nil, err
+		}
+	case res, active := <-r.pageRecordsChan:
+		if !active {
+			r.logger.Debug("scan finished")
 			return nil, io.EOF
 		}
 
@@ -68,10 +65,7 @@ func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
 		}
 
 		if res.result.Err != nil {
-			r.logger.Error("error reading paginated record", "error", res.result.Err)
-			r.cancel()
-
-			return nil, res.result.Err
+			return nil, fmt.Errorf("error reading record: %w", res.result.Err)
 		}
 
 		rec := models.Record{
@@ -80,115 +74,89 @@ func (r *RecordReader) readPage(ctx context.Context) (*models.Token, error) {
 
 		recToken := models.NewRecordToken(&rec, 0, res.filter)
 
-		r.config.rpsCollector.Increment()
-
 		return recToken, nil
 	}
+
+	return nil, nil
 }
 
-// startScanPaginated starts the paginated scan for the RecordReader.
-func (r *RecordReader) startScanPaginated(ctx context.Context) {
-	defer close(r.pageRecordsChan)
-
-	// Generate the list of all paginated scan tasks.
-	producers, err := r.generatePaginatedProducers()
-	if err != nil {
-		r.errChan <- err
-		return
-	}
-
-	// Execute the tasks sequentially.
-	for _, producer := range producers {
-		if err := r.executePaginatedProducer(ctx, producer); err != nil {
-			r.errChan <- err
-			return
-		}
-	}
-}
-
-// paginatedScanProducer is a function that initiates a paginated scan
-// and returns a channel from which the scan results can be read.
-type paginatedScanProducer func() (<-chan *pageRecord, error)
-
-// executePaginatedProducer runs a single paginated scan task.
-func (r *RecordReader) executePaginatedProducer(ctx context.Context, producer paginatedScanProducer) error {
-	if r.config.scanLimiter != nil {
-		if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("failed to acquire scan limiter: %w", err)
-		}
-		defer r.config.scanLimiter.Release(1)
-	}
-
-	// Call the producer function. This starts the actual Aerospike paginated scan
-	// and returns a channel for its results.
-	resultsChan, err := producer()
-	if err != nil {
-		return fmt.Errorf("paginated scan producer failed: %w", err)
-	}
-
-	// Drain all results from this specific paginated scan.
-	for res := range resultsChan {
-		select {
-		case r.pageRecordsChan <- res:
-			// Result successfully forwarded to the reader.
-		case <-ctx.Done():
-			// The reader's context was canceled, so we stop processing.
-			r.logger.Debug("context cancelled during paginated record processing")
-			return ctx.Err()
-		}
-	}
-
-	return nil
-}
-
-// generatePaginatedProducers creates a list of paginated scan-producing functions based on the reader's configuration.
-func (r *RecordReader) generatePaginatedProducers() ([]paginatedScanProducer, error) {
-	if r.config.partitionFilter == nil {
-		return nil, fmt.Errorf("paginated scan requires partition filter")
-	}
-
+// startScanPaginated starts the scan for the RecordReader only for state save!
+func (r *RecordReader) startScanPaginated(ctx context.Context, localErrChan chan error) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
-	scanPolicy.MaxRecords = r.config.pageSize
 
 	setsToScan := r.config.setList
 	if len(setsToScan) == 0 {
-		setsToScan = []string{""} // Scan the entire namespace if no sets are specified.
+		setsToScan = []string{""}
 	}
-
-	var producers = make([]paginatedScanProducer, 0, len(setsToScan))
 
 	for _, set := range setsToScan {
-		capturedSet := set
-		producer := func() (<-chan *pageRecord, error) {
-			return r.streamPartitionPages(&scanPolicy, capturedSet)
-		}
-		producers = append(producers, producer)
-	}
+		if r.config.scanLimiter != nil {
+			err := r.config.scanLimiter.Acquire(r.ctx, 1)
+			if err != nil {
+				localErrChan <- err
+				return
+			}
 
-	return producers, nil
+			r.logger.Debug("acquired scan limiter")
+		}
+
+		resultChan, errChan := r.streamPartitionPages(
+			&scanPolicy,
+			set,
+		)
+
+		for {
+			select {
+			case <-ctx.Done():
+				localErrChan <- ctx.Err()
+				return
+			case err, ok := <-errChan:
+				if !ok {
+					break
+				}
+
+				if err != nil {
+					localErrChan <- err
+					return
+				}
+			case result, ok := <-resultChan:
+				if !ok {
+					// After we finish all the readings, we close pageRecord chan.
+					close(r.pageRecordsChan)
+					close(localErrChan)
+
+					return
+				}
+
+				for i := range result {
+					r.pageRecordsChan <- result[i]
+				}
+			}
+		}
+	}
 }
 
-// streamPartitionPages performs paginated scanning for a single set.
-func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string) (<-chan *pageRecord, error) {
-	resultChan := make(chan *pageRecord, resultChanSize)
+// streamPartitionPages reads the whole pageRecord and sends it to the resultChan.
+func (r *RecordReader) streamPartitionPages(
+	scanPolicy *a.ScanPolicy,
+	set string,
+) (resultChan chan []*pageRecord, errChan chan error) {
+	scanPolicy.MaxRecords = r.config.pageSize
+	// resultChan must not be buffered, we send the whole pageRecord to the resultChan.
+	// Implementing buffering would result in substantial RAM consumption.
+	resultChan = make(chan []*pageRecord)
+	errChan = make(chan error)
+
+	// Each scan requires a copy of the partition filter.
+	pf := *r.config.partitionFilter
 
 	go func() {
-		defer close(resultChan)
-
-		// Each scan requires a copy of the partition filter.
-		pf := *r.config.partitionFilter
-
-		r.logger.Debug("starting paginated partition scan", slog.String("set", set),
-			slog.Int("begin", pf.Begin),
-			slog.Int("count", pf.Count))
-
-		// Continue scanning pages until no more records are found.
+		// For one iteration, we scan 1 pageRecord.
 		for {
 			curFilter, err := models.NewPartitionFilterSerialized(&pf)
 			if err != nil {
-				r.logger.Error("failed to serialize partition filter", slog.Any("error", err))
-				return
+				errChan <- fmt.Errorf("failed to serialize partition filter: %w", err)
 			}
 
 			recSet, aErr := r.client.ScanPartitions(
@@ -199,15 +167,17 @@ func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string
 				r.config.binList...,
 			)
 			if aErr != nil {
-				r.logger.Error("failed to scan partitions", slog.Any("error", aErr))
+				errChan <- fmt.Errorf("failed to scan sets: %w", aErr.Unwrap())
 				return
 			}
 
-			var recordCount int64
+			// result contains []*a.Result and serialized filter models.PartitionFilterSerialized
+			result := make([]*pageRecord, 0, r.config.pageSize)
 
-			// Process all records from this page.
+			// to count records on pageRecord.
+			var counter int64
 			for res := range recSet.Results() {
-				recordCount++
+				counter++
 
 				if res.Err != nil {
 					// Ignore last page errors.
@@ -217,29 +187,29 @@ func (r *RecordReader) streamPartitionPages(scanPolicy *a.ScanPolicy, set string
 
 					continue
 				}
-
-				// Send the pageRecord with the current filter state.
-				pageRec := newPageRecord(res, &curFilter)
-				select {
-				case resultChan <- pageRec:
-				case <-r.ctx.Done():
-					recSet.Close()
-					return
-				}
+				// Save to pageRecord filter that returns current pageRecord.
+				result = append(result, newPageRecord(res, &curFilter))
 			}
 
 			if aErr = r.recodsetCloser.Close(recSet); aErr != nil {
-				r.logger.Error("failed to close record set", slog.Any("error", aErr))
-				return
+				errChan <- fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
 			}
 
-			// If there were no records on this page, we've reached the end.
-			if recordCount == 0 {
-				r.logger.Debug("paginated scan completed", slog.String("set", set))
+			resultChan <- result
+			// If there were no records on the pageRecord, we think that it was last pageRecord and exit.
+			if counter == 0 {
+				close(resultChan)
+				close(errChan)
+
+				if r.config.scanLimiter != nil {
+					r.config.scanLimiter.Release(1)
+					r.logger.Debug("scan limiter released")
+				}
+
 				return
 			}
 		}
 	}()
 
-	return resultChan, nil
+	return resultChan, errChan
 }

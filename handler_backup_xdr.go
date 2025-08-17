@@ -104,7 +104,7 @@ func newBackupXDRHandler(
 	)
 
 	writerProcessor := newFileWriterProcessor[*models.ASBXToken](
-		emptyPrefixSuffix,
+		"",
 		emptyPrefixSuffix,
 		writer,
 		encoder,

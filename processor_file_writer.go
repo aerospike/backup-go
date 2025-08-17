@@ -34,7 +34,7 @@ import (
 
 // fileWriterProcessor configures and creates file writers pipelines.
 type fileWriterProcessor[T models.TokenConstraint] struct {
-	prefixGenerator func() string
+	prefix          string
 	suffixGenerator func() string
 
 	writer            Writer
@@ -54,7 +54,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 
 // newFileWriterProcessor returns a new file writer processor instance.
 func newFileWriterProcessor[T models.TokenConstraint](
-	prefixGenerator func() string,
+	prefix string,
 	suffixGenerator func() string,
 	writer Writer,
 	encoder Encoder[T],
@@ -71,7 +71,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	logger.Debug("created new file writer processor")
 
 	return &fileWriterProcessor[T]{
-		prefixGenerator:   prefixGenerator,
+		prefix:            prefix,
 		suffixGenerator:   suffixGenerator,
 		writer:            writer,
 		encoder:           encoder,
@@ -154,8 +154,14 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, fileLimi
 }
 
 // configureWriter returns configured writer.
-func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, prefix string, sizeCounter *atomic.Uint64,
+func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, sizeCounter *atomic.Uint64,
 ) (io.WriteCloser, error) {
+	// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
+	// If it is set, we use it as a prefix.
+	prefix := fw.prefix
+	if fw.prefix == "" {
+		prefix = fmt.Sprintf("%d_", n)
+	}
 	// Generate file name.
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 

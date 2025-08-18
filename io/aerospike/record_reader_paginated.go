@@ -82,6 +82,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
+		r.logger.Debug("scan started")
 		go r.startScan()
 	})
 

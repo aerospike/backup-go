@@ -24,66 +24,12 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
-	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
-	"golang.org/x/sync/semaphore"
 )
 
 // resultChanSize is the size of the channel used to send scan results.
 const resultChanSize = 1024
-
-// RecordReaderConfig represents the configuration for scanning Aerospike records.
-type RecordReaderConfig struct {
-	timeBounds      models.TimeBounds
-	partitionFilter *a.PartitionFilter
-	// If nodes is set we ignore partitionFilter.
-	nodes       []*a.Node
-	scanPolicy  *a.ScanPolicy
-	scanLimiter *semaphore.Weighted
-	namespace   string
-	setList     []string
-	binList     []string
-	noTTLOnly   bool
-
-	// pageSize used for paginated scan for saving reading state.
-	// If pageSize = 0, we think that we use normal scan.
-	pageSize int64
-
-	rpsCollector *metrics.Collector
-}
-
-// NewRecordReaderConfig creates a new RecordReaderConfig.
-func NewRecordReaderConfig(namespace string,
-	setList []string,
-	partitionFilter *a.PartitionFilter,
-	nodes []*a.Node,
-	scanPolicy *a.ScanPolicy,
-	binList []string,
-	timeBounds models.TimeBounds,
-	scanLimiter *semaphore.Weighted,
-	noTTLOnly bool,
-	pageSize int64,
-	rpsCollector *metrics.Collector,
-) *RecordReaderConfig {
-	if len(setList) == 0 {
-		setList = []string{""}
-	}
-
-	return &RecordReaderConfig{
-		namespace:       namespace,
-		setList:         setList,
-		partitionFilter: partitionFilter,
-		nodes:           nodes,
-		scanPolicy:      scanPolicy,
-		binList:         binList,
-		timeBounds:      timeBounds,
-		scanLimiter:     scanLimiter,
-		noTTLOnly:       noTTLOnly,
-		pageSize:        pageSize,
-		rpsCollector:    rpsCollector,
-	}
-}
 
 // scanner is an interface for scanning Aerospike records.
 type scanner interface {
@@ -155,12 +101,12 @@ func NewRecordReader(
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	ctx, cancel := context.WithCancel(ctx)
 
-	logger.Debug("created new aerospike record reader")
-
 	if cfg.pageSize > 0 {
+		logger.Info("Created new paginated aerospike record reader", cfg.LogAttrs()...)
 		return NewPaginatedRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 	}
 
+	logger.Info("Created new aerospike record reader", cfg.LogAttrs()...)
 	return NewSingleRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 }
 
@@ -187,6 +133,7 @@ func NewSingleRecordReader(
 func (r *SingleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
 		// Start scan with the global context.
+		r.logger.Debug("scan started")
 		go r.startScan(r.ctx)
 	})
 

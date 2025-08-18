@@ -111,7 +111,7 @@ type RecordReader interface {
 }
 
 // scanProducer is a function that initiates a scan and returns a channel from which the scan results can be read.
-type scanProducer func() (*a.Recordset, a.Error)
+type scanProducer func() (*a.Recordset, error)
 
 // SingleRecordReader is a RecordReader that reads records from Aerospike one by one.
 type SingleRecordReader struct {
@@ -293,12 +293,19 @@ func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 			for _, set := range r.config.setList {
 				// Capture loop variables to ensure the lambda uses the correct values.
 				capturedNode, capturedSet := node, set
-				producer := func() (*a.Recordset, a.Error) {
+				producer := func() (*a.Recordset, error) {
 					r.logger.Debug("starting node scan",
 						slog.String("set", capturedSet),
 						slog.String("node", capturedNode.GetName()))
 
-					return r.client.ScanNode(&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
+					recordset, err := r.client.ScanNode(
+						&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
+					if err != nil {
+						return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, node %s: %w",
+							capturedSet, r.config.namespace, capturedNode, err)
+					}
+
+					return recordset, nil
 				}
 				producers = append(producers, producer)
 			}
@@ -308,7 +315,7 @@ func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 		// Partition Scan Mode
 		for _, set := range r.config.setList {
 			capturedSet := set
-			producer := func() (*a.Recordset, a.Error) {
+			producer := func() (*a.Recordset, error) {
 				// Each scan requires a fresh copy of the partition filter.
 				pf := *r.config.partitionFilter
 				r.logger.Debug("starting partition scan",
@@ -316,7 +323,14 @@ func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 					slog.Int("begin", pf.Begin),
 					slog.Int("count", pf.Count))
 
-				return r.client.ScanPartitions(&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
+				recordset, err := r.client.ScanPartitions(
+					&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
+				if err != nil {
+					return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
+						capturedSet, r.config.namespace, pf.Begin, pf.Count, err)
+				}
+
+				return recordset, nil
 			}
 			producers = append(producers, producer)
 		}

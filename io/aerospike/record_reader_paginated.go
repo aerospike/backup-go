@@ -160,8 +160,7 @@ func (r *PaginatedRecordReader) scanPage(
 	}
 
 	if r.config.scanLimiter != nil {
-		err := r.config.scanLimiter.Acquire(r.ctx, 1)
-		if err != nil {
+		if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
 			return 0, err
 		}
 

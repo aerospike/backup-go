@@ -33,8 +33,8 @@ type pageRecord struct {
 	filter *models.PartitionFilterSerialized
 }
 
-// PaginatedRecordReader reads records from Aerospike in pages and saves current filter.
-type PaginatedRecordReader struct {
+// paginatedRecordReader reads records from Aerospike in pages and saves current filter.
+type paginatedRecordReader struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	client          scanner
@@ -47,21 +47,21 @@ type PaginatedRecordReader struct {
 }
 
 // Close no-op operation to satisfy pipe.Reader interface.
-func (r *PaginatedRecordReader) Close() {
+func (r *paginatedRecordReader) Close() {
 }
 
-// NewPaginatedRecordReader creates a new PaginatedRecordReader.
-func NewPaginatedRecordReader(
+// newPaginatedRecordReader creates a new paginatedRecordReader.
+func newPaginatedRecordReader(
 	ctx context.Context,
 	scanner scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
 	closer RecordsetCloser,
 	cancel context.CancelFunc,
-) *PaginatedRecordReader {
-	logger.Debug("created new paginated aerospike record reader", cfg.LogAttrs()...)
+) *paginatedRecordReader {
+	logger.Debug("created new paginated aerospike record reader", cfg.logAttrs()...)
 
-	return &PaginatedRecordReader{
+	return &paginatedRecordReader{
 		ctx:             ctx,
 		cancel:          cancel,
 		client:          scanner,
@@ -82,7 +82,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 }
 
 // readPage reads the next record from pageRecord from the Aerospike database.
-func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
+func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
 		r.logger.Debug("scan started")
 		go r.startScan()
@@ -125,7 +125,7 @@ func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 }
 
 // startScan starts the scan for the RecordReader only for state save!
-func (r *PaginatedRecordReader) startScan() {
+func (r *paginatedRecordReader) startScan() {
 	defer close(r.pageRecordsChan)
 
 	scanPolicy := *r.config.scanPolicy
@@ -140,7 +140,7 @@ func (r *PaginatedRecordReader) startScan() {
 	}
 }
 
-func (r *PaginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
+func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
 	pf := *r.config.partitionFilter // Each scan requires a copy of the partition filter.
 
 	for {
@@ -155,7 +155,7 @@ func (r *PaginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 	}
 }
 
-func (r *PaginatedRecordReader) scanPage(
+func (r *paginatedRecordReader) scanPage(
 	pf *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	set string,

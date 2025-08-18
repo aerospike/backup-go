@@ -44,7 +44,7 @@ type RecordReaderConfig struct {
 	rpsCollector *metrics.Collector
 }
 
-func (c *RecordReaderConfig) LogAttrs() []any {
+func (c *RecordReaderConfig) logAttrs() []any {
 	var attrs []any
 
 	if c.timeBounds.FromTime != nil {

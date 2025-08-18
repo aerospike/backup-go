@@ -59,8 +59,8 @@ type RecordReader interface {
 // scanProducer is a function that initiates a scan and returns a channel from which the scan results can be read.
 type scanProducer func() (*a.Recordset, error)
 
-// SingleRecordReader is a RecordReader that reads records from Aerospike one by one.
-type SingleRecordReader struct {
+// singleRecordReader is a RecordReader that reads records from Aerospike one by one in single thread.
+type singleRecordReader struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	client          scanner
@@ -90,6 +90,9 @@ func (r *RecordsetCloserImpl) Close(recordset *a.Recordset) a.Error {
 }
 
 // NewRecordReader creates a new RecordReader.
+// If the reader is configured to use page size, it will return a paginatedRecordReader,
+// it enables saving scan position for resuming.
+// Otherwise, it will return a singleRecordReader, that does regular scan in single thread.
 func NewRecordReader(
 	ctx context.Context,
 	client scanner,
@@ -102,23 +105,23 @@ func NewRecordReader(
 	ctx, cancel := context.WithCancel(ctx)
 
 	if cfg.pageSize > 0 {
-		return NewPaginatedRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
+		return newPaginatedRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 	}
 
-	return NewSingleRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
+	return newSingleRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 }
 
-func NewSingleRecordReader(
+func newSingleRecordReader(
 	ctx context.Context,
 	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
 	recodsetCloser RecordsetCloser,
 	cancel context.CancelFunc,
-) *SingleRecordReader {
-	logger.Debug("created new aerospike record reader", cfg.LogAttrs()...)
+) *singleRecordReader {
+	logger.Debug("created new aerospike record reader", cfg.logAttrs()...)
 
-	return &SingleRecordReader{
+	return &singleRecordReader{
 		ctx:             ctx,
 		cancel:          cancel,
 		config:          cfg,
@@ -130,7 +133,7 @@ func NewSingleRecordReader(
 	}
 }
 
-func (r *SingleRecordReader) Read(ctx context.Context) (*models.Token, error) {
+func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
 		// Start scan with the global context.
 		r.logger.Debug("scan started")
@@ -173,11 +176,11 @@ func (r *SingleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 }
 
 // Close no-op operation to satisfy pipe.Reader interface.
-func (r *SingleRecordReader) Close() {
+func (r *singleRecordReader) Close() {
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *SingleRecordReader) startScan(ctx context.Context) {
+func (r *singleRecordReader) startScan(ctx context.Context) {
 	defer close(r.resultChan)
 
 	// Generate the list of all scan tasks.
@@ -199,7 +202,7 @@ func (r *SingleRecordReader) startScan(ctx context.Context) {
 // executeProducer runs a single scan task. It acquires a semaphore,
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
-func (r *SingleRecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
+func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -228,7 +231,7 @@ func (r *SingleRecordReader) executeProducer(ctx context.Context, producer scanP
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.
-func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
+func (r *singleRecordReader) generateProducers() ([]scanProducer, error) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 

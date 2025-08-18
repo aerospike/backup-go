@@ -137,7 +137,7 @@ func (r *PaginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 	for {
 		count, err := r.scanPage(&pf, scanPolicy, set)
 		if err != nil {
-			return err
+			return fmt.Errorf("faild to scan set %s: %w", set, err)
 		}
 
 		if count == 0 { // empty pageRecord
@@ -161,7 +161,6 @@ func (r *PaginatedRecordReader) scanPage(
 			return 0, err
 		}
 
-		r.logger.Debug("acquired scan limiter")
 		defer r.config.scanLimiter.Release(1)
 	}
 
@@ -178,7 +177,7 @@ func (r *PaginatedRecordReader) scanPage(
 		r.config.binList...,
 	)
 	if aErr != nil {
-		return 0, fmt.Errorf("failed to scan sets %s: %w", set, aErr.Unwrap())
+		return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 	}
 
 	// to count records on pageRecord.
@@ -198,7 +197,7 @@ func (r *PaginatedRecordReader) scanPage(
 	}
 
 	if aErr = r.recodsetCloser.Close(recSet); aErr != nil {
-		return 0, fmt.Errorf("failed to close record set %s: %w", set, aErr.Unwrap())
+		return 0, fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
 	}
 
 	return counter, nil

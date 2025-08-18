@@ -191,6 +191,14 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("parallel by nodes, racks and/or and after digest/partition and the same time not allowed")
 	}
 
+	if c.PageSize > 0 && c.isParalleledByNodes() {
+		return fmt.Errorf("page size is not supported for parallel by nodes")
+	}
+
+	if c.PageSize > 0 && len(c.PartitionFilters) == 0 {
+		return fmt.Errorf("partion filters must be set for paginated backup")
+	}
+
 	if c.RecordsPerSecond < 0 {
 		return fmt.Errorf("rps value must not be negative, got %d", c.RecordsPerSecond)
 	}

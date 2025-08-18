@@ -279,7 +279,8 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 
 	nodes := bh.aerospikeClient.GetNodes()
 	readerConfig := bh.readerProcessor.recordReaderConfigForNode(nodes, &scanPolicy)
-	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger)
+	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger,
+		aerospike.NewRecordsetCloser())
 
 	// Timestamp processor.
 	tsProcessor := processors.NewVoidTimeSetter[*models.Token](bh.logger)

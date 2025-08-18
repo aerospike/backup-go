@@ -340,6 +340,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 
 	v, err = reader.Read(ctx)
 	require.Equal(t, err, io.EOF)
+	require.Nil(t, v)
 
 	mockScanner.AssertExpectations(t)
 }

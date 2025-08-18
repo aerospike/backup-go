@@ -103,6 +103,8 @@ type scanner interface {
 	) (*a.Recordset, a.Error)
 }
 
+// RecordReader is an interface for reading Aerospike records.
+// implements pipe.Reader for a token.
 type RecordReader interface {
 	Read(ctx context.Context) (*models.Token, error)
 	Close()
@@ -111,6 +113,7 @@ type RecordReader interface {
 // scanProducer is a function that initiates a scan and returns a channel from which the scan results can be read.
 type scanProducer func() (*a.Recordset, a.Error)
 
+// SingleRecordReader is a RecordReader that reads records from Aerospike one by one.
 type SingleRecordReader struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -222,9 +225,8 @@ func (r *SingleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	}
 }
 
-// Close cancels the Aerospike scan used to read records if it was started.
+// Close no-op operation to satisfy pipe.Reader interface.
 func (r *SingleRecordReader) Close() {
-	r.logger.Debug("closed aerospike record reader")
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.

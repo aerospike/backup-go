@@ -32,6 +32,7 @@ type pageRecord struct {
 	filter *models.PartitionFilterSerialized
 }
 
+// PaginatedRecordReader reads records from Aerospike in pages and saves current filter.
 type PaginatedRecordReader struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -44,12 +45,13 @@ type PaginatedRecordReader struct {
 	recodsetCloser  RecordsetCloser
 }
 
+// Close no-op operation to satisfy pipe.Reader interface.
 func (r *PaginatedRecordReader) Close() {
 }
 
 func NewPaginatedRecordReader(
 	ctx context.Context,
-	scaner scanner,
+	scanner scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
 	closer RecordsetCloser,
@@ -58,7 +60,7 @@ func NewPaginatedRecordReader(
 	return &PaginatedRecordReader{
 		ctx:             ctx,
 		cancel:          cancel,
-		client:          scaner,
+		client:          scanner,
 		logger:          logger,
 		config:          cfg,
 		pageRecordsChan: make(chan *pageRecord),

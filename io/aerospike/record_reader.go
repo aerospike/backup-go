@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand"
 	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -235,8 +234,6 @@ func (r *SingleRecordReader) startScan(ctx context.Context) {
 		return
 	}
 
-	r.shuffleProducers(producers)
-
 	// Execute the tasks sequentially.
 	for _, producer := range producers {
 		if err := r.executeProducer(ctx, producer); err != nil {
@@ -305,6 +302,7 @@ func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 				producers = append(producers, producer)
 			}
 		}
+
 	case r.config.partitionFilter != nil:
 		// Partition Scan Mode
 		for _, set := range setsToScan {
@@ -326,13 +324,6 @@ func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 	}
 
 	return producers, nil
-}
-
-// shuffleProducers randomizes the order of the producers slice to avoid overloading a single node.
-func (r *SingleRecordReader) shuffleProducers(producers []scanProducer) {
-	rand.Shuffle(len(producers), func(i, j int) {
-		producers[i], producers[j] = producers[j], producers[i]
-	})
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {

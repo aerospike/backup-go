@@ -116,7 +116,7 @@ func NewSingleRecordReader(
 	recodsetCloser RecordsetCloser,
 	cancel context.CancelFunc,
 ) *SingleRecordReader {
-	logger.Info("Created new aerospike record reader", cfg.LogAttrs()...)
+	logger.Debug("created new aerospike record reader", cfg.LogAttrs()...)
 
 	return &SingleRecordReader{
 		ctx:             ctx,

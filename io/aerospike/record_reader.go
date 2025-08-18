@@ -109,15 +109,15 @@ type RecordReader interface {
 type scanProducer func() (*a.Recordset, a.Error)
 
 type SingleRecordReader struct {
-	ctx            context.Context
-	cancel         context.CancelFunc
-	client         scanner
-	logger         *slog.Logger
-	config         *RecordReaderConfig
-	resultChan     chan *a.Result
-	errChan        chan error
-	scanOnce       sync.Once
-	recodsetCloser RecordsetCloser
+	ctx             context.Context
+	cancel          context.CancelFunc
+	client          scanner
+	logger          *slog.Logger
+	config          *RecordReaderConfig
+	resultChan      chan *a.Result
+	errChan         chan error
+	scanOnce        sync.Once
+	recordsetCloser RecordsetCloser
 }
 
 // RecordsetCloser is an interface for closing Aerospike recordsets.
@@ -150,6 +150,7 @@ func NewRecordReader(
 	ctx, cancel := context.WithCancel(ctx)
 
 	logger.Debug("created new aerospike record reader")
+
 	if cfg.pageSize > 0 {
 		return NewPaginatedRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 	}
@@ -166,14 +167,14 @@ func NewSingleRecordReader(
 	cancel context.CancelFunc,
 ) *SingleRecordReader {
 	return &SingleRecordReader{
-		ctx:            ctx,
-		cancel:         cancel,
-		config:         cfg,
-		client:         client,
-		logger:         logger,
-		resultChan:     make(chan *a.Result, resultChanSize),
-		errChan:        make(chan error, 1),
-		recodsetCloser: recodsetCloser,
+		ctx:             ctx,
+		cancel:          cancel,
+		config:          cfg,
+		client:          client,
+		logger:          logger,
+		resultChan:      make(chan *a.Result, resultChanSize),
+		errChan:         make(chan error, 1),
+		recordsetCloser: recodsetCloser,
 	}
 }
 
@@ -202,10 +203,8 @@ func (r *SingleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 		}
 
 		if res.Err != nil {
-			r.logger.Error("error reading record", slog.Any("error", res.Err))
 			r.cancel()
-
-			return nil, res.Err
+			return nil, fmt.Errorf("error reading record: %w", res.Err)
 		}
 
 		rec := models.Record{
@@ -275,7 +274,7 @@ func (r *SingleRecordReader) executeProducer(ctx context.Context, producer scanP
 		r.resultChan <- res
 	}
 
-	return r.recodsetCloser.Close(recordset)
+	return r.recordsetCloser.Close(recordset)
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.

@@ -77,21 +77,21 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
-	errChan := make(chan error, 1)
-
 	r.scanOnce.Do(func() {
-		go r.startScanPaginated(ctx, errChan)
+		go r.startScan(ctx)
 	})
 
 	select {
 	case <-ctx.Done():
+		r.cancel()
 		return nil, ctx.Err()
-	case err := <-errChan:
-		if err != nil {
-			return nil, err
-		}
-	case res, active := <-r.pageRecordsChan:
-		if !active {
+	case <-r.ctx.Done():
+		return nil, r.ctx.Err()
+	case err := <-r.errChan:
+		r.cancel()
+		return nil, err
+	case res, ok := <-r.pageRecordsChan:
+		if !ok {
 			r.logger.Debug("scan finished")
 			return nil, io.EOF
 		}
@@ -101,6 +101,7 @@ func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 		}
 
 		if res.result.Err != nil {
+			r.cancel()
 			return nil, fmt.Errorf("error reading record: %w", res.result.Err)
 		}
 
@@ -112,12 +113,10 @@ func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 
 		return recToken, nil
 	}
-
-	return nil, nil
 }
 
-// startScanPaginated starts the scan for the RecordReader only for state save!
-func (r *PaginatedRecordReader) startScanPaginated(ctx context.Context, localErrChan chan error) {
+// startScan starts the scan for the RecordReader only for state save!
+func (r *PaginatedRecordReader) startScan(ctx context.Context) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
@@ -130,7 +129,7 @@ func (r *PaginatedRecordReader) startScanPaginated(ctx context.Context, localErr
 		if r.config.scanLimiter != nil {
 			err := r.config.scanLimiter.Acquire(r.ctx, 1)
 			if err != nil {
-				localErrChan <- err
+				r.errChan <- err
 				return
 			}
 
@@ -145,7 +144,7 @@ func (r *PaginatedRecordReader) startScanPaginated(ctx context.Context, localErr
 		for {
 			select {
 			case <-ctx.Done():
-				localErrChan <- ctx.Err()
+				r.errChan <- ctx.Err()
 				return
 			case err, ok := <-errChan:
 				if !ok {
@@ -153,14 +152,14 @@ func (r *PaginatedRecordReader) startScanPaginated(ctx context.Context, localErr
 				}
 
 				if err != nil {
-					localErrChan <- err
+					r.errChan <- err
 					return
 				}
 			case result, ok := <-resultChan:
 				if !ok {
 					// After we finish all the readings, we close pageRecord chan.
 					close(r.pageRecordsChan)
-					close(localErrChan)
+					close(r.errChan)
 
 					return
 				}

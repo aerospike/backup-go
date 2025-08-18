@@ -78,7 +78,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 // readPage reads the next record from pageRecord from the Aerospike database.
 func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
-		go r.startScan(ctx)
+		go r.startScan()
 	})
 
 	select {
@@ -116,135 +116,91 @@ func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 }
 
 // startScan starts the scan for the RecordReader only for state save!
-func (r *PaginatedRecordReader) startScan(ctx context.Context) {
+func (r *PaginatedRecordReader) startScan() {
+	defer close(r.pageRecordsChan)
+	defer close(r.errChan)
+
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
-	setsToScan := r.config.setList
-	if len(setsToScan) == 0 {
-		setsToScan = []string{""}
-	}
-
-	for _, set := range setsToScan {
-		if r.config.scanLimiter != nil {
-			err := r.config.scanLimiter.Acquire(r.ctx, 1)
-			if err != nil {
-				r.errChan <- err
-				return
-			}
-
-			r.logger.Debug("acquired scan limiter")
-		}
-
-		resultChan, errChan := r.streamPartitionPages(
-			&scanPolicy,
-			set,
-		)
-
-		for {
-			select {
-			case <-ctx.Done():
-				r.errChan <- ctx.Err()
-				return
-			case err, ok := <-errChan:
-				if !ok {
-					break
-				}
-
-				if err != nil {
-					r.errChan <- err
-					return
-				}
-			case result, ok := <-resultChan:
-				if !ok {
-					// After we finish all the readings, we close pageRecord chan.
-					close(r.pageRecordsChan)
-					close(r.errChan)
-
-					return
-				}
-
-				for i := range result {
-					r.pageRecordsChan <- result[i]
-				}
-			}
+	for _, set := range r.config.setList {
+		if err := r.scanSet(set, &scanPolicy); err != nil {
+			r.errChan <- err
+			return
 		}
 	}
 }
 
-// streamPartitionPages reads the whole pageRecord and sends it to the resultChan.
-func (r *PaginatedRecordReader) streamPartitionPages(
-	scanPolicy *a.ScanPolicy,
-	set string,
-) (resultChan chan []*pageRecord, errChan chan error) {
+func (r *PaginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
 	scanPolicy.MaxRecords = r.config.pageSize
-	// resultChan must not be buffered, we send the whole pageRecord to the resultChan.
-	// Implementing buffering would result in substantial RAM consumption.
-	resultChan = make(chan []*pageRecord)
-	errChan = make(chan error)
-
-	// Each scan requires a copy of the partition filter.
 	pf := *r.config.partitionFilter
 
-	go func() {
-		// For one iteration, we scan 1 pageRecord.
-		for {
-			curFilter, err := models.NewPartitionFilterSerialized(&pf)
-			if err != nil {
-				errChan <- fmt.Errorf("failed to serialize partition filter: %w", err)
-			}
-
-			recSet, aErr := r.client.ScanPartitions(
-				scanPolicy,
-				&pf,
-				r.config.namespace,
-				set,
-				r.config.binList...,
-			)
-			if aErr != nil {
-				errChan <- fmt.Errorf("failed to scan sets: %w", aErr.Unwrap())
-				return
-			}
-
-			// result contains []*a.Result and serialized filter models.PartitionFilterSerialized
-			result := make([]*pageRecord, 0, r.config.pageSize)
-
-			// to count records on pageRecord.
-			var counter int64
-			for res := range recSet.Results() {
-				counter++
-
-				if res.Err != nil {
-					// Ignore last page errors.
-					if !res.Err.Matches(types.INVALID_NODE_ERROR) {
-						r.logger.Error("error reading paginated record", slog.Any("error", res.Err))
-					}
-
-					continue
-				}
-				// Save to pageRecord filter that returns current pageRecord.
-				result = append(result, newPageRecord(res, &curFilter))
-			}
-
-			if aErr = r.recodsetCloser.Close(recSet); aErr != nil {
-				errChan <- fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
-			}
-
-			resultChan <- result
-			// If there were no records on the pageRecord, we think that it was last pageRecord and exit.
-			if counter == 0 {
-				close(resultChan)
-				close(errChan)
-
-				if r.config.scanLimiter != nil {
-					r.config.scanLimiter.Release(1)
-					r.logger.Debug("scan limiter released")
-				}
-
-				return
-			}
+	for {
+		count, err := r.scanPage(&pf, scanPolicy, set)
+		if err != nil {
+			return err
 		}
-	}()
 
-	return resultChan, errChan
+		if count == 0 { // empty pageRecord
+			return nil
+		}
+	}
+}
+
+func (r *PaginatedRecordReader) scanPage(
+	pf *a.PartitionFilter,
+	scanPolicy *a.ScanPolicy,
+	set string,
+) (uint64, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	if r.config.scanLimiter != nil {
+		err := r.config.scanLimiter.Acquire(r.ctx, 1)
+		if err != nil {
+			return 0, err
+		}
+
+		r.logger.Debug("acquired scan limiter")
+		defer r.config.scanLimiter.Release(1)
+	}
+
+	curFilter, err := models.NewPartitionFilterSerialized(pf)
+	if err != nil {
+		return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
+	}
+
+	recSet, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
+		scanPolicy,
+		pf,
+		r.config.namespace,
+		set,
+		r.config.binList...,
+	)
+	if aErr != nil {
+		return 0, fmt.Errorf("failed to scan sets: %w", aErr.Unwrap())
+	}
+
+	// to count records on pageRecord.
+	var counter uint64
+	for res := range recSet.Results() {
+		counter++
+
+		if res.Err != nil {
+			// Ignore last page errors.
+			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
+				r.logger.Error("error reading paginated record", slog.Any("error", res.Err))
+			}
+
+			continue
+		}
+		r.pageRecordsChan <- newPageRecord(res, &curFilter)
+	}
+
+	if aErr = r.recodsetCloser.Close(recSet); aErr != nil {
+		return 0, fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
+	}
+
+	return counter, nil
 }

@@ -66,6 +66,10 @@ func NewRecordReaderConfig(namespace string,
 	pageSize int64,
 	rpsCollector *metrics.Collector,
 ) *RecordReaderConfig {
+	if len(setList) == 0 {
+		setList = []string{""}
+	}
+
 	return &RecordReaderConfig{
 		namespace:       namespace,
 		setList:         setList,
@@ -279,17 +283,12 @@ func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
-	setsToScan := r.config.setList
-	if len(setsToScan) == 0 {
-		setsToScan = []string{""} // Scan the entire namespace if no sets are specified.
-	}
-
 	var producers []scanProducer
 
 	switch {
 	case len(r.config.nodes) > 0:
 		for _, node := range r.config.nodes {
-			for _, set := range setsToScan {
+			for _, set := range r.config.setList {
 				// Capture loop variables to ensure the lambda uses the correct values.
 				capturedNode, capturedSet := node, set
 				producer := func() (*a.Recordset, a.Error) {
@@ -305,7 +304,7 @@ func (r *SingleRecordReader) generateProducers() ([]scanProducer, error) {
 
 	case r.config.partitionFilter != nil:
 		// Partition Scan Mode
-		for _, set := range setsToScan {
+		for _, set := range r.config.setList {
 			capturedSet := set
 			producer := func() (*a.Recordset, a.Error) {
 				// Each scan requires a fresh copy of the partition filter.

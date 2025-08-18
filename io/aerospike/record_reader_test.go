@@ -96,7 +96,7 @@ func TestAerospikeRecordReader(t *testing.T) {
 	require.NotNil(t, reader)
 
 	v, err := reader.Read(ctx)
-	time.Sleep(100 * time.Millisecond)
+
 	require.Nil(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	require.Equal(t, expectedRecToken, v)
@@ -166,6 +166,8 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 	v, err := reader.Read(ctx)
 	require.NotNil(t, err)
 	require.Nil(t, v)
+
+	time.Sleep(10 * time.Millisecond)
 	mockScanner.AssertExpectations(t)
 }
 
@@ -335,6 +337,10 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 	require.Nil(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	require.Equal(t, expectedRecToken, v)
+
+	v, err = reader.Read(ctx)
+	require.Equal(t, err, io.EOF)
+
 	mockScanner.AssertExpectations(t)
 }
 func TestSIndexReader(t *testing.T) {

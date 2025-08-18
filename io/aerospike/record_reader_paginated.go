@@ -117,8 +117,7 @@ func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 
 // startScan starts the scan for the RecordReader only for state save!
 func (r *PaginatedRecordReader) startScan() {
-	defer close(r.errChan)         // err channel should be closed last.
-	defer close(r.pageRecordsChan) // result channel should nbe closed first.
+	defer close(r.pageRecordsChan)
 
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)

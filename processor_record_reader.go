@@ -122,7 +122,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForPartition(
 }
 
 func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForNodes(
-	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
+	ctx context.Context, numWorkers int, scanPolicy *a.ScanPolicy,
 ) ([]pipe.Reader[*models.Token], error) {
 	nodes, err := rr.getNodes()
 	if err != nil {
@@ -131,18 +131,18 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForNodes(
 
 	// As we can have nodes < workers, we can't distribute a small number of nodes to a large number of workers.
 	// So we set workers = nodes.
-	if len(nodes) < n {
-		n = len(nodes)
+	if len(nodes) < numWorkers {
+		numWorkers = len(nodes)
 	}
 
-	nodesGroups, err := splitNodes(nodes, n)
+	nodesGroups, err := splitNodes(nodes, numWorkers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to split nodes: %w", err)
 	}
 
-	readers := make([]pipe.Reader[*models.Token], n)
+	readers := make([]pipe.Reader[*models.Token], numWorkers)
 
-	for i := 0; i < n; i++ {
+	for i := 0; i < numWorkers; i++ {
 		// Skip empty groups.
 		if len(nodesGroups[i]) == 0 {
 			continue

@@ -102,11 +102,8 @@ func NewRecordReader(
 	ctx, cancel := context.WithCancel(ctx)
 
 	if cfg.pageSize > 0 {
-		logger.Info("Created new paginated aerospike record reader", cfg.LogAttrs()...)
 		return NewPaginatedRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 	}
-
-	logger.Info("Created new aerospike record reader", cfg.LogAttrs()...)
 
 	return NewSingleRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 }
@@ -119,6 +116,8 @@ func NewSingleRecordReader(
 	recodsetCloser RecordsetCloser,
 	cancel context.CancelFunc,
 ) *SingleRecordReader {
+	logger.Info("Created new aerospike record reader", cfg.LogAttrs()...)
+
 	return &SingleRecordReader{
 		ctx:             ctx,
 		cancel:          cancel,

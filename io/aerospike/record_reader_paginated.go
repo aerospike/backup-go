@@ -59,6 +59,8 @@ func NewPaginatedRecordReader(
 	closer RecordsetCloser,
 	cancel context.CancelFunc,
 ) *PaginatedRecordReader {
+	logger.Info("Created new paginated aerospike record reader", cfg.LogAttrs()...)
+
 	return &PaginatedRecordReader{
 		ctx:             ctx,
 		cancel:          cancel,

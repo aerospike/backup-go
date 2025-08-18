@@ -118,6 +118,8 @@ func (r *PaginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 
 		recToken := models.NewRecordToken(&rec, 0, res.filter)
 
+		r.config.rpsCollector.Increment()
+
 		return recToken, nil
 	}
 }

@@ -49,6 +49,7 @@ type PaginatedRecordReader struct {
 func (r *PaginatedRecordReader) Close() {
 }
 
+// NewPaginatedRecordReader creates a new PaginatedRecordReader.
 func NewPaginatedRecordReader(
 	ctx context.Context,
 	scanner scanner,
@@ -188,9 +189,9 @@ func (r *PaginatedRecordReader) scanPage(
 		counter++
 
 		if res.Err != nil {
-			// Ignore last page errors.
+			// When reading last page (containing 0 records), the scan might return an types.INVALID_NODE_ERROR error
 			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
-				r.logger.Error("error reading paginated record", slog.Any("error", res.Err))
+				return 0, fmt.Errorf("error reading paginated record: %w", res.Err)
 			}
 
 			continue

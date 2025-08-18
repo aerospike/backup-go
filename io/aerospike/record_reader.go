@@ -107,6 +107,7 @@ func NewRecordReader(
 	}
 
 	logger.Info("Created new aerospike record reader", cfg.LogAttrs()...)
+
 	return NewSingleRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
 }
 

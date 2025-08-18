@@ -125,6 +125,7 @@ func (r *PaginatedRecordReader) startScan() {
 
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
+	scanPolicy.MaxRecords = r.config.pageSize
 
 	for _, set := range r.config.setList {
 		if err := r.scanSet(set, &scanPolicy); err != nil {
@@ -135,7 +136,6 @@ func (r *PaginatedRecordReader) startScan() {
 }
 
 func (r *PaginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
-	scanPolicy.MaxRecords = r.config.pageSize
 	pf := *r.config.partitionFilter // Each scan requires a copy of the partition filter.
 
 	for {

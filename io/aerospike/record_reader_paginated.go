@@ -206,5 +206,5 @@ func (r *PaginatedRecordReader) scanPage(
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}
 
-	return
+	return count, err
 }

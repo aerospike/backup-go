@@ -132,7 +132,7 @@ func (r *PaginatedRecordReader) startScan() {
 
 func (r *PaginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
 	scanPolicy.MaxRecords = r.config.pageSize
-	pf := *r.config.partitionFilter
+	pf := *r.config.partitionFilter // Each scan requires a copy of the partition filter.
 
 	for {
 		count, err := r.scanPage(&pf, scanPolicy, set)
@@ -178,7 +178,7 @@ func (r *PaginatedRecordReader) scanPage(
 		r.config.binList...,
 	)
 	if aErr != nil {
-		return 0, fmt.Errorf("failed to scan sets: %w", aErr.Unwrap())
+		return 0, fmt.Errorf("failed to scan sets %s: %w", set, aErr.Unwrap())
 	}
 
 	// to count records on pageRecord.
@@ -198,7 +198,7 @@ func (r *PaginatedRecordReader) scanPage(
 	}
 
 	if aErr = r.recodsetCloser.Close(recSet); aErr != nil {
-		return 0, fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
+		return 0, fmt.Errorf("failed to close record set %s: %w", set, aErr.Unwrap())
 	}
 
 	return counter, nil

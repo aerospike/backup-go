@@ -494,7 +494,7 @@ func TestAerospikeRecordReaderPaginatedIgnoreInvalidNodeError(t *testing.T) {
 
 	// Second result has INVALID_NODE_ERROR (should be ignored)
 	mockResults <- &a.Result{
-		Err: a.ErrNetwork,
+		Err: a.ErrClusterIsEmpty,
 	}
 	close(mockResults)
 	setFieldValue(mockRecordSet, "records", mockResults)

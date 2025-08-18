@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -153,7 +154,7 @@ func (r *PaginatedRecordReader) scanPage(
 	pf *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	set string,
-) (uint64, error) {
+) (count uint64, err error) {
 	if err := r.ctx.Err(); err != nil {
 		return 0, err
 	}
@@ -183,10 +184,16 @@ func (r *PaginatedRecordReader) scanPage(
 		return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 	}
 
+	defer func() { // close record set
+		cerr := r.recodsetCloser.Close(recSet)
+		if cerr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", cerr.Unwrap()))
+		}
+	}()
+
 	// to count records on pageRecord.
-	var counter uint64
 	for res := range recSet.Results() {
-		counter++
+		count++
 
 		if res.Err != nil {
 			// When reading last page (containing 0 records), the scan might return an types.INVALID_NODE_ERROR error
@@ -199,9 +206,5 @@ func (r *PaginatedRecordReader) scanPage(
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}
 
-	if aErr = r.recodsetCloser.Close(recSet); aErr != nil {
-		return 0, fmt.Errorf("failed to close record set: %w", aErr.Unwrap())
-	}
-
-	return counter, nil
+	return
 }

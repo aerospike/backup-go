@@ -141,7 +141,7 @@ func (r *PaginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 	for {
 		count, err := r.scanPage(&pf, scanPolicy, set)
 		if err != nil {
-			return fmt.Errorf("faild to scan set %s namespace %s: %w", set, r.config.namespace, err)
+			return fmt.Errorf("failed to scan set %s namespace %s: %w", set, r.config.namespace, err)
 		}
 
 		if count == 0 { // empty pageRecord

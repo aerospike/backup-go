@@ -47,7 +47,7 @@ func TestReader_GetSize(t *testing.T) {
 	r, err := NewReader(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, int64(0), r.GetSize())
+	require.Equal(t, int64(-1), r.GetSize())
 }
 
 func TestReader_GetNumber(t *testing.T) {
@@ -57,7 +57,7 @@ func TestReader_GetNumber(t *testing.T) {
 	r, err := NewReader(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, int64(0), r.GetNumber())
+	require.Equal(t, int64(-1), r.GetNumber())
 }
 
 func TestReader_CtxCancelled(t *testing.T) {

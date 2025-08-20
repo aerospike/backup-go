@@ -63,12 +63,14 @@ func newStdinReadCloser() io.ReadCloser {
 
 // GetSize returns 0 for stdin.
 func (r *Reader) GetSize() int64 {
-	return 0
+	// No need to wait calculations for stdin.
+	return -1
 }
 
 // GetNumber returns 0 for stdin.
 func (r *Reader) GetNumber() int64 {
-	return 0
+	// No need to wait calculations for stdin.
+	return -1
 }
 
 // ListObjects returns a list of objects in the path.

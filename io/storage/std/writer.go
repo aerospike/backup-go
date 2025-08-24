@@ -17,27 +17,36 @@ package std
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
-
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 )
 
 const (
-	bufferSize = 4096 * 1024 // 4mb
-	stdoutType = "stdout"
+	defaultBufferSize = 4096 * 1024 // 4mb
+	stdoutType        = "stdout"
 )
 
-// Writer implements stdout writer.
-type Writer struct{}
+// Writer represents an stdout writer.
+type Writer struct {
+	bufferSize int
+}
 
-// NewWriter creates a new stdout writer. opts are ignored.
-func NewWriter(ctx context.Context, _ ...ioStorage.Opt) (*Writer, error) {
+// NewWriter creates a new stdout writer.
+func NewWriter(ctx context.Context, bufferSize int) (*Writer, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 
-	return &Writer{}, nil
+	if bufferSize < 0 {
+		return nil, fmt.Errorf("buffer size must not be negative")
+	}
+
+	if bufferSize == 0 {
+		bufferSize = defaultBufferSize
+	}
+
+	return &Writer{bufferSize: bufferSize}, nil
 }
 
 // stdoutWriteCloser implements io.WriteCloser for stdout.
@@ -58,11 +67,11 @@ func (w *Writer) NewWriter(ctx context.Context, _ string) (io.WriteCloser, error
 	}
 
 	return &stdoutWriteCloser{
-		Writer: bufio.NewWriterSize(os.Stdout, bufferSize),
+		Writer: bufio.NewWriterSize(os.Stdout, w.bufferSize),
 	}, nil
 }
 
-// RemoveFiles no-op for stdout.
+// RemoveFiles is a no-op for stdout.
 func (w *Writer) RemoveFiles(_ context.Context) error {
 	return nil
 }

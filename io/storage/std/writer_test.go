@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,26 +30,32 @@ func TestNewWriter(t *testing.T) {
 	tests := []struct {
 		name    string
 		ctx     context.Context
-		opts    []ioStorage.Opt
+		buffer  int
 		wantErr bool
 	}{
 		{
 			name:    "success",
 			ctx:     context.Background(),
-			opts:    nil,
+			buffer:  0,
 			wantErr: false,
 		},
 		{
 			name:    "cancelled context",
 			ctx:     func() context.Context { ctx, cancel := context.WithCancel(context.Background()); cancel(); return ctx }(),
-			opts:    nil,
+			buffer:  0,
+			wantErr: true,
+		},
+		{
+			name:    "negative buffer",
+			ctx:     context.Background(),
+			buffer:  -10,
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			writer, err := NewWriter(tt.ctx, tt.opts...)
+			writer, err := NewWriter(tt.ctx, tt.buffer)
 
 			switch tt.wantErr {
 			case true:
@@ -353,7 +358,7 @@ func TestStdout_Remove(t *testing.T) {
 
 	ctx := context.Background()
 
-	w, err := NewWriter(ctx)
+	w, err := NewWriter(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	err = w.RemoveFiles(ctx)
@@ -368,7 +373,7 @@ func TestStdout_GetType(t *testing.T) {
 
 	ctx := context.Background()
 
-	w, err := NewWriter(ctx)
+	w, err := NewWriter(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	res := w.GetType()

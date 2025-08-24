@@ -17,6 +17,7 @@ package std
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -27,16 +28,26 @@ import (
 
 const stdinType = "stdin"
 
+// Reader represents an stdin reader.
 type Reader struct {
+	bufferSize int
 }
 
-// NewReader creates a new stdin reader. opts are ignored.
-func NewReader(ctx context.Context, _ ...ioStorage.Opt) (*Reader, error) {
+// NewReader creates a new stdin reader.
+func NewReader(ctx context.Context, bufferSize int) (*Reader, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 
-	return &Reader{}, nil
+	if bufferSize < 0 {
+		return nil, fmt.Errorf("buffer size must not be negative")
+	}
+
+	if bufferSize == 0 {
+		bufferSize = defaultBufferSize
+	}
+
+	return &Reader{bufferSize: bufferSize}, nil
 }
 
 // GetType returns the `stdType` type of storage. Used in logging.
@@ -49,25 +60,25 @@ type stdinReadCloser struct {
 	io.Reader
 }
 
-// Close no-op for stdin.
+// Close is a no-op for stdin.
 func (r *stdinReadCloser) Close() error {
 	return nil
 }
 
-// newStdinReadCloser creates io.ReadCloser from stdin
-func newStdinReadCloser() io.ReadCloser {
+// newStdinReadCloser returns an io.ReadCloser for os.Stdin.
+func newStdinReadCloser(bufferSize int) io.ReadCloser {
 	return &stdinReadCloser{
 		Reader: bufio.NewReaderSize(os.Stdin, bufferSize),
 	}
 }
 
-// GetSize returns 0 for stdin.
+// GetSize returns -1 for stdin, not to calculate estimates.
 func (r *Reader) GetSize() int64 {
 	// No need to wait calculations for stdin.
 	return -1
 }
 
-// GetNumber returns 0 for stdin.
+// GetNumber returns -1 for stdin, not to calculate estimates.
 func (r *Reader) GetNumber() int64 {
 	// No need to wait calculations for stdin.
 	return -1
@@ -92,7 +103,7 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	readersCh <- models.File{Reader: newStdinReadCloser(), Name: filepath.Base(filename)}
+	readersCh <- models.File{Reader: newStdinReadCloser(r.bufferSize), Name: filepath.Base(filename)}
 }
 
 // StreamFiles opens stdin as files and sends io.Readers to the `readersCh`

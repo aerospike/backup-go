@@ -34,17 +34,26 @@ func TestReader_GetType(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	r, err := NewReader(ctx)
+	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	require.Equal(t, stdinType, r.GetType())
+}
+
+func TestReader_NegativeBuffer(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	r, err := NewReader(ctx, -10)
+	require.Error(t, err)
+	require.Nil(t, r)
 }
 
 func TestReader_GetSize(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	r, err := NewReader(ctx)
+	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	require.Equal(t, int64(-1), r.GetSize())
@@ -54,7 +63,7 @@ func TestReader_GetNumber(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	r, err := NewReader(ctx)
+	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	require.Equal(t, int64(-1), r.GetNumber())
@@ -65,7 +74,7 @@ func TestReader_CtxCancelled(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	r, err := NewReader(ctx)
+	r, err := NewReader(ctx, defaultBufferSize)
 	require.Error(t, err)
 	require.Nil(t, r)
 }
@@ -74,7 +83,7 @@ func TestReader_ListObjects(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	r, err := NewReader(ctx)
+	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	objects, err := r.ListObjects(ctx, testPath)
@@ -103,7 +112,7 @@ func TestReader_StreamFiles(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	reader, err := NewReader(ctx)
+	reader, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
@@ -148,7 +157,7 @@ func TestReader_StreamFile(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	reader, err := NewReader(ctx)
+	reader, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File, 1)
@@ -184,7 +193,7 @@ func TestStdinReadCloser(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	readCloser := newStdinReadCloser()
+	readCloser := newStdinReadCloser(defaultBufferSize)
 	require.NotNil(t, readCloser)
 
 	data, err := io.ReadAll(readCloser)
@@ -206,7 +215,7 @@ func TestReader_EmptyStdin(t *testing.T) {
 	w.Close()
 
 	ctx := context.Background()
-	reader, err := NewReader(ctx)
+	reader, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)

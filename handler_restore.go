@@ -185,10 +185,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		return fmt.Errorf("failed to create compose processor: %w", err)
 	}
 
-	pipelineMode := pipe.RoundRobin
-	if rh.config.EncoderType == EncoderTypeASBX || len(dataReaders) == len(dataWriters) {
-		pipelineMode = pipe.Fixed
-	}
+	pipelineMode := rh.getPipelineMode(len(dataReaders), len(dataWriters))
 
 	pl, err := pipe.NewPipe(
 		composeProcessor,
@@ -205,6 +202,15 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 	rh.pl.Store(pl)
 
 	return pl.Run(ctx)
+}
+
+func (rh *RestoreHandler[T]) getPipelineMode(numReaders, numWriters int) pipe.FanoutStrategy {
+	switch {
+	case rh.config.EncoderType == EncoderTypeASBX, numReaders == numWriters:
+		return pipe.Fixed
+	default:
+		return pipe.RoundRobin
+	}
 }
 
 func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.ProcessorCreator[T], error) {

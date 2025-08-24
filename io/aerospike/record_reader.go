@@ -298,10 +298,12 @@ func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds
 	expressions := []*a.Expression{noMrtSetExpression()}
 
 	if len(sets) > 0 {
+		setsExps := make([]*a.Expression, len(sets))
 		for _, set := range sets {
 			setExp := a.ExpEq(a.ExpSetName(), a.ExpStringVal(set))
-			expressions = append(expressions, setExp)
+			setsExps = append(setsExps, setExp)
 		}
+		expressions = append(expressions, a.ExpOr(setsExps...))
 	}
 
 	if currentExpression != nil {

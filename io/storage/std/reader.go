@@ -72,13 +72,13 @@ func newStdinReadCloser(bufferSize int) io.ReadCloser {
 	}
 }
 
-// GetSize returns -1 for stdin, not to calculate estimates.
+// GetSize returns -1 for stdin, indicating that estimates should not be calculated.
 func (r *Reader) GetSize() int64 {
 	// No need to wait calculations for stdin.
 	return -1
 }
 
-// GetNumber returns -1 for stdin, not to calculate estimates.
+// GetNumber returns -1 for stdin, indicating that estimates should not be calculated.
 func (r *Reader) GetNumber() int64 {
 	// No need to wait calculations for stdin.
 	return -1

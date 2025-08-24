@@ -129,7 +129,12 @@ func (r *paginatedRecordReader) startScan() {
 	defer close(r.pageRecordsChan)
 
 	scanPolicy := *r.config.scanPolicy
-	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
+	scanPolicy.FilterExpression = getScanExpression(
+		scanPolicy.FilterExpression,
+		r.config.timeBounds,
+		r.config.noTTLOnly,
+		r.config.setList,
+	)
 	scanPolicy.MaxRecords = r.config.pageSize
 
 	for _, set := range r.config.setList {

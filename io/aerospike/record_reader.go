@@ -233,7 +233,12 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.
 func (r *singleRecordReader) generateProducers() ([]scanProducer, error) {
 	scanPolicy := *r.config.scanPolicy
-	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
+	scanPolicy.FilterExpression = getScanExpression(
+		scanPolicy.FilterExpression,
+		r.config.timeBounds,
+		r.config.noTTLOnly,
+		r.config.setList,
+	)
 
 	var producers []scanProducer
 
@@ -263,27 +268,24 @@ func (r *singleRecordReader) generateProducers() ([]scanProducer, error) {
 
 	case r.config.partitionFilter != nil:
 		// Partition Scan Mode
-		for _, set := range r.config.setList {
-			capturedSet := set
-			producer := func() (*a.Recordset, error) {
-				// Each scan requires a fresh copy of the partition filter.
-				pf := *r.config.partitionFilter
-				r.logger.Debug("starting partition scan",
-					slog.String("set", capturedSet),
-					slog.Int("begin", pf.Begin),
-					slog.Int("count", pf.Count))
+		producer := func() (*a.Recordset, error) {
+			// Each scan requires a fresh copy of the partition filter.
+			pf := *r.config.partitionFilter
+			r.logger.Debug("starting partition scan",
+				slog.Int("begin", pf.Begin),
+				slog.Int("count", pf.Count))
 
-				recordset, err := r.client.ScanPartitions(
-					&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
-				if err != nil {
-					return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
-						capturedSet, r.config.namespace, pf.Begin, pf.Count, err)
-				}
-
-				return recordset, nil
+			recordset, err := r.client.ScanPartitions(
+				&scanPolicy, &pf, r.config.namespace, "", r.config.binList...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to start scan for, namespace %s, filter %d-%d: %w",
+					r.config.namespace, pf.Begin, pf.Count, err)
 			}
-			producers = append(producers, producer)
+
+			return recordset, nil
 		}
+		producers = append(producers, producer)
+
 	default:
 		return nil, errors.New("invalid scan parameters: either nodes or partitionFilter must be specified")
 	}
@@ -291,8 +293,16 @@ func (r *singleRecordReader) generateProducers() ([]scanProducer, error) {
 	return producers, nil
 }
 
-func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
+func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool, sets []string,
+) *a.Expression {
 	expressions := []*a.Expression{noMrtSetExpression()}
+
+	if len(sets) > 0 {
+		for _, set := range sets {
+			setExp := a.ExpEq(a.ExpSetName(), a.ExpStringVal(set))
+			expressions = append(expressions, setExp)
+		}
+	}
 
 	if currentExpression != nil {
 		expressions = append(expressions, currentExpression)

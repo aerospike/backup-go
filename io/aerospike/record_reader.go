@@ -304,6 +304,9 @@ func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds
 			setsExps = append(setsExps, setExp)
 		}
 		expressions = append(expressions, a.ExpOr(setsExps...))
+
+		fmt.Println("!!!!!!!!!!!!SET FILTER APPLIED:", expressions)
+		fmt.Println("++++++++SETS:", sets)
 	}
 
 	if currentExpression != nil {

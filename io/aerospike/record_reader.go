@@ -245,25 +245,23 @@ func (r *singleRecordReader) generateProducers() ([]scanProducer, error) {
 	switch {
 	case len(r.config.nodes) > 0:
 		for _, node := range r.config.nodes {
-			for _, set := range r.config.setList {
-				// Capture loop variables to ensure the lambda uses the correct values.
-				capturedNode, capturedSet := node, set
-				producer := func() (*a.Recordset, error) {
-					r.logger.Debug("starting node scan",
-						slog.String("set", capturedSet),
-						slog.String("node", capturedNode.GetName()))
 
-					recordset, err := r.client.ScanNode(
-						&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
-					if err != nil {
-						return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, node %s: %w",
-							capturedSet, r.config.namespace, capturedNode, err)
-					}
+			// Capture loop variables to ensure the lambda uses the correct values.
+			capturedNode := node
+			producer := func() (*a.Recordset, error) {
+				r.logger.Debug("starting node scan",
+					slog.String("node", capturedNode.GetName()))
 
-					return recordset, nil
+				recordset, err := r.client.ScanNode(
+					&scanPolicy, capturedNode, r.config.namespace, "", r.config.binList...)
+				if err != nil {
+					return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, node %s: %w",
+						"", r.config.namespace, capturedNode, err)
 				}
-				producers = append(producers, producer)
+
+				return recordset, nil
 			}
+			producers = append(producers, producer)
 		}
 
 	case r.config.partitionFilter != nil:
@@ -298,15 +296,19 @@ func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds
 	expressions := []*a.Expression{noMrtSetExpression()}
 
 	if len(sets) > 0 && !(len(sets) == 1 && sets[0] == "") {
-		setsExps := make([]*a.Expression, 0, len(sets))
-		for _, set := range sets {
-			setExp := a.ExpEq(a.ExpSetName(), a.ExpStringVal(set))
-			setsExps = append(setsExps, setExp)
-		}
-		expressions = append(expressions, a.ExpOr(setsExps...))
+		if len(sets) == 1 {
+			expressions = append(expressions, a.ExpEq(a.ExpSetName(), a.ExpStringVal(sets[0])))
+		} else {
+			setsExps := make([]*a.Expression, 0, len(sets))
+			for _, set := range sets {
+				setExp := a.ExpEq(a.ExpSetName(), a.ExpStringVal(set))
+				setsExps = append(setsExps, setExp)
+			}
+			expressions = append(expressions, a.ExpOr(setsExps...))
 
-		fmt.Println("!!!!!!!!!!!!SET FILTER APPLIED:", expressions)
-		fmt.Println("++++++++SETS:", sets)
+			fmt.Println("!!!!!!!!!!!!SET FILTER APPLIED:", expressions)
+			fmt.Println("++++++++SETS:", sets)
+		}
 	}
 
 	if currentExpression != nil {

@@ -16,6 +16,7 @@ package processors
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
@@ -71,7 +72,8 @@ func TestNewFilterByType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			processor := NewFilterByType[*models.Token](tt.noRecords, tt.noIndexes, tt.noUdf)
+			var skipped atomic.Uint64
+			processor := NewFilterByType[*models.Token](tt.noRecords, tt.noIndexes, tt.noUdf, &skipped)
 			assert.IsType(t, tt.expectType, processor)
 		})
 	}

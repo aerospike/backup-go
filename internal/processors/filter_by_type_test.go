@@ -16,6 +16,7 @@ package processors
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
@@ -71,7 +72,8 @@ func TestNewFilterByType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			processor := NewFilterByType[*models.Token](tt.noRecords, tt.noIndexes, tt.noUdf)
+			var skipped atomic.Uint64
+			processor := NewFilterByType[*models.Token](tt.noRecords, tt.noIndexes, tt.noUdf, &skipped)
 			assert.IsType(t, tt.expectType, processor)
 		})
 	}
@@ -79,6 +81,7 @@ func TestNewFilterByType(t *testing.T) {
 
 func TestFilterByTypeProcess(t *testing.T) {
 	t.Parallel()
+	var skipped atomic.Uint64
 	tests := []struct {
 		name         string
 		filter       *filterByType[*models.Token]
@@ -92,6 +95,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				noRecords: true,
 				noIndexes: false,
 				noUdf:     false,
+				skipped:   &skipped,
 			},
 			token: &models.Token{
 				Type: models.TokenTypeRecord,
@@ -105,6 +109,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
+				skipped:   &skipped,
 			},
 			token:       &models.Token{Type: models.TokenTypeRecord},
 			expectError: false,
@@ -115,6 +120,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				noRecords: false,
 				noIndexes: true,
 				noUdf:     false,
+				skipped:   &skipped,
 			},
 			token: &models.Token{
 				Type: models.TokenTypeSIndex,
@@ -128,6 +134,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
+				skipped:   &skipped,
 			},
 			token:       &models.Token{Type: models.TokenTypeSIndex},
 			expectError: false,
@@ -138,6 +145,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     true,
+				skipped:   &skipped,
 			},
 			token: &models.Token{
 				Type: models.TokenTypeUDF,
@@ -151,6 +159,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
+				skipped:   &skipped,
 			},
 			token:       &models.Token{Type: models.TokenTypeUDF},
 			expectError: false,
@@ -161,6 +170,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
+				skipped:   &skipped,
 			},
 			token:       &models.Token{Type: models.TokenTypeRecord},
 			expectError: false,

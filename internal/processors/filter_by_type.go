@@ -16,6 +16,7 @@ package processors
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
 )
@@ -25,10 +26,12 @@ type filterByType[T models.TokenConstraint] struct {
 	noRecords bool
 	noIndexes bool
 	noUdf     bool
+
+	skipped *atomic.Uint64
 }
 
 // NewFilterByType creates new filterByType processor
-func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool) processor[T] {
+func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool, skipped *atomic.Uint64) processor[T] {
 	if !noRecords && !noIndexes && !noUdf {
 		return &noopProcessor[T]{}
 	}
@@ -37,6 +40,7 @@ func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool)
 		noRecords: noRecords,
 		noIndexes: noIndexes,
 		noUdf:     noUdf,
+		skipped:   skipped,
 	}
 }
 
@@ -48,6 +52,8 @@ func (p filterByType[T]) Process(token T) (T, error) {
 	}
 
 	if p.noRecords && t.Type == models.TokenTypeRecord {
+		p.skipped.Add(1)
+
 		return nil, fmt.Errorf("%w: record is filtered with no-records flag", models.ErrFilteredOut)
 	}
 

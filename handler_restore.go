@@ -226,7 +226,12 @@ func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.Proc
 		return newDataProcessor[T](
 			processors.NewRecordCounter[T](&rh.stats.ReadRecords),
 			processors.NewSizeCounter[T](&rh.stats.TotalBytesRead),
-			processors.NewFilterByType[T](rh.config.NoRecords, rh.config.NoIndexes, rh.config.NoUDFs),
+			processors.NewFilterByType[T](
+				rh.config.NoRecords,
+				rh.config.NoIndexes,
+				rh.config.NoUDFs,
+				&rh.stats.RecordsSkipped,
+			),
 			processors.NewFilterBySet[T](rh.config.SetList, &rh.stats.RecordsSkipped),
 			processors.NewFilterByBin[T](rh.config.BinList, &rh.stats.RecordsSkipped),
 			processors.NewChangeNamespace[T](nsSource, nsDest),

@@ -72,23 +72,48 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(
 	// in the scan policy so that maps and lists are returned as raw blob bins
 	scanPolicy.RawCDT = true
 
-	// If we are paralleling scans by nodes.
+	var (
+		partitionGroups []*a.PartitionFilter
+		err             error
+	)
+
 	if rr.config.isParalleledByNodes() {
-		return rr.newAerospikeReadWorkersForNodes(ctx, n, &scanPolicy)
+		partitionGroups, err = rr.newPartitionGroupsFromNodes(n)
+	} else {
+		partitionGroups, err = rr.newPartitionGroups(n)
 	}
 
-	return rr.newAerospikeReadWorkersForPartition(ctx, n, &scanPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create partition groups: %w", err)
+	}
+
+	// If we have multiply partition filters, we shrink workers to number of filters.
+	readers := make([]pipe.Reader[*models.Token], len(partitionGroups))
+
+	for i := range partitionGroups {
+		recordReaderConfig := rr.newRecordReaderConfig(partitionGroups[i], &scanPolicy)
+
+		recordReader := aerospike.NewRecordReader(
+			ctx,
+			rr.aerospikeClient,
+			recordReaderConfig,
+			rr.logger,
+			aerospike.NewRecordsetCloser(),
+		)
+
+		readers[i] = recordReader
+	}
+
+	return readers, nil
 }
 
-func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForPartition(
-	ctx context.Context, n int, scanPolicy *a.ScanPolicy,
-) ([]pipe.Reader[*models.Token], error) {
+func (rr *recordReaderProcessor[T]) newPartitionGroups(numWorkers int) ([]*a.PartitionFilter, error) {
 	var err error
 
 	partitionGroups := rr.config.PartitionFilters
 
 	if !rr.config.isStateContinue() {
-		partitionGroups, err = splitPartitions(rr.config.PartitionFilters, n)
+		partitionGroups, err = splitPartitions(rr.config.PartitionFilters, numWorkers)
 		if err != nil {
 			return nil, err
 		}
@@ -101,100 +126,32 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForPartition(
 		}
 	}
 
-	// If we have multiply partition filters, we shrink workers to number of filters.
-	readers := make([]pipe.Reader[*models.Token], len(partitionGroups))
-
-	for i := range partitionGroups {
-		recordReaderConfig := rr.recordReaderConfigForPartitions(partitionGroups[i], scanPolicy)
-
-		recordReader := aerospike.NewRecordReader(
-			ctx,
-			rr.aerospikeClient,
-			recordReaderConfig,
-			rr.logger,
-			aerospike.NewRecordsetCloser(),
-		)
-
-		readers[i] = recordReader
-	}
-
-	return readers, nil
+	return partitionGroups, nil
 }
 
-func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForNodes(
-	ctx context.Context, numWorkers int, scanPolicy *a.ScanPolicy,
-) ([]pipe.Reader[*models.Token], error) {
+func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(numWorkers int) ([]*a.PartitionFilter, error) {
 	nodes, err := rr.getNodes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get nodes: %w", err)
 	}
 
-	// As we can have nodes < workers, we can't distribute a small number of nodes to a large number of workers.
-	// So we set workers = nodes.
-	// if len(nodes) < numWorkers {
-	// 	numWorkers = len(nodes)
-	// }
-	//
-	// ********************************************************************
+	var partIDs []int
 
-	var partIds []int
 	for _, node := range nodes {
 		parts, err := rr.infoClient.GetPrimaryPartitions(node.GetName(), rr.config.Namespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get primary partitions for node: %s: %w", node.GetName(), err)
 		}
-		partIds = append(partIds, parts...)
+
+		partIDs = append(partIDs, parts...)
 	}
 
-	partF, err := splitPartitionIDs(partIds, numWorkers)
+	partitionGroups, err := splitPartitionIDs(partIDs, numWorkers)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to split partition ids: %w", err)
 	}
 
-	readers := make([]pipe.Reader[*models.Token], len(partF))
-	for i, partition := range partF {
-		recordReaderConfig := rr.recordReaderConfigForPartitions(partition, scanPolicy)
-
-		recordReader := aerospike.NewRecordReader(
-			ctx,
-			rr.aerospikeClient,
-			recordReaderConfig,
-			rr.logger,
-			aerospike.NewRecordsetCloser(),
-		)
-
-		readers[i] = recordReader
-	}
-
-	// ********************************************************************
-
-	// nodesGroups, err := splitNodes(nodes, numWorkers)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to split nodes: %w", err)
-	// }
-	//
-	// readers := make([]pipe.Reader[*models.Token], numWorkers)
-	//
-	// for i := 0; i < numWorkers; i++ {
-	// 	// Skip empty groups.
-	// 	if len(nodesGroups[i]) == 0 {
-	// 		continue
-	// 	}
-	//
-	// 	recordReaderConfig := rr.recordReaderConfigForNode(nodesGroups[i], scanPolicy)
-	//
-	// 	recordReader := aerospike.NewRecordReader(
-	// 		ctx,
-	// 		rr.aerospikeClient,
-	// 		recordReaderConfig,
-	// 		rr.logger,
-	// 		aerospike.NewRecordsetCloser(),
-	// 	)
-	//
-	// 	readers[i] = recordReader
-	// }
-
-	return readers, nil
+	return partitionGroups, nil
 }
 
 func (rr *recordReaderProcessor[T]) getNodes() ([]*a.Node, error) {
@@ -280,39 +237,14 @@ func (rr *recordReaderProcessor[T]) filterNodes(nodesList []string, nodes []*a.N
 	return filteredNodes, nil
 }
 
-func (rr *recordReaderProcessor[T]) recordReaderConfigForPartitions(
+func (rr *recordReaderProcessor[T]) newRecordReaderConfig(
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 ) *aerospike.RecordReaderConfig {
-	pfCopy := *partitionFilter
-
 	return aerospike.NewRecordReaderConfig(
 		rr.config.Namespace,
 		rr.config.SetList,
-		&pfCopy,
-		nil,
-		scanPolicy,
-		rr.config.BinList,
-		models.TimeBounds{
-			FromTime: rr.config.ModAfter,
-			ToTime:   rr.config.ModBefore,
-		},
-		rr.scanLimiter,
-		rr.config.NoTTLOnly,
-		rr.config.PageSize,
-		rr.rpsCollector,
-	)
-}
-
-func (rr *recordReaderProcessor[T]) recordReaderConfigForNode(
-	nodes []*a.Node,
-	scanPolicy *a.ScanPolicy,
-) *aerospike.RecordReaderConfig {
-	return aerospike.NewRecordReaderConfig(
-		rr.config.Namespace,
-		rr.config.SetList,
-		nil,
-		nodes,
+		partitionFilter,
 		scanPolicy,
 		rr.config.BinList,
 		models.TimeBounds{

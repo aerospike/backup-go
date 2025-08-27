@@ -277,8 +277,13 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	// in the scan policy so that maps and lists are returned as raw blob bins
 	scanPolicy.RawCDT = true
 
-	nodes := bh.aerospikeClient.GetNodes()
-	readerConfig := bh.readerProcessor.recordReaderConfigForNode(nodes, &scanPolicy)
+	filters, err := bh.readerProcessor.newPartitionGroupsFromNodes(bh.config.ParallelRead)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create partition groups: %w", err)
+	}
+
+	partitionFilter := randomPartition(filters)
+	readerConfig := bh.readerProcessor.newRecordReaderConfig(partitionFilter, &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger,
 		aerospike.NewRecordsetCloser())
 

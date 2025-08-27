@@ -58,25 +58,6 @@ func doWork(errors chan<- error, done chan<- struct{}, logger *slog.Logger, work
 	done <- struct{}{}
 }
 
-func splitNodes(nodes []*a.Node, numWorkers int) ([][]*a.Node, error) {
-	if numWorkers < 1 {
-		return nil, fmt.Errorf("numWorkers is less than 1, cannot split nodes")
-	}
-
-	if len(nodes) == 0 {
-		return nil, fmt.Errorf("number of nodes is less than 1, cannot split nodes")
-	}
-
-	result := make([][]*a.Node, numWorkers)
-
-	for i, node := range nodes {
-		workerIndex := i % numWorkers
-		result[workerIndex] = append(result[workerIndex], node)
-	}
-
-	return result, nil
-}
-
 func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 	digestBytes, err := base64.StdEncoding.DecodeString(digest)
 	if err != nil {

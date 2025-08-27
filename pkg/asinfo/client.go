@@ -1442,34 +1442,9 @@ func base64StringToBitArray(base64Str string) ([]bool, error) {
 	return bitarray, nil
 }
 
-// findRanges returns a list of ranges [start, end] where the bit is set to 1 in the bitarray.
-func findRanges(bitarray []bool) [][]int {
-	var ranges [][]int
-	start := -1
-
-	for i, bit := range bitarray {
-		if bit {
-			if start == -1 {
-				start = i
-			}
-		} else {
-			if start != -1 {
-				ranges = append(ranges, []int{start, i - 1})
-				start = -1
-			}
-		}
-	}
-
-	// Handle the case where the last bit(s) are set to 1
-	if start != -1 {
-		ranges = append(ranges, []int{start, len(bitarray) - 1})
-	}
-
-	return ranges
-}
-
 func bitMapToIntSlice(b []bool) []int {
 	var result []int
+
 	for i, bit := range b {
 		if bit {
 			result = append(result, i)

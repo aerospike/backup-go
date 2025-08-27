@@ -179,7 +179,20 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 }
 
 func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) {
+	if numWorkers <= 0 {
+		return nil, fmt.Errorf("number of workers is less than 1, cannot split partition ids")
+	}
+
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("partition ids is empty")
+	}
+
+	if len(ids) > MaxPartitions {
+		return nil, fmt.Errorf("partition ids count is greater than max partitions: %d", len(ids))
+	}
+
 	var err error
+
 	result := make([]*a.PartitionFilter, numWorkers)
 
 	baseSize := len(ids) / numWorkers
@@ -193,10 +206,16 @@ func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) 
 		}
 
 		endIdx := startIdx + currentSize
-		result[i], err = NewPartitionFilterByIDs(ids[startIdx:endIdx])
+
+		// Make a copy, to prevent memory leak.
+		partitionIDs := make([]int, currentSize)
+		copy(partitionIDs, ids[startIdx:endIdx])
+
+		result[i], err = NewPartitionFilterByIDs(partitionIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to split partition ids: %w", err)
 		}
+
 		startIdx = endIdx
 	}
 

@@ -40,6 +40,11 @@ func NewPartitionFilterByID(partitionID int) *a.PartitionFilter {
 	return a.NewPartitionFilterById(partitionID)
 }
 
+// NewPartitionFilterByIDs returns a partition filter by ids with specified ids.
+func NewPartitionFilterByIDs(partitionIDs []int) (*a.PartitionFilter, error) {
+	return a.NewPartitionFilterSelectPartitions(partitionIDs)
+}
+
 // NewPartitionFilterByDigest returns a partition filter by digest with specified value.
 func NewPartitionFilterByDigest(namespace, digest string) (*a.PartitionFilter, error) {
 	key, err := newKeyByDigest(namespace, digest)
@@ -168,6 +173,31 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 		result = append(result, group...)
 
 		remainingWorkers -= numRangeWorkers
+	}
+
+	return result, nil
+}
+
+func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) {
+	var err error
+	result := make([]*a.PartitionFilter, numWorkers)
+
+	baseSize := len(ids) / numWorkers
+	remainder := len(ids) % numWorkers
+	startIdx := 0
+
+	for i := 0; i < numWorkers; i++ {
+		currentSize := baseSize
+		if i < remainder {
+			currentSize++
+		}
+
+		endIdx := startIdx + currentSize
+		result[i], err = NewPartitionFilterByIDs(ids[startIdx:endIdx])
+		if err != nil {
+			return nil, fmt.Errorf("failed to split partition ids: %w", err)
+		}
+		startIdx = endIdx
 	}
 
 	return result, nil

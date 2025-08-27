@@ -131,24 +131,29 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForNodes(
 
 	// As we can have nodes < workers, we can't distribute a small number of nodes to a large number of workers.
 	// So we set workers = nodes.
-	if len(nodes) < numWorkers {
-		numWorkers = len(nodes)
-	}
+	// if len(nodes) < numWorkers {
+	// 	numWorkers = len(nodes)
+	// }
+	//
+	// ********************************************************************
 
-	nodesGroups, err := splitNodes(nodes, numWorkers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to split nodes: %w", err)
-	}
-
-	readers := make([]pipe.Reader[*models.Token], numWorkers)
-
-	for i := 0; i < numWorkers; i++ {
-		// Skip empty groups.
-		if len(nodesGroups[i]) == 0 {
-			continue
+	var partIds []int
+	for _, node := range nodes {
+		parts, err := rr.infoClient.GetPrimaryPartitions(node.GetName(), rr.config.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get primary partitions for node: %s: %w", node.GetName(), err)
 		}
+		partIds = append(partIds, parts...)
+	}
 
-		recordReaderConfig := rr.recordReaderConfigForNode(nodesGroups[i], scanPolicy)
+	partF, err := splitPartitionIDs(partIds, numWorkers)
+	if err != nil {
+		return nil, err
+	}
+
+	readers := make([]pipe.Reader[*models.Token], len(partF))
+	for i, partition := range partF {
+		recordReaderConfig := rr.recordReaderConfigForPartitions(partition, scanPolicy)
 
 		recordReader := aerospike.NewRecordReader(
 			ctx,
@@ -160,6 +165,34 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkersForNodes(
 
 		readers[i] = recordReader
 	}
+
+	// ********************************************************************
+
+	// nodesGroups, err := splitNodes(nodes, numWorkers)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to split nodes: %w", err)
+	// }
+	//
+	// readers := make([]pipe.Reader[*models.Token], numWorkers)
+	//
+	// for i := 0; i < numWorkers; i++ {
+	// 	// Skip empty groups.
+	// 	if len(nodesGroups[i]) == 0 {
+	// 		continue
+	// 	}
+	//
+	// 	recordReaderConfig := rr.recordReaderConfigForNode(nodesGroups[i], scanPolicy)
+	//
+	// 	recordReader := aerospike.NewRecordReader(
+	// 		ctx,
+	// 		rr.aerospikeClient,
+	// 		recordReaderConfig,
+	// 		rr.logger,
+	// 		aerospike.NewRecordsetCloser(),
+	// 	)
+	//
+	// 	readers[i] = recordReader
+	// }
 
 	return readers, nil
 }

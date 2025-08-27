@@ -695,7 +695,7 @@ func (ic *Client) GetService(node string) (string, error) {
 	)
 	// First request TLS name.
 	err = executeWithRetry(ic.retryPolicy, func() error {
-		result, err = ic.getService(node, ic.cmdDict[cmdIDServiceTLSStd])
+		result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceTLSStd])
 		if err != nil {
 			return err
 		}
@@ -705,7 +705,7 @@ func (ic *Client) GetService(node string) (string, error) {
 	// If result is empty, then request plain.
 	if result == "" {
 		err = executeWithRetry(ic.retryPolicy, func() error {
-			result, err = ic.getService(node, ic.cmdDict[cmdIDServiceClearStd])
+			result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceClearStd])
 			if err != nil {
 				return err
 			}
@@ -717,7 +717,7 @@ func (ic *Client) GetService(node string) (string, error) {
 	return result, err
 }
 
-func (ic *Client) getService(node, cmd string) (string, error) {
+func (ic *Client) getByNode(node, cmd string) (string, error) {
 	resp, err := ic.requestByNode(node, cmd)
 	if err != nil {
 		return "", fmt.Errorf("failed get %s info for node %s: %w", cmd, node, err)
@@ -796,6 +796,58 @@ func (ic *Client) GetDCsList() ([]string, error) {
 	}
 
 	return dcs, nil
+}
+
+// GetPrimaryPartitions returns a list of primary partitions.
+func (ic *Client) GetPrimaryPartitions(node, namespace string) ([]int, error) {
+	var (
+		result []int
+		err    error
+	)
+
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		result, err = ic.getPrimaryPartitions(node, namespace)
+		if err != nil {
+			return err
+		}
+
+		return err
+	})
+
+	return result, err
+}
+
+func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
+	cmd := ic.cmdDict[cmdIDReplicas]
+
+	result, err := ic.getByNode(node, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get by node command: %s: %w", cmd, err)
+	}
+
+	var base64Res string
+	// Looks like the "replicas" response didn't look like any known info responses,
+	// so we can't use standard parsing func.
+	nsResults := strings.Split(result, ";")
+	// TODO: add checks?
+	for _, nsRes := range nsResults {
+		res := strings.Split(nsRes, ":")
+		if res[0] == namespace {
+			data := strings.Split(res[1], ",")
+			base64Res = data[2]
+		}
+	}
+
+	if base64Res == "" {
+		return nil, fmt.Errorf("failed to find replicas for node %s", node)
+	}
+
+	bitMap, err := base64StringToBitArray(base64Res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse xdr connector response: %w", err)
+	}
+
+	return bitMapToIntSlice(bitMap), nil
 }
 
 // ***** Utility functions *****
@@ -1365,4 +1417,64 @@ func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
 	}
 
 	return nil
+}
+
+// base64StringToBitArray decodes a base64 string and converts the result to a bitarray (slice of booleans).
+func base64StringToBitArray(base64Str string) ([]bool, error) {
+	decodedBytes, err := base64.StdEncoding.DecodeString(base64Str)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 string: %w", err)
+	}
+
+	bitarray := make([]bool, 0, len(decodedBytes)*8) // Pre-allocate for efficiency
+
+	for _, b := range decodedBytes {
+		for i := 7; i >= 0; i-- {
+			// Check if the i-th bit is set (from most significant to least significant)
+			if (b>>i)&1 == 1 {
+				bitarray = append(bitarray, true)
+			} else {
+				bitarray = append(bitarray, false)
+			}
+		}
+	}
+
+	return bitarray, nil
+}
+
+// findRanges returns a list of ranges [start, end] where the bit is set to 1 in the bitarray.
+func findRanges(bitarray []bool) [][]int {
+	var ranges [][]int
+	start := -1
+
+	for i, bit := range bitarray {
+		if bit {
+			if start == -1 {
+				start = i
+			}
+		} else {
+			if start != -1 {
+				ranges = append(ranges, []int{start, i - 1})
+				start = -1
+			}
+		}
+	}
+
+	// Handle the case where the last bit(s) are set to 1
+	if start != -1 {
+		ranges = append(ranges, []int{start, len(bitarray) - 1})
+	}
+
+	return ranges
+}
+
+func bitMapToIntSlice(b []bool) []int {
+	var result []int
+	for i, bit := range b {
+		if bit {
+			result = append(result, i)
+		}
+	}
+
+	return result
 }

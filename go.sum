@@ -40,8 +40,8 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0.53.0/go.mod h1:jUZ5LYlw40WMd07qxcQJD5M40aUxrfwqQX1g7zxYnrQ=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.53.0 h1:Ron4zCA/yk6U7WOBXhTJcDpsUBG9npumK6xw2auFltQ=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.53.0/go.mod h1:cSgYe11MCNYunTnRXrKiR/tHc0eoKjICUuWpNZoVCOo=
-github.com/aerospike/aerospike-client-go/v8 v8.2.2 h1:NV1GxB+ATUb1cQtwaIS731A/6EkwuAX4/heh8CpvQOI=
-github.com/aerospike/aerospike-client-go/v8 v8.2.2/go.mod h1:H6CzKDoHxBj1yY/oQPci1bUIbEx2ATQtJ2GtZ+N64Wg=
+github.com/aerospike/aerospike-client-go/v8 v8.0.2-0.20250821184147-58e0e2f0420e h1:tVcPvN6/hjUvh3j56Vqj0nSGttT93ldjglHL0IGWO9E=
+github.com/aerospike/aerospike-client-go/v8 v8.0.2-0.20250821184147-58e0e2f0420e/go.mod h1:t1LXZ3QVi4B4lR9qEkyei1eMbuohBJBGs1YY5b5fYEI=
 github.com/aws/aws-sdk-go-v2 v1.38.0 h1:UCRQ5mlqcFk9HJDIqENSLR3wiG1VTWlyUfLDEvY7RxU=
 github.com/aws/aws-sdk-go-v2 v1.38.0/go.mod h1:9Q0OoGQoboYIAJyslFyF1f5K1Ryddop8gqMhWx/n4Wg=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.0 h1:6GMWV6CNpA/6fbFHnoAjrv4+LGfyTqZz2LtCHnspgDg=

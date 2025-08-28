@@ -687,6 +687,11 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 		params = append(params, space, []byte(sindex.Path.B64Context))
 	}
 
+	// If there is expression add it to the end.
+	if sindex.Expression != "" {
+		params = append(params, space, []byte(sindex.Expression))
+	}
+
 	// Write all parameters at once
 	return writeBytes(w, params...)
 }

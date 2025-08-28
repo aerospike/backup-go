@@ -236,6 +236,70 @@ func (_c *MockAerospikeClient_CreateComplexIndex_Call) RunAndReturn(run func(pol
 	return _c
 }
 
+// CreateIndexWithExpression provides a mock function for the type MockAerospikeClient
+func (_mock *MockAerospikeClient) CreateIndexWithExpression(policy *aerospike.WritePolicy, namespace string, set string, indexName string, indexType aerospike.IndexType, indexCollectionType aerospike.IndexCollectionType, expression *aerospike.Expression) (*aerospike.IndexTask, aerospike.Error) {
+	ret := _mock.Called(policy, namespace, set, indexName, indexType, indexCollectionType, expression)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateIndexWithExpression")
+	}
+
+	var r0 *aerospike.IndexTask
+	var r1 aerospike.Error
+	if returnFunc, ok := ret.Get(0).(func(*aerospike.WritePolicy, string, string, string, aerospike.IndexType, aerospike.IndexCollectionType, *aerospike.Expression) (*aerospike.IndexTask, aerospike.Error)); ok {
+		return returnFunc(policy, namespace, set, indexName, indexType, indexCollectionType, expression)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*aerospike.WritePolicy, string, string, string, aerospike.IndexType, aerospike.IndexCollectionType, *aerospike.Expression) *aerospike.IndexTask); ok {
+		r0 = returnFunc(policy, namespace, set, indexName, indexType, indexCollectionType, expression)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*aerospike.IndexTask)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*aerospike.WritePolicy, string, string, string, aerospike.IndexType, aerospike.IndexCollectionType, *aerospike.Expression) aerospike.Error); ok {
+		r1 = returnFunc(policy, namespace, set, indexName, indexType, indexCollectionType, expression)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(aerospike.Error)
+		}
+	}
+	return r0, r1
+}
+
+// MockAerospikeClient_CreateIndexWithExpression_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateIndexWithExpression'
+type MockAerospikeClient_CreateIndexWithExpression_Call struct {
+	*mock.Call
+}
+
+// CreateIndexWithExpression is a helper method to define mock.On call
+//   - policy
+//   - namespace
+//   - set
+//   - indexName
+//   - indexType
+//   - indexCollectionType
+//   - expression
+func (_e *MockAerospikeClient_Expecter) CreateIndexWithExpression(policy interface{}, namespace interface{}, set interface{}, indexName interface{}, indexType interface{}, indexCollectionType interface{}, expression interface{}) *MockAerospikeClient_CreateIndexWithExpression_Call {
+	return &MockAerospikeClient_CreateIndexWithExpression_Call{Call: _e.mock.On("CreateIndexWithExpression", policy, namespace, set, indexName, indexType, indexCollectionType, expression)}
+}
+
+func (_c *MockAerospikeClient_CreateIndexWithExpression_Call) Run(run func(policy *aerospike.WritePolicy, namespace string, set string, indexName string, indexType aerospike.IndexType, indexCollectionType aerospike.IndexCollectionType, expression *aerospike.Expression)) *MockAerospikeClient_CreateIndexWithExpression_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*aerospike.WritePolicy), args[1].(string), args[2].(string), args[3].(string), args[4].(aerospike.IndexType), args[5].(aerospike.IndexCollectionType), args[6].(*aerospike.Expression))
+	})
+	return _c
+}
+
+func (_c *MockAerospikeClient_CreateIndexWithExpression_Call) Return(indexTask *aerospike.IndexTask, error aerospike.Error) *MockAerospikeClient_CreateIndexWithExpression_Call {
+	_c.Call.Return(indexTask, error)
+	return _c
+}
+
+func (_c *MockAerospikeClient_CreateIndexWithExpression_Call) RunAndReturn(run func(policy *aerospike.WritePolicy, namespace string, set string, indexName string, indexType aerospike.IndexType, indexCollectionType aerospike.IndexCollectionType, expression *aerospike.Expression) (*aerospike.IndexTask, aerospike.Error)) *MockAerospikeClient_CreateIndexWithExpression_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DropIndex provides a mock function for the type MockAerospikeClient
 func (_mock *MockAerospikeClient) DropIndex(policy *aerospike.WritePolicy, namespace string, set string, indexName string) aerospike.Error {
 	ret := _mock.Called(policy, namespace, set, indexName)

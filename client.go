@@ -45,8 +45,24 @@ type AerospikeClient interface {
 	GetDefaultInfoPolicy() *a.InfoPolicy
 	GetDefaultWritePolicy() *a.WritePolicy
 	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
-	CreateComplexIndex(policy *a.WritePolicy, namespace string, set string, indexName string, binName string,
-		indexType a.IndexType, indexCollectionType a.IndexCollectionType, ctx ...*a.CDTContext,
+	CreateComplexIndex(
+		policy *a.WritePolicy,
+		namespace string,
+		set string,
+		indexName string,
+		binName string,
+		indexType a.IndexType,
+		indexCollectionType a.IndexCollectionType,
+		ctx ...*a.CDTContext,
+	) (*a.IndexTask, a.Error)
+	CreateIndexWithExpression(
+		policy *a.WritePolicy,
+		namespace,
+		set,
+		indexName string,
+		indexType a.IndexType,
+		indexCollectionType a.IndexCollectionType,
+		expression *a.Expression,
 	) (*a.IndexTask, a.Error)
 	DropIndex(policy *a.WritePolicy, namespace string, set string, indexName string) a.Error
 	RegisterUDF(policy *a.WritePolicy, udfBody []byte, serverPath string, language a.Language,

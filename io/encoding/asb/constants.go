@@ -54,8 +54,9 @@ const (
 
 // global line types
 const (
-	globalTypeSIndex byte = 'i'
-	globalTypeUDF    byte = 'u'
+	globalTypeSIndex           byte = 'i'
+	globalTypeUDF              byte = 'u'
+	globalTypeSIndexExpression byte = 'e'
 )
 
 // key types
@@ -146,7 +147,7 @@ const (
 // misc constants
 const (
 	// FormatVersion is the current version of the ASB encoding format
-	FormatVersion = "3.1"
+	FormatVersion = "3.2"
 )
 
 var (

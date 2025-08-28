@@ -29,7 +29,7 @@ import (
 	"github.com/segmentio/asm/base64"
 )
 
-const supportedVersion = "3.1"
+var supportedVersion = version{3, 2}
 
 var errInvalidToken = errors.New("invalid token")
 
@@ -207,7 +207,12 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Deco
 		return nil, fmt.Errorf("error while reading %s header: %w", fileName, err)
 	}
 
-	if asb.header.Version != supportedVersion {
+	fileVersion, err := parseVersion(asb.header.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error while parsing %s header version: %w", fileName, err)
+	}
+
+	if !supportedVersion.greaterOrEqual(fileVersion) {
 		return nil, fmt.Errorf("unsupported backup file version: %s", asb.header.Version)
 	}
 
@@ -396,7 +401,12 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 
 	switch b {
 	case globalTypeSIndex:
-		res, err = r.readSIndex()
+		res, err = r.readSIndex(false)
+		if err != nil {
+			return nil, newLineError(lineTypeSindex, err)
+		}
+	case globalTypeSIndexExpression:
+		res, err = r.readSIndex(true)
 		if err != nil {
 			return nil, newLineError(lineTypeSindex, err)
 		}
@@ -413,8 +423,11 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 }
 
 // readSIndex is used to read secondary index lines in the global section of the asb file.
-// readSIndex expects that r has been advanced past the secondary index global line marker '* i'
-func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
+// readSIndex expects that r has been advanced past the secondary index global line marker '* i' or '* e'
+// If isExpression = true, we assume it is sindex with expression.
+//
+//nolint:gocyclo // Long decoding func
+func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 	var (
 		res models.SIndex
 		err error
@@ -501,12 +514,20 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		if err := _expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
-
-		// NOTE: the context should always be base64 encoded,
-		// so escaping is not needed
-		path.B64Context, err = _readUntil(r.reader, asbNewLine, false)
-		if err != nil {
-			return nil, err
+		// Expression filter has a base64 encoded expression and no CDT context.
+		// If it is not expression, we assume it is CDT contex.
+		if isExpression {
+			res.Expression, err = _readUntil(r.reader, asbNewLine, false)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// NOTE: the context should always be base64 encoded,
+			// so escaping is not needed
+			path.B64Context, err = _readUntil(r.reader, asbNewLine, false)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

@@ -77,7 +77,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(
 		err             error
 	)
 
-	if rr.config.isParalleledByNodes() {
+	if rr.config.isProcessedByNodes() {
 		partitionGroups, err = rr.newPartitionGroupsFromNodes(n)
 	} else {
 		partitionGroups, err = rr.newPartitionGroups(n)

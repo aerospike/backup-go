@@ -98,6 +98,11 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
+	// Set the default retry policy if it is not set.
+	if r.RetryPolicy == nil {
+		r.RetryPolicy = models.NewDefaultRetryPolicy()
+	}
+
 	// Check if the bucket exists and we have permissions.
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
@@ -245,10 +250,7 @@ func (r *Reader) openObject(
 		return
 	}
 
-	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &r.bucketName,
-		Key:    &path,
-	})
+	object, err := newRetryableReader(ctx, r.client, r.RetryPolicy, r.bucketName, path)
 
 	if err != nil {
 		// Skip 404 not found error.
@@ -267,7 +269,7 @@ func (r *Reader) openObject(
 	}
 
 	if object != nil {
-		readersCh <- models.File{Reader: object.Body, Name: filepath.Base(path)}
+		readersCh <- models.File{Reader: object, Name: filepath.Base(path)}
 	}
 }
 

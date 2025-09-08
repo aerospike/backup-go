@@ -44,7 +44,7 @@ type retryableReader struct {
 // newRetryableReader returns a new retryable reader.
 func newRetryableReader(ctx context.Context, client *s3.Client, retryPolicy *models.RetryPolicy, bucket, key string,
 ) (*retryableReader, error) {
-	// Get file size to calculate the number of chunks.
+	// Get file size to calculate when to finish.
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),

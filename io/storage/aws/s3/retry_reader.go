@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync/atomic"
 
@@ -39,10 +40,13 @@ type retryableReader struct {
 	key       string
 	position  int64
 	totalSize int64
+
+	logger *slog.Logger
 }
 
 // newRetryableReader returns a new retryable reader.
-func newRetryableReader(ctx context.Context, client *s3.Client, retryPolicy *models.RetryPolicy, bucket, key string,
+func newRetryableReader(
+	ctx context.Context, client *s3.Client, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
 ) (*retryableReader, error) {
 	// Get file size to calculate when to finish.
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
@@ -60,6 +64,7 @@ func newRetryableReader(ctx context.Context, client *s3.Client, retryPolicy *mod
 		totalSize:   *head.ContentLength,
 		retryPolicy: retryPolicy,
 		ctx:         ctx,
+		logger:      logger,
 	}
 
 	if err := r.openStream(); err != nil {
@@ -81,8 +86,13 @@ func (r *retryableReader) openStream() error {
 	if r.position > 0 {
 		// We read from the current position till the end of the file.
 		// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
-		r := fmt.Sprintf("bytes=%d-", r.position)
-		rangeHeader = &r
+		rh := fmt.Sprintf("bytes=%d-", r.position)
+
+		if r.logger != nil {
+			r.logger.Debug("start reading from", slog.String("position", rh))
+		}
+
+		rangeHeader = &rh
 	}
 
 	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
@@ -126,6 +136,9 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		}
 
 		if isNetworkError(err) {
+			if r.logger != nil {
+				r.logger.Debug("got network error", slog.Any("err", err))
+			}
 			// Close the previous stream and try again.
 			if r.reader != nil {
 				r.reader.Close()
@@ -181,7 +194,6 @@ func isNetworkError(err error) bool {
 		"i/o timeout",
 		"connection timed out",
 		"network is unreachable",
-		"unexpected EOF",
 	}
 
 	for _, netErr := range netErrors {

@@ -250,7 +250,7 @@ func (r *Reader) openObject(
 		return
 	}
 
-	object, err := newRetryableReader(ctx, r.client, r.RetryPolicy, r.bucketName, path)
+	object, err := newRetryableReader(ctx, r.client, r.RetryPolicy, r.Logger, r.bucketName, path)
 
 	if err != nil {
 		// Skip 404 not found error.

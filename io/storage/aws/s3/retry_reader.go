@@ -100,8 +100,10 @@ func (r *retryableReader) openStream() error {
 		}
 
 		rangeHeader = &rh
+		r.logger.Info("new range header", slog.String("value", *rangeHeader))
 	}
-	r.logger.Info("new range header", slog.String("value", *rangeHeader))
+	
+	r.logger.Info("try to get object")
 	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(r.key),

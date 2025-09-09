@@ -141,9 +141,8 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 
 			return n, err
 		}
-
+		fmt.Println("--------------got network error", err)
 		if isNetworkError(err) {
-			fmt.Println("--------------got network error", err)
 			if r.logger != nil {
 				r.logger.Debug("got network error", slog.Any("err", err))
 			}

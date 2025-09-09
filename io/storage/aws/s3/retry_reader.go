@@ -95,7 +95,7 @@ func (r *retryableReader) openStream() error {
 		// We read from the current position till the end of the file.
 		// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
 		rh := fmt.Sprintf("bytes=%d-", r.position)
-
+		fmt.Println("--------------start reading from", rh)
 		if r.logger != nil {
 			r.logger.Debug("start reading from", slog.String("position", rh))
 		}
@@ -116,6 +116,7 @@ func (r *retryableReader) openStream() error {
 	if r.reader != nil {
 		r.reader.Close()
 	}
+	fmt.Println("--------------new reader")
 	// Set a new stream.
 	r.reader = resp.Body
 

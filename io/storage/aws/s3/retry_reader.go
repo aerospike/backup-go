@@ -181,6 +181,7 @@ func isNetworkError(err error) bool {
 		"i/o timeout",
 		"connection timed out",
 		"network is unreachable",
+		"unexpected EOF",
 	}
 
 	for _, netErr := range netErrors {

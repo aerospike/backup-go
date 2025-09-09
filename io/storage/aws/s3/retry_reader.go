@@ -114,15 +114,8 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		return 0, io.EOF
 	}
 
-	// Save the previous position, to retry read from that place.
-	prevPosition := r.position
-
 	var attempt uint
 	for r.retryPolicy.AttemptsLeft(attempt) {
-		// Each retry, reset the position to the previous position.
-		if attempt > 0 {
-			r.position = prevPosition
-		}
 
 		n, err := r.reader.Read(p)
 

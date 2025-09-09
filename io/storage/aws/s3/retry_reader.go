@@ -192,7 +192,7 @@ func isNetworkError(err error) bool {
 	// Check error string.
 	errStr := strings.ToLower(err.Error())
 	fmt.Println("--------------is error", errStr)
-	// Errors to retry on.
+	// Errors to retry on. All errors should be in lower case.
 	var netErrors = []string{
 		"connection reset",
 		"broken pipe",
@@ -202,7 +202,7 @@ func isNetworkError(err error) bool {
 		"i/o timeout",
 		"connection timed out",
 		"network is unreachable",
-		"unexpected EOF",
+		"unexpected eof",
 	}
 
 	for _, netErr := range netErrors {

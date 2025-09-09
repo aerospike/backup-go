@@ -48,7 +48,6 @@ type retryableReader struct {
 func newRetryableReader(
 	ctx context.Context, client *s3.Client, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
 ) (*retryableReader, error) {
-	fmt.Println("--------------newRetryableReader", logger)
 	if logger != nil {
 		logger.Debug("created retryable reader",
 			slog.String("bucket", bucket),
@@ -95,7 +94,6 @@ func (r *retryableReader) openStream() error {
 		// We read from the current position till the end of the file.
 		// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
 		rh := fmt.Sprintf("bytes=%d-", r.position)
-		fmt.Println("--------------start reading from", rh)
 		if r.logger != nil {
 			r.logger.Debug("start reading from", slog.String("position", rh))
 		}
@@ -116,7 +114,7 @@ func (r *retryableReader) openStream() error {
 	if r.reader != nil {
 		r.reader.Close()
 	}
-	fmt.Println("--------------new reader")
+
 	// Set a new stream.
 	r.reader = resp.Body
 
@@ -142,11 +140,12 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 
 			return n, err
 		}
-		fmt.Println("--------------got network error", err)
+
+		if r.logger != nil {
+			r.logger.Debug("got retryable reader error", slog.Any("err", err))
+		}
+
 		if isNetworkError(err) {
-			if r.logger != nil {
-				r.logger.Debug("got network error", slog.Any("err", err))
-			}
 			// Close the previous stream and try again.
 			if r.reader != nil {
 				r.reader.Close()
@@ -155,7 +154,9 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 			r.retryPolicy.Sleep(attempt)
 
 			attempt++
-			fmt.Println("--------------retry")
+			if r.logger != nil {
+				r.logger.Debug("retry read", slog.Any("attempt", attempt))
+			}
 			// Open a new stream.
 			if rErr := r.openStream(); rErr != nil {
 				return n, fmt.Errorf("failed to reopen stream after %d attempts: %w", attempt, rErr)
@@ -192,7 +193,6 @@ func isNetworkError(err error) bool {
 
 	// Check error string.
 	errStr := strings.ToLower(err.Error())
-	fmt.Println("--------------is error", errStr)
 	// Errors to retry on. All errors should be in lower case.
 	var netErrors = []string{
 		"connection reset",
@@ -208,7 +208,6 @@ func isNetworkError(err error) bool {
 
 	for _, netErr := range netErrors {
 		if strings.Contains(errStr, netErr) {
-			fmt.Println("--------------got match", netErr)
 			return true
 		}
 	}

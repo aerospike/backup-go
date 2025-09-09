@@ -191,6 +191,7 @@ func isNetworkError(err error) bool {
 
 	// Check error string.
 	errStr := strings.ToLower(err.Error())
+	fmt.Println("--------------is error", errStr)
 	// Errors to retry on.
 	var netErrors = []string{
 		"connection reset",

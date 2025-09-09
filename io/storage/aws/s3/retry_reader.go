@@ -48,6 +48,7 @@ type retryableReader struct {
 func newRetryableReader(
 	ctx context.Context, client *s3.Client, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
 ) (*retryableReader, error) {
+	fmt.Println("--------------newRetryableReader", logger)
 	if logger != nil {
 		logger.Debug("created retryable reader",
 			slog.String("bucket", bucket),
@@ -142,6 +143,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		}
 
 		if isNetworkError(err) {
+			fmt.Println("--------------got network error", err)
 			if r.logger != nil {
 				r.logger.Debug("got network error", slog.Any("err", err))
 			}

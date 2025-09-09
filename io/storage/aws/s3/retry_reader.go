@@ -127,8 +127,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 	var attempt uint
 	for r.retryPolicy.AttemptsLeft(attempt) {
 		n, err := r.reader.Read(p)
-
-		if err == nil || err == io.EOF {
+		if err == nil {
 			// Success reading updated position.
 			r.position += int64(n)
 

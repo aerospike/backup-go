@@ -154,7 +154,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 			r.retryPolicy.Sleep(attempt)
 
 			attempt++
-
+			fmt.Println("--------------retry")
 			// Open a new stream.
 			if rErr := r.openStream(); rErr != nil {
 				return n, fmt.Errorf("failed to reopen stream after %d attempts: %w", attempt, rErr)
@@ -201,10 +201,12 @@ func isNetworkError(err error) bool {
 		"i/o timeout",
 		"connection timed out",
 		"network is unreachable",
+		"unexpected EOF",
 	}
 
 	for _, netErr := range netErrors {
 		if strings.Contains(errStr, netErr) {
+			fmt.Println("--------------got match", netErr)
 			return true
 		}
 	}

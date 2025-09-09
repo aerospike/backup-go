@@ -86,6 +86,7 @@ func (r *retryableReader) openStream() error {
 	if r.closed.Load() {
 		return fmt.Errorf("reader is closed")
 	}
+	r.logger.Info("opening new stream")
 
 	// Calc the range header if we need to resume the download.
 	var rangeHeader *string
@@ -100,12 +101,13 @@ func (r *retryableReader) openStream() error {
 
 		rangeHeader = &rh
 	}
-
+	r.logger.Info("new range header", slog.String("value", *rangeHeader))
 	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(r.key),
 		Range:  rangeHeader,
 	})
+	r.logger.Info("got object", err)
 	if err != nil {
 		return fmt.Errorf("failed to get object: %w", err)
 	}
@@ -114,10 +116,10 @@ func (r *retryableReader) openStream() error {
 	if r.reader != nil {
 		r.reader.Close()
 	}
-
+	r.logger.Info("closed prev reader")
 	// Set a new stream.
 	r.reader = resp.Body
-
+	r.logger.Info("returning new reader")
 	return nil
 }
 
@@ -126,45 +128,48 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 	if r.closed.Load() {
 		return 0, fmt.Errorf("reader is closed")
 	}
-
+	r.logger.Info("reading from stream")
 	if r.position >= r.totalSize {
+		r.logger.Info("reached end of file")
 		return 0, io.EOF
 	}
 
 	var attempt uint
 	for r.retryPolicy.AttemptsLeft(attempt) {
+		r.logger.Info("attempt", attempt)
 		n, err := r.reader.Read(p)
 		if err == nil {
 			// Success reading updated position.
 			r.position += int64(n)
-
+			r.logger.Info("success read", n)
 			return n, err
 		}
 
 		if r.logger != nil {
 			r.logger.Debug("got retryable reader error", slog.Any("err", err))
 		}
-
+		r.logger.Info("got err", err)
 		if isNetworkError(err) {
 			// Close the previous stream and try again.
 			if r.reader != nil {
 				r.reader.Close()
 			}
-
+			r.logger.Info("start sleep", attempt)
 			r.retryPolicy.Sleep(attempt)
-
+			r.logger.Info("end sleep", attempt)
 			attempt++
 			if r.logger != nil {
 				r.logger.Debug("retry read", slog.Any("attempt", attempt))
 			}
+			r.logger.Info("try reopen stream", attempt)
 			// Open a new stream.
 			if rErr := r.openStream(); rErr != nil {
 				return n, fmt.Errorf("failed to reopen stream after %d attempts: %w", attempt, rErr)
 			}
-
+			r.logger.Info("continue", attempt)
 			continue
 		}
-
+		r.logger.Info("unknown err", err)
 		return n, err
 	}
 

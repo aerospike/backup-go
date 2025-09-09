@@ -48,6 +48,13 @@ type retryableReader struct {
 func newRetryableReader(
 	ctx context.Context, client *s3.Client, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
 ) (*retryableReader, error) {
+	if logger != nil {
+		logger.Debug("created retryable reader",
+			slog.String("bucket", bucket),
+			slog.String("key", key),
+			slog.Any("retryPolicy", retryPolicy),
+		)
+	}
 	// Get file size to calculate when to finish.
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),

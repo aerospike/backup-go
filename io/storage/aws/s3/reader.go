@@ -99,11 +99,6 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	// Set the default retry policy if it is not set.
-	if r.RetryPolicy == nil {
-		r.RetryPolicy = models.NewDefaultRetryPolicy()
-	}
-
 	// Check if the bucket exists and we have permissions.
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),

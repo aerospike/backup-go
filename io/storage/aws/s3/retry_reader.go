@@ -84,6 +84,11 @@ func newRetryableReader(
 		return nil, fmt.Errorf("failed to get object size: %w", err)
 	}
 
+	// Set the default retry policy if it is not set.
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
 	r := &retryableReader{
 		client:      client,
 		bucket:      bucket,

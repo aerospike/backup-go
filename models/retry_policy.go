@@ -85,5 +85,10 @@ func (p *RetryPolicy) AttemptsLeft(attempt uint) bool {
 		return false
 	}
 
-	return attempt <= p.MaxRetries
+	// If MaxRetries is 0, then at least one retry attempt is made.
+	if p.MaxRetries == 0 && attempt == 0 {
+		return true
+	}
+
+	return attempt < p.MaxRetries
 }

@@ -33,6 +33,28 @@ type payloadWriter struct {
 	ignoreRecordError bool
 }
 
+func newPayloadWriter(
+	dbWriter dbWriter,
+	writePolicy *a.WritePolicy,
+	stats *models.RestoreStats,
+	retryPolicy *models.RetryPolicy,
+	metricsCollector *metrics.Collector,
+	ignoreRecordError bool,
+) *payloadWriter {
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
+	return &payloadWriter{
+		dbWriter:          dbWriter,
+		writePolicy:       writePolicy,
+		stats:             stats,
+		retryPolicy:       retryPolicy,
+		metrics:           metricsCollector,
+		ignoreRecordError: ignoreRecordError,
+	}
+}
+
 func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 	var (
 		aerr    a.Error

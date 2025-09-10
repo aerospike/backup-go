@@ -48,6 +48,10 @@ func newBatchRecordWriter(
 	ignoreRecordError bool,
 	logger *slog.Logger,
 ) *batchRecordWriter {
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
 	return &batchRecordWriter{
 		asc:               asc,
 		writePolicy:       writePolicy,

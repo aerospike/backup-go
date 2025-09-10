@@ -50,14 +50,14 @@ func TestPayloadWriterSuccess(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	writer := &payloadWriter{
-		dbWriter:          mockDBWriter,
-		writePolicy:       policy,
-		stats:             stats,
-		retryPolicy:       nil,
-		metrics:           rpsCollector,
-		ignoreRecordError: false,
-	}
+	writer := newPayloadWriter(
+		mockDBWriter,
+		policy,
+		stats,
+		nil,
+		rpsCollector,
+		false,
+	)
 
 	err := writer.writePayload(token)
 	require.Nil(t, err)
@@ -99,14 +99,14 @@ func TestPayloadWriterRetry(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	writer := &payloadWriter{
-		dbWriter:          mockDBWriter,
-		writePolicy:       policy,
-		stats:             stats,
-		retryPolicy:       retryPolicy,
-		metrics:           rpsCollector,
-		ignoreRecordError: false,
-	}
+	writer := newPayloadWriter(
+		mockDBWriter,
+		policy,
+		stats,
+		retryPolicy,
+		rpsCollector,
+		false,
+	)
 
 	err := writer.writePayload(token)
 	require.Nil(t, err)
@@ -146,14 +146,14 @@ func TestPayloadWriterRetryExhausted(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	writer := &payloadWriter{
-		dbWriter:          mockDBWriter,
-		writePolicy:       policy,
-		stats:             stats,
-		retryPolicy:       retryPolicy,
-		metrics:           rpsCollector,
-		ignoreRecordError: false,
-	}
+	writer := newPayloadWriter(
+		mockDBWriter,
+		policy,
+		stats,
+		retryPolicy,
+		rpsCollector,
+		false,
+	)
 
 	err := writer.writePayload(token)
 	require.NotNil(t, err)
@@ -192,14 +192,14 @@ func TestPayloadWriterNonRetryableError(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	writer := &payloadWriter{
-		dbWriter:          mockDBWriter,
-		writePolicy:       policy,
-		stats:             stats,
-		retryPolicy:       retryPolicy,
-		metrics:           rpsCollector,
-		ignoreRecordError: false,
-	}
+	writer := newPayloadWriter(
+		mockDBWriter,
+		policy,
+		stats,
+		retryPolicy,
+		rpsCollector,
+		false,
+	)
 
 	err := writer.writePayload(token)
 	require.NotNil(t, err)

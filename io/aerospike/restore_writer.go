@@ -40,7 +40,7 @@ type RestoreWriter[T models.TokenConstraint] struct {
 	sindexWriter
 	udfWriter
 	recordWriter
-	payloadWriter
+	*payloadWriter
 	logger *slog.Logger
 }
 
@@ -85,14 +85,14 @@ func NewRestoreWriter[T models.TokenConstraint](
 			rpsCollector,
 			ignoreRecordError,
 		),
-		payloadWriter: payloadWriter{
+		payloadWriter: newPayloadWriter(
 			asc,
 			writePolicy,
 			stats,
 			retryPolicy,
 			rpsCollector,
 			ignoreRecordError,
-		},
+		),
 		logger: logger,
 	}
 }

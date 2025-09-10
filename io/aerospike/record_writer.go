@@ -40,6 +40,10 @@ func newSingleRecordWriter(
 	rpsCollector *metrics.Collector,
 	ignoreRecordError bool,
 ) *singleRecordWriter {
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
 	return &singleRecordWriter{
 		asc:               asc,
 		writePolicy:       writePolicy,

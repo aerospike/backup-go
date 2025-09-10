@@ -89,10 +89,12 @@ func newRetryableReader(
 		retryPolicy = models.NewDefaultRetryPolicy()
 	}
 
-	logger = logger.With(
-		slog.String("bucket", bucket),
-		slog.String("key", key),
-	)
+	if logger != nil {
+		logger = logger.With(
+			slog.String("bucket", bucket),
+			slog.String("key", key),
+		)
+	}
 
 	r := &retryableReader{
 		client:      client,

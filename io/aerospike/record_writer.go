@@ -77,7 +77,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 		attempt uint
 	)
 
-	for attemptsLeft(rw.retryPolicy, attempt) {
+	for rw.retryPolicy.AttemptsLeft(attempt) {
 		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
 
 		if aerr == nil {
@@ -106,7 +106,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return nil
 
 		case shouldRetry(aerr):
-			sleep(rw.retryPolicy, attempt)
+			rw.retryPolicy.Sleep(attempt)
 
 			attempt++
 

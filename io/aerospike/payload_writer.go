@@ -44,7 +44,7 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, t.Payload)
 	t.Payload = xdr.SetRecordExistsActionBit(p.writePolicy.RecordExistsAction, t.Payload)
 
-	for attemptsLeft(p.retryPolicy, attempt) {
+	for p.retryPolicy.AttemptsLeft(attempt) {
 		aerr = p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
 
 		if aerr == nil {
@@ -73,7 +73,7 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			return nil
 
 		case shouldRetry(aerr):
-			sleep(p.retryPolicy, attempt)
+			p.retryPolicy.Sleep(attempt)
 
 			attempt++
 

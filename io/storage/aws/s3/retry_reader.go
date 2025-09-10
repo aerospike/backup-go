@@ -27,9 +27,36 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+// netErrors contains errors to retry on. All errors should be in lower case.
+var netErrors = []string{
+	"connection reset",
+	"broken pipe",
+	"timeout",
+	"connection refused",
+	"no route to host",
+	"i/o timeout",
+	"connection timed out",
+	"network is unreachable",
+	"unexpected eof",
+}
+
+type s3getter interface {
+	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
+	) (*s3.HeadObjectOutput, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options),
+	) (*s3.GetObjectOutput, error)
+}
+
+// readerCloser interface for mocking tests.
+//
+//nolint:unused // Used only for tests.
+type readerCloser interface {
+	io.ReadCloser
+}
+
 // retryableReader is a wrapper around the s3 reader that implements the retryable interface.
 type retryableReader struct {
-	client      *s3.Client
+	client      s3getter
 	retryPolicy *models.RetryPolicy
 
 	ctx    context.Context
@@ -46,15 +73,8 @@ type retryableReader struct {
 
 // newRetryableReader returns a new retryable reader.
 func newRetryableReader(
-	ctx context.Context, client *s3.Client, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
+	ctx context.Context, client s3getter, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
 ) (*retryableReader, error) {
-	if logger != nil {
-		logger.Debug("created retryable reader",
-			slog.String("bucket", bucket),
-			slog.String("key", key),
-			slog.Any("retryPolicy", retryPolicy),
-		)
-	}
 	// Get file size to calculate when to finish.
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
@@ -76,6 +96,14 @@ func newRetryableReader(
 
 	if err := r.openStream(); err != nil {
 		return nil, fmt.Errorf("failed to open initial object stream: %w", err)
+	}
+
+	if logger != nil {
+		logger.Debug("created retryable reader",
+			slog.String("bucket", bucket),
+			slog.String("key", key),
+			slog.Any("retryPolicy", retryPolicy),
+		)
 	}
 
 	return r, nil
@@ -113,7 +141,11 @@ func (r *retryableReader) openStream() error {
 
 	// Close previous stream if exists.
 	if r.reader != nil {
-		r.reader.Close()
+		err = r.reader.Close()
+		// Ignore error.
+		if err != nil && r.logger != nil {
+			r.logger.Error("failed to close previous stream", slog.Any("err", err))
+		}
 	}
 
 	// Set a new stream.
@@ -127,12 +159,16 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 	if r.closed.Load() {
 		return 0, fmt.Errorf("reader is closed")
 	}
-
+	// If we reached end of file, return EOF.
 	if r.position >= r.totalSize {
 		return 0, io.EOF
 	}
 
-	var attempt uint
+	var (
+		err     error
+		attempt uint
+	)
+
 	for r.retryPolicy.AttemptsLeft(attempt) {
 		n, err := r.reader.Read(p)
 		if err == nil {
@@ -147,17 +183,13 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		}
 
 		if isNetworkError(err) {
-			// Close the previous stream and try again.
-			if r.reader != nil {
-				r.reader.Close()
+			if r.logger != nil {
+				r.logger.Debug("retry read", slog.Any("attempt", attempt), slog.Any("err", err))
 			}
 
 			r.retryPolicy.Sleep(attempt)
 
 			attempt++
-			if r.logger != nil {
-				r.logger.Debug("retry read", slog.Any("attempt", attempt))
-			}
 
 			// Open a new stream.
 			if rErr := r.openStream(); rErr != nil {
@@ -170,7 +202,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		return n, err
 	}
 
-	return 0, fmt.Errorf("failed after %d attempts", attempt)
+	return 0, fmt.Errorf("failed after %d attempts: %w", attempt, err)
 }
 
 // Close closes the reader.
@@ -195,18 +227,6 @@ func isNetworkError(err error) bool {
 
 	// Check error string.
 	errStr := strings.ToLower(err.Error())
-	// Errors to retry on. All errors should be in lower case.
-	var netErrors = []string{
-		"connection reset",
-		"broken pipe",
-		"timeout",
-		"connection refused",
-		"no route to host",
-		"i/o timeout",
-		"connection timed out",
-		"network is unreachable",
-		"unexpected eof",
-	}
 
 	for _, netErr := range netErrors {
 		if strings.Contains(errStr, netErr) {

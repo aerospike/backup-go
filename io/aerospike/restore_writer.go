@@ -19,8 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -169,23 +167,6 @@ func (rw *RestoreWriter[T]) writeASBXToken(token *models.ASBXToken) (int, error)
 func (rw *RestoreWriter[T]) Close() error {
 	rw.logger.Debug("close restore writer")
 	return rw.close()
-}
-
-func attemptsLeft(rc *models.RetryPolicy, attempt uint) bool {
-	if rc == nil {
-		return attempt == 0 // only pass on 1st try.
-	}
-
-	return attempt <= rc.MaxRetries
-}
-
-func sleep(rc *models.RetryPolicy, attempt uint) {
-	if rc == nil {
-		return
-	}
-
-	duration := time.Duration(float64(rc.BaseTimeout) * math.Pow(rc.Multiplier, float64(attempt)))
-	time.Sleep(duration)
 }
 
 func isNilOrAcceptableError(err a.Error) bool {

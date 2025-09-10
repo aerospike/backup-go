@@ -78,7 +78,7 @@ type Reader struct {
 // For S3 client next parameters must be set:
 //   - o.UsePathStyle = true
 //   - o.BaseEndpoint = &endpoint - if endpoint != ""
-//   - WithHTTPClient and set timeouts, not to lock retryable reader.
+//   - WithHTTPClient using timeouts to prevent socket locks on errors.
 func NewReader(
 	ctx context.Context,
 	client *s3.Client,

@@ -89,6 +89,11 @@ func newRetryableReader(
 		retryPolicy = models.NewDefaultRetryPolicy()
 	}
 
+	logger = logger.With(
+		slog.String("bucket", bucket),
+		slog.String("key", key),
+	)
+
 	r := &retryableReader{
 		client:      client,
 		bucket:      bucket,
@@ -105,8 +110,6 @@ func newRetryableReader(
 
 	if logger != nil {
 		logger.Debug("created retryable reader",
-			slog.String("bucket", bucket),
-			slog.String("key", key),
 			slog.Any("retryPolicy", retryPolicy),
 		)
 	}
@@ -128,7 +131,9 @@ func (r *retryableReader) openStream() error {
 		// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
 		rh := fmt.Sprintf("bytes=%d-", r.position)
 		if r.logger != nil {
-			r.logger.Debug("start reading from", slog.String("position", rh))
+			r.logger.Debug("start reading from",
+				slog.String("position", rh),
+			)
 		}
 
 		rangeHeader = &rh
@@ -149,7 +154,9 @@ func (r *retryableReader) openStream() error {
 		err = r.reader.Close()
 		// Log error, as it is not critical, doesn't interrupt the process.
 		if err != nil && r.logger != nil {
-			r.logger.Error("failed to close previous stream", slog.Any("err", err))
+			r.logger.Error("failed to close previous stream",
+				slog.Any("err", err),
+			)
 		}
 	}
 
@@ -186,12 +193,17 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		lastErr = err
 
 		if r.logger != nil {
-			r.logger.Debug("got retryable reader error", slog.Any("err", err))
+			r.logger.Debug("got retryable reader error",
+				slog.Any("err", err),
+			)
 		}
 
 		if isNetworkError(err) {
 			if r.logger != nil {
-				r.logger.Debug("retry read", slog.Any("attempt", attempt), slog.Any("err", err))
+				r.logger.Debug("retry read",
+					slog.Any("attempt", attempt),
+					slog.Any("err", err),
+				)
 			}
 
 			r.retryPolicy.Sleep(attempt)

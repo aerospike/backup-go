@@ -85,5 +85,5 @@ func (p *RetryPolicy) AttemptsLeft(attempt uint) bool {
 		return false
 	}
 
-	return attempt < p.MaxRetries
+	return attempt <= p.MaxRetries
 }

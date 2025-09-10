@@ -142,7 +142,7 @@ func (r *retryableReader) openStream() error {
 	// Close previous stream if exists.
 	if r.reader != nil {
 		err = r.reader.Close()
-		// Ignore error.
+		// Log error, as it is not critical, doesn't interrupt the process.
 		if err != nil && r.logger != nil {
 			r.logger.Error("failed to close previous stream", slog.Any("err", err))
 		}

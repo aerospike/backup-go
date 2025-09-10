@@ -1359,6 +1359,8 @@ func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
 		}
 
 		policy.Sleep(attempt)
+
+		attempt++
 	}
 
 	if err != nil {

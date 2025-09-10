@@ -151,8 +151,6 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			return fmt.Errorf("non-retryable error on restore: %w", aerr)
 		}
 
-		attempt++
-
 		if !rw.retryPolicy.AttemptsLeft(attempt) {
 			break
 		}
@@ -163,6 +161,8 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		)
 
 		rw.retryPolicy.Sleep(attempt)
+
+		attempt++
 	}
 
 	rw.logger.Error("Max retries reached",

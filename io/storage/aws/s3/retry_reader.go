@@ -204,7 +204,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		return n, err
 	}
 
-	return 0, fmt.Errorf("failed after %d attempts: %w", attempt-1, lastErr)
+	return 0, fmt.Errorf("failed after %d attempts: %w", attempt, lastErr)
 }
 
 // Close closes the reader.

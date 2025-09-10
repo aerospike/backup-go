@@ -248,6 +248,7 @@ func isNetworkError(err error) bool {
 		errors.Is(err, syscall.ENETUNREACH) || // "network is unreachable"
 		errors.Is(err, syscall.ECONNABORTED) || // "software caused connection abort"
 		errors.Is(err, syscall.EHOSTUNREACH) || // "no route to host"
+		errors.Is(err, io.ErrClosedPipe) || // "closed pipe"
 		errors.Is(err, io.ErrUnexpectedEOF) { // "unexpected eof"
 		return true
 	}

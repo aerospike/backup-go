@@ -215,7 +215,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			return input.Range != nil
 		})).Return(&s3.GetObjectOutput{Body: mockReader2}, nil)
 
-		mockReader1.On("Read", mock.Anything).Return(5, errors.New("connection reset"))
+		mockReader1.On("Read", mock.Anything).Return(5, syscall.ECONNRESET)
 		mockReader1.On("Close").Return(nil)
 
 		mockReader2.On("Read", mock.Anything).Return(10, nil)
@@ -248,7 +248,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			On("GetObject", ctx, mock.AnythingOfType("*s3.GetObjectInput")).
 			Return(nil, errTest).Once()
 
-		mockReader.On("Read", mock.Anything).Return(5, errors.New("i/o timeout"))
+		mockReader.On("Read", mock.Anything).Return(5, io.ErrUnexpectedEOF)
 		mockReader.On("Close").Return(nil)
 
 		rr, err := newRetryableReader(ctx, s3Mock, policy, logger, testBucket, testKey)
@@ -304,9 +304,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		s3Mock.EXPECT().GetObject(ctx, mock.AnythingOfType("*s3.GetObjectInput")).
 			Return(&s3.GetObjectOutput{Body: mockReader1}, nil)
 
-		networkErr := errors.New("connection refused")
-
-		mockReader1.On("Read", mock.Anything).Return(0, networkErr)
+		mockReader1.On("Read", mock.Anything).Return(0, syscall.ECONNREFUSED)
 		mockReader1.On("Close").Return(nil)
 
 		rr, err := newRetryableReader(ctx, s3Mock, limitedPolicy, logger, testBucket, testKey)
@@ -317,7 +315,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		n, err := rr.Read(buf)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed after")
-		require.Contains(t, err.Error(), networkErr.Error())
+		require.Contains(t, err.Error(), syscall.ECONNREFUSED.Error())
 		require.Equal(t, 0, n)
 	})
 }
@@ -334,6 +332,7 @@ func TestIsNetworkErrorValid(t *testing.T) {
 		syscall.ECONNABORTED, // "software caused connection abort"
 		syscall.EHOSTUNREACH, // "no route to host"
 		io.ErrUnexpectedEOF,
+		io.ErrClosedPipe,
 	}
 
 	for _, e := range checkErrs {

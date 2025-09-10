@@ -583,7 +583,7 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 		size, num, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
 			if r.Logger != nil {
-				r.Logger.Info("failed to calculate stats for path",
+				r.Logger.Warn("failed to calculate stats for path",
 					slog.String("path", path),
 					slog.Any("error", err),
 				)

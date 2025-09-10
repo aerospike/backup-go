@@ -829,9 +829,14 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	// Looks like the "replicas" response didn't look like any known info responses,
 	// so we can't use standard parsing func.
 	nsResults := strings.Split(result, ";")
-	// TODO: add checks?
+
 	for _, nsRes := range nsResults {
 		res := strings.Split(nsRes, ":")
+		if len(res) != 2 {
+			// Skip potentially broken response.
+			continue
+		}
+
 		if res[0] == namespace {
 			data := strings.Split(res[1], ",")
 			base64Res = data[2]

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"syscall"
 	"testing"
 	"time"
 
@@ -324,11 +325,27 @@ func TestRetryableReader_Read(t *testing.T) {
 func TestIsNetworkErrorValid(t *testing.T) {
 	t.Parallel()
 
-	for _, e := range netErrors {
-		t.Run(fmt.Sprintf("test: %s", e), func(t *testing.T) {
+	checkErrs := []error{
+		syscall.ECONNRESET,   // "connection reset"
+		syscall.EPIPE,        // "broken pipe"
+		syscall.ETIMEDOUT,    // "timeout"
+		syscall.ECONNREFUSED, // "connection refused"
+		syscall.ENETUNREACH,  // "network is unreachable"
+		syscall.ECONNABORTED, // "software caused connection abort"
+		syscall.EHOSTUNREACH, // "no route to host"
+		io.ErrUnexpectedEOF,
+	}
+
+	for _, e := range checkErrs {
+		// wrap errors to emulate client.
+		w1Err := fmt.Errorf("wrapped error: %w", e)
+		w2Err := fmt.Errorf("wrapped error: %w", w1Err)
+		w3Err := fmt.Errorf("wrapped error: %w", w2Err)
+
+		t.Run(fmt.Sprintf("test: %s", e.Error()), func(t *testing.T) {
 			t.Parallel()
 
-			result := isNetworkError(errors.New(e))
+			result := isNetworkError(w3Err)
 			assert.Equal(t, true, result)
 		})
 	}

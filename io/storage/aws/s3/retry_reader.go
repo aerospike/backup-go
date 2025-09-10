@@ -16,29 +16,18 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"strings"
+	"net"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
-
-// netErrors contains errors to retry on. All errors should be in lower case.
-var netErrors = []string{
-	"connection reset",
-	"broken pipe",
-	"timeout",
-	"connection refused",
-	"no route to host",
-	"i/o timeout",
-	"connection timed out",
-	"network is unreachable",
-	"unexpected eof",
-}
 
 type s3getter interface {
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
@@ -63,7 +52,7 @@ type retryableReader struct {
 	reader io.ReadCloser
 	closed atomic.Bool
 
-	eTag      string
+	eTag      *string
 	bucket    string
 	key       string
 	position  int64
@@ -104,14 +93,11 @@ func newRetryableReader(
 		retryPolicy: retryPolicy,
 		ctx:         ctx,
 		logger:      logger,
+		eTag:        head.ETag,
 	}
 
 	if head.ContentLength != nil {
 		r.totalSize = *head.ContentLength
-	}
-
-	if head.ETag != nil {
-		r.eTag = *head.ETag
 	}
 
 	if err := r.openStream(); err != nil {
@@ -153,7 +139,7 @@ func (r *retryableReader) openStream() error {
 		Bucket:  aws.String(r.bucket),
 		Key:     aws.String(r.key),
 		Range:   rangeHeader,
-		IfMatch: aws.String(r.eTag),
+		IfMatch: r.eTag,
 	})
 
 	if err != nil {
@@ -255,13 +241,21 @@ func isNetworkError(err error) bool {
 		return false
 	}
 
-	// Check error string.
-	errStr := strings.ToLower(err.Error())
+	if errors.Is(err, syscall.ECONNRESET) || // "connection reset"
+		errors.Is(err, syscall.EPIPE) || // "broken pipe"
+		errors.Is(err, syscall.ETIMEDOUT) || // "timeout"
+		errors.Is(err, syscall.ECONNREFUSED) || // "connection refused"
+		errors.Is(err, syscall.ENETUNREACH) || // "network is unreachable"
+		errors.Is(err, syscall.ECONNABORTED) || // "software caused connection abort"
+		errors.Is(err, syscall.EHOSTUNREACH) || // "no route to host"
+		errors.Is(err, io.ErrUnexpectedEOF) { // "unexpected eof"
+		return true
+	}
 
-	for _, netErr := range netErrors {
-		if strings.Contains(errStr, netErr) {
-			return true
-		}
+	// For timeouts surfaced as net.Error (e.g. "i/o timeout")
+	var nErr net.Error
+	if errors.As(err, &nErr) && nErr.Timeout() {
+		return true
 	}
 
 	return false

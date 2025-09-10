@@ -63,6 +63,7 @@ type retryableReader struct {
 	reader io.ReadCloser
 	closed atomic.Bool
 
+	eTag      string
 	bucket    string
 	key       string
 	position  int64
@@ -100,10 +101,17 @@ func newRetryableReader(
 		client:      client,
 		bucket:      bucket,
 		key:         key,
-		totalSize:   *head.ContentLength,
 		retryPolicy: retryPolicy,
 		ctx:         ctx,
 		logger:      logger,
+	}
+
+	if head.ContentLength != nil {
+		r.totalSize = *head.ContentLength
+	}
+
+	if head.ETag != nil {
+		r.eTag = *head.ETag
 	}
 
 	if err := r.openStream(); err != nil {
@@ -142,9 +150,10 @@ func (r *retryableReader) openStream() error {
 	}
 
 	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
-		Bucket: aws.String(r.bucket),
-		Key:    aws.String(r.key),
-		Range:  rangeHeader,
+		Bucket:  aws.String(r.bucket),
+		Key:     aws.String(r.key),
+		Range:   rangeHeader,
+		IfMatch: aws.String(r.eTag),
 	})
 
 	if err != nil {

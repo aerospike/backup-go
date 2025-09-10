@@ -165,7 +165,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 	}
 
 	var (
-		err     error
+		lastErr error
 		attempt uint
 	)
 
@@ -177,6 +177,8 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 
 			return n, err
 		}
+		// To return the last error at the end of execution.
+		lastErr = err
 
 		if r.logger != nil {
 			r.logger.Debug("got retryable reader error", slog.Any("err", err))
@@ -202,7 +204,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		return n, err
 	}
 
-	return 0, fmt.Errorf("failed after %d attempts: %w", attempt, err)
+	return 0, fmt.Errorf("failed after %d attempts: %w", attempt-1, lastErr)
 }
 
 // Close closes the reader.

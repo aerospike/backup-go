@@ -206,7 +206,7 @@ func (ic *Client) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 
 		indexes, err = ic.getSIndexes(node, namespace, ic.policy)
 
-		return err
+		return nil
 	})
 
 	return indexes, err
@@ -585,9 +585,6 @@ func (ic *Client) GetRackNodes(rackID int) ([]string, error) {
 
 	err = executeWithRetry(ic.retryPolicy, func() error {
 		result, err = ic.getRackNodes(rackID)
-		if err != nil {
-			return err
-		}
 
 		return err
 	})
@@ -696,9 +693,6 @@ func (ic *Client) GetService(node string) (string, error) {
 	// First request TLS name.
 	err = executeWithRetry(ic.retryPolicy, func() error {
 		result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceTLSStd])
-		if err != nil {
-			return err
-		}
 
 		return err
 	})
@@ -706,9 +700,6 @@ func (ic *Client) GetService(node string) (string, error) {
 	if result == "" {
 		err = executeWithRetry(ic.retryPolicy, func() error {
 			result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceClearStd])
-			if err != nil {
-				return err
-			}
 
 			return err
 		})
@@ -807,9 +798,6 @@ func (ic *Client) GetPrimaryPartitions(node, namespace string) ([]int, error) {
 
 	err = executeWithRetry(ic.retryPolicy, func() error {
 		result, err = ic.getPrimaryPartitions(node, namespace)
-		if err != nil {
-			return err
-		}
 
 		return err
 	})
@@ -849,7 +837,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 
 	bitMap, err := base64StringToBitArray(base64Res)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse xdr connector response: %w", err)
+		return nil, fmt.Errorf("failed to parse primary partiotion bitmap: %w", err)
 	}
 
 	return bitMapToIntSlice(bitMap), nil

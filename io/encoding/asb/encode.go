@@ -141,11 +141,6 @@ func writeFirstMetaText(w io.Writer) {
 func recordToASB(c bool, r *models.Record, w io.Writer) (int, error) {
 	var bytesWritten int
 
-	fmt.Println("+++++++++RECORD++++++++++")
-	fmt.Println(r.Key.String())
-	fmt.Println(r.Node.GetName())
-	fmt.Println(r.Bins)
-
 	n, err := keyToASB(r.Key, w)
 	bytesWritten += n
 

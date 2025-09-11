@@ -144,7 +144,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(numWorkers int) 
 		}
 
 		rr.logger.Debug("got partitions for node",
-			slog.Any("partitions", partIDs),
+			slog.Any("partitions", parts),
 			slog.String("node", node.GetName()))
 
 		partIDs = append(partIDs, parts...)

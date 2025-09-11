@@ -188,8 +188,8 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		}
 		// To return the last error at the end of execution.
 		lastErr = err
-
-		if r.logger != nil {
+		// Skip EOF errors, not to scare users.
+		if r.logger != nil && !errors.Is(err, io.EOF) {
 			r.logger.Debug("retryable reader got error",
 				slog.Any("err", err),
 			)

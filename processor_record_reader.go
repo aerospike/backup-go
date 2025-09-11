@@ -143,6 +143,10 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(numWorkers int) 
 			return nil, fmt.Errorf("failed to get primary partitions for node: %s: %w", node.GetName(), err)
 		}
 
+		rr.logger.Debug("got partitions for node",
+			slog.Any("partitions", partIDs),
+			slog.String("node", node.GetName()))
+
 		partIDs = append(partIDs, parts...)
 	}
 

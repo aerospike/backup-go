@@ -190,7 +190,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 		lastErr = err
 
 		if r.logger != nil {
-			r.logger.Debug("got retryable reader error",
+			r.logger.Debug("retryable reader got error",
 				slog.Any("err", err),
 			)
 		}

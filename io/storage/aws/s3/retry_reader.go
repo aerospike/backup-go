@@ -150,34 +150,47 @@ func (r *retryableReader) openStream() error {
 		// To return the last error at the end of execution.
 		lastErr = err
 
-		if err != nil {
+		if isNetworkError(err) {
 			r.logger.Warn("failed to get object",
 				slog.Any("attempt", attempt),
 				slog.Any("err", err),
 			)
 
+			r.retryPolicy.Sleep(attempt)
+
+			attempt++
+
 			continue
 		}
 
-		// Close previous stream if exists.
-		if r.reader != nil {
-			err = r.reader.Close()
-			// Log error, as it is not critical, doesn't interrupt the process.
-			if err != nil && r.logger != nil {
-				r.logger.Error("failed to close previous stream",
-					slog.Any("err", err),
-				)
-			}
+		// Additional check for error.
+		if err == nil {
+			// Replace the current reader with a new one.
+			r.setReader(resp.Body)
 		}
-
-		// Set a new stream.
-		r.reader = resp.Body
 
 		// If everything is ok, err=nil
 		return err
 	}
 
 	return fmt.Errorf("failed to open stream after %d attempts: %w", attempt, lastErr)
+}
+
+// setReader encapsulates set reader logic.
+func (r *retryableReader) setReader(body io.ReadCloser) {
+	// Close previous stream if exists.
+	if r.reader != nil {
+		err := r.reader.Close()
+		// Log error, as it is not critical, doesn't interrupt the process.
+		if err != nil && r.logger != nil {
+			r.logger.Error("failed to close previous stream",
+				slog.Any("err", err),
+			)
+		}
+	}
+
+	// Set a new stream.
+	r.reader = body
 }
 
 // Read reads from the stream.
@@ -214,7 +227,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 
 		if isNetworkError(err) {
 			if r.logger != nil {
-				r.logger.Debug("retry read",
+				r.logger.Warn("retry read",
 					slog.Any("attempt", attempt),
 					slog.Any("err", err),
 				)

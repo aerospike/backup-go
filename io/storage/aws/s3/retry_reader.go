@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pkg/canceler"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -52,10 +51,9 @@ type retryableReader struct {
 	client      s3getter
 	retryPolicy *models.RetryPolicy
 
-	ctx             context.Context
-	reader          io.ReadCloser
-	closed          atomic.Bool
-	contextCanceler *canceler.Context
+	ctx    context.Context
+	reader io.ReadCloser
+	closed atomic.Bool
 
 	eTag      *string
 	bucket    string
@@ -96,14 +94,13 @@ func newRetryableReader(
 	}
 
 	r := &retryableReader{
-		client:          client,
-		bucket:          bucket,
-		key:             key,
-		retryPolicy:     retryPolicy,
-		ctx:             ctx,
-		logger:          logger,
-		eTag:            head.ETag,
-		contextCanceler: canceler.NewContext(),
+		client:      client,
+		bucket:      bucket,
+		key:         key,
+		retryPolicy: retryPolicy,
+		ctx:         ctx,
+		logger:      logger,
+		eTag:        head.ETag,
 	}
 
 	if head.ContentLength != nil {
@@ -145,10 +142,7 @@ func (r *retryableReader) openStream() error {
 		rangeHeader = &rh
 	}
 
-	ctx, cancel := context.WithTimeout(r.ctx, GetObjectTimeout)
-	r.contextCanceler.AddCancelFunc(cancel)
-
-	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
+	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
 		Bucket:  aws.String(r.bucket),
 		Key:     aws.String(r.key),
 		Range:   rangeHeader,

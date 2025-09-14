@@ -100,7 +100,10 @@ func NewReader(
 	}
 
 	// Check if the bucket exists and we have permissions.
-	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
+	hCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
+	defer cancel()
+
+	if _, err := client.HeadBucket(hCtx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	}); err != nil {
 		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)

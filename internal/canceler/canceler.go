@@ -14,11 +14,19 @@
 
 package canceler
 
-import "context"
+import (
+	"context"
+	"sync"
+	"sync/atomic"
+	"time"
+)
 
 // Context canceler accumulate cancel functions to cancel them at the end of execution.
 type Context struct {
+	mu         sync.Mutex
 	cancelFunc []context.CancelFunc
+	timeout    time.Duration
+	disabled   atomic.Bool
 }
 
 // NewContext returns new Context Canceler
@@ -29,13 +37,29 @@ func NewContext() *Context {
 }
 
 // AddCancelFunc adds cancel func for postponed call.
-func (ctx *Context) AddCancelFunc(cancelFunc context.CancelFunc) {
-	ctx.cancelFunc = append(ctx.cancelFunc, cancelFunc)
+func (c *Context) AddCancelFunc(cancelFunc context.CancelFunc) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cancelFunc = append(c.cancelFunc, cancelFunc)
 }
 
 // Cancel run all cancel functions.
-func (ctx *Context) Cancel() {
-	for _, cancelFunc := range ctx.cancelFunc {
+func (c *Context) Cancel() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, cancelFunc := range c.cancelFunc {
 		cancelFunc()
 	}
+}
+
+func (c *Context) Observe(timeout time.Duration, cancelFunc context.CancelFunc) {
+	time.Sleep(timeout)
+	ticker := time.NewTicker(timeout)
+	defer ticker.Stop()
+
+}
+
+func (c *Context) DisableTimeout() {
+
 }

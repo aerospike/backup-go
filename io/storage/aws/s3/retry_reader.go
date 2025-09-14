@@ -209,7 +209,12 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 
 			// Open a new stream.
 			if rErr := r.openStream(); rErr != nil {
-				return n, fmt.Errorf("failed to reopen stream after %d attempts: %w", attempt, rErr)
+				r.logger.Warn("failed to reopen stream",
+					slog.Any("attempt", attempt),
+					slog.Any("err", rErr),
+				)
+				
+				continue
 			}
 
 			continue

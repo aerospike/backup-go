@@ -30,6 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+const GetObjectTimeout = 10 * time.Second
+
 type s3getter interface {
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
 	) (*s3.HeadObjectOutput, error)
@@ -136,47 +138,23 @@ func (r *retryableReader) openStream() error {
 		rangeHeader = &rh
 	}
 
-	var (
-		lastErr error
-		attempt uint
-	)
+	ctx, cancel := context.WithTimeout(r.ctx, GetObjectTimeout)
+	defer cancel()
 
-	ctx, _ := context.WithTimeout(r.ctx, 10*time.Second)
+	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket:  aws.String(r.bucket),
+		Key:     aws.String(r.key),
+		Range:   rangeHeader,
+		IfMatch: r.eTag,
+	})
 
-	for r.retryPolicy.AttemptsLeft(attempt) {
-		resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket:  aws.String(r.bucket),
-			Key:     aws.String(r.key),
-			Range:   rangeHeader,
-			IfMatch: r.eTag,
-		})
-		// To return the last error at the end of execution.
-		lastErr = err
-
-		if isNetworkError(err) {
-			r.logger.Warn("failed to get object",
-				slog.Any("attempt", attempt),
-				slog.Any("err", err),
-			)
-
-			r.retryPolicy.Sleep(attempt)
-
-			attempt++
-
-			continue
-		}
-
-		// Additional check for error.
-		if err == nil {
-			// Replace the current reader with a new one.
-			r.setReader(resp.Body)
-		}
-
-		// If everything is ok, err=nil
-		return err
+	if err != nil {
+		return fmt.Errorf("failed to get object: %w", err)
 	}
 
-	return fmt.Errorf("failed to open stream after %d attempts: %w", attempt, lastErr)
+	r.setReader(resp.Body)
+
+	return nil
 }
 
 // setReader encapsulates set reader logic.
@@ -242,7 +220,10 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 
 			// Open a new stream.
 			if rErr := r.openStream(); rErr != nil {
-				return n, fmt.Errorf("failed to reopen stream: %w", rErr)
+				r.logger.Warn("failed to reopen stream",
+					slog.Any("attempt", attempt),
+					slog.Any("err", rErr),
+				)
 			}
 
 			continue
@@ -284,7 +265,6 @@ func isNetworkError(err error) bool {
 		errors.Is(err, io.ErrClosedPipe) || // "closed pipe"
 		errors.Is(err, io.ErrUnexpectedEOF) || // "unexpected eof"
 		errors.Is(err, context.DeadlineExceeded) { // "context deadline"
-
 		return true
 	}
 

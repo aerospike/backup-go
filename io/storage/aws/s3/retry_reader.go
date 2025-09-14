@@ -23,14 +23,11 @@ import (
 	"net"
 	"sync/atomic"
 	"syscall"
-	"time"
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
-
-const GetObjectTimeout = 10 * time.Second
 
 type s3getter interface {
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
@@ -68,11 +65,8 @@ type retryableReader struct {
 func newRetryableReader(
 	ctx context.Context, client s3getter, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
 ) (*retryableReader, error) {
-	// Use separate context with timeout for header request.
-	hCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
-	defer cancel()
 	// Get file size to calculate when to finish.
-	head, err := client.HeadObject(hCtx, &s3.HeadObjectInput{
+	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})

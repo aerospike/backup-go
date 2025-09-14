@@ -135,32 +135,49 @@ func (r *retryableReader) openStream() error {
 		rangeHeader = &rh
 	}
 
-	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
-		Bucket:  aws.String(r.bucket),
-		Key:     aws.String(r.key),
-		Range:   rangeHeader,
-		IfMatch: r.eTag,
-	})
+	var (
+		lastErr error
+		attempt uint
+	)
 
-	if err != nil {
-		return fmt.Errorf("failed to get object: %w", err)
-	}
+	for r.retryPolicy.AttemptsLeft(attempt) {
+		resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
+			Bucket:  aws.String(r.bucket),
+			Key:     aws.String(r.key),
+			Range:   rangeHeader,
+			IfMatch: r.eTag,
+		})
+		// To return the last error at the end of execution.
+		lastErr = err
 
-	// Close previous stream if exists.
-	if r.reader != nil {
-		err = r.reader.Close()
-		// Log error, as it is not critical, doesn't interrupt the process.
-		if err != nil && r.logger != nil {
-			r.logger.Error("failed to close previous stream",
+		if err != nil {
+			r.logger.Warn("failed to get object",
+				slog.Any("attempt", attempt),
 				slog.Any("err", err),
 			)
+
+			continue
 		}
+
+		// Close previous stream if exists.
+		if r.reader != nil {
+			err = r.reader.Close()
+			// Log error, as it is not critical, doesn't interrupt the process.
+			if err != nil && r.logger != nil {
+				r.logger.Error("failed to close previous stream",
+					slog.Any("err", err),
+				)
+			}
+		}
+
+		// Set a new stream.
+		r.reader = resp.Body
+
+		// If everything is ok, err=nil
+		return err
 	}
 
-	// Set a new stream.
-	r.reader = resp.Body
-
-	return nil
+	return fmt.Errorf("failed to open stream after %d attempts: %w", attempt, lastErr)
 }
 
 // Read reads from the stream.
@@ -209,12 +226,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 
 			// Open a new stream.
 			if rErr := r.openStream(); rErr != nil {
-				r.logger.Warn("failed to reopen stream",
-					slog.Any("attempt", attempt),
-					slog.Any("err", rErr),
-				)
-				
-				continue
+				return n, fmt.Errorf("failed to reopen stream: %w", rErr)
 			}
 
 			continue

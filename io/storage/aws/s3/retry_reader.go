@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/pkg/canceler"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -51,9 +52,10 @@ type retryableReader struct {
 	client      s3getter
 	retryPolicy *models.RetryPolicy
 
-	ctx    context.Context
-	reader io.ReadCloser
-	closed atomic.Bool
+	ctx             context.Context
+	reader          io.ReadCloser
+	closed          atomic.Bool
+	contextCanceler *canceler.Context
 
 	eTag      *string
 	bucket    string
@@ -70,13 +72,12 @@ func newRetryableReader(
 ) (*retryableReader, error) {
 	// Use separate context with timeout for header request.
 	hCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
+	defer cancel()
 	// Get file size to calculate when to finish.
 	head, err := client.HeadObject(hCtx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
-
-	cancel()
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object size: %w", err)
@@ -95,13 +96,14 @@ func newRetryableReader(
 	}
 
 	r := &retryableReader{
-		client:      client,
-		bucket:      bucket,
-		key:         key,
-		retryPolicy: retryPolicy,
-		ctx:         ctx,
-		logger:      logger,
-		eTag:        head.ETag,
+		client:          client,
+		bucket:          bucket,
+		key:             key,
+		retryPolicy:     retryPolicy,
+		ctx:             ctx,
+		logger:          logger,
+		eTag:            head.ETag,
+		contextCanceler: canceler.NewContext(),
 	}
 
 	if head.ContentLength != nil {
@@ -144,6 +146,7 @@ func (r *retryableReader) openStream() error {
 	}
 
 	ctx, cancel := context.WithTimeout(r.ctx, GetObjectTimeout)
+	r.contextCanceler.AddCancelFunc(cancel)
 
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:  aws.String(r.bucket),
@@ -151,8 +154,6 @@ func (r *retryableReader) openStream() error {
 		Range:   rangeHeader,
 		IfMatch: r.eTag,
 	})
-
-	cancel()
 
 	if err != nil {
 		return fmt.Errorf("failed to get object: %w", err)
@@ -252,6 +253,8 @@ func (r *retryableReader) Close() error {
 	if r.reader != nil {
 		return r.reader.Close()
 	}
+
+	r.contextCanceler.Cancel()
 
 	return nil
 }

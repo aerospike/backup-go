@@ -138,8 +138,7 @@ func (r *retryableReader) openStream() error {
 		rangeHeader = &rh
 	}
 
-	ctx, cancel := context.WithTimeout(r.ctx, GetObjectTimeout)
-	defer cancel()
+	ctx, _ := context.WithTimeout(r.ctx, GetObjectTimeout)
 
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:  aws.String(r.bucket),

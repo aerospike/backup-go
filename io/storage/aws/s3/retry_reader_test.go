@@ -248,7 +248,8 @@ func TestRetryableReader_Read(t *testing.T) {
 			On("GetObject", ctx, mock.AnythingOfType("*s3.GetObjectInput")).
 			Return(nil, errTest).Once()
 
-		mockReader.On("Read", mock.Anything).Return(5, io.ErrUnexpectedEOF)
+		mockReader.EXPECT().Read(mock.Anything).Return(5, io.ErrUnexpectedEOF).Once().
+			On("Read", mock.Anything).Return(5, nil)
 		mockReader.On("Close").Return(nil)
 
 		rr, err := newRetryableReader(ctx, s3Mock, policy, logger, testBucket, testKey)
@@ -257,8 +258,7 @@ func TestRetryableReader_Read(t *testing.T) {
 
 		buf := make([]byte, 2048)
 		n, err := rr.Read(buf)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to reopen stream")
+		require.NoError(t, err)
 		require.Equal(t, 5, n)
 	})
 

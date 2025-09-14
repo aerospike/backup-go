@@ -23,6 +23,7 @@ import (
 	"net"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -140,8 +141,10 @@ func (r *retryableReader) openStream() error {
 		attempt uint
 	)
 
+	ctx, _ := context.WithTimeout(r.ctx, 10*time.Second)
+
 	for r.retryPolicy.AttemptsLeft(attempt) {
-		resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
+		resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 			Bucket:  aws.String(r.bucket),
 			Key:     aws.String(r.key),
 			Range:   rangeHeader,

@@ -248,8 +248,6 @@ func (r *retryableReader) Close() error {
 		return r.reader.Close()
 	}
 
-	r.contextCanceler.Cancel()
-
 	return nil
 }
 

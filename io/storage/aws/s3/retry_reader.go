@@ -68,11 +68,16 @@ type retryableReader struct {
 func newRetryableReader(
 	ctx context.Context, client s3getter, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
 ) (*retryableReader, error) {
+	// Use separate context with timeout for header request.
+	hCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
 	// Get file size to calculate when to finish.
-	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
+	head, err := client.HeadObject(hCtx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
+
+	cancel()
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object size: %w", err)
 	}
@@ -139,7 +144,6 @@ func (r *retryableReader) openStream() error {
 	}
 
 	ctx, cancel := context.WithTimeout(r.ctx, GetObjectTimeout)
-	defer cancel()
 
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:  aws.String(r.bucket),
@@ -147,6 +151,8 @@ func (r *retryableReader) openStream() error {
 		Range:   rangeHeader,
 		IfMatch: r.eTag,
 	})
+
+	cancel()
 
 	if err != nil {
 		return fmt.Errorf("failed to get object: %w", err)

@@ -239,6 +239,63 @@ func (_c *MockInfoGetter_GetNodesNames_Call) RunAndReturn(run func() []string) *
 	return _c
 }
 
+// GetPrimaryPartitions provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) GetPrimaryPartitions(node string, namespace string) ([]int, error) {
+	ret := _mock.Called(node, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPrimaryPartitions")
+	}
+
+	var r0 []int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) ([]int, error)); ok {
+		return returnFunc(node, namespace)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, string) []int); ok {
+		r0 = returnFunc(node, namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = returnFunc(node, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockInfoGetter_GetPrimaryPartitions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPrimaryPartitions'
+type MockInfoGetter_GetPrimaryPartitions_Call struct {
+	*mock.Call
+}
+
+// GetPrimaryPartitions is a helper method to define mock.On call
+//   - node
+//   - namespace
+func (_e *MockInfoGetter_Expecter) GetPrimaryPartitions(node interface{}, namespace interface{}) *MockInfoGetter_GetPrimaryPartitions_Call {
+	return &MockInfoGetter_GetPrimaryPartitions_Call{Call: _e.mock.On("GetPrimaryPartitions", node, namespace)}
+}
+
+func (_c *MockInfoGetter_GetPrimaryPartitions_Call) Run(run func(node string, namespace string)) *MockInfoGetter_GetPrimaryPartitions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_GetPrimaryPartitions_Call) Return(ints []int, err error) *MockInfoGetter_GetPrimaryPartitions_Call {
+	_c.Call.Return(ints, err)
+	return _c
+}
+
+func (_c *MockInfoGetter_GetPrimaryPartitions_Call) RunAndReturn(run func(node string, namespace string) ([]int, error)) *MockInfoGetter_GetPrimaryPartitions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRackNodes provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) GetRackNodes(rackID int) ([]string, error) {
 	ret := _mock.Called(rackID)

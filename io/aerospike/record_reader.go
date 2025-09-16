@@ -16,7 +16,6 @@ package aerospike
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -36,13 +35,6 @@ type scanner interface {
 	ScanPartitions(
 		scanPolicy *a.ScanPolicy,
 		partitionFilter *a.PartitionFilter,
-		namespace string,
-		setName string,
-		binNames ...string,
-	) (*a.Recordset, a.Error)
-	ScanNode(
-		scanPolicy *a.ScanPolicy,
-		node *a.Node,
 		namespace string,
 		setName string,
 		binNames ...string,
@@ -98,17 +90,17 @@ func NewRecordReader(
 	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
-	recodsetCloser RecordsetCloser,
+	recordsetCloser RecordsetCloser,
 ) RecordReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeRecord)
 	ctx, cancel := context.WithCancel(ctx)
 
 	if cfg.pageSize > 0 {
-		return newPaginatedRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
+		return newPaginatedRecordReader(ctx, client, cfg, logger, recordsetCloser, cancel)
 	}
 
-	return newSingleRecordReader(ctx, client, cfg, logger, recodsetCloser, cancel)
+	return newSingleRecordReader(ctx, client, cfg, logger, recordsetCloser, cancel)
 }
 
 func newSingleRecordReader(
@@ -116,7 +108,7 @@ func newSingleRecordReader(
 	client scanner,
 	cfg *RecordReaderConfig,
 	logger *slog.Logger,
-	recodsetCloser RecordsetCloser,
+	recordsetCloser RecordsetCloser,
 	cancel context.CancelFunc,
 ) *singleRecordReader {
 	logger.Debug("created new aerospike record reader", cfg.logAttrs()...)
@@ -129,7 +121,7 @@ func newSingleRecordReader(
 		logger:          logger,
 		resultChan:      make(chan *a.Result, resultChanSize),
 		errChan:         make(chan error, 1),
-		recordsetCloser: recodsetCloser,
+		recordsetCloser: recordsetCloser,
 	}
 }
 
@@ -184,11 +176,7 @@ func (r *singleRecordReader) startScan(ctx context.Context) {
 	defer close(r.resultChan)
 
 	// Generate the list of all scan tasks.
-	producers, err := r.generateProducers()
-	if err != nil {
-		r.errChan <- err
-		return
-	}
+	producers := r.generateProducers()
 
 	// Execute the tasks sequentially.
 	for _, producer := range producers {
@@ -231,64 +219,35 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.
-func (r *singleRecordReader) generateProducers() ([]scanProducer, error) {
+func (r *singleRecordReader) generateProducers() []scanProducer {
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
 
-	var producers []scanProducer
+	producers := make([]scanProducer, len(r.config.setList))
 
-	switch {
-	case len(r.config.nodes) > 0:
-		for _, node := range r.config.nodes {
-			for _, set := range r.config.setList {
-				// Capture loop variables to ensure the lambda uses the correct values.
-				capturedNode, capturedSet := node, set
-				producer := func() (*a.Recordset, error) {
-					r.logger.Debug("starting node scan",
-						slog.String("set", capturedSet),
-						slog.String("node", capturedNode.GetName()))
+	for i, set := range r.config.setList {
+		capturedSet := set
+		producer := func() (*a.Recordset, error) {
+			// Each scan requires a fresh copy of the partition filter.
+			pf := *r.config.partitionFilter
+			r.logger.Debug("starting partition scan",
+				slog.String("set", capturedSet),
+				slog.Int("begin", pf.Begin),
+				slog.Int("count", pf.Count))
 
-					recordset, err := r.client.ScanNode(
-						&scanPolicy, capturedNode, r.config.namespace, capturedSet, r.config.binList...)
-					if err != nil {
-						return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, node %s: %w",
-							capturedSet, r.config.namespace, capturedNode, err)
-					}
-
-					return recordset, nil
-				}
-				producers = append(producers, producer)
+			recordset, err := r.client.ScanPartitions(
+				&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
+					capturedSet, r.config.namespace, pf.Begin, pf.Count, err)
 			}
+
+			return recordset, nil
 		}
-
-	case r.config.partitionFilter != nil:
-		// Partition Scan Mode
-		for _, set := range r.config.setList {
-			capturedSet := set
-			producer := func() (*a.Recordset, error) {
-				// Each scan requires a fresh copy of the partition filter.
-				pf := *r.config.partitionFilter
-				r.logger.Debug("starting partition scan",
-					slog.String("set", capturedSet),
-					slog.Int("begin", pf.Begin),
-					slog.Int("count", pf.Count))
-
-				recordset, err := r.client.ScanPartitions(
-					&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
-				if err != nil {
-					return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
-						capturedSet, r.config.namespace, pf.Begin, pf.Count, err)
-				}
-
-				return recordset, nil
-			}
-			producers = append(producers, producer)
-		}
-	default:
-		return nil, errors.New("invalid scan parameters: either nodes or partitionFilter must be specified")
+		producers[i] = producer
 	}
 
-	return producers, nil
+	return producers
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {

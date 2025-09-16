@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -46,11 +45,6 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.RecordsPerSecond = -1
 	assert.ErrorContains(t, config.validate(), "rps")
-	config = NewDefaultBackupConfig()
-
-	config.ParallelNodes = true
-	config.PartitionFilters = []*a.PartitionFilter{NewPartitionFilterByID(1)}
-	assert.ErrorContains(t, config.validate(), "parallel by nodes, racks and/or and after digest/partition")
 	config = NewDefaultBackupConfig()
 
 	config.Bandwidth = -1

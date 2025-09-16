@@ -78,6 +78,7 @@ type Reader struct {
 // For S3 client next parameters must be set:
 //   - o.UsePathStyle = true
 //   - o.BaseEndpoint = &endpoint - if endpoint != ""
+//   - WithHTTPClient using timeouts to prevent socket locks on errors.
 func NewReader(
 	ctx context.Context,
 	client *s3.Client,
@@ -98,7 +99,6 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	// Check if the bucket exists and we have permissions.
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	}); err != nil {
@@ -245,10 +245,7 @@ func (r *Reader) openObject(
 		return
 	}
 
-	object, err := r.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &r.bucketName,
-		Key:    &path,
-	})
+	object, err := newRetryableReader(ctx, r.client, r.RetryPolicy, r.Logger, r.bucketName, path)
 
 	if err != nil {
 		// Skip 404 not found error.
@@ -267,7 +264,7 @@ func (r *Reader) openObject(
 	}
 
 	if object != nil {
-		readersCh <- models.File{Reader: object.Body, Name: filepath.Base(path)}
+		readersCh <- models.File{Reader: object, Name: filepath.Base(path)}
 	}
 }
 
@@ -585,7 +582,7 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 		size, num, err := r.calculateTotalSizeForPath(ctx, path)
 		if err != nil {
 			if r.Logger != nil {
-				r.Logger.Error("failed to calculate stats for path",
+				r.Logger.Warn("failed to calculate stats for path",
 					slog.String("path", path),
 					slog.Any("error", err),
 				)

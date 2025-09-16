@@ -17,6 +17,8 @@ package storage
 import (
 	"log/slog"
 	"time"
+
+	"github.com/aerospike/backup-go/models"
 )
 
 type validator interface {
@@ -67,6 +69,10 @@ type Options struct {
 
 	// Size of chunk to upload.
 	ChunkSize int
+
+	// RetryPolicy is used to control the number of retries for failed requests.
+	// At the moment supported only for S3 Reader.
+	RetryPolicy *models.RetryPolicy
 }
 
 type Opt func(*Options)
@@ -196,5 +202,13 @@ func WithWarmPollDuration(duration time.Duration) Opt {
 func WithChunkSize(bytes int) Opt {
 	return func(r *Options) {
 		r.ChunkSize = bytes
+	}
+}
+
+// WithRetryPolicy sets the retry policy.
+// Is used only for S3 Reader.
+func WithRetryPolicy(policy *models.RetryPolicy) Opt {
+	return func(r *Options) {
+		r.RetryPolicy = policy
 	}
 }

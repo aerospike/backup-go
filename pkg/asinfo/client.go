@@ -17,11 +17,9 @@ package asinfo
 import (
 	"errors"
 	"fmt"
-	"math"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
@@ -1349,15 +1347,20 @@ func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
 		return fmt.Errorf("retry policy cannot be nil")
 	}
 
-	var err error
-	for i := range policy.MaxRetries {
+	var (
+		err     error
+		attempt uint
+	)
+
+	for policy.AttemptsLeft(attempt) {
 		err = command()
 		if err == nil {
 			return nil
 		}
 
-		duration := time.Duration(float64(policy.BaseTimeout) * math.Pow(policy.Multiplier, float64(i)))
-		time.Sleep(duration)
+		policy.Sleep(attempt)
+
+		attempt++
 	}
 
 	if err != nil {

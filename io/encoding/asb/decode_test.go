@@ -447,7 +447,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
 			}
-			got, err := r.readSIndex()
+			got, err := r.readSIndex(false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ASBReader.readSIndex() error = %v, wantErr %v", err, tt.wantErr)
 				return

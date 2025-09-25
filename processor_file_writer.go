@@ -32,6 +32,8 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 )
 
+const metadataFileName = "metadata.asb"
+
 // fileWriterProcessor configures and creates file writers pipelines.
 type fileWriterProcessor[T models.TokenConstraint] struct {
 	prefix          string
@@ -135,6 +137,16 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	return writers, nil
 }
 
+// newMetaWriter creates a new writer for metadata based on the current configuration.
+func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context) (io.WriteCloser, error) {
+	w, err := lazy.NewWriter(ctx, -1, fw.configureWriter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create meta writer: %w", err)
+	}
+
+	return metrics.NewWriter(w, fw.kbpsCollector), nil
+}
+
 // newWriter creates a new writer based on the current configuration.
 // If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
 // The returned writer may be compressed or encrypted depending on the BackupHandler's
@@ -162,8 +174,13 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	if fw.prefix == "" {
 		prefix = fmt.Sprintf("%d_", n)
 	}
+
 	// Generate file name.
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
+	if n == -1 {
+		// For metadata writer create a separate file.
+		filename = metadataFileName
+	}
 
 	// Create a file writer.
 	storageWriter, err := fw.writer.NewWriter(ctx, filename)

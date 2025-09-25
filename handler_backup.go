@@ -320,13 +320,18 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 
 	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
 
+	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
+	if err != nil {
+		return err
+	}
+
 	// backup secondary indexes and UDFs on the first writer
 	// this is done to match the behavior of the
 	// backup c tool and keep the backup files more consistent
 	// at some point we may want to treat the secondary indexes/UDFs
 	// like records and back them up as part of the same pipeline
 	// but doing so would cause them to be mixed in with records in the backup file(s)
-	err = bh.backupSIndexesAndUDFs(ctx, backupWriters[0])
+	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
 	if err != nil {
 		return err
 	}
@@ -403,23 +408,23 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 	writer io.WriteCloser,
 ) error {
 	// The original writer is wrapped to disable closing after writing metadata.
-	writer = newNoCloseWriter(writer)
+	ncWriter := newNoCloseWriter(writer)
 
 	if !bh.config.NoIndexes {
-		err := bh.backupSIndexes(ctx, writer)
+		err := bh.backupSIndexes(ctx, ncWriter)
 		if err != nil {
 			return fmt.Errorf("failed to backup secondary indexes: %w", err)
 		}
 	}
 
 	if !bh.config.NoUDFs {
-		err := bh.backupUDFs(ctx, writer)
+		err := bh.backupUDFs(ctx, ncWriter)
 		if err != nil {
 			return fmt.Errorf("failed to backup UDFs: %w", err)
 		}
 	}
 
-	return nil
+	return writer.Close()
 }
 
 // GetStats returns the stats of the backup job.

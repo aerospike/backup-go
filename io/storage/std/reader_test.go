@@ -99,15 +99,17 @@ func TestReader_ListObjects(t *testing.T) {
 }
 
 func TestReader_StreamFiles(t *testing.T) {
-	t.Parallel()
-
 	oldStdin := os.Stdin
 	r, w, _ := os.Pipe()
 	os.Stdin = r
 	defer func() { os.Stdin = oldStdin }()
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
 		defer w.Close()
+		defer wg.Done()
 		_, err := w.WriteString(testData)
 		require.NoError(t, err)
 	}()
@@ -119,6 +121,8 @@ func TestReader_StreamFiles(t *testing.T) {
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 	go reader.StreamFiles(ctx, readerChan, errorChan)
+
+	wg.Wait()
 
 	var counter int
 	for {
@@ -144,8 +148,6 @@ func TestReader_StreamFiles(t *testing.T) {
 }
 
 func TestReader_StreamFile(t *testing.T) {
-	t.Parallel()
-
 	oldStdin := os.Stdin
 	r, w, _ := os.Pipe()
 	os.Stdin = r
@@ -161,8 +163,6 @@ func TestReader_StreamFile(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	wg.Wait()
-
 	ctx := context.Background()
 	reader, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
@@ -171,6 +171,8 @@ func TestReader_StreamFile(t *testing.T) {
 	errorChan := make(chan error, 1)
 
 	go reader.StreamFile(ctx, testFileName, readerChan, errorChan)
+
+	wg.Wait()
 
 	select {
 	case file := <-readerChan:
@@ -187,15 +189,17 @@ func TestReader_StreamFile(t *testing.T) {
 }
 
 func TestStdinReadCloser(t *testing.T) {
-	t.Parallel()
-
 	oldStdin := os.Stdin
 	r, w, _ := os.Pipe()
 	os.Stdin = r
 	defer func() { os.Stdin = oldStdin }()
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
 		defer w.Close()
+		defer wg.Done()
 		_, err := w.WriteString(testData)
 		require.NoError(t, err)
 	}()
@@ -203,6 +207,7 @@ func TestStdinReadCloser(t *testing.T) {
 	readCloser := newStdinReadCloser(defaultBufferSize)
 	require.NotNil(t, readCloser)
 
+	wg.Wait()
 	data, err := io.ReadAll(readCloser)
 	require.NoError(t, err)
 	require.Equal(t, testData, string(data))
@@ -212,8 +217,6 @@ func TestStdinReadCloser(t *testing.T) {
 }
 
 func TestReader_EmptyStdin(t *testing.T) {
-	t.Parallel()
-
 	oldStdin := os.Stdin
 	r, w, _ := os.Pipe()
 	os.Stdin = r

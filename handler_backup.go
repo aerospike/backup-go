@@ -423,7 +423,7 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 			return fmt.Errorf("failed to backup UDFs: %w", err)
 		}
 	}
-	
+
 	return writer.Close()
 }
 

@@ -410,17 +410,17 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 	// The original writer is wrapped to disable closing after writing metadata.
 	ncWriter := newNoCloseWriter(writer)
 
-	if !bh.config.NoIndexes {
-		err := bh.backupSIndexes(ctx, ncWriter)
-		if err != nil {
-			return fmt.Errorf("failed to backup secondary indexes: %w", err)
-		}
-	}
-
 	if !bh.config.NoUDFs {
 		err := bh.backupUDFs(ctx, ncWriter)
 		if err != nil {
 			return fmt.Errorf("failed to backup UDFs: %w", err)
+		}
+	}
+
+	if !bh.config.NoIndexes {
+		err := bh.backupSIndexes(ctx, ncWriter)
+		if err != nil {
+			return fmt.Errorf("failed to backup secondary indexes: %w", err)
 		}
 	}
 

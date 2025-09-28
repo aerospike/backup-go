@@ -120,7 +120,7 @@ func TestReader_StreamFiles(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go reader.StreamFiles(ctx, readerChan, errorChan)
+	go reader.StreamFiles(ctx, readerChan, errorChan, "")
 
 	wg.Wait()
 
@@ -230,7 +230,7 @@ func TestReader_EmptyStdin(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go reader.StreamFiles(ctx, readerChan, errorChan)
+	go reader.StreamFiles(ctx, readerChan, errorChan, "")
 
 	var counter int
 	for {

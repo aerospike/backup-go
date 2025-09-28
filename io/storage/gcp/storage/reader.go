@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
@@ -51,6 +52,10 @@ type Reader struct {
 	totalSize atomic.Int64
 	// total number of objects in a path.
 	totalNumber atomic.Int64
+
+	// If `skipPrefix` was set on the ` StreamFiles ` function, skipped file names will be stored here.
+	skippedFilePaths []string
+	skippedMu        sync.RWMutex
 }
 
 // NewReader returns new GCP storage directory/file reader.
@@ -105,7 +110,7 @@ func NewReader(
 // StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
 // If an error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefix string,
 ) {
 	defer close(readersCh)
 
@@ -128,7 +133,7 @@ func (r *Reader) StreamFiles(
 				}
 			}
 
-			r.streamDirectory(ctx, path, readersCh, errorsCh)
+			r.streamDirectory(ctx, path, readersCh, errorsCh, skipPrefix)
 		case false:
 			// If not a folder, only file.
 			r.StreamFile(ctx, path, readersCh, errorsCh)
@@ -137,7 +142,7 @@ func (r *Reader) StreamFiles(
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error, skipPrefix string,
 ) {
 	it := r.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix:      path,
@@ -171,6 +176,15 @@ func (r *Reader) streamDirectory(
 				// for the user so they know what is going on.
 				continue
 			}
+		}
+
+		// If skipPrefix is set we save skipped filepath and continue.
+		if skipPrefix != "" && strings.HasPrefix(objAttrs.Name, skipPrefix) {
+			r.skippedMu.Lock()
+			r.skippedFilePaths = append(r.skippedFilePaths, objAttrs.Name)
+			r.skippedMu.Unlock()
+
+			continue
 		}
 
 		r.openObject(ctx, objAttrs.Name, readersCh, errorsCh, true)
@@ -402,4 +416,20 @@ func (r *Reader) GetSize() int64 {
 // GetNumber returns the number of asb/asbx files/dirs that was initialized.
 func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
+}
+
+// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+func (r *Reader) GetSkipped() []string {
+	r.skippedMu.RLock()
+	defer r.skippedMu.RUnlock()
+
+	if len(r.skippedFilePaths) == 0 {
+		return nil
+	}
+
+	// As slices are passed as pointer, we should create a copy before return.
+	result := make([]string, len(r.skippedFilePaths))
+	copy(result, r.skippedFilePaths)
+
+	return result
 }

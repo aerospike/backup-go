@@ -44,6 +44,7 @@ const (
 	testReadFolderPathList        = "folder_path_list/"
 	testReadFolderFileList        = "folder_file_list/"
 	testReadFolderSorted          = "folder_sorted/"
+	testReadFolderSkipped         = "folder_read_skipped/"
 
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
@@ -58,6 +59,7 @@ const (
 	testFileNameTemplateAsbx  = "%d_backup_%d.asbx"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
+	testMetadataPrefix        = "metadata_"
 
 	testFileContent        = "content"
 	testFileContentAsbx    = "content-asbx"
@@ -188,6 +190,18 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 			return err
 		}
 
+		// Skipped
+		fileName = fmt.Sprintf("%s%s", testReadFolderSkipped, fmt.Sprintf(testFileNameTemplate, i))
+		if i%2 == 0 {
+			fileName = fmt.Sprintf("%s%s", testReadFolderSkipped,
+				fmt.Sprintf("%s%s", testMetadataPrefix, fmt.Sprintf(testFileNameTemplate, i)))
+		}
+		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+		sw.ContentType = fileType
+		if err := writeContent(sw, testFileContent); err != nil {
+			return err
+		}
+
 		// Path list.
 		fileName = fmt.Sprintf("%s%s%s",
 			testReadFolderPathList,
@@ -293,7 +307,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -335,7 +349,7 @@ func (s *GCPSuite) TestReader_WithSorting() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -404,7 +418,7 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -611,7 +625,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -651,7 +665,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	for err = range eCH {
 		s.Require().ErrorContains(err, "object doesn't exist")
@@ -714,7 +728,7 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -761,7 +775,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -807,7 +821,7 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -853,7 +867,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, "")
 
 	var filesCounter int
 
@@ -897,4 +911,50 @@ func readAll(r io.ReadCloser) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		ioStorage.WithDir(testReadFolderSkipped),
+		ioStorage.WithValidator(validatorMock{}),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH, testMetadataPrefix)
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 3, filesCounter)
+				goto Done
+			}
+			filesCounter++
+		}
+	}
+
+Done:
+	skipped := reader.GetSkipped()
+	require.Equal(s.T(), 2, len(skipped))
 }

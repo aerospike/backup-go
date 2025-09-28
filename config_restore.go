@@ -21,6 +21,16 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+// ApplyMetadataType custom type for ApplyMetadata enum.
+type ApplyMetadataType int
+
+const (
+	// ApplyMetadataDefault apply metadata as it was found in backup files.
+	ApplyMetadataDefault ApplyMetadataType = iota
+	// ApplyMetadataAfter apply metadata after records restore.
+	ApplyMetadataAfter
+)
+
 // ConfigRestore contains configuration for the restore operation.
 type ConfigRestore struct {
 	// WritePolicy applies to Aerospike write operations made during backup and restore
@@ -89,6 +99,10 @@ type ConfigRestore struct {
 	MetricsEnabled bool
 	// ValidateOnly indicates whether restore should only validate the backup files.
 	ValidateOnly bool
+	// ApplyMetadata defines when to restore metadata (Sindexes and UDFs).
+	// Can be ApplyMetadataDefault or ApplyMetadataAfter.
+	// Default is ApplyMetadataDefault.
+	ApplyMetadata ApplyMetadataType
 }
 
 // NewDefaultRestoreConfig returns a new ConfigRestore with default values.

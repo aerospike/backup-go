@@ -22,6 +22,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"sync/atomic"
 
 	ioStorage "github.com/aerospike/backup-go/io/storage"
@@ -44,6 +46,10 @@ type Reader struct {
 	totalSize atomic.Int64
 	// total number of objects in a path.
 	totalNumber atomic.Int64
+
+	// If `skipPrefix` was set on the ` StreamFiles ` function, skipped file names will be stored here.
+	skippedFilePaths []string
+	skippedMu        sync.RWMutex
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -84,8 +90,9 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 // StreamFiles reads file/directory from disk and sends io.Readers to the `readersCh`
 // communication channel for lazy loading.
 // In case of an error, it is sent to the `errorsCh` channel.
+// If `skipPrefix` is set, it will skip files that start with this prefix and save a skipped list of files.
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefix string,
 ) {
 	defer close(readersCh)
 
@@ -107,7 +114,7 @@ func (r *Reader) StreamFiles(
 				}
 			}
 
-			r.streamDirectory(ctx, path, readersCh, errorsCh)
+			r.streamDirectory(ctx, path, readersCh, errorsCh, skipPrefix)
 		case false:
 			// If not a folder, only file.
 			r.StreamFile(ctx, path, readersCh, errorsCh)
@@ -116,7 +123,7 @@ func (r *Reader) StreamFiles(
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
+	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error, skipPrefix string,
 ) {
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
@@ -134,7 +141,7 @@ func (r *Reader) streamDirectory(
 			// Iterate over nested dirs recursively.
 			if r.WithNestedDir {
 				nestedDir := filepath.Join(path, file.Name())
-				r.streamDirectory(ctx, nestedDir, readersCh, errorsCh)
+				r.streamDirectory(ctx, nestedDir, readersCh, errorsCh, skipPrefix)
 			}
 
 			continue
@@ -160,6 +167,15 @@ func (r *Reader) streamDirectory(
 				// for the user so they know what is going on.
 				continue
 			}
+		}
+
+		// If skipPrefix is set we save skipped filepath and continue.
+		if skipPrefix != "" && strings.HasPrefix(file.Name(), skipPrefix) {
+			r.skippedMu.Lock()
+			r.skippedFilePaths = append(r.skippedFilePaths, filePath)
+			r.skippedMu.Unlock()
+
+			continue
 		}
 
 		var reader io.ReadCloser
@@ -397,4 +413,20 @@ func (r *Reader) GetSize() int64 {
 // GetNumber returns the number of asb/asbx files/dirs that was initialized.
 func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
+}
+
+// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+func (r *Reader) GetSkipped() []string {
+	r.skippedMu.RLock()
+	defer r.skippedMu.RUnlock()
+
+	if len(r.skippedFilePaths) == 0 {
+		return nil
+	}
+
+	// As slices are passed as pointer, we should create a copy before return.
+	result := make([]string, len(r.skippedFilePaths))
+	copy(result, r.skippedFilePaths)
+
+	return result
 }

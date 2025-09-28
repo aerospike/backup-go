@@ -126,6 +126,52 @@ func (_c *MockStreamingReader_GetSize_Call) RunAndReturn(run func() int64) *Mock
 	return _c
 }
 
+// GetSkipped provides a mock function for the type MockStreamingReader
+func (_mock *MockStreamingReader) GetSkipped() []string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSkipped")
+	}
+
+	var r0 []string
+	if returnFunc, ok := ret.Get(0).(func() []string); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	return r0
+}
+
+// MockStreamingReader_GetSkipped_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSkipped'
+type MockStreamingReader_GetSkipped_Call struct {
+	*mock.Call
+}
+
+// GetSkipped is a helper method to define mock.On call
+func (_e *MockStreamingReader_Expecter) GetSkipped() *MockStreamingReader_GetSkipped_Call {
+	return &MockStreamingReader_GetSkipped_Call{Call: _e.mock.On("GetSkipped")}
+}
+
+func (_c *MockStreamingReader_GetSkipped_Call) Run(run func()) *MockStreamingReader_GetSkipped_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockStreamingReader_GetSkipped_Call) Return(strings []string) *MockStreamingReader_GetSkipped_Call {
+	_c.Call.Return(strings)
+	return _c
+}
+
+func (_c *MockStreamingReader_GetSkipped_Call) RunAndReturn(run func() []string) *MockStreamingReader_GetSkipped_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetType provides a mock function for the type MockStreamingReader
 func (_mock *MockStreamingReader) GetType() string {
 	ret := _mock.Called()
@@ -265,8 +311,8 @@ func (_c *MockStreamingReader_StreamFile_Call) RunAndReturn(run func(ctx context
 }
 
 // StreamFiles provides a mock function for the type MockStreamingReader
-func (_mock *MockStreamingReader) StreamFiles(context1 context.Context, fileCh chan<- models.File, errCh chan<- error) {
-	_mock.Called(context1, fileCh, errCh)
+func (_mock *MockStreamingReader) StreamFiles(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, s string) {
+	_mock.Called(context1, fileCh, errCh, s)
 	return
 }
 
@@ -279,13 +325,14 @@ type MockStreamingReader_StreamFiles_Call struct {
 //   - context1
 //   - fileCh
 //   - errCh
-func (_e *MockStreamingReader_Expecter) StreamFiles(context1 interface{}, fileCh interface{}, errCh interface{}) *MockStreamingReader_StreamFiles_Call {
-	return &MockStreamingReader_StreamFiles_Call{Call: _e.mock.On("StreamFiles", context1, fileCh, errCh)}
+//   - s
+func (_e *MockStreamingReader_Expecter) StreamFiles(context1 interface{}, fileCh interface{}, errCh interface{}, s interface{}) *MockStreamingReader_StreamFiles_Call {
+	return &MockStreamingReader_StreamFiles_Call{Call: _e.mock.On("StreamFiles", context1, fileCh, errCh, s)}
 }
 
-func (_c *MockStreamingReader_StreamFiles_Call) Run(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error)) *MockStreamingReader_StreamFiles_Call {
+func (_c *MockStreamingReader_StreamFiles_Call) Run(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, s string)) *MockStreamingReader_StreamFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(chan<- models.File), args[2].(chan<- error))
+		run(args[0].(context.Context), args[1].(chan<- models.File), args[2].(chan<- error), args[3].(string))
 	})
 	return _c
 }
@@ -295,7 +342,7 @@ func (_c *MockStreamingReader_StreamFiles_Call) Return() *MockStreamingReader_St
 	return _c
 }
 
-func (_c *MockStreamingReader_StreamFiles_Call) RunAndReturn(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error)) *MockStreamingReader_StreamFiles_Call {
+func (_c *MockStreamingReader_StreamFiles_Call) RunAndReturn(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, s string)) *MockStreamingReader_StreamFiles_Call {
 	_c.Run(run)
 	return _c
 }

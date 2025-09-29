@@ -45,7 +45,7 @@ type Reader struct {
 	// total number of objects in a path.
 	totalNumber atomic.Int64
 
-	// If `skipPrefix` was set on the ` StreamFiles ` function, skipped file names will be stored here.
+	// If `skipPrefix` was set on the ` StreamFiles` function, skipped file names will be stored here.
 	skipped *ioStorage.SkippedFiles
 }
 

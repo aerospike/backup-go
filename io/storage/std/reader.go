@@ -108,7 +108,7 @@ func (r *Reader) StreamFile(
 
 // StreamFiles opens stdin as files and sends io.Readers to the `readersCh`
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, _ string,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, _ []string,
 ) {
 	defer close(readersCh)
 

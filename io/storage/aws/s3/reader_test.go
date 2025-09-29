@@ -188,7 +188,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 			return err
 		}
 
-		// SKipped.
+		// Skipped.
 		fileName = fmt.Sprintf("%s/%s", testReadFolderSkipped, fmt.Sprintf(testFileNameAsbTemplate, i))
 		if i%2 == 0 {
 			fileName = fmt.Sprintf("%s/%s", testReadFolderSkipped,

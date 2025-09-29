@@ -246,7 +246,7 @@ func (c *ConfigBackup) validate() error {
 	}
 
 	if c.OutputFilePrefix != "" && c.OutputFilePrefix == metadataFileNamePrefix {
-		return fmt.Errorf("prefix is reserved for metadata file, please use another prefix")
+		return fmt.Errorf("prefix is reserved for metadata files, please use another prefix")
 	}
 
 	return nil

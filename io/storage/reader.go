@@ -108,11 +108,14 @@ func IsDirectory(prefix, fileName string) bool {
 	return strings.Contains(fileName, "/")
 }
 
-// SkippedFiles contains information about skipped files.
+// SkippedFiles collects information about files that were
+// not processed during an operation.
 type SkippedFiles struct {
-	// prefixes that were skipped.
+	// prefixes holds a list of path prefixes used to identify files
+	// that should be skipped.
 	prefixes []string
-	// filePaths skipped file paths will be stored here.
+	// filePaths stores a list of full paths for individual files that
+	// were skipped.
 	filePaths []string
 	mu        sync.RWMutex
 }

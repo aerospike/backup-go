@@ -195,6 +195,8 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		if err := rh.runPipeline(ctx, metadataReaders); err != nil {
 			return fmt.Errorf("failed to apply metadata: %w", err)
 		}
+
+		rh.logger.Info("metadata applied successfully")
 	}
 
 	return nil

@@ -40,3 +40,7 @@ packages:
     config:
       dir: ./pkg/secret-agent/connection/mocks
       pkgname: mocks
+  github.com/aerospike/backup-go/io/storage/aws/s3:
+    config:
+      dir: ./io/storage/aws/s3/mocks
+      pkgname: mocks

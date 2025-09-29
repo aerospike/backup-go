@@ -16,6 +16,7 @@ package models
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -66,4 +67,28 @@ func (p *RetryPolicy) Validate() error {
 	}
 
 	return nil
+}
+
+// Sleep waits for the specified number of retry attempts.
+func (p *RetryPolicy) Sleep(attempt uint) {
+	if p == nil {
+		return
+	}
+
+	duration := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
+	time.Sleep(duration)
+}
+
+// AttemptsLeft returns true if there are still retry attempts left.
+func (p *RetryPolicy) AttemptsLeft(attempt uint) bool {
+	if p == nil {
+		return false
+	}
+
+	// If MaxRetries is 0, then at least one retry attempt is made.
+	if p.MaxRetries == 0 && attempt == 0 {
+		return true
+	}
+
+	return attempt < p.MaxRetries
 }

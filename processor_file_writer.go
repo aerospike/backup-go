@@ -175,12 +175,14 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	if n == -1 {
 		// For metadata writer create a separate file.
 		prefix = metadataFileNamePrefix
-	}
 
+		fw.logger.Info("set prefix", slog.String("prefix", prefix), slog.Int("n", n))
+	}
+	fw.logger.Info("prefix before check", slog.String("prefix", prefix), slog.Int("n", n))
 	if fw.prefix == "" {
 		prefix = fmt.Sprintf("%d_", n)
 	}
-	fw.logger.Info("prefix", slog.String("prefix", prefix))
+	fw.logger.Info("prefix", slog.String("prefix", prefix), slog.Int("n", n))
 	// Generate file name.
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 

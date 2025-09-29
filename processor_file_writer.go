@@ -171,7 +171,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
 	// If it is set, we use it as a prefix.
 	prefix := fw.prefix
-
+	fw.logger.Info("new writer", slog.Int("n", n))
 	if n == -1 {
 		// For metadata writer create a separate file.
 		prefix = metadataFileNamePrefix
@@ -180,7 +180,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	if fw.prefix == "" {
 		prefix = fmt.Sprintf("%d_", n)
 	}
-
+	fw.logger.Info("prefix", slog.String("prefix", prefix))
 	// Generate file name.
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 

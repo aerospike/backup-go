@@ -70,3 +70,7 @@ func (v version) compare(other version) int {
 
 	return 0
 }
+
+func (v version) toString() string {
+	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
+}

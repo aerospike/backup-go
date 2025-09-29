@@ -190,6 +190,23 @@ func (ic *Client) GetVersion() (AerospikeVersion, error) {
 	return lowestVersion, nil
 }
 
+// HasExpressionSindex check if database contain expression based Sindexes.
+func (ic *Client) HasExpressionSindex(namespace string) (bool, error) {
+	list, err := ic.GetSIndexes(namespace)
+	if err != nil {
+		return false, err
+	}
+
+	for i := range list {
+		if list[i].Expression != "" {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// GetSIndexes returns list of SIndexes for the given namespace.
 func (ic *Client) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 	var (
 		indexes []*models.SIndex
@@ -210,6 +227,7 @@ func (ic *Client) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 	return indexes, err
 }
 
+// GetUDFs returns list of UDFs.
 func (ic *Client) GetUDFs() ([]*models.UDF, error) {
 	var (
 		udfs []*models.UDF

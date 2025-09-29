@@ -48,6 +48,10 @@ func newBatchRecordWriter(
 	ignoreRecordError bool,
 	logger *slog.Logger,
 ) *batchRecordWriter {
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
 	return &batchRecordWriter{
 		asc:               asc,
 		writePolicy:       writePolicy,
@@ -151,9 +155,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			return fmt.Errorf("non-retryable error on restore: %w", aerr)
 		}
 
-		attempt++
-
-		if !attemptsLeft(rw.retryPolicy, attempt) {
+		if !rw.retryPolicy.AttemptsLeft(attempt) {
 			break
 		}
 
@@ -162,7 +164,9 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			slog.Int("remainingOperations", len(rw.operationBuffer)),
 		)
 
-		sleep(rw.retryPolicy, attempt)
+		rw.retryPolicy.Sleep(attempt)
+
+		attempt++
 	}
 
 	rw.logger.Error("Max retries reached",

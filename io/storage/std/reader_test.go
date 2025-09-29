@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
@@ -150,11 +151,17 @@ func TestReader_StreamFile(t *testing.T) {
 	os.Stdin = r
 	defer func() { os.Stdin = oldStdin }()
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
 		defer w.Close()
+		defer wg.Done()
 		_, err := w.WriteString(testData)
 		require.NoError(t, err)
 	}()
+
+	wg.Wait()
 
 	ctx := context.Background()
 	reader, err := NewReader(ctx, defaultBufferSize)

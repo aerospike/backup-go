@@ -33,6 +33,28 @@ type payloadWriter struct {
 	ignoreRecordError bool
 }
 
+func newPayloadWriter(
+	dbWriter dbWriter,
+	writePolicy *a.WritePolicy,
+	stats *models.RestoreStats,
+	retryPolicy *models.RetryPolicy,
+	metricsCollector *metrics.Collector,
+	ignoreRecordError bool,
+) *payloadWriter {
+	if retryPolicy == nil {
+		retryPolicy = models.NewDefaultRetryPolicy()
+	}
+
+	return &payloadWriter{
+		dbWriter:          dbWriter,
+		writePolicy:       writePolicy,
+		stats:             stats,
+		retryPolicy:       retryPolicy,
+		metrics:           metricsCollector,
+		ignoreRecordError: ignoreRecordError,
+	}
+}
+
 func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 	var (
 		aerr    a.Error
@@ -44,7 +66,7 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, t.Payload)
 	t.Payload = xdr.SetRecordExistsActionBit(p.writePolicy.RecordExistsAction, t.Payload)
 
-	for attemptsLeft(p.retryPolicy, attempt) {
+	for p.retryPolicy.AttemptsLeft(attempt) {
 		aerr = p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
 
 		if aerr == nil {
@@ -73,7 +95,7 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			return nil
 
 		case shouldRetry(aerr):
-			sleep(p.retryPolicy, attempt)
+			p.retryPolicy.Sleep(attempt)
 
 			attempt++
 

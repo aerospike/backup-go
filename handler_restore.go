@@ -196,7 +196,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 			return fmt.Errorf("failed to apply metadata: %w", err)
 		}
 
-		rh.logger.Info("metadata applied successfully")
+		rh.logger.Info("metadata applied after records")
 	}
 
 	return nil

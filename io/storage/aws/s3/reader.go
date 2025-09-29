@@ -223,12 +223,15 @@ func (r *Reader) streamDirectory(
 			}
 
 			// If skipPrefix is set we save skipped filepath and continue.
-			if skipPrefix != "" && strings.HasPrefix(*p.Key, skipPrefix) {
-				r.skippedMu.Lock()
-				r.skippedFilePaths = append(r.skippedFilePaths, *p.Key)
-				r.skippedMu.Unlock()
+			if skipPrefix != "" {
+				fileName := filepath.Base(*p.Key)
+				if strings.HasPrefix(fileName, skipPrefix) {
+					r.skippedMu.Lock()
+					r.skippedFilePaths = append(r.skippedFilePaths, *p.Key)
+					r.skippedMu.Unlock()
 
-				continue
+					continue
+				}
 			}
 
 			r.openObject(ctx, *p.Key, readersCh, errorsCh, true)

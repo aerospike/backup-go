@@ -191,7 +191,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		// SKipped.
 		fileName = fmt.Sprintf("%s/%s", testReadFolderSkipped, fmt.Sprintf(testFileNameAsbTemplate, i))
 		if i%2 == 0 {
-			fileName = fmt.Sprintf("%s%s", testReadFolderSkipped,
+			fileName = fmt.Sprintf("%s/%s", testReadFolderSkipped,
 				fmt.Sprintf("%s%s", testMetadataPrefix, fmt.Sprintf(testFileNameAsbTemplate, i)))
 		}
 		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
@@ -1071,7 +1071,7 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
+				require.Equal(s.T(), 2, filesCounter)
 				goto Done
 			}
 			filesCounter++
@@ -1080,5 +1080,5 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 
 Done:
 	skipped := reader.GetSkipped()
-	require.Equal(s.T(), 2, len(skipped))
+	require.Equal(s.T(), 3, len(skipped))
 }

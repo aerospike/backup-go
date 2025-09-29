@@ -950,7 +950,7 @@ func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
+				require.Equal(s.T(), 2, filesCounter)
 				goto Done
 			}
 			filesCounter++
@@ -959,5 +959,5 @@ func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
 
 Done:
 	skipped := reader.GetSkipped()
-	require.Equal(s.T(), 2, len(skipped))
+	require.Equal(s.T(), 3, len(skipped))
 }

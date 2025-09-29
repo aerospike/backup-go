@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -67,8 +66,7 @@ type Reader struct {
 	totalNumber atomic.Int64
 
 	// If `skipPrefix` was set on the ` StreamFiles ` function, skipped file names will be stored here.
-	skippedFilePaths []string
-	skippedMu        sync.RWMutex
+	skipped *ioStorage.SkippedFiles
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -145,7 +143,7 @@ func NewReader(
 // StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
 // If error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefix string,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
 	defer close(readersCh)
 
@@ -153,6 +151,10 @@ func (r *Reader) StreamFiles(
 	if len(r.objectsToStream) > 0 {
 		r.streamSetObjects(ctx, readersCh, errorsCh)
 		return
+	}
+	// Init file skipper when skipPrefix is set.
+	if len(skipPrefixes) > 0 {
+		r.skipped = ioStorage.NewSkippedFiles(skipPrefixes)
 	}
 
 	for _, path := range r.PathList {
@@ -168,7 +170,7 @@ func (r *Reader) StreamFiles(
 				}
 			}
 
-			r.streamDirectory(ctx, path, readersCh, errorsCh, skipPrefix)
+			r.streamDirectory(ctx, path, readersCh, errorsCh)
 		case false:
 			// If not a folder, only file.
 			r.StreamFile(ctx, path, readersCh, errorsCh)
@@ -177,7 +179,7 @@ func (r *Reader) StreamFiles(
 }
 
 func (r *Reader) streamDirectory(
-	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error, skipPrefix string,
+	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
 	pager := r.client.NewListBlobsFlatPager(r.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &path,
@@ -213,15 +215,8 @@ func (r *Reader) streamDirectory(
 			}
 
 			// If skipPrefix is set we save skipped filepath and continue.
-			if skipPrefix != "" {
-				fileName := filepath.Base(*blobItem.Name)
-				if strings.HasPrefix(fileName, skipPrefix) {
-					r.skippedMu.Lock()
-					r.skippedFilePaths = append(r.skippedFilePaths, *blobItem.Name)
-					r.skippedMu.Unlock()
-
-					continue
-				}
+			if r.skipped.Skip(*blobItem.Name) {
+				continue
 			}
 
 			r.openObject(ctx, *blobItem.Name, readersCh, errorsCh, true)
@@ -653,16 +648,5 @@ func (r *Reader) GetNumber() int64 {
 
 // GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
-	r.skippedMu.RLock()
-	defer r.skippedMu.RUnlock()
-
-	if len(r.skippedFilePaths) == 0 {
-		return nil
-	}
-
-	// As slices are passed as pointer, we should create a copy before return.
-	result := make([]string, len(r.skippedFilePaths))
-	copy(result, r.skippedFilePaths)
-
-	return result
+	return r.skipped.GetSkipped()
 }

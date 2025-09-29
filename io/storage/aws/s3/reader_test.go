@@ -277,7 +277,7 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -328,7 +328,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -378,7 +378,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -424,7 +424,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -473,7 +473,7 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -546,7 +546,7 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -616,7 +616,7 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -671,7 +671,7 @@ func (s *AwsSuite) TestReader_OpenFileOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -707,7 +707,7 @@ func (s *AwsSuite) TestReader_OpenFileErr() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	for err = range eCH {
 		s.Require().Error(err)
@@ -1016,7 +1016,7 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -1061,7 +1061,7 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, testMetadataPrefix)
+	go reader.StreamFiles(ctx, rCH, eCH, []string{testMetadataPrefix})
 
 	var filesCounter int
 

@@ -83,7 +83,7 @@ func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -122,7 +122,7 @@ func TestDirectoryReader_StreamFiles_OneFile(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -184,7 +184,7 @@ func TestDirectoryReader_StreamFiles_ErrNoSuchFile(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -269,7 +269,7 @@ func TestDirectoryReader_OpenFile(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -303,7 +303,7 @@ func TestDirectoryReader_OpenFileErr(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -356,7 +356,7 @@ func TestDirectoryReader_StreamFiles_Nested_OK(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -415,7 +415,7 @@ func TestDirectoryReader_StreamFilesList(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -472,7 +472,7 @@ func TestDirectoryReader_StreamPathList(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -514,7 +514,7 @@ func TestReader_WithSorting(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	result := make([]string, 0, 3)
 	for {
@@ -568,7 +568,7 @@ func TestReader_StreamFilesPreloaded(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, "")
+	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -677,7 +677,7 @@ func TestReader_StreamFiles_Skipped(t *testing.T) {
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, prefix)
+	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, []string{prefix})
 
 	var counter int
 	for {

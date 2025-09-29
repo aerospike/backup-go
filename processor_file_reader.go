@@ -68,13 +68,13 @@ func newFileReaderProcessor[T models.TokenConstraint](
 }
 
 func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Reader[T] {
-	skipPrefix := ""
+	var skipPrefixes []string
 	if fr.config.ApplyMetadataLast {
-		skipPrefix = metadataFileNamePrefix
+		skipPrefixes = []string{metadataFileNamePrefix}
 	}
 
 	// Start lazy file reading.
-	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh, skipPrefix)
+	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh, skipPrefixes)
 
 	readWorkers := make([]pipe.Reader[T], fr.parallel)
 

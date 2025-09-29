@@ -307,7 +307,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -349,7 +349,7 @@ func (s *GCPSuite) TestReader_WithSorting() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -418,7 +418,7 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -625,7 +625,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -665,7 +665,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	for err = range eCH {
 		s.Require().ErrorContains(err, "object doesn't exist")
@@ -728,7 +728,7 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -775,7 +775,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -821,7 +821,7 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -867,7 +867,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -937,7 +937,7 @@ func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, testMetadataPrefix)
+	go reader.StreamFiles(ctx, rCH, eCH, []string{testMetadataPrefix})
 
 	var filesCounter int
 

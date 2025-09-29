@@ -325,12 +325,11 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		return err
 	}
 
-	// backup secondary indexes and UDFs on the first writer
-	// this is done to match the behavior of the
-	// backup c tool and keep the backup files more consistent
-	// at some point we may want to treat the secondary indexes/UDFs
-	// like records and back them up as part of the same pipeline
-	// but doing so would cause them to be mixed in with records in the backup file(s)
+	// backup secondary indexes and UDFs on the separate metaWriter.
+	// We don't mix them anymore with records as it was done before.
+	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
+	// This is done to keep the backup files more consistent and to avoid mixing them with records.
+	// Also, now we can restore metadata after records.
 	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
 	if err != nil {
 		return err

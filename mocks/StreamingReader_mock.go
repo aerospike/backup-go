@@ -311,8 +311,8 @@ func (_c *MockStreamingReader_StreamFile_Call) RunAndReturn(run func(ctx context
 }
 
 // StreamFiles provides a mock function for the type MockStreamingReader
-func (_mock *MockStreamingReader) StreamFiles(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, s string) {
-	_mock.Called(context1, fileCh, errCh, s)
+func (_mock *MockStreamingReader) StreamFiles(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, strings []string) {
+	_mock.Called(context1, fileCh, errCh, strings)
 	return
 }
 
@@ -325,14 +325,14 @@ type MockStreamingReader_StreamFiles_Call struct {
 //   - context1
 //   - fileCh
 //   - errCh
-//   - s
-func (_e *MockStreamingReader_Expecter) StreamFiles(context1 interface{}, fileCh interface{}, errCh interface{}, s interface{}) *MockStreamingReader_StreamFiles_Call {
-	return &MockStreamingReader_StreamFiles_Call{Call: _e.mock.On("StreamFiles", context1, fileCh, errCh, s)}
+//   - strings
+func (_e *MockStreamingReader_Expecter) StreamFiles(context1 interface{}, fileCh interface{}, errCh interface{}, strings interface{}) *MockStreamingReader_StreamFiles_Call {
+	return &MockStreamingReader_StreamFiles_Call{Call: _e.mock.On("StreamFiles", context1, fileCh, errCh, strings)}
 }
 
-func (_c *MockStreamingReader_StreamFiles_Call) Run(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, s string)) *MockStreamingReader_StreamFiles_Call {
+func (_c *MockStreamingReader_StreamFiles_Call) Run(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, strings []string)) *MockStreamingReader_StreamFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(chan<- models.File), args[2].(chan<- error), args[3].(string))
+		run(args[0].(context.Context), args[1].(chan<- models.File), args[2].(chan<- error), args[3].([]string))
 	})
 	return _c
 }
@@ -342,7 +342,7 @@ func (_c *MockStreamingReader_StreamFiles_Call) Return() *MockStreamingReader_St
 	return _c
 }
 
-func (_c *MockStreamingReader_StreamFiles_Call) RunAndReturn(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, s string)) *MockStreamingReader_StreamFiles_Call {
+func (_c *MockStreamingReader_StreamFiles_Call) RunAndReturn(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, strings []string)) *MockStreamingReader_StreamFiles_Call {
 	_c.Run(run)
 	return _c
 }

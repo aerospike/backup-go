@@ -250,7 +250,7 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -289,7 +289,7 @@ func (s *AzureSuite) TestReader_WithSorting() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -353,7 +353,7 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -413,7 +413,7 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -451,7 +451,7 @@ func (s *AzureSuite) TestReader_OpenFileErr() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	for err = range eCH {
 		s.Require().ErrorContains(err, "blob does not exist")
@@ -645,7 +645,7 @@ func (s *AzureSuite) TestReader_WithMarker() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -690,7 +690,7 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -734,7 +734,7 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -778,7 +778,7 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, "")
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -940,7 +940,7 @@ func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH, testMetadataPrefix)
+	go reader.StreamFiles(ctx, rCH, eCH, []string{testMetadataPrefix})
 
 	var filesCounter int
 

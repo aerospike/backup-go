@@ -35,8 +35,8 @@ import (
 type StreamingReader interface {
 	// StreamFiles creates readers from files and sends them to the channel.
 	// In case of an error, the error is sent to the error channel.
-	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh, skipPrefix)`.
-	StreamFiles(context.Context, chan<- models.File, chan<- error, string)
+	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh, skipPrefixes)`.
+	StreamFiles(context.Context, chan<- models.File, chan<- error, []string)
 
 	// StreamFile creates a single file reader and sends io.Readers to the `readersCh`
 	// In case of an error, it is sent to the `errorsCh` channel.
@@ -187,7 +187,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 		metadataReaders := rh.readProcessor.newMetadataReaders(ctx)
 
 		if len(metadataReaders) == 0 {
-			rh.logger.Warn("metadata readers not found")
+			rh.logger.Debug("metadata readers not found")
 
 			return nil
 		}

@@ -90,7 +90,7 @@ type ConfigRestore struct {
 	// ValidateOnly indicates whether restore should only validate the backup files.
 	ValidateOnly bool
 	// ApplyMetadataLast defines when to restore metadata (Sindexes and UDFs).
-	// If set to true, metadata will be restored after all records.
+	// If set to true, metadata will be restored after all records have been processed.
 	ApplyMetadataLast bool
 }
 

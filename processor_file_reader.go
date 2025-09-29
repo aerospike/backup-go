@@ -69,7 +69,7 @@ func newFileReaderProcessor[T models.TokenConstraint](
 
 func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Reader[T] {
 	skipPrefix := ""
-	if fr.config.ApplyMetadata == ApplyMetadataAfter {
+	if fr.config.ApplyMetadataLast {
 		skipPrefix = metadataFileNamePrefix
 	}
 

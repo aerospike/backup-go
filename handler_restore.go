@@ -183,7 +183,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 	}
 
 	// Apply metadata at the end.
-	if rh.config.ApplyMetadata == ApplyMetadataAfter {
+	if rh.config.ApplyMetadataLast {
 		metadataReaders := rh.readProcessor.newMetadataReaders(ctx)
 
 		if len(metadataReaders) == 0 {

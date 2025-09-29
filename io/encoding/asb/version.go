@@ -26,32 +26,37 @@ type version struct {
 	Minor int
 }
 
+// newVersion creates new version.
+func newVersion(major, minor int) *version {
+	return &version{Major: major, Minor: minor}
+}
+
 // parseVersion parses string version.
-func parseVersion(v string) (version, error) {
+func parseVersion(v string) (*version, error) {
 	parts := strings.Split(v, ".")
 	if len(parts) != 2 {
-		return version{}, fmt.Errorf("invalid version format: %s", v)
+		return nil, fmt.Errorf("invalid version format: %s", v)
 	}
 
 	major, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return version{}, fmt.Errorf("invalid major version: %s", parts[0])
+		return nil, fmt.Errorf("invalid major version: %s", parts[0])
 	}
 
 	minor, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return version{}, fmt.Errorf("invalid minor version: %s", parts[1])
+		return nil, fmt.Errorf("invalid minor version: %s", parts[1])
 	}
 
-	return version{Major: major, Minor: minor}, nil
+	return &version{Major: major, Minor: minor}, nil
 }
 
 // greaterOrEqual checks if current version is greater or equal to other.
-func (v version) greaterOrEqual(other version) bool {
+func (v *version) greaterOrEqual(other version) bool {
 	return v.compare(other) >= 0
 }
 
-func (v version) compare(other version) int {
+func (v *version) compare(other version) int {
 	if v.Major != other.Major {
 		if v.Major < other.Major {
 			return -1
@@ -71,6 +76,6 @@ func (v version) compare(other version) int {
 	return 0
 }
 
-func (v version) toString() string {
+func (v *version) toString() string {
 	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
 }

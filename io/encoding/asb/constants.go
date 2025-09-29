@@ -144,12 +144,6 @@ const (
 	asbNewLine = '\n'
 )
 
-// misc constants
-const (
-	// FormatVersion is the current version of the ASB encoding format
-	FormatVersion = "3.2"
-)
-
 var (
 	space                     = []byte(" ")
 	newLine                   = []byte("\n")

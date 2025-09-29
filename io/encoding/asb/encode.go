@@ -32,9 +32,10 @@ import (
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
 type Encoder[T models.TokenConstraint] struct {
-	namespace string
-	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
-	compact bool
+	config *Config
+	// Version is the version string of the backup file.
+	// It is predefined to avoid unnecessary processing on each header generation.
+	version string
 
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
@@ -43,16 +44,16 @@ type Encoder[T models.TokenConstraint] struct {
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder[T models.TokenConstraint](namespace string, compact bool) *Encoder[T] {
+func NewEncoder[T models.TokenConstraint](cfg *Config) *Encoder[T] {
 	return &Encoder[T]{
-		namespace: namespace,
-		compact:   compact,
+		config:  cfg,
+		version: cfg.getVersion().toString(),
 	}
 }
 
 // GenerateFilename generates a file name for the given namespace.
 func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
-	return prefix + e.namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
+	return prefix + e.config.Namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
 // EncodeToken encodes a token to the ASB format.
@@ -96,7 +97,7 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 }
 
 func (e *Encoder[T]) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
-	return recordToASB(e.compact, rec, buff)
+	return recordToASB(e.config.Compact, rec, buff)
 }
 
 func (e *Encoder[T]) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
@@ -111,9 +112,9 @@ func (e *Encoder[T]) GetHeader(_ uint64) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 1024))
 
-	writeVersionText(FormatVersion, buff)
+	writeVersionText(e.version, buff)
 
-	writeNamespaceMetaText(e.namespace, buff)
+	writeNamespaceMetaText(e.config.Namespace, buff)
 
 	if !e.firstFileWritten.Swap(true) {
 		writeFirstMetaText(buff)

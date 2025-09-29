@@ -171,7 +171,7 @@ func (r *Reader) streamDirectory(
 		}
 
 		// If skipPrefix is set we save skipped filepath and continue.
-		if r.skipped.Skip(file.Name()) {
+		if r.skipped.Skip(filePath) {
 			continue
 		}
 

@@ -136,13 +136,7 @@ func newBackupHandler(
 		}
 	}
 
-	hasExprSind, err := infoClient.HasExpressionSindex(config.Namespace)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
-	}
-
-	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExprSind)
+	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, false)
 
 	stats := models.NewBackupStats()
 
@@ -326,19 +320,8 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 
 	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
 
-	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
-	if err != nil {
-		return err
-	}
-
-	// backup secondary indexes and UDFs on the separate metaWriter.
-	// We don't mix them anymore with records as it was done before.
-	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
-	// This is done to keep the backup files more consistent and to avoid mixing them with records.
-	// Also, now we can restore metadata after records.
-	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
-	if err != nil {
-		return err
+	if err = bh.backupMetadata(ctx); err != nil {
+		return fmt.Errorf("failed to backup metadata: %w", err)
 	}
 
 	if bh.config.NoRecords {
@@ -398,6 +381,33 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	return pl.Run(ctx)
 }
 
+func (bh *BackupHandler) backupMetadata(ctx context.Context) error {
+	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
+	if err != nil {
+		return err
+	}
+
+	hasExprSind, err := bh.infoClient.HasExpressionSindex(bh.config.Namespace)
+	if err != nil {
+		return fmt.Errorf("failed to check if expression sindex exists: %w", err)
+	}
+
+	// Init a separate encoder with expression sindex flag check for metadata.
+	metaEncoder := NewEncoder[*models.Token](bh.config.EncoderType, bh.config.Namespace, bh.config.Compact, hasExprSind)
+
+	// backup secondary indexes and UDFs on the separate metaWriter.
+	// We don't mix them anymore with records as it was done before.
+	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
+	// This is done to keep the backup files more consistent and to avoid mixing them with records.
+	// Also, now we can restore metadata after records.
+	err = bh.backupSIndexesAndUDFs(ctx, metaWriter, metaEncoder)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (bh *BackupHandler) countRecords(ctx context.Context) {
 	records, err := bh.recordCounter.countRecords(ctx, bh.infoClient)
 	if err != nil {
@@ -411,19 +421,20 @@ func (bh *BackupHandler) countRecords(ctx context.Context) {
 func (bh *BackupHandler) backupSIndexesAndUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
+	encoder Encoder[*models.Token],
 ) error {
 	// The original writer is wrapped to disable closing after writing metadata.
 	ncWriter := newNoCloseWriter(writer)
 
 	if !bh.config.NoUDFs {
-		err := bh.backupUDFs(ctx, ncWriter)
+		err := bh.backupUDFs(ctx, ncWriter, encoder)
 		if err != nil {
 			return fmt.Errorf("failed to backup UDFs: %w", err)
 		}
 	}
 
 	if !bh.config.NoIndexes {
-		err := bh.backupSIndexes(ctx, ncWriter)
+		err := bh.backupSIndexes(ctx, ncWriter, encoder)
 		if err != nil {
 			return fmt.Errorf("failed to backup secondary indexes: %w", err)
 		}
@@ -480,6 +491,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 func (bh *BackupHandler) backupSIndexes(
 	ctx context.Context,
 	writer io.WriteCloser,
+	encoder Encoder[*models.Token],
 ) error {
 	dataReader := aerospike.NewSIndexReader(bh.infoClient, bh.config.Namespace, bh.logger)
 
@@ -490,7 +502,7 @@ func (bh *BackupHandler) backupSIndexes(
 
 	sindexWriter := pipe.Writer[*models.Token](
 		newTokenWriter(
-			bh.encoder,
+			encoder,
 			writer,
 			bh.logger.With(slog.String("writer", "sindex")),
 			stInfo,
@@ -518,6 +530,7 @@ func (bh *BackupHandler) backupSIndexes(
 func (bh *BackupHandler) backupUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
+	encoder Encoder[*models.Token],
 ) error {
 	dataReader := aerospike.NewUDFReader(bh.infoClient, bh.logger)
 
@@ -528,7 +541,7 @@ func (bh *BackupHandler) backupUDFs(
 
 	udfWriter := pipe.Writer[*models.Token](
 		newTokenWriter(
-			bh.encoder,
+			encoder,
 			writer,
 			bh.logger.With(slog.String("writer", "udf")),
 			stInfo,

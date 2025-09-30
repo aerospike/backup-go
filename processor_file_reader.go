@@ -127,6 +127,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 		for i := range mdFiles {
 			fr.reader.StreamFile(ctx, mdFiles[i], mdReadersCh, fr.errorsCh)
 		}
+
 		close(mdReadersCh)
 	}()
 

@@ -35,8 +35,8 @@ import (
 type StreamingReader interface {
 	// StreamFiles creates readers from files and sends them to the channel.
 	// In case of an error, the error is sent to the error channel.
-	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
-	StreamFiles(context.Context, chan<- models.File, chan<- error)
+	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh, skipPrefixes)`.
+	StreamFiles(context.Context, chan<- models.File, chan<- error, []string)
 
 	// StreamFile creates a single file reader and sends io.Readers to the `readersCh`
 	// In case of an error, it is sent to the `errorsCh` channel.
@@ -54,6 +54,9 @@ type StreamingReader interface {
 
 	// GetNumber returns the number of asb/asbx files in the path.
 	GetNumber() int64
+
+	// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+	GetSkipped() []string
 }
 
 // RestoreHandler handles a restore job using the given reader.
@@ -175,6 +178,31 @@ func (rh *RestoreHandler[T]) run() {
 func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 	dataReaders := rh.readProcessor.newDataReaders(ctx)
 
+	if err := rh.runPipeline(ctx, dataReaders); err != nil {
+		return err
+	}
+
+	// Apply metadata at the end.
+	if rh.config.ApplyMetadataLast {
+		metadataReaders := rh.readProcessor.newMetadataReaders(ctx)
+
+		if len(metadataReaders) == 0 {
+			rh.logger.Debug("metadata readers not found")
+
+			return nil
+		}
+
+		if err := rh.runPipeline(ctx, metadataReaders); err != nil {
+			return fmt.Errorf("failed to apply metadata: %w", err)
+		}
+
+		rh.logger.Info("metadata applied after records")
+	}
+
+	return nil
+}
+
+func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe.Reader[T]) error {
 	dataWriters, err := rh.writeProcessor.newDataWriters()
 	if err != nil {
 		return fmt.Errorf("failed to create writer workers: %w", err)

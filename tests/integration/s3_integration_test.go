@@ -179,7 +179,7 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go reader.StreamFiles(context.Background(), readerChan, errorChan)
+	go reader.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	select {
 	case r := <-readerChan:
@@ -244,7 +244,7 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go reader.StreamFiles(context.Background(), readerChan, errorChan)
+	go reader.StreamFiles(context.Background(), readerChan, errorChan, nil)
 
 	select {
 	case r := <-readerChan:

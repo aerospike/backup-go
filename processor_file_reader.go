@@ -126,13 +126,13 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 	go func() {
 		for i := range mdFiles {
 			fr.reader.StreamFile(ctx, mdFiles[i], mdReadersCh, fr.errorsCh)
-			close(mdReadersCh)
 		}
+		close(mdReadersCh)
 	}()
 
 	readWorkers := make([]pipe.Reader[T], fr.parallel)
 	for i := 0; i < fr.parallel; i++ {
-		readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.decoderFun)
+		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.decoderFun)
 	}
 
 	return readWorkers

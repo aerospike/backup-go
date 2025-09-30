@@ -2006,7 +2006,7 @@ func TestClient_getService(t *testing.T) {
 
 	nodes := ic.GetNodesNames()
 
-	_, err = ic.getService(nodes[0], cmdServiceTLSStd)
+	_, err = ic.getByNode(nodes[0], cmdServiceTLSStd)
 	require.NoError(t, err)
 }
 
@@ -2060,4 +2060,19 @@ func TestClient_GetDCsList(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []string{testASDC}, result)
+}
+
+func TestClient_GetReplicas(t *testing.T) {
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	node, err := ic.cluster.GetRandomNode()
+	require.NoError(t, err)
+
+	b, err := ic.GetPrimaryPartitions(node.GetName(), testASNamespace)
+	require.NoError(t, err)
+	require.NotNil(t, b)
 }

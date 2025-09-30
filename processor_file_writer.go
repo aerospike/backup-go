@@ -32,6 +32,8 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 )
 
+const metadataFileNamePrefix = "metadata_"
+
 // fileWriterProcessor configures and creates file writers pipelines.
 type fileWriterProcessor[T models.TokenConstraint] struct {
 	prefix          string
@@ -122,7 +124,7 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	writers := make([]io.WriteCloser, fw.parallel)
 
 	for i := range fw.parallel {
-		writer, err := fw.newWriter(ctx, i, fw.fileLimit)
+		writer, err := fw.newWriter(ctx, i)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create writer: %w", err)
 		}
@@ -135,19 +137,29 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	return writers, nil
 }
 
+// newMetaWriter creates a new writer for metadata based on the current configuration.
+func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context) (io.WriteCloser, error) {
+	w, err := fw.newWriter(ctx, -1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create meta writer: %w", err)
+	}
+
+	return metrics.NewWriter(w, fw.kbpsCollector), nil
+}
+
 // newWriter creates a new writer based on the current configuration.
 // If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
 // The returned writer may be compressed or encrypted depending on the BackupHandler's
 // configuration.
-func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int, fileLimit uint64,
+func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int,
 ) (io.WriteCloser, error) {
 	var saveCommandChan chan int
 	if fw.state != nil {
 		saveCommandChan = fw.state.SaveCommandChan
 	}
 
-	if fileLimit > 0 {
-		return sized.NewWriter(ctx, n, saveCommandChan, fileLimit, fw.configureWriter)
+	if fw.fileLimit > 0 {
+		return sized.NewWriter(ctx, n, saveCommandChan, fw.fileLimit, fw.configureWriter)
 	}
 
 	return lazy.NewWriter(ctx, n, fw.configureWriter)
@@ -159,9 +171,16 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
 	// If it is set, we use it as a prefix.
 	prefix := fw.prefix
-	if fw.prefix == "" {
+
+	if n == -1 {
+		// For metadata writer create a separate file.
+		prefix = metadataFileNamePrefix
+	}
+
+	if prefix == "" {
 		prefix = fmt.Sprintf("%d_", n)
 	}
+
 	// Generate file name.
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 

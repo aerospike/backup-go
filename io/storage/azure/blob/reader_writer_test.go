@@ -48,6 +48,7 @@ const (
 	testReadFolderPathList   = "folder_path_list/"
 	testReadFolderFileList   = "folder_file_list/"
 	testReadFolderSorted     = "folder_sorted/"
+	testReadFolderSkipped    = "folder_read_skipped/"
 
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
@@ -61,6 +62,7 @@ const (
 	testFileNameTemplateAsbx  = "%d_backup_%d.asbx"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
+	testMetadataPrefix        = "metadata_"
 
 	testFileContent       = "content"
 	testFileContentAsbx   = "content-asbx"
@@ -104,6 +106,7 @@ func TestAzureSuite(t *testing.T) {
 	suite.Run(t, s)
 }
 
+//nolint:gocyclo // Long function to generate all kinds of data.
 func fillTestData(ctx context.Context, client *azblob.Client) error {
 	if _, err := client.CreateContainer(ctx, testContainerName, nil); err != nil {
 		return err
@@ -158,6 +161,16 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 		fileName = fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
 		if i%2 == 0 {
 			fileName = fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplateWrong, i))
+		}
+		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
+			return err
+		}
+
+		// Skipped
+		fileName = fmt.Sprintf("%s%s", testReadFolderSkipped, fmt.Sprintf(testFileNameTemplate, i))
+		if i%2 == 0 {
+			fileName = fmt.Sprintf("%s%s", testReadFolderSkipped,
+				fmt.Sprintf("%s%s", testMetadataPrefix, fmt.Sprintf(testFileNameTemplate, i)))
 		}
 		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
@@ -237,7 +250,7 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -276,7 +289,7 @@ func (s *AzureSuite) TestReader_WithSorting() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -340,7 +353,7 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -400,7 +413,7 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -438,7 +451,7 @@ func (s *AzureSuite) TestReader_OpenFileErr() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	for err = range eCH {
 		s.Require().ErrorContains(err, "blob does not exist")
@@ -632,7 +645,7 @@ func (s *AzureSuite) TestReader_WithMarker() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -677,7 +690,7 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -721,7 +734,7 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -765,7 +778,7 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -904,4 +917,47 @@ func readAll(r io.ReadCloser) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
+	s.Require().NoError(err)
+	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testContainerName,
+		ioStorage.WithDir(testReadFolderSkipped),
+		ioStorage.WithValidator(validatorMock{}),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH, []string{testMetadataPrefix})
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 2, filesCounter)
+				goto Done
+			}
+			filesCounter++
+		}
+	}
+
+Done:
+	skipped := reader.GetSkipped()
+	require.Equal(s.T(), 3, len(skipped))
 }

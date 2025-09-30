@@ -81,7 +81,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 	switch fr.config.EncoderType {
 	case EncoderTypeASB:
 		for i := 0; i < fr.parallel; i++ {
-			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.decoderFun)
+			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.decoderFun, fr.config.IgnoreDecoderErrors)
 		}
 	case EncoderTypeASBX:
 		workersReadChans := make([]chan models.File, fr.parallel)
@@ -89,7 +89,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 		for i := 0; i < fr.parallel; i++ {
 			rCh := make(chan models.File)
 			workersReadChans[i] = rCh
-			readWorkers[i] = newTokenReader(rCh, fr.logger, fr.decoderFun)
+			readWorkers[i] = newTokenReader(rCh, fr.logger, fr.decoderFun, fr.config.IgnoreDecoderErrors)
 		}
 
 		go distributeFiles(fr.readersCh, workersReadChans, fr.errorsCh)
@@ -133,7 +133,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 
 	readWorkers := make([]pipe.Reader[T], fr.parallel)
 	for i := 0; i < fr.parallel; i++ {
-		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.decoderFun)
+		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.decoderFun, fr.config.IgnoreDecoderErrors)
 	}
 
 	return readWorkers

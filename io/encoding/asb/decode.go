@@ -29,8 +29,6 @@ import (
 	"github.com/segmentio/asm/base64"
 )
 
-var supportedVersion = version{3, 2}
-
 var errInvalidToken = errors.New("invalid token")
 
 // The following sync.Pool instances provide optimized memory reuse
@@ -212,7 +210,7 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Deco
 		return nil, fmt.Errorf("error while parsing %s header version: %w", fileName, err)
 	}
 
-	if !supportedVersion.greaterOrEqual(fileVersion) {
+	if !versionCurrent.greaterOrEqual(fileVersion) {
 		return nil, fmt.Errorf("unsupported backup file version: %s", asb.header.Version)
 	}
 

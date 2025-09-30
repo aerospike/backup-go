@@ -20,6 +20,17 @@ import (
 	"strings"
 )
 
+var (
+	// versionDefault is the default version of the ASB format.
+	versionDefault = newVersion(3, 1)
+	// versionExpSindex is the version of the ASB format with expression Sindex support.
+	// Should be used only for metadata files.
+	versionExpSindex = newVersion(3, 2)
+
+	// Current supported version for decoding.
+	versionCurrent = versionExpSindex
+)
+
 // version represents protocol version in format major.minor
 type version struct {
 	Major int

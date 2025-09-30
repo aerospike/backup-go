@@ -54,7 +54,7 @@ func TestTokenReader_ReadSingleToken(t *testing.T) {
 		return mockDecoder, nil
 	}
 
-	tr := newTokenReader(readersCh, logger, convertFn)
+	tr := newTokenReader(readersCh, logger, convertFn, false)
 
 	token, err := tr.Read(context.Background())
 	assert.NoError(t, err)
@@ -78,7 +78,7 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 		return mockDecoder, nil
 	}
 
-	tr := newTokenReader(readersCh, logger, convertFn)
+	tr := newTokenReader(readersCh, logger, convertFn, false)
 	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
@@ -121,7 +121,7 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 		return currentDecoder, nil
 	}
 
-	tr := newTokenReader(readersCh, logger, convertFn)
+	tr := newTokenReader(readersCh, logger, convertFn, false)
 	ctx := context.Background()
 
 	// Read from first decoder
@@ -148,7 +148,7 @@ func TestTokenReader_ReadFromClosedChannel(t *testing.T) {
 	readersCh := make(chan models.File)
 	close(readersCh)
 
-	tr := newTokenReader[*models.Token](readersCh, logger, nil)
+	tr := newTokenReader[*models.Token](readersCh, logger, nil, false)
 
 	token, err := tr.Read(context.Background())
 	assert.Equal(t, io.EOF, err)
@@ -169,7 +169,7 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 		return mockDecoder, nil
 	}
 
-	tr := newTokenReader(readersCh, logger, convertFn)
+	tr := newTokenReader(readersCh, logger, convertFn, false)
 
 	token, err := tr.Read(context.Background())
 	assert.Error(t, err)
@@ -182,7 +182,7 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 func TestTokenReader_Close(t *testing.T) {
 	logger := slog.Default()
 	readersCh := make(chan models.File)
-	tr := newTokenReader[*models.Token](readersCh, logger, nil)
+	tr := newTokenReader[*models.Token](readersCh, logger, nil, false)
 
 	// Close is a no-op, so we just ensure it doesn't panic
 	assert.NotPanics(t, func() {

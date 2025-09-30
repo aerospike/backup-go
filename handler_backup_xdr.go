@@ -114,6 +114,7 @@ func newBackupXDRHandler(
 		emptyPrefixSuffix,
 		writer,
 		encoder,
+		encoder,
 		config.EncryptionPolicy,
 		config.SecretAgentConfig,
 		config.CompressionPolicy,
@@ -172,12 +173,10 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	}
 
 	// Write workers.
-	backupWriters, err := bh.writerProcessor.newWriters(ctx)
+	writeWorkers, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create storage writers: %w", err)
+		return fmt.Errorf("failed create write workers: %w", err)
 	}
-
-	writeWorkers := bh.writerProcessor.newDataWriters(backupWriters)
 
 	proc := newDataProcessor(
 		processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),

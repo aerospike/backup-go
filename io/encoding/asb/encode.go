@@ -662,11 +662,17 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 	// sindexes only ever use 1 path for now
 	numPaths := 1
 
+	sindexSection := globalSIndex
+	// If we have sindex with expression, we need to use the globalSIndexExpression section.
+	if sindex.Expression != "" {
+		sindexSection = globalSIndexExpression
+	}
+
 	// Prepare all parameters
 	params := [][]byte{
 		globalSection,
 		space,
-		globalSIndex,
+		sindexSection,
 		space,
 		escapeASB(sindex.Namespace),
 		space,

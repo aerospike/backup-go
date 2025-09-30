@@ -177,9 +177,10 @@ var (
 	headerTypeString = []byte{keyTypeString}
 	headerTypeBytes  = []byte{keyTypeBytes}
 
-	globalSection = []byte{markerGlobalSection}
-	globalSIndex  = []byte{globalTypeSIndex}
-	globalUDF     = []byte{globalTypeUDF}
+	globalSection          = []byte{markerGlobalSection}
+	globalSIndex           = []byte{globalTypeSIndex}
+	globalSIndexExpression = []byte{globalTypeSIndexExpression}
+	globalUDF              = []byte{globalTypeUDF}
 
 	tokenVersion    = []byte(tokenASBVersion)
 	tokenFirst      = []byte(tokenFirstFile)

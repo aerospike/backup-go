@@ -41,6 +41,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 
 	writer            Writer
 	encoder           Encoder[T]
+	metaEncoder       Encoder[T]
 	encryptionPolicy  *EncryptionPolicy
 	secretAgentConfig *SecretAgentConfig
 	compressionPolicy *CompressionPolicy
@@ -60,6 +61,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	suffixGenerator func() string,
 	writer Writer,
 	encoder Encoder[T],
+	metaEncoder Encoder[T],
 	encryptionPolicy *EncryptionPolicy,
 	secretAgentConfig *SecretAgentConfig,
 	compressionPolicy *CompressionPolicy,
@@ -77,6 +79,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		suffixGenerator:   suffixGenerator,
 		writer:            writer,
 		encoder:           encoder,
+		metaEncoder:       metaEncoder,
 		encryptionPolicy:  encryptionPolicy,
 		secretAgentConfig: secretAgentConfig,
 		compressionPolicy: compressionPolicy,
@@ -90,7 +93,12 @@ func newFileWriterProcessor[T models.TokenConstraint](
 }
 
 // newDataWriters returns initialized pipeline workers for write operations.
-func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser) []pipe.Writer[T] {
+func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Writer[T], error) {
+	writers, err := fw.newWriters(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage writers: %w", err)
+	}
+
 	dataWriters := make([]pipe.Writer[T], len(writers))
 
 	for i, writer := range writers {
@@ -99,7 +107,17 @@ func (fw *fileWriterProcessor[T]) newDataWriters(writers []io.WriteCloser) []pip
 
 	fw.logger.Debug("created data writers", slog.Int("count", len(writers)))
 
-	return dataWriters
+	return dataWriters, nil
+}
+
+// newMetaWriter creates a new writer for metadata based on the current configuration.
+func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context) (io.WriteCloser, error) {
+	w, err := fw.newWriter(ctx, -1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create meta writer: %w", err)
+	}
+
+	return metrics.NewWriter(w, fw.kbpsCollector), nil
 }
 
 // createDataWriter creates a single data writer with state info if available.
@@ -137,16 +155,6 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 	return writers, nil
 }
 
-// newMetaWriter creates a new writer for metadata based on the current configuration.
-func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context) (io.WriteCloser, error) {
-	w, err := fw.newWriter(ctx, -1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create meta writer: %w", err)
-	}
-
-	return metrics.NewWriter(w, fw.kbpsCollector), nil
-}
-
 // newWriter creates a new writer based on the current configuration.
 // If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
 // The returned writer may be compressed or encrypted depending on the BackupHandler's
@@ -172,9 +180,13 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	// If it is set, we use it as a prefix.
 	prefix := fw.prefix
 
+	encoder := fw.encoder
+
 	if n == -1 {
 		// For metadata writer create a separate file.
 		prefix = metadataFileNamePrefix
+		// Set encoder to metadata encoder.
+		encoder = fw.metaEncoder
 	}
 
 	if prefix == "" {
@@ -182,7 +194,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	}
 
 	// Generate file name.
-	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
+	filename := encoder.GenerateFilename(prefix, fw.suffixGenerator())
 
 	// Create a file writer.
 	storageWriter, err := fw.writer.NewWriter(ctx, filename)
@@ -212,7 +224,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	}
 
 	// Write file header.
-	_, err = compressedWriter.Write(fw.encoder.GetHeader(num))
+	_, err = compressedWriter.Write(encoder.GetHeader(num))
 	if err != nil {
 		return nil, fmt.Errorf("failed to write header: %w", err)
 	}

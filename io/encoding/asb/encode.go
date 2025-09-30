@@ -32,7 +32,7 @@ import (
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
 type Encoder[T models.TokenConstraint] struct {
-	config *Config
+	config *EncoderConfig
 	// Version is the version string of the backup file.
 	// It is predefined to avoid unnecessary processing on each header generation.
 	version string
@@ -44,7 +44,7 @@ type Encoder[T models.TokenConstraint] struct {
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder[T models.TokenConstraint](cfg *Config) *Encoder[T] {
+func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
 	return &Encoder[T]{
 		config:  cfg,
 		version: cfg.getVersion().toString(),

@@ -98,6 +98,7 @@ type InfoGetter interface {
 	GetNamespacesList() ([]string, error)
 	GetStatus() (string, error)
 	GetDCsList() ([]string, error)
+	HasExpressionSindex(namespace string) (bool, error)
 }
 
 // Client is the main entry point for the backup package.
@@ -341,7 +342,10 @@ func (c *Client) BackupXDR(
 		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
 	}
 
-	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient)
+	handler, err := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup xdr handler: %w", err)
+	}
 
 	handler.run()
 

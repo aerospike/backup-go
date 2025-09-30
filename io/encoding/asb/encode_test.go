@@ -33,10 +33,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testEncoderConfig = NewEncoderConfig("test", false, false)
+
 func TestEncodeTokenRecord(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
 	require.NoError(t, aerr)
@@ -66,7 +68,7 @@ func TestEncodeTokenRecord(t *testing.T) {
 func TestEncodeTokenUDF(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -89,7 +91,7 @@ func TestEncodeTokenUDF(t *testing.T) {
 func TestEncodeTokenSIndex(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -117,7 +119,7 @@ func TestEncodeTokenSIndex(t *testing.T) {
 func TestEncodeTokenInvalid(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -132,7 +134,7 @@ func TestEncodeTokenInvalid(t *testing.T) {
 func TestEncodeRecord(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	var recExpr int64 = 10
 
@@ -162,7 +164,7 @@ func TestEncodeRecord(t *testing.T) {
 func TestEncodeSIndex(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -187,7 +189,7 @@ func TestGetHeaderFirst(t *testing.T) {
 
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 	firstHeader := encoder.GetHeader(0)
 	require.Equal(t, expected, string(firstHeader))
 
@@ -1625,7 +1627,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 
 func BenchmarkEncodeRecord(b *testing.B) {
 	output := &bytes.Buffer{}
-	encoder := NewEncoder[*models.Token]("test", false)
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	key := genKey()
 	rec := &models.Record{

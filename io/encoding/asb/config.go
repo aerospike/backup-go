@@ -8,8 +8,8 @@ var (
 	versionExpSindex = newVersion(3, 2)
 )
 
-// Config contains configuration options for the Encoder.
-type Config struct {
+// EncoderConfig contains configuration options for the Encoder.
+type EncoderConfig struct {
 	// Namespace is the namespace to backup.
 	Namespace string
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
@@ -19,8 +19,17 @@ type Config struct {
 	HasExpressionSindex bool
 }
 
+// NewEncoderConfig returns a new encoder EncoderConfig.
+func NewEncoderConfig(namespace string, compact, hasExprSindex bool) *EncoderConfig {
+	return &EncoderConfig{
+		Namespace:           namespace,
+		Compact:             compact,
+		HasExpressionSindex: hasExprSindex,
+	}
+}
+
 // getVersion resolves version depending on the config.
-func (c *Config) getVersion() *version {
+func (c *EncoderConfig) getVersion() *version {
 	if c.HasExpressionSindex {
 		return versionExpSindex
 	}

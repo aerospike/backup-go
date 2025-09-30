@@ -42,15 +42,18 @@ type Encoder[T models.TokenConstraint] interface {
 }
 
 // NewEncoder returns a new Encoder according to `EncoderType`.
-func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, compact bool) Encoder[T] {
+func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, compact, hasExprSindex bool,
+) Encoder[T] {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewEncoder[T](namespace, compact)
+		cfg := asb.NewEncoderConfig(namespace, compact, hasExprSindex)
+		return asb.NewEncoder[T](cfg)
 	case EncoderTypeASBX:
 		return asbx.NewEncoder[T](namespace)
 	default:
-		return asb.NewEncoder[T](namespace, compact)
+		cfg := asb.NewEncoderConfig(namespace, compact, hasExprSindex)
+		return asb.NewEncoder[T](cfg)
 	}
 }
 

@@ -129,56 +129,56 @@ func TestParseVersion(t *testing.T) {
 func TestVersionCompare(t *testing.T) {
 	tests := []struct {
 		name     string
-		version1 version
-		version2 version
+		version1 *version
+		version2 *version
 		expected int
 	}{
 		{
 			name:     "equal versions",
-			version1: version{Major: 3, Minor: 1},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 3, Minor: 1},
+			version2: &version{Major: 3, Minor: 1},
 			expected: 0,
 		},
 		{
 			name:     "version1 greater by major",
-			version1: version{Major: 4, Minor: 0},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 4, Minor: 0},
+			version2: &version{Major: 3, Minor: 1},
 			expected: 1,
 		},
 		{
 			name:     "version1 less by major",
-			version1: version{Major: 2, Minor: 9},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 2, Minor: 9},
+			version2: &version{Major: 3, Minor: 1},
 			expected: -1,
 		},
 		{
 			name:     "version1 greater by minor",
-			version1: version{Major: 3, Minor: 2},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 3, Minor: 2},
+			version2: &version{Major: 3, Minor: 1},
 			expected: 1,
 		},
 		{
 			name:     "version1 less by minor",
-			version1: version{Major: 3, Minor: 0},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 3, Minor: 0},
+			version2: &version{Major: 3, Minor: 1},
 			expected: -1,
 		},
 		{
 			name:     "major difference overrides minor",
-			version1: version{Major: 4, Minor: 0},
-			version2: version{Major: 3, Minor: 999},
+			version1: &version{Major: 4, Minor: 0},
+			version2: &version{Major: 3, Minor: 999},
 			expected: 1,
 		},
 		{
 			name:     "zero versions",
-			version1: version{Major: 0, Minor: 0},
-			version2: version{Major: 0, Minor: 0},
+			version1: &version{Major: 0, Minor: 0},
+			version2: &version{Major: 0, Minor: 0},
 			expected: 0,
 		},
 		{
 			name:     "large version numbers",
-			version1: version{Major: 100, Minor: 50},
-			version2: version{Major: 100, Minor: 49},
+			version1: &version{Major: 100, Minor: 50},
+			version2: &version{Major: 100, Minor: 49},
 			expected: 1,
 		},
 	}
@@ -199,56 +199,56 @@ func TestVersionCompare(t *testing.T) {
 func TestVersionGreaterOrEqual(t *testing.T) {
 	tests := []struct {
 		name     string
-		version1 version
-		version2 version
+		version1 *version
+		version2 *version
 		expected bool
 	}{
 		{
 			name:     "equal versions should return true",
-			version1: version{Major: 3, Minor: 1},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 3, Minor: 1},
+			version2: &version{Major: 3, Minor: 1},
 			expected: true,
 		},
 		{
 			name:     "greater major version should return true",
-			version1: version{Major: 4, Minor: 0},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 4, Minor: 0},
+			version2: &version{Major: 3, Minor: 1},
 			expected: true,
 		},
 		{
 			name:     "greater minor version should return true",
-			version1: version{Major: 3, Minor: 2},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 3, Minor: 2},
+			version2: &version{Major: 3, Minor: 1},
 			expected: true,
 		},
 		{
 			name:     "less major version should return false",
-			version1: version{Major: 2, Minor: 9},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 2, Minor: 9},
+			version2: &version{Major: 3, Minor: 1},
 			expected: false,
 		},
 		{
 			name:     "less minor version should return false",
-			version1: version{Major: 3, Minor: 0},
-			version2: version{Major: 3, Minor: 1},
+			version1: &version{Major: 3, Minor: 0},
+			version2: &version{Major: 3, Minor: 1},
 			expected: false,
 		},
 		{
 			name:     "zero version comparison",
-			version1: version{Major: 0, Minor: 1},
-			version2: version{Major: 0, Minor: 0},
+			version1: &version{Major: 0, Minor: 1},
+			version2: &version{Major: 0, Minor: 0},
 			expected: true,
 		},
 		{
 			name:     "real world example - supported version check",
-			version1: version{Major: 3, Minor: 5},
-			version2: version{Major: 3, Minor: 1}, // minimum required
+			version1: &version{Major: 3, Minor: 5},
+			version2: &version{Major: 3, Minor: 1}, // minimum required
 			expected: true,
 		},
 		{
 			name:     "real world example - unsupported version",
-			version1: version{Major: 2, Minor: 9},
-			version2: version{Major: 3, Minor: 1}, // minimum required
+			version1: &version{Major: 2, Minor: 9},
+			version2: &version{Major: 3, Minor: 1}, // minimum required
 			expected: false,
 		},
 	}

@@ -52,11 +52,11 @@ func parseVersion(v string) (*version, error) {
 }
 
 // greaterOrEqual checks if current version is greater or equal to other.
-func (v *version) greaterOrEqual(other version) bool {
+func (v *version) greaterOrEqual(other *version) bool {
 	return v.compare(other) >= 0
 }
 
-func (v *version) compare(other version) int {
+func (v *version) compare(other *version) int {
 	if v.Major != other.Major {
 		if v.Major < other.Major {
 			return -1

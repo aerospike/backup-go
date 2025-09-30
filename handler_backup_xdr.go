@@ -65,7 +65,7 @@ func newBackupXDRHandler(
 	writer Writer,
 	logger *slog.Logger,
 	infoClient InfoGetter,
-) *HandlerBackupXDR {
+) (*HandlerBackupXDR, error) {
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
@@ -73,7 +73,13 @@ func newBackupXDRHandler(
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
-	encoder := NewEncoder[*models.ASBXToken](config.EncoderType, config.Namespace, false)
+	hasExprSind, err := infoClient.HasExpressionSindex(config.Namespace)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
+	}
+
+	encoder := NewEncoder[*models.ASBXToken](config.EncoderType, config.Namespace, false, hasExprSind)
 
 	stats := models.NewBackupStats()
 
@@ -134,7 +140,7 @@ func newBackupXDRHandler(
 		done:            make(chan struct{}, 1),
 		rpsCollector:    rpsCollector,
 		kbpsCollector:   kbpsCollector,
-	}
+	}, nil
 }
 
 // run runs the backup job.

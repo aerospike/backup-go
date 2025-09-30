@@ -136,7 +136,13 @@ func newBackupHandler(
 		}
 	}
 
-	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact)
+	hasExprSind, err := infoClient.HasExpressionSindex(config.Namespace)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
+	}
+
+	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExprSind)
 
 	stats := models.NewBackupStats()
 

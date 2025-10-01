@@ -63,6 +63,7 @@ type BackupHandler struct {
 	readerProcessor *recordReaderProcessor[*models.Token]
 	writerProcessor *fileWriterProcessor[*models.Token]
 	encoder         Encoder[*models.Token]
+	metaEncoder     Encoder[*models.Token]
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 	recordCounter   *recordCounter
@@ -136,7 +137,16 @@ func newBackupHandler(
 		}
 	}
 
-	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact)
+	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, false)
+
+	hasExprSind, err := infoClient.HasExpressionSindex(config.Namespace)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
+	}
+
+	// Init a separate encoder with expression sindex flag check for metadata.
+	metaEncoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExprSind)
 
 	stats := models.NewBackupStats()
 
@@ -183,6 +193,7 @@ func newBackupHandler(
 		logger:                 logger,
 		firstFileHeaderWritten: &atomic.Bool{},
 		encoder:                encoder,
+		metaEncoder:            metaEncoder,
 		readerProcessor:        readerProcessor,
 		recordCounter:          recCounter,
 		limiter:                limiter,
@@ -201,6 +212,7 @@ func newBackupHandler(
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,
+		metaEncoder,
 		config.EncryptionPolicy,
 		config.SecretAgentConfig,
 		config.CompressionPolicy,
@@ -313,26 +325,13 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 }
 
 func (bh *BackupHandler) backup(ctx context.Context) error {
-	backupWriters, err := bh.writerProcessor.newWriters(ctx)
+	dataWriters, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed create write workers: %w", err)
 	}
 
-	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
-
-	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
-	if err != nil {
-		return err
-	}
-
-	// backup secondary indexes and UDFs on the separate metaWriter.
-	// We don't mix them anymore with records as it was done before.
-	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
-	// This is done to keep the backup files more consistent and to avoid mixing them with records.
-	// Also, now we can restore metadata after records.
-	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
-	if err != nil {
-		return err
+	if err = bh.backupMetadata(ctx); err != nil {
+		return fmt.Errorf("failed to backup metadata: %w", err)
 	}
 
 	if bh.config.NoRecords {
@@ -390,6 +389,25 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	bh.pl.Store(pl)
 
 	return pl.Run(ctx)
+}
+
+func (bh *BackupHandler) backupMetadata(ctx context.Context) error {
+	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
+	if err != nil {
+		return err
+	}
+
+	// backup secondary indexes and UDFs on the separate metaWriter.
+	// We don't mix them anymore with records as it was done before.
+	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
+	// This is done to keep the backup files more consistent and to avoid mixing them with records.
+	// Also, now we can restore metadata after records.
+	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (bh *BackupHandler) countRecords(ctx context.Context) {
@@ -484,7 +502,7 @@ func (bh *BackupHandler) backupSIndexes(
 
 	sindexWriter := pipe.Writer[*models.Token](
 		newTokenWriter(
-			bh.encoder,
+			bh.metaEncoder,
 			writer,
 			bh.logger.With(slog.String("writer", "sindex")),
 			stInfo,
@@ -522,7 +540,7 @@ func (bh *BackupHandler) backupUDFs(
 
 	udfWriter := pipe.Writer[*models.Token](
 		newTokenWriter(
-			bh.encoder,
+			bh.metaEncoder,
 			writer,
 			bh.logger.With(slog.String("writer", "udf")),
 			stInfo,

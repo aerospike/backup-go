@@ -16,6 +16,7 @@ package backup
 
 import (
 	"io"
+	"log/slog"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
@@ -42,15 +43,18 @@ type Encoder[T models.TokenConstraint] interface {
 }
 
 // NewEncoder returns a new Encoder according to `EncoderType`.
-func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, compact bool) Encoder[T] {
+func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, compact, hasExprSindex bool,
+) Encoder[T] {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewEncoder[T](namespace, compact)
+		cfg := asb.NewEncoderConfig(namespace, compact, hasExprSindex)
+		return asb.NewEncoder[T](cfg)
 	case EncoderTypeASBX:
 		return asbx.NewEncoder[T](namespace)
 	default:
-		return asb.NewEncoder[T](namespace, compact)
+		cfg := asb.NewEncoderConfig(namespace, compact, hasExprSindex)
+		return asb.NewEncoder[T](cfg)
 	}
 }
 
@@ -66,15 +70,16 @@ type Decoder[T models.TokenConstraint] interface {
 }
 
 // NewDecoder returns a new Decoder according to `EncoderType`.
-func NewDecoder[T models.TokenConstraint](eType EncoderType, src io.Reader, fileNumber uint64, fileName string,
+func NewDecoder[T models.TokenConstraint](
+	eType EncoderType, src io.Reader, fileNumber uint64, fileName string, ignoreErrors bool, logger *slog.Logger,
 ) (Decoder[T], error) {
 	switch eType {
 	// As at the moment only one `ASB` Decoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewDecoder[T](src, fileName)
+		return asb.NewDecoder[T](src, fileName, ignoreErrors, logger)
 	case EncoderTypeASBX:
 		return asbx.NewDecoder[T](src, fileNumber, fileName)
 	default:
-		return asb.NewDecoder[T](src, fileName)
+		return asb.NewDecoder[T](src, fileName, ignoreErrors, logger)
 	}
 }

@@ -688,6 +688,11 @@ func (r *Decoder[T]) readRecord() (*models.Record, error) {
 		case i == 3 && b == expectedRecordHeaderTypes[4]:
 			i++
 		case b != expectedRecordHeaderTypes[i]:
+			// Skip unknown record type - read until newline.
+			if err = r.skipToNextLine(); err != nil {
+				return nil, fmt.Errorf("failed to skip unknown record line type %c: %w", b, err)
+			}
+
 			return nil, fmt.Errorf("invalid record header line type %c expected %c", b, expectedRecordHeaderTypes[i])
 		}
 

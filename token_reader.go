@@ -27,12 +27,11 @@ import (
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
 type tokenReader[T models.TokenConstraint] struct {
-	readersCh           <-chan models.File
-	decoder             Decoder[T]
-	logger              *slog.Logger
-	newDecoderFn        func(io.ReadCloser, uint64, string) (Decoder[T], error)
-	currentReader       io.Closer
-	ignoreDecoderErrors bool
+	readersCh     <-chan models.File
+	decoder       Decoder[T]
+	logger        *slog.Logger
+	newDecoderFn  func(io.ReadCloser, uint64, string) (Decoder[T], error)
+	currentReader io.Closer
 }
 
 // newTokenReader creates a new tokenReader.
@@ -40,13 +39,11 @@ func newTokenReader[T models.TokenConstraint](
 	readersCh <-chan models.File,
 	logger *slog.Logger,
 	newDecoderFn func(io.ReadCloser, uint64, string) (Decoder[T], error),
-	ignoreDecoderErrors bool,
 ) *tokenReader[T] {
 	return &tokenReader[T]{
-		readersCh:           readersCh,
-		newDecoderFn:        newDecoderFn,
-		logger:              logger,
-		ignoreDecoderErrors: ignoreDecoderErrors,
+		readersCh:    readersCh,
+		newDecoderFn: newDecoderFn,
+		logger:       logger,
 	}
 }
 
@@ -69,11 +66,6 @@ func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
 				tr.decoder = nil
 				tr.currentReader = nil
 			default:
-				if tr.ignoreDecoderErrors {
-					tr.logger.Warn("ignoring error while reading token", slog.Any("error", err))
-					continue
-				}
-
 				return nil, err
 			}
 		}

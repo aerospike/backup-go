@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"sync"
 
@@ -180,17 +181,22 @@ type metaData struct {
 
 // Decoder contains logic for decoding backup data from the .asb format.
 type Decoder[T models.TokenConstraint] struct {
-	header   *header
-	metaData *metaData
-	reader   *countingReader
+	header       *header
+	metaData     *metaData
+	reader       *countingReader
+	ignoreErrors bool
+	logger       *slog.Logger
 }
 
 // NewDecoder creates a new Decoder.
-func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignoreErrors bool, logger *slog.Logger,
+) (*Decoder[T], error) {
 	var err error
 
 	asb := Decoder[T]{
-		reader: newCountingReader(src, fileName),
+		reader:       newCountingReader(src, fileName),
+		ignoreErrors: ignoreErrors,
+		logger:       logger,
 	}
 
 	asb.header, err = asb.readHeader()
@@ -414,11 +420,20 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 			return nil, newLineError(lineTypeUDF, err)
 		}
 	default:
-		// Skip unknown global type - read until newline.
-		if err = r.skipToNextLine(); err != nil {
-			return nil, fmt.Errorf("failed to skip unknown global line type %c: %w", b, err)
+		if r.ignoreErrors {
+			// Skip unknown global type - read until newline.
+			if err = r.skipToNextLine(); err != nil {
+				return nil, fmt.Errorf("failed to skip unknown global line type %c: %w", b, err)
+			}
+
+			r.logger.Warn("ignoring error while reading global type",
+				slog.Any("error", fmt.Errorf("invalid global line type %c", b)))
+
+			// Recursively try to read next global
+			return r.readGlobals()
 		}
 
+		// If not skipping errors, just return the error.
 		return nil, fmt.Errorf("invalid global line type %c", b)
 	}
 
@@ -688,9 +703,20 @@ func (r *Decoder[T]) readRecord() (*models.Record, error) {
 		case i == 3 && b == expectedRecordHeaderTypes[4]:
 			i++
 		case b != expectedRecordHeaderTypes[i]:
-			// Skip unknown record type - read until newline.
-			if err = r.skipToNextLine(); err != nil {
-				return nil, fmt.Errorf("failed to skip unknown record line type %c: %w", b, err)
+			if r.ignoreErrors {
+				// Skip only this field.
+				if err := r.skipToNextLine(); err != nil {
+					return nil, fmt.Errorf("failed to skip unknown record header type %c: %w", b, err)
+				}
+
+				r.logger.Warn("ignoring error while reading record field type",
+					slog.Any("error",
+						fmt.Errorf("invalid record header line type %c expected %c", b, expectedRecordHeaderTypes[i])))
+
+				// Don't increment i, retry reading the same expected field.
+				i--
+
+				continue
 			}
 
 			return nil, fmt.Errorf("invalid record header line type %c expected %c", b, expectedRecordHeaderTypes[i])

@@ -17,6 +17,7 @@ package asb
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"reflect"
 	"strings"
@@ -3629,7 +3630,7 @@ func TestNewASBReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := NewDecoder[*models.Token](tt.args.src, testFileName)
+			got, err := NewDecoder[*models.Token](tt.args.src, testFileName, false, slog.Default())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)
 				return

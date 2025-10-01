@@ -418,7 +418,7 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 		if err = r.skipToNextLine(); err != nil {
 			return nil, fmt.Errorf("failed to skip unknown global line type %c: %w", b, err)
 		}
-		
+
 		return nil, fmt.Errorf("invalid global line type %c", b)
 	}
 

@@ -414,6 +414,11 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 			return nil, newLineError(lineTypeUDF, err)
 		}
 	default:
+		// Skip unknown global type - read until newline.
+		if err = r.skipToNextLine(); err != nil {
+			return nil, fmt.Errorf("failed to skip unknown global line type %c: %w", b, err)
+		}
+		
 		return nil, fmt.Errorf("invalid global line type %c", b)
 	}
 
@@ -1159,6 +1164,22 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 	}
 
 	return digest, nil
+}
+
+func (r *Decoder[T]) skipToNextLine() error {
+	// Read until newline, no escaping needed for skip.
+	buf, err := _readUntilAny(r.reader, []byte{asbNewLine}, false)
+	if err != nil {
+		return err
+	}
+
+	// Return buffer to pool immediately since we don't need the data.
+	returnSmallBuffer(buf)
+
+	// Consume the newline.
+	_, err = r.reader.ReadByte()
+
+	return err
 }
 
 // ***** Helper Functions

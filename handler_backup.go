@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"sync"
 	"sync/atomic"
 
@@ -241,10 +242,6 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 		return 0, fmt.Errorf("failed to count records: %w", err)
 	}
 
-	// Calculate headers size.
-	header := bh.encoder.GetHeader(0)
-	headerSize := len(header) * bh.config.ParallelWrite
-
 	// Calculate records size.
 	samples, samplesData, err := bh.getEstimateSamples(ctx, recordsNumber)
 	if err != nil {
@@ -260,10 +257,20 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	bh.logger.Debug("compression", slog.Float64("ratio", compressRatio))
 
 	result := getEstimate(samples, float64(totalCount), bh.logger)
-	// Add headers.
-	result += float64(headerSize)
+
 	// Apply compression ratio. (For uncompressed it will be 1)
 	result /= compressRatio
+
+	// Calculate and add estimated backup file headers size.
+	header := bh.encoder.GetHeader(0)
+	numFiles := bh.config.ParallelWrite
+
+	if bh.config.FileLimit > 0 {
+		numFiles = int(math.Max(result/float64(bh.config.FileLimit), float64(numFiles)))
+	}
+
+	headerSize := len(header) * numFiles
+	result += float64(headerSize) / compressRatio
 
 	return uint64(result), nil
 }

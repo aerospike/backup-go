@@ -245,7 +245,7 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("racks list or nodes list are not supported with PREFER_RACK replica policy")
 	}
 
-	if c.OutputFilePrefix != "" && c.OutputFilePrefix == metadataFileNamePrefix {
+	if c.OutputFilePrefix == metadataFileNamePrefix {
 		return fmt.Errorf("prefix is reserved for metadata files, please use another prefix")
 	}
 

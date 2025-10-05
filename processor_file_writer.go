@@ -36,59 +36,57 @@ const metadataFileNamePrefix = "metadata_"
 
 // fileWriterProcessor configures and creates file writers pipelines.
 type fileWriterProcessor[T models.TokenConstraint] struct {
-	prefix          string
 	suffixGenerator func() string
 
-	writer            Writer
-	encoder           Encoder[T]
-	metaEncoder       Encoder[T]
-	encryptionPolicy  *EncryptionPolicy
-	secretAgentConfig *SecretAgentConfig
-	compressionPolicy *CompressionPolicy
-	state             *State
-	stats             *models.BackupStats
-	kbpsCollector     *metrics.Collector
-
-	fileLimit uint64
-	parallel  int
+	config        configGetter
+	writer        Writer
+	encoder       Encoder[T]
+	metaEncoder   Encoder[T]
+	state         *State
+	stats         *models.BackupStats
+	kbpsCollector *metrics.Collector
 
 	logger *slog.Logger
 }
 
+// configGetter is an interface for getting configuration values form both xdr and scan backup config.
+type configGetter interface {
+	getEncoderType() EncoderType
+	getNamespace() string
+	getCompact() bool
+	getFileLimit() uint64
+	getOutputFilePrefix() string
+	getEncryptionPolicy() *EncryptionPolicy
+	getSecretAgentConfig() *SecretAgentConfig
+	getCompressionPolicy() *CompressionPolicy
+	getParallelWrite() int
+}
+
 // newFileWriterProcessor returns a new file writer processor instance.
 func newFileWriterProcessor[T models.TokenConstraint](
-	prefix string,
+	config configGetter,
 	suffixGenerator func() string,
 	writer Writer,
 	encoder Encoder[T],
-	metaEncoder Encoder[T],
-	encryptionPolicy *EncryptionPolicy,
-	secretAgentConfig *SecretAgentConfig,
-	compressionPolicy *CompressionPolicy,
 	state *State,
 	stats *models.BackupStats,
 	kbpsCollector *metrics.Collector,
-	fileLimit uint64,
-	parallel int,
+	hasExprSind bool,
 	logger *slog.Logger,
 ) *fileWriterProcessor[T] {
 	logger.Debug("created new file writer processor")
 
 	return &fileWriterProcessor[T]{
-		prefix:            prefix,
-		suffixGenerator:   suffixGenerator,
-		writer:            writer,
-		encoder:           encoder,
-		metaEncoder:       metaEncoder,
-		encryptionPolicy:  encryptionPolicy,
-		secretAgentConfig: secretAgentConfig,
-		compressionPolicy: compressionPolicy,
-		state:             state,
-		stats:             stats,
-		kbpsCollector:     kbpsCollector,
-		fileLimit:         fileLimit,
-		parallel:          parallel,
-		logger:            logger,
+		config:          config,
+		suffixGenerator: suffixGenerator,
+		writer:          writer,
+		encoder:         encoder,
+		// Init a separate encoder with expression sindex flag check for metadata.
+		metaEncoder:   NewEncoder[T](config.getEncoderType(), config.getNamespace(), config.getCompact(), hasExprSind),
+		state:         state,
+		stats:         stats,
+		kbpsCollector: kbpsCollector,
+		logger:        logger,
 	}
 }
 
@@ -139,9 +137,9 @@ func (fw *fileWriterProcessor[T]) getStateInfo(n int) *stateInfo {
 
 // newWriters returns a slice of configured writers.
 func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteCloser, error) {
-	writers := make([]io.WriteCloser, fw.parallel)
+	writers := make([]io.WriteCloser, fw.config.getParallelWrite())
 
-	for i := range fw.parallel {
+	for i := range fw.config.getParallelWrite() {
 		writer, err := fw.newWriter(ctx, i)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create writer: %w", err)
@@ -166,8 +164,8 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int,
 		saveCommandChan = fw.state.SaveCommandChan
 	}
 
-	if fw.fileLimit > 0 {
-		return sized.NewWriter(ctx, n, saveCommandChan, fw.fileLimit, fw.configureWriter)
+	if fw.config.getFileLimit() > 0 {
+		return sized.NewWriter(ctx, n, saveCommandChan, fw.config.getFileLimit(), fw.configureWriter)
 	}
 
 	return lazy.NewWriter(ctx, n, fw.configureWriter)
@@ -178,7 +176,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 ) (io.WriteCloser, error) {
 	// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
 	// If it is set, we use it as a prefix.
-	prefix := fw.prefix
+	prefix := fw.config.getOutputFilePrefix()
 
 	encoder := fw.encoder
 
@@ -204,8 +202,8 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 
 	// Apply encryption (if it is enabled).
 	encryptedWriter, err := newEncryptionWriter(
-		fw.encryptionPolicy,
-		fw.secretAgentConfig,
+		fw.config.getEncryptionPolicy(),
+		fw.config.getSecretAgentConfig(),
 		counter.NewWriter(storageWriter, &fw.stats.BytesWritten, sizeCounter),
 	)
 	if err != nil {
@@ -213,7 +211,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	}
 
 	// Apply compression (if it is enabled).
-	compressedWriter, err := newCompressionWriter(fw.compressionPolicy, encryptedWriter)
+	compressedWriter, err := newCompressionWriter(fw.config.getCompressionPolicy(), encryptedWriter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set compression: %w", err)
 	}

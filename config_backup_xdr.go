@@ -187,3 +187,39 @@ func validateRewind(value string) error {
 
 	return nil
 }
+
+func (c *ConfigBackupXDR) getEncoderType() EncoderType {
+	return c.EncoderType
+}
+
+func (c *ConfigBackupXDR) getNamespace() string {
+	return c.Namespace
+}
+
+func (c *ConfigBackupXDR) getCompact() bool {
+	return false
+}
+
+func (c *ConfigBackupXDR) getFileLimit() uint64 {
+	return c.FileLimit
+}
+
+func (c *ConfigBackupXDR) getOutputFilePrefix() string {
+	return ""
+}
+
+func (c *ConfigBackupXDR) getEncryptionPolicy() *EncryptionPolicy {
+	return c.EncryptionPolicy
+}
+
+func (c *ConfigBackupXDR) getSecretAgentConfig() *SecretAgentConfig {
+	return c.SecretAgentConfig
+}
+
+func (c *ConfigBackupXDR) getCompressionPolicy() *CompressionPolicy {
+	return c.CompressionPolicy
+}
+
+func (c *ConfigBackupXDR) getParallelWrite() int {
+	return c.ParallelWrite
+}

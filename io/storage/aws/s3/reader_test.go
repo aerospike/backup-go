@@ -59,11 +59,12 @@ const (
 	testFileContentAsb       = "content-asb"
 	testFileContentAsbx      = "content-asbx"
 
+	testReadFolderSkipped = "folder_read_skipped"
+	testMetadataPrefix    = "metadata_"
+
 	testFileContentSorted1 = "sorted1"
 	testFileContentSorted2 = "sorted2"
 	testFileContentSorted3 = "sorted3"
-
-	testFoldersNumber = 5
 )
 
 var testFoldersTimestamps = []string{"1732519290025", "1732519390025", "1732519490025", "1732519590025", "1732519790025"}
@@ -136,7 +137,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		}
 	}
 
-	for i := range testFoldersNumber {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s/%s", testFolderFileList, fmt.Sprintf(testFileNameAsbTemplate, i))
 		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
@@ -178,6 +179,20 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		fileName = fmt.Sprintf("%s/%s", testFolderMixedData, fmt.Sprintf(testFileNameAsbTemplate, i))
 		if i%2 == 0 {
 			fileName = fmt.Sprintf("%s/%s", testFolderMixedData, fmt.Sprintf(testFileNameTemplateWrong, i))
+		}
+		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(testBucket),
+			Key:    aws.String(fileName),
+			Body:   bytes.NewReader([]byte(testFileContentAsb)),
+		}); err != nil {
+			return err
+		}
+
+		// Skipped.
+		fileName = fmt.Sprintf("%s/%s", testReadFolderSkipped, fmt.Sprintf(testFileNameAsbTemplate, i))
+		if i%2 == 0 {
+			fileName = fmt.Sprintf("%s/%s", testReadFolderSkipped,
+				fmt.Sprintf("%s%s", testMetadataPrefix, fmt.Sprintf(testFileNameAsbTemplate, i)))
 		}
 		if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
@@ -262,7 +277,7 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -313,7 +328,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -363,7 +378,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -409,7 +424,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -458,7 +473,7 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -531,7 +546,7 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -601,7 +616,7 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -656,7 +671,7 @@ func (s *AwsSuite) TestReader_OpenFileOk() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -692,7 +707,7 @@ func (s *AwsSuite) TestReader_OpenFileErr() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	for err = range eCH {
 		s.Require().Error(err)
@@ -1001,7 +1016,7 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -1017,4 +1032,53 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 			filesCounter++
 		}
 	}
+}
+
+func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+	ctx := context.Background()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	mockValidator := new(mocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == util.FileExtAsb {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		ioStorage.WithDir(testReadFolderSkipped),
+		ioStorage.WithValidator(mockValidator),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH, []string{testMetadataPrefix})
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 2, filesCounter)
+				goto Done
+			}
+			filesCounter++
+		}
+	}
+
+Done:
+	skipped := reader.GetSkipped()
+	require.Equal(s.T(), 3, len(skipped))
 }

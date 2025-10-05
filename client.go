@@ -417,12 +417,13 @@ func (c *Client) InfoClient() InfoGetter {
 	return c.infoClient
 }
 
-// Estimate calculates the backup size from a random sample of estimateSamples records number.
+// Estimate calculates the backup size in bytes from a random sample of estimateSamples records number.
 // It counts total records for backup, selects sample records,
 // and interpolates the size of sample on total records count according to parallelism and compression.
+// It does not apply any backup filter configuration.
 //   - ctx can be used to cancel the calculation operation.
 //   - config is the backup configuration for the calculation operation.
-//   - estimateSamples is number of records to be scanned for calculations.
+//   - estimateSamples is the number of records to be scanned for calculations.
 func (c *Client) Estimate(
 	ctx context.Context,
 	config *ConfigBackup,

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"sync"
 	"sync/atomic"
 
@@ -241,10 +242,6 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 		return 0, fmt.Errorf("failed to count records: %w", err)
 	}
 
-	// Calculate headers size.
-	header := bh.encoder.GetHeader(0)
-	headerSize := len(header) * bh.config.ParallelWrite
-
 	// Calculate records size.
 	samples, samplesData, err := bh.getEstimateSamples(ctx, recordsNumber)
 	if err != nil {
@@ -260,10 +257,20 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	bh.logger.Debug("compression", slog.Float64("ratio", compressRatio))
 
 	result := getEstimate(samples, float64(totalCount), bh.logger)
-	// Add headers.
-	result += float64(headerSize)
+
 	// Apply compression ratio. (For uncompressed it will be 1)
 	result /= compressRatio
+
+	// Calculate and add estimated backup file headers size.
+	header := bh.encoder.GetHeader(0)
+	numFiles := bh.config.ParallelWrite
+
+	if bh.config.FileLimit > 0 {
+		numFiles = int(math.Max(result/float64(bh.config.FileLimit), float64(numFiles)))
+	}
+
+	headerSize := len(header) * numFiles
+	result += float64(headerSize) / compressRatio
 
 	return uint64(result), nil
 }
@@ -318,13 +325,17 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 
 	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
 
-	// backup secondary indexes and UDFs on the first writer
-	// this is done to match the behavior of the
-	// backup c tool and keep the backup files more consistent
-	// at some point we may want to treat the secondary indexes/UDFs
-	// like records and back them up as part of the same pipeline
-	// but doing so would cause them to be mixed in with records in the backup file(s)
-	err = bh.backupSIndexesAndUDFs(ctx, backupWriters[0])
+	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
+	if err != nil {
+		return err
+	}
+
+	// backup secondary indexes and UDFs on the separate metaWriter.
+	// We don't mix them anymore with records as it was done before.
+	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
+	// This is done to keep the backup files more consistent and to avoid mixing them with records.
+	// Also, now we can restore metadata after records.
+	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
 	if err != nil {
 		return err
 	}
@@ -401,23 +412,23 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 	writer io.WriteCloser,
 ) error {
 	// The original writer is wrapped to disable closing after writing metadata.
-	writer = newNoCloseWriter(writer)
-
-	if !bh.config.NoIndexes {
-		err := bh.backupSIndexes(ctx, writer)
-		if err != nil {
-			return fmt.Errorf("failed to backup secondary indexes: %w", err)
-		}
-	}
+	ncWriter := newNoCloseWriter(writer)
 
 	if !bh.config.NoUDFs {
-		err := bh.backupUDFs(ctx, writer)
+		err := bh.backupUDFs(ctx, ncWriter)
 		if err != nil {
 			return fmt.Errorf("failed to backup UDFs: %w", err)
 		}
 	}
 
-	return nil
+	if !bh.config.NoIndexes {
+		err := bh.backupSIndexes(ctx, ncWriter)
+		if err != nil {
+			return fmt.Errorf("failed to backup secondary indexes: %w", err)
+		}
+	}
+
+	return writer.Close()
 }
 
 // GetStats returns the stats of the backup job.

@@ -17,7 +17,9 @@ package storage
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aerospike/backup-go/internal/util"
@@ -104,4 +106,74 @@ func IsDirectory(prefix, fileName string) bool {
 	}
 	// All other variants.
 	return strings.Contains(fileName, "/")
+}
+
+// SkippedFiles collects information about files that were
+// not processed during an operation.
+type SkippedFiles struct {
+	// prefixes holds a list of path prefixes used to identify files
+	// that should be skipped.
+	prefixes []string
+	// filePaths stores a list of full paths for individual files that
+	// were skipped.
+	filePaths []string
+	mu        sync.RWMutex
+}
+
+// NewSkippedFiles returns new SkippedFiles instance, to track skipped files.
+func NewSkippedFiles(prefixes []string) *SkippedFiles {
+	return &SkippedFiles{
+		prefixes:  prefixes,
+		filePaths: make([]string, 0),
+	}
+}
+
+// Skip check if file must be skipped. If yes, it will be added to filePaths.
+func (s *SkippedFiles) Skip(path string) bool {
+	if s == nil {
+		return false
+	}
+
+	if len(s.prefixes) == 0 {
+		return false
+	}
+
+	fileName := filepath.Base(path)
+
+	for i := range s.prefixes {
+		if s.prefixes[i] == "" {
+			// Skip empty prefixes
+			continue
+		}
+
+		if strings.HasPrefix(fileName, s.prefixes[i]) {
+			s.mu.Lock()
+			s.filePaths = append(s.filePaths, path)
+			s.mu.Unlock()
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+func (s *SkippedFiles) GetSkipped() []string {
+	if s == nil {
+		return nil
+	}
+
+	if len(s.filePaths) == 0 {
+		return nil
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// As slices are passed as pointer, we should create a copy before return.
+	result := make([]string, len(s.filePaths))
+	copy(result, s.filePaths)
+
+	return result
 }

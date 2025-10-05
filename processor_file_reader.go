@@ -68,31 +68,20 @@ func newFileReaderProcessor[T models.TokenConstraint](
 }
 
 func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Reader[T] {
-	// Start lazy file reading.
-	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh)
-
-	fn := func(r io.ReadCloser, fileNumber uint64, fileName string) (Decoder[T], error) {
-		reader, err := fr.wrapReader(r)
-		if err != nil {
-			return nil, err
-		}
-
-		reader = metrics.NewReader(reader, fr.kbpsCollector)
-
-		d, err := NewDecoder[T](fr.config.EncoderType, reader, fileNumber, fileName)
-		if err != nil {
-			return nil, err
-		}
-
-		return d, nil
+	var skipPrefixes []string
+	if fr.config.ApplyMetadataLast {
+		skipPrefixes = []string{metadataFileNamePrefix}
 	}
+
+	// Start lazy file reading.
+	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh, skipPrefixes)
 
 	readWorkers := make([]pipe.Reader[T], fr.parallel)
 
 	switch fr.config.EncoderType {
 	case EncoderTypeASB:
 		for i := 0; i < fr.parallel; i++ {
-			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fn)
+			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.decoderFun)
 		}
 	case EncoderTypeASBX:
 		workersReadChans := make([]chan models.File, fr.parallel)
@@ -100,10 +89,51 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 		for i := 0; i < fr.parallel; i++ {
 			rCh := make(chan models.File)
 			workersReadChans[i] = rCh
-			readWorkers[i] = newTokenReader(rCh, fr.logger, fn)
+			readWorkers[i] = newTokenReader(rCh, fr.logger, fr.decoderFun)
 		}
 
 		go distributeFiles(fr.readersCh, workersReadChans, fr.errorsCh)
+	}
+
+	return readWorkers
+}
+
+func (fr *fileReaderProcessor[T]) decoderFun(r io.ReadCloser, fileNumber uint64, fileName string) (Decoder[T], error) {
+	reader, err := fr.wrapReader(r)
+	if err != nil {
+		return nil, err
+	}
+
+	reader = metrics.NewReader(reader, fr.kbpsCollector)
+
+	d, err := NewDecoder[T](fr.config.EncoderType, reader, fileNumber, fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	return d, nil
+}
+
+func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe.Reader[T] {
+	mdFiles := fr.reader.GetSkipped()
+
+	if len(mdFiles) == 0 {
+		return nil
+	}
+
+	mdReadersCh := make(chan models.File)
+
+	go func() {
+		for i := range mdFiles {
+			fr.reader.StreamFile(ctx, mdFiles[i], mdReadersCh, fr.errorsCh)
+		}
+
+		close(mdReadersCh)
+	}()
+
+	readWorkers := make([]pipe.Reader[T], fr.parallel)
+	for i := 0; i < fr.parallel; i++ {
+		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.decoderFun)
 	}
 
 	return readWorkers

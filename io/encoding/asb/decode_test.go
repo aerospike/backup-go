@@ -1726,6 +1726,35 @@ func TestASBReader_readRecord(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "unknown fields",
+			fields: fields{
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ z unknown\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
+			},
+			want: &models.Record{
+				Record: &a.Record{
+					Key: intKey,
+					Bins: map[string]any{
+						"bin1": nil,
+						"bin2": int64(2),
+					},
+					Generation: 10,
+				},
+				VoidTime: 10,
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1733,9 +1762,11 @@ func TestASBReader_readRecord(t *testing.T) {
 			t.Parallel()
 
 			r := &Decoder[*models.Token]{
-				reader:   tt.fields.reader,
-				header:   tt.fields.header,
-				metaData: tt.fields.metaData,
+				reader:       tt.fields.reader,
+				header:       tt.fields.header,
+				metaData:     tt.fields.metaData,
+				logger:       slog.Default(),
+				ignoreErrors: true,
 			}
 			got, err := r.readRecord()
 			if (err != nil) != tt.wantErr {

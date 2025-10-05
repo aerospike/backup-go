@@ -20,6 +20,7 @@ import (
 )
 
 func TestParseVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		input       string
@@ -99,6 +100,8 @@ func TestParseVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := parseVersion(tt.input)
 
 			if tt.shouldError {
@@ -127,6 +130,8 @@ func TestParseVersion(t *testing.T) {
 }
 
 func TestVersionCompare(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		version1 *version
@@ -185,6 +190,7 @@ func TestVersionCompare(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := tt.version1.compare(tt.version2)
 			if result != tt.expected {
 				t.Errorf("version{%d, %d}.compare(version{%d, %d}) = %d, want %d",
@@ -197,6 +203,8 @@ func TestVersionCompare(t *testing.T) {
 }
 
 func TestVersionGreaterOrEqual(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		version1 *version
@@ -255,6 +263,8 @@ func TestVersionGreaterOrEqual(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := tt.version1.greaterOrEqual(tt.version2)
 			if result != tt.expected {
 				t.Errorf("version{%d, %d}.greaterOrEqual(version{%d, %d}) = %t, want %t",
@@ -268,6 +278,8 @@ func TestVersionGreaterOrEqual(t *testing.T) {
 
 // Интеграционный тест - проверяем весь flow вместе
 func TestVersionValidationFlow(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name             string
 		headerVersion    string
@@ -302,6 +314,8 @@ func TestVersionValidationFlow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			headerVer, err := parseVersion(tt.headerVersion)
 			if err != nil {
 				if tt.shouldBeValid {

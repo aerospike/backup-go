@@ -392,20 +392,7 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 	var res any
 
 	if err := _expectChar(r.reader, markerGlobalSection); err != nil {
-		if r.ignoreUnknownFields {
-			// Skip unknown global type - read until newline.
-			if err = r.skipToNextLine(); err != nil {
-				return nil, fmt.Errorf("failed to skip unknown global section: %w", err)
-			}
-
-			r.logger.Warn("ignoring error while reading global section",
-				slog.Any("error", fmt.Errorf("invalid global section: %w", err)))
-
-			// Recursively try to read next global
-			return r.readGlobals()
-		}
-
-		return nil, err
+		return r.skipAndRetryGlobals(fmt.Errorf("failed to read global section: %w", err))
 	}
 
 	if err := _expectChar(r.reader, ' '); err != nil {
@@ -434,24 +421,25 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 			return nil, newLineError(lineTypeUDF, err)
 		}
 	default:
-		if r.ignoreUnknownFields {
-			// Skip unknown global type - read until newline.
-			if err = r.skipToNextLine(); err != nil {
-				return nil, fmt.Errorf("failed to skip unknown global line type %c: %w", b, err)
-			}
-
-			r.logger.Warn("ignoring error while reading global type",
-				slog.Any("error", fmt.Errorf("invalid global line type %c", b)))
-
-			// Recursively try to read next global
-			return r.readGlobals()
-		}
-
-		// If not skipping errors, just return the error.
-		return nil, fmt.Errorf("invalid global line type %c", b)
+		return r.skipAndRetryGlobals(fmt.Errorf("failed to read global line type %c: %w", b, err))
 	}
 
 	return res, nil
+}
+
+func (r *Decoder[T]) skipAndRetryGlobals(err error) (any, error) {
+	if !r.ignoreUnknownFields {
+		return nil, err
+	}
+
+	if err := r.skipToNextLine(); err != nil {
+		return nil, fmt.Errorf("failed to skip: %w", err)
+	}
+
+	r.logger.Warn("skipping unknown section",
+		slog.Any("error", err))
+
+	return r.readGlobals()
 }
 
 // readSIndex is used to read secondary index lines in the global section of the asb file.

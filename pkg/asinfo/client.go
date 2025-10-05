@@ -190,15 +190,15 @@ func (ic *Client) GetVersion() (AerospikeVersion, error) {
 	return lowestVersion, nil
 }
 
-// HasExpressionSindex check if database contain expression based Sindexes.
+// HasExpressionSindex checks whether the namespace contains expression based secondary indexes.
 func (ic *Client) HasExpressionSindex(namespace string) (bool, error) {
 	list, err := ic.GetSIndexes(namespace)
 	if err != nil {
 		return false, err
 	}
 
-	for i := range list {
-		if list[i].Expression != "" {
+	for _, idx := range list {
+		if idx.Expression != "" {
 			return true, nil
 		}
 	}

@@ -1383,13 +1383,11 @@ func TestBackupEstimate(t *testing.T) {
 	t.Parallel()
 	const setName = "testEstimate"
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
-	defer cancel()
+	t.Cleanup(func() { cancel() })
 
 	asClient, err := testAerospikeClient()
 	require.NoError(t, err)
-	defer asClient.Close()
-
-	backupConfig := NewDefaultBackupConfig()
+	t.Cleanup(func() { asClient.Close() })
 
 	records, err := genRecords(testASNamespace, setName, 100, testBins)
 	require.NoError(t, err)
@@ -1399,13 +1397,35 @@ func TestBackupEstimate(t *testing.T) {
 	backupClient, err := NewClient(asClient, WithID("test_client"))
 	require.NoError(t, err)
 
-	bh, err := backupClient.Estimate(
-		ctx,
-		backupConfig,
-		10,
-	)
-	require.NoError(t, err)
-	require.NotNil(t, bh)
+	configFileLimit := NewDefaultBackupConfig()
+	configFileLimit.FileLimit = 5
+
+	testCases := []struct {
+		name   string
+		config *ConfigBackup
+	}{
+		{
+			"configDefault",
+			NewDefaultBackupConfig(),
+		},
+		{
+			"configFileLimit",
+			configFileLimit,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			bh, err := backupClient.Estimate(
+				ctx,
+				tt.config,
+				10,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, bh)
+		})
+	}
 }
 
 func TestBackupContinuation(t *testing.T) {

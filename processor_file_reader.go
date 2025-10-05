@@ -111,7 +111,7 @@ func (fr *fileReaderProcessor[T]) decoderFun(r io.ReadCloser, fileNumber uint64,
 		reader,
 		fileNumber,
 		fileName,
-		fr.config.ignoreUnknownFields,
+		fr.config.IgnoreUnknownFields,
 		fr.logger,
 	)
 	if err != nil {

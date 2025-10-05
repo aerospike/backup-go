@@ -92,9 +92,9 @@ type ConfigRestore struct {
 	// ApplyMetadataLast defines when to restore metadata (Sindexes and UDFs).
 	// If set to true, metadata will be restored after all records have been processed.
 	ApplyMetadataLast bool
-	// ignoreUnknownFields indicates whether restore should ignore unknown to decoder fields.
+	// IgnoreUnknownFields indicates whether restore should ignore unknown to decoder fields.
 	// Will be used for backward compatibility, to ignore unknown fields in the future.
-	ignoreUnknownFields bool
+	IgnoreUnknownFields bool
 }
 
 // NewDefaultRestoreConfig returns a new ConfigRestore with default values.

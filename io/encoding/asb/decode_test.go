@@ -1762,11 +1762,11 @@ func TestASBReader_readRecord(t *testing.T) {
 			t.Parallel()
 
 			r := &Decoder[*models.Token]{
-				reader:       tt.fields.reader,
-				header:       tt.fields.header,
-				metaData:     tt.fields.metaData,
-				logger:       slog.Default(),
-				ignoreErrors: true,
+				reader:              tt.fields.reader,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+				logger:              slog.Default(),
+				ignoreUnknownFields: true,
 			}
 			got, err := r.readRecord()
 			if (err != nil) != tt.wantErr {

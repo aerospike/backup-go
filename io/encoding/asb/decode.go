@@ -181,22 +181,23 @@ type metaData struct {
 
 // Decoder contains logic for decoding backup data from the .asb format.
 type Decoder[T models.TokenConstraint] struct {
-	header       *header
-	metaData     *metaData
-	reader       *countingReader
-	ignoreErrors bool
-	logger       *slog.Logger
+	header   *header
+	metaData *metaData
+	reader   *countingReader
+	// If set to true, unknown global/record types will be ignored and the decoder will continue to read the next line.
+	ignoreUnknownFields bool
+	logger              *slog.Logger
 }
 
 // NewDecoder creates a new Decoder.
-func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignoreErrors bool, logger *slog.Logger,
+func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignoreUnknownFields bool, logger *slog.Logger,
 ) (*Decoder[T], error) {
 	var err error
 
 	asb := Decoder[T]{
-		reader:       newCountingReader(src, fileName),
-		ignoreErrors: ignoreErrors,
-		logger:       logger,
+		reader:              newCountingReader(src, fileName),
+		ignoreUnknownFields: ignoreUnknownFields,
+		logger:              logger,
 	}
 
 	asb.header, err = asb.readHeader()
@@ -391,6 +392,19 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 	var res any
 
 	if err := _expectChar(r.reader, markerGlobalSection); err != nil {
+		if r.ignoreUnknownFields {
+			// Skip unknown global type - read until newline.
+			if err = r.skipToNextLine(); err != nil {
+				return nil, fmt.Errorf("failed to skip unknown global section: %w", err)
+			}
+
+			r.logger.Warn("ignoring error while reading global section",
+				slog.Any("error", fmt.Errorf("invalid global section: %w", err)))
+
+			// Recursively try to read next global
+			return r.readGlobals()
+		}
+
 		return nil, err
 	}
 
@@ -420,7 +434,7 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 			return nil, newLineError(lineTypeUDF, err)
 		}
 	default:
-		if r.ignoreErrors {
+		if r.ignoreUnknownFields {
 			// Skip unknown global type - read until newline.
 			if err = r.skipToNextLine(); err != nil {
 				return nil, fmt.Errorf("failed to skip unknown global line type %c: %w", b, err)
@@ -703,7 +717,7 @@ func (r *Decoder[T]) readRecord() (*models.Record, error) {
 		case i == 3 && b == expectedRecordHeaderTypes[4]:
 			i++
 		case b != expectedRecordHeaderTypes[i]:
-			if r.ignoreErrors {
+			if r.ignoreUnknownFields {
 				// Skip only this field.
 				if err := r.skipToNextLine(); err != nil {
 					return nil, fmt.Errorf("failed to skip unknown record header type %c: %w", b, err)

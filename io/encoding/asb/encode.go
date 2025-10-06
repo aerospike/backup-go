@@ -49,7 +49,7 @@ func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
 	return &Encoder[T]{
 		config:      cfg,
 		metaVersion: cfg.getVersion().toString(),
-		version:     versionCurrent.toString(),
+		version:     versionDefault.toString(),
 	}
 }
 

@@ -36,7 +36,7 @@ const (
 // line names
 const (
 	lineTypeUndefined    = ""
-	lineTypeVersion      = "version"
+	lineTypeVersion      = "metaVersion"
 	lineTypeNamespace    = "namespace"
 	lineTypeUDF          = "UDF"
 	lineTypeSindex       = "sindex"

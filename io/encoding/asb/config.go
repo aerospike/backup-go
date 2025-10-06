@@ -21,7 +21,7 @@ type EncoderConfig struct {
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	Compact bool
 	// HasExpressionSindex indicates whether the backup contains an expression SIndex.
-	// In that case an asb version will be bumped.
+	// In that case an asb metaVersion will be bumped.
 	HasExpressionSindex bool
 }
 

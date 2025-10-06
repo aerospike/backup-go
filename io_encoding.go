@@ -38,7 +38,7 @@ const (
 //go:generate mockery --name Encoder
 type Encoder[T models.TokenConstraint] interface {
 	EncodeToken(T) ([]byte, error)
-	GetHeader(uint64) []byte
+	GetHeader(uint64, bool) []byte
 	GenerateFilename(prefix, suffix string) string
 }
 

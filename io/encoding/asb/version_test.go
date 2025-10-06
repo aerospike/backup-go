@@ -29,22 +29,22 @@ func TestParseVersion(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name:     "valid version 3.1",
+			name:     "valid metaVersion 3.1",
 			input:    "3.1",
 			expected: version{Major: 3, Minor: 1},
 		},
 		{
-			name:     "valid version 0.0",
+			name:     "valid metaVersion 0.0",
 			input:    "0.0",
 			expected: version{Major: 0, Minor: 0},
 		},
 		{
-			name:     "valid version 10.15",
+			name:     "valid metaVersion 10.15",
 			input:    "10.15",
 			expected: version{Major: 10, Minor: 15},
 		},
 		{
-			name:     "valid version 1.999",
+			name:     "valid metaVersion 1.999",
 			input:    "1.999",
 			expected: version{Major: 1, Minor: 999},
 		},
@@ -52,49 +52,49 @@ func TestParseVersion(t *testing.T) {
 			name:        "empty string",
 			input:       "",
 			shouldError: true,
-			errorMsg:    "invalid version format",
+			errorMsg:    "invalid metaVersion format",
 		},
 		{
 			name:        "single number",
 			input:       "3",
 			shouldError: true,
-			errorMsg:    "invalid version format",
+			errorMsg:    "invalid metaVersion format",
 		},
 		{
 			name:        "too many parts",
 			input:       "3.1.2",
 			shouldError: true,
-			errorMsg:    "invalid version format",
+			errorMsg:    "invalid metaVersion format",
 		},
 		{
 			name:        "invalid major - letters",
 			input:       "a.1",
 			shouldError: true,
-			errorMsg:    "invalid major version",
+			errorMsg:    "invalid major metaVersion",
 		},
 		{
 			name:        "invalid minor - letters",
 			input:       "3.b",
 			shouldError: true,
-			errorMsg:    "invalid minor version",
+			errorMsg:    "invalid minor metaVersion",
 		},
 		{
 			name:        "float major",
 			input:       "3.5.1",
 			shouldError: true,
-			errorMsg:    "invalid version format",
+			errorMsg:    "invalid metaVersion format",
 		},
 		{
-			name:        "spaces in version",
+			name:        "spaces in metaVersion",
 			input:       " 3.1 ",
 			shouldError: true,
-			errorMsg:    "invalid major version",
+			errorMsg:    "invalid major metaVersion",
 		},
 		{
 			name:        "dot only",
 			input:       ".",
 			shouldError: true,
-			errorMsg:    "invalid major version",
+			errorMsg:    "invalid major metaVersion",
 		},
 	}
 
@@ -181,7 +181,7 @@ func TestVersionCompare(t *testing.T) {
 			expected: 0,
 		},
 		{
-			name:     "large version numbers",
+			name:     "large metaVersion numbers",
 			version1: &version{Major: 100, Minor: 50},
 			version2: &version{Major: 100, Minor: 49},
 			expected: 1,
@@ -193,7 +193,7 @@ func TestVersionCompare(t *testing.T) {
 			t.Parallel()
 			result := tt.version1.compare(tt.version2)
 			if result != tt.expected {
-				t.Errorf("version{%d, %d}.compare(version{%d, %d}) = %d, want %d",
+				t.Errorf("metaVersion{%d, %d}.compare(metaVersion{%d, %d}) = %d, want %d",
 					tt.version1.Major, tt.version1.Minor,
 					tt.version2.Major, tt.version2.Minor,
 					result, tt.expected)
@@ -218,43 +218,43 @@ func TestVersionGreaterOrEqual(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "greater major version should return true",
+			name:     "greater major metaVersion should return true",
 			version1: &version{Major: 4, Minor: 0},
 			version2: &version{Major: 3, Minor: 1},
 			expected: true,
 		},
 		{
-			name:     "greater minor version should return true",
+			name:     "greater minor metaVersion should return true",
 			version1: &version{Major: 3, Minor: 2},
 			version2: &version{Major: 3, Minor: 1},
 			expected: true,
 		},
 		{
-			name:     "less major version should return false",
+			name:     "less major metaVersion should return false",
 			version1: &version{Major: 2, Minor: 9},
 			version2: &version{Major: 3, Minor: 1},
 			expected: false,
 		},
 		{
-			name:     "less minor version should return false",
+			name:     "less minor metaVersion should return false",
 			version1: &version{Major: 3, Minor: 0},
 			version2: &version{Major: 3, Minor: 1},
 			expected: false,
 		},
 		{
-			name:     "zero version comparison",
+			name:     "zero metaVersion comparison",
 			version1: &version{Major: 0, Minor: 1},
 			version2: &version{Major: 0, Minor: 0},
 			expected: true,
 		},
 		{
-			name:     "real world example - supported version check",
+			name:     "real world example - supported metaVersion check",
 			version1: &version{Major: 3, Minor: 5},
 			version2: &version{Major: 3, Minor: 1}, // minimum required
 			expected: true,
 		},
 		{
-			name:     "real world example - unsupported version",
+			name:     "real world example - unsupported metaVersion",
 			version1: &version{Major: 2, Minor: 9},
 			version2: &version{Major: 3, Minor: 1}, // minimum required
 			expected: false,
@@ -267,7 +267,7 @@ func TestVersionGreaterOrEqual(t *testing.T) {
 
 			result := tt.version1.greaterOrEqual(tt.version2)
 			if result != tt.expected {
-				t.Errorf("version{%d, %d}.greaterOrEqual(version{%d, %d}) = %t, want %t",
+				t.Errorf("metaVersion{%d, %d}.greaterOrEqual(metaVersion{%d, %d}) = %t, want %t",
 					tt.version1.Major, tt.version1.Minor,
 					tt.version2.Major, tt.version2.Minor,
 					result, tt.expected)
@@ -287,25 +287,25 @@ func TestVersionValidationFlow(t *testing.T) {
 		shouldBeValid    bool
 	}{
 		{
-			name:             "valid newer version",
+			name:             "valid newer metaVersion",
 			headerVersion:    "3.5",
 			supportedVersion: "3.1",
 			shouldBeValid:    true,
 		},
 		{
-			name:             "valid equal version",
+			name:             "valid equal metaVersion",
 			headerVersion:    "3.1",
 			supportedVersion: "3.1",
 			shouldBeValid:    true,
 		},
 		{
-			name:             "invalid older version",
+			name:             "invalid older metaVersion",
 			headerVersion:    "2.9",
 			supportedVersion: "3.1",
 			shouldBeValid:    false,
 		},
 		{
-			name:             "invalid version format",
+			name:             "invalid metaVersion format",
 			headerVersion:    "invalid",
 			supportedVersion: "3.1",
 			shouldBeValid:    false,
@@ -319,20 +319,20 @@ func TestVersionValidationFlow(t *testing.T) {
 			headerVer, err := parseVersion(tt.headerVersion)
 			if err != nil {
 				if tt.shouldBeValid {
-					t.Errorf("unexpected error parsing header version: %v", err)
+					t.Errorf("unexpected error parsing header metaVersion: %v", err)
 				}
 				return
 			}
 
 			supportedVer, err := parseVersion(tt.supportedVersion)
 			if err != nil {
-				t.Errorf("unexpected error parsing supported version: %v", err)
+				t.Errorf("unexpected error parsing supported metaVersion: %v", err)
 				return
 			}
 
 			isValid := headerVer.greaterOrEqual(supportedVer)
 			if isValid != tt.shouldBeValid {
-				t.Errorf("version validation failed: header=%s, supported=%s, got=%t, want=%t",
+				t.Errorf("metaVersion validation failed: header=%s, supported=%s, got=%t, want=%t",
 					tt.headerVersion, tt.supportedVersion, isValid, tt.shouldBeValid)
 			}
 		})

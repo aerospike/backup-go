@@ -41,7 +41,6 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 
 	writer            Writer
 	encoder           Encoder[T]
-	metaEncoder       Encoder[T]
 	encryptionPolicy  *EncryptionPolicy
 	secretAgentConfig *SecretAgentConfig
 	compressionPolicy *CompressionPolicy
@@ -61,7 +60,6 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	suffixGenerator func() string,
 	writer Writer,
 	encoder Encoder[T],
-	metaEncoder Encoder[T],
 	encryptionPolicy *EncryptionPolicy,
 	secretAgentConfig *SecretAgentConfig,
 	compressionPolicy *CompressionPolicy,
@@ -79,7 +77,6 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		suffixGenerator:   suffixGenerator,
 		writer:            writer,
 		encoder:           encoder,
-		metaEncoder:       metaEncoder,
 		encryptionPolicy:  encryptionPolicy,
 		secretAgentConfig: secretAgentConfig,
 		compressionPolicy: compressionPolicy,
@@ -179,14 +176,13 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
 	// If it is set, we use it as a prefix.
 	prefix := fw.prefix
-
-	encoder := fw.encoder
+	// Is it a metadata file?
+	var isMeta bool
 
 	if n == -1 {
 		// For metadata writer create a separate file.
 		prefix = metadataFileNamePrefix
-		// Set encoder to metadata encoder.
-		encoder = fw.metaEncoder
+		isMeta = true
 	}
 
 	if prefix == "" {
@@ -194,7 +190,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	}
 
 	// Generate file name.
-	filename := encoder.GenerateFilename(prefix, fw.suffixGenerator())
+	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 
 	// Create a file writer.
 	storageWriter, err := fw.writer.NewWriter(ctx, filename)
@@ -224,7 +220,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	}
 
 	// Write file header.
-	_, err = compressedWriter.Write(encoder.GetHeader(num))
+	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isMeta))
 	if err != nil {
 		return nil, fmt.Errorf("failed to write header: %w", err)
 	}

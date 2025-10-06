@@ -64,7 +64,6 @@ type BackupHandler struct {
 	readerProcessor *recordReaderProcessor[*models.Token]
 	writerProcessor *fileWriterProcessor[*models.Token]
 	encoder         Encoder[*models.Token]
-	metaEncoder     Encoder[*models.Token]
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 	recordCounter   *recordCounter
@@ -138,16 +137,13 @@ func newBackupHandler(
 		}
 	}
 
-	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, false)
-
 	hasExprSind, err := infoClient.HasExpressionSindex(config.Namespace)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
 	}
 
-	// Init a separate encoder with expression sindex flag check for metadata.
-	metaEncoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExprSind)
+	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExprSind)
 
 	stats := models.NewBackupStats()
 
@@ -194,7 +190,6 @@ func newBackupHandler(
 		logger:                 logger,
 		firstFileHeaderWritten: &atomic.Bool{},
 		encoder:                encoder,
-		metaEncoder:            metaEncoder,
 		readerProcessor:        readerProcessor,
 		recordCounter:          recCounter,
 		limiter:                limiter,
@@ -213,7 +208,6 @@ func newBackupHandler(
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,
-		metaEncoder,
 		config.EncryptionPolicy,
 		config.SecretAgentConfig,
 		config.CompressionPolicy,
@@ -274,7 +268,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	result /= compressRatio
 
 	// Calculate and add estimated backup file headers size.
-	header := bh.encoder.GetHeader(0)
+	header := bh.encoder.GetHeader(0, false)
 	numFiles := bh.config.ParallelWrite
 
 	if bh.config.FileLimit > 0 {
@@ -509,7 +503,7 @@ func (bh *BackupHandler) backupSIndexes(
 
 	sindexWriter := pipe.Writer[*models.Token](
 		newTokenWriter(
-			bh.metaEncoder,
+			bh.encoder,
 			writer,
 			bh.logger.With(slog.String("writer", "sindex")),
 			stInfo,
@@ -547,7 +541,7 @@ func (bh *BackupHandler) backupUDFs(
 
 	udfWriter := pipe.Writer[*models.Token](
 		newTokenWriter(
-			bh.metaEncoder,
+			bh.encoder,
 			writer,
 			bh.logger.With(slog.String("writer", "udf")),
 			stInfo,

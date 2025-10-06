@@ -114,7 +114,6 @@ func newBackupXDRHandler(
 		emptyPrefixSuffix,
 		writer,
 		encoder,
-		encoder,
 		config.EncryptionPolicy,
 		config.SecretAgentConfig,
 		config.CompressionPolicy,

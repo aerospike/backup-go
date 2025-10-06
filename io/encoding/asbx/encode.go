@@ -84,7 +84,7 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 }
 
 // GetHeader returns prepared file header as []byte.
-func (e *Encoder[T]) GetHeader(fileNumber uint64) []byte {
+func (e *Encoder[T]) GetHeader(fileNumber uint64, _ bool) []byte {
 	// Header has fixed size of 40 bytes and contains:
 	// Version - 1 byte.
 	// File number - 8 bytes.

@@ -190,11 +190,11 @@ func TestGetHeaderFirst(t *testing.T) {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
 	encoder := NewEncoder[*models.Token](testEncoderConfig)
-	firstHeader := encoder.GetHeader(0)
+	firstHeader := encoder.GetHeader(0, false)
 	require.Equal(t, expected, string(firstHeader))
 
 	secondExpected := "Version 3.1\n# namespace test\n"
-	secondHeader := encoder.GetHeader(0)
+	secondHeader := encoder.GetHeader(0, false)
 	require.Equal(t, secondExpected, string(secondHeader))
 }
 
@@ -1683,7 +1683,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 	benchmarkSizes := []int{64, 256, 1024, 4096, 16384}
 
 	for _, size := range benchmarkSizes {
-		// Test the optimized version
+		// Test the optimized metaVersion
 		b.Run(fmt.Sprintf("optimized-size-%d", size), func(b *testing.B) {
 			data := make([]byte, size)
 			_, err := rand.Read(data)
@@ -1703,7 +1703,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 			}
 		})
 
-		// Test the unoptimized version
+		// Test the unoptimized metaVersion
 		b.Run(fmt.Sprintf("native-size-%d", size), func(b *testing.B) {
 			data := make([]byte, size)
 			_, err := rand.Read(data)

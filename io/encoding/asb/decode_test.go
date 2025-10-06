@@ -1765,7 +1765,7 @@ func TestASBReader_readRecord(t *testing.T) {
 						"+ s set1\n" +
 						"unknown\n" +
 						"+ g 10\n" +
-						"+ t 999999999999999999999999999999999999\n" +
+						"+ t 1\n" +
 						"+ b 2\n" +
 						"- N bin1\n" +
 						"- I bin2 2\n",

@@ -20,9 +20,9 @@ type EncoderConfig struct {
 	Namespace string
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	Compact bool
-	// HasExpressionSindex indicates whether the backup contains an expression SIndex.
+	// HasExpressionSIndex indicates whether the backup contains an expression SIndex.
 	// In that case an asb metaVersion will be bumped.
-	HasExpressionSindex bool
+	HasExpressionSIndex bool
 }
 
 // NewEncoderConfig returns a new encoder EncoderConfig.
@@ -30,15 +30,15 @@ func NewEncoderConfig(namespace string, compact, hasExprSindex bool) *EncoderCon
 	return &EncoderConfig{
 		Namespace:           namespace,
 		Compact:             compact,
-		HasExpressionSindex: hasExprSindex,
+		HasExpressionSIndex: hasExprSindex,
 	}
 }
 
 // getVersion resolves version depending on the config.
 func (c *EncoderConfig) getVersion() *version {
-	if c.HasExpressionSindex {
-		return versionExpSindex
+	if c.HasExpressionSIndex {
+		return version32
 	}
 
-	return versionDefault
+	return version31
 }

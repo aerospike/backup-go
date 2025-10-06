@@ -190,8 +190,8 @@ func (ic *Client) GetVersion() (AerospikeVersion, error) {
 	return lowestVersion, nil
 }
 
-// HasExpressionSindex checks whether the namespace contains expression based secondary indexes.
-func (ic *Client) HasExpressionSindex(namespace string) (bool, error) {
+// HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.
+func (ic *Client) HasExpressionSIndex(namespace string) (bool, error) {
 	list, err := ic.GetSIndexes(namespace)
 	if err != nil {
 		return false, err

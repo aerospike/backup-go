@@ -1683,7 +1683,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 	benchmarkSizes := []int{64, 256, 1024, 4096, 16384}
 
 	for _, size := range benchmarkSizes {
-		// Test the optimized metaVersion
+		// Test the optimized version
 		b.Run(fmt.Sprintf("optimized-size-%d", size), func(b *testing.B) {
 			data := make([]byte, size)
 			_, err := rand.Read(data)
@@ -1703,7 +1703,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 			}
 		})
 
-		// Test the unoptimized metaVersion
+		// Test the unoptimized version
 		b.Run(fmt.Sprintf("native-size-%d", size), func(b *testing.B) {
 			data := make([]byte, size)
 			_, err := rand.Read(data)

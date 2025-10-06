@@ -21,14 +21,14 @@ import (
 )
 
 var (
-	// versionDefault is the default version of the ASB format.
-	versionDefault = newVersion(3, 1)
-	// versionExpSindex is the version of the ASB format with expression Sindex support.
+	// version31 is the default version of the ASB format.
+	version31 = newVersion(3, 1)
+	// version32 is the version of the ASB format with expression Sindex support.
 	// Should be used only for metadata files.
-	versionExpSindex = newVersion(3, 2)
+	version32 = newVersion(3, 2)
 
 	// Current supported version for decoding.
-	versionCurrent = versionExpSindex
+	versionCurrent = version32
 )
 
 // version represents protocol version in format major.minor
@@ -46,17 +46,17 @@ func newVersion(major, minor int) *version {
 func parseVersion(v string) (*version, error) {
 	parts := strings.Split(v, ".")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid metaVersion format: %s", v)
+		return nil, fmt.Errorf("invalid version format: %s", v)
 	}
 
 	major, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return nil, fmt.Errorf("invalid major metaVersion: %s", parts[0])
+		return nil, fmt.Errorf("invalid major version: %s", parts[0])
 	}
 
 	minor, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return nil, fmt.Errorf("invalid minor metaVersion: %s", parts[1])
+		return nil, fmt.Errorf("invalid minor version: %s", parts[1])
 	}
 
 	return &version{Major: major, Minor: minor}, nil

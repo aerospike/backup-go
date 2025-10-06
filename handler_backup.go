@@ -137,7 +137,7 @@ func newBackupHandler(
 		}
 	}
 
-	hasExprSind, err := infoClient.HasExpressionSindex(config.Namespace)
+	hasExprSind, err := infoClient.HasExpressionSIndex(config.Namespace)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)

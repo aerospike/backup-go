@@ -214,11 +214,11 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignore
 
 	fileVersion, err := parseVersion(asb.header.Version)
 	if err != nil {
-		return nil, fmt.Errorf("error while parsing %s header metaVersion: %w", fileName, err)
+		return nil, fmt.Errorf("error while parsing %s header version: %w", fileName, err)
 	}
 
 	if !versionCurrent.greaterOrEqual(fileVersion) {
-		return nil, fmt.Errorf("unsupported backup file metaVersion: %s", asb.header.Version)
+		return nil, fmt.Errorf("unsupported backup file version: %s", asb.header.Version)
 	}
 
 	asb.metaData, err = asb.readMetadata()
@@ -290,7 +290,7 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 		return nil, err
 	}
 
-	// metaVersion number format is "x.y"
+	// version number format is "x.y"
 	ver, err := _readNBytes(r.reader, 3)
 	if err != nil {
 		return nil, err

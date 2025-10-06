@@ -98,7 +98,7 @@ type InfoGetter interface {
 	GetNamespacesList() ([]string, error)
 	GetStatus() (string, error)
 	GetDCsList() ([]string, error)
-	HasExpressionSindex(namespace string) (bool, error)
+	HasExpressionSIndex(namespace string) (bool, error)
 }
 
 // Client is the main entry point for the backup package.

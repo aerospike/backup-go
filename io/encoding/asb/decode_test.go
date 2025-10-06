@@ -76,7 +76,7 @@ func TestASBReader_readHeader(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative bad metaVersion number",
+			name: "negative bad version number",
 			fields: fields{
 				reader: newTestCountingReader("Version 31"),
 			},
@@ -3755,7 +3755,7 @@ func TestNewASBReader(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "negative missing metaVersion",
+			name: "negative missing version",
 			args: args{
 				src: newTestCountingReader(
 					"# namespace ns1\n" +

@@ -733,12 +733,12 @@ func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func() (asinfo.Aerosp
 	return _c
 }
 
-// HasExpressionSindex provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) HasExpressionSindex(namespace string) (bool, error) {
+// HasExpressionSIndex provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) HasExpressionSIndex(namespace string) (bool, error) {
 	ret := _mock.Called(namespace)
 
 	if len(ret) == 0 {
-		panic("no return value specified for HasExpressionSindex")
+		panic("no return value specified for HasExpressionSIndex")
 	}
 
 	var r0 bool
@@ -759,30 +759,30 @@ func (_mock *MockInfoGetter) HasExpressionSindex(namespace string) (bool, error)
 	return r0, r1
 }
 
-// MockInfoGetter_HasExpressionSindex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExpressionSindex'
-type MockInfoGetter_HasExpressionSindex_Call struct {
+// MockInfoGetter_HasExpressionSIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExpressionSIndex'
+type MockInfoGetter_HasExpressionSIndex_Call struct {
 	*mock.Call
 }
 
-// HasExpressionSindex is a helper method to define mock.On call
+// HasExpressionSIndex is a helper method to define mock.On call
 //   - namespace
-func (_e *MockInfoGetter_Expecter) HasExpressionSindex(namespace interface{}) *MockInfoGetter_HasExpressionSindex_Call {
-	return &MockInfoGetter_HasExpressionSindex_Call{Call: _e.mock.On("HasExpressionSindex", namespace)}
+func (_e *MockInfoGetter_Expecter) HasExpressionSIndex(namespace interface{}) *MockInfoGetter_HasExpressionSIndex_Call {
+	return &MockInfoGetter_HasExpressionSIndex_Call{Call: _e.mock.On("HasExpressionSIndex", namespace)}
 }
 
-func (_c *MockInfoGetter_HasExpressionSindex_Call) Run(run func(namespace string)) *MockInfoGetter_HasExpressionSindex_Call {
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) Run(run func(namespace string)) *MockInfoGetter_HasExpressionSIndex_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
 	return _c
 }
 
-func (_c *MockInfoGetter_HasExpressionSindex_Call) Return(b bool, err error) *MockInfoGetter_HasExpressionSindex_Call {
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) Return(b bool, err error) *MockInfoGetter_HasExpressionSIndex_Call {
 	_c.Call.Return(b, err)
 	return _c
 }
 
-func (_c *MockInfoGetter_HasExpressionSindex_Call) RunAndReturn(run func(namespace string) (bool, error)) *MockInfoGetter_HasExpressionSindex_Call {
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(namespace string) (bool, error)) *MockInfoGetter_HasExpressionSIndex_Call {
 	_c.Call.Return(run)
 	return _c
 }

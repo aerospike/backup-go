@@ -110,14 +110,19 @@ func newBackupXDRHandler(
 	)
 
 	writerProcessor := newFileWriterProcessor[*models.ASBXToken](
-		config,
+		"",
 		emptyPrefixSuffix,
 		writer,
 		encoder,
+		encoder,
+		config.EncryptionPolicy,
+		config.SecretAgentConfig,
+		config.CompressionPolicy,
 		nil,
 		stats,
 		kbpsCollector,
-		false,
+		config.FileLimit,
+		config.ParallelWrite,
 		logger,
 	)
 

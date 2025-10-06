@@ -251,39 +251,3 @@ func (c *ConfigBackup) validate() error {
 
 	return nil
 }
-
-func (c *ConfigBackup) getEncoderType() EncoderType {
-	return c.EncoderType
-}
-
-func (c *ConfigBackup) getNamespace() string {
-	return c.Namespace
-}
-
-func (c *ConfigBackup) getCompact() bool {
-	return c.Compact
-}
-
-func (c *ConfigBackup) getFileLimit() uint64 {
-	return c.FileLimit
-}
-
-func (c *ConfigBackup) getOutputFilePrefix() string {
-	return c.OutputFilePrefix
-}
-
-func (c *ConfigBackup) getEncryptionPolicy() *EncryptionPolicy {
-	return c.EncryptionPolicy
-}
-
-func (c *ConfigBackup) getSecretAgentConfig() *SecretAgentConfig {
-	return c.SecretAgentConfig
-}
-
-func (c *ConfigBackup) getCompressionPolicy() *CompressionPolicy {
-	return c.CompressionPolicy
-}
-
-func (c *ConfigBackup) getParallelWrite() int {
-	return c.ParallelWrite
-}

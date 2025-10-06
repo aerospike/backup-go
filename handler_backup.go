@@ -139,12 +139,15 @@ func newBackupHandler(
 	}
 
 	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, false)
-	// Check if expression sindex exists for metadata backup.
+
 	hasExprSind, err := infoClient.HasExpressionSindex(config.Namespace)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
 	}
+
+	// Init a separate encoder with expression sindex flag check for metadata.
+	metaEncoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExprSind)
 
 	stats := models.NewBackupStats()
 
@@ -191,6 +194,7 @@ func newBackupHandler(
 		logger:                 logger,
 		firstFileHeaderWritten: &atomic.Bool{},
 		encoder:                encoder,
+		metaEncoder:            metaEncoder,
 		readerProcessor:        readerProcessor,
 		recordCounter:          recCounter,
 		limiter:                limiter,
@@ -205,14 +209,19 @@ func newBackupHandler(
 	}
 
 	writerProcessor := newFileWriterProcessor[*models.Token](
-		config,
+		bh.config.OutputFilePrefix,
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,
+		metaEncoder,
+		config.EncryptionPolicy,
+		config.SecretAgentConfig,
+		config.CompressionPolicy,
 		state,
 		stats,
 		kbpsCollector,
-		hasExprSind,
+		config.FileLimit,
+		config.ParallelWrite,
 		logger,
 	)
 

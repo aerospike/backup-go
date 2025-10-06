@@ -209,7 +209,7 @@ func newBackupHandler(
 	}
 
 	writerProcessor := newFileWriterProcessor[*models.Token](
-		bh.config.OutputFilePrefix,
+		config.OutputFilePrefix,
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,

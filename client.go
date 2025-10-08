@@ -45,8 +45,24 @@ type AerospikeClient interface {
 	GetDefaultInfoPolicy() *a.InfoPolicy
 	GetDefaultWritePolicy() *a.WritePolicy
 	Put(policy *a.WritePolicy, key *a.Key, bins a.BinMap) a.Error
-	CreateComplexIndex(policy *a.WritePolicy, namespace string, set string, indexName string, binName string,
-		indexType a.IndexType, indexCollectionType a.IndexCollectionType, ctx ...*a.CDTContext,
+	CreateComplexIndex(
+		policy *a.WritePolicy,
+		namespace string,
+		set string,
+		indexName string,
+		binName string,
+		indexType a.IndexType,
+		indexCollectionType a.IndexCollectionType,
+		ctx ...*a.CDTContext,
+	) (*a.IndexTask, a.Error)
+	CreateIndexWithExpression(
+		policy *a.WritePolicy,
+		namespace,
+		set,
+		indexName string,
+		indexType a.IndexType,
+		indexCollectionType a.IndexCollectionType,
+		expression *a.Expression,
 	) (*a.IndexTask, a.Error)
 	DropIndex(policy *a.WritePolicy, namespace string, set string, indexName string) a.Error
 	RegisterUDF(policy *a.WritePolicy, udfBody []byte, serverPath string, language a.Language,
@@ -82,6 +98,7 @@ type InfoGetter interface {
 	GetNamespacesList() ([]string, error)
 	GetStatus() (string, error)
 	GetDCsList() ([]string, error)
+	HasExpressionSIndex(namespace string) (bool, error)
 }
 
 // Client is the main entry point for the backup package.
@@ -325,7 +342,10 @@ func (c *Client) BackupXDR(
 		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
 	}
 
-	handler := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient)
+	handler, err := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup xdr handler: %w", err)
+	}
 
 	handler.run()
 

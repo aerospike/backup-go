@@ -61,29 +61,36 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		return fmt.Errorf("invalid sindex collection type: %c", si.IndexType)
 	}
 
-	var ctx []*a.CDTContext
+	var (
+		ctx []*a.CDTContext
+		exp *a.Expression
+		err error
+	)
 
 	if si.Path.B64Context != "" {
-		var err error
 		ctx, err = a.Base64ToCDTContext(si.Path.B64Context)
-
 		if err != nil {
 			return fmt.Errorf("error decoding sindex context %s: %w", si.Path.B64Context, err)
 		}
 	}
 
-	job, err := rw.asc.CreateComplexIndex(
+	if si.Expression != "" {
+		exp, err = a.ExpFromBase64(si.Expression)
+		if err != nil {
+			return fmt.Errorf("error decoding sindex expression %s: %w", si.Expression, err)
+		}
+	}
+
+	job, aErr := rw.createIndex(
 		rw.writePolicy,
-		si.Namespace,
-		si.Set,
-		si.Name,
-		si.Path.BinName,
+		si,
 		sindexType,
 		sindexCollectionType,
+		exp,
 		ctx...,
 	)
 	if err != nil {
-		if err.Matches(atypes.INDEX_FOUND) {
+		if aErr.Matches(atypes.INDEX_FOUND) {
 			rw.logger.Debug("index already exists, replacing it", "sindex", si.Name)
 
 			err = rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
@@ -91,17 +98,15 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 				return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
 			}
 
-			job, err = rw.asc.CreateComplexIndex(
+			job, aErr = rw.createIndex(
 				rw.writePolicy,
-				si.Namespace,
-				si.Set,
-				si.Name,
-				si.Path.BinName,
+				si,
 				sindexType,
 				sindexCollectionType,
+				exp,
 				ctx...,
 			)
-			if err != nil {
+			if aErr != nil {
 				return fmt.Errorf("error creating replacement sindex %s: %w", si.Name, err)
 			}
 		} else {
@@ -126,4 +131,36 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	rw.logger.Debug("created sindex", "sindex", si.Name)
 
 	return nil
+}
+
+func (rw sindexWriter) createIndex(
+	wp *a.WritePolicy,
+	si *models.SIndex,
+	sindexType a.IndexType,
+	sindexCollectionType a.IndexCollectionType,
+	exp *a.Expression,
+	ctx ...*a.CDTContext,
+) (*a.IndexTask, a.Error) {
+	if si.Expression != "" {
+		return rw.asc.CreateIndexWithExpression(
+			wp,
+			si.Namespace,
+			si.Set,
+			si.Name,
+			sindexType,
+			sindexCollectionType,
+			exp,
+		)
+	}
+
+	return rw.asc.CreateComplexIndex(
+		wp,
+		si.Namespace,
+		si.Set,
+		si.Name,
+		si.Path.BinName,
+		sindexType,
+		sindexCollectionType,
+		ctx...,
+	)
 }

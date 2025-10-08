@@ -69,7 +69,7 @@ func TestEncoder_Decoder(t *testing.T) {
 	num, err := util.GetFileNumber(fileName)
 	require.NoError(t, err)
 
-	h := enc.GetHeader(num)
+	h := enc.GetHeader(num, false)
 	content = append(content, h...)
 
 	et, err := enc.EncodeToken(token)
@@ -109,7 +109,7 @@ func TestDecoder_ErrorToken(t *testing.T) {
 	num, err := util.GetFileNumber(fileName)
 	require.NoError(t, err)
 
-	h := enc.GetHeader(num)
+	h := enc.GetHeader(num, false)
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)
@@ -124,7 +124,7 @@ func TestDecoder_ErrorFileNumber(t *testing.T) {
 	enc := NewEncoder[*models.ASBXToken](testNamespace)
 
 	content := make([]byte, 0)
-	h := enc.GetHeader(0)
+	h := enc.GetHeader(0, false)
 	content = append(content, h...)
 
 	reader := bytes.NewReader(content)

@@ -1250,9 +1250,9 @@ func TestRestoreExpiredRecords(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
-	encoder := NewEncoder[*models.Token](EncoderTypeASB, testASNamespace, false)
+	encoder := NewEncoder[*models.Token](EncoderTypeASB, testASNamespace, false, false)
 
-	header := encoder.GetHeader(0)
+	header := encoder.GetHeader(0, false)
 
 	_, err = w.Write(header)
 	require.NoError(t, err)

@@ -17,6 +17,7 @@ package asb
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"reflect"
 	"strings"
@@ -447,7 +448,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
 			}
-			got, err := r.readSIndex()
+			got, err := r.readSIndex(false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ASBReader.readSIndex() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1725,6 +1726,73 @@ func TestASBReader_readRecord(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "unknown fields",
+			fields: fields{
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"+ z unknown\n" +
+						"+ g 10\n" +
+						"+ t 10\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
+			},
+			want: &models.Record{
+				Record: &a.Record{
+					Key: intKey,
+					Bins: map[string]any{
+						"bin1": nil,
+						"bin2": int64(2),
+					},
+					Generation: 10,
+				},
+				VoidTime: 10,
+			},
+			wantErr: false,
+		},
+		{
+			name: "unknown field",
+			fields: fields{
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"unknown\n" +
+						"+ g 10\n" +
+						"+ t 1\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "empty line",
+			fields: fields{
+				reader: newTestCountingReader(
+					"+ k I 10\n" +
+						"+ n namespace1\n" +
+						"+ d " + encodedDigest + "\n" +
+						"+ s set1\n" +
+						"\n" +
+						"+ g 10\n" +
+						"+ t 999999999999999999999999999999999999\n" +
+						"+ b 2\n" +
+						"- N bin1\n" +
+						"- I bin2 2\n",
+				),
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1732,9 +1800,11 @@ func TestASBReader_readRecord(t *testing.T) {
 			t.Parallel()
 
 			r := &Decoder[*models.Token]{
-				reader:   tt.fields.reader,
-				header:   tt.fields.header,
-				metaData: tt.fields.metaData,
+				reader:              tt.fields.reader,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+				logger:              slog.Default(),
+				ignoreUnknownFields: true,
 			}
 			got, err := r.readRecord()
 			if (err != nil) != tt.wantErr {
@@ -3362,10 +3432,11 @@ func TestASBReader_readGlobals(t *testing.T) {
 		reader   *countingReader
 	}
 	tests := []struct {
-		fields  fields
-		want    any
-		name    string
-		wantErr bool
+		fields              fields
+		want                any
+		name                string
+		wantErr             bool
+		ignoreUnknownFields bool
 	}{
 		{
 			name: "positive sindex",
@@ -3382,7 +3453,27 @@ func TestASBReader_readGlobals(t *testing.T) {
 					BinType: models.NumericSIDataType,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			ignoreUnknownFields: false,
+		},
+		{
+			name: "expression sindex",
+			fields: fields{
+				reader: newTestCountingReader("* e userdata1 testSet1 sindex1 N 1 bin1 N expression\n"),
+			},
+			want: &models.SIndex{
+				Namespace: "userdata1",
+				Set:       "testSet1",
+				Name:      "sindex1",
+				IndexType: models.BinSIndex,
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.NumericSIDataType,
+				},
+				Expression: "expression",
+			},
+			wantErr:             false,
+			ignoreUnknownFields: false,
 		},
 		{
 			name: "positive UDF",
@@ -3394,56 +3485,116 @@ func TestASBReader_readGlobals(t *testing.T) {
 				Name:    "lua-udf",
 				Content: []byte("lua-content"),
 			},
-			wantErr: false,
+			wantErr:             false,
+			ignoreUnknownFields: false,
 		},
 		{
 			name: "negative missing start char",
 			fields: fields{
 				reader: newTestCountingReader(" i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
-			want:    nil,
-			wantErr: true,
+			want:                nil,
+			wantErr:             true,
+			ignoreUnknownFields: false,
 		},
 		{
 			name: "negative missing space after start char",
 			fields: fields{
 				reader: newTestCountingReader("*i userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
-			want:    nil,
-			wantErr: true,
+			want:                nil,
+			wantErr:             true,
+			ignoreUnknownFields: false,
 		},
 		{
 			name: "negative bad type",
 			fields: fields{
 				reader: newTestCountingReader("* x userdata1 testSet1 sindex1 N 1 bin1 N\n"),
 			},
-			want:    nil,
-			wantErr: true,
+			want:                nil,
+			wantErr:             true,
+			ignoreUnknownFields: false,
 		},
 		{
 			name: "negative bad sindex",
 			fields: fields{
 				reader: newTestCountingReader("* i userdata1 testSet1 sindex1 X 1 bin1 N\n"),
 			},
-			want:    nil,
-			wantErr: true,
+			want:                nil,
+			wantErr:             true,
+			ignoreUnknownFields: false,
 		},
 		{
 			name: "negative bad udf",
 			fields: fields{
 				reader: newTestCountingReader("* u X lua-udf 11 lua-content\n"),
 			},
-			want:    nil,
-			wantErr: true,
+			want:                nil,
+			wantErr:             true,
+			ignoreUnknownFields: false,
+		},
+		{
+			name: "unknown global",
+			fields: fields{
+				reader: newTestCountingReader(
+					"* z unknown\n" +
+						"* i userdata1 testSet1 sindex1 N 1 bin1 N\n",
+				),
+			},
+			want: &models.SIndex{
+				Namespace: "userdata1",
+				Set:       "testSet1",
+				Name:      "sindex1",
+				IndexType: models.BinSIndex,
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.NumericSIDataType,
+				},
+			},
+			wantErr:             false,
+			ignoreUnknownFields: true,
+		},
+		{
+			name: "unknown global section",
+			fields: fields{
+				reader: newTestCountingReader(
+					"& unknown\n" +
+						"* i userdata1 testSet1 sindex1 N 1 bin1 N\n",
+				),
+			},
+			want: &models.SIndex{
+				Namespace: "userdata1",
+				Set:       "testSet1",
+				Name:      "sindex1",
+				IndexType: models.BinSIndex,
+				Path: models.SIndexPath{
+					BinName: "bin1",
+					BinType: models.NumericSIDataType,
+				},
+			},
+			wantErr:             false,
+			ignoreUnknownFields: true,
+		},
+		{
+			name: "unknown empty",
+			fields: fields{
+				reader: newTestCountingReader("* z unknown\n"),
+			},
+			want: nil,
+			// Will get EOF.
+			wantErr:             true,
+			ignoreUnknownFields: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := &Decoder[*models.Token]{
-				reader:   tt.fields.reader,
-				header:   tt.fields.header,
-				metaData: tt.fields.metaData,
+				reader:              tt.fields.reader,
+				header:              tt.fields.header,
+				metaData:            tt.fields.metaData,
+				logger:              slog.Default(),
+				ignoreUnknownFields: tt.ignoreUnknownFields,
 			}
 			got, err := r.readGlobals()
 			if (err != nil) != tt.wantErr {
@@ -3629,7 +3780,7 @@ func TestNewASBReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := NewDecoder[*models.Token](tt.args.src, testFileName)
+			got, err := NewDecoder[*models.Token](tt.args.src, testFileName, false, slog.Default())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)
 				return

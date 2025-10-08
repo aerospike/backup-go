@@ -139,16 +139,16 @@ func (_c *MockEncoder_GenerateFilename_Call[T]) RunAndReturn(run func(prefix str
 }
 
 // GetHeader provides a mock function for the type MockEncoder
-func (_mock *MockEncoder[T]) GetHeader(v uint64) []byte {
-	ret := _mock.Called(v)
+func (_mock *MockEncoder[T]) GetHeader(v uint64, b bool) []byte {
+	ret := _mock.Called(v, b)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetHeader")
 	}
 
 	var r0 []byte
-	if returnFunc, ok := ret.Get(0).(func(uint64) []byte); ok {
-		r0 = returnFunc(v)
+	if returnFunc, ok := ret.Get(0).(func(uint64, bool) []byte); ok {
+		r0 = returnFunc(v, b)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -164,13 +164,14 @@ type MockEncoder_GetHeader_Call[T models.TokenConstraint] struct {
 
 // GetHeader is a helper method to define mock.On call
 //   - v
-func (_e *MockEncoder_Expecter[T]) GetHeader(v interface{}) *MockEncoder_GetHeader_Call[T] {
-	return &MockEncoder_GetHeader_Call[T]{Call: _e.mock.On("GetHeader", v)}
+//   - b
+func (_e *MockEncoder_Expecter[T]) GetHeader(v interface{}, b interface{}) *MockEncoder_GetHeader_Call[T] {
+	return &MockEncoder_GetHeader_Call[T]{Call: _e.mock.On("GetHeader", v, b)}
 }
 
-func (_c *MockEncoder_GetHeader_Call[T]) Run(run func(v uint64)) *MockEncoder_GetHeader_Call[T] {
+func (_c *MockEncoder_GetHeader_Call[T]) Run(run func(v uint64, b bool)) *MockEncoder_GetHeader_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(uint64))
+		run(args[0].(uint64), args[1].(bool))
 	})
 	return _c
 }
@@ -180,7 +181,7 @@ func (_c *MockEncoder_GetHeader_Call[T]) Return(bytes []byte) *MockEncoder_GetHe
 	return _c
 }
 
-func (_c *MockEncoder_GetHeader_Call[T]) RunAndReturn(run func(v uint64) []byte) *MockEncoder_GetHeader_Call[T] {
+func (_c *MockEncoder_GetHeader_Call[T]) RunAndReturn(run func(v uint64, b bool) []byte) *MockEncoder_GetHeader_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"sync"
 
@@ -28,8 +29,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 )
-
-const supportedVersion = "3.1"
 
 var errInvalidToken = errors.New("invalid token")
 
@@ -185,14 +184,20 @@ type Decoder[T models.TokenConstraint] struct {
 	header   *header
 	metaData *metaData
 	reader   *countingReader
+	// If set to true, unknown global/record types will be ignored and the decoder will continue to read the next line.
+	ignoreUnknownFields bool
+	logger              *slog.Logger
 }
 
 // NewDecoder creates a new Decoder.
-func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Decoder[T], error) {
+func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignoreUnknownFields bool, logger *slog.Logger,
+) (*Decoder[T], error) {
 	var err error
 
 	asb := Decoder[T]{
-		reader: newCountingReader(src, fileName),
+		reader:              newCountingReader(src, fileName),
+		ignoreUnknownFields: ignoreUnknownFields,
+		logger:              logger,
 	}
 
 	asb.header, err = asb.readHeader()
@@ -207,7 +212,12 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string) (*Deco
 		return nil, fmt.Errorf("error while reading %s header: %w", fileName, err)
 	}
 
-	if asb.header.Version != supportedVersion {
+	fileVersion, err := parseVersion(asb.header.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error while parsing %s header version: %w", fileName, err)
+	}
+
+	if !versionCurrent.greaterOrEqual(fileVersion) {
 		return nil, fmt.Errorf("unsupported backup file version: %s", asb.header.Version)
 	}
 
@@ -382,7 +392,7 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 	var res any
 
 	if err := _expectChar(r.reader, markerGlobalSection); err != nil {
-		return nil, err
+		return r.skipAndRetryGlobals(fmt.Errorf("failed to read global section: %w", err))
 	}
 
 	if err := _expectChar(r.reader, ' '); err != nil {
@@ -396,7 +406,12 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 
 	switch b {
 	case globalTypeSIndex:
-		res, err = r.readSIndex()
+		res, err = r.readSIndex(false)
+		if err != nil {
+			return nil, newLineError(lineTypeSindex, err)
+		}
+	case globalTypeSIndexExpression:
+		res, err = r.readSIndex(true)
 		if err != nil {
 			return nil, newLineError(lineTypeSindex, err)
 		}
@@ -406,15 +421,33 @@ func (r *Decoder[T]) readGlobals() (any, error) {
 			return nil, newLineError(lineTypeUDF, err)
 		}
 	default:
-		return nil, fmt.Errorf("invalid global line type %c", b)
+		return r.skipAndRetryGlobals(fmt.Errorf("failed to read global line type %c: %w", b, err))
 	}
 
 	return res, nil
 }
 
+func (r *Decoder[T]) skipAndRetryGlobals(err error) (any, error) {
+	if !r.ignoreUnknownFields {
+		return nil, err
+	}
+
+	if err := r.skipToNextLine(); err != nil {
+		return nil, fmt.Errorf("failed to skip: %w", err)
+	}
+
+	r.logger.Warn("skipping unknown section",
+		slog.Any("error", err))
+
+	return r.readGlobals()
+}
+
 // readSIndex is used to read secondary index lines in the global section of the asb file.
-// readSIndex expects that r has been advanced past the secondary index global line marker '* i'
-func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
+// readSIndex expects that r has been advanced past the secondary index global line marker '* i' or '* e'
+// If isExpression = true, we assume it is sindex with expression.
+//
+//nolint:gocyclo // Long decoding func
+func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 	var (
 		res models.SIndex
 		err error
@@ -501,12 +534,20 @@ func (r *Decoder[T]) readSIndex() (*models.SIndex, error) {
 		if err := _expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
-
-		// NOTE: the context should always be base64 encoded,
-		// so escaping is not needed
-		path.B64Context, err = _readUntil(r.reader, asbNewLine, false)
-		if err != nil {
-			return nil, err
+		// Expression filter has a base64 encoded expression and no CDT context.
+		// If it is not expression, we assume it is CDT contex.
+		if isExpression {
+			res.Expression, err = _readUntil(r.reader, asbNewLine, false)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// NOTE: the context should always be base64 encoded,
+			// so escaping is not needed
+			path.B64Context, err = _readUntil(r.reader, asbNewLine, false)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -664,6 +705,22 @@ func (r *Decoder[T]) readRecord() (*models.Record, error) {
 		case i == 3 && b == expectedRecordHeaderTypes[4]:
 			i++
 		case b != expectedRecordHeaderTypes[i]:
+			if r.ignoreUnknownFields {
+				// Skip only this field.
+				if err := r.skipToNextLine(); err != nil {
+					return nil, fmt.Errorf("failed to skip unknown record header type %c: %w", b, err)
+				}
+
+				r.logger.Warn("ignoring error while reading record field type",
+					slog.Any("error",
+						fmt.Errorf("invalid record header line type %c expected %c", b, expectedRecordHeaderTypes[i])))
+
+				// Don't increment i, retry reading the same expected field.
+				i--
+
+				continue
+			}
+
 			return nil, fmt.Errorf("invalid record header line type %c expected %c", b, expectedRecordHeaderTypes[i])
 		}
 
@@ -1140,6 +1197,22 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 	}
 
 	return digest, nil
+}
+
+func (r *Decoder[T]) skipToNextLine() error {
+	// Read until newline, no escaping needed for skip.
+	buf, err := _readUntilAny(r.reader, []byte{asbNewLine}, false)
+	if err != nil {
+		return err
+	}
+
+	// Return buffer to pool immediately since we don't need the data.
+	returnSmallBuffer(buf)
+
+	// Consume the newline.
+	_, err = r.reader.ReadByte()
+
+	return err
 }
 
 // ***** Helper Functions

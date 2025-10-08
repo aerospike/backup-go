@@ -32,9 +32,7 @@ import (
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
 type Encoder[T models.TokenConstraint] struct {
-	namespace string
-	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
-	compact bool
+	config *EncoderConfig
 
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
@@ -43,21 +41,19 @@ type Encoder[T models.TokenConstraint] struct {
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder[T models.TokenConstraint](namespace string, compact bool) *Encoder[T] {
+func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
 	return &Encoder[T]{
-		namespace: namespace,
-		compact:   compact,
+		config: cfg,
 	}
 }
 
 // GenerateFilename generates a file name for the given namespace.
 func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
-	return prefix + e.namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
+	return prefix + e.config.Namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
 // EncodeToken encodes a token to the ASB format.
-// It returns a byte slice of the encoded token and an error if the encoding
-// fails.
+// It returns a byte slice of the encoded token and an error if the encoding fails.
 func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
@@ -96,30 +92,38 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 }
 
 func (e *Encoder[T]) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
-	return recordToASB(e.compact, rec, buff)
+	return recordToASB(e.config.Compact, rec, buff)
 }
 
 func (e *Encoder[T]) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
 	return udfToASB(udf, buff)
 }
 
-func (e *Encoder[T]) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (int, error) {
-	return sindexToASB(sindex, buff)
+func (e *Encoder[T]) encodeSIndex(sIndex *models.SIndex, buff *bytes.Buffer) (int, error) {
+	return sindexToASB(sIndex, buff)
 }
 
-func (e *Encoder[T]) GetHeader(_ uint64) []byte {
+func (e *Encoder[T]) GetHeader(_ uint64, isMeta bool) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 1024))
 
-	writeVersionText(FormatVersion, buff)
+	writeVersionText(e.headerVersion(isMeta), buff)
 
-	writeNamespaceMetaText(e.namespace, buff)
+	writeNamespaceMetaText(e.config.Namespace, buff)
 
 	if !e.firstFileWritten.Swap(true) {
 		writeFirstMetaText(buff)
 	}
 
 	return buff.Bytes()
+}
+
+func (e *Encoder[T]) headerVersion(isMeta bool) string {
+	if isMeta {
+		return e.config.getVersion().toString()
+	}
+
+	return version31.toString()
 }
 
 // **** META DATA ****
@@ -661,11 +665,17 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 	// sindexes only ever use 1 path for now
 	numPaths := 1
 
+	sindexSection := globalSIndex
+	// If we have sindex with expression, we need to use the globalSIndexExpression section.
+	if sindex.Expression != "" {
+		sindexSection = globalSIndexExpression
+	}
+
 	// Prepare all parameters
 	params := [][]byte{
 		globalSection,
 		space,
-		globalSIndex,
+		sindexSection,
 		space,
 		escapeASB(sindex.Namespace),
 		space,
@@ -685,6 +695,11 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 	// If there's a B64Context, add it to the parameters
 	if sindex.Path.B64Context != "" {
 		params = append(params, space, []byte(sindex.Path.B64Context))
+	}
+
+	// If there is expression add it to the end.
+	if sindex.Expression != "" {
+		params = append(params, space, []byte(sindex.Expression))
 	}
 
 	// Write all parameters at once

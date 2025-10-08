@@ -63,9 +63,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	}
 }
 
-func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(
-	ctx context.Context, n int,
-) ([]pipe.Reader[*models.Token], error) {
+func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context) ([]pipe.Reader[*models.Token], error) {
 	scanPolicy := *rr.config.ScanPolicy
 
 	// we need to set the RawCDT flag
@@ -78,9 +76,9 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(
 	)
 
 	if rr.config.isProcessedByNodes() {
-		partitionGroups, err = rr.newPartitionGroupsFromNodes(n)
+		partitionGroups, err = rr.newPartitionGroupsFromNodes()
 	} else {
-		partitionGroups, err = rr.newPartitionGroups(n)
+		partitionGroups, err = rr.newPartitionGroups()
 	}
 
 	if err != nil {
@@ -107,13 +105,13 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(
 	return readers, nil
 }
 
-func (rr *recordReaderProcessor[T]) newPartitionGroups(numWorkers int) ([]*a.PartitionFilter, error) {
+func (rr *recordReaderProcessor[T]) newPartitionGroups() ([]*a.PartitionFilter, error) {
 	var err error
 
 	partitionGroups := rr.config.PartitionFilters
 
 	if !rr.config.isStateContinue() {
-		partitionGroups, err = splitPartitions(rr.config.PartitionFilters, numWorkers)
+		partitionGroups, err = splitPartitions(rr.config.PartitionFilters, rr.config.ParallelRead)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +127,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroups(numWorkers int) ([]*a.Par
 	return partitionGroups, nil
 }
 
-func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(numWorkers int) ([]*a.PartitionFilter, error) {
+func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes() ([]*a.PartitionFilter, error) {
 	nodes, err := rr.getNodes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get nodes: %w", err)
@@ -150,7 +148,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(numWorkers int) 
 		partIDs = append(partIDs, parts...)
 	}
 
-	partitionGroups, err := splitPartitionIDs(partIDs, numWorkers)
+	partitionGroups, err := splitPartitionIDs(partIDs, rr.config.ParallelRead)
 	if err != nil {
 		return nil, fmt.Errorf("failed to split partition ids: %w", err)
 	}

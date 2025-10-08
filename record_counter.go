@@ -84,7 +84,7 @@ func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, err
 	filters := rc.config.PartitionFilters
 
 	if rc.config.isProcessedByNodes() {
-		filters, err = rc.readerProcessor.newPartitionGroupsFromNodes(rc.config.ParallelRead)
+		filters, err = rc.readerProcessor.newPartitionGroupsFromNodes()
 		if err != nil {
 			return 0, fmt.Errorf("failed to create partition groups: %w", err)
 		}

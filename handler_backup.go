@@ -370,7 +370,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 			ctx, rps),
 	)
 
-	dataReaders, err := bh.readerProcessor.newAerospikeReadWorkers(ctx, bh.config.ParallelRead)
+	dataReaders, err := bh.readerProcessor.newAerospikeReadWorkers(ctx)
 	if err != nil {
 		return err
 	}

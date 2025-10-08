@@ -112,7 +112,7 @@ func newBackupHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
-	// redefine context cancel.
+	// Derive a new cancellable context from the existing one.
 	ctx, cancel := context.WithCancel(ctx)
 
 	var state *State
@@ -132,18 +132,18 @@ func newBackupHandler(
 			config.PartitionFilters, err = state.loadPartitionFilters()
 			if err != nil {
 				cancel()
-				return nil, fmt.Errorf("failed to load partition filters for : %w", err)
+				return nil, fmt.Errorf("failed to load partition filters: %w", err)
 			}
 		}
 	}
 
-	hasExprSind, err := infoClient.HasExpressionSIndex(config.Namespace)
+	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(config.Namespace)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
 	}
 
-	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExprSind)
+	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExpressionSIndex)
 
 	stats := models.NewBackupStats()
 
@@ -514,7 +514,7 @@ func (bh *BackupHandler) backupSIndexes(
 
 	proc := newDataProcessor(processors.NewNoop[*models.Token]())
 
-	sindexPipeline, err := pipe.NewPipe(
+	sIndexPipeline, err := pipe.NewPipe(
 		proc,
 		[]pipe.Reader[*models.Token]{dataReader},
 		[]pipe.Writer[*models.Token]{sindexWriter},
@@ -525,7 +525,7 @@ func (bh *BackupHandler) backupSIndexes(
 		return fmt.Errorf("failed to create sindex pipeline: %w", err)
 	}
 
-	return sindexPipeline.Run(ctx)
+	return sIndexPipeline.Run(ctx)
 }
 
 func (bh *BackupHandler) backupUDFs(

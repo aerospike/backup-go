@@ -33,10 +33,6 @@ import (
 // This is a stateful object that must be created for every backup operation.
 type Encoder[T models.TokenConstraint] struct {
 	config *EncoderConfig
-	// Version is the version string of the backup file.
-	// It is predefined to avoid unnecessary processing on each header generation.
-	metaVersion string
-	version     string
 
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
@@ -47,9 +43,7 @@ type Encoder[T models.TokenConstraint] struct {
 // NewEncoder creates a new Encoder.
 func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
 	return &Encoder[T]{
-		config:      cfg,
-		metaVersion: cfg.getVersion().toString(),
-		version:     version31.toString(),
+		config: cfg,
 	}
 }
 
@@ -59,8 +53,7 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 }
 
 // EncodeToken encodes a token to the ASB format.
-// It returns a byte slice of the encoded token and an error if the encoding
-// fails.
+// It returns a byte slice of the encoded token and an error if the encoding fails.
 func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
@@ -106,20 +99,15 @@ func (e *Encoder[T]) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error)
 	return udfToASB(udf, buff)
 }
 
-func (e *Encoder[T]) encodeSIndex(sindex *models.SIndex, buff *bytes.Buffer) (int, error) {
-	return sindexToASB(sindex, buff)
+func (e *Encoder[T]) encodeSIndex(sIndex *models.SIndex, buff *bytes.Buffer) (int, error) {
+	return sindexToASB(sIndex, buff)
 }
 
 func (e *Encoder[T]) GetHeader(_ uint64, isMeta bool) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 1024))
-	// Check if this ism meta file, we use a different version for meta files.
-	hv := e.version
-	if isMeta {
-		hv = e.metaVersion
-	}
 
-	writeVersionText(hv, buff)
+	writeVersionText(e.headerVersion(isMeta), buff)
 
 	writeNamespaceMetaText(e.config.Namespace, buff)
 
@@ -128,6 +116,14 @@ func (e *Encoder[T]) GetHeader(_ uint64, isMeta bool) []byte {
 	}
 
 	return buff.Bytes()
+}
+
+func (e *Encoder[T]) headerVersion(isMeta bool) string {
+	if isMeta {
+		return e.config.getVersion().toString()
+	}
+
+	return version31.toString()
 }
 
 // **** META DATA ****

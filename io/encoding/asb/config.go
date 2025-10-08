@@ -16,7 +16,7 @@ package asb
 
 // EncoderConfig contains configuration options for the Encoder.
 type EncoderConfig struct {
-	// Namespace is the namespace to backup.
+	// Namespace is the namespace to back up.
 	Namespace string
 	// Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
 	Compact bool
@@ -26,11 +26,11 @@ type EncoderConfig struct {
 }
 
 // NewEncoderConfig returns a new encoder EncoderConfig.
-func NewEncoderConfig(namespace string, compact, hasExprSindex bool) *EncoderConfig {
+func NewEncoderConfig(namespace string, compact, hasExpressionSIndex bool) *EncoderConfig {
 	return &EncoderConfig{
 		Namespace:           namespace,
 		Compact:             compact,
-		HasExpressionSIndex: hasExprSindex,
+		HasExpressionSIndex: hasExpressionSIndex,
 	}
 }
 

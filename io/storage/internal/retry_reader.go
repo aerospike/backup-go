@@ -34,9 +34,9 @@ type readerCloser interface {
 	io.ReadCloser
 }
 
-// rangeReader interface for range reader. That reads a file from a specific position.
+// rangeReader interface for range reader. That reads a file from a specific offset.
 type rangeReader interface {
-	OpenRange(ctx context.Context, rangeHeader *string) (io.ReadCloser, error)
+	OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error)
 	GetSize() int64
 	GetInfo() string
 }
@@ -49,7 +49,7 @@ type RetryableReader struct {
 
 	retryPolicy *models.RetryPolicy
 	logger      *slog.Logger
-	position    int64
+	offset      int64
 	totalSize   int64
 
 	closed atomic.Bool
@@ -102,23 +102,15 @@ func (r *RetryableReader) openStream() error {
 		return fmt.Errorf("reader is closed")
 	}
 
-	// Calc the range header if we need to resume the download.
-	var rangeHeader *string
-
-	if r.position > 0 {
-		// We read from the current position till the end of the file.
-		// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
-		rh := fmt.Sprintf("bytes=%d-", r.position)
+	if r.offset > 0 {
 		if r.logger != nil {
 			r.logger.Debug("start reading from",
-				slog.String("position", rh),
+				slog.Int64("offset", r.offset),
 			)
 		}
-
-		rangeHeader = &rh
 	}
-
-	fReader, err := r.rangeReader.OpenRange(r.ctx, rangeHeader)
+	// Count = 0 means read to the end of the file.
+	fReader, err := r.rangeReader.OpenRange(r.ctx, r.offset, 0)
 	if err != nil {
 		return fmt.Errorf("failed to get file: %w", err)
 	}
@@ -151,7 +143,7 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		return 0, fmt.Errorf("reader is closed")
 	}
 	// If we reached end of file, return EOF.
-	if r.position >= r.totalSize {
+	if r.offset >= r.totalSize {
 		return 0, io.EOF
 	}
 
@@ -163,8 +155,8 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 	for r.retryPolicy.AttemptsLeft(attempt) {
 		n, err := r.reader.Read(p)
 		if err == nil {
-			// Success reading updated position.
-			r.position += int64(n)
+			// Success reading updated offset.
+			r.offset += int64(n)
 
 			return n, err
 		}

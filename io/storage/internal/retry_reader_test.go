@@ -53,7 +53,7 @@ func TestRetryableReader_New(t *testing.T) {
 		readerMock := mocks.NewMockreaderCloser(t)
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerMock, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -74,7 +74,7 @@ func TestRetryableReader_New(t *testing.T) {
 		t.Parallel()
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, errTest)
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -107,7 +107,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		readerMock.On("Close").Return(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerMock, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -127,7 +127,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		n, err := rr.Read(buf)
 		require.NoError(t, err)
 		require.Equal(t, 10, n)
-		require.Equal(t, int64(10), rr.position)
+		require.Equal(t, int64(10), rr.offset)
 	})
 
 	t.Run("Reader closed", func(t *testing.T) {
@@ -137,7 +137,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		readerMock.On("Close").Return(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerMock, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -161,14 +161,14 @@ func TestRetryableReader_Read(t *testing.T) {
 		require.Contains(t, err.Error(), "reader is closed")
 	})
 
-	t.Run("EOF when position >= totalSize", func(t *testing.T) {
+	t.Run("EOF when offset >= totalSize", func(t *testing.T) {
 		t.Parallel()
 
 		readerMock := mocks.NewMockreaderCloser(t)
 		readerMock.On("Close").Return(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerMock, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -184,7 +184,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		require.NoError(t, err)
 		defer rr.Close()
 
-		rr.position = rr.totalSize
+		rr.offset = rr.totalSize
 
 		buf := make([]byte, 10)
 		n, err := rr.Read(buf)
@@ -204,9 +204,9 @@ func TestRetryableReader_Read(t *testing.T) {
 		readerMock.On("Close").Return(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerErrorMock, nil).Once().
-			On("OpenRange", mock.Anything, mock.Anything).
+			On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerMock, nil).Once()
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -222,13 +222,13 @@ func TestRetryableReader_Read(t *testing.T) {
 		require.NoError(t, err)
 		defer rr.Close()
 
-		rr.position = 5
+		rr.offset = 5
 
 		buf := make([]byte, 10)
 		n, err := rr.Read(buf)
 		require.NoError(t, err)
 		require.Equal(t, 10, n)
-		require.Equal(t, int64(15), rr.position)
+		require.Equal(t, int64(15), rr.offset)
 	})
 
 	t.Run("Network error - failed to reopen stream", func(t *testing.T) {
@@ -241,9 +241,9 @@ func TestRetryableReader_Read(t *testing.T) {
 
 		rrMock := mocks.NewMockrangeReader(t)
 		// First call ok.
-		rrMock.EXPECT().OpenRange(ctx, mock.Anything).Return(readerMock, nil).Once().
+		rrMock.EXPECT().OpenRange(ctx, mock.Anything, mock.Anything).Return(readerMock, nil).Once().
 			// Second call fails.
-			On("OpenRange", mock.Anything, mock.Anything).
+			On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, errTest)
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -273,7 +273,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		readerErrorMock.On("Close").Return(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerErrorMock, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
@@ -308,7 +308,7 @@ func TestRetryableReader_Read(t *testing.T) {
 		readerErrorMock.On("Close").Return(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
-		rrMock.On("OpenRange", mock.Anything, mock.Anything).
+		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(readerErrorMock, nil)
 		rrMock.On("GetSize").
 			Return(testSize)

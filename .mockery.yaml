@@ -48,3 +48,7 @@ packages:
     config:
       dir: ./io/storage/aws/s3/mocks
       pkgname: mocks
+  github.com/aerospike/backup-go/io/storage/azure/blob:
+    config:
+      dir: ./io/storage/azure/blob/mocks
+      pkgname: mocks

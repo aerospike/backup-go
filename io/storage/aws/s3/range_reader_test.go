@@ -28,10 +28,11 @@ import (
 )
 
 const (
-	testKey         = "test-key"
-	testETag        = "test-etag"
-	testSize        = int64(12345)
-	testRangeHeader = "bytes=0-1023"
+	testKey    = "test-key"
+	testETag   = "test-etag"
+	testSize   = int64(12345)
+	testOffset = int64(100)
+	testCount  = 0
 )
 
 var (
@@ -152,7 +153,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 	bucket := aws.String(testBucket)
 	key := aws.String(testKey)
 	etag := aws.String(testETag)
-	rangeHeader := aws.String(testRangeHeader)
+	rangeHeader := aws.String(fmt.Sprintf("bytes=%d-", testOffset))
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
@@ -177,7 +178,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:   testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, rangeHeader)
+		body, err := reader.OpenRange(ctx, testOffset, testCount)
 
 		require.NoError(t, err)
 		require.NotNil(t, body)
@@ -207,7 +208,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:   testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, nil)
+		body, err := reader.OpenRange(ctx, 0, 0)
 
 		require.NoError(t, err)
 		require.NotNil(t, body)
@@ -237,7 +238,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:   testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, differentRange)
+		body, err := reader.OpenRange(ctx, 1024, 2047)
 
 		require.NoError(t, err)
 		require.NotNil(t, body)
@@ -262,7 +263,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:   testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, rangeHeader)
+		body, err := reader.OpenRange(ctx, testOffset, testCount)
 
 		require.ErrorIs(t, err, errS3Test)
 		require.Contains(t, err.Error(), "failed to get object")

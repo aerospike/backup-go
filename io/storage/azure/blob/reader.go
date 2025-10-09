@@ -244,7 +244,13 @@ func (r *Reader) openObject(
 		return
 	}
 
-	resp, err := r.client.DownloadStream(ctx, r.containerName, path, nil)
+	rReader, err := newRangeReader(ctx, newAzureBlobClient(r.client), r.containerName, path)
+	if err != nil {
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		return
+	}
+
+	object, err := internal.NewRetryableReader(ctx, rReader, r.RetryPolicy, r.Logger)
 	if err != nil {
 		// Skip 404 not found error.
 		var respErr *azcore.ResponseError
@@ -257,8 +263,8 @@ func (r *Reader) openObject(
 		return
 	}
 
-	if resp.Body != nil {
-		readersCh <- models.File{Reader: resp.Body, Name: filepath.Base(path)}
+	if object != nil {
+		readersCh <- models.File{Reader: object, Name: filepath.Base(path)}
 	}
 }
 

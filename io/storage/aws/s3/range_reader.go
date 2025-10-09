@@ -1,3 +1,17 @@
+// Copyright 2024 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this rangeReader except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package s3
 
 import (
@@ -5,6 +19,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -25,7 +40,7 @@ type rangeReader struct {
 	size int64
 }
 
-// newRangeReader creates a new file reader..
+// newRangeReader creates a new file reader.
 func newRangeReader(ctx context.Context, client s3Getter, bucket, key *string) (*rangeReader, error) {
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: bucket,
@@ -50,11 +65,11 @@ func newRangeReader(ctx context.Context, client s3Getter, bucket, key *string) (
 }
 
 // OpenRange opens a file by range.
-func (r *rangeReader) OpenRange(ctx context.Context, rangeHeader *string) (io.ReadCloser, error) {
+func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:  r.bucket,
 		Key:     r.key,
-		Range:   rangeHeader,
+		Range:   getRangeHeader(offset, count),
 		IfMatch: r.etag,
 	})
 	if err != nil {
@@ -72,4 +87,19 @@ func (r *rangeReader) GetSize() int64 {
 // GetInfo returns file info for logging.
 func (r *rangeReader) GetInfo() string {
 	return fmt.Sprintf("%s:%s", *r.bucket, *r.key)
+}
+
+func getRangeHeader(offset, count int64) *string {
+	// We read from the current offset till the end of the file.
+	// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
+	switch {
+	case offset == 0 && count == 0:
+		return nil
+	case offset > 0 && count == 0:
+		return aws.String(fmt.Sprintf("bytes=%d-", offset))
+	case offset > 0 && count > 0:
+		return aws.String(fmt.Sprintf("bytes=%d-%d", offset, count))
+	default:
+		return nil
+	}
 }

@@ -127,8 +127,8 @@ func (_c *MockrangeReader_GetSize_Call) RunAndReturn(run func() int64) *Mockrang
 }
 
 // OpenRange provides a mock function for the type MockrangeReader
-func (_mock *MockrangeReader) OpenRange(ctx context.Context, rangeHeader *string) (io.ReadCloser, error) {
-	ret := _mock.Called(ctx, rangeHeader)
+func (_mock *MockrangeReader) OpenRange(ctx context.Context, offset int64, count int64) (io.ReadCloser, error) {
+	ret := _mock.Called(ctx, offset, count)
 
 	if len(ret) == 0 {
 		panic("no return value specified for OpenRange")
@@ -136,18 +136,18 @@ func (_mock *MockrangeReader) OpenRange(ctx context.Context, rangeHeader *string
 
 	var r0 io.ReadCloser
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *string) (io.ReadCloser, error)); ok {
-		return returnFunc(ctx, rangeHeader)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) (io.ReadCloser, error)); ok {
+		return returnFunc(ctx, offset, count)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *string) io.ReadCloser); ok {
-		r0 = returnFunc(ctx, rangeHeader)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) io.ReadCloser); ok {
+		r0 = returnFunc(ctx, offset, count)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(io.ReadCloser)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *string) error); ok {
-		r1 = returnFunc(ctx, rangeHeader)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64) error); ok {
+		r1 = returnFunc(ctx, offset, count)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -161,14 +161,15 @@ type MockrangeReader_OpenRange_Call struct {
 
 // OpenRange is a helper method to define mock.On call
 //   - ctx
-//   - rangeHeader
-func (_e *MockrangeReader_Expecter) OpenRange(ctx interface{}, rangeHeader interface{}) *MockrangeReader_OpenRange_Call {
-	return &MockrangeReader_OpenRange_Call{Call: _e.mock.On("OpenRange", ctx, rangeHeader)}
+//   - offset
+//   - count
+func (_e *MockrangeReader_Expecter) OpenRange(ctx interface{}, offset interface{}, count interface{}) *MockrangeReader_OpenRange_Call {
+	return &MockrangeReader_OpenRange_Call{Call: _e.mock.On("OpenRange", ctx, offset, count)}
 }
 
-func (_c *MockrangeReader_OpenRange_Call) Run(run func(ctx context.Context, rangeHeader *string)) *MockrangeReader_OpenRange_Call {
+func (_c *MockrangeReader_OpenRange_Call) Run(run func(ctx context.Context, offset int64, count int64)) *MockrangeReader_OpenRange_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
 	})
 	return _c
 }
@@ -178,7 +179,7 @@ func (_c *MockrangeReader_OpenRange_Call) Return(readCloser io.ReadCloser, err e
 	return _c
 }
 
-func (_c *MockrangeReader_OpenRange_Call) RunAndReturn(run func(ctx context.Context, rangeHeader *string) (io.ReadCloser, error)) *MockrangeReader_OpenRange_Call {
+func (_c *MockrangeReader_OpenRange_Call) RunAndReturn(run func(ctx context.Context, offset int64, count int64) (io.ReadCloser, error)) *MockrangeReader_OpenRange_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -106,7 +106,14 @@ func (fr *fileReaderProcessor[T]) decoderFun(r io.ReadCloser, fileNumber uint64,
 
 	reader = metrics.NewReader(reader, fr.kbpsCollector)
 
-	d, err := NewDecoder[T](fr.config.EncoderType, reader, fileNumber, fileName)
+	d, err := NewDecoder[T](
+		fr.config.EncoderType,
+		reader,
+		fileNumber,
+		fileName,
+		fr.config.IgnoreUnknownFields,
+		fr.logger,
+	)
 	if err != nil {
 		return nil, err
 	}

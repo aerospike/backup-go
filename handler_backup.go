@@ -112,7 +112,7 @@ func newBackupHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
-	// redefine context cancel.
+	// Derive a new cancellable context from the existing one.
 	ctx, cancel := context.WithCancel(ctx)
 
 	var state *State
@@ -132,12 +132,18 @@ func newBackupHandler(
 			config.PartitionFilters, err = state.loadPartitionFilters()
 			if err != nil {
 				cancel()
-				return nil, fmt.Errorf("failed to load partition filters for : %w", err)
+				return nil, fmt.Errorf("failed to load partition filters: %w", err)
 			}
 		}
 	}
 
-	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact)
+	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(config.Namespace)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
+	}
+
+	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExpressionSIndex)
 
 	stats := models.NewBackupStats()
 
@@ -198,7 +204,7 @@ func newBackupHandler(
 	}
 
 	writerProcessor := newFileWriterProcessor[*models.Token](
-		bh.config.OutputFilePrefix,
+		config.OutputFilePrefix,
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,
@@ -262,7 +268,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	result /= compressRatio
 
 	// Calculate and add estimated backup file headers size.
-	header := bh.encoder.GetHeader(0)
+	header := bh.encoder.GetHeader(0, false)
 	numFiles := bh.config.ParallelWrite
 
 	if bh.config.FileLimit > 0 {
@@ -318,26 +324,13 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 }
 
 func (bh *BackupHandler) backup(ctx context.Context) error {
-	backupWriters, err := bh.writerProcessor.newWriters(ctx)
+	dataWriters, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed create write workers: %w", err)
 	}
 
-	dataWriters := bh.writerProcessor.newDataWriters(backupWriters)
-
-	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
-	if err != nil {
-		return err
-	}
-
-	// backup secondary indexes and UDFs on the separate metaWriter.
-	// We don't mix them anymore with records as it was done before.
-	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
-	// This is done to keep the backup files more consistent and to avoid mixing them with records.
-	// Also, now we can restore metadata after records.
-	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
-	if err != nil {
-		return err
+	if err = bh.backupMetadata(ctx); err != nil {
+		return fmt.Errorf("failed to backup metadata: %w", err)
 	}
 
 	if bh.config.NoRecords {
@@ -395,6 +388,25 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	bh.pl.Store(pl)
 
 	return pl.Run(ctx)
+}
+
+func (bh *BackupHandler) backupMetadata(ctx context.Context) error {
+	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
+	if err != nil {
+		return err
+	}
+
+	// backup secondary indexes and UDFs on the separate metaWriter.
+	// We don't mix them anymore with records as it was done before.
+	// Now the secondary indexes/UDFs will be stored in a separate pipeline to separate files.
+	// This is done to keep the backup files more consistent and to avoid mixing them with records.
+	// Also, now we can restore metadata after records.
+	err = bh.backupSIndexesAndUDFs(ctx, metaWriter)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (bh *BackupHandler) countRecords(ctx context.Context) {
@@ -500,7 +512,7 @@ func (bh *BackupHandler) backupSIndexes(
 
 	proc := newDataProcessor(processors.NewNoop[*models.Token]())
 
-	sindexPipeline, err := pipe.NewPipe(
+	sIndexPipeline, err := pipe.NewPipe(
 		proc,
 		[]pipe.Reader[*models.Token]{dataReader},
 		[]pipe.Writer[*models.Token]{sindexWriter},
@@ -511,7 +523,7 @@ func (bh *BackupHandler) backupSIndexes(
 		return fmt.Errorf("failed to create sindex pipeline: %w", err)
 	}
 
-	return sindexPipeline.Run(ctx)
+	return sIndexPipeline.Run(ctx)
 }
 
 func (bh *BackupHandler) backupUDFs(

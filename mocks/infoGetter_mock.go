@@ -790,6 +790,60 @@ func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func() (asinfo.Aerosp
 	return _c
 }
 
+// HasExpressionSIndex provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) HasExpressionSIndex(namespace string) (bool, error) {
+	ret := _mock.Called(namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasExpressionSIndex")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (bool, error)); ok {
+		return returnFunc(namespace)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = returnFunc(namespace)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockInfoGetter_HasExpressionSIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExpressionSIndex'
+type MockInfoGetter_HasExpressionSIndex_Call struct {
+	*mock.Call
+}
+
+// HasExpressionSIndex is a helper method to define mock.On call
+//   - namespace
+func (_e *MockInfoGetter_Expecter) HasExpressionSIndex(namespace interface{}) *MockInfoGetter_HasExpressionSIndex_Call {
+	return &MockInfoGetter_HasExpressionSIndex_Call{Call: _e.mock.On("HasExpressionSIndex", namespace)}
+}
+
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) Run(run func(namespace string)) *MockInfoGetter_HasExpressionSIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) Return(b bool, err error) *MockInfoGetter_HasExpressionSIndex_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(namespace string) (bool, error)) *MockInfoGetter_HasExpressionSIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StartXDR provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) StartXDR(nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool) error {
 	ret := _mock.Called(nodeName, dc, hostPort, namespace, rewind, throughput, forward)

@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	ioStorage "github.com/aerospike/backup-go/io/storage/internal"
 	"github.com/aerospike/backup-go/models"
 )
 

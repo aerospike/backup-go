@@ -1,7 +1,7 @@
 // Copyright 2024 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
+// you may not use this rangeReader except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
@@ -25,7 +25,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -36,20 +37,20 @@ const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part
 // Writer represents a s3 storage writer.
 type Writer struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	client *s3.Client
 	// bucketName contains name of the bucket to read from.
 	bucketName string
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
-	// Sync for running backup to one file.
+	// Sync for running backup to one rangeReader.
 	called atomic.Bool
 
 	storageClass types.StorageClass
 }
 
-// NewWriter creates a new writer for S3 storage directory/file writes.
+// NewWriter creates a new writer for S3 storage directory/rangeReader writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
 // For S3 client next parameters must be set:
@@ -59,7 +60,7 @@ func NewWriter(
 	ctx context.Context,
 	client *s3.Client,
 	bucketName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Writer, error) {
 	w := &Writer{}
 
@@ -80,7 +81,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = ioStorage.CleanPath(w.PathList[0], true)
+		w.prefix = internal.CleanPath(w.PathList[0], true)
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -128,12 +129,12 @@ func NewWriter(
 
 // NewWriter returns a new S3 writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
-	// protection for single file backup.
+	// protection for single rangeReader backup.
 	if !w.IsDir {
 		if !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
+			return nil, fmt.Errorf("parallel running for single rangeReader is not allowed")
 		}
-		// If we use backup to single file, we overwrite the file name.
+		// If we use backup to single rangeReader, we overwrite the rangeReader name.
 		filename = w.PathList[0]
 	}
 
@@ -272,14 +273,14 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix
 	return len(resp.Contents) == 0, nil
 }
 
-// RemoveFiles removes a backup file or files from directory.
+// RemoveFiles removes a backup rangeReader or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	return w.Remove(ctx, w.PathList[0])
 }
 
-// Remove deletes the file or directory contents specified by path.
+// Remove deletes the rangeReader or directory contents specified by path.
 func (w *Writer) Remove(ctx context.Context, targetPath string) error {
-	// Remove file.
+	// Remove rangeReader.
 	if !w.IsDir {
 		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 			Bucket: aws.String(w.bucketName),
@@ -293,7 +294,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove files from dir.
 	var continuationToken *string
 
-	prefix := ioStorage.CleanPath(targetPath, true)
+	prefix := internal.CleanPath(targetPath, true)
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -306,7 +307,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || ioStorage.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
+			if p.Key == nil || internal.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
 				continue
 			}
 

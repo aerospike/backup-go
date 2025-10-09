@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/internal/util"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
-	"github.com/aerospike/backup-go/io/storage/mocks"
+	"github.com/aerospike/backup-go/io/storage/options"
+	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +37,7 @@ func Test_openBackupFile(t *testing.T) {
 	tmpDir := path.Join(t.TempDir(), "Test_openBackupFile")
 	ctx := context.Background()
 
-	factory, err := NewWriter(ctx, ioStorage.WithRemoveFiles(), ioStorage.WithDir(tmpDir))
+	factory, err := NewWriter(ctx, options.WithRemoveFiles(), options.WithDir(tmpDir))
 	require.NoError(t, err)
 
 	w, err := factory.NewWriter(context.Background(), "test")
@@ -74,7 +74,7 @@ func TestDirectoryWriter_GetType(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "Test_openBackupFile")
 	ctx := context.Background()
-	w, err := NewWriter(ctx, ioStorage.WithRemoveFiles(), ioStorage.WithDir(tmpDir))
+	w, err := NewWriter(ctx, options.WithRemoveFiles(), options.WithDir(tmpDir))
 	require.NoError(t, err)
 
 	require.Equal(t, localType, w.GetType())
@@ -94,7 +94,7 @@ func TestNewWriter_WithFile(t *testing.T) {
 	filePath := filepath.Join(tmpDir, "test.asb")
 	ctx := context.Background()
 
-	w, err := NewWriter(ctx, ioStorage.WithFile(filePath))
+	w, err := NewWriter(ctx, options.WithFile(filePath))
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
@@ -107,7 +107,7 @@ func TestNewWriter_WithDir_NonExistent(t *testing.T) {
 	tmpDir := path.Join(t.TempDir(), "TestNewWriter_WithDir_NonExistent", "nonexistent")
 	ctx := context.Background()
 
-	w, err := NewWriter(ctx, ioStorage.WithDir(tmpDir))
+	w, err := NewWriter(ctx, options.WithDir(tmpDir))
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
@@ -122,7 +122,7 @@ func TestNewWriter_WithDir_Empty(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	w, err := NewWriter(ctx, ioStorage.WithDir(tmpDir))
+	w, err := NewWriter(ctx, options.WithDir(tmpDir))
 	require.NoError(t, err)
 	require.NotNil(t, w)
 }
@@ -140,7 +140,7 @@ func TestNewWriter_WithDir_NonEmpty_NoRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	_, err = NewWriter(ctx, ioStorage.WithDir(tmpDir))
+	_, err = NewWriter(ctx, options.WithDir(tmpDir))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backup folder must be empty or set RemoveFiles = true")
 }
@@ -158,7 +158,7 @@ func TestNewWriter_WithDir_NonEmpty_WithRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	w, err := NewWriter(ctx, ioStorage.WithDir(tmpDir), ioStorage.WithRemoveFiles())
+	w, err := NewWriter(ctx, options.WithDir(tmpDir), options.WithRemoveFiles())
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
@@ -180,7 +180,7 @@ func TestNewWriter_WithDir_SkipDirCheck(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	w, err := NewWriter(ctx, ioStorage.WithDir(tmpDir), ioStorage.WithSkipDirCheck())
+	w, err := NewWriter(ctx, options.WithDir(tmpDir), options.WithSkipDirCheck())
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
@@ -265,7 +265,7 @@ func TestWriter_RemoveFiles_NonExistent(t *testing.T) {
 	ctx := context.Background()
 
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{tmpDir},
 			IsDir:    true,
 		},
@@ -289,7 +289,7 @@ func TestWriter_RemoveFiles_File(t *testing.T) {
 
 	ctx := context.Background()
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{filePath},
 			IsDir:    false,
 		},
@@ -320,7 +320,7 @@ func TestWriter_RemoveFiles_Dir_WithNestedDir(t *testing.T) {
 
 	ctx := context.Background()
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList:      []string{tmpDir},
 			IsDir:         true,
 			WithNestedDir: true,
@@ -356,7 +356,7 @@ func TestWriter_RemoveFiles_Dir_WithValidator(t *testing.T) {
 	err = os.MkdirAll(nestedDir, os.ModePerm)
 	require.NoError(t, err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
@@ -366,7 +366,7 @@ func TestWriter_RemoveFiles_Dir_WithValidator(t *testing.T) {
 
 	ctx := context.Background()
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList:  []string{tmpDir},
 			IsDir:     true,
 			Validator: mockValidator,
@@ -394,7 +394,7 @@ func TestWriter_RemoveFiles_CanceledContext(t *testing.T) {
 	cancel()
 
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{tmpDir},
 			IsDir:    true,
 		},
@@ -414,7 +414,7 @@ func TestWriter_NewWriter_CanceledContext(t *testing.T) {
 	cancel()
 
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{tmpDir},
 			IsDir:    true,
 		},
@@ -431,7 +431,7 @@ func TestWriter_NewWriter_CreateDirError(t *testing.T) {
 	tmpDir := "\000invalid"
 
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{tmpDir},
 			IsDir:    true,
 		},
@@ -451,7 +451,7 @@ func TestWriter_NewWriter_WithFile(t *testing.T) {
 	filePath := filepath.Join(tmpDir, testFileName)
 
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{filePath},
 			IsDir:    false,
 		},
@@ -478,7 +478,7 @@ func TestWriter_NewWriter_WithDir(t *testing.T) {
 	require.NoError(t, err)
 
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{tmpDir},
 			IsDir:    true,
 		},
@@ -509,7 +509,7 @@ func TestWriter_NewWriter_ParallelWithFile_Error(t *testing.T) {
 	filePath := filepath.Join(tmpDir, testFileName)
 
 	w := &Writer{
-		Options: ioStorage.Options{
+		Options: options.Options{
 			PathList: []string{filePath},
 			IsDir:    false,
 		},

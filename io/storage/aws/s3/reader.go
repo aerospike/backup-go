@@ -1,7 +1,7 @@
 // Copyright 2024 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
+// you may not use this rangeReader except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
@@ -25,7 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -51,7 +52,7 @@ const (
 // Reader represents S3 storage reader.
 type Reader struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	client *s3.Client
 
@@ -71,8 +72,8 @@ type Reader struct {
 	// total number of objects in a path.
 	totalNumber atomic.Int64
 
-	// If `skipPrefix` was set on the `StreamFiles` function, skipped file names will be stored here.
-	skipped *ioStorage.SkippedFiles
+	// If `skipPrefix` was set on the `StreamFiles` function, skipped rangeReader names will be stored here.
+	skipped *internal.SkippedFiles
 }
 
 // NewReader returns new S3 storage reader.
@@ -86,12 +87,12 @@ func NewReader(
 	ctx context.Context,
 	client *s3.Client,
 	bucketName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Reader, error) {
 	r := &Reader{}
 
 	// Set default val.
-	r.PollWarmDuration = ioStorage.DefaultPollWarmDuration
+	r.PollWarmDuration = internal.DefaultPollWarmDuration
 	r.Logger = slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.Level(1024)}))
 
 	for _, opt := range opts {
@@ -114,13 +115,13 @@ func NewReader(
 	if r.IsDir {
 		if !r.SkipDirCheck {
 			if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+				return nil, fmt.Errorf("%w: %w", internal.ErrEmptyStorage, err)
 			}
 		}
 
 		// Presort files if needed.
 		if r.SortFiles && len(r.PathList) == 1 {
-			if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+			if err := internal.PreSort(ctx, r, r.PathList[0]); err != nil {
 				return nil, fmt.Errorf("failed to pre sort: %w", err)
 			}
 		}
@@ -163,16 +164,16 @@ func (r *Reader) StreamFiles(
 		r.streamSetObjects(ctx, readersCh, errorsCh)
 		return
 	}
-	// Init file skipper when skipPrefix is set.
+	// Init rangeReader skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
-		r.skipped = ioStorage.NewSkippedFiles(skipPrefixes)
+		r.skipped = internal.NewSkippedFiles(skipPrefixes)
 	}
 
 	for _, path := range r.PathList {
 		// If it is a folder, open and return.
 		switch r.IsDir {
 		case true:
-			path = ioStorage.CleanPath(path, true)
+			path = internal.CleanPath(path, true)
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(ctx, path)
 				if err != nil {
@@ -183,7 +184,7 @@ func (r *Reader) StreamFiles(
 
 			r.streamDirectory(ctx, path, readersCh, errorsCh)
 		case false:
-			// If not a folder, only file.
+			// If not a folder, only rangeReader.
 			r.StreamFile(ctx, path, readersCh, errorsCh)
 		}
 	}
@@ -205,7 +206,7 @@ func (r *Reader) streamDirectory(
 		})
 
 		if err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to list objects: %w", err))
+			internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to list objects: %w", err))
 			return
 		}
 
@@ -249,17 +250,22 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
 		return
 	}
 
 	if state != objStatusAvailable {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path))
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", internal.ErrArchivedObject, path))
 		return
 	}
 
-	object, err := newRetryableReader(ctx, r.client, r.RetryPolicy, r.Logger, r.bucketName, path)
+	rReader, err := newRangeReader(ctx, r.client, &r.bucketName, &path)
+	if err != nil {
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		return
+	}
 
+	object, err := internal.NewRetryableReader(ctx, rReader, r.RetryPolicy, r.Logger)
 	if err != nil {
 		// Skip 404 not found error.
 		var opErr *smithy.OperationError
@@ -271,7 +277,7 @@ func (r *Reader) openObject(
 		}
 
 		// We check *p.Key == nil in the beginning.
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open rangeReader %s: %w", path, err))
 
 		return
 	}
@@ -281,7 +287,7 @@ func (r *Reader) openObject(
 	}
 }
 
-// StreamFile opens single file from s3 and sends io.Readers to the `readersCh`
+// StreamFile opens single rangeReader from s3 and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
@@ -293,7 +299,7 @@ func (r *Reader) GetType() string {
 	return s3type
 }
 
-// checkRestoreDirectory checks that the restore directory contains any file.
+// checkRestoreDirectory checks that the restore directory contains any rangeReader.
 func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	var continuationToken *string
 
@@ -320,7 +326,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 
 			switch {
 			case r.Validator != nil:
-				// If we found a valid file, return.
+				// If we found a valid rangeReader, return.
 				if err = r.Validator.Run(*p.Key); err == nil {
 					return nil
 				}
@@ -386,7 +392,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 // shouldSkip performs check, is we should skip files.
 // Current types.Object is too heavy to copy to this function, so we pass only name and size.
 func (r *Reader) shouldSkip(path string, name *string, size *int64) bool {
-	return name == nil || ioStorage.IsDirectory(path, *name) && !r.WithNestedDir ||
+	return name == nil || internal.IsDirectory(path, *name) && !r.WithNestedDir ||
 		(size != nil && *size == 0)
 }
 
@@ -617,7 +623,7 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 }
 
 func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
-	// if we have file to calculate.
+	// if we have rangeReader to calculate.
 	if !r.IsDir {
 		headOutput, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
 			Bucket: aws.String(r.bucketName),
@@ -670,7 +676,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	return totalSize, totalNum, nil
 }
 
-// GetSize returns the size of asb/asbx file/dir that was initialized.
+// GetSize returns the size of asb/asbx rangeReader/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
 }
@@ -680,7 +686,7 @@ func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of rangeReader paths that were skipped during the `StreamFlies` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

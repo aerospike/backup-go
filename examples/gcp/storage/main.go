@@ -22,8 +22,8 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	gcpStorage "github.com/aerospike/backup-go/io/storage/gcp/storage"
+	ioStorage "github.com/aerospike/backup-go/io/storage/options"
 )
 
 const (

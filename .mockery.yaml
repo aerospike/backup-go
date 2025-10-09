@@ -26,11 +26,15 @@ packages:
     config:
       dir: ./io/encoding/asb/mocks
       pkgname: mocks
-  github.com/aerospike/backup-go/io/storage:
+  github.com/aerospike/backup-go/io/storage/internal:
     config:
-      dir: ./io/storage/mocks
+      dir: ./io/storage/internal/mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/io/storage/options:
+    config:
       exclude-subpkg-regex:
         - Opt
+      dir: ./io/storage/options/mocks
       pkgname: mocks
   github.com/aerospike/backup-go/pipe:
     config:

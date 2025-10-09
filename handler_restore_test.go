@@ -21,8 +21,8 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
+	ioStorage "github.com/aerospike/backup-go/io/storage/options"
 	"github.com/stretchr/testify/suite"
 )
 

@@ -22,8 +22,8 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	s3Storasge "github.com/aerospike/backup-go/io/storage/aws/s3"
+	ioStorage "github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )

@@ -1,7 +1,7 @@
 // Copyright 2024 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
+// you may not use this rangeReader except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
@@ -24,7 +24,7 @@ import (
 	"sync"
 	"testing"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
@@ -102,10 +102,10 @@ aws_secret_access_key = minioadminpassword`)
 
 		err = os.WriteFile(filePath, credentialsFileBytes, 0o600)
 		if err != nil {
-			return fmt.Errorf("error writing ~/.aws/credentials file: %w", err)
+			return fmt.Errorf("error writing ~/.aws/credentials rangeReader: %w", err)
 		}
 
-		fmt.Println("Credentials file created successfully!")
+		fmt.Println("Credentials rangeReader created successfully!")
 	}
 
 	return nil
@@ -187,9 +187,9 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testWriteFolderEmpty),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testWriteFolderEmpty),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -225,8 +225,8 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testWriteFolderWithDataError),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testWriteFolderWithDataError),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -241,9 +241,9 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testWriteFolderWithData),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testWriteFolderWithData),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -280,8 +280,8 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithFile(filePath),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithFile(filePath),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -293,7 +293,7 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 	err = w.Close()
 	s.Require().NoError(err)
 
-	// Verify file was written
+	// Verify rangeReader was written
 	_, err = client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(testBucket),
 		Key:    aws.String(filePath),
@@ -311,8 +311,8 @@ func (s *WriterSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderTypeCheck),
-		ioStorage.WithRemoveFiles(),
+		options.WithDir(testFolderTypeCheck),
+		options.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 

@@ -28,7 +28,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -45,7 +46,7 @@ const (
 // Reader represents GCP storage reader.
 type Reader struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	client *azblob.Client
 
@@ -66,7 +67,7 @@ type Reader struct {
 	totalNumber atomic.Int64
 
 	// If `skipPrefix` was set on the `StreamFiles` function, skipped file names will be stored here.
-	skipped *ioStorage.SkippedFiles
+	skipped *internal.SkippedFiles
 }
 
 // NewReader returns new Azure blob directory/file reader.
@@ -76,14 +77,14 @@ func NewReader(
 	ctx context.Context,
 	client *azblob.Client,
 	containerName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Reader, error) {
 	r := &Reader{
 		client: client,
 	}
 
 	// Set default val.
-	r.PollWarmDuration = ioStorage.DefaultPollWarmDuration
+	r.PollWarmDuration = internal.DefaultPollWarmDuration
 	r.Logger = slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.Level(1024)}))
 
 	for _, opt := range opts {
@@ -104,13 +105,13 @@ func NewReader(
 	if r.IsDir {
 		if !r.SkipDirCheck {
 			if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+				return nil, fmt.Errorf("%w: %w", internal.ErrEmptyStorage, err)
 			}
 		}
 
 		// Presort files if needed.
 		if r.SortFiles && len(r.PathList) == 1 {
-			if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+			if err := internal.PreSort(ctx, r, r.PathList[0]); err != nil {
 				return nil, fmt.Errorf("failed to pre sort: %w", err)
 			}
 		}
@@ -154,14 +155,14 @@ func (r *Reader) StreamFiles(
 	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
-		r.skipped = ioStorage.NewSkippedFiles(skipPrefixes)
+		r.skipped = internal.NewSkippedFiles(skipPrefixes)
 	}
 
 	for _, path := range r.PathList {
 		// If it is a folder, open and return.
 		switch r.IsDir {
 		case true:
-			path = ioStorage.CleanPath(path, false)
+			path = internal.CleanPath(path, false)
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(ctx, path)
 				if err != nil {
@@ -188,14 +189,14 @@ func (r *Reader) streamDirectory(
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get next page: %w", err))
+			internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get next page: %w", err))
 
 			return
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get object attributes for %s", path))
+				internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get object attributes for %s", path))
 
 				return
 			}
@@ -234,12 +235,12 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
 		return
 	}
 
 	if state != objStatusAvailable {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path))
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", internal.ErrArchivedObject, path))
 		return
 	}
 
@@ -251,7 +252,7 @@ func (r *Reader) openObject(
 			return
 		}
 
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
 
 		return
 	}
@@ -272,7 +273,7 @@ func (r *Reader) StreamFile(
 // Unfortunately azure blob returns *generated.BlobItem from internal api that can't be imported.
 // So we have to pass exact values of *generated.BlobItem to this function.
 func (r *Reader) shouldSkip(path, fileName string, fileSize int64) bool {
-	return (ioStorage.IsDirectory(path, fileName) && !r.WithNestedDir) ||
+	return (internal.IsDirectory(path, fileName) && !r.WithNestedDir) ||
 		isSkippedByStartAfter(r.StartAfter, fileName) ||
 		fileSize == 0
 }

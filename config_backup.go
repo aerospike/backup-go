@@ -76,10 +76,6 @@ type ConfigBackup struct {
 	// The list of rack ids.
 	// (optional, given an empty list, all racks will be backed up)
 	RackList []int
-	// ParallelNodes specifies how to perform scan.
-	// If set to true, we launch parallel workers for nodes; otherwise workers run in parallel for partitions.
-	// Excludes PartitionFilters param.
-	ParallelNodes bool
 	// EncoderType describes an Encoder type that will be used on backing up.
 	// Default `EncoderTypeASB` = 0.
 	EncoderType EncoderType
@@ -97,7 +93,6 @@ type ConfigBackup struct {
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
 	// Limits backup bandwidth (bytes per second).
-	// The lower bound is 8MiB (maximum size of the Aerospike record).
 	// Effective limit value is calculated using the formula:
 	// Bandwidth * base64ratio + metaOverhead
 	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
@@ -144,9 +139,9 @@ func NewDefaultBackupConfig() *ConfigBackup {
 	}
 }
 
-// isParalleledByNodes determines whether the backup is parallelized by nodes.
-func (c *ConfigBackup) isParalleledByNodes() bool {
-	return c.ParallelNodes || len(c.NodeList) > 0 || len(c.RackList) > 0
+// isProcessedByNodes determines whether the backup is parallelized by nodes.
+func (c *ConfigBackup) isProcessedByNodes() bool {
+	return len(c.NodeList) > 0 || len(c.RackList) > 0
 }
 
 // isDefaultPartitionFilter checks if the default filter is set.
@@ -187,12 +182,8 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("modified before must be strictly greater than modified after")
 	}
 
-	if c.isParalleledByNodes() && !c.isDefaultPartitionFilter() {
-		return fmt.Errorf("parallel by nodes, racks and/or and after digest/partition and the same time not allowed")
-	}
-
-	if c.PageSize > 0 && c.isParalleledByNodes() {
-		return fmt.Errorf("page size is not supported for parallel by nodes")
+	if c.isProcessedByNodes() && !c.isDefaultPartitionFilter() {
+		return fmt.Errorf("process by nodes, racks and/or and after digest/partition and the same time not allowed")
 	}
 
 	if c.PageSize > 0 && len(c.PartitionFilters) == 0 {

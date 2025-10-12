@@ -79,19 +79,27 @@ func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, err
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	if rc.config.isParalleledByNodes() {
-		return rc.countRecordsUsingScanByNodes(ctx, &scanPolicy)
+	var err error
+
+	filters := rc.config.PartitionFilters
+
+	if rc.config.isProcessedByNodes() {
+		filters, err = rc.readerProcessor.newPartitionGroupsFromNodes()
+		if err != nil {
+			return 0, fmt.Errorf("failed to create partition groups: %w", err)
+		}
 	}
 
-	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
+	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy, filters)
 }
 
-func (rc *recordCounter) countRecordsUsingScanByPartitions(ctx context.Context, scanPolicy *a.ScanPolicy,
+func (rc *recordCounter) countRecordsUsingScanByPartitions(
+	ctx context.Context, scanPolicy *a.ScanPolicy, filters []*a.PartitionFilter,
 ) (uint64, error) {
 	var count uint64
 
-	partitionFilter := randomPartition(rc.config.PartitionFilters)
-	readerConfig := rc.readerProcessor.recordReaderConfigForPartitions(partitionFilter, scanPolicy)
+	partitionFilter := randomPartition(filters)
+	readerConfig := rc.readerProcessor.newRecordReaderConfig(partitionFilter, scanPolicy)
 
 	recordReader := aerospike.NewRecordReader(
 		ctx, rc.aerospikeClient, readerConfig, rc.logger, aerospike.NewRecordsetCloser())
@@ -102,31 +110,7 @@ func (rc *recordCounter) countRecordsUsingScanByPartitions(ctx context.Context, 
 		return 0, err
 	}
 
-	return count * uint64(sumPartition(rc.config.PartitionFilters)), nil
-}
-
-func (rc *recordCounter) countRecordsUsingScanByNodes(ctx context.Context, scanPolicy *a.ScanPolicy,
-) (uint64, error) {
-	nodes, err := rc.readerProcessor.getNodes()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get nodes: %w", err)
-	}
-
-	// #nosec G404
-	randomIndex := rand.Intn(len(nodes))
-	randomNode := []*a.Node{nodes[randomIndex]}
-	readerConfig := rc.readerProcessor.recordReaderConfigForNode(randomNode, scanPolicy)
-
-	recordReader := aerospike.NewRecordReader(
-		ctx, rc.aerospikeClient, readerConfig, rc.logger, aerospike.NewRecordsetCloser())
-	defer recordReader.Close()
-
-	count, err := countRecords(ctx, recordReader)
-	if err != nil {
-		return 0, err
-	}
-
-	return count * uint64(len(nodes)), nil
+	return count * uint64(sumPartition(filters)), nil
 }
 
 // countRecords counts the records returned by the given reader.
@@ -173,7 +157,11 @@ func sumPartition(partitionFilters []*a.PartitionFilter) int {
 	var totalPartitionCount int
 
 	for _, pf := range partitionFilters {
-		totalPartitionCount += pf.Count
+		if pf.Count != 0 {
+			totalPartitionCount += pf.Count
+		} else {
+			totalPartitionCount += len(pf.Partitions)
+		}
 	}
 
 	return totalPartitionCount

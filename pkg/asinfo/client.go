@@ -221,7 +221,7 @@ func (ic *Client) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 
 		indexes, err = ic.getSIndexes(node, namespace, ic.policy)
 
-		return err
+		return nil
 	})
 
 	return indexes, err
@@ -601,9 +601,6 @@ func (ic *Client) GetRackNodes(rackID int) ([]string, error) {
 
 	err = executeWithRetry(ic.retryPolicy, func() error {
 		result, err = ic.getRackNodes(rackID)
-		if err != nil {
-			return err
-		}
 
 		return err
 	})
@@ -711,20 +708,14 @@ func (ic *Client) GetService(node string) (string, error) {
 	)
 	// First request TLS name.
 	err = executeWithRetry(ic.retryPolicy, func() error {
-		result, err = ic.getService(node, ic.cmdDict[cmdIDServiceTLSStd])
-		if err != nil {
-			return err
-		}
+		result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceTLSStd])
 
 		return err
 	})
 	// If result is empty, then request plain.
 	if result == "" {
 		err = executeWithRetry(ic.retryPolicy, func() error {
-			result, err = ic.getService(node, ic.cmdDict[cmdIDServiceClearStd])
-			if err != nil {
-				return err
-			}
+			result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceClearStd])
 
 			return err
 		})
@@ -733,7 +724,7 @@ func (ic *Client) GetService(node string) (string, error) {
 	return result, err
 }
 
-func (ic *Client) getService(node, cmd string) (string, error) {
+func (ic *Client) getByNode(node, cmd string) (string, error) {
 	resp, err := ic.requestByNode(node, cmd)
 	if err != nil {
 		return "", fmt.Errorf("failed get %s info for node %s: %w", cmd, node, err)
@@ -812,6 +803,60 @@ func (ic *Client) GetDCsList() ([]string, error) {
 	}
 
 	return dcs, nil
+}
+
+// GetPrimaryPartitions returns a list of primary partitions.
+func (ic *Client) GetPrimaryPartitions(node, namespace string) ([]int, error) {
+	var (
+		result []int
+		err    error
+	)
+
+	err = executeWithRetry(ic.retryPolicy, func() error {
+		result, err = ic.getPrimaryPartitions(node, namespace)
+
+		return err
+	})
+
+	return result, err
+}
+
+func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
+	cmd := ic.cmdDict[cmdIDReplicas]
+
+	result, err := ic.getByNode(node, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get by node command: %s: %w", cmd, err)
+	}
+
+	var base64Res string
+	// Looks like the "replicas" response didn't look like any known info responses,
+	// so we can't use standard parsing func.
+	nsResults := strings.Split(result, ";")
+
+	for _, nsRes := range nsResults {
+		res := strings.Split(nsRes, ":")
+		if len(res) != 2 {
+			// Skip potentially broken response.
+			continue
+		}
+
+		if res[0] == namespace {
+			data := strings.Split(res[1], ",")
+			base64Res = data[2]
+		}
+	}
+
+	if base64Res == "" {
+		return nil, fmt.Errorf("failed to find replicas for node %s", node)
+	}
+
+	bitMap, err := base64StringToBitArray(base64Res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse primary partiotion bitmap: %w", err)
+	}
+
+	return bitMapToIntSlice(bitMap), nil
 }
 
 // ***** Utility functions *****
@@ -1386,4 +1431,39 @@ func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
 	}
 
 	return nil
+}
+
+// base64StringToBitArray decodes a base64 string and converts the result to a bitarray (slice of booleans).
+func base64StringToBitArray(base64Str string) ([]bool, error) {
+	decodedBytes, err := base64.StdEncoding.DecodeString(base64Str)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 string: %w", err)
+	}
+
+	bitarray := make([]bool, 0, len(decodedBytes)*8) // Pre-allocate for efficiency
+
+	for _, b := range decodedBytes {
+		for i := 7; i >= 0; i-- {
+			// Check if the i-th bit is set (from most significant to least significant)
+			if (b>>i)&1 == 1 {
+				bitarray = append(bitarray, true)
+			} else {
+				bitarray = append(bitarray, false)
+			}
+		}
+	}
+
+	return bitarray, nil
+}
+
+func bitMapToIntSlice(b []bool) []int {
+	var result []int
+
+	for i, bit := range b {
+		if bit {
+			result = append(result, i)
+		}
+	}
+
+	return result
 }

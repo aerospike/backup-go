@@ -99,6 +99,7 @@ type InfoGetter interface {
 	GetStatus() (string, error)
 	GetDCsList() ([]string, error)
 	HasExpressionSIndex(namespace string) (bool, error)
+	GetPrimaryPartitions(node, namespace string) ([]int, error)
 }
 
 // Client is the main entry point for the backup package.

@@ -37,10 +37,11 @@ const (
 	cmdIDSetXDRMaxThroughput
 	cmdIDSetXDRForward
 	cmdIDGetConfigXDR
+	cmdIDReplicas
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 22
+const commandsNumber = 23
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
@@ -66,6 +67,7 @@ const (
 	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 	cmdGetConfigXDR        = "get-config:context=xdr"
+	cmdReplicas            = "replicas:max=1"
 
 	// Deprecated commands:
 
@@ -102,6 +104,7 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 	cmds[cmdIDSetXDRMaxThroughput] = cmdSetXDRMaxThroughput
 	cmds[cmdIDSetXDRForward] = cmdSetXDRForward
 	cmds[cmdIDGetConfigXDR] = cmdGetConfigXDR
+	cmds[cmdIDReplicas] = cmdReplicas
 
 	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList

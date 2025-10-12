@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	errors2 "github.com/aerospike/backup-go/io/storage/errors"
 	"github.com/aerospike/backup-go/io/storage/internal"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -105,7 +106,7 @@ func NewReader(
 	if r.IsDir {
 		if !r.SkipDirCheck {
 			if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", internal.ErrEmptyStorage, err)
+				return nil, fmt.Errorf("%w: %w", errors2.ErrEmptyStorage, err)
 			}
 		}
 
@@ -240,7 +241,7 @@ func (r *Reader) openObject(
 	}
 
 	if state != objStatusAvailable {
-		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", internal.ErrArchivedObject, path))
+		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", errors2.ErrArchivedObject, path))
 		return
 	}
 

@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	errors2 "github.com/aerospike/backup-go/io/storage/errors"
 	"github.com/aerospike/backup-go/io/storage/internal"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -68,7 +69,7 @@ func NewReader(ctx context.Context, opts ...options.Opt) (*Reader, error) {
 		if !r.SkipDirCheck {
 			for _, path := range r.PathList {
 				if err := r.checkRestoreDirectory(path); err != nil {
-					return nil, fmt.Errorf("%w: %w", internal.ErrEmptyStorage, err)
+					return nil, fmt.Errorf("%w: %w", errors2.ErrEmptyStorage, err)
 				}
 			}
 		}

@@ -28,7 +28,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
-	errors2 "github.com/aerospike/backup-go/io/storage/errors"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/internal"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -106,7 +106,7 @@ func NewReader(
 	if r.IsDir {
 		if !r.SkipDirCheck {
 			if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", errors2.ErrEmptyStorage, err)
+				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
 			}
 		}
 
@@ -190,14 +190,14 @@ func (r *Reader) streamDirectory(
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get next page: %w", err))
+			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get next page: %w", err))
 
 			return
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get object attributes for %s", path))
+				ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get object attributes for %s", path))
 
 				return
 			}
@@ -236,18 +236,18 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
 		return
 	}
 
 	if state != objStatusAvailable {
-		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", errors2.ErrArchivedObject, path))
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: %s", ioStorage.ErrArchivedObject, path))
 		return
 	}
 
 	rReader, err := newRangeReader(ctx, newAzureBlobClient(r.client), r.containerName, path)
 	if err != nil {
-		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
 		return
 	}
 
@@ -259,7 +259,7 @@ func (r *Reader) openObject(
 			return
 		}
 
-		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
 
 		return
 	}

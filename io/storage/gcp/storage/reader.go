@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
-	errors2 "github.com/aerospike/backup-go/io/storage/errors"
+	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/internal"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -90,7 +90,7 @@ func NewReader(
 	if r.IsDir {
 		if !r.SkipDirCheck {
 			if err = r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", errors2.ErrEmptyStorage, err)
+				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
 			}
 		}
 
@@ -132,7 +132,7 @@ func (r *Reader) StreamFiles(
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(ctx, path)
 				if err != nil {
-					internal.ErrToChan(ctx, errorsCh, err)
+					ioStorage.ErrToChan(ctx, errorsCh, err)
 					return
 				}
 			}
@@ -158,7 +158,7 @@ func (r *Reader) streamDirectory(
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err))
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -206,7 +206,7 @@ func (r *Reader) openObject(
 			return
 		}
 
-		internal.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open directory file %s: %w", path, err))
+		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open directory file %s: %w", path, err))
 
 		return
 	}

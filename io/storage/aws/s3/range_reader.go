@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+// s3Getter is an interface for s3 client. Used for mocking tests.
 type s3Getter interface {
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
 	) (*s3.HeadObjectOutput, error)
@@ -42,6 +43,10 @@ type rangeReader struct {
 
 // newRangeReader creates a new file reader.
 func newRangeReader(ctx context.Context, client s3Getter, bucket, key *string) (*rangeReader, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key is nil")
+	}
+
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: bucket,
 		Key:    key,

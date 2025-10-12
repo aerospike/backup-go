@@ -293,7 +293,7 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 	err = w.Close()
 	s.Require().NoError(err)
 
-	// Verify rangeReader was written
+	// Verify file was written
 	_, err = client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(testBucket),
 		Key:    aws.String(filePath),

@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errors
+package storage
 
 import (
+	"context"
 	"errors"
 )
 
@@ -23,3 +24,14 @@ var (
 	ErrEmptyStorage   = errors.New("empty storage")
 	ErrArchivedObject = errors.New("archived object")
 )
+
+// ErrToChan checks context before sending an error to errors chan.
+// If context is already canceled and the reader must be stopped, no need to send error to errors chan.
+func ErrToChan(ctx context.Context, ch chan<- error, err error) {
+	if err != nil && ctx.Err() == nil {
+		select {
+		case ch <- err:
+		case <-ctx.Done():
+		}
+	}
+}

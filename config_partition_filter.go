@@ -213,7 +213,7 @@ func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) 
 
 		result[i], err = NewPartitionFilterByIDs(partitionIDs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to split partition ids: %w", err)
+			return nil, err
 		}
 
 		startIdx = endIdx

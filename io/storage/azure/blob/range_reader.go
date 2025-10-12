@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 )
@@ -62,6 +63,7 @@ type rangeReader struct {
 	client    azblobGetter
 	container string
 	path      string
+	etag      *azcore.ETag
 
 	size int64
 }
@@ -83,12 +85,13 @@ func newRangeReader(ctx context.Context, client azblobGetter, container, path st
 		container: container,
 		path:      path,
 		size:      size,
+		etag:      objProps.ETag,
 	}, nil
 }
 
 // OpenRange opens a file by range.
 func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
-	resp, err := r.client.DownloadStream(ctx, r.container, r.path, getStreamOptions(offset, count))
+	resp, err := r.client.DownloadStream(ctx, r.container, r.path, r.getStreamOptions(offset, count))
 	if err != nil {
 		return nil, fmt.Errorf("failed to download stream %s: %w", r.path, err)
 	}
@@ -106,7 +109,8 @@ func (r *rangeReader) GetInfo() string {
 	return fmt.Sprintf("%s:%s", r.container, r.path)
 }
 
-func getStreamOptions(offset, count int64) *blob.DownloadStreamOptions {
+// getStreamOptions returns stream options for download stream.
+func (r *rangeReader) getStreamOptions(offset, count int64) *blob.DownloadStreamOptions {
 	// HTTPRange defines a range of bytes within an HTTP resource, starting at offset and
 	// ending at offset+count. A zero-value HTTPRange indicates the entire resource. An HTTPRange
 	// which has an offset and zero value count indicates from the offset to the resource's end.
@@ -118,6 +122,11 @@ func getStreamOptions(offset, count int64) *blob.DownloadStreamOptions {
 		Range: blob.HTTPRange{
 			Offset: offset,
 			Count:  count,
+		},
+		AccessConditions: &blob.AccessConditions{
+			ModifiedAccessConditions: &blob.ModifiedAccessConditions{
+				IfMatch: r.etag,
+			},
 		},
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/aerospike/backup-go/io/storage/azure/blob/mocks"
@@ -32,12 +33,22 @@ const (
 	testSize      = int64(12345)
 )
 
+// testETag we need pointer to this value, so it will be variable.
+var testETag = azcore.ETag("test-etag")
+
 var (
 	errBlobTest = errors.New("blob test error")
 )
 
 func int64Ptr(i int64) *int64 {
 	return &i
+}
+
+func defaultReader() *rangeReader {
+	return &rangeReader{
+		container: testContainer,
+		path:      testPath,
+	}
 }
 
 func TestNewRangeReader(t *testing.T) {
@@ -131,6 +142,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 				Offset: offset,
 				Count:  count,
 			},
+			AccessConditions: &blob.AccessConditions{
+				ModifiedAccessConditions: &blob.ModifiedAccessConditions{
+					IfMatch: &testETag,
+				},
+			},
 		}).Return(azblob.DownloadStreamResponse{
 			DownloadResponse: blob.DownloadResponse{
 				Body: bodyMock,
@@ -142,6 +158,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			container: testContainer,
 			path:      testPath,
 			size:      testSize,
+			etag:      &testETag,
 		}
 
 		body, err := reader.OpenRange(ctx, offset, count)
@@ -190,6 +207,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 				Offset: offset,
 				Count:  0,
 			},
+			AccessConditions: &blob.AccessConditions{
+				ModifiedAccessConditions: &blob.ModifiedAccessConditions{
+					IfMatch: &testETag,
+				},
+			},
 		}).Return(azblob.DownloadStreamResponse{
 			DownloadResponse: blob.DownloadResponse{
 				Body: bodyMock,
@@ -201,6 +223,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			container: testContainer,
 			path:      testPath,
 			size:      testSize,
+			etag:      &testETag,
 		}
 
 		body, err := reader.OpenRange(ctx, offset, 0)
@@ -223,6 +246,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 				Offset: offset,
 				Count:  count,
 			},
+			AccessConditions: &blob.AccessConditions{
+				ModifiedAccessConditions: &blob.ModifiedAccessConditions{
+					IfMatch: &testETag,
+				},
+			},
 		}).Return(azblob.DownloadStreamResponse{
 			DownloadResponse: blob.DownloadResponse{
 				Body: bodyMock,
@@ -234,6 +262,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			container: testContainer,
 			path:      testPath,
 			size:      testSize,
+			etag:      &testETag,
 		}
 
 		body, err := reader.OpenRange(ctx, offset, count)
@@ -254,6 +283,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 				Offset: offset,
 				Count:  count,
 			},
+			AccessConditions: &blob.AccessConditions{
+				ModifiedAccessConditions: &blob.ModifiedAccessConditions{
+					IfMatch: &testETag,
+				},
+			},
 		}).Return(azblob.DownloadStreamResponse{}, errBlobTest)
 
 		reader := &rangeReader{
@@ -261,6 +295,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			container: testContainer,
 			path:      testPath,
 			size:      testSize,
+			etag:      &testETag,
 		}
 
 		body, err := reader.OpenRange(ctx, offset, count)
@@ -363,7 +398,9 @@ func TestGetStreamOptions(t *testing.T) {
 	t.Run("Returns nil for zero offset and count", func(t *testing.T) {
 		t.Parallel()
 
-		opts := getStreamOptions(0, 0)
+		r := defaultReader()
+
+		opts := r.getStreamOptions(0, 0)
 
 		require.Nil(t, opts)
 	})
@@ -374,7 +411,9 @@ func TestGetStreamOptions(t *testing.T) {
 		offset := int64(100)
 		count := int64(1024)
 
-		opts := getStreamOptions(offset, count)
+		r := defaultReader()
+
+		opts := r.getStreamOptions(offset, count)
 
 		require.NotNil(t, opts)
 		require.Equal(t, offset, opts.Range.Offset)
@@ -386,7 +425,9 @@ func TestGetStreamOptions(t *testing.T) {
 
 		offset := int64(100)
 
-		opts := getStreamOptions(offset, 0)
+		r := defaultReader()
+
+		opts := r.getStreamOptions(offset, 0)
 
 		require.NotNil(t, opts)
 		require.Equal(t, offset, opts.Range.Offset)
@@ -398,7 +439,9 @@ func TestGetStreamOptions(t *testing.T) {
 
 		count := int64(1024)
 
-		opts := getStreamOptions(0, count)
+		r := defaultReader()
+
+		opts := r.getStreamOptions(0, count)
 
 		require.NotNil(t, opts)
 		require.Equal(t, int64(0), opts.Range.Offset)
@@ -411,7 +454,9 @@ func TestGetStreamOptions(t *testing.T) {
 		offset := int64(1048576)  // 1MB
 		count := int64(104857600) // 100MB
 
-		opts := getStreamOptions(offset, count)
+		r := defaultReader()
+
+		opts := r.getStreamOptions(offset, count)
 
 		require.NotNil(t, opts)
 		require.Equal(t, offset, opts.Range.Offset)

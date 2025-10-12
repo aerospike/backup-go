@@ -289,9 +289,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	// we need to set the RawCDT flag
 	// in the scan policy so that maps and lists are returned as raw blob bins
 	scanPolicy.RawCDT = true
-
-	nodes := bh.aerospikeClient.GetNodes()
-	readerConfig := bh.readerProcessor.recordReaderConfigForNode(nodes, &scanPolicy)
+	readerConfig := bh.readerProcessor.newRecordReaderConfig(NewPartitionFilterAll(), &scanPolicy)
 	recordReader := aerospike.NewRecordReader(ctx, bh.aerospikeClient, readerConfig, bh.logger,
 		aerospike.NewRecordsetCloser())
 
@@ -365,7 +363,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 			ctx, rps),
 	)
 
-	dataReaders, err := bh.readerProcessor.newAerospikeReadWorkers(ctx, bh.config.ParallelRead)
+	dataReaders, err := bh.readerProcessor.newAerospikeReadWorkers(ctx)
 	if err != nil {
 		return err
 	}

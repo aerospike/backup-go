@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -81,7 +81,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = internal.CleanPath(w.PathList[0], true)
+		w.prefix = common.CleanPath(w.PathList[0], true)
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -294,7 +294,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove files from dir.
 	var continuationToken *string
 
-	prefix := internal.CleanPath(targetPath, true)
+	prefix := common.CleanPath(targetPath, true)
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -307,7 +307,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || internal.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
+			if p.Key == nil || common.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
 				continue
 			}
 

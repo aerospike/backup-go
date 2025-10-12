@@ -23,7 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
-	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
@@ -78,7 +78,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = internal.CleanPath(w.PathList[0], false)
+		w.prefix = common.CleanPath(w.PathList[0], false)
 	}
 
 	// Check if container exists.
@@ -243,7 +243,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		return nil
 	}
 
-	prefix := internal.CleanPath(targetPath, false)
+	prefix := common.CleanPath(targetPath, false)
 	// Remove files from dir.
 	pager := w.client.NewListBlobsFlatPager(w.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &prefix,
@@ -257,7 +257,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 
 		for _, blobItem := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if internal.IsDirectory(prefix, *blobItem.Name) && !w.WithNestedDir {
+			if common.IsDirectory(prefix, *blobItem.Name) && !w.WithNestedDir {
 				continue
 			}
 

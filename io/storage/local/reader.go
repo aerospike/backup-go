@@ -24,8 +24,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
-	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 )
@@ -48,7 +47,7 @@ type Reader struct {
 	totalNumber atomic.Int64
 
 	// If `skipPrefix` was set on the `StreamFiles` function, skipped file names will be stored here.
-	skipped *internal.SkippedFiles
+	skipped *common.SkippedFiles
 }
 
 // NewReader creates a new local directory/file Reader.
@@ -69,13 +68,13 @@ func NewReader(ctx context.Context, opts ...options.Opt) (*Reader, error) {
 		if !r.SkipDirCheck {
 			for _, path := range r.PathList {
 				if err := r.checkRestoreDirectory(path); err != nil {
-					return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+					return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
 				}
 			}
 		}
 
 		if r.SortFiles && len(r.PathList) == 1 {
-			if err := internal.PreSort(ctx, r, r.PathList[0]); err != nil {
+			if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
 				return nil, fmt.Errorf("failed to pre sort: %w", err)
 			}
 		}
@@ -102,7 +101,7 @@ func (r *Reader) StreamFiles(
 	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
-		r.skipped = internal.NewSkippedFiles(skipPrefixes)
+		r.skipped = common.NewSkippedFiles(skipPrefixes)
 	}
 
 	for _, path := range r.PathList {
@@ -112,7 +111,7 @@ func (r *Reader) StreamFiles(
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(path)
 				if err != nil {
-					ioStorage.ErrToChan(ctx, errorsCh, err)
+					common.ErrToChan(ctx, errorsCh, err)
 					return
 				}
 			}
@@ -130,13 +129,13 @@ func (r *Reader) streamDirectory(
 ) {
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read path %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read path %s: %w", path, err))
 		return
 	}
 
 	for _, file := range fileInfo {
 		if err = ctx.Err(); err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, err)
+			common.ErrToChan(ctx, errorsCh, err)
 			return
 		}
 
@@ -155,7 +154,7 @@ func (r *Reader) streamDirectory(
 		// Skip empty files.
 		info, err := file.Info()
 		if err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s: %w", filePath, err))
 			return
 		}
 
@@ -181,7 +180,7 @@ func (r *Reader) streamDirectory(
 
 		reader, err = os.Open(filePath)
 		if err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filePath, err))
 			return
 		}
 
@@ -194,13 +193,13 @@ func (r *Reader) streamDirectory(
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
 	if ctx.Err() != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, ctx.Err())
+		common.ErrToChan(ctx, errorsCh, ctx.Err())
 		return
 	}
 
 	reader, err := os.Open(filename)
 	if err != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filename, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filename, err))
 		return
 	}
 

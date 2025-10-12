@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/io/storage/aws/s3/mocks"
-	closerMock "github.com/aerospike/backup-go/io/storage/internal/mocks"
+	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"

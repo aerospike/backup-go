@@ -31,7 +31,7 @@ type s3Getter interface {
 	) (*s3.GetObjectOutput, error)
 }
 
-// rangeReader encapsulate getting a file by range and file size logic. To use with retry reader.
+// rangeReader encapsulates getting a file by range and file size logic. To use with retry reader.
 type rangeReader struct {
 	client s3Getter
 	bucket *string

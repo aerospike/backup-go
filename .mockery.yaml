@@ -52,3 +52,7 @@ packages:
     config:
       dir: ./io/storage/azure/blob/mocks
       pkgname: mocks
+  github.com/aerospike/backup-go/io/storage/gcp/storage:
+    config:
+      dir: ./io/storage/gcp/storage/mocks
+      pkgname: mocks

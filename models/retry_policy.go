@@ -47,7 +47,7 @@ func NewRetryPolicy(baseTimeout time.Duration, multiplier float64, maxRetries ui
 
 // NewDefaultRetryPolicy returns a new RetryPolicy with default values.
 func NewDefaultRetryPolicy() *RetryPolicy {
-	return NewRetryPolicy(1000*time.Millisecond, 1, 3)
+	return NewRetryPolicy(1000*time.Millisecond, 2.0, 3)
 }
 
 // Validate checks retry policy values.
@@ -64,56 +64,59 @@ func (p *RetryPolicy) Validate() error {
 		return fmt.Errorf("multiplier must be greater than 0")
 	}
 
-	if p.MaxRetries < 1 {
-		return fmt.Errorf("max retries must be greater than 0")
-	}
+	// MaxRetries validation removed - 0 is valid (means no retries)
 
 	return nil
 }
 
-// Sleep waits for the specified number of retry attempts.
-func (p *RetryPolicy) Sleep(attempt uint) {
-	if p == nil {
-		return
-	}
-
-	duration := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
-	time.Sleep(duration)
-}
-
-// AttemptsLeft returns true if there are still retry attempts left.
+// AttemptsLeft returns true if there are still retry attempts remaining.
+// MaxRetries=0 means only the initial attempt (no retries).
+// MaxRetries=N means initial attempt + N retries = N+1 total attempts.
 func (p *RetryPolicy) AttemptsLeft(attempt uint) bool {
 	if p == nil {
 		return false
 	}
 
-	// If MaxRetries is 0, then at least one retry attempt is made.
-	if p.MaxRetries == 0 && attempt == 0 {
-		return true
+	// If MaxRetries is 0, only attempt 0 (initial) is allowed
+	if p.MaxRetries == 0 {
+		return attempt == 0
 	}
 
 	return attempt < p.MaxRetries
 }
 
-// SleepWithContext waits for the specified number of retry attempts.
-// TODO: working on it, will replace standard Sleep() with this one.
-func (p *RetryPolicy) SleepWithContext(ctx context.Context, attempt uint) {
+// TotalAttempts returns the total number of attempts (initial + retries).
+// Can be used to iterate over all attempts or logging.
+func (p *RetryPolicy) TotalAttempts() uint {
+	if p == nil || p.MaxRetries == 0 {
+		return 1
+	}
+	return p.MaxRetries + 1
+}
+
+// Sleep waits for the calculated delay or until context is cancelled.
+// Returns ctx.Err() if context was cancelled, nil if sleep completed.
+func (p *RetryPolicy) Sleep(ctx context.Context, attempt uint) error {
 	if p == nil {
-		return
+		return nil
 	}
 
-	duration := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
+	duration := p.calculateDelay(attempt)
 
-	ticker := time.NewTicker(duration)
-	defer ticker.Stop()
-	// Wait what happens first: ctx.Done or ticker.C.
-	for {
-		select {
-		case <-ctx.Done():
-			// TODO: exit policy?
-			return
-		case <-ticker.C:
-			return
-		}
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
+}
+
+// calculateDelay computes the delay for a given attempt number.
+func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
+	delay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
+
+	return delay
 }

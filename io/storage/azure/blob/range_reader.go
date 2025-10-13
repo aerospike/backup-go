@@ -24,15 +24,17 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 )
 
+// azblobGetter is an interface for azblob client. Used for mocking tests.
 type azblobGetter interface {
 	// GetBlobProperties encapsulate chain: ServiceClient().NewContainerClient().NewBlobClient().GetProperties()
 	GetBlobProperties(ctx context.Context, container, path string,
 	) (blob.GetPropertiesResponse, error)
+	// DownloadStream downloads a file with options.
 	DownloadStream(ctx context.Context, container, path string, options *blob.DownloadStreamOptions,
 	) (azblob.DownloadStreamResponse, error)
 }
 
-// azureBlobClient wrapper for *azblob.Client for testing.
+// azureBlobClient is a wrapper around *azblob.Client, primarily for testing purposes.
 type azureBlobClient struct {
 	client *azblob.Client
 }
@@ -51,14 +53,14 @@ func (a *azureBlobClient) GetBlobProperties(ctx context.Context, container, path
 		GetProperties(ctx, nil)
 }
 
-// DownloadStream implement DownloadStream()
+// DownloadStream implements DownloadStream().
 func (a *azureBlobClient) DownloadStream(
 	ctx context.Context, container, path string, options *blob.DownloadStreamOptions,
 ) (azblob.DownloadStreamResponse, error) {
 	return a.client.DownloadStream(ctx, container, path, options)
 }
 
-// rangeReader encapsulate getting a file by range and file size logic. To use with retry reader.
+// rangeReader file encapsulates getting a file by range and file size logic. To use with retry reader.
 type rangeReader struct {
 	client    azblobGetter
 	container string

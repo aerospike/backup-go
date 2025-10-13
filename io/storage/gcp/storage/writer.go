@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
-	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"google.golang.org/api/iterator"
 )
@@ -74,7 +74,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = internal.CleanPath(w.PathList[0], false)
+		w.prefix = common.CleanPath(w.PathList[0], false)
 	}
 
 	bucketHandler := client.Bucket(bucketName)
@@ -144,7 +144,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		return nil
 	}
 
-	prefix := internal.CleanPath(targetPath, false)
+	prefix := common.CleanPath(targetPath, false)
 	// Remove files from dir.
 	it := w.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix: prefix,
@@ -162,7 +162,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		// Skip files in folders.
-		if internal.IsDirectory(prefix, objAttrs.Name) && !w.WithNestedDir {
+		if common.IsDirectory(prefix, objAttrs.Name) && !w.WithNestedDir {
 			continue
 		}
 
@@ -203,7 +203,7 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 		}
 
 		// Skip files in folders.
-		if internal.IsDirectory(prefix, objAttrs.Name) {
+		if common.IsDirectory(prefix, objAttrs.Name) {
 			continue
 		}
 

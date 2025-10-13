@@ -46,7 +46,7 @@ func (g *gcpStorageClient) GetReader(ctx context.Context, path string, generatio
 	return g.handler.Object(path).Generation(generation).NewRangeReader(ctx, offset, length)
 }
 
-// rangeReader encapsulate getting a file by range and file size logic. To use with retry reader.
+// rangeReader encapsulates getting a file by range and file size logic. To use with retry reader.
 type rangeReader struct {
 	client     gcpGetter
 	bucket     string

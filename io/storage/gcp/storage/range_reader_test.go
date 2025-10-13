@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
+	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/aerospike/backup-go/io/storage/gcp/storage/mocks"
-	closerMock "github.com/aerospike/backup-go/io/storage/internal/mocks"
 	"github.com/stretchr/testify/require"
 )
 

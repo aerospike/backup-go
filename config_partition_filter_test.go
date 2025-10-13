@@ -268,3 +268,85 @@ func TestSplitPartition_ErrNumWorkersLess1(t *testing.T) {
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "number of workers is less than 1, cannot split partition filters")
 }
+
+func TestPartitionFilter_splitPartitionIDs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		ids        []int
+		numWorkers int
+		result     []*aerospike.PartitionFilter
+		wantErr    bool
+	}{
+		{
+			name:       "success",
+			ids:        []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+			numWorkers: 10,
+			result: []*aerospike.PartitionFilter{
+				newTestPartitionFilterByIDs([]int{0}),
+				newTestPartitionFilterByIDs([]int{1}),
+				newTestPartitionFilterByIDs([]int{2}),
+				newTestPartitionFilterByIDs([]int{3}),
+				newTestPartitionFilterByIDs([]int{4}),
+				newTestPartitionFilterByIDs([]int{5}),
+				newTestPartitionFilterByIDs([]int{6}),
+				newTestPartitionFilterByIDs([]int{7}),
+				newTestPartitionFilterByIDs([]int{8}),
+				newTestPartitionFilterByIDs([]int{9}),
+			},
+			wantErr: false,
+		},
+		{
+			name:       "success small workers",
+			ids:        []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+			numWorkers: 5,
+			result: []*aerospike.PartitionFilter{
+				newTestPartitionFilterByIDs([]int{0, 1}),
+				newTestPartitionFilterByIDs([]int{2, 3}),
+				newTestPartitionFilterByIDs([]int{4, 5}),
+				newTestPartitionFilterByIDs([]int{6, 7}),
+				newTestPartitionFilterByIDs([]int{8, 9}),
+			},
+			wantErr: false,
+		},
+		{
+			name:       "num workers error",
+			ids:        []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+			numWorkers: -1,
+			result:     nil,
+			wantErr:    true,
+		},
+		{
+			name:       "len ids error",
+			ids:        []int{},
+			numWorkers: 10,
+			result:     nil,
+			wantErr:    true,
+		},
+		{
+			name:       "max part error",
+			ids:        make([]int, 5000),
+			numWorkers: 10,
+			result:     nil,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := splitPartitionIDs(tt.ids, tt.numWorkers)
+			if tt.wantErr {
+				assert.Error(t, err)
+			}
+			assert.EqualExportedValues(t, tt.result, result)
+		})
+	}
+}
+
+func newTestPartitionFilterByIDs(slice []int) *aerospike.PartitionFilter {
+	result, _ := NewPartitionFilterByIDs(slice)
+	return result
+}

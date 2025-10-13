@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -99,7 +99,7 @@ func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
 	if ctx.Err() != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, ctx.Err())
+		common.ErrToChan(ctx, errorsCh, ctx.Err())
 		return
 	}
 

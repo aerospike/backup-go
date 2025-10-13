@@ -55,6 +55,7 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDSetXDRMaxThroughput: cmdSetXDRMaxThroughput,
 				cmdIDSetXDRForward:       cmdSetXDRForward,
 				cmdIDGetConfigXDR:        cmdGetConfigXDR,
+				cmdIDReplicas:            cmdReplicas,
 			},
 		},
 		{
@@ -84,6 +85,7 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDSetXDRMaxThroughput: cmdSetXDRMaxThroughput,
 				cmdIDSetXDRForward:       cmdSetXDRForward,
 				cmdIDGetConfigXDR:        cmdGetConfigXDR,
+				cmdIDReplicas:            cmdReplicas,
 			},
 		},
 	}

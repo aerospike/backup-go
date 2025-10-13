@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package common
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/io/storage/internal/mocks"
+	"github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

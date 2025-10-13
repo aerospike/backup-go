@@ -26,9 +26,9 @@ packages:
     config:
       dir: ./io/encoding/asb/mocks
       pkgname: mocks
-  github.com/aerospike/backup-go/io/storage/internal:
+  github.com/aerospike/backup-go/io/storage/common:
     config:
-      dir: ./io/storage/internal/mocks
+      dir: ./io/storage/common/mocks
       pkgname: mocks
   github.com/aerospike/backup-go/io/storage/options:
     config:

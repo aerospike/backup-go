@@ -99,6 +99,7 @@ type InfoGetter interface {
 	GetStatus() (string, error)
 	GetDCsList() ([]string, error)
 	HasExpressionSIndex(namespace string) (bool, error)
+	GetPrimaryPartitions(node, namespace string) ([]int, error)
 }
 
 // Client is the main entry point for the backup package.
@@ -117,8 +118,8 @@ type InfoGetter interface {
 //
 //	writers, err := local.NewWriter(
 //		ctx,
-//		ioStorage.WithRemoveFiles(),
-//		ioStorage.WithDir("backups_folder"),
+//		options.WithRemoveFiles(),
+//		options.WithDir("backups_folder"),
 //	)
 //	if err != nil {
 //		// handle error

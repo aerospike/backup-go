@@ -23,7 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/aerospike/backup-go/io/storage/azure/blob/mocks"
-	closerMock "github.com/aerospike/backup-go/io/storage/internal/mocks"
+	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/stretchr/testify/require"
 )
 

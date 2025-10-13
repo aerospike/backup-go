@@ -27,7 +27,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/storage/local"
-	ioStorage "github.com/aerospike/backup-go/io/storage/options"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/aerospike/backup-go/tests"
@@ -100,8 +100,8 @@ func runBackupRestoreLocal(
 
 	writer, err := local.NewWriter(
 		ctx,
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithDir(directory),
+		options.WithRemoveFiles(),
+		options.WithDir(directory),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create local writer: %w", err)
@@ -131,8 +131,8 @@ func runBackupRestoreLocal(
 
 	reader, err := local.NewReader(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithDir(directory),
+		options.WithValidator(asb.NewValidator()),
+		options.WithDir(directory),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create local reader: %w", err)
@@ -563,54 +563,6 @@ func TestBackupRestoreRps(t *testing.T) {
 	require.InDelta(t, expectedDuration, bStat.GetDuration(), epsilon)
 	require.InDelta(t, expectedDuration, rStat.GetDuration(), epsilon)
 	require.InDelta(t, totalDuration, rStat.GetDuration()+bStat.GetDuration(), epsilon)
-
-	// Validate stats.
-	require.Equal(t, uint64(0), rStat.GetRecordsExpired())
-	require.Equal(t, uint64(0), rStat.GetRecordsSkipped())
-	require.Equal(t, uint64(0), rStat.GetRecordsFresher())
-	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
-	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
-}
-
-func TestBackupRestoreParallelNode(t *testing.T) {
-	t.Parallel()
-	const setName = "testParallelNode"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
-	defer cancel()
-
-	asClient, err := testAerospikeClient()
-	require.NoError(t, err)
-	defer asClient.Close()
-
-	backupConfig := NewDefaultBackupConfig()
-	backupConfig.ParallelNodes = true
-	backupConfig.SetList = []string{setName}
-	restoreConfig := NewDefaultRestoreConfig()
-
-	records, err := genRecords(testASNamespace, setName, 100, testBins)
-	require.NoError(t, err)
-	err = writeRecords(asClient, records)
-	require.NoError(t, err)
-
-	directory := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
-
-	bStat, rStat, err := runBackupRestoreLocal(ctx, asClient, directory, backupConfig, restoreConfig)
-	require.NoError(t, err)
-	require.Equal(t, bStat.GetReadRecords(), rStat.GetRecordsInserted())
-
-	// Validate records.
-	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
-	require.NoError(t, err)
-
-	require.Equal(t, dbRecords.Len(), len(records))
-	for _, expRec := range records {
-		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
-		if !ok {
-			t.Errorf("expected record not found: %v", expRec.Key)
-			return
-		}
-		require.Equal(t, expRec.Bins, actual.Bins)
-	}
 
 	// Validate stats.
 	require.Equal(t, uint64(0), rStat.GetRecordsExpired())
@@ -1243,7 +1195,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 
 	writer, err := local.NewWriter(
 		ctx,
-		ioStorage.WithDir(directory),
+		options.WithDir(directory),
 	)
 	require.NoError(t, err)
 	w, err := writer.NewWriter(ctx, fmt.Sprintf("%s-%s.asb", testASNamespace, setName))
@@ -1277,8 +1229,8 @@ func TestRestoreExpiredRecords(t *testing.T) {
 
 	reader, err := local.NewReader(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithDir(directory),
+		options.WithValidator(asb.NewValidator()),
+		options.WithDir(directory),
 	)
 	require.NoError(t, err)
 
@@ -1325,9 +1277,9 @@ func TestBackupContextCancel(t *testing.T) {
 
 	reader, err := local.NewReader(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithDir(directory),
-		ioStorage.WithSkipDirCheck(),
+		options.WithValidator(asb.NewValidator()),
+		options.WithDir(directory),
+		options.WithSkipDirCheck(),
 	)
 	require.NoError(t, err)
 
@@ -1362,7 +1314,7 @@ func TestRestoreContextCancel(t *testing.T) {
 
 	writer, err := local.NewWriter(
 		ctx,
-		ioStorage.WithDir(directory),
+		options.WithDir(directory),
 	)
 	require.NoError(t, err)
 
@@ -1473,9 +1425,9 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 ) (uint64, error) {
 	writers, err := local.NewWriter(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithDir(testFolder),
+		options.WithValidator(asb.NewValidator()),
+		options.WithSkipDirCheck(),
+		options.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err
@@ -1483,8 +1435,8 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 
 	readers, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(testFolder),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDir(testFolder),
+		options.WithSkipDirCheck(),
 	)
 	if err != nil {
 		return 0, err
@@ -1524,9 +1476,9 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 ) (uint64, error) {
 	writers, err := local.NewWriter(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithDir(testFolder),
+		options.WithValidator(asb.NewValidator()),
+		options.WithSkipDirCheck(),
+		options.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err
@@ -1534,7 +1486,7 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 
 	readers, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(testFolder),
+		options.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err

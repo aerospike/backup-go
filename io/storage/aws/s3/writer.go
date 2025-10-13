@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/io/storage/internal"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -44,13 +44,13 @@ type Writer struct {
 	bucketName string
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
-	// Sync for running backup to one rangeReader.
+	// Sync for running backup to one file.
 	called atomic.Bool
 
 	storageClass types.StorageClass
 }
 
-// NewWriter creates a new writer for S3 storage directory/rangeReader writes.
+// NewWriter creates a new writer for S3 storage directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
 // For S3 client next parameters must be set:
@@ -81,7 +81,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = internal.CleanPath(w.PathList[0], true)
+		w.prefix = common.CleanPath(w.PathList[0], true)
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -129,12 +129,12 @@ func NewWriter(
 
 // NewWriter returns a new S3 writer to the specified path.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
-	// protection for single rangeReader backup.
+	// protection for single file backup.
 	if !w.IsDir {
 		if !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single rangeReader is not allowed")
+			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
-		// If we use backup to single rangeReader, we overwrite the rangeReader name.
+		// If we use backup to single file, we overwrite the file name.
 		filename = w.PathList[0]
 	}
 
@@ -273,14 +273,14 @@ func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix
 	return len(resp.Contents) == 0, nil
 }
 
-// RemoveFiles removes a backup rangeReader or files from directory.
+// RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	return w.Remove(ctx, w.PathList[0])
 }
 
-// Remove deletes the rangeReader or directory contents specified by path.
+// Remove deletes the file or directory contents specified by path.
 func (w *Writer) Remove(ctx context.Context, targetPath string) error {
-	// Remove rangeReader.
+	// Remove file.
 	if !w.IsDir {
 		if _, err := w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 			Bucket: aws.String(w.bucketName),
@@ -294,7 +294,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove files from dir.
 	var continuationToken *string
 
-	prefix := internal.CleanPath(targetPath, true)
+	prefix := common.CleanPath(targetPath, true)
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -307,7 +307,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || internal.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
+			if p.Key == nil || common.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
 				continue
 			}
 

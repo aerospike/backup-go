@@ -198,7 +198,13 @@ func (r *Reader) openObject(
 	errorsCh chan<- error,
 	skipNotFound bool,
 ) {
-	reader, err := r.bucketHandle.Object(path).NewReader(ctx)
+	rReader, err := newRangeReader(ctx, newGcpStorageClient(r.bucketHandle), r.bucketName, path)
+	if err != nil {
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		return
+	}
+
+	object, err := common.NewRetryableReader(ctx, rReader, r.RetryPolicy, r.Logger)
 	if err != nil {
 		// Skip 404 not found error.
 		if errors.Is(err, storage.ErrObjectNotExist) && skipNotFound {
@@ -210,8 +216,8 @@ func (r *Reader) openObject(
 		return
 	}
 
-	if reader != nil {
-		readersCh <- models.File{Reader: reader, Name: filepath.Base(path)}
+	if object != nil {
+		readersCh <- models.File{Reader: object, Name: filepath.Base(path)}
 	}
 }
 

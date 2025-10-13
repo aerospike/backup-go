@@ -198,7 +198,6 @@ func (r *Reader) openObject(
 	errorsCh chan<- error,
 	skipNotFound bool,
 ) {
-
 	rReader, err := newRangeReader(ctx, newGcpStorageClient(r.bucketHandle), r.bucketName, path)
 	if err != nil {
 		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))

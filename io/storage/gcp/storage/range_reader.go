@@ -22,6 +22,7 @@ import (
 	"cloud.google.com/go/storage"
 )
 
+// gcpGetter  is an interface for *storage.BucketHandle. Used for mocking tests.
 type gcpGetter interface {
 	GetAttrs(ctx context.Context, path string) (attrs *storage.ObjectAttrs, err error)
 	GetReader(ctx context.Context, path string, generation, offset, length int64) (reader io.ReadCloser, err error)
@@ -37,12 +38,19 @@ func newGcpStorageClient(handler *storage.BucketHandle) gcpGetter {
 	return &gcpStorageClient{handler: handler}
 }
 
-// GetAttrs returns object attributes.
+// GetAttrs wraps storage.BucketHandle.Object.Attrs.
 func (g *gcpStorageClient) GetAttrs(ctx context.Context, path string) (attrs *storage.ObjectAttrs, err error) {
 	return g.handler.Object(path).Attrs(ctx)
 }
 
-func (g *gcpStorageClient) GetReader(ctx context.Context, path string, generation, offset, length int64) (reader io.ReadCloser, err error) {
+// GetReader wraps storage.BucketHandle.Object.NewRangeReader.
+func (g *gcpStorageClient) GetReader(ctx context.Context, path string, generation, offset, length int64,
+) (reader io.ReadCloser, err error) {
+	// For GCS we need to set length to -1 to read the file till the end.
+	if length == 0 {
+		length = -1
+	}
+
 	return g.handler.Object(path).Generation(generation).NewRangeReader(ctx, offset, length)
 }
 

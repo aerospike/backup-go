@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // RetryPolicy defines the configuration for retry attempts in case of failures.
@@ -91,4 +93,27 @@ func (p *RetryPolicy) AttemptsLeft(attempt uint) bool {
 	}
 
 	return attempt < p.MaxRetries
+}
+
+// SleepWithContext waits for the specified number of retry attempts.
+// TODO: working on it, will replace standard Sleep() with this one.
+func (p *RetryPolicy) SleepWithContext(ctx context.Context, attempt uint) {
+	if p == nil {
+		return
+	}
+
+	duration := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
+
+	ticker := time.NewTicker(duration)
+	defer ticker.Stop()
+	// Wait what happens first: ctx.Done or ticker.C.
+	for {
+		select {
+		case <-ctx.Done():
+			// TODO: exit policy?
+			return
+		case <-ticker.C:
+			return
+		}
+	}
 }

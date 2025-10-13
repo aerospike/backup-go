@@ -22,13 +22,13 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-// gcpGetter  is an interface for *storage.BucketHandle. Used for mocking tests.
+// gcpGetter is an interface for *storage.BucketHandle. Used for mocking tests.
 type gcpGetter interface {
 	GetAttrs(ctx context.Context, path string) (attrs *storage.ObjectAttrs, err error)
 	GetReader(ctx context.Context, path string, generation, offset, length int64) (reader io.ReadCloser, err error)
 }
 
-// gcpStorageClient wrapper for *storage.Client for testing.
+// gcpStorageClient is a wrapper around *storage.Client, primarily for testing purposes.
 type gcpStorageClient struct {
 	handler *storage.BucketHandle
 }

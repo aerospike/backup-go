@@ -118,8 +118,8 @@ type InfoGetter interface {
 //
 //	writers, err := local.NewWriter(
 //		ctx,
-//		ioStorage.WithRemoveFiles(),
-//		ioStorage.WithDir("backups_folder"),
+//		options.WithRemoveFiles(),
+//		options.WithDir("backups_folder"),
 //	)
 //	if err != nil {
 //		// handle error

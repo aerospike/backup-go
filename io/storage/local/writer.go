@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/options"
 )
 
 const bufferSize = 4096 * 1024 // 4mb
@@ -31,7 +31,7 @@ const bufferSize = 4096 * 1024 // 4mb
 // Writer represents a local storage writer.
 type Writer struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 	// Sync for running backup to one file.
 	called atomic.Bool
 }
@@ -39,7 +39,7 @@ type Writer struct {
 // NewWriter creates a new writer for local directory/file writes.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithRemoveFiles() - optional.
-func NewWriter(ctx context.Context, opts ...ioStorage.Opt) (*Writer, error) {
+func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 	w := &Writer{}
 
 	for _, opt := range opts {

@@ -26,8 +26,8 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/aerospike/backup-go/tests"
@@ -100,8 +100,8 @@ func runBackupRestoreLocal(
 
 	writer, err := local.NewWriter(
 		ctx,
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithDir(directory),
+		options.WithRemoveFiles(),
+		options.WithDir(directory),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create local writer: %w", err)
@@ -131,8 +131,8 @@ func runBackupRestoreLocal(
 
 	reader, err := local.NewReader(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithDir(directory),
+		options.WithValidator(asb.NewValidator()),
+		options.WithDir(directory),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create local reader: %w", err)
@@ -1195,7 +1195,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 
 	writer, err := local.NewWriter(
 		ctx,
-		ioStorage.WithDir(directory),
+		options.WithDir(directory),
 	)
 	require.NoError(t, err)
 	w, err := writer.NewWriter(ctx, fmt.Sprintf("%s-%s.asb", testASNamespace, setName))
@@ -1229,8 +1229,8 @@ func TestRestoreExpiredRecords(t *testing.T) {
 
 	reader, err := local.NewReader(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithDir(directory),
+		options.WithValidator(asb.NewValidator()),
+		options.WithDir(directory),
 	)
 	require.NoError(t, err)
 
@@ -1277,9 +1277,9 @@ func TestBackupContextCancel(t *testing.T) {
 
 	reader, err := local.NewReader(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithDir(directory),
-		ioStorage.WithSkipDirCheck(),
+		options.WithValidator(asb.NewValidator()),
+		options.WithDir(directory),
+		options.WithSkipDirCheck(),
 	)
 	require.NoError(t, err)
 
@@ -1314,7 +1314,7 @@ func TestRestoreContextCancel(t *testing.T) {
 
 	writer, err := local.NewWriter(
 		ctx,
-		ioStorage.WithDir(directory),
+		options.WithDir(directory),
 	)
 	require.NoError(t, err)
 
@@ -1425,9 +1425,9 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 ) (uint64, error) {
 	writers, err := local.NewWriter(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithDir(testFolder),
+		options.WithValidator(asb.NewValidator()),
+		options.WithSkipDirCheck(),
+		options.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err
@@ -1435,8 +1435,8 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 
 	readers, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(testFolder),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDir(testFolder),
+		options.WithSkipDirCheck(),
 	)
 	if err != nil {
 		return 0, err
@@ -1476,9 +1476,9 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 ) (uint64, error) {
 	writers, err := local.NewWriter(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithDir(testFolder),
+		options.WithValidator(asb.NewValidator()),
+		options.WithSkipDirCheck(),
+		options.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err
@@ -1486,7 +1486,7 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 
 	readers, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(testFolder),
+		options.WithDir(testFolder),
 	)
 	if err != nil {
 		return 0, err

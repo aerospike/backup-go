@@ -68,7 +68,7 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 	return p.retryPolicy.Do(p.ctx, func() error {
 		aerr := p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
 
-		if aerr.IsInDoubt() {
+		if aerr != nil && aerr.IsInDoubt() {
 			p.stats.IncrErrorsInDoubt()
 		}
 

@@ -277,7 +277,7 @@ func (r *Reader) openObject(
 		}
 
 		// We check *p.Key == nil in the beginning.
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open rangeReader %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
 
 		return
 	}

@@ -55,7 +55,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	}
 }
 
-func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
+func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Writer[T], error) {
 	var parallelism int
 
 	switch {
@@ -70,7 +70,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
 	}
 
-	useBatchWrites, err := rw.useBatchWrites()
+	useBatchWrites, err := rw.useBatchWrites(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check batch writes: %w", err)
 	}
@@ -79,6 +79,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 
 	for i := 0; i < parallelism; i++ {
 		writer := aerospike.NewRestoreWriter[T](
+			ctx,
 			rw.aerospikeClient,
 			rw.config.WritePolicy,
 			rw.stats,
@@ -96,12 +97,12 @@ func (rw *recordWriterProcessor[T]) newDataWriters() ([]pipe.Writer[T], error) {
 	return dataWriters, nil
 }
 
-func (rw *recordWriterProcessor[T]) useBatchWrites() (bool, error) {
+func (rw *recordWriterProcessor[T]) useBatchWrites(ctx context.Context) (bool, error) {
 	if rw.config.DisableBatchWrites {
 		return false, nil
 	}
 
-	return rw.infoClient.SupportsBatchWrite()
+	return rw.infoClient.SupportsBatchWrite(ctx)
 }
 
 // discardWriter is a writer that does nothing. Used for backup files validation.

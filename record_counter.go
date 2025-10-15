@@ -56,14 +56,14 @@ func newRecordCounter(
 
 func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter) (uint64, error) {
 	if rc.config.withoutFilter() {
-		return rc.countUsingInfoClient(infoClient)
+		return rc.countUsingInfoClient(ctx, infoClient)
 	}
 
 	return rc.countRecordsUsingScan(ctx)
 }
 
-func (rc *recordCounter) countUsingInfoClient(infoClient InfoGetter) (uint64, error) {
-	totalRecordCount, err := infoClient.GetRecordCount(rc.config.Namespace, rc.config.SetList)
+func (rc *recordCounter) countUsingInfoClient(ctx context.Context, infoClient InfoGetter) (uint64, error) {
+	totalRecordCount, err := infoClient.GetRecordCount(ctx, rc.config.Namespace, rc.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get record count: %w", err)
 	}
@@ -84,7 +84,7 @@ func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, err
 	filters := rc.config.PartitionFilters
 
 	if rc.config.isProcessedByNodes() {
-		filters, err = rc.readerProcessor.newPartitionGroupsFromNodes()
+		filters, err = rc.readerProcessor.newPartitionGroupsFromNodes(ctx)
 		if err != nil {
 			return 0, fmt.Errorf("failed to create partition groups: %w", err)
 		}

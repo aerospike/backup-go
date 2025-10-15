@@ -216,7 +216,7 @@ func TestBackupRestoreIndexUdf(t *testing.T) {
 	// Validate sindexes.
 	infoClient, err := testInfoClient(asClient)
 	require.NoError(t, err)
-	dbIndexes, err := readAllSIndexes(infoClient, testASNamespace)
+	dbIndexes, err := readAllSIndexes(ctx, infoClient, testASNamespace)
 	require.NoError(t, err)
 	require.EqualValues(t, indexes, dbIndexes)
 }
@@ -585,7 +585,7 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	nodes := asClient.GetNodes()
 	ic, err := asinfo.NewClient(asClient.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
-	nodeServiceAddress, err := ic.GetService(nodes[0].GetName())
+	nodeServiceAddress, err := ic.GetService(ctx, nodes[0].GetName())
 	require.NoError(t, err)
 
 	backupConfig := NewDefaultBackupConfig()
@@ -1779,8 +1779,8 @@ func getIndexType(sindex *models.SIndex) (a.IndexType, error) {
 	return "", fmt.Errorf("invalid sindex bin type: %c", sindex.Path.BinType)
 }
 
-func readAllSIndexes(client *asinfo.Client, namespace string) ([]*models.SIndex, error) {
-	return client.GetSIndexes(namespace)
+func readAllSIndexes(ctx context.Context, client *asinfo.Client, namespace string) ([]*models.SIndex, error) {
+	return client.GetSIndexes(ctx, namespace)
 }
 
 type digestT = string

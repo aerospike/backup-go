@@ -91,6 +91,7 @@ func (p *RetryPolicy) TotalAttempts() uint {
 	if p == nil || p.MaxRetries == 0 {
 		return 1
 	}
+
 	return p.MaxRetries + 1
 }
 

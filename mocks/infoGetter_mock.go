@@ -5,6 +5,8 @@
 package mocks
 
 import (
+	"context"
+
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
 	mock "github.com/stretchr/testify/mock"
@@ -38,16 +40,16 @@ func (_m *MockInfoGetter) EXPECT() *MockInfoGetter_Expecter {
 }
 
 // BlockMRTWrites provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) BlockMRTWrites(nodeName string, namespace string) error {
-	ret := _mock.Called(nodeName, namespace)
+func (_mock *MockInfoGetter) BlockMRTWrites(ctx context.Context, nodeName string, namespace string) error {
+	ret := _mock.Called(ctx, nodeName, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BlockMRTWrites")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = returnFunc(nodeName, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, nodeName, namespace)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -60,15 +62,16 @@ type MockInfoGetter_BlockMRTWrites_Call struct {
 }
 
 // BlockMRTWrites is a helper method to define mock.On call
+//   - ctx
 //   - nodeName
 //   - namespace
-func (_e *MockInfoGetter_Expecter) BlockMRTWrites(nodeName interface{}, namespace interface{}) *MockInfoGetter_BlockMRTWrites_Call {
-	return &MockInfoGetter_BlockMRTWrites_Call{Call: _e.mock.On("BlockMRTWrites", nodeName, namespace)}
+func (_e *MockInfoGetter_Expecter) BlockMRTWrites(ctx interface{}, nodeName interface{}, namespace interface{}) *MockInfoGetter_BlockMRTWrites_Call {
+	return &MockInfoGetter_BlockMRTWrites_Call{Call: _e.mock.On("BlockMRTWrites", ctx, nodeName, namespace)}
 }
 
-func (_c *MockInfoGetter_BlockMRTWrites_Call) Run(run func(nodeName string, namespace string)) *MockInfoGetter_BlockMRTWrites_Call {
+func (_c *MockInfoGetter_BlockMRTWrites_Call) Run(run func(ctx context.Context, nodeName string, namespace string)) *MockInfoGetter_BlockMRTWrites_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -78,14 +81,14 @@ func (_c *MockInfoGetter_BlockMRTWrites_Call) Return(err error) *MockInfoGetter_
 	return _c
 }
 
-func (_c *MockInfoGetter_BlockMRTWrites_Call) RunAndReturn(run func(nodeName string, namespace string) error) *MockInfoGetter_BlockMRTWrites_Call {
+func (_c *MockInfoGetter_BlockMRTWrites_Call) RunAndReturn(run func(ctx context.Context, nodeName string, namespace string) error) *MockInfoGetter_BlockMRTWrites_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetDCsList provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetDCsList() ([]string, error) {
-	ret := _mock.Called()
+func (_mock *MockInfoGetter) GetDCsList(ctx context.Context) ([]string, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetDCsList")
@@ -93,18 +96,18 @@ func (_mock *MockInfoGetter) GetDCsList() ([]string, error) {
 
 	var r0 []string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]string, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]string, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() []string); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -117,13 +120,14 @@ type MockInfoGetter_GetDCsList_Call struct {
 }
 
 // GetDCsList is a helper method to define mock.On call
-func (_e *MockInfoGetter_Expecter) GetDCsList() *MockInfoGetter_GetDCsList_Call {
-	return &MockInfoGetter_GetDCsList_Call{Call: _e.mock.On("GetDCsList")}
+//   - ctx
+func (_e *MockInfoGetter_Expecter) GetDCsList(ctx interface{}) *MockInfoGetter_GetDCsList_Call {
+	return &MockInfoGetter_GetDCsList_Call{Call: _e.mock.On("GetDCsList", ctx)}
 }
 
-func (_c *MockInfoGetter_GetDCsList_Call) Run(run func()) *MockInfoGetter_GetDCsList_Call {
+func (_c *MockInfoGetter_GetDCsList_Call) Run(run func(ctx context.Context)) *MockInfoGetter_GetDCsList_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -133,14 +137,14 @@ func (_c *MockInfoGetter_GetDCsList_Call) Return(strings []string, err error) *M
 	return _c
 }
 
-func (_c *MockInfoGetter_GetDCsList_Call) RunAndReturn(run func() ([]string, error)) *MockInfoGetter_GetDCsList_Call {
+func (_c *MockInfoGetter_GetDCsList_Call) RunAndReturn(run func(ctx context.Context) ([]string, error)) *MockInfoGetter_GetDCsList_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetNamespacesList provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetNamespacesList() ([]string, error) {
-	ret := _mock.Called()
+func (_mock *MockInfoGetter) GetNamespacesList(ctx context.Context) ([]string, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNamespacesList")
@@ -148,18 +152,18 @@ func (_mock *MockInfoGetter) GetNamespacesList() ([]string, error) {
 
 	var r0 []string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]string, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]string, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() []string); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -172,13 +176,14 @@ type MockInfoGetter_GetNamespacesList_Call struct {
 }
 
 // GetNamespacesList is a helper method to define mock.On call
-func (_e *MockInfoGetter_Expecter) GetNamespacesList() *MockInfoGetter_GetNamespacesList_Call {
-	return &MockInfoGetter_GetNamespacesList_Call{Call: _e.mock.On("GetNamespacesList")}
+//   - ctx
+func (_e *MockInfoGetter_Expecter) GetNamespacesList(ctx interface{}) *MockInfoGetter_GetNamespacesList_Call {
+	return &MockInfoGetter_GetNamespacesList_Call{Call: _e.mock.On("GetNamespacesList", ctx)}
 }
 
-func (_c *MockInfoGetter_GetNamespacesList_Call) Run(run func()) *MockInfoGetter_GetNamespacesList_Call {
+func (_c *MockInfoGetter_GetNamespacesList_Call) Run(run func(ctx context.Context)) *MockInfoGetter_GetNamespacesList_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -188,7 +193,7 @@ func (_c *MockInfoGetter_GetNamespacesList_Call) Return(strings []string, err er
 	return _c
 }
 
-func (_c *MockInfoGetter_GetNamespacesList_Call) RunAndReturn(run func() ([]string, error)) *MockInfoGetter_GetNamespacesList_Call {
+func (_c *MockInfoGetter_GetNamespacesList_Call) RunAndReturn(run func(ctx context.Context) ([]string, error)) *MockInfoGetter_GetNamespacesList_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -240,8 +245,8 @@ func (_c *MockInfoGetter_GetNodesNames_Call) RunAndReturn(run func() []string) *
 }
 
 // GetPrimaryPartitions provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetPrimaryPartitions(node string, namespace string) ([]int, error) {
-	ret := _mock.Called(node, namespace)
+func (_mock *MockInfoGetter) GetPrimaryPartitions(ctx context.Context, node string, namespace string) ([]int, error) {
+	ret := _mock.Called(ctx, node, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPrimaryPartitions")
@@ -249,18 +254,18 @@ func (_mock *MockInfoGetter) GetPrimaryPartitions(node string, namespace string)
 
 	var r0 []int
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, string) ([]int, error)); ok {
-		return returnFunc(node, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) ([]int, error)); ok {
+		return returnFunc(ctx, node, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, string) []int); ok {
-		r0 = returnFunc(node, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) []int); ok {
+		r0 = returnFunc(ctx, node, namespace)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]int)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = returnFunc(node, namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, node, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -273,15 +278,16 @@ type MockInfoGetter_GetPrimaryPartitions_Call struct {
 }
 
 // GetPrimaryPartitions is a helper method to define mock.On call
+//   - ctx
 //   - node
 //   - namespace
-func (_e *MockInfoGetter_Expecter) GetPrimaryPartitions(node interface{}, namespace interface{}) *MockInfoGetter_GetPrimaryPartitions_Call {
-	return &MockInfoGetter_GetPrimaryPartitions_Call{Call: _e.mock.On("GetPrimaryPartitions", node, namespace)}
+func (_e *MockInfoGetter_Expecter) GetPrimaryPartitions(ctx interface{}, node interface{}, namespace interface{}) *MockInfoGetter_GetPrimaryPartitions_Call {
+	return &MockInfoGetter_GetPrimaryPartitions_Call{Call: _e.mock.On("GetPrimaryPartitions", ctx, node, namespace)}
 }
 
-func (_c *MockInfoGetter_GetPrimaryPartitions_Call) Run(run func(node string, namespace string)) *MockInfoGetter_GetPrimaryPartitions_Call {
+func (_c *MockInfoGetter_GetPrimaryPartitions_Call) Run(run func(ctx context.Context, node string, namespace string)) *MockInfoGetter_GetPrimaryPartitions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -291,14 +297,14 @@ func (_c *MockInfoGetter_GetPrimaryPartitions_Call) Return(ints []int, err error
 	return _c
 }
 
-func (_c *MockInfoGetter_GetPrimaryPartitions_Call) RunAndReturn(run func(node string, namespace string) ([]int, error)) *MockInfoGetter_GetPrimaryPartitions_Call {
+func (_c *MockInfoGetter_GetPrimaryPartitions_Call) RunAndReturn(run func(ctx context.Context, node string, namespace string) ([]int, error)) *MockInfoGetter_GetPrimaryPartitions_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetRackNodes provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetRackNodes(rackID int) ([]string, error) {
-	ret := _mock.Called(rackID)
+func (_mock *MockInfoGetter) GetRackNodes(ctx context.Context, rackID int) ([]string, error) {
+	ret := _mock.Called(ctx, rackID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRackNodes")
@@ -306,18 +312,18 @@ func (_mock *MockInfoGetter) GetRackNodes(rackID int) ([]string, error) {
 
 	var r0 []string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int) ([]string, error)); ok {
-		return returnFunc(rackID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]string, error)); ok {
+		return returnFunc(ctx, rackID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int) []string); ok {
-		r0 = returnFunc(rackID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []string); ok {
+		r0 = returnFunc(ctx, rackID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(int) error); ok {
-		r1 = returnFunc(rackID)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = returnFunc(ctx, rackID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -330,14 +336,15 @@ type MockInfoGetter_GetRackNodes_Call struct {
 }
 
 // GetRackNodes is a helper method to define mock.On call
+//   - ctx
 //   - rackID
-func (_e *MockInfoGetter_Expecter) GetRackNodes(rackID interface{}) *MockInfoGetter_GetRackNodes_Call {
-	return &MockInfoGetter_GetRackNodes_Call{Call: _e.mock.On("GetRackNodes", rackID)}
+func (_e *MockInfoGetter_Expecter) GetRackNodes(ctx interface{}, rackID interface{}) *MockInfoGetter_GetRackNodes_Call {
+	return &MockInfoGetter_GetRackNodes_Call{Call: _e.mock.On("GetRackNodes", ctx, rackID)}
 }
 
-func (_c *MockInfoGetter_GetRackNodes_Call) Run(run func(rackID int)) *MockInfoGetter_GetRackNodes_Call {
+func (_c *MockInfoGetter_GetRackNodes_Call) Run(run func(ctx context.Context, rackID int)) *MockInfoGetter_GetRackNodes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(int))
+		run(args[0].(context.Context), args[1].(int))
 	})
 	return _c
 }
@@ -347,14 +354,14 @@ func (_c *MockInfoGetter_GetRackNodes_Call) Return(strings []string, err error) 
 	return _c
 }
 
-func (_c *MockInfoGetter_GetRackNodes_Call) RunAndReturn(run func(rackID int) ([]string, error)) *MockInfoGetter_GetRackNodes_Call {
+func (_c *MockInfoGetter_GetRackNodes_Call) RunAndReturn(run func(ctx context.Context, rackID int) ([]string, error)) *MockInfoGetter_GetRackNodes_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetRecordCount provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetRecordCount(namespace string, sets []string) (uint64, error) {
-	ret := _mock.Called(namespace, sets)
+func (_mock *MockInfoGetter) GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error) {
+	ret := _mock.Called(ctx, namespace, sets)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRecordCount")
@@ -362,16 +369,16 @@ func (_mock *MockInfoGetter) GetRecordCount(namespace string, sets []string) (ui
 
 	var r0 uint64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, []string) (uint64, error)); ok {
-		return returnFunc(namespace, sets)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string) (uint64, error)); ok {
+		return returnFunc(ctx, namespace, sets)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, []string) uint64); ok {
-		r0 = returnFunc(namespace, sets)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string) uint64); ok {
+		r0 = returnFunc(ctx, namespace, sets)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, []string) error); ok {
-		r1 = returnFunc(namespace, sets)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []string) error); ok {
+		r1 = returnFunc(ctx, namespace, sets)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -384,15 +391,16 @@ type MockInfoGetter_GetRecordCount_Call struct {
 }
 
 // GetRecordCount is a helper method to define mock.On call
+//   - ctx
 //   - namespace
 //   - sets
-func (_e *MockInfoGetter_Expecter) GetRecordCount(namespace interface{}, sets interface{}) *MockInfoGetter_GetRecordCount_Call {
-	return &MockInfoGetter_GetRecordCount_Call{Call: _e.mock.On("GetRecordCount", namespace, sets)}
+func (_e *MockInfoGetter_Expecter) GetRecordCount(ctx interface{}, namespace interface{}, sets interface{}) *MockInfoGetter_GetRecordCount_Call {
+	return &MockInfoGetter_GetRecordCount_Call{Call: _e.mock.On("GetRecordCount", ctx, namespace, sets)}
 }
 
-func (_c *MockInfoGetter_GetRecordCount_Call) Run(run func(namespace string, sets []string)) *MockInfoGetter_GetRecordCount_Call {
+func (_c *MockInfoGetter_GetRecordCount_Call) Run(run func(ctx context.Context, namespace string, sets []string)) *MockInfoGetter_GetRecordCount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].([]string))
+		run(args[0].(context.Context), args[1].(string), args[2].([]string))
 	})
 	return _c
 }
@@ -402,14 +410,14 @@ func (_c *MockInfoGetter_GetRecordCount_Call) Return(v uint64, err error) *MockI
 	return _c
 }
 
-func (_c *MockInfoGetter_GetRecordCount_Call) RunAndReturn(run func(namespace string, sets []string) (uint64, error)) *MockInfoGetter_GetRecordCount_Call {
+func (_c *MockInfoGetter_GetRecordCount_Call) RunAndReturn(run func(ctx context.Context, namespace string, sets []string) (uint64, error)) *MockInfoGetter_GetRecordCount_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetSIndexes provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetSIndexes(namespace string) ([]*models.SIndex, error) {
-	ret := _mock.Called(namespace)
+func (_mock *MockInfoGetter) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
+	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSIndexes")
@@ -417,18 +425,18 @@ func (_mock *MockInfoGetter) GetSIndexes(namespace string) ([]*models.SIndex, er
 
 	var r0 []*models.SIndex
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) ([]*models.SIndex, error)); ok {
-		return returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]*models.SIndex, error)); ok {
+		return returnFunc(ctx, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string) []*models.SIndex); ok {
-		r0 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []*models.SIndex); ok {
+		r0 = returnFunc(ctx, namespace)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.SIndex)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -441,14 +449,15 @@ type MockInfoGetter_GetSIndexes_Call struct {
 }
 
 // GetSIndexes is a helper method to define mock.On call
+//   - ctx
 //   - namespace
-func (_e *MockInfoGetter_Expecter) GetSIndexes(namespace interface{}) *MockInfoGetter_GetSIndexes_Call {
-	return &MockInfoGetter_GetSIndexes_Call{Call: _e.mock.On("GetSIndexes", namespace)}
+func (_e *MockInfoGetter_Expecter) GetSIndexes(ctx interface{}, namespace interface{}) *MockInfoGetter_GetSIndexes_Call {
+	return &MockInfoGetter_GetSIndexes_Call{Call: _e.mock.On("GetSIndexes", ctx, namespace)}
 }
 
-func (_c *MockInfoGetter_GetSIndexes_Call) Run(run func(namespace string)) *MockInfoGetter_GetSIndexes_Call {
+func (_c *MockInfoGetter_GetSIndexes_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_GetSIndexes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -458,14 +467,14 @@ func (_c *MockInfoGetter_GetSIndexes_Call) Return(sIndexs []*models.SIndex, err 
 	return _c
 }
 
-func (_c *MockInfoGetter_GetSIndexes_Call) RunAndReturn(run func(namespace string) ([]*models.SIndex, error)) *MockInfoGetter_GetSIndexes_Call {
+func (_c *MockInfoGetter_GetSIndexes_Call) RunAndReturn(run func(ctx context.Context, namespace string) ([]*models.SIndex, error)) *MockInfoGetter_GetSIndexes_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetService provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetService(node string) (string, error) {
-	ret := _mock.Called(node)
+func (_mock *MockInfoGetter) GetService(ctx context.Context, node string) (string, error) {
+	ret := _mock.Called(ctx, node)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetService")
@@ -473,16 +482,16 @@ func (_mock *MockInfoGetter) GetService(node string) (string, error) {
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
-		return returnFunc(node)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return returnFunc(ctx, node)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
-		r0 = returnFunc(node)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = returnFunc(ctx, node)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(node)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, node)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -495,14 +504,15 @@ type MockInfoGetter_GetService_Call struct {
 }
 
 // GetService is a helper method to define mock.On call
+//   - ctx
 //   - node
-func (_e *MockInfoGetter_Expecter) GetService(node interface{}) *MockInfoGetter_GetService_Call {
-	return &MockInfoGetter_GetService_Call{Call: _e.mock.On("GetService", node)}
+func (_e *MockInfoGetter_Expecter) GetService(ctx interface{}, node interface{}) *MockInfoGetter_GetService_Call {
+	return &MockInfoGetter_GetService_Call{Call: _e.mock.On("GetService", ctx, node)}
 }
 
-func (_c *MockInfoGetter_GetService_Call) Run(run func(node string)) *MockInfoGetter_GetService_Call {
+func (_c *MockInfoGetter_GetService_Call) Run(run func(ctx context.Context, node string)) *MockInfoGetter_GetService_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -512,14 +522,14 @@ func (_c *MockInfoGetter_GetService_Call) Return(s string, err error) *MockInfoG
 	return _c
 }
 
-func (_c *MockInfoGetter_GetService_Call) RunAndReturn(run func(node string) (string, error)) *MockInfoGetter_GetService_Call {
+func (_c *MockInfoGetter_GetService_Call) RunAndReturn(run func(ctx context.Context, node string) (string, error)) *MockInfoGetter_GetService_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetSetsList provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetSetsList(namespace string) ([]string, error) {
-	ret := _mock.Called(namespace)
+func (_mock *MockInfoGetter) GetSetsList(ctx context.Context, namespace string) ([]string, error) {
+	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSetsList")
@@ -527,18 +537,18 @@ func (_mock *MockInfoGetter) GetSetsList(namespace string) ([]string, error) {
 
 	var r0 []string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) ([]string, error)); ok {
-		return returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return returnFunc(ctx, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string) []string); ok {
-		r0 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = returnFunc(ctx, namespace)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -551,14 +561,15 @@ type MockInfoGetter_GetSetsList_Call struct {
 }
 
 // GetSetsList is a helper method to define mock.On call
+//   - ctx
 //   - namespace
-func (_e *MockInfoGetter_Expecter) GetSetsList(namespace interface{}) *MockInfoGetter_GetSetsList_Call {
-	return &MockInfoGetter_GetSetsList_Call{Call: _e.mock.On("GetSetsList", namespace)}
+func (_e *MockInfoGetter_Expecter) GetSetsList(ctx interface{}, namespace interface{}) *MockInfoGetter_GetSetsList_Call {
+	return &MockInfoGetter_GetSetsList_Call{Call: _e.mock.On("GetSetsList", ctx, namespace)}
 }
 
-func (_c *MockInfoGetter_GetSetsList_Call) Run(run func(namespace string)) *MockInfoGetter_GetSetsList_Call {
+func (_c *MockInfoGetter_GetSetsList_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_GetSetsList_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -568,14 +579,14 @@ func (_c *MockInfoGetter_GetSetsList_Call) Return(strings []string, err error) *
 	return _c
 }
 
-func (_c *MockInfoGetter_GetSetsList_Call) RunAndReturn(run func(namespace string) ([]string, error)) *MockInfoGetter_GetSetsList_Call {
+func (_c *MockInfoGetter_GetSetsList_Call) RunAndReturn(run func(ctx context.Context, namespace string) ([]string, error)) *MockInfoGetter_GetSetsList_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetStats provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetStats(nodeName string, dc string, namespace string) (asinfo.Stats, error) {
-	ret := _mock.Called(nodeName, dc, namespace)
+func (_mock *MockInfoGetter) GetStats(ctx context.Context, nodeName string, dc string, namespace string) (asinfo.Stats, error) {
+	ret := _mock.Called(ctx, nodeName, dc, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetStats")
@@ -583,16 +594,16 @@ func (_mock *MockInfoGetter) GetStats(nodeName string, dc string, namespace stri
 
 	var r0 asinfo.Stats
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, string, string) (asinfo.Stats, error)); ok {
-		return returnFunc(nodeName, dc, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) (asinfo.Stats, error)); ok {
+		return returnFunc(ctx, nodeName, dc, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, string, string) asinfo.Stats); ok {
-		r0 = returnFunc(nodeName, dc, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) asinfo.Stats); ok {
+		r0 = returnFunc(ctx, nodeName, dc, namespace)
 	} else {
 		r0 = ret.Get(0).(asinfo.Stats)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string, string) error); ok {
-		r1 = returnFunc(nodeName, dc, namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = returnFunc(ctx, nodeName, dc, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -605,16 +616,17 @@ type MockInfoGetter_GetStats_Call struct {
 }
 
 // GetStats is a helper method to define mock.On call
+//   - ctx
 //   - nodeName
 //   - dc
 //   - namespace
-func (_e *MockInfoGetter_Expecter) GetStats(nodeName interface{}, dc interface{}, namespace interface{}) *MockInfoGetter_GetStats_Call {
-	return &MockInfoGetter_GetStats_Call{Call: _e.mock.On("GetStats", nodeName, dc, namespace)}
+func (_e *MockInfoGetter_Expecter) GetStats(ctx interface{}, nodeName interface{}, dc interface{}, namespace interface{}) *MockInfoGetter_GetStats_Call {
+	return &MockInfoGetter_GetStats_Call{Call: _e.mock.On("GetStats", ctx, nodeName, dc, namespace)}
 }
 
-func (_c *MockInfoGetter_GetStats_Call) Run(run func(nodeName string, dc string, namespace string)) *MockInfoGetter_GetStats_Call {
+func (_c *MockInfoGetter_GetStats_Call) Run(run func(ctx context.Context, nodeName string, dc string, namespace string)) *MockInfoGetter_GetStats_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -624,14 +636,14 @@ func (_c *MockInfoGetter_GetStats_Call) Return(stats asinfo.Stats, err error) *M
 	return _c
 }
 
-func (_c *MockInfoGetter_GetStats_Call) RunAndReturn(run func(nodeName string, dc string, namespace string) (asinfo.Stats, error)) *MockInfoGetter_GetStats_Call {
+func (_c *MockInfoGetter_GetStats_Call) RunAndReturn(run func(ctx context.Context, nodeName string, dc string, namespace string) (asinfo.Stats, error)) *MockInfoGetter_GetStats_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetStatus provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetStatus() (string, error) {
-	ret := _mock.Called()
+func (_mock *MockInfoGetter) GetStatus(ctx context.Context) (string, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetStatus")
@@ -639,16 +651,16 @@ func (_mock *MockInfoGetter) GetStatus() (string, error) {
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (string, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (string, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() string); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) string); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -661,13 +673,14 @@ type MockInfoGetter_GetStatus_Call struct {
 }
 
 // GetStatus is a helper method to define mock.On call
-func (_e *MockInfoGetter_Expecter) GetStatus() *MockInfoGetter_GetStatus_Call {
-	return &MockInfoGetter_GetStatus_Call{Call: _e.mock.On("GetStatus")}
+//   - ctx
+func (_e *MockInfoGetter_Expecter) GetStatus(ctx interface{}) *MockInfoGetter_GetStatus_Call {
+	return &MockInfoGetter_GetStatus_Call{Call: _e.mock.On("GetStatus", ctx)}
 }
 
-func (_c *MockInfoGetter_GetStatus_Call) Run(run func()) *MockInfoGetter_GetStatus_Call {
+func (_c *MockInfoGetter_GetStatus_Call) Run(run func(ctx context.Context)) *MockInfoGetter_GetStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -677,14 +690,14 @@ func (_c *MockInfoGetter_GetStatus_Call) Return(s string, err error) *MockInfoGe
 	return _c
 }
 
-func (_c *MockInfoGetter_GetStatus_Call) RunAndReturn(run func() (string, error)) *MockInfoGetter_GetStatus_Call {
+func (_c *MockInfoGetter_GetStatus_Call) RunAndReturn(run func(ctx context.Context) (string, error)) *MockInfoGetter_GetStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUDFs provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetUDFs() ([]*models.UDF, error) {
-	ret := _mock.Called()
+func (_mock *MockInfoGetter) GetUDFs(ctx context.Context) ([]*models.UDF, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUDFs")
@@ -692,18 +705,18 @@ func (_mock *MockInfoGetter) GetUDFs() ([]*models.UDF, error) {
 
 	var r0 []*models.UDF
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]*models.UDF, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]*models.UDF, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() []*models.UDF); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []*models.UDF); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.UDF)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -716,13 +729,14 @@ type MockInfoGetter_GetUDFs_Call struct {
 }
 
 // GetUDFs is a helper method to define mock.On call
-func (_e *MockInfoGetter_Expecter) GetUDFs() *MockInfoGetter_GetUDFs_Call {
-	return &MockInfoGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs")}
+//   - ctx
+func (_e *MockInfoGetter_Expecter) GetUDFs(ctx interface{}) *MockInfoGetter_GetUDFs_Call {
+	return &MockInfoGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs", ctx)}
 }
 
-func (_c *MockInfoGetter_GetUDFs_Call) Run(run func()) *MockInfoGetter_GetUDFs_Call {
+func (_c *MockInfoGetter_GetUDFs_Call) Run(run func(ctx context.Context)) *MockInfoGetter_GetUDFs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -732,14 +746,14 @@ func (_c *MockInfoGetter_GetUDFs_Call) Return(uDFs []*models.UDF, err error) *Mo
 	return _c
 }
 
-func (_c *MockInfoGetter_GetUDFs_Call) RunAndReturn(run func() ([]*models.UDF, error)) *MockInfoGetter_GetUDFs_Call {
+func (_c *MockInfoGetter_GetUDFs_Call) RunAndReturn(run func(ctx context.Context) ([]*models.UDF, error)) *MockInfoGetter_GetUDFs_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetVersion provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetVersion() (asinfo.AerospikeVersion, error) {
-	ret := _mock.Called()
+func (_mock *MockInfoGetter) GetVersion(ctx context.Context) (asinfo.AerospikeVersion, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetVersion")
@@ -747,16 +761,16 @@ func (_mock *MockInfoGetter) GetVersion() (asinfo.AerospikeVersion, error) {
 
 	var r0 asinfo.AerospikeVersion
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (asinfo.AerospikeVersion, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (asinfo.AerospikeVersion, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() asinfo.AerospikeVersion); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) asinfo.AerospikeVersion); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		r0 = ret.Get(0).(asinfo.AerospikeVersion)
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -769,13 +783,14 @@ type MockInfoGetter_GetVersion_Call struct {
 }
 
 // GetVersion is a helper method to define mock.On call
-func (_e *MockInfoGetter_Expecter) GetVersion() *MockInfoGetter_GetVersion_Call {
-	return &MockInfoGetter_GetVersion_Call{Call: _e.mock.On("GetVersion")}
+//   - ctx
+func (_e *MockInfoGetter_Expecter) GetVersion(ctx interface{}) *MockInfoGetter_GetVersion_Call {
+	return &MockInfoGetter_GetVersion_Call{Call: _e.mock.On("GetVersion", ctx)}
 }
 
-func (_c *MockInfoGetter_GetVersion_Call) Run(run func()) *MockInfoGetter_GetVersion_Call {
+func (_c *MockInfoGetter_GetVersion_Call) Run(run func(ctx context.Context)) *MockInfoGetter_GetVersion_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -785,14 +800,14 @@ func (_c *MockInfoGetter_GetVersion_Call) Return(aerospikeVersion asinfo.Aerospi
 	return _c
 }
 
-func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func() (asinfo.AerospikeVersion, error)) *MockInfoGetter_GetVersion_Call {
+func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func(ctx context.Context) (asinfo.AerospikeVersion, error)) *MockInfoGetter_GetVersion_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // HasExpressionSIndex provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) HasExpressionSIndex(namespace string) (bool, error) {
-	ret := _mock.Called(namespace)
+func (_mock *MockInfoGetter) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
+	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for HasExpressionSIndex")
@@ -800,16 +815,16 @@ func (_mock *MockInfoGetter) HasExpressionSIndex(namespace string) (bool, error)
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (bool, error)); ok {
-		return returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return returnFunc(ctx, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string) bool); ok {
-		r0 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = returnFunc(ctx, namespace)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -822,14 +837,15 @@ type MockInfoGetter_HasExpressionSIndex_Call struct {
 }
 
 // HasExpressionSIndex is a helper method to define mock.On call
+//   - ctx
 //   - namespace
-func (_e *MockInfoGetter_Expecter) HasExpressionSIndex(namespace interface{}) *MockInfoGetter_HasExpressionSIndex_Call {
-	return &MockInfoGetter_HasExpressionSIndex_Call{Call: _e.mock.On("HasExpressionSIndex", namespace)}
+func (_e *MockInfoGetter_Expecter) HasExpressionSIndex(ctx interface{}, namespace interface{}) *MockInfoGetter_HasExpressionSIndex_Call {
+	return &MockInfoGetter_HasExpressionSIndex_Call{Call: _e.mock.On("HasExpressionSIndex", ctx, namespace)}
 }
 
-func (_c *MockInfoGetter_HasExpressionSIndex_Call) Run(run func(namespace string)) *MockInfoGetter_HasExpressionSIndex_Call {
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_HasExpressionSIndex_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -839,22 +855,22 @@ func (_c *MockInfoGetter_HasExpressionSIndex_Call) Return(b bool, err error) *Mo
 	return _c
 }
 
-func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(namespace string) (bool, error)) *MockInfoGetter_HasExpressionSIndex_Call {
+func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockInfoGetter_HasExpressionSIndex_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StartXDR provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StartXDR(nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool) error {
-	ret := _mock.Called(nodeName, dc, hostPort, namespace, rewind, throughput, forward)
+func (_mock *MockInfoGetter) StartXDR(ctx context.Context, nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool) error {
+	ret := _mock.Called(ctx, nodeName, dc, hostPort, namespace, rewind, throughput, forward)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartXDR")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(string, string, string, string, string, int, bool) error); ok {
-		r0 = returnFunc(nodeName, dc, hostPort, namespace, rewind, throughput, forward)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, int, bool) error); ok {
+		r0 = returnFunc(ctx, nodeName, dc, hostPort, namespace, rewind, throughput, forward)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -867,6 +883,7 @@ type MockInfoGetter_StartXDR_Call struct {
 }
 
 // StartXDR is a helper method to define mock.On call
+//   - ctx
 //   - nodeName
 //   - dc
 //   - hostPort
@@ -874,13 +891,13 @@ type MockInfoGetter_StartXDR_Call struct {
 //   - rewind
 //   - throughput
 //   - forward
-func (_e *MockInfoGetter_Expecter) StartXDR(nodeName interface{}, dc interface{}, hostPort interface{}, namespace interface{}, rewind interface{}, throughput interface{}, forward interface{}) *MockInfoGetter_StartXDR_Call {
-	return &MockInfoGetter_StartXDR_Call{Call: _e.mock.On("StartXDR", nodeName, dc, hostPort, namespace, rewind, throughput, forward)}
+func (_e *MockInfoGetter_Expecter) StartXDR(ctx interface{}, nodeName interface{}, dc interface{}, hostPort interface{}, namespace interface{}, rewind interface{}, throughput interface{}, forward interface{}) *MockInfoGetter_StartXDR_Call {
+	return &MockInfoGetter_StartXDR_Call{Call: _e.mock.On("StartXDR", ctx, nodeName, dc, hostPort, namespace, rewind, throughput, forward)}
 }
 
-func (_c *MockInfoGetter_StartXDR_Call) Run(run func(nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool)) *MockInfoGetter_StartXDR_Call {
+func (_c *MockInfoGetter_StartXDR_Call) Run(run func(ctx context.Context, nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool)) *MockInfoGetter_StartXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(int), args[6].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(int), args[7].(bool))
 	})
 	return _c
 }
@@ -890,22 +907,22 @@ func (_c *MockInfoGetter_StartXDR_Call) Return(err error) *MockInfoGetter_StartX
 	return _c
 }
 
-func (_c *MockInfoGetter_StartXDR_Call) RunAndReturn(run func(nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool) error) *MockInfoGetter_StartXDR_Call {
+func (_c *MockInfoGetter_StartXDR_Call) RunAndReturn(run func(ctx context.Context, nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool) error) *MockInfoGetter_StartXDR_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StopXDR provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StopXDR(nodeName string, dc string) error {
-	ret := _mock.Called(nodeName, dc)
+func (_mock *MockInfoGetter) StopXDR(ctx context.Context, nodeName string, dc string) error {
+	ret := _mock.Called(ctx, nodeName, dc)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StopXDR")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = returnFunc(nodeName, dc)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, nodeName, dc)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -918,15 +935,16 @@ type MockInfoGetter_StopXDR_Call struct {
 }
 
 // StopXDR is a helper method to define mock.On call
+//   - ctx
 //   - nodeName
 //   - dc
-func (_e *MockInfoGetter_Expecter) StopXDR(nodeName interface{}, dc interface{}) *MockInfoGetter_StopXDR_Call {
-	return &MockInfoGetter_StopXDR_Call{Call: _e.mock.On("StopXDR", nodeName, dc)}
+func (_e *MockInfoGetter_Expecter) StopXDR(ctx interface{}, nodeName interface{}, dc interface{}) *MockInfoGetter_StopXDR_Call {
+	return &MockInfoGetter_StopXDR_Call{Call: _e.mock.On("StopXDR", ctx, nodeName, dc)}
 }
 
-func (_c *MockInfoGetter_StopXDR_Call) Run(run func(nodeName string, dc string)) *MockInfoGetter_StopXDR_Call {
+func (_c *MockInfoGetter_StopXDR_Call) Run(run func(ctx context.Context, nodeName string, dc string)) *MockInfoGetter_StopXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -936,14 +954,14 @@ func (_c *MockInfoGetter_StopXDR_Call) Return(err error) *MockInfoGetter_StopXDR
 	return _c
 }
 
-func (_c *MockInfoGetter_StopXDR_Call) RunAndReturn(run func(nodeName string, dc string) error) *MockInfoGetter_StopXDR_Call {
+func (_c *MockInfoGetter_StopXDR_Call) RunAndReturn(run func(ctx context.Context, nodeName string, dc string) error) *MockInfoGetter_StopXDR_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // SupportsBatchWrite provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) SupportsBatchWrite() (bool, error) {
-	ret := _mock.Called()
+func (_mock *MockInfoGetter) SupportsBatchWrite(ctx context.Context) (bool, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SupportsBatchWrite")
@@ -951,16 +969,16 @@ func (_mock *MockInfoGetter) SupportsBatchWrite() (bool, error) {
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (bool, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (bool, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() bool); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) bool); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -973,13 +991,14 @@ type MockInfoGetter_SupportsBatchWrite_Call struct {
 }
 
 // SupportsBatchWrite is a helper method to define mock.On call
-func (_e *MockInfoGetter_Expecter) SupportsBatchWrite() *MockInfoGetter_SupportsBatchWrite_Call {
-	return &MockInfoGetter_SupportsBatchWrite_Call{Call: _e.mock.On("SupportsBatchWrite")}
+//   - ctx
+func (_e *MockInfoGetter_Expecter) SupportsBatchWrite(ctx interface{}) *MockInfoGetter_SupportsBatchWrite_Call {
+	return &MockInfoGetter_SupportsBatchWrite_Call{Call: _e.mock.On("SupportsBatchWrite", ctx)}
 }
 
-func (_c *MockInfoGetter_SupportsBatchWrite_Call) Run(run func()) *MockInfoGetter_SupportsBatchWrite_Call {
+func (_c *MockInfoGetter_SupportsBatchWrite_Call) Run(run func(ctx context.Context)) *MockInfoGetter_SupportsBatchWrite_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -989,22 +1008,22 @@ func (_c *MockInfoGetter_SupportsBatchWrite_Call) Return(b bool, err error) *Moc
 	return _c
 }
 
-func (_c *MockInfoGetter_SupportsBatchWrite_Call) RunAndReturn(run func() (bool, error)) *MockInfoGetter_SupportsBatchWrite_Call {
+func (_c *MockInfoGetter_SupportsBatchWrite_Call) RunAndReturn(run func(ctx context.Context) (bool, error)) *MockInfoGetter_SupportsBatchWrite_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UnBlockMRTWrites provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) UnBlockMRTWrites(nodeName string, namespace string) error {
-	ret := _mock.Called(nodeName, namespace)
+func (_mock *MockInfoGetter) UnBlockMRTWrites(ctx context.Context, nodeName string, namespace string) error {
+	ret := _mock.Called(ctx, nodeName, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UnBlockMRTWrites")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = returnFunc(nodeName, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, nodeName, namespace)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1017,15 +1036,16 @@ type MockInfoGetter_UnBlockMRTWrites_Call struct {
 }
 
 // UnBlockMRTWrites is a helper method to define mock.On call
+//   - ctx
 //   - nodeName
 //   - namespace
-func (_e *MockInfoGetter_Expecter) UnBlockMRTWrites(nodeName interface{}, namespace interface{}) *MockInfoGetter_UnBlockMRTWrites_Call {
-	return &MockInfoGetter_UnBlockMRTWrites_Call{Call: _e.mock.On("UnBlockMRTWrites", nodeName, namespace)}
+func (_e *MockInfoGetter_Expecter) UnBlockMRTWrites(ctx interface{}, nodeName interface{}, namespace interface{}) *MockInfoGetter_UnBlockMRTWrites_Call {
+	return &MockInfoGetter_UnBlockMRTWrites_Call{Call: _e.mock.On("UnBlockMRTWrites", ctx, nodeName, namespace)}
 }
 
-func (_c *MockInfoGetter_UnBlockMRTWrites_Call) Run(run func(nodeName string, namespace string)) *MockInfoGetter_UnBlockMRTWrites_Call {
+func (_c *MockInfoGetter_UnBlockMRTWrites_Call) Run(run func(ctx context.Context, nodeName string, namespace string)) *MockInfoGetter_UnBlockMRTWrites_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -1035,7 +1055,7 @@ func (_c *MockInfoGetter_UnBlockMRTWrites_Call) Return(err error) *MockInfoGette
 	return _c
 }
 
-func (_c *MockInfoGetter_UnBlockMRTWrites_Call) RunAndReturn(run func(nodeName string, namespace string) error) *MockInfoGetter_UnBlockMRTWrites_Call {
+func (_c *MockInfoGetter_UnBlockMRTWrites_Call) RunAndReturn(run func(ctx context.Context, nodeName string, namespace string) error) *MockInfoGetter_UnBlockMRTWrites_Call {
 	_c.Call.Return(run)
 	return _c
 }

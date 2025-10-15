@@ -15,6 +15,7 @@
 package asinfo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -116,8 +117,10 @@ func NewClient(
 		policy:      policy,
 		retryPolicy: retryPolicy,
 	}
+	// On init we can use context.Background(), as we don't need to do any async operations.
+	ctx := context.Background()
 
-	v, err := ic.GetVersion()
+	v, err := ic.GetVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
@@ -127,10 +130,10 @@ func NewClient(
 	return ic, nil
 }
 
-func (ic *Client) GetInfo(names ...string) (map[string]string, error) {
+func (ic *Client) GetInfo(ctx context.Context, names ...string) (map[string]string, error) {
 	var result map[string]string
 
-	err := executeWithRetry(ic.retryPolicy, func() error {
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, err := ic.cluster.GetRandomNode()
 		if err != nil {
 			return err
@@ -159,7 +162,7 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 }
 
 // GetVersion returns lowest node version from cluster.
-func (ic *Client) GetVersion() (AerospikeVersion, error) {
+func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
 	nodes := ic.cluster.GetNodes()
 	if len(nodes) == 0 {
 		return AerospikeVersion{}, fmt.Errorf("no nodes available in cluster")
@@ -170,7 +173,7 @@ func (ic *Client) GetVersion() (AerospikeVersion, error) {
 	for i, node := range nodes {
 		var currentVersion AerospikeVersion
 
-		err := executeWithRetry(ic.retryPolicy, func() error {
+		err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 			var retryErr error
 			currentVersion, retryErr = ic.getAerospikeVersion(node, ic.policy)
 
@@ -191,8 +194,8 @@ func (ic *Client) GetVersion() (AerospikeVersion, error) {
 }
 
 // HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.
-func (ic *Client) HasExpressionSIndex(namespace string) (bool, error) {
-	list, err := ic.GetSIndexes(namespace)
+func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
+	list, err := ic.GetSIndexes(ctx, namespace)
 	if err != nil {
 		return false, err
 	}
@@ -207,13 +210,13 @@ func (ic *Client) HasExpressionSIndex(namespace string) (bool, error) {
 }
 
 // GetSIndexes returns list of SIndexes for the given namespace.
-func (ic *Client) GetSIndexes(namespace string) ([]*models.SIndex, error) {
+func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
 	var (
 		indexes []*models.SIndex
 		err     error
 	)
 
-	err = executeWithRetry(ic.retryPolicy, func() error {
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
 			return aErr.Unwrap()
@@ -228,13 +231,13 @@ func (ic *Client) GetSIndexes(namespace string) ([]*models.SIndex, error) {
 }
 
 // GetUDFs returns list of UDFs.
-func (ic *Client) GetUDFs() ([]*models.UDF, error) {
+func (ic *Client) GetUDFs(ctx context.Context) ([]*models.UDF, error) {
 	var (
 		udfs []*models.UDF
 		err  error
 	)
 
-	err = executeWithRetry(ic.retryPolicy, func() error {
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
 			return aErr.Unwrap()
@@ -248,8 +251,8 @@ func (ic *Client) GetUDFs() ([]*models.UDF, error) {
 	return udfs, err
 }
 
-func (ic *Client) SupportsBatchWrite() (bool, error) {
-	v, err := ic.GetVersion()
+func (ic *Client) SupportsBatchWrite(ctx context.Context) (bool, error) {
+	v, err := ic.GetVersion(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
@@ -258,10 +261,10 @@ func (ic *Client) SupportsBatchWrite() (bool, error) {
 }
 
 // GetRecordCount counts number of records in given namespace and sets.
-func (ic *Client) GetRecordCount(namespace string, sets []string) (uint64, error) {
+func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error) {
 	var count uint64
 
-	err := executeWithRetry(ic.retryPolicy, func() error {
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aerr := ic.cluster.GetRandomNode()
 		if aerr != nil {
 			return aerr
@@ -309,9 +312,12 @@ func (ic *Client) GetRecordCount(namespace string, sets []string) (uint64, error
 }
 
 // StartXDR creates xdr config and starts replication.
-func (ic *Client) StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error {
+func (ic *Client) StartXDR(
+	ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool,
+) error {
 	// The Order of this operation is important. Don't move it if you don't know what you are doing!
 	if err := executeWithRetry(
+		ctx,
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRDC(nodeName, dc)
@@ -321,6 +327,7 @@ func (ic *Client) StartXDR(nodeName, dc, hostPort, namespace, rewind string, thr
 	}
 
 	if err := executeWithRetry(
+		ctx,
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRConnector(nodeName, dc)
@@ -330,6 +337,7 @@ func (ic *Client) StartXDR(nodeName, dc, hostPort, namespace, rewind string, thr
 	}
 
 	if err := executeWithRetry(
+		ctx,
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRNode(nodeName, dc, hostPort)
@@ -339,6 +347,7 @@ func (ic *Client) StartXDR(nodeName, dc, hostPort, namespace, rewind string, thr
 	}
 
 	if err := executeWithRetry(
+		ctx,
 		ic.retryPolicy,
 		func() error {
 			return ic.setMaxThroughput(nodeName, dc, namespace, throughput)
@@ -348,6 +357,7 @@ func (ic *Client) StartXDR(nodeName, dc, hostPort, namespace, rewind string, thr
 	}
 
 	if err := executeWithRetry(
+		ctx,
 		ic.retryPolicy,
 		func() error {
 			return ic.createXDRNamespace(nodeName, dc, namespace, rewind)
@@ -358,6 +368,7 @@ func (ic *Client) StartXDR(nodeName, dc, hostPort, namespace, rewind string, thr
 
 	if forward {
 		if err := executeWithRetry(
+			ctx,
 			ic.retryPolicy,
 			func() error {
 				return ic.setXDRForward(nodeName, dc, namespace, forward)
@@ -371,8 +382,8 @@ func (ic *Client) StartXDR(nodeName, dc, hostPort, namespace, rewind string, thr
 }
 
 // StopXDR disable replication and remove xdr config.
-func (ic *Client) StopXDR(nodeName, dc string) error {
-	return executeWithRetry(ic.retryPolicy, func() error {
+func (ic *Client) StopXDR(ctx context.Context, nodeName, dc string) error {
+	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		return ic.stopXDR(nodeName, dc)
 	})
 }
@@ -461,8 +472,8 @@ func (ic *Client) deleteXDRDC(nodeName, dc string) error {
 }
 
 // BlockMRTWrites blocks MRT writes on cluster.
-func (ic *Client) BlockMRTWrites(nodeName, namespace string) error {
-	return executeWithRetry(ic.retryPolicy, func() error {
+func (ic *Client) BlockMRTWrites(ctx context.Context, nodeName, namespace string) error {
+	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		return ic.blockMRTWrites(nodeName, namespace)
 	})
 }
@@ -483,8 +494,8 @@ func (ic *Client) blockMRTWrites(nodeName, namespace string) error {
 }
 
 // UnBlockMRTWrites unblocks MRT writes on cluster.
-func (ic *Client) UnBlockMRTWrites(nodeName, namespace string) error {
-	return executeWithRetry(ic.retryPolicy, func() error {
+func (ic *Client) UnBlockMRTWrites(ctx context.Context, nodeName, namespace string) error {
+	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		return ic.unBlockMRTWrites(nodeName, namespace)
 	})
 }
@@ -556,10 +567,10 @@ func (ic *Client) setXDRForward(nodeName, dc, namespace string, forward bool) er
 	return nil
 }
 
-func (ic *Client) GetSetsList(namespace string) ([]string, error) {
+func (ic *Client) GetSetsList(ctx context.Context, namespace string) ([]string, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetsOfNamespace], namespace)
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed get sets: %w", err)
 	}
@@ -593,26 +604,10 @@ func (ic *Client) GetSetsList(namespace string) ([]string, error) {
 }
 
 // GetRackNodes returns list of nodes by rack id.
-func (ic *Client) GetRackNodes(rackID int) ([]string, error) {
-	var (
-		result []string
-		err    error
-	)
-
-	err = executeWithRetry(ic.retryPolicy, func() error {
-		result, err = ic.getRackNodes(rackID)
-
-		return err
-	})
-
-	return result, err
-}
-
-// getRackNodes returns list of nodes for a rack.
-func (ic *Client) getRackNodes(rackID int) ([]string, error) {
+func (ic *Client) GetRackNodes(ctx context.Context, rackID int) ([]string, error) {
 	cmd := ic.cmdDict[cmdIDRack]
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed get racks info: %w", err)
 	}
@@ -654,7 +649,22 @@ type Stats struct {
 
 // GetStats requests node statistics like recoveries, lag, etc.
 // returns Stats struct.
-func (ic *Client) GetStats(nodeName, dc, namespace string) (Stats, error) {
+func (ic *Client) GetStats(ctx context.Context, nodeName, dc, namespace string) (Stats, error) {
+	var (
+		result Stats
+		err    error
+	)
+	// First request TLS name.
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
+		result, err = ic.getStats(nodeName, dc, namespace)
+
+		return err
+	})
+
+	return result, err
+}
+
+func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDGetXDRStats], dc, namespace)
 
 	resp, err := ic.requestByNode(nodeName, cmd)
@@ -701,20 +711,20 @@ func (ic *Client) GetStats(nodeName, dc, namespace string) (Stats, error) {
 }
 
 // GetService returns service name by node name.
-func (ic *Client) GetService(node string) (string, error) {
+func (ic *Client) GetService(ctx context.Context, node string) (string, error) {
 	var (
 		result string
 		err    error
 	)
 	// First request TLS name.
-	err = executeWithRetry(ic.retryPolicy, func() error {
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
 		result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceTLSStd])
 
 		return err
 	})
 	// If result is empty, then request plain.
 	if result == "" {
-		err = executeWithRetry(ic.retryPolicy, func() error {
+		err = executeWithRetry(ctx, ic.retryPolicy, func() error {
 			result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceClearStd])
 
 			return err
@@ -739,10 +749,10 @@ func (ic *Client) getByNode(node, cmd string) (string, error) {
 }
 
 // GetNamespacesList returns list of namespaces.
-func (ic *Client) GetNamespacesList() ([]string, error) {
+func (ic *Client) GetNamespacesList(ctx context.Context) ([]string, error) {
 	cmd := ic.cmdDict[cmdIDNamespaces]
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed get namespaces list: %w", err)
 	}
@@ -756,10 +766,10 @@ func (ic *Client) GetNamespacesList() ([]string, error) {
 }
 
 // GetStatus returns cluster status.
-func (ic *Client) GetStatus() (string, error) {
+func (ic *Client) GetStatus(ctx context.Context) (string, error) {
 	cmd := ic.cmdDict[cmdIDStatus]
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return "", fmt.Errorf("failed get status info: %w", err)
 	}
@@ -773,10 +783,10 @@ func (ic *Client) GetStatus() (string, error) {
 }
 
 // GetDCsList returns list of XDR DCs.
-func (ic *Client) GetDCsList() ([]string, error) {
+func (ic *Client) GetDCsList(ctx context.Context) ([]string, error) {
 	cmd := ic.cmdDict[cmdIDGetConfigXDR]
 
-	resp, err := ic.GetInfo(cmd)
+	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed get DCs list: %w", err)
 	}
@@ -806,13 +816,13 @@ func (ic *Client) GetDCsList() ([]string, error) {
 }
 
 // GetPrimaryPartitions returns a list of primary partitions.
-func (ic *Client) GetPrimaryPartitions(node, namespace string) ([]int, error) {
+func (ic *Client) GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error) {
 	var (
 		result []int
 		err    error
 	)
 
-	err = executeWithRetry(ic.retryPolicy, func() error {
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
 		result, err = ic.getPrimaryPartitions(node, namespace)
 
 		return err
@@ -1405,7 +1415,7 @@ func parseUDFGetResponse(resp string) (infoMap, error) {
 	return parseInfoObject(resp, ";", "=")
 }
 
-func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
+func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command func() error) error {
 	if policy == nil {
 		return fmt.Errorf("retry policy cannot be nil")
 	}
@@ -1421,7 +1431,9 @@ func executeWithRetry(policy *models.RetryPolicy, command func() error) error {
 			return nil
 		}
 
-		policy.Sleep(attempt)
+		if err := policy.Sleep(ctx, attempt); err != nil {
+			return err
+		}
 
 		attempt++
 	}

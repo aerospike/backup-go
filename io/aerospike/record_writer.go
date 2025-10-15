@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -24,6 +25,7 @@ import (
 )
 
 type singleRecordWriter struct {
+	ctx               context.Context
 	asc               dbWriter
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
@@ -33,6 +35,7 @@ type singleRecordWriter struct {
 }
 
 func newSingleRecordWriter(
+	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -45,6 +48,7 @@ func newSingleRecordWriter(
 	}
 
 	return &singleRecordWriter{
+		ctx:               ctx,
 		asc:               asc,
 		writePolicy:       writePolicy,
 		stats:             stats,
@@ -110,7 +114,9 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return nil
 
 		case shouldRetry(aerr):
-			rw.retryPolicy.Sleep(attempt)
+			if err := rw.retryPolicy.Sleep(rw.ctx, attempt); err != nil {
+				return err
+			}
 
 			attempt++
 

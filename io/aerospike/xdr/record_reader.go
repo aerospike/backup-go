@@ -83,11 +83,11 @@ func NewRecordReaderConfig(
 
 // infoCommander interface for an info client.
 type infoCommander interface {
-	StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
-	StopXDR(nodeName, dc string) error
-	GetStats(nodeName, dc, namespace string) (asinfo.Stats, error)
-	BlockMRTWrites(nodeName, namespace string) error
-	UnBlockMRTWrites(nodeName, namespace string) error
+	StartXDR(ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
+	StopXDR(ctx context.Context, nodeName, dc string) error
+	GetStats(ctx context.Context, nodeName, dc, namespace string) (asinfo.Stats, error)
+	BlockMRTWrites(ctx context.Context, nodeName, namespace string) error
+	UnBlockMRTWrites(ctx context.Context, nodeName, namespace string) error
 	GetNodesNames() []string
 }
 

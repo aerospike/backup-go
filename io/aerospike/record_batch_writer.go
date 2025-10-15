@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,6 +27,7 @@ import (
 )
 
 type batchRecordWriter struct {
+	ctx               context.Context
 	asc               dbWriter
 	writePolicy       *a.WritePolicy
 	batchPolicy       *a.BatchPolicy
@@ -39,6 +41,7 @@ type batchRecordWriter struct {
 }
 
 func newBatchRecordWriter(
+	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -53,6 +56,7 @@ func newBatchRecordWriter(
 	}
 
 	return &batchRecordWriter{
+		ctx:               ctx,
 		asc:               asc,
 		writePolicy:       writePolicy,
 		batchPolicy:       mapWriteToBatchPolicy(writePolicy),
@@ -164,7 +168,9 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			slog.Int("remainingOperations", len(rw.operationBuffer)),
 		)
 
-		rw.retryPolicy.Sleep(attempt)
+		if err := rw.retryPolicy.Sleep(rw.ctx, attempt); err != nil {
+			return err
+		}
 
 		attempt++
 	}

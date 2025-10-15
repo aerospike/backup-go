@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -25,6 +26,7 @@ import (
 )
 
 type payloadWriter struct {
+	ctx               context.Context
 	dbWriter          dbWriter
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
@@ -34,6 +36,7 @@ type payloadWriter struct {
 }
 
 func newPayloadWriter(
+	ctx context.Context,
 	dbWriter dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -46,6 +49,7 @@ func newPayloadWriter(
 	}
 
 	return &payloadWriter{
+		ctx:               ctx,
 		dbWriter:          dbWriter,
 		writePolicy:       writePolicy,
 		stats:             stats,
@@ -95,7 +99,9 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			return nil
 
 		case shouldRetry(aerr):
-			p.retryPolicy.Sleep(attempt)
+			if err := p.retryPolicy.Sleep(p.ctx, attempt); err != nil {
+				return err
+			}
 
 			attempt++
 

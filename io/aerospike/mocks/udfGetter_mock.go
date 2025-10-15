@@ -5,6 +5,8 @@
 package mocks
 
 import (
+	"context"
+
 	"github.com/aerospike/backup-go/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -37,8 +39,8 @@ func (_m *MockudfGetter) EXPECT() *MockudfGetter_Expecter {
 }
 
 // GetUDFs provides a mock function for the type MockudfGetter
-func (_mock *MockudfGetter) GetUDFs() ([]*models.UDF, error) {
-	ret := _mock.Called()
+func (_mock *MockudfGetter) GetUDFs(ctx context.Context) ([]*models.UDF, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUDFs")
@@ -46,18 +48,18 @@ func (_mock *MockudfGetter) GetUDFs() ([]*models.UDF, error) {
 
 	var r0 []*models.UDF
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]*models.UDF, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]*models.UDF, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() []*models.UDF); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []*models.UDF); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.UDF)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -70,13 +72,14 @@ type MockudfGetter_GetUDFs_Call struct {
 }
 
 // GetUDFs is a helper method to define mock.On call
-func (_e *MockudfGetter_Expecter) GetUDFs() *MockudfGetter_GetUDFs_Call {
-	return &MockudfGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs")}
+//   - ctx
+func (_e *MockudfGetter_Expecter) GetUDFs(ctx interface{}) *MockudfGetter_GetUDFs_Call {
+	return &MockudfGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs", ctx)}
 }
 
-func (_c *MockudfGetter_GetUDFs_Call) Run(run func()) *MockudfGetter_GetUDFs_Call {
+func (_c *MockudfGetter_GetUDFs_Call) Run(run func(ctx context.Context)) *MockudfGetter_GetUDFs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -86,7 +89,7 @@ func (_c *MockudfGetter_GetUDFs_Call) Return(uDFs []*models.UDF, err error) *Moc
 	return _c
 }
 
-func (_c *MockudfGetter_GetUDFs_Call) RunAndReturn(run func() ([]*models.UDF, error)) *MockudfGetter_GetUDFs_Call {
+func (_c *MockudfGetter_GetUDFs_Call) RunAndReturn(run func(ctx context.Context) ([]*models.UDF, error)) *MockudfGetter_GetUDFs_Call {
 	_c.Call.Return(run)
 	return _c
 }

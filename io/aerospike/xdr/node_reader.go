@@ -79,6 +79,7 @@ func NewNodeReader(
 func (r *NodeReader) Run() error {
 	// Create XDR config.
 	if err := r.infoClient.StartXDR(
+		r.ctx,
 		r.nodeName,
 		r.config.dc,
 		r.config.currentHostPort,
@@ -157,7 +158,7 @@ func (r *NodeReader) serve() {
 
 			if r.checkpoint-unixLag < 0 || stats.Lag == 0 {
 				// Run MRT writes.
-				if err = r.infoClient.UnBlockMRTWrites(r.nodeName, r.config.namespace); err != nil {
+				if err = r.infoClient.UnBlockMRTWrites(r.ctx, r.nodeName, r.config.namespace); err != nil {
 					r.logger.Error("failed to unblock mrt writes",
 						slog.Any("error", err))
 				}
@@ -180,14 +181,14 @@ func (r *NodeReader) close() {
 		r.nodesRecovered <- struct{}{}
 	}
 
-	if err := r.infoClient.StopXDR(r.nodeName, r.config.dc); err != nil {
+	if err := r.infoClient.StopXDR(r.ctx, r.nodeName, r.config.dc); err != nil {
 		r.logger.Error("failed to remove xdr config",
 			slog.Any("error", err))
 	}
 
 	// If mrt was stopped.
 	if r.mrtWritesStopped.Load() {
-		if err := r.infoClient.UnBlockMRTWrites(r.nodeName, r.config.namespace); err != nil {
+		if err := r.infoClient.UnBlockMRTWrites(r.ctx, r.nodeName, r.config.namespace); err != nil {
 			r.logger.Error("failed to unblock mrt writes", slog.Any("error", err))
 		}
 		// Only after successful unblocking.
@@ -200,7 +201,7 @@ func (r *NodeReader) close() {
 func (r *NodeReader) BlockMrt() error {
 	r.mrtWritesStopped.Store(true)
 	// Stop MRT writes in this checkpoint.
-	if err := r.infoClient.BlockMRTWrites(r.nodeName, r.config.namespace); err != nil {
+	if err := r.infoClient.BlockMRTWrites(r.ctx, r.nodeName, r.config.namespace); err != nil {
 		return fmt.Errorf("failed to block mrt writes: %w", err)
 	}
 
@@ -225,7 +226,7 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 	for retries := 0; retries < getStatsAttempts; retries++ {
 		time.Sleep(delay)
 
-		stats, err := r.infoClient.GetStats(r.nodeName, r.config.dc, r.config.namespace)
+		stats, err := r.infoClient.GetStats(r.ctx, r.nodeName, r.config.dc, r.config.namespace)
 
 		switch {
 		case err == nil:
@@ -234,6 +235,7 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 			r.logger.Warn("failed to get stats, try to restart xdr", slog.Any("error", err))
 			// Try to restart XDR.
 			if err = r.infoClient.StartXDR(
+				r.ctx,
 				r.nodeName,
 				r.config.dc,
 				r.config.currentHostPort,

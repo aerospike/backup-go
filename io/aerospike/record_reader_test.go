@@ -28,6 +28,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -356,7 +357,7 @@ func TestSIndexReader(t *testing.T) {
 		},
 		{},
 	}
-	mockSIndexGetter.EXPECT().GetSIndexes(namespace).Return(
+	mockSIndexGetter.EXPECT().GetSIndexes(mock.Anything, namespace).Return(
 		mockSIndexes,
 		nil,
 	)
@@ -390,7 +391,7 @@ func TestSIndexReader(t *testing.T) {
 	// negative GetSindexes fails
 
 	mockSIndexGetter = mocks.NewMocksindexGetter(t)
-	mockSIndexGetter.EXPECT().GetSIndexes(namespace).Return(
+	mockSIndexGetter.EXPECT().GetSIndexes(mock.Anything, namespace).Return(
 		nil,
 		fmt.Errorf("error"),
 	)
@@ -417,7 +418,7 @@ func TestUDFReader(t *testing.T) {
 			Name: "udf2",
 		},
 	}
-	mockUDFGetter.EXPECT().GetUDFs().Return(
+	mockUDFGetter.EXPECT().GetUDFs(mock.Anything).Return(
 		mockUDFs,
 		nil,
 	)
@@ -451,7 +452,7 @@ func TestUDFReaderReadFailed(t *testing.T) {
 	t.Parallel()
 
 	mockUDFGetter := mocks.NewMockudfGetter(t)
-	mockUDFGetter.EXPECT().GetUDFs().Return(
+	mockUDFGetter.EXPECT().GetUDFs(mock.Anything).Return(
 		nil,
 		fmt.Errorf("error"),
 	)

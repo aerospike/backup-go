@@ -209,7 +209,9 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 				)
 			}
 
-			r.retryPolicy.Sleep(attempt)
+			if err := r.retryPolicy.Sleep(r.ctx, attempt); err != nil {
+				return 0, err
+			}
 
 			attempt++
 

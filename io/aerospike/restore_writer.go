@@ -46,6 +46,7 @@ type RestoreWriter[T models.TokenConstraint] struct {
 
 // NewRestoreWriter creates a new RestoreWriter.
 func NewRestoreWriter[T models.TokenConstraint](
+	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -75,6 +76,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 			logger:      logger,
 		},
 		recordWriter: newRecordWriter(
+			ctx,
 			asc,
 			writePolicy,
 			stats,
@@ -86,6 +88,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 			ignoreRecordError,
 		),
 		payloadWriter: newPayloadWriter(
+			ctx,
 			asc,
 			writePolicy,
 			stats,
@@ -98,6 +101,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 }
 
 func newRecordWriter(
+	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -110,6 +114,7 @@ func newRecordWriter(
 ) recordWriter {
 	if useBatchWrites {
 		return newBatchRecordWriter(
+			ctx,
 			asc,
 			writePolicy,
 			stats,
@@ -122,6 +127,7 @@ func newRecordWriter(
 	}
 
 	return newSingleRecordWriter(
+		ctx,
 		asc,
 		writePolicy,
 		stats,

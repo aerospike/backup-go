@@ -16,6 +16,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -191,380 +192,568 @@ func TestRetryPolicy_Validate(t *testing.T) {
 	})
 }
 
-func TestRetryPolicy_AttemptsLeft(t *testing.T) {
+func TestRetryPolicy_Do(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Returns true for first attempt", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name           string
+		policy         *RetryPolicy
+		operation      func() (callCount *int, operation func() error)
+		contextTimeout time.Duration
+		wantErr        bool
+		wantCallCount  int
+	}{
+		{
+			name:   "success on first attempt",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return nil
+				}
+			},
+			wantErr:       false,
+			wantCallCount: 1,
+		},
+		{
+			name:   "success on second attempt",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					if count < 2 {
+						return errors.New("temporary error")
+					}
+					return nil
+				}
+			},
+			wantErr:       false,
+			wantCallCount: 2,
+		},
+		{
+			name:   "success on third attempt",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					if count < 3 {
+						return errors.New("temporary error")
+					}
+					return nil
+				}
+			},
+			wantErr:       false,
+			wantCallCount: 3,
+		},
+		{
+			name:   "all attempts fail",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 2),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return errors.New("persistent error")
+				}
+			},
+			wantErr:       true,
+			wantCallCount: 2,
+		},
+		{
+			name:   "no retries (MaxRetries=0)",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 0),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return errors.New("error on first attempt")
+				}
+			},
+			wantErr:       true,
+			wantCallCount: 1,
+		},
+		{
+			name:   "context cancelled during retry",
+			policy: NewRetryPolicy(100*time.Millisecond, 2.0, 5),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return errors.New("error that triggers retry")
+				}
+			},
+			// Cancel during sleep
+			contextTimeout: 150 * time.Millisecond,
+			wantErr:        true,
+			wantCallCount:  2,
+		},
+		{
+			name:   "nil policy executes once",
+			policy: nil,
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return nil
+				}
+			},
+			wantErr:       false,
+			wantCallCount: 1,
+		},
+		{
+			name:   "nil policy with error executes once",
+			policy: nil,
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return errors.New("error")
+				}
+			},
+			wantErr:       true,
+			wantCallCount: 1,
+		},
+		{
+			name:   "success with MaxRetries=1",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 1),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return nil
+				}
+			},
+			wantErr:       false,
+			wantCallCount: 1,
+		},
+		{
+			name:   "all attempts fail with MaxRetries=1",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 1),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return errors.New("persistent error")
+				}
+			},
+			wantErr:       true,
+			wantCallCount: 1,
+		},
+	}
 
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, testMaxRetries)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		result := policy.AttemptsLeft(0)
+			ctx := context.Background()
+			if tt.contextTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tt.contextTimeout)
+				defer cancel()
+			}
 
-		require.True(t, result)
-	})
+			callCount, operation := tt.operation()
 
-	t.Run("Returns true when attempts under max", func(t *testing.T) {
-		t.Parallel()
+			err := tt.policy.Do(ctx, operation)
 
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, testMaxRetries)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Do() error = %v, wantErr %v", err, tt.wantErr)
+			}
 
-		result := policy.AttemptsLeft(2)
-
-		require.True(t, result)
-	})
-
-	t.Run("Returns false when attempts equal max", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, testMaxRetries)
-
-		result := policy.AttemptsLeft(3)
-
-		require.False(t, result)
-	})
-
-	t.Run("Returns false when attempts exceed max", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, testMaxRetries)
-
-		result := policy.AttemptsLeft(10)
-
-		require.False(t, result)
-	})
-
-	t.Run("Returns false for nil policy", func(t *testing.T) {
-		t.Parallel()
-
-		var policy *RetryPolicy
-
-		result := policy.AttemptsLeft(0)
-
-		require.False(t, result)
-	})
-
-	t.Run("Returns true for zero max retries on first attempt", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, 0)
-
-		result := policy.AttemptsLeft(0)
-
-		require.True(t, result)
-	})
-
-	t.Run("Returns false for zero max retries on second attempt", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, 0)
-
-		result := policy.AttemptsLeft(1)
-
-		require.False(t, result)
-	})
-
-	t.Run("Returns correct value for large max retries", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, 1000)
-
-		require.True(t, policy.AttemptsLeft(0))
-		require.True(t, policy.AttemptsLeft(500))
-		require.True(t, policy.AttemptsLeft(999))
-		require.False(t, policy.AttemptsLeft(1000))
-		require.False(t, policy.AttemptsLeft(1001))
-	})
-
-	t.Run("Returns correct value for max retries of 1", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, 1)
-
-		require.True(t, policy.AttemptsLeft(0))
-		require.False(t, policy.AttemptsLeft(1))
-	})
+			if *callCount != tt.wantCallCount {
+				t.Errorf("Do() callCount = %v, want %v", *callCount, tt.wantCallCount)
+			}
+		})
+	}
 }
 
-func TestRetryPolicy_TotalAttempts(t *testing.T) {
+func TestRetryPolicy_Do_ErrorMessages(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Returns 1 for zero max retries", func(t *testing.T) {
+	t.Run("error message contains attempt count", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, 0)
-
-		total := policy.TotalAttempts()
-
-		require.Equal(t, uint(1), total)
-	})
-
-	t.Run("Returns correct total for non-zero max retries", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, testMaxRetries)
-
-		total := policy.TotalAttempts()
-
-		require.Equal(t, uint(4), total) // 1 initial + 3 retries
-	})
-
-	t.Run("Returns 1 for nil policy", func(t *testing.T) {
-		t.Parallel()
-
-		var policy *RetryPolicy
-
-		total := policy.TotalAttempts()
-
-		require.Equal(t, uint(1), total)
-	})
-
-	t.Run("Returns correct total for max retries of 1", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, 1)
-
-		total := policy.TotalAttempts()
-
-		require.Equal(t, uint(2), total) // 1 initial + 1 retry
-	})
-
-	t.Run("Returns correct total for large max retries", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(testBaseTimeout, testMultiplier, 999)
-
-		total := policy.TotalAttempts()
-
-		require.Equal(t, uint(1000), total)
-	})
-}
-
-func TestRetryPolicy_Sleep(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Sleeps for base timeout on first attempt", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(50*time.Millisecond, 1.0, testMaxRetries)
+		policy := NewRetryPolicy(10*time.Millisecond, 2.0, 2)
 		ctx := context.Background()
-		start := time.Now()
 
-		err := policy.Sleep(ctx, 0)
+		err := policy.Do(ctx, func() error {
+			return errors.New("test error")
+		})
 
-		elapsed := time.Since(start)
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, elapsed, 50*time.Millisecond)
-		require.Less(t, elapsed, 100*time.Millisecond)
-	})
-
-	t.Run("Sleeps with exponential backoff", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(50*time.Millisecond, 2.0, testMaxRetries)
-		ctx := context.Background()
-		start := time.Now()
-
-		err := policy.Sleep(ctx, 2) // 50ms * 2^2 = 200ms
-
-		elapsed := time.Since(start)
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, elapsed, 200*time.Millisecond)
-		require.Less(t, elapsed, 250*time.Millisecond)
-	})
-
-	t.Run("Returns nil for nil policy", func(t *testing.T) {
-		t.Parallel()
-
-		var policy *RetryPolicy
-		ctx := context.Background()
-		start := time.Now()
-
-		err := policy.Sleep(ctx, 0)
-
-		elapsed := time.Since(start)
-		require.NoError(t, err)
-		require.Less(t, elapsed, 10*time.Millisecond)
-	})
-
-	t.Run("Returns early on context cancellation", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(1*time.Second, 1.0, testMaxRetries)
-		ctx, cancel := context.WithCancel(context.Background())
-		start := time.Now()
-
-		go func() {
-			time.Sleep(50 * time.Millisecond)
-			cancel()
-		}()
-
-		err := policy.Sleep(ctx, 0)
-
-		elapsed := time.Since(start)
 		require.Error(t, err)
-		require.Equal(t, context.Canceled, err)
-		require.Less(t, elapsed, 200*time.Millisecond)
+		require.Contains(t, err.Error(), "failed after 2 attempt(s)")
+		require.Contains(t, err.Error(), "test error")
 	})
 
-	t.Run("Returns early on context timeout", func(t *testing.T) {
+	t.Run("context error is joined with last operation error", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(1*time.Second, 1.0, testMaxRetries)
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		policy := NewRetryPolicy(100*time.Millisecond, 2.0, 5)
+		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 		defer cancel()
-		start := time.Now()
 
-		err := policy.Sleep(ctx, 0)
+		err := policy.Do(ctx, func() error {
+			return errors.New("operation error")
+		})
 
-		elapsed := time.Since(start)
 		require.Error(t, err)
-		require.Equal(t, context.DeadlineExceeded, err)
-		require.Less(t, elapsed, 200*time.Millisecond)
-	})
-
-	t.Run("Works with already cancelled context", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(1*time.Second, 1.0, testMaxRetries)
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		start := time.Now()
-
-		err := policy.Sleep(ctx, 0)
-
-		elapsed := time.Since(start)
-		require.Error(t, err)
-		require.Equal(t, context.Canceled, err)
-		require.Less(t, elapsed, 50*time.Millisecond)
-	})
-
-	t.Run("Sleeps with multiplier 1.0", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(50*time.Millisecond, 1.0, testMaxRetries)
-		ctx := context.Background()
-		start := time.Now()
-
-		err := policy.Sleep(ctx, 5) // Should still be 50ms
-
-		elapsed := time.Since(start)
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, elapsed, 50*time.Millisecond)
-		require.Less(t, elapsed, 100*time.Millisecond)
-	})
-
-	t.Run("Sleeps with large multiplier", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(10*time.Millisecond, 3.0, testMaxRetries)
-		ctx := context.Background()
-		start := time.Now()
-
-		err := policy.Sleep(ctx, 3) // 10ms * 3^3 = 270ms
-
-		elapsed := time.Since(start)
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, elapsed, 270*time.Millisecond)
-		require.Less(t, elapsed, 320*time.Millisecond)
-	})
-
-	t.Run("Sleeps with fractional multiplier", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(100*time.Millisecond, 1.5, testMaxRetries)
-		ctx := context.Background()
-		start := time.Now()
-
-		err := policy.Sleep(ctx, 2) // 100ms * 1.5^2 = 225ms
-
-		elapsed := time.Since(start)
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, elapsed, 225*time.Millisecond)
-		require.Less(t, elapsed, 275*time.Millisecond)
-	})
-
-	t.Run("Sleeps with zero base timeout", func(t *testing.T) {
-		t.Parallel()
-
-		policy := NewRetryPolicy(0, testMultiplier, testMaxRetries)
-		ctx := context.Background()
-		start := time.Now()
-
-		err := policy.Sleep(ctx, 0)
-
-		elapsed := time.Since(start)
-		require.NoError(t, err)
-		require.Less(t, elapsed, 10*time.Millisecond)
+		// Should contain both context error and operation error
+		require.Contains(t, err.Error(), "context deadline exceeded")
+		require.Contains(t, err.Error(), "operation error")
 	})
 }
 
-func TestRetryPolicy_calculateDelay(t *testing.T) {
+func TestRetryPolicy_Do_ThreadSafety(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Calculates correct delay for first attempt", func(t *testing.T) {
+	policy := NewRetryPolicy(10*time.Millisecond, 2.0, 3)
+	const numGoroutines = 100
+	errChan := make(chan error, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			ctx := context.Background()
+			callCount := 0
+
+			err := policy.Do(ctx, func() error {
+				callCount++
+				if callCount < 2 {
+					return errors.New("temporary error")
+				}
+				return nil
+			})
+
+			errChan <- err
+		}()
+	}
+
+	// Collect results
+	for i := 0; i < numGoroutines; i++ {
+		err := <-errChan
+		require.NoError(t, err)
+	}
+}
+
+func TestDoWithData(t *testing.T) {
+	t.Parallel()
+
+	type testResult struct {
+		value string
+		count int
+	}
+
+	tests := []struct {
+		name           string
+		policy         *RetryPolicy
+		operation      func() (callCount *int, operation func() (testResult, error))
+		contextTimeout time.Duration
+		wantResult     testResult
+		wantErr        bool
+		wantCallCount  int
+	}{
+		{
+			name:   "success on first attempt",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3),
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					return testResult{value: "success", count: count}, nil
+				}
+			},
+			wantResult:    testResult{value: "success", count: 1},
+			wantErr:       false,
+			wantCallCount: 1,
+		},
+		{
+			name:   "success on second attempt",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3),
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					if count < 2 {
+						return testResult{}, errors.New("temporary error")
+					}
+					return testResult{value: "success", count: count}, nil
+				}
+			},
+			wantResult:    testResult{value: "success", count: 2},
+			wantErr:       false,
+			wantCallCount: 2,
+		},
+		{
+			name:   "success on third attempt",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3),
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					if count < 3 {
+						return testResult{}, errors.New("temporary error")
+					}
+					return testResult{value: "success", count: count}, nil
+				}
+			},
+			wantResult:    testResult{value: "success", count: 3},
+			wantErr:       false,
+			wantCallCount: 3,
+		},
+		{
+			name:   "all attempts fail",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 2),
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					return testResult{}, errors.New("persistent error")
+				}
+			},
+			wantResult:    testResult{}, // zero value
+			wantErr:       true,
+			wantCallCount: 2, // MaxRetries=2 means 2 total attempts
+		},
+		{
+			name:   "no retries (MaxRetries=0)",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 0),
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					return testResult{value: "first", count: count}, nil
+				}
+			},
+			wantResult:    testResult{value: "first", count: 1},
+			wantErr:       false,
+			wantCallCount: 1,
+		},
+		{
+			name:   "context cancelled during retry",
+			policy: NewRetryPolicy(100*time.Millisecond, 2.0, 5),
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					return testResult{}, errors.New("error to trigger retry")
+				}
+			},
+			contextTimeout: 150 * time.Millisecond, // Cancel during sleep
+			wantResult:     testResult{},           // zero value
+			wantErr:        true,
+			wantCallCount:  2, // First attempt + one retry before cancellation
+		},
+		{
+			name:   "nil policy returns immediately",
+			policy: nil,
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					return testResult{value: "direct", count: count}, nil
+				}
+			},
+			wantResult:    testResult{value: "direct", count: 1},
+			wantErr:       false,
+			wantCallCount: 1,
+		},
+		{
+			name:   "nil policy with error",
+			policy: nil,
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					return testResult{}, errors.New("error")
+				}
+			},
+			wantResult:    testResult{},
+			wantErr:       true,
+			wantCallCount: 1,
+		},
+		{
+			name:   "returns last result on failure",
+			policy: NewRetryPolicy(10*time.Millisecond, 2.0, 2),
+			operation: func() (callCount *int, operation func() (testResult, error)) {
+				count := 0
+				return &count, func() (testResult, error) {
+					count++
+					// Return partial result even on error
+					return testResult{value: "partial", count: count}, errors.New("error")
+				}
+			},
+			wantResult:    testResult{value: "partial", count: 2},
+			wantErr:       true,
+			wantCallCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			if tt.contextTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tt.contextTimeout)
+				defer cancel()
+			}
+
+			callCount, operation := tt.operation()
+
+			result, err := DoWithData(ctx, tt.policy, operation)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DoWithData() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if result != tt.wantResult {
+				t.Errorf("DoWithData() result = %v, want %v", result, tt.wantResult)
+			}
+
+			if *callCount != tt.wantCallCount {
+				t.Errorf("DoWithData() callCount = %v, want %v", *callCount, tt.wantCallCount)
+			}
+		})
+	}
+}
+
+func TestDoWithData_DifferentTypes(t *testing.T) {
+	t.Parallel()
+
+	policy := NewRetryPolicy(10*time.Millisecond, 2.0, 3)
+	ctx := context.Background()
+
+	t.Run("string type", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(100*time.Millisecond, 2.0, testMaxRetries)
+		result, err := DoWithData(ctx, policy, func() (string, error) {
+			return "test", nil
+		})
 
-		delay := policy.calculateDelay(0)
-
-		require.Equal(t, 100*time.Millisecond, delay)
+		require.NoError(t, err)
+		require.Equal(t, "test", result)
 	})
 
-	t.Run("Calculates correct delay with exponential backoff", func(t *testing.T) {
+	t.Run("int64 type", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(100*time.Millisecond, 2.0, testMaxRetries)
+		result, err := DoWithData(ctx, policy, func() (int64, error) {
+			return 42, nil
+		})
 
-		delay1 := policy.calculateDelay(1) // 100 * 2^1 = 200ms
-		delay2 := policy.calculateDelay(2) // 100 * 2^2 = 400ms
-		delay3 := policy.calculateDelay(3) // 100 * 2^3 = 800ms
-
-		require.Equal(t, 200*time.Millisecond, delay1)
-		require.Equal(t, 400*time.Millisecond, delay2)
-		require.Equal(t, 800*time.Millisecond, delay3)
+		require.NoError(t, err)
+		require.Equal(t, int64(42), result)
 	})
 
-	t.Run("Calculates correct delay with multiplier 1.0", func(t *testing.T) {
+	t.Run("slice type", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(100*time.Millisecond, 1.0, testMaxRetries)
+		result, err := DoWithData(ctx, policy, func() ([]string, error) {
+			return []string{"a", "b", "c"}, nil
+		})
 
-		delay0 := policy.calculateDelay(0)
-		delay5 := policy.calculateDelay(5)
-
-		require.Equal(t, 100*time.Millisecond, delay0)
-		require.Equal(t, 100*time.Millisecond, delay5)
+		require.NoError(t, err)
+		require.Len(t, result, 3)
 	})
 
-	t.Run("Calculates correct delay with fractional multiplier", func(t *testing.T) {
+	t.Run("pointer type", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(100*time.Millisecond, 1.5, testMaxRetries)
+		type testStruct struct {
+			Value int
+		}
 
-		delay2 := policy.calculateDelay(2) // 100 * 1.5^2 = 225ms
+		result, err := DoWithData(ctx, policy, func() (*testStruct, error) {
+			return &testStruct{Value: 100}, nil
+		})
 
-		require.Equal(t, 225*time.Millisecond, delay2)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 100, result.Value)
 	})
 
-	t.Run("Calculates correct delay with zero base timeout", func(t *testing.T) {
+	t.Run("map type", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(0, 2.0, testMaxRetries)
+		result, err := DoWithData(ctx, policy, func() (map[string]int, error) {
+			return map[string]int{"a": 1, "b": 2}, nil
+		})
 
-		delay := policy.calculateDelay(5)
-
-		require.Equal(t, time.Duration(0), delay)
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+		require.Equal(t, 1, result["a"])
 	})
+}
 
-	t.Run("Calculates correct delay with large attempt number", func(t *testing.T) {
+func TestDoWithData_ErrorMessages(t *testing.T) {
+	t.Parallel()
+
+	t.Run("error message contains attempt count", func(t *testing.T) {
 		t.Parallel()
 
-		policy := NewRetryPolicy(10*time.Millisecond, 2.0, testMaxRetries)
+		policy := NewRetryPolicy(10*time.Millisecond, 2.0, 2)
+		ctx := context.Background()
 
-		delay := policy.calculateDelay(10) // 10ms * 2^10 = 10240ms
+		_, err := DoWithData(ctx, policy, func() (string, error) {
+			return "", errors.New("test error")
+		})
 
-		require.Equal(t, 10240*time.Millisecond, delay)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed after 2 attempt(s)")
+		require.Contains(t, err.Error(), "test error")
 	})
+
+	t.Run("context error is joined with last operation error", func(t *testing.T) {
+		t.Parallel()
+
+		policy := NewRetryPolicy(100*time.Millisecond, 2.0, 5)
+		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+		defer cancel()
+
+		_, err := DoWithData(ctx, policy, func() (int, error) {
+			return 0, errors.New("operation error")
+		})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context deadline exceeded")
+		require.Contains(t, err.Error(), "operation error")
+	})
+}
+
+func TestDoWithData_ThreadSafety(t *testing.T) {
+	t.Parallel()
+
+	policy := NewRetryPolicy(10*time.Millisecond, 2.0, 3)
+	const numGoroutines = 100
+
+	type result struct {
+		value int
+		err   error
+	}
+	resultChan := make(chan result, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(expectedValue int) {
+			ctx := context.Background()
+			callCount := 0
+
+			val, err := DoWithData(ctx, policy, func() (int, error) {
+				callCount++
+				if callCount < 2 {
+					return 0, errors.New("temporary error")
+				}
+				return expectedValue, nil
+			})
+
+			resultChan <- result{value: val, err: err}
+		}(i)
+	}
+
+	// Collect results
+	for i := 0; i < numGoroutines; i++ {
+		r := <-resultChan
+		require.NoError(t, r.err)
+	}
 }

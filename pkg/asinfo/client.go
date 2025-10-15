@@ -1420,29 +1420,7 @@ func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command f
 		return fmt.Errorf("retry policy cannot be nil")
 	}
 
-	var (
-		err     error
-		attempt uint
-	)
-
-	for policy.AttemptsLeft(attempt) {
-		err = command()
-		if err == nil {
-			return nil
-		}
-
-		if err := policy.Sleep(ctx, attempt); err != nil {
-			return err
-		}
-
-		attempt++
-	}
-
-	if err != nil {
-		return fmt.Errorf("after %d attempts: %w", policy.MaxRetries, err)
-	}
-
-	return nil
+	return policy.Do(ctx, command)
 }
 
 // base64StringToBitArray decodes a base64 string and converts the result to a bitarray (slice of booleans).

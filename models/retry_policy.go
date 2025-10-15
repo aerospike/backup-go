@@ -15,8 +15,10 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"time"
 
 	"golang.org/x/net/context"
@@ -69,35 +71,19 @@ func (p *RetryPolicy) Validate() error {
 	return nil
 }
 
-// AttemptsLeft returns true if there are still retry attempts remaining.
-// MaxRetries=0 means only the initial attempt (no retries).
-// MaxRetries=N means initial attempt + N retries = N+1 total attempts.
-func (p *RetryPolicy) AttemptsLeft(attempt uint) bool {
-	if p == nil {
-		return false
-	}
-
-	// If MaxRetries is 0, only attempt 0 (initial) is allowed
-	if p.MaxRetries == 0 {
-		return attempt == 0
-	}
-
-	return attempt < p.MaxRetries
-}
-
-// TotalAttempts returns the total number of attempts (initial + retries).
+// totalAttempts returns the total number of attempts (initial + retries).
 // Can be used to iterate over all attempts or logging.
-func (p *RetryPolicy) TotalAttempts() uint {
+func (p *RetryPolicy) totalAttempts() uint {
 	if p == nil || p.MaxRetries == 0 {
 		return 1
 	}
 
-	return p.MaxRetries + 1
+	return p.MaxRetries
 }
 
-// Sleep waits for the calculated delay or until context is cancelled.
+// sleep waits for the calculated delay or until context is cancelled.
 // Returns ctx.Err() if context was cancelled, nil if sleep completed.
-func (p *RetryPolicy) Sleep(ctx context.Context, attempt uint) error {
+func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
 	if p == nil {
 		return nil
 	}
@@ -115,9 +101,96 @@ func (p *RetryPolicy) Sleep(ctx context.Context, attempt uint) error {
 	}
 }
 
-// calculateDelay computes the delay for a given attempt number.
+// calculateDelay computes the delay with added jitter to prevent thundering herd.
+// Jitter is +-10% of the calculated delay.
 func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
-	delay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
+	baseDelay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
+
+	// Add +-10% jitter.
+	jitterPercent := 0.1
+	jitterAmount := time.Duration(float64(baseDelay) * jitterPercent)
+
+	//nolint:gosec // rand is used for jitter, not critical for security.
+	jitter := time.Duration(rand.Int64N(int64(jitterAmount*2))) - jitterAmount
+
+	delay := baseDelay + jitter
+	if delay < 0 {
+		delay = 0
+	}
 
 	return delay
+}
+
+// Do executes the operation with automatic retry logic.
+// The operation is retried up to MaxRetries times with exponential backoff and jitter.
+// Returns operation error if all retries are exhausted.
+func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
+	if p == nil {
+		return operation()
+	}
+
+	var lastErr error
+
+	totalAttempts := p.totalAttempts()
+
+	for attempt := uint(0); attempt < totalAttempts; attempt++ {
+		// Execute operation.
+		lastErr = operation()
+		if lastErr == nil {
+			// Success.
+			return nil
+		}
+
+		// If this was the last attempt, exit.
+		if attempt >= totalAttempts-1 {
+			break
+		}
+
+		// sleep before the next attempt. We check context only in sleep, not to slow down first operation.
+		if err := p.sleep(ctx, attempt); err != nil {
+			// Show all errors if any.
+			return errors.Join(err, lastErr)
+		}
+	}
+
+	return fmt.Errorf("failed after %d attempt(s): %w", totalAttempts, lastErr)
+}
+
+// DoWithData executes the operation with automatic retry logic and returns typed result.
+// The operation is retried with RetryPolicy.
+// Returns operation result and error if all retries are exhausted.
+//
+// Type parameter T is the return type of the operation.
+func DoWithData[T any](ctx context.Context, p *RetryPolicy, operation func() (T, error)) (T, error) {
+	var result T
+
+	if p == nil {
+		return operation()
+	}
+
+	var lastErr error
+
+	totalAttempts := p.totalAttempts()
+
+	for attempt := uint(0); attempt < totalAttempts; attempt++ {
+		// Execute operation.
+		result, lastErr = operation()
+		if lastErr == nil {
+			// Success.
+			return result, nil
+		}
+
+		// If this was the last attempt, exit.
+		if attempt >= totalAttempts-1 {
+			break
+		}
+
+		// sleep before the next attempt. We check context only in sleep, not to slow down first operation.
+		if err := p.sleep(ctx, attempt); err != nil {
+			// Show all errors if any.
+			return result, errors.Join(err, lastErr)
+		}
+	}
+
+	return result, fmt.Errorf("failed after %d attempt(s): %w", totalAttempts, lastErr)
 }

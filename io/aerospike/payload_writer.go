@@ -60,24 +60,13 @@ func newPayloadWriter(
 }
 
 func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
-	var (
-		aerr    a.Error
-		attempt uint
-	)
-
 	p.metrics.Increment()
 
 	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, t.Payload)
 	t.Payload = xdr.SetRecordExistsActionBit(p.writePolicy.RecordExistsAction, t.Payload)
 
-	for p.retryPolicy.AttemptsLeft(attempt) {
-		aerr = p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
-
-		if aerr == nil {
-			p.stats.IncrRecordsInserted()
-
-			return nil
-		}
+	return p.retryPolicy.Do(p.ctx, func() error {
+		aerr := p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
 
 		if aerr.IsInDoubt() {
 			p.stats.IncrErrorsInDoubt()
@@ -86,6 +75,8 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 		switch {
 		case isNilOrAcceptableError(aerr):
 			switch {
+			case aerr == nil:
+				p.stats.IncrRecordsInserted()
 			case aerr.Matches(atypes.GENERATION_ERROR):
 				p.stats.IncrRecordsFresher()
 			case aerr.Matches(atypes.KEY_EXISTS_ERROR):
@@ -93,23 +84,14 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			}
 
 			return nil
-
 		case p.ignoreRecordError && shouldIgnore(aerr):
 			p.stats.IncrRecordsIgnored()
+
 			return nil
-
 		case shouldRetry(aerr):
-			if err := p.retryPolicy.Sleep(p.ctx, attempt); err != nil {
-				return err
-			}
-
-			attempt++
-
-			continue
+			return fmt.Errorf("failed to write payload: %w", aerr)
+		default:
+			return aerr
 		}
-
-		return fmt.Errorf("failed to write payload: %w", aerr)
-	}
-
-	return aerr
+	})
 }

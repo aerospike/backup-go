@@ -80,19 +80,8 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 }
 
 func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
-	var (
-		aerr    a.Error
-		attempt uint
-	)
-
-	for rw.retryPolicy.AttemptsLeft(attempt) {
-		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
-
-		if aerr == nil {
-			rw.stats.IncrRecordsInserted()
-
-			return nil
-		}
+	return rw.retryPolicy.Do(rw.ctx, func() error {
+		aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
 
 		if aerr.IsInDoubt() {
 			rw.stats.IncrErrorsInDoubt()
@@ -101,6 +90,8 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 		switch {
 		case isNilOrAcceptableError(aerr):
 			switch {
+			case aerr == nil:
+				rw.stats.IncrRecordsInserted()
 			case aerr.Matches(atypes.GENERATION_ERROR):
 				rw.stats.IncrRecordsFresher()
 			case aerr.Matches(atypes.KEY_EXISTS_ERROR):
@@ -108,25 +99,16 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			}
 
 			return nil
-
 		case rw.ignoreRecordError && shouldIgnore(aerr):
 			rw.stats.IncrRecordsIgnored()
+
 			return nil
-
 		case shouldRetry(aerr):
-			if err := rw.retryPolicy.Sleep(rw.ctx, attempt); err != nil {
-				return err
-			}
-
-			attempt++
-
-			continue
+			return fmt.Errorf("failed to execute write: %w", aerr)
+		default:
+			return aerr
 		}
-
-		return aerr
-	}
-
-	return aerr
+	})
 }
 
 func (rw *singleRecordWriter) close() error {

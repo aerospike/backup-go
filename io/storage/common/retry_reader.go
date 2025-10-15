@@ -147,21 +147,15 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		return 0, io.EOF
 	}
 
-	var (
-		lastErr error
-		attempt uint
-	)
-
-	for r.retryPolicy.AttemptsLeft(attempt) {
+	return models.DoWithData(r.ctx, r.retryPolicy, func() (int, error) {
 		n, err := r.reader.Read(p)
 		if err == nil {
 			// Success reading updated offset.
 			r.offset += int64(n)
 
-			return n, err
+			return n, nil
 		}
-		// To return the last error at the end of execution.
-		lastErr = err
+
 		// Do not log EOF errors.
 		if r.logger != nil && !errors.Is(err, io.EOF) {
 			r.logger.Debug("retryable reader got error",
@@ -172,32 +166,20 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		if isNetworkError(err) {
 			if r.logger != nil {
 				r.logger.Warn("retry read",
-					slog.Any("attempt", attempt),
 					slog.Any("err", err),
 				)
 			}
 
-			if err := r.retryPolicy.Sleep(r.ctx, attempt); err != nil {
-				return 0, err
-			}
-
-			attempt++
-
 			// Open a new stream.
-			if rErr := r.openStream(); rErr != nil {
+			if err := r.openStream(); err != nil {
 				r.logger.Warn("failed to reopen stream",
-					slog.Any("attempt", attempt),
-					slog.Any("err", rErr),
+					slog.Any("err", err),
 				)
 			}
-
-			continue
 		}
 
 		return n, err
-	}
-
-	return 0, fmt.Errorf("failed after %d attempts: %w", attempt, lastErr)
+	})
 }
 
 // Close closes the reader.

@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	s3Storasge "github.com/aerospike/backup-go/io/storage/aws/s3"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -126,9 +126,9 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		ioStorage.WithDir(testBackupDir),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testBackupDir),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -159,8 +159,8 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 		ctx,
 		client,
 		"backup",
-		ioStorage.WithDir(testBackupDir),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testBackupDir),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 
@@ -172,8 +172,8 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		ioStorage.WithDir(testBackupDir),
-		ioStorage.WithValidator(asb.NewValidator()),
+		options.WithDir(testBackupDir),
+		options.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)
 
@@ -201,9 +201,9 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 		ctx,
 		client,
 		"backup",
-		ioStorage.WithFile(testBackupFile),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithFile(testBackupFile),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -237,8 +237,8 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 		context.Background(),
 		client,
 		"backup",
-		ioStorage.WithFile(testBackupFile),
-		ioStorage.WithValidator(asb.NewValidator()),
+		options.WithFile(testBackupFile),
+		options.WithValidator(asb.NewValidator()),
 	)
 	s.Require().NoError(err)
 

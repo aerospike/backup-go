@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package s3
+package common
 
 import (
 	"context"
@@ -25,16 +25,7 @@ import (
 	"syscall"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
-
-type s3getter interface {
-	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
-	) (*s3.HeadObjectOutput, error)
-	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options),
-	) (*s3.GetObjectOutput, error)
-}
 
 // readerCloser interface for mocking tests.
 //
@@ -43,36 +34,38 @@ type readerCloser interface {
 	io.ReadCloser
 }
 
-// retryableReader is a wrapper around the s3 reader that implements the retryable interface.
-type retryableReader struct {
-	client      s3getter
-	retryPolicy *models.RetryPolicy
-
-	ctx    context.Context
-	reader io.ReadCloser
-	closed atomic.Bool
-
-	eTag      *string
-	bucket    string
-	key       string
-	position  int64
-	totalSize int64
-
-	logger *slog.Logger
+// rangeReader interface for range reader. That reads a file from a specific offset.
+type rangeReader interface {
+	OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error)
+	GetSize() int64
+	GetInfo() string
 }
 
-// newRetryableReader returns a new retryable reader.
-func newRetryableReader(
-	ctx context.Context, client s3getter, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
-) (*retryableReader, error) {
-	// Get file size to calculate when to finish.
-	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
+// RetryableReader is a wrapper around the s3 reader that implements the retryable interface.
+type RetryableReader struct {
+	ctx         context.Context
+	rangeReader rangeReader
+	reader      io.ReadCloser
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get object size: %w", err)
+	retryPolicy *models.RetryPolicy
+	logger      *slog.Logger
+	offset      int64
+	totalSize   int64
+
+	closed atomic.Bool
+}
+
+// NewRetryableReader returns a new retryable reader.
+func NewRetryableReader(
+	ctx context.Context,
+	rangeReader rangeReader,
+	retryPolicy *models.RetryPolicy,
+	logger *slog.Logger,
+) (*RetryableReader, error) {
+	if logger != nil {
+		logger = logger.With(
+			slog.String("fileinfo", rangeReader.GetInfo()),
+		)
 	}
 
 	// Set the default retry policy if it is not set.
@@ -80,25 +73,14 @@ func newRetryableReader(
 		retryPolicy = models.NewDefaultRetryPolicy()
 	}
 
-	if logger != nil {
-		logger = logger.With(
-			slog.String("bucket", bucket),
-			slog.String("key", key),
-		)
-	}
+	totalSize := rangeReader.GetSize()
 
-	r := &retryableReader{
-		client:      client,
-		bucket:      bucket,
-		key:         key,
-		retryPolicy: retryPolicy,
+	r := &RetryableReader{
 		ctx:         ctx,
+		rangeReader: rangeReader,
+		retryPolicy: retryPolicy,
+		totalSize:   totalSize,
 		logger:      logger,
-		eTag:        head.ETag,
-	}
-
-	if head.ContentLength != nil {
-		r.totalSize = *head.ContentLength
 	}
 
 	if err := r.openStream(); err != nil {
@@ -115,45 +97,31 @@ func newRetryableReader(
 }
 
 // openStream opens a new stream with offset if needed.
-func (r *retryableReader) openStream() error {
+func (r *RetryableReader) openStream() error {
 	if r.closed.Load() {
 		return fmt.Errorf("reader is closed")
 	}
 
-	// Calc the range header if we need to resume the download.
-	var rangeHeader *string
-
-	if r.position > 0 {
-		// We read from the current position till the end of the file.
-		// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
-		rh := fmt.Sprintf("bytes=%d-", r.position)
+	if r.offset > 0 {
 		if r.logger != nil {
 			r.logger.Debug("start reading from",
-				slog.String("position", rh),
+				slog.Int64("offset", r.offset),
 			)
 		}
-
-		rangeHeader = &rh
 	}
-
-	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
-		Bucket:  aws.String(r.bucket),
-		Key:     aws.String(r.key),
-		Range:   rangeHeader,
-		IfMatch: r.eTag,
-	})
-
+	// Count = 0 means read to the end of the file.
+	fReader, err := r.rangeReader.OpenRange(r.ctx, r.offset, 0)
 	if err != nil {
-		return fmt.Errorf("failed to get object: %w", err)
+		return fmt.Errorf("failed to get file: %w", err)
 	}
 
-	r.setReader(resp.Body)
+	r.setReader(fReader)
 
 	return nil
 }
 
 // setReader encapsulates set reader logic.
-func (r *retryableReader) setReader(body io.ReadCloser) {
+func (r *RetryableReader) setReader(body io.ReadCloser) {
 	// Close previous stream if exists.
 	if r.reader != nil {
 		err := r.reader.Close()
@@ -170,12 +138,12 @@ func (r *retryableReader) setReader(body io.ReadCloser) {
 }
 
 // Read reads from the stream.
-func (r *retryableReader) Read(p []byte) (int, error) {
+func (r *RetryableReader) Read(p []byte) (int, error) {
 	if r.closed.Load() {
 		return 0, fmt.Errorf("reader is closed")
 	}
 	// If we reached end of file, return EOF.
-	if r.position >= r.totalSize {
+	if r.offset >= r.totalSize {
 		return 0, io.EOF
 	}
 
@@ -187,8 +155,8 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 	for r.retryPolicy.AttemptsLeft(attempt) {
 		n, err := r.reader.Read(p)
 		if err == nil {
-			// Success reading updated position.
-			r.position += int64(n)
+			// Success reading updated offset.
+			r.offset += int64(n)
 
 			return n, err
 		}
@@ -233,7 +201,7 @@ func (r *retryableReader) Read(p []byte) (int, error) {
 }
 
 // Close closes the reader.
-func (r *retryableReader) Close() error {
+func (r *RetryableReader) Close() error {
 	if r.closed.Load() {
 		return nil
 	}

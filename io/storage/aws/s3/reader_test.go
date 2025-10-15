@@ -25,8 +25,8 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/internal/util"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
-	"github.com/aerospike/backup-go/io/storage/mocks"
+	"github.com/aerospike/backup-go/io/storage/options"
+	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -213,7 +213,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		return err
 	}
 
-	// Create one file for OpenFileOk test
+	// Create one rangeReader for OpenFileOk test
 	fileName := fmt.Sprintf("%s/%s", testFolderOneFile, testFileNameOneFile)
 	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(testBucket),
@@ -267,10 +267,10 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderStartAfter),
-		ioStorage.WithStartAfter(startAfter),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithNestedDir(),
+		options.WithDir(testFolderStartAfter),
+		options.WithStartAfter(startAfter),
+		options.WithSkipDirCheck(),
+		options.WithNestedDir(),
 	)
 	s.Require().NoError(err)
 
@@ -302,12 +302,12 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid file extension")
+		return fmt.Errorf("invalid rangeReader extension")
 	})
 
 	pathList := []string{
@@ -319,9 +319,9 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDirList(pathList),
-		ioStorage.WithValidator(mockValidator),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDirList(pathList),
+		options.WithValidator(mockValidator),
+		options.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -353,12 +353,12 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid file extension")
+		return fmt.Errorf("invalid rangeReader extension")
 	})
 
 	pathList := []string{
@@ -370,8 +370,8 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithFileList(pathList),
-		ioStorage.WithValidator(mockValidator),
+		options.WithFileList(pathList),
+		options.WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 
@@ -403,21 +403,21 @@ func (s *AwsSuite) TestReader_WithSorting() {
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsbx {
 			return nil
 		}
-		return fmt.Errorf("invalid file extension")
+		return fmt.Errorf("invalid rangeReader extension")
 	})
 
 	reader, err := NewReader(
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderSorted),
-		ioStorage.WithValidator(mockValidator),
-		ioStorage.WithSorting(),
+		options.WithDir(testFolderSorted),
+		options.WithValidator(mockValidator),
+		options.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -459,7 +459,7 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderMixed),
+		options.WithDir(testFolderMixed),
 	)
 	s.Require().NoError(err)
 
@@ -526,20 +526,20 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid file extension")
+		return fmt.Errorf("invalid rangeReader extension")
 	})
 
 	reader, err := NewReader(
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderWithData),
-		ioStorage.WithValidator(mockValidator),
+		options.WithDir(testFolderWithData),
+		options.WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 
@@ -571,20 +571,20 @@ func (s *AwsSuite) TestReader_StreamFilesEmpty() {
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid file extension")
+		return fmt.Errorf("invalid rangeReader extension")
 	})
 
 	_, err = NewReader(
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderEmpty),
-		ioStorage.WithValidator(mockValidator),
+		options.WithDir(testFolderEmpty),
+		options.WithValidator(mockValidator),
 	)
 	s.Require().ErrorContains(err, "is empty")
 }
@@ -596,20 +596,20 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid file extension")
+		return fmt.Errorf("invalid rangeReader extension")
 	})
 
 	reader, err := NewReader(
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderMixedData),
-		ioStorage.WithValidator(mockValidator),
+		options.WithDir(testFolderMixedData),
+		options.WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 
@@ -645,7 +645,7 @@ func (s *AwsSuite) TestReader_GetType() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderWithData),
+		options.WithDir(testFolderWithData),
 	)
 	s.Require().NoError(err)
 
@@ -664,7 +664,7 @@ func (s *AwsSuite) TestReader_OpenFileOk() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithFile(fmt.Sprintf("%s/%s", testFolderOneFile, testFileNameOneFile)),
+		options.WithFile(fmt.Sprintf("%s/%s", testFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
@@ -700,7 +700,7 @@ func (s *AwsSuite) TestReader_OpenFileErr() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithFile(fmt.Sprintf("%s/%s", testFolderOneFile, "file_error")),
+		options.WithFile(fmt.Sprintf("%s/%s", testFolderOneFile, "file_error")),
 	)
 	s.Require().NoError(err)
 
@@ -897,8 +897,8 @@ func (s *AwsSuite) TestReader_ListObjects() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderWithData),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDir(testFolderWithData),
+		options.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -953,9 +953,9 @@ func TestReader_ShouldSkip(t *testing.T) {
 			expected:      true,
 		},
 		{
-			name:          "regular file",
+			name:          "regular rangeReader",
 			path:          "test/path/",
-			fileName:      aws.String("test/path/file.txt"),
+			fileName:      aws.String("test/path/rangeReader.txt"),
 			fileSize:      &testSize,
 			withNestedDir: false,
 			expected:      false,
@@ -963,7 +963,7 @@ func TestReader_ShouldSkip(t *testing.T) {
 		{
 			name:          "nil filename",
 			path:          "test/path",
-			fileName:      aws.String("file.txt"),
+			fileName:      aws.String("rangeReader.txt"),
 			fileSize:      &testEmptySize,
 			withNestedDir: false,
 			expected:      true,
@@ -973,7 +973,7 @@ func TestReader_ShouldSkip(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			reader := &Reader{
-				Options: ioStorage.Options{
+				Options: options.Options{
 					WithNestedDir: tc.withNestedDir,
 				},
 			}
@@ -995,8 +995,8 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderWithData),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDir(testFolderWithData),
+		options.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -1041,20 +1041,20 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
-	mockValidator := new(mocks.Mockvalidator)
+	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid file extension")
+		return fmt.Errorf("invalid rangeReader extension")
 	})
 
 	reader, err := NewReader(
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testReadFolderSkipped),
-		ioStorage.WithValidator(mockValidator),
+		options.WithDir(testReadFolderSkipped),
+		options.WithValidator(mockValidator),
 	)
 	s.Require().NoError(err)
 

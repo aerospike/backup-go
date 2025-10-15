@@ -22,7 +22,8 @@ import (
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/common"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"google.golang.org/api/iterator"
 )
 
@@ -34,7 +35,7 @@ const (
 // Writer represents a GCP storage writer.
 type Writer struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 	// bucketName contains bucket name, is used for logging.
 	bucketName string
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
@@ -52,7 +53,7 @@ func NewWriter(
 	ctx context.Context,
 	client *storage.Client,
 	bucketName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Writer, error) {
 	w := &Writer{}
 
@@ -73,7 +74,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = ioStorage.CleanPath(w.PathList[0], false)
+		w.prefix = common.CleanPath(w.PathList[0], false)
 	}
 
 	bucketHandler := client.Bucket(bucketName)
@@ -143,7 +144,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		return nil
 	}
 
-	prefix := ioStorage.CleanPath(targetPath, false)
+	prefix := common.CleanPath(targetPath, false)
 	// Remove files from dir.
 	it := w.bucketHandle.Objects(ctx, &storage.Query{
 		Prefix: prefix,
@@ -161,7 +162,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		// Skip files in folders.
-		if ioStorage.IsDirectory(prefix, objAttrs.Name) && !w.WithNestedDir {
+		if common.IsDirectory(prefix, objAttrs.Name) && !w.WithNestedDir {
 			continue
 		}
 
@@ -202,7 +203,7 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 		}
 
 		// Skip files in folders.
-		if ioStorage.IsDirectory(prefix, objAttrs.Name) {
+		if common.IsDirectory(prefix, objAttrs.Name) {
 			continue
 		}
 

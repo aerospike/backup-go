@@ -24,7 +24,8 @@ import (
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/common"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"google.golang.org/api/iterator"
 )
@@ -34,7 +35,7 @@ const gcpStorageType = "gcp-storage"
 // Reader represents GCP storage reader.
 type Reader struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	// bucketHandle contains storage bucket handler for performing reading and writing operations.
 	bucketHandle *storage.BucketHandle
@@ -53,7 +54,7 @@ type Reader struct {
 	totalNumber atomic.Int64
 
 	// If `skipPrefix` was set on the `StreamFiles` function, skipped file names will be stored here.
-	skipped *ioStorage.SkippedFiles
+	skipped *common.SkippedFiles
 }
 
 // NewReader returns new GCP storage directory/file reader.
@@ -63,7 +64,7 @@ func NewReader(
 	ctx context.Context,
 	client *storage.Client,
 	bucketName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Reader, error) {
 	r := &Reader{}
 
@@ -88,13 +89,13 @@ func NewReader(
 	if r.IsDir {
 		if !r.SkipDirCheck {
 			if err = r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+				return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
 			}
 		}
 
 		// Presort files if needed.
 		if r.SortFiles && len(r.PathList) == 1 {
-			if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+			if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
 				return nil, fmt.Errorf("failed to pre sort: %w", err)
 			}
 		}
@@ -119,18 +120,18 @@ func (r *Reader) StreamFiles(
 	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
-		r.skipped = ioStorage.NewSkippedFiles(skipPrefixes)
+		r.skipped = common.NewSkippedFiles(skipPrefixes)
 	}
 
 	for _, path := range r.PathList {
 		// If it is a folder, open and return.
 		switch r.IsDir {
 		case true:
-			path = ioStorage.CleanPath(path, false)
+			path = common.CleanPath(path, false)
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(ctx, path)
 				if err != nil {
-					ioStorage.ErrToChan(ctx, errorsCh, err)
+					common.ErrToChan(ctx, errorsCh, err)
 					return
 				}
 			}
@@ -156,7 +157,7 @@ func (r *Reader) streamDirectory(
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read object attributes from bucket %s: %w",
 					r.bucketName, err))
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -197,20 +198,26 @@ func (r *Reader) openObject(
 	errorsCh chan<- error,
 	skipNotFound bool,
 ) {
-	reader, err := r.bucketHandle.Object(path).NewReader(ctx)
+	rReader, err := newRangeReader(ctx, newGcpStorageClient(r.bucketHandle), r.bucketName, path)
+	if err != nil {
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		return
+	}
+
+	object, err := common.NewRetryableReader(ctx, rReader, r.RetryPolicy, r.Logger)
 	if err != nil {
 		// Skip 404 not found error.
 		if errors.Is(err, storage.ErrObjectNotExist) && skipNotFound {
 			return
 		}
 
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open directory file %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open directory file %s: %w", path, err))
 
 		return
 	}
 
-	if reader != nil {
-		readersCh <- models.File{Reader: reader, Name: filepath.Base(path)}
+	if object != nil {
+		readersCh <- models.File{Reader: object, Name: filepath.Base(path)}
 	}
 }
 
@@ -327,7 +334,7 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 
 // shouldSkip determines whether the file should be skipped.
 func (r *Reader) shouldSkip(path string, attr *storage.ObjectAttrs) bool {
-	return (ioStorage.IsDirectory(path, attr.Name) && !r.WithNestedDir) || attr.Size == 0
+	return (common.IsDirectory(path, attr.Name) && !r.WithNestedDir) || attr.Size == 0
 }
 
 func (r *Reader) calculateTotalSize(ctx context.Context) {

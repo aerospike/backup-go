@@ -21,8 +21,8 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asbx"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -70,9 +70,9 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 
 	writers, err := local.NewWriter(
 		ctx,
-		ioStorage.WithValidator(asbx.NewValidator()),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithDir(backupDir),
+		options.WithValidator(asbx.NewValidator()),
+		options.WithRemoveFiles(),
+		options.WithDir(backupDir),
 	)
 	s.Require().NoError(err)
 
@@ -106,9 +106,9 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 
 	readers, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(backupDir),
-		ioStorage.WithValidator(asbx.NewValidator()),
-		ioStorage.WithSorting(),
+		options.WithDir(backupDir),
+		options.WithValidator(asbx.NewValidator()),
+		options.WithSorting(),
 	)
 	s.Require().NoError(err)
 

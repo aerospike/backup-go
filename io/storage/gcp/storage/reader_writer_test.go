@@ -25,7 +25,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/internal/util"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -299,8 +299,8 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderWithData),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithDir(testReadFolderWithData),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -341,8 +341,8 @@ func (s *GCPSuite) TestReader_WithSorting() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderSorted),
-		ioStorage.WithSorting(),
+		options.WithDir(testReadFolderSorted),
+		options.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -388,9 +388,9 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderEmpty),
-		ioStorage.WithValidator(validatorMock{}),
-		ioStorage.WithNestedDir(),
+		options.WithDir(testReadFolderEmpty),
+		options.WithValidator(validatorMock{}),
+		options.WithNestedDir(),
 	)
 	s.Require().ErrorContains(err, "is empty")
 }
@@ -410,8 +410,8 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderMixedData),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithDir(testReadFolderMixedData),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -451,8 +451,8 @@ func (s *GCPSuite) TestReader_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderMixedData),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithDir(testReadFolderMixedData),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -475,8 +475,8 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderEmpty),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderEmpty),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -507,8 +507,8 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderWithDataError),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderWithDataError),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -528,9 +528,9 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderWithData),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderWithData),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -561,9 +561,9 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderMixedData),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderMixedData),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
@@ -594,8 +594,8 @@ func (s *GCPSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testFolderTypeCheck),
-		ioStorage.WithRemoveFiles(),
+		options.WithDir(testFolderTypeCheck),
+		options.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -618,7 +618,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
+		options.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
@@ -658,7 +658,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
+		options.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
 	)
 	s.Require().NoError(err)
 
@@ -688,7 +688,7 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
+		options.WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
@@ -718,10 +718,10 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderWithStartOffset),
-		ioStorage.WithStartAfter(startOffset),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithNestedDir(),
+		options.WithDir(testReadFolderWithStartOffset),
+		options.WithStartAfter(startOffset),
+		options.WithSkipDirCheck(),
+		options.WithNestedDir(),
 	)
 	s.Require().NoError(err)
 
@@ -766,9 +766,9 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDirList(pathList),
-		ioStorage.WithValidator(validatorMock{}),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDirList(pathList),
+		options.WithValidator(validatorMock{}),
+		options.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
@@ -813,8 +813,8 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFileList(pathList),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithFileList(pathList),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -854,7 +854,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testFolderMixedBackups),
+		options.WithDir(testFolderMixedBackups),
 	)
 	s.Require().NoError(err)
 
@@ -929,8 +929,8 @@ func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderSkipped),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithDir(testReadFolderSkipped),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 

@@ -26,11 +26,15 @@ packages:
     config:
       dir: ./io/encoding/asb/mocks
       pkgname: mocks
-  github.com/aerospike/backup-go/io/storage:
+  github.com/aerospike/backup-go/io/storage/common:
     config:
-      dir: ./io/storage/mocks
+      dir: ./io/storage/common/mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/io/storage/options:
+    config:
       exclude-subpkg-regex:
         - Opt
+      dir: ./io/storage/options/mocks
       pkgname: mocks
   github.com/aerospike/backup-go/pipe:
     config:
@@ -43,4 +47,12 @@ packages:
   github.com/aerospike/backup-go/io/storage/aws/s3:
     config:
       dir: ./io/storage/aws/s3/mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/io/storage/azure/blob:
+    config:
+      dir: ./io/storage/azure/blob/mocks
+      pkgname: mocks
+  github.com/aerospike/backup-go/io/storage/gcp/storage:
+    config:
+      dir: ./io/storage/gcp/storage/mocks
       pkgname: mocks

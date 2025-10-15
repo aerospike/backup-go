@@ -22,8 +22,8 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	s3Storasge "github.com/aerospike/backup-go/io/storage/aws/s3"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -84,8 +84,8 @@ func runBackup(ctx context.Context, c *backup.Client) {
 		ctx,
 		s3Client,
 		"backup",
-		ioStorage.WithDir(backupFolder),
-		ioStorage.WithRemoveFiles(),
+		options.WithDir(backupFolder),
+		options.WithRemoveFiles(),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -129,8 +129,8 @@ func runRestore(ctx context.Context, c *backup.Client) {
 		ctx,
 		s3Client,
 		"backup",
-		ioStorage.WithDir(backupFolder),
-		ioStorage.WithValidator(asb.NewValidator()),
+		options.WithDir(backupFolder),
+		options.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
 		log.Fatal(err)

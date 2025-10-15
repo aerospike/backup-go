@@ -24,8 +24,8 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
 	"github.com/aerospike/backup-go/io/storage/local"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 )
@@ -54,16 +54,16 @@ func TestState(t *testing.T) {
 
 	reader, err := local.NewReader(
 		ctx,
-		ioStorage.WithDir(testDir),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDir(testDir),
+		options.WithSkipDirCheck(),
 	)
 	require.NoError(t, err)
 
 	writer, err := local.NewWriter(
 		ctx,
-		ioStorage.WithValidator(asb.NewValidator()),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithDir(testDir),
+		options.WithValidator(asb.NewValidator()),
+		options.WithSkipDirCheck(),
+		options.WithDir(testDir),
 	)
 	require.NoError(t, err)
 

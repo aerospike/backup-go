@@ -25,7 +25,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/common"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -36,7 +37,7 @@ const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part
 // Writer represents a s3 storage writer.
 type Writer struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	client *s3.Client
 	// bucketName contains name of the bucket to read from.
@@ -59,7 +60,7 @@ func NewWriter(
 	ctx context.Context,
 	client *s3.Client,
 	bucketName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Writer, error) {
 	w := &Writer{}
 
@@ -80,7 +81,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = ioStorage.CleanPath(w.PathList[0], true)
+		w.prefix = common.CleanPath(w.PathList[0], true)
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -293,7 +294,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove files from dir.
 	var continuationToken *string
 
-	prefix := ioStorage.CleanPath(targetPath, true)
+	prefix := common.CleanPath(targetPath, true)
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -306,7 +307,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || ioStorage.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
+			if p.Key == nil || common.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
 				continue
 			}
 

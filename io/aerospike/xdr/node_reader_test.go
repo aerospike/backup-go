@@ -61,7 +61,7 @@ func TestNodeReader_BlockMrt(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("BlockMRTWrites", mock.Anything, mock.Anything).Return(nil)
+		ic.On("BlockMRTWrites", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		nodesRecovered := make(chan struct{}, 1)
 		nr := NewNodeReader(
@@ -83,7 +83,7 @@ func TestNodeReader_BlockMrt(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("BlockMRTWrites", mock.Anything, mock.Anything).
+		ic.On("BlockMRTWrites", mock.Anything, mock.Anything, mock.Anything).
 			Return(errors.New("block error"))
 
 		nodesRecovered := make(chan struct{}, 1)

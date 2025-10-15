@@ -34,7 +34,7 @@ func TestNodeReader_Run(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything,
+		ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(errors.New("start xdr error"))
 
@@ -110,7 +110,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything).
+		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(asinfo.Stats{
 				Recoveries:        1,
 				RecoveriesPending: 0,
@@ -139,7 +139,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything).
+		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(asinfo.Stats{}, errors.New("get stats error"))
 
 		nodesRecovered := make(chan struct{}, 1)
@@ -163,17 +163,17 @@ func TestNodeReader_GetStats(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 
-		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything).
+		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(asinfo.Stats{}, errors.New("DC not found")).Once()
 
-		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything).
+		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(asinfo.Stats{
 				Recoveries:        1,
 				RecoveriesPending: 0,
 				Lag:               10,
 			}, nil).Once()
 
-		ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything,
+		ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil)
 
@@ -200,7 +200,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 
-		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything).
+		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(asinfo.Stats{}, errors.New("persistent error"))
 
 		nodesRecovered := make(chan struct{}, 1)
@@ -227,7 +227,7 @@ func TestNodeReader_Close(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("StopXDR", mock.Anything, mock.Anything).Return(nil)
+		ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		nodesRecovered := make(chan struct{}, 1)
 		nr := NewNodeReader(
@@ -254,7 +254,7 @@ func TestNodeReader_Close(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("StopXDR", mock.Anything, mock.Anything).Return(nil)
+		ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		nodesRecovered := make(chan struct{}, 1)
 		nr := NewNodeReader(
@@ -284,8 +284,8 @@ func TestNodeReader_Close(t *testing.T) {
 		ctx := context.Background()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
-		ic.On("StopXDR", mock.Anything, mock.Anything).Return(nil)
-		ic.On("UnBlockMRTWrites", mock.Anything, mock.Anything).Return(nil)
+		ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ic.On("UnBlockMRTWrites", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		nodesRecovered := make(chan struct{}, 1)
 		nr := NewNodeReader(

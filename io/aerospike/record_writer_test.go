@@ -194,7 +194,7 @@ func TestBatchRecordWriterRetry(t *testing.T) {
 	retryPolicy := &models.RetryPolicy{
 		BaseTimeout: 10 * time.Millisecond,
 		Multiplier:  1,
-		MaxRetries:  2,
+		MaxRetries:  3,
 	}
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		testMetricMessage, true)

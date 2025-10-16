@@ -27,12 +27,16 @@ import (
 
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part
+const (
+	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
+	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
+)
 
 // Writer represents a s3 storage writer.
 type Writer struct {
@@ -141,24 +145,26 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	fullPath := path.Join(w.prefix, filename)
 
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket:       &w.bucketName,
-		Key:          &fullPath,
-		StorageClass: w.storageClass,
+		Bucket:            &w.bucketName,
+		Key:               &fullPath,
+		StorageClass:      w.storageClass,
+		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
 	return &s3Writer{
-		ctx:        ctx,
-		uploadID:   upload.UploadId,
-		key:        fullPath,
-		client:     w.client,
-		bucket:     w.bucketName,
-		buffer:     new(bytes.Buffer),
-		partNumber: 1,
-		chunkSize:  w.ChunkSize,
-		logger:     w.Logger,
+		ctx:         ctx,
+		uploadID:    upload.UploadId,
+		key:         fullPath,
+		client:      w.client,
+		bucket:      w.bucketName,
+		buffer:      new(bytes.Buffer),
+		partNumber:  1,
+		chunkSize:   w.ChunkSize,
+		logger:      w.Logger,
+		retryPolicy: w.RetryPolicy,
 	}, nil
 }
 
@@ -181,6 +187,7 @@ type s3Writer struct {
 	partNumber     int32
 	closed         bool
 	logger         *slog.Logger
+	retryPolicy    *models.RetryPolicy
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
@@ -191,7 +198,9 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer.Len() >= w.chunkSize {
-		err := w.uploadPart()
+		err := w.retryPolicy.Do(w.ctx, func() error {
+			return w.uploadPart()
+		})
 		if err != nil {
 			return 0, fmt.Errorf("failed to upload part: %w", err)
 		}
@@ -202,11 +211,12 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 
 func (w *s3Writer) uploadPart() error {
 	response, err := w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-		Body:       bytes.NewReader(w.buffer.Bytes()),
-		Bucket:     &w.bucket,
-		Key:        &w.key,
-		PartNumber: &w.partNumber,
-		UploadId:   w.uploadID,
+		Body:              bytes.NewReader(w.buffer.Bytes()),
+		Bucket:            &w.bucket,
+		Key:               &w.key,
+		PartNumber:        &w.partNumber,
+		UploadId:          w.uploadID,
+		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
 	})
 
 	if err != nil {

@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -24,6 +25,7 @@ import (
 )
 
 type singleRecordWriter struct {
+	ctx               context.Context
 	asc               dbWriter
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
@@ -33,6 +35,7 @@ type singleRecordWriter struct {
 }
 
 func newSingleRecordWriter(
+	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -45,6 +48,7 @@ func newSingleRecordWriter(
 	}
 
 	return &singleRecordWriter{
+		ctx:               ctx,
 		asc:               asc,
 		writePolicy:       writePolicy,
 		stats:             stats,
@@ -76,27 +80,18 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 }
 
 func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
-	var (
-		aerr    a.Error
-		attempt uint
-	)
+	return rw.retryPolicy.Do(rw.ctx, func() error {
+		aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
 
-	for rw.retryPolicy.AttemptsLeft(attempt) {
-		aerr = rw.asc.Put(writePolicy, record.Key, record.Bins)
-
-		if aerr == nil {
-			rw.stats.IncrRecordsInserted()
-
-			return nil
-		}
-
-		if aerr.IsInDoubt() {
+		if aerr != nil && aerr.IsInDoubt() {
 			rw.stats.IncrErrorsInDoubt()
 		}
 
 		switch {
 		case isNilOrAcceptableError(aerr):
 			switch {
+			case aerr == nil:
+				rw.stats.IncrRecordsInserted()
 			case aerr.Matches(atypes.GENERATION_ERROR):
 				rw.stats.IncrRecordsFresher()
 			case aerr.Matches(atypes.KEY_EXISTS_ERROR):
@@ -104,23 +99,16 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			}
 
 			return nil
-
 		case rw.ignoreRecordError && shouldIgnore(aerr):
 			rw.stats.IncrRecordsIgnored()
+
 			return nil
-
 		case shouldRetry(aerr):
-			rw.retryPolicy.Sleep(attempt)
-
-			attempt++
-
-			continue
+			return aerr
+		default:
+			return aerr
 		}
-
-		return aerr
-	}
-
-	return aerr
+	})
 }
 
 func (rw *singleRecordWriter) close() error {

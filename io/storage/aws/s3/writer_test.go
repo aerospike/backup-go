@@ -102,10 +102,10 @@ aws_secret_access_key = minioadminpassword`)
 
 		err = os.WriteFile(filePath, credentialsFileBytes, 0o600)
 		if err != nil {
-			return fmt.Errorf("error writing ~/.aws/credentials rangeReader: %w", err)
+			return fmt.Errorf("error writing ~/.aws/credentials file: %w", err)
 		}
 
-		fmt.Println("Credentials rangeReader created successfully!")
+		fmt.Println("Credentials file created successfully!")
 	}
 
 	return nil

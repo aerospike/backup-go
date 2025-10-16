@@ -28,7 +28,7 @@ import (
 //
 //go:generate mockery --name sindexGetter
 type sindexGetter interface {
-	GetSIndexes(namespace string) ([]*models.SIndex, error)
+	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
 }
 
 // SindexReader satisfies the DataReader interface.
@@ -62,7 +62,7 @@ func (r *SindexReader) Read(ctx context.Context) (*models.Token, error) {
 	if r.sindexes == nil {
 		r.logger.Debug("fetching all secondary indexes")
 
-		sindexes, err := r.client.GetSIndexes(r.namespace)
+		sindexes, err := r.client.GetSIndexes(ctx, r.namespace)
 		if err != nil {
 			return nil, err
 		}

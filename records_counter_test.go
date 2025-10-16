@@ -15,12 +15,14 @@
 package backup
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -84,7 +86,7 @@ func TestCountUsingInfoClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockInfoClient := mocks.NewMockInfoGetter(t)
-			mockInfoClient.On("GetRecordCount", tt.namespace, []string{"set1"}).Return(tt.recordCount, tt.infoError)
+			mockInfoClient.On("GetRecordCount", mock.Anything, tt.namespace, []string{"set1"}).Return(tt.recordCount, tt.infoError)
 
 			handler := &recordCounter{
 				config: &ConfigBackup{
@@ -94,7 +96,9 @@ func TestCountUsingInfoClient(t *testing.T) {
 				},
 			}
 
-			result, err := handler.countUsingInfoClient(mockInfoClient)
+			ctx := context.Background()
+
+			result, err := handler.countUsingInfoClient(ctx, mockInfoClient)
 
 			if tt.expectError {
 				assert.Error(t, err)

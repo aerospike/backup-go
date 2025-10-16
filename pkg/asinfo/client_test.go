@@ -15,6 +15,7 @@
 package asinfo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -1816,14 +1817,15 @@ func TestClient_EnableDisableXDR(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
+	ctx := context.Background()
 
-	err = ic.StartXDR(nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, true)
+	err = ic.StartXDR(ctx, nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, true)
 	require.NoError(t, err)
 
-	_, err = ic.GetStats(nodes[0], testASDC, testASNamespace)
+	_, err = ic.GetStats(ctx, nodes[0], testASDC, testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.StopXDR(nodes[0], testASDC)
+	err = ic.StopXDR(ctx, nodes[0], testASDC)
 	require.NoError(t, err)
 }
 
@@ -1838,9 +1840,11 @@ func TestClient_BlockUnblockMRTWrites(t *testing.T) {
 
 	nodes := ic.GetNodesNames()
 
-	_ = ic.BlockMRTWrites(nodes[0], testASNamespace)
+	ctx := context.Background()
 
-	_ = ic.UnBlockMRTWrites(nodes[0], testASNamespace)
+	_ = ic.BlockMRTWrites(ctx, nodes[0], testASNamespace)
+
+	_ = ic.UnBlockMRTWrites(ctx, nodes[0], testASNamespace)
 }
 
 func TestClient_parseResultResponse(t *testing.T) {
@@ -1909,7 +1913,9 @@ func TestClient_GetSIndexes(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	_, err = ic.GetSIndexes(testASNamespace)
+	ctx := context.Background()
+
+	_, err = ic.GetSIndexes(ctx, testASNamespace)
 	require.NoError(t, err)
 }
 
@@ -1922,7 +1928,9 @@ func TestClient_GetUDFs(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	_, err = ic.GetUDFs()
+	ctx := context.Background()
+
+	_, err = ic.GetUDFs(ctx)
 	require.NoError(t, err)
 }
 
@@ -1935,7 +1943,9 @@ func TestClient_GetRecordCount(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	_, err = ic.GetRecordCount(testASNamespace, nil)
+	ctx := context.Background()
+
+	_, err = ic.GetRecordCount(ctx, testASNamespace, nil)
 	require.NoError(t, err)
 }
 
@@ -1948,13 +1958,15 @@ func TestClient_XDR(t *testing.T) {
 
 	nodes := ic.GetNodesNames()
 
-	err = ic.StartXDR(nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, false)
+	ctx := context.Background()
+
+	err = ic.StartXDR(ctx, nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, false)
 	require.NoError(t, err)
 
-	_, err = ic.GetStats(nodes[0], testASDC, testASNamespace)
+	_, err = ic.GetStats(ctx, nodes[0], testASDC, testASNamespace)
 	require.NoError(t, err)
 
-	err = ic.StopXDR(nodes[0], testASDC)
+	err = ic.StopXDR(ctx, nodes[0], testASDC)
 	require.NoError(t, err)
 }
 
@@ -1974,7 +1986,9 @@ func TestClient_GetSets(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	result, err := ic.GetSetsList(testASNamespace)
+	ctx := context.Background()
+
+	result, err := ic.GetSetsList(ctx, testASNamespace)
 	require.NoError(t, err)
 
 	require.Greater(t, len(result), 1)
@@ -1989,7 +2003,9 @@ func TestClient_getRackNodes(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	res, err := ic.getRackNodes(0)
+	ctx := context.Background()
+
+	res, err := ic.GetRackNodes(ctx, 0)
 	require.NoError(t, err)
 
 	fmt.Println(res)
@@ -2019,7 +2035,9 @@ func TestClient_GetNamespacesList(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	result, err := ic.GetNamespacesList()
+	ctx := context.Background()
+
+	result, err := ic.GetNamespacesList(ctx)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{testASNamespace}, result)
@@ -2034,7 +2052,9 @@ func TestClient_GetStatus(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	require.NoError(t, err)
 
-	result, err := ic.GetStatus()
+	ctx := context.Background()
+
+	result, err := ic.GetStatus(ctx)
 	require.NoError(t, err)
 
 	require.Equal(t, "ok", result)
@@ -2053,7 +2073,9 @@ func TestClient_GetDCsList(t *testing.T) {
 	err = ic.createXDRDC(node.GetName(), testASDC)
 	require.NoError(t, err)
 
-	result, err := ic.GetDCsList()
+	ctx := context.Background()
+
+	result, err := ic.GetDCsList(ctx)
 	require.NoError(t, err)
 
 	err = ic.deleteXDRDC(node.GetName(), testASDC)
@@ -2072,7 +2094,9 @@ func TestClient_GetReplicas(t *testing.T) {
 	node, err := ic.cluster.GetRandomNode()
 	require.NoError(t, err)
 
-	b, err := ic.GetPrimaryPartitions(node.GetName(), testASNamespace)
+	ctx := context.Background()
+
+	b, err := ic.GetPrimaryPartitions(ctx, node.GetName(), testASNamespace)
 	require.NoError(t, err)
 	require.NotNil(t, b)
 }

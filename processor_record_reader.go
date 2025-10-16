@@ -76,7 +76,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context)
 	)
 
 	if rr.config.isProcessedByNodes() {
-		partitionGroups, err = rr.newPartitionGroupsFromNodes()
+		partitionGroups, err = rr.newPartitionGroupsFromNodes(ctx)
 	} else {
 		partitionGroups, err = rr.newPartitionGroups()
 	}
@@ -127,8 +127,8 @@ func (rr *recordReaderProcessor[T]) newPartitionGroups() ([]*a.PartitionFilter, 
 	return partitionGroups, nil
 }
 
-func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes() ([]*a.PartitionFilter, error) {
-	nodes, err := rr.getNodes()
+func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(ctx context.Context) ([]*a.PartitionFilter, error) {
+	nodes, err := rr.getNodes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get nodes: %w", err)
 	}
@@ -136,7 +136,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes() ([]*a.Partitio
 	var partIDs []int
 
 	for _, node := range nodes {
-		parts, err := rr.infoClient.GetPrimaryPartitions(node.GetName(), rr.config.Namespace)
+		parts, err := rr.infoClient.GetPrimaryPartitions(ctx, node.GetName(), rr.config.Namespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get primary partitions for node: %s: %w", node.GetName(), err)
 		}
@@ -156,14 +156,14 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes() ([]*a.Partitio
 	return partitionGroups, nil
 }
 
-func (rr *recordReaderProcessor[T]) getNodes() ([]*a.Node, error) {
+func (rr *recordReaderProcessor[T]) getNodes(ctx context.Context) ([]*a.Node, error) {
 	nodesToFilter := rr.config.NodeList
 
 	if len(rr.config.RackList) > 0 {
 		nodeList := make([]string, 0)
 
 		for _, rack := range rr.config.RackList {
-			nodes, err := rr.infoClient.GetRackNodes(rack)
+			nodes, err := rr.infoClient.GetRackNodes(ctx, rack)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get rack nodes: %w", err)
 			}
@@ -179,7 +179,7 @@ func (rr *recordReaderProcessor[T]) getNodes() ([]*a.Node, error) {
 	rr.logger.Info("got nodes from cluster", slog.Any("nodes", nodes))
 
 	// If bh.config.NodeList is not empty we filter nodes.
-	nodes, err := rr.filterNodes(nodesToFilter, nodes)
+	nodes, err := rr.filterNodes(ctx, nodesToFilter, nodes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter nodes: %w", err)
 	}
@@ -189,7 +189,8 @@ func (rr *recordReaderProcessor[T]) getNodes() ([]*a.Node, error) {
 
 // filterNodes iterates over the nodes and selects only those nodes that are in nodesList.
 // Returns a slice of filtered *a.Node and error.
-func (rr *recordReaderProcessor[T]) filterNodes(nodesList []string, nodes []*a.Node) ([]*a.Node, error) {
+func (rr *recordReaderProcessor[T]) filterNodes(ctx context.Context, nodesList []string, nodes []*a.Node,
+) ([]*a.Node, error) {
 	if len(nodesList) == 0 {
 		return nodes, nil
 	}
@@ -206,7 +207,7 @@ func (rr *recordReaderProcessor[T]) filterNodes(nodesList []string, nodes []*a.N
 			continue
 		}
 
-		nodeServiceAddress, err := rr.infoClient.GetService(nodes[i].GetName())
+		nodeServiceAddress, err := rr.infoClient.GetService(ctx, nodes[i].GetName())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get node %s service: %w", nodes[i].GetName(), err)
 		}

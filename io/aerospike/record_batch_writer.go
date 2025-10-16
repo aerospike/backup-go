@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,6 +27,7 @@ import (
 )
 
 type batchRecordWriter struct {
+	ctx               context.Context
 	asc               dbWriter
 	writePolicy       *a.WritePolicy
 	batchPolicy       *a.BatchPolicy
@@ -39,6 +41,7 @@ type batchRecordWriter struct {
 }
 
 func newBatchRecordWriter(
+	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -53,6 +56,7 @@ func newBatchRecordWriter(
 	}
 
 	return &batchRecordWriter{
+		ctx:               ctx,
 		asc:               asc,
 		writePolicy:       writePolicy,
 		batchPolicy:       mapWriteToBatchPolicy(writePolicy),
@@ -118,11 +122,6 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		return nil
 	}
 
-	var (
-		attempt uint
-		aerr    a.Error
-	)
-
 	rw.logger.Debug("Starting batch operation",
 		slog.Int("bufferSize", len(rw.operationBuffer)),
 		slog.Any("retryPolicy", rw.retryPolicy),
@@ -130,13 +129,12 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 	var opErr error
 
-	for {
+	return rw.retryPolicy.Do(rw.ctx, func() error {
 		rw.logger.Debug("Attempting batch operation",
-			slog.Any("attempt", attempt),
 			slog.Int("bufferSize", len(rw.operationBuffer)),
 		)
 
-		aerr = rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
+		aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
 
 		if aerr != nil && aerr.IsInDoubt() {
 			rw.stats.IncrErrorsInDoubt()
@@ -151,33 +149,25 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				rw.logger.Debug("All operations succeeded")
 				return nil
 			}
-		case !shouldRetry(aerr):
-			return fmt.Errorf("non-retryable error on restore: %w", aerr)
+
+			rw.logger.Debug("Not all operations succeeded",
+				slog.Int("remainingOperations", len(rw.operationBuffer)),
+				slog.Any("error", opErr),
+			)
+
+			return nil
+		case shouldRetry(aerr):
+			rw.logger.Debug("Retryable error occurred",
+				slog.Any("error", aerr),
+				slog.Int("remainingOperations", len(rw.operationBuffer)),
+			)
+
+			return aerr
+		default:
+			return fmt.Errorf("%d operations failed: %w",
+				len(rw.operationBuffer), errors.Join(aerr, opErr))
 		}
-
-		if !rw.retryPolicy.AttemptsLeft(attempt) {
-			break
-		}
-
-		rw.logger.Debug("Retryable error occurred",
-			slog.Any("error", aerr),
-			slog.Int("remainingOperations", len(rw.operationBuffer)),
-		)
-
-		rw.retryPolicy.Sleep(attempt)
-
-		attempt++
-	}
-
-	rw.logger.Error("Max retries reached",
-		slog.Any("attempts", attempt),
-		slog.Int("failedOperations", len(rw.operationBuffer)),
-		slog.Any("operationError", opErr),
-		slog.Any("lastError", aerr),
-	)
-
-	return fmt.Errorf("max retries reached, %d operations failed: %w",
-		len(rw.operationBuffer), errors.Join(aerr, opErr))
+	})
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {

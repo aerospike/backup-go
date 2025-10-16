@@ -50,7 +50,10 @@ func TestPayloadWriterSuccess(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
+	ctx := context.Background()
+
 	writer := newPayloadWriter(
+		ctx,
 		mockDBWriter,
 		policy,
 		stats,
@@ -99,7 +102,10 @@ func TestPayloadWriterRetry(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
+	ctx := context.Background()
+
 	writer := newPayloadWriter(
+		ctx,
 		mockDBWriter,
 		policy,
 		stats,
@@ -146,7 +152,10 @@ func TestPayloadWriterRetryExhausted(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
+	ctx := context.Background()
+
 	writer := newPayloadWriter(
+		ctx,
 		mockDBWriter,
 		policy,
 		stats,
@@ -192,7 +201,10 @@ func TestPayloadWriterNonRetryableError(t *testing.T) {
 	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
+	ctx := context.Background()
+
 	writer := newPayloadWriter(
+		ctx,
 		mockDBWriter,
 		policy,
 		stats,

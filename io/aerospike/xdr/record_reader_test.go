@@ -71,10 +71,10 @@ func testRecordReaderConfig(host ...string) *RecordReaderConfig {
 func newInfoMock(t *testing.T) infoCommander {
 	t.Helper()
 	ic := mocks.NewMockinfoCommander(t)
-	ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything,
+	ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
-	ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything).
+	ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(asinfo.Stats{
 			Recoveries:        0,
 			RecoveriesPending: 1,
@@ -172,7 +172,7 @@ func TestRecordReaderWatchNodes(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
 
 	ic := mocks.NewMockinfoCommander(t)
-	ic.On("BlockMRTWrites", mock.Anything, mock.Anything).Return(nil)
+	ic.On("BlockMRTWrites", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	hostPort := testCurrentHost5
 	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(hostPort), logger)

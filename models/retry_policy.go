@@ -15,9 +15,13 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // RetryPolicy defines the configuration for retry attempts in case of failures.
@@ -45,7 +49,7 @@ func NewRetryPolicy(baseTimeout time.Duration, multiplier float64, maxRetries ui
 
 // NewDefaultRetryPolicy returns a new RetryPolicy with default values.
 func NewDefaultRetryPolicy() *RetryPolicy {
-	return NewRetryPolicy(1000*time.Millisecond, 1, 3)
+	return NewRetryPolicy(1000*time.Millisecond, 2.0, 3)
 }
 
 // Validate checks retry policy values.
@@ -62,33 +66,96 @@ func (p *RetryPolicy) Validate() error {
 		return fmt.Errorf("multiplier must be greater than 0")
 	}
 
-	if p.MaxRetries < 1 {
-		return fmt.Errorf("max retries must be greater than 0")
-	}
+	// MaxRetries validation removed - 0 is valid (means no retries)
 
 	return nil
 }
 
-// Sleep waits for the specified number of retry attempts.
-func (p *RetryPolicy) Sleep(attempt uint) {
-	if p == nil {
-		return
+// totalAttempts returns the total number of attempts (initial + retries).
+// Can be used to iterate over all attempts or logging.
+func (p *RetryPolicy) totalAttempts() uint {
+	if p == nil || p.MaxRetries == 0 {
+		return 1
 	}
 
-	duration := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
-	time.Sleep(duration)
+	return p.MaxRetries
 }
 
-// AttemptsLeft returns true if there are still retry attempts left.
-func (p *RetryPolicy) AttemptsLeft(attempt uint) bool {
+// sleep waits for the calculated delay or until context is cancelled.
+// Returns ctx.Err() if context was cancelled, nil if sleep completed.
+func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
 	if p == nil {
-		return false
+		return nil
 	}
 
-	// If MaxRetries is 0, then at least one retry attempt is made.
-	if p.MaxRetries == 0 && attempt == 0 {
-		return true
+	duration := p.calculateDelay(attempt)
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(duration):
+		return nil
+	}
+}
+
+// calculateDelay computes the delay with added jitter to prevent thundering herd.
+// Jitter is +-10% of the calculated delay.
+func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
+	baseDelay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
+
+	jitter := p.calculateJitter(baseDelay)
+	delay := baseDelay + jitter
+
+	if delay < 0 {
+		delay = 0
 	}
 
-	return attempt < p.MaxRetries
+	return delay
+}
+
+// calculateJitter computes the jitter to prevent thundering herd.
+func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
+	// Add +-10% jitter.
+	jitterPercent := 0.1
+	jitterAmount := time.Duration(float64(baseDelay) * jitterPercent)
+
+	//nolint:gosec // rand is used for jitter, not critical for security.
+	jitter := time.Duration(rand.Int64N(int64(jitterAmount*2))) - jitterAmount
+
+	return jitter
+}
+
+// Do executes the operation with automatic retry logic.
+// The operation is retried up to MaxRetries times with exponential backoff and jitter.
+// Returns operation error if all retries are exhausted.
+func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
+	if p == nil {
+		return operation()
+	}
+
+	var lastErr error
+
+	totalAttempts := p.totalAttempts()
+
+	for attempt := uint(0); attempt < totalAttempts; attempt++ {
+		// Execute operation.
+		lastErr = operation()
+		if lastErr == nil {
+			// Success.
+			return nil
+		}
+
+		// If this was the last attempt, exit.
+		if attempt >= totalAttempts-1 {
+			break
+		}
+
+		// sleep before the next attempt. We check context only in sleep, not to slow down first operation.
+		if err := p.sleep(ctx, attempt); err != nil {
+			// Show all errors if any.
+			return errors.Join(err, lastErr)
+		}
+	}
+
+	return fmt.Errorf("failed after %d attempt(s): %w", totalAttempts, lastErr)
 }

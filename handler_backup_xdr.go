@@ -73,7 +73,7 @@ func newBackupXDRHandler(
 	// redefine context cancel.
 	ctx, cancel := context.WithCancel(ctx)
 
-	hasExprSind, err := infoClient.HasExpressionSIndex(config.Namespace)
+	hasExprSind, err := infoClient.HasExpressionSIndex(ctx, config.Namespace)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
@@ -158,7 +158,7 @@ func (bh *HandlerBackupXDR) run() {
 
 func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	// Count total records.
-	records, err := bh.infoClient.GetRecordCount(bh.config.Namespace, nil)
+	records, err := bh.infoClient.GetRecordCount(ctx, bh.config.Namespace, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get records count: %w", err)
 	}

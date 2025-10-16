@@ -148,54 +148,58 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 	}
 
 	var (
-		lastErr error
-		attempt uint
+		// n will contain a result of Read. Don't shadow it.
+		n int
+		// readErr contains reader error. We need to separate errors to return EOF correctly.
+		readErr error
 	)
 
-	for r.retryPolicy.AttemptsLeft(attempt) {
-		n, err := r.reader.Read(p)
-		if err == nil {
+	retryErr := r.retryPolicy.Do(r.ctx, func() error {
+		n, readErr = r.reader.Read(p)
+		if readErr == nil {
 			// Success reading updated offset.
 			r.offset += int64(n)
-
-			return n, err
+			return nil
 		}
-		// To return the last error at the end of execution.
-		lastErr = err
+
+		// EOF is not retryable - return success to stop retry.
+		if errors.Is(readErr, io.EOF) {
+			return nil
+		}
+
 		// Do not log EOF errors.
-		if r.logger != nil && !errors.Is(err, io.EOF) {
+		if r.logger != nil {
 			r.logger.Debug("retryable reader got error",
-				slog.Any("err", err),
+				slog.Any("error", readErr),
 			)
 		}
 
-		if isNetworkError(err) {
+		if isNetworkError(readErr) {
 			if r.logger != nil {
 				r.logger.Warn("retry read",
-					slog.Any("attempt", attempt),
-					slog.Any("err", err),
+					slog.Any("error", readErr),
 				)
 			}
-
-			r.retryPolicy.Sleep(attempt)
-
-			attempt++
 
 			// Open a new stream.
-			if rErr := r.openStream(); rErr != nil {
+			// Attention: we only log streamErr, as retry will work anyway.
+			if streamErr := r.openStream(); streamErr != nil {
 				r.logger.Warn("failed to reopen stream",
-					slog.Any("attempt", attempt),
-					slog.Any("err", rErr),
+					slog.Any("error", streamErr),
 				)
 			}
-
-			continue
 		}
 
-		return n, err
+		return readErr
+	})
+
+	// If retry failed (context cancelled, etc), return retry error.
+	if retryErr != nil {
+		return n, retryErr
 	}
 
-	return 0, fmt.Errorf("failed after %d attempts: %w", attempt, lastErr)
+	// Otherwise return what Read returned (might be io.EOF or nil)
+	return n, readErr
 }
 
 // Close closes the reader.

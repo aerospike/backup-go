@@ -203,7 +203,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 }
 
 func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe.Reader[T]) error {
-	dataWriters, err := rh.writeProcessor.newDataWriters()
+	dataWriters, err := rh.writeProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create writer workers: %w", err)
 	}

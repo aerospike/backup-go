@@ -213,7 +213,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 		return err
 	}
 
-	// Create one rangeReader for OpenFileOk test
+	// Create one file for OpenFileOk test
 	fileName := fmt.Sprintf("%s/%s", testFolderOneFile, testFileNameOneFile)
 	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(testBucket),
@@ -307,7 +307,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid rangeReader extension")
+		return fmt.Errorf("invalid file extension")
 	})
 
 	pathList := []string{
@@ -358,7 +358,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid rangeReader extension")
+		return fmt.Errorf("invalid file extension")
 	})
 
 	pathList := []string{
@@ -408,7 +408,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 		if filepath.Ext(fileName) == util.FileExtAsbx {
 			return nil
 		}
-		return fmt.Errorf("invalid rangeReader extension")
+		return fmt.Errorf("invalid file extension")
 	})
 
 	reader, err := NewReader(
@@ -531,7 +531,7 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid rangeReader extension")
+		return fmt.Errorf("invalid file extension")
 	})
 
 	reader, err := NewReader(
@@ -576,7 +576,7 @@ func (s *AwsSuite) TestReader_StreamFilesEmpty() {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid rangeReader extension")
+		return fmt.Errorf("invalid file extension")
 	})
 
 	_, err = NewReader(
@@ -601,7 +601,7 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid rangeReader extension")
+		return fmt.Errorf("invalid file extension")
 	})
 
 	reader, err := NewReader(
@@ -953,9 +953,9 @@ func TestReader_ShouldSkip(t *testing.T) {
 			expected:      true,
 		},
 		{
-			name:          "regular rangeReader",
+			name:          "regular file",
 			path:          "test/path/",
-			fileName:      aws.String("test/path/rangeReader.txt"),
+			fileName:      aws.String("test/path/file.txt"),
 			fileSize:      &testSize,
 			withNestedDir: false,
 			expected:      false,
@@ -963,7 +963,7 @@ func TestReader_ShouldSkip(t *testing.T) {
 		{
 			name:          "nil filename",
 			path:          "test/path",
-			fileName:      aws.String("rangeReader.txt"),
+			fileName:      aws.String("file.txt"),
 			fileSize:      &testEmptySize,
 			withNestedDir: false,
 			expected:      true,
@@ -1046,7 +1046,7 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 		if filepath.Ext(fileName) == util.FileExtAsb {
 			return nil
 		}
-		return fmt.Errorf("invalid rangeReader extension")
+		return fmt.Errorf("invalid file extension")
 	})
 
 	reader, err := NewReader(

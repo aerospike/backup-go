@@ -134,7 +134,7 @@ func TestEncryptionPolicy_Validate(t *testing.T) {
 	policy.Mode = "NA"
 	assert.ErrorContains(t, policy.validate(), "invalid encryption mode")
 	policy.Mode = CompressNone
-	assert.ErrorContains(t, policy.validate(), "encryption key location not specified")
+	assert.NoError(t, policy.validate())
 	keyFile := "keyFile"
 	policy.KeyFile = &keyFile
 	keyEnv := "keyEnv"

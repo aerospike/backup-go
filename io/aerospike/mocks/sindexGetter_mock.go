@@ -5,6 +5,8 @@
 package mocks
 
 import (
+	"context"
+
 	"github.com/aerospike/backup-go/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -37,8 +39,8 @@ func (_m *MocksindexGetter) EXPECT() *MocksindexGetter_Expecter {
 }
 
 // GetSIndexes provides a mock function for the type MocksindexGetter
-func (_mock *MocksindexGetter) GetSIndexes(namespace string) ([]*models.SIndex, error) {
-	ret := _mock.Called(namespace)
+func (_mock *MocksindexGetter) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
+	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSIndexes")
@@ -46,18 +48,18 @@ func (_mock *MocksindexGetter) GetSIndexes(namespace string) ([]*models.SIndex, 
 
 	var r0 []*models.SIndex
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) ([]*models.SIndex, error)); ok {
-		return returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]*models.SIndex, error)); ok {
+		return returnFunc(ctx, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string) []*models.SIndex); ok {
-		r0 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []*models.SIndex); ok {
+		r0 = returnFunc(ctx, namespace)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.SIndex)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -70,14 +72,15 @@ type MocksindexGetter_GetSIndexes_Call struct {
 }
 
 // GetSIndexes is a helper method to define mock.On call
+//   - ctx
 //   - namespace
-func (_e *MocksindexGetter_Expecter) GetSIndexes(namespace interface{}) *MocksindexGetter_GetSIndexes_Call {
-	return &MocksindexGetter_GetSIndexes_Call{Call: _e.mock.On("GetSIndexes", namespace)}
+func (_e *MocksindexGetter_Expecter) GetSIndexes(ctx interface{}, namespace interface{}) *MocksindexGetter_GetSIndexes_Call {
+	return &MocksindexGetter_GetSIndexes_Call{Call: _e.mock.On("GetSIndexes", ctx, namespace)}
 }
 
-func (_c *MocksindexGetter_GetSIndexes_Call) Run(run func(namespace string)) *MocksindexGetter_GetSIndexes_Call {
+func (_c *MocksindexGetter_GetSIndexes_Call) Run(run func(ctx context.Context, namespace string)) *MocksindexGetter_GetSIndexes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -87,7 +90,7 @@ func (_c *MocksindexGetter_GetSIndexes_Call) Return(sIndexs []*models.SIndex, er
 	return _c
 }
 
-func (_c *MocksindexGetter_GetSIndexes_Call) RunAndReturn(run func(namespace string) ([]*models.SIndex, error)) *MocksindexGetter_GetSIndexes_Call {
+func (_c *MocksindexGetter_GetSIndexes_Call) RunAndReturn(run func(ctx context.Context, namespace string) ([]*models.SIndex, error)) *MocksindexGetter_GetSIndexes_Call {
 	_c.Call.Return(run)
 	return _c
 }

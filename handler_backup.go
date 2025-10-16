@@ -137,7 +137,7 @@ func newBackupHandler(
 		}
 	}
 
-	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(config.Namespace)
+	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(ctx, config.Namespace)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
@@ -243,7 +243,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 		return 0, fmt.Errorf("samples records number is negative")
 	}
 
-	totalCount, err := bh.infoClient.GetRecordCount(bh.config.Namespace, bh.config.SetList)
+	totalCount, err := bh.infoClient.GetRecordCount(ctx, bh.config.Namespace, bh.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count records: %w", err)
 	}

@@ -15,7 +15,7 @@
 package aerospike
 
 import (
-	"fmt"
+	"context"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -25,6 +25,7 @@ import (
 )
 
 type payloadWriter struct {
+	ctx               context.Context
 	dbWriter          dbWriter
 	writePolicy       *a.WritePolicy
 	stats             *models.RestoreStats
@@ -34,6 +35,7 @@ type payloadWriter struct {
 }
 
 func newPayloadWriter(
+	ctx context.Context,
 	dbWriter dbWriter,
 	writePolicy *a.WritePolicy,
 	stats *models.RestoreStats,
@@ -46,6 +48,7 @@ func newPayloadWriter(
 	}
 
 	return &payloadWriter{
+		ctx:               ctx,
 		dbWriter:          dbWriter,
 		writePolicy:       writePolicy,
 		stats:             stats,
@@ -56,32 +59,23 @@ func newPayloadWriter(
 }
 
 func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
-	var (
-		aerr    a.Error
-		attempt uint
-	)
-
 	p.metrics.Increment()
 
 	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, t.Payload)
 	t.Payload = xdr.SetRecordExistsActionBit(p.writePolicy.RecordExistsAction, t.Payload)
 
-	for p.retryPolicy.AttemptsLeft(attempt) {
-		aerr = p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
+	return p.retryPolicy.Do(p.ctx, func() error {
+		aerr := p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
 
-		if aerr == nil {
-			p.stats.IncrRecordsInserted()
-
-			return nil
-		}
-
-		if aerr.IsInDoubt() {
+		if aerr != nil && aerr.IsInDoubt() {
 			p.stats.IncrErrorsInDoubt()
 		}
 
 		switch {
 		case isNilOrAcceptableError(aerr):
 			switch {
+			case aerr == nil:
+				p.stats.IncrRecordsInserted()
 			case aerr.Matches(atypes.GENERATION_ERROR):
 				p.stats.IncrRecordsFresher()
 			case aerr.Matches(atypes.KEY_EXISTS_ERROR):
@@ -89,21 +83,14 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			}
 
 			return nil
-
 		case p.ignoreRecordError && shouldIgnore(aerr):
 			p.stats.IncrRecordsIgnored()
+
 			return nil
-
 		case shouldRetry(aerr):
-			p.retryPolicy.Sleep(attempt)
-
-			attempt++
-
-			continue
+			return aerr
+		default:
+			return aerr
 		}
-
-		return fmt.Errorf("failed to write payload: %w", aerr)
-	}
-
-	return aerr
+	})
 }

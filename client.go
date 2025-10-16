@@ -81,25 +81,25 @@ type AerospikeClient interface {
 // InfoGetter is an interface that abstracts methods for retrieving cluster information
 // and performing cluster operations.
 type InfoGetter interface {
-	GetRecordCount(namespace string, sets []string) (uint64, error)
-	GetRackNodes(rackID int) ([]string, error)
-	GetService(node string) (string, error)
-	GetVersion() (asinfo.AerospikeVersion, error)
-	GetSIndexes(namespace string) ([]*models.SIndex, error)
-	GetUDFs() ([]*models.UDF, error)
-	SupportsBatchWrite() (bool, error)
-	StartXDR(nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
-	StopXDR(nodeName, dc string) error
-	BlockMRTWrites(nodeName, namespace string) error
-	UnBlockMRTWrites(nodeName, namespace string) error
+	GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error)
+	GetRackNodes(ctx context.Context, rackID int) ([]string, error)
+	GetService(ctx context.Context, node string) (string, error)
+	GetVersion(ctx context.Context) (asinfo.AerospikeVersion, error)
+	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
+	GetUDFs(ctx context.Context) ([]*models.UDF, error)
+	SupportsBatchWrite(ctx context.Context) (bool, error)
+	StartXDR(ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
+	StopXDR(ctx context.Context, nodeName, dc string) error
+	BlockMRTWrites(ctx context.Context, nodeName, namespace string) error
+	UnBlockMRTWrites(ctx context.Context, nodeName, namespace string) error
+	GetSetsList(ctx context.Context, namespace string) ([]string, error)
+	GetStats(ctx context.Context, nodeName, dc, namespace string) (asinfo.Stats, error)
+	GetNamespacesList(ctx context.Context) ([]string, error)
+	GetStatus(ctx context.Context) (string, error)
+	GetDCsList(ctx context.Context) ([]string, error)
+	HasExpressionSIndex(ctx context.Context, namespace string) (bool, error)
+	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetNodesNames() []string
-	GetSetsList(namespace string) ([]string, error)
-	GetStats(nodeName, dc, namespace string) (asinfo.Stats, error)
-	GetNamespacesList() ([]string, error)
-	GetStatus() (string, error)
-	GetDCsList() ([]string, error)
-	HasExpressionSIndex(namespace string) (bool, error)
-	GetPrimaryPartitions(node, namespace string) ([]int, error)
 }
 
 // Client is the main entry point for the backup package.

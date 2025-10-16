@@ -29,7 +29,7 @@ import (
 //
 //go:generate mockery --name udfGetter
 type udfGetter interface {
-	GetUDFs() ([]*models.UDF, error)
+	GetUDFs(ctx context.Context) ([]*models.UDF, error)
 }
 
 // UdfReader satisfies the DataReader interface.
@@ -61,7 +61,7 @@ func (r *UdfReader) Read(ctx context.Context) (*models.Token, error) {
 	if r.udfs == nil {
 		r.logger.Debug("fetching all UDFs")
 
-		udfs, err := r.client.GetUDFs()
+		udfs, err := r.client.GetUDFs(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch UDFs: %w", err)
 		}

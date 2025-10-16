@@ -134,19 +134,12 @@ func TestEncryptionPolicy_Validate(t *testing.T) {
 	policy.Mode = "NA"
 	assert.ErrorContains(t, policy.validate(), "invalid encryption mode")
 	policy.Mode = CompressNone
-	assert.ErrorContains(t, policy.validate(), "encryption key location not specified")
+	assert.NoError(t, policy.validate())
 	keyFile := "keyFile"
 	policy.KeyFile = &keyFile
 	keyEnv := "keyEnv"
 	policy.KeyEnv = &keyEnv
 	assert.ErrorContains(t, policy.validate(), "only one encryption key source may be specified")
-}
-
-func TestEncryptionPolicy_ValidateNone(t *testing.T) {
-	var policy EncryptionPolicy
-
-	policy.Mode = CompressNone
-	assert.NoError(t, policy.validate())
 }
 
 func TestConfigRestore_IsValidForASBX(t *testing.T) {

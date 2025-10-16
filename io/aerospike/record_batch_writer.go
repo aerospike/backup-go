@@ -152,7 +152,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 			rw.logger.Debug("Not all operations succeeded",
 				slog.Int("remainingOperations", len(rw.operationBuffer)),
-				slog.Any("opErr", opErr),
+				slog.Any("error", opErr),
 			)
 
 			return nil
@@ -162,7 +162,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				slog.Int("remainingOperations", len(rw.operationBuffer)),
 			)
 
-			return fmt.Errorf("failed to fluash buffer: %w", aerr)
+			return fmt.Errorf("failed to flush buffer: %w", aerr)
 		default:
 			return fmt.Errorf("%d operations failed: %w",
 				len(rw.operationBuffer), errors.Join(aerr, opErr))

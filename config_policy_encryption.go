@@ -51,7 +51,7 @@ func (p *EncryptionPolicy) validate() error {
 		return fmt.Errorf("invalid encryption mode: %s", p.Mode)
 	}
 
-	if p.KeyFile == nil && p.KeyEnv == nil && p.KeySecret == nil {
+	if p.Mode != EncryptNone && p.KeyFile == nil && p.KeyEnv == nil && p.KeySecret == nil {
 		return errors.New("encryption key location not specified")
 	}
 

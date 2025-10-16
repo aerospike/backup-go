@@ -90,13 +90,10 @@ func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
 
 	duration := p.calculateDelay(attempt)
 
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-timer.C:
+	case <-time.After(duration):
 		return nil
 	}
 }
@@ -106,6 +103,18 @@ func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
 func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
 	baseDelay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
 
+	jitter := p.calculateJitter(baseDelay)
+	delay := baseDelay + jitter
+
+	if delay < 0 {
+		delay = 0
+	}
+
+	return delay
+}
+
+// calculateJitter computes the jitter to prevent thundering herd.
+func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
 	// Add +-10% jitter.
 	jitterPercent := 0.1
 	jitterAmount := time.Duration(float64(baseDelay) * jitterPercent)
@@ -113,12 +122,7 @@ func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
 	//nolint:gosec // rand is used for jitter, not critical for security.
 	jitter := time.Duration(rand.Int64N(int64(jitterAmount*2))) - jitterAmount
 
-	delay := baseDelay + jitter
-	if delay < 0 {
-		delay = 0
-	}
-
-	return delay
+	return jitter
 }
 
 // Do executes the operation with automatic retry logic.

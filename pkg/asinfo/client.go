@@ -222,9 +222,10 @@ func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.
 			return aErr.Unwrap()
 		}
 
-		indexes, err = ic.getSIndexes(node, namespace, ic.policy)
+		var indErr error
+		indexes, indErr = ic.getSIndexes(node, namespace, ic.policy)
 
-		return nil
+		return indErr
 	})
 
 	return indexes, err
@@ -654,7 +655,7 @@ func (ic *Client) GetStats(ctx context.Context, nodeName, dc, namespace string) 
 		result Stats
 		err    error
 	)
-	// First request TLS name.
+
 	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
 		result, err = ic.getStats(nodeName, dc, namespace)
 

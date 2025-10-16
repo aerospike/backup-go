@@ -168,9 +168,9 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		}
 
 		// Do not log EOF errors.
-		if r.logger != nil && !errors.Is(readErr, io.EOF) {
+		if r.logger != nil {
 			r.logger.Debug("retryable reader got error",
-				slog.Any("readErr", readErr),
+				slog.Any("error", readErr),
 			)
 		}
 

@@ -202,11 +202,12 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 
 func (w *s3Writer) uploadPart() error {
 	response, err := w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-		Body:       bytes.NewReader(w.buffer.Bytes()),
-		Bucket:     &w.bucket,
-		Key:        &w.key,
-		PartNumber: &w.partNumber,
-		UploadId:   w.uploadID,
+		Body:              bytes.NewReader(w.buffer.Bytes()),
+		Bucket:            &w.bucket,
+		Key:               &w.key,
+		PartNumber:        &w.partNumber,
+		UploadId:          w.uploadID,
+		ChecksumAlgorithm: types.ChecksumAlgorithmCrc32,
 	})
 
 	if err != nil {

@@ -104,7 +104,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 
 			return nil
 		case shouldRetry(aerr):
-			return fmt.Errorf("failed to execute write: %w", aerr)
+			return aerr
 		default:
 			return aerr
 		}

@@ -162,7 +162,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				slog.Int("remainingOperations", len(rw.operationBuffer)),
 			)
 
-			return fmt.Errorf("failed to flush buffer: %w", aerr)
+			return aerr
 		default:
 			return fmt.Errorf("%d operations failed: %w",
 				len(rw.operationBuffer), errors.Join(aerr, opErr))

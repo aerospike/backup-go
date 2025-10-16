@@ -177,7 +177,7 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		if isNetworkError(readErr) {
 			if r.logger != nil {
 				r.logger.Warn("retry read",
-					slog.Any("readErr", readErr),
+					slog.Any("error", readErr),
 				)
 			}
 
@@ -185,7 +185,7 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 			// Attention: we only log streamErr, as retry will work anyway.
 			if streamErr := r.openStream(); streamErr != nil {
 				r.logger.Warn("failed to reopen stream",
-					slog.Any("readErr", streamErr),
+					slog.Any("error", streamErr),
 				)
 			}
 		}

@@ -58,7 +58,7 @@ func (rw udfWriter) writeUDF(udf *models.UDF) error {
 		return fmt.Errorf("error registering UDF %s: %w", udf.Name, err)
 	}
 
-	rw.logger.Debug("registered UDF", "udf", udf.Name)
+	rw.logger.Debug("registered UDF", slog.String("name", udf.Name))
 
 	return nil
 }

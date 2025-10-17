@@ -1313,7 +1313,7 @@ type infoMap map[string]string
 // each key-value pair is separated by a colon and the key is separated from the value by an equals sign
 // e.g. "foo=bar:baz=qux;foo=bar:baz=qux"
 // the above example is returned as []infoMap{infoMap{"foo": "bar", "baz": "qux"}, infoMap{"foo": "bar", "baz": "qux"}}
-// if the passed in infor response is empty nil, nil is returned
+// if the passed in info response is empty, nil is returned.
 func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]infoMap, error) {
 	if resp == "" {
 		return nil, nil

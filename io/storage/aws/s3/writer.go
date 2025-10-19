@@ -225,8 +225,9 @@ func (w *s3Writer) uploadPart() error {
 
 	p := w.partNumber
 	w.completedParts = append(w.completedParts, types.CompletedPart{
-		PartNumber: &p,
-		ETag:       response.ETag,
+		PartNumber:    &p,
+		ETag:          response.ETag,
+		ChecksumCRC32: response.ChecksumCRC32,
 	})
 
 	w.partNumber++

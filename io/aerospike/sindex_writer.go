@@ -31,32 +31,32 @@ type sindexWriter struct {
 
 // writeSecondaryIndex writes a secondary index to Aerospike.
 func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
-	var sindexType a.IndexType
+	var sIndexType a.IndexType
 
 	switch si.Path.BinType {
 	case models.NumericSIDataType:
-		sindexType = a.NUMERIC
+		sIndexType = a.NUMERIC
 	case models.StringSIDataType:
-		sindexType = a.STRING
+		sIndexType = a.STRING
 	case models.BlobSIDataType:
-		sindexType = a.BLOB
+		sIndexType = a.BLOB
 	case models.GEO2DSphereSIDataType:
-		sindexType = a.GEO2DSPHERE
+		sIndexType = a.GEO2DSPHERE
 	default:
 		return fmt.Errorf("invalid sindex bin type: %c", si.Path.BinType)
 	}
 
-	var sindexCollectionType a.IndexCollectionType
+	var sIndexCollectionType a.IndexCollectionType
 
 	switch si.IndexType {
 	case models.BinSIndex:
-		sindexCollectionType = a.ICT_DEFAULT
+		sIndexCollectionType = a.ICT_DEFAULT
 	case models.ListElementSIndex:
-		sindexCollectionType = a.ICT_LIST
+		sIndexCollectionType = a.ICT_LIST
 	case models.MapKeySIndex:
-		sindexCollectionType = a.ICT_MAPKEYS
+		sIndexCollectionType = a.ICT_MAPKEYS
 	case models.MapValueSIndex:
-		sindexCollectionType = a.ICT_MAPVALUES
+		sIndexCollectionType = a.ICT_MAPVALUES
 	default:
 		return fmt.Errorf("invalid sindex collection type: %c", si.IndexType)
 	}
@@ -84,33 +84,33 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	job, aErr := rw.createIndex(
 		rw.writePolicy,
 		si,
-		sindexType,
-		sindexCollectionType,
+		sIndexType,
+		sIndexCollectionType,
 		exp,
 		ctx...,
 	)
-	if err != nil {
+	if aErr != nil {
 		if aErr.Matches(atypes.INDEX_FOUND) {
-			rw.logger.Debug("index already exists, replacing it", "sindex", si.Name)
+			rw.logger.Debug("secondary index already exists, replacing it", "name", si.Name)
 
-			err = rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
+			err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
 			if err != nil {
 				return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
 			}
 
-			job, aErr = rw.createIndex(
+			job, err = rw.createIndex(
 				rw.writePolicy,
 				si,
-				sindexType,
-				sindexCollectionType,
+				sIndexType,
+				sIndexCollectionType,
 				exp,
 				ctx...,
 			)
-			if aErr != nil {
+			if err != nil {
 				return fmt.Errorf("error creating replacement sindex %s: %w", si.Name, err)
 			}
 		} else {
-			return fmt.Errorf("error creating sindex %s: %w", si.Name, err)
+			return fmt.Errorf("error creating sindex %s: %w", si.Name, aErr)
 		}
 	}
 
@@ -128,7 +128,7 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		return fmt.Errorf("error creating sindex %s: %w", si.Name, err)
 	}
 
-	rw.logger.Debug("created sindex", "sindex", si.Name)
+	rw.logger.Debug("created secondary index", slog.String("name", si.Name))
 
 	return nil
 }
@@ -136,8 +136,8 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 func (rw sindexWriter) createIndex(
 	wp *a.WritePolicy,
 	si *models.SIndex,
-	sindexType a.IndexType,
-	sindexCollectionType a.IndexCollectionType,
+	sIndexType a.IndexType,
+	sIndexCollectionType a.IndexCollectionType,
 	exp *a.Expression,
 	ctx ...*a.CDTContext,
 ) (*a.IndexTask, a.Error) {
@@ -147,8 +147,8 @@ func (rw sindexWriter) createIndex(
 			si.Namespace,
 			si.Set,
 			si.Name,
-			sindexType,
-			sindexCollectionType,
+			sIndexType,
+			sIndexCollectionType,
 			exp,
 		)
 	}
@@ -159,8 +159,8 @@ func (rw sindexWriter) createIndex(
 		si.Set,
 		si.Name,
 		si.Path.BinName,
-		sindexType,
-		sindexCollectionType,
+		sIndexType,
+		sIndexCollectionType,
 		ctx...,
 	)
 }

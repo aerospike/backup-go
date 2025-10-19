@@ -191,9 +191,8 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer.Len() >= w.chunkSize {
-		err := w.uploadPart()
-		if err != nil {
-			return 0, fmt.Errorf("failed to upload part: %w", err)
+		if err := w.uploadPart(); err != nil {
+			return 0, err
 		}
 	}
 
@@ -231,9 +230,8 @@ func (w *s3Writer) Close() error {
 	}
 
 	if w.buffer.Len() > 0 {
-		err := w.uploadPart()
-		if err != nil {
-			return fmt.Errorf("failed to upload part: %w", err)
+		if err := w.uploadPart(); err != nil {
+			return err
 		}
 	}
 

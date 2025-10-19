@@ -28,7 +28,7 @@ type ConfigRestore struct {
 	WritePolicy *a.WritePolicy
 	// Namespace details for the restore operation.
 	// By default, the data is restored to the namespace from which it was taken.
-	Namespace *RestoreNamespaceConfig `json:"namespace,omitempty"`
+	Namespace *RestoreNamespaceConfig
 	// Encryption details.
 	EncryptionPolicy *EncryptionPolicy
 	// Compression details.
@@ -89,7 +89,7 @@ type ConfigRestore struct {
 	MetricsEnabled bool
 	// ValidateOnly indicates whether restore should only validate the backup files.
 	ValidateOnly bool
-	// ApplyMetadataLast defines when to restore metadata (Sindexes and UDFs).
+	// ApplyMetadataLast defines when to restore metadata (secondary indexes and UDFs).
 	// If set to true, metadata will be restored after all records have been processed.
 	ApplyMetadataLast bool
 	// IgnoreUnknownFields indicates whether restore should ignore unknown to decoder fields.

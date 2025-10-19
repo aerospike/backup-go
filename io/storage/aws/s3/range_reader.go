@@ -22,7 +22,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 const bufferSize = 4096 * 1024
@@ -82,11 +81,10 @@ type bufferedReadCloser struct {
 // OpenRange opens a file by range.
 func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket:       r.bucket,
-		Key:          r.key,
-		Range:        getRangeHeader(offset, count),
-		IfMatch:      r.etag,
-		ChecksumMode: types.ChecksumModeEnabled,
+		Bucket:  r.bucket,
+		Key:     r.key,
+		Range:   getRangeHeader(offset, count),
+		IfMatch: r.etag,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object %s: %w", *r.key, err)

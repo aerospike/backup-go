@@ -34,8 +34,7 @@ import (
 )
 
 const (
-	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
-	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
+	s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part
 )
 
 // Writer represents a s3 storage writer.
@@ -145,10 +144,9 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	fullPath := path.Join(w.prefix, filename)
 
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket:            &w.bucketName,
-		Key:               &fullPath,
-		StorageClass:      w.storageClass,
-		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
+		Bucket:       &w.bucketName,
+		Key:          &fullPath,
+		StorageClass: w.storageClass,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
@@ -211,12 +209,11 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 
 func (w *s3Writer) uploadPart() error {
 	response, err := w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-		Body:              bytes.NewReader(w.buffer.Bytes()),
-		Bucket:            &w.bucket,
-		Key:               &w.key,
-		PartNumber:        &w.partNumber,
-		UploadId:          w.uploadID,
-		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
+		Body:       bytes.NewReader(w.buffer.Bytes()),
+		Bucket:     &w.bucket,
+		Key:        &w.key,
+		PartNumber: &w.partNumber,
+		UploadId:   w.uploadID,
 	})
 
 	if err != nil {
@@ -225,9 +222,8 @@ func (w *s3Writer) uploadPart() error {
 
 	p := w.partNumber
 	w.completedParts = append(w.completedParts, types.CompletedPart{
-		PartNumber:    &p,
-		ETag:          response.ETag,
-		ChecksumCRC32: response.ChecksumCRC32,
+		PartNumber: &p,
+		ETag:       response.ETag,
 	})
 
 	w.partNumber++

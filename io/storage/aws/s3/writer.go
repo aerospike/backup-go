@@ -198,10 +198,8 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer.Len() >= w.chunkSize {
-		err := w.retryPolicy.Do(w.ctx, func() error {
-			return w.uploadPart()
-		})
-		if err != nil {
+
+		if err := w.uploadPart(); err != nil {
 			return 0, fmt.Errorf("failed to upload part: %w", err)
 		}
 	}
@@ -210,17 +208,24 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 }
 
 func (w *s3Writer) uploadPart() error {
-	response, err := w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-		Body:              bytes.NewReader(w.buffer.Bytes()),
-		Bucket:            &w.bucket,
-		Key:               &w.key,
-		PartNumber:        &w.partNumber,
-		UploadId:          w.uploadID,
-		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
-	})
+	var response *s3.UploadPartOutput
 
+	err := w.retryPolicy.Do(w.ctx, func() error {
+		var uploadErr error
+
+		response, uploadErr = w.client.UploadPart(w.ctx, &s3.UploadPartInput{
+			Body:              bytes.NewReader(w.buffer.Bytes()),
+			Bucket:            &w.bucket,
+			Key:               &w.key,
+			PartNumber:        &w.partNumber,
+			UploadId:          w.uploadID,
+			ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
+		})
+
+		return uploadErr
+	})
 	if err != nil {
-		return fmt.Errorf("failed to upload part: %w", err)
+		return err
 	}
 
 	p := w.partNumber

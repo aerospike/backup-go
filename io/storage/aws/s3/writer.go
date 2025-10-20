@@ -23,9 +23,11 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/io/storage/common"
+	"github.com/aerospike/backup-go/io/storage/common/pool"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -154,17 +156,21 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &s3Writer{
 		ctx:         ctx,
+		cancel:      cancel,
 		uploadID:    upload.UploadId,
 		key:         fullPath,
 		client:      w.client,
 		bucket:      w.bucketName,
 		buffer:      new(bytes.Buffer),
-		partNumber:  1,
 		chunkSize:   w.ChunkSize,
 		logger:      w.Logger,
 		retryPolicy: w.RetryPolicy,
+		workersPool: pool.NewPool(10),
+		bufferPool:  sync.Pool{New: func() interface{} { return make([]byte, 0) }},
 	}, nil
 }
 
@@ -176,7 +182,9 @@ func (w *Writer) GetType() string {
 // s3Writer wrapper for writing files, as S3 in not supporting creation of io.Writer.
 type s3Writer struct {
 	// ctx is stored internally so that it can be used in io.WriteCloser methods
-	ctx            context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	uploadID       *string
 	client         *s3.Client
 	buffer         *bytes.Buffer
@@ -184,10 +192,13 @@ type s3Writer struct {
 	bucket         string
 	completedParts []types.CompletedPart
 	chunkSize      int
-	partNumber     int32
+	partNumber     atomic.Int32
 	closed         bool
 	logger         *slog.Logger
 	retryPolicy    *models.RetryPolicy
+	workersPool    *pool.Pool
+	bufferPool     sync.Pool
+	uploadErr      atomic.Value
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
@@ -197,27 +208,39 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, os.ErrClosed
 	}
 
-	if w.buffer.Len() >= w.chunkSize {
+	if err := w.uploadErr.Load(); err != nil {
+		return 0, err.(error)
+	}
 
-		if err := w.uploadPart(); err != nil {
-			return 0, fmt.Errorf("failed to upload part: %w", err)
-		}
+	if w.buffer.Len() >= w.chunkSize {
+		// Get buffer from pool.
+		buf := w.bufferPool.Get().([]byte)
+		w.buffer.Read(buf)
+
+		w.partNumber.Add(1)
+		partNumber := w.partNumber.Load()
+
+		w.workersPool.Submit(func() {
+			w.uploadPart(buf, partNumber)
+		})
+
+		w.buffer.Reset()
 	}
 
 	return w.buffer.Write(p)
 }
 
-func (w *s3Writer) uploadPart() error {
+func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 	var response *s3.UploadPartOutput
 
 	err := w.retryPolicy.Do(w.ctx, func() error {
 		var uploadErr error
 
 		response, uploadErr = w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-			Body:              bytes.NewReader(w.buffer.Bytes()),
+			Body:              bytes.NewReader(p),
 			Bucket:            &w.bucket,
 			Key:               &w.key,
-			PartNumber:        &w.partNumber,
+			PartNumber:        aws.Int32(w.partNumber.Load()),
 			UploadId:          w.uploadID,
 			ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
 		})
@@ -225,20 +248,18 @@ func (w *s3Writer) uploadPart() error {
 		return uploadErr
 	})
 	if err != nil {
-		return err
+		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", w.partNumber.Load(), err)) {
+			w.cancel()
+		}
 	}
 
-	p := w.partNumber
+	w.bufferPool.Put(p)
+
 	w.completedParts = append(w.completedParts, types.CompletedPart{
-		PartNumber:    &p,
+		PartNumber:    aws.Int32(w.partNumber.Load()),
 		ETag:          response.ETag,
 		ChecksumCRC32: response.ChecksumCRC32,
 	})
-
-	w.partNumber++
-	w.buffer.Reset()
-
-	return nil
 }
 
 func (w *s3Writer) Close() error {
@@ -246,11 +267,16 @@ func (w *s3Writer) Close() error {
 		return os.ErrClosed
 	}
 
+	if err := w.uploadErr.Load(); err != nil {
+		return err.(error)
+	}
+
 	if w.buffer.Len() > 0 {
-		err := w.uploadPart()
-		if err != nil {
-			return fmt.Errorf("failed to upload part: %w", err)
-		}
+		lastPart := make([]byte, w.buffer.Len())
+		w.buffer.Read(lastPart)
+		w.partNumber.Add(1)
+
+		w.uploadPart(lastPart, w.partNumber.Load())
 	}
 
 	_, err := w.client.CompleteMultipartUpload(w.ctx,

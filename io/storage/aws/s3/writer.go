@@ -161,7 +161,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string, isMeta bool) (i
 		fullPath = filepath.Join(filepath.Dir(w.PathList[0]), filename)
 	default:
 		// If we use backup to single file, we overwrite the file name.
-		filename = w.PathList[0]
+		fullPath = path.Join(w.prefix, w.PathList[0])
 	}
 
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{

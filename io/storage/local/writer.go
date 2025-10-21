@@ -221,13 +221,17 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string, isMeta bool) (i
 		}
 	}
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
-	filePath := w.PathList[0]
-	if w.IsDir {
+	var filePath string
+	switch {
+	case w.IsDir:
+		// If it is directory.
 		filePath = filepath.Join(w.PathList[0], fileName)
-	}
-
-	if isMeta && !w.IsDir {
+	case isMeta && !w.IsDir:
+		// If it is metadata file and we backup to one file.
 		filePath = filepath.Join(filepath.Dir(w.PathList[0]), fileName)
+	default:
+		// If we backup to one file.
+		filePath = w.PathList[0]
 	}
 
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)

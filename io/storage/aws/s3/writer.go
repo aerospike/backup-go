@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -148,11 +149,20 @@ func (w *Writer) NewWriter(ctx context.Context, filename string, isMeta bool) (i
 		if !isMeta && !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
+
+	}
+
+	var fullPath string
+	switch {
+	case w.IsDir:
+		fullPath = path.Join(w.prefix, filename)
+	case isMeta && !w.IsDir:
+		// If it is metadata file and we backup to one file.
+		fullPath = filepath.Join(filepath.Dir(w.PathList[0]), filename)
+	default:
 		// If we use backup to single file, we overwrite the file name.
 		filename = w.PathList[0]
 	}
-
-	fullPath := path.Join(w.prefix, filename)
 
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:            &w.bucketName,

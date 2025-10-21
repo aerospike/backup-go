@@ -171,7 +171,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		chunkSize:   w.ChunkSize,
 		logger:      w.Logger,
 		retryPolicy: w.RetryPolicy,
-		workersPool: pool.NewPool(10),
+		workersPool: pool.NewPool(3),
 		bufferPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, w.ChunkSize)

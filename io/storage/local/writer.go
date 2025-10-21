@@ -226,6 +226,10 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string, isMeta bool) (i
 		filePath = filepath.Join(w.PathList[0], fileName)
 	}
 
+	if isMeta && !w.IsDir {
+		filePath = filepath.Join(filepath.Dir(w.PathList[0]), fileName)
+	}
+
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)

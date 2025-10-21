@@ -172,6 +172,11 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		logger:      w.Logger,
 		retryPolicy: w.RetryPolicy,
 		workersPool: pool.NewPool(10),
+		bufferPool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, w.ChunkSize)
+			},
+		},
 	}, nil
 }
 
@@ -202,6 +207,7 @@ type s3Writer struct {
 	retryPolicy *models.RetryPolicy
 	workersPool *pool.Pool
 	uploadErr   atomic.Value
+	bufferPool  sync.Pool
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
@@ -215,13 +221,19 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, err.(error)
 	}
 
-	if w.buffer.Len() >= w.chunkSize {
-		// Get buffer from pool.
-		buf := make([]byte, w.buffer.Len())
+	var shouldReset bool
 
-		_, err := w.buffer.Read(buf)
-		if err != nil {
-			return 0, err
+	for w.buffer.Len() >= w.chunkSize {
+		buf := w.bufferPool.Get().([]byte)
+
+		bytesRead, readErr := w.buffer.Read(buf)
+		if readErr != nil && readErr != io.EOF {
+			w.bufferPool.Put(buf)
+			return bytesRead, w.abortUpload(readErr)
+		}
+
+		if bytesRead < len(buf) {
+			buf = buf[:bytesRead]
 		}
 
 		w.partNumber.Add(1)
@@ -231,6 +243,10 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 			w.uploadPart(buf, partNumber)
 		})
 
+		shouldReset = true
+	}
+
+	if shouldReset {
 		w.buffer.Reset()
 	}
 
@@ -238,6 +254,8 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 }
 
 func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
+	defer w.bufferPool.Put(p)
+
 	if w.ctx.Err() != nil || w.uploadErr.Load() != nil {
 		return
 	}

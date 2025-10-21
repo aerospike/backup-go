@@ -257,7 +257,11 @@ func isRetryableError(err error) bool {
 		var httpErr *awshttp.ResponseError
 		if errors.As(oe.Err, &httpErr) {
 			statusCode := httpErr.HTTPStatusCode()
-			// Retry 500, 503, 429
+			// Retry 500, 503, 429.
+			// Sources:
+			// https://repost.aws/knowledge-center/http-5xx-errors-s3
+			// https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
+			// OpenObject will be retried by ASW Client, but .Read() will be retried by us.
 			return statusCode == 500 || statusCode == 503 || statusCode == 429
 		}
 	}

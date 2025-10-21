@@ -24,6 +24,7 @@ import (
 	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,10 +163,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		clientMock := mocks.NewMocks3Getter(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
-			Bucket:  bucket,
-			Key:     key,
-			Range:   rangeHeader,
-			IfMatch: etag,
+			Bucket:       bucket,
+			Key:          key,
+			Range:        rangeHeader,
+			IfMatch:      etag,
+			ChecksumMode: types.ChecksumModeEnabled,
 		}).Return(&s3.GetObjectOutput{
 			Body: bodyMock,
 		}, nil)
@@ -192,10 +194,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		clientMock := mocks.NewMocks3Getter(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
-			Bucket:  bucket,
-			Key:     key,
-			Range:   nil,
-			IfMatch: etag,
+			Bucket:       bucket,
+			Key:          key,
+			Range:        nil,
+			IfMatch:      etag,
+			ChecksumMode: types.ChecksumModeEnabled,
 		}).Return(&s3.GetObjectOutput{
 			Body: bodyMock,
 		}, nil)
@@ -222,10 +225,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		clientMock := mocks.NewMocks3Getter(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
-			Bucket:  bucket,
-			Key:     key,
-			Range:   differentRange,
-			IfMatch: etag,
+			Bucket:       bucket,
+			Key:          key,
+			Range:        differentRange,
+			IfMatch:      etag,
+			ChecksumMode: types.ChecksumModeEnabled,
 		}).Return(&s3.GetObjectOutput{
 			Body: bodyMock,
 		}, nil)
@@ -249,10 +253,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		clientMock := mocks.NewMocks3Getter(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
-			Bucket:  bucket,
-			Key:     key,
-			Range:   rangeHeader,
-			IfMatch: etag,
+			Bucket:       bucket,
+			Key:          key,
+			Range:        rangeHeader,
+			IfMatch:      etag,
+			ChecksumMode: types.ChecksumModeEnabled,
 		}).Return(nil, errS3Test)
 
 		reader := &rangeReader{

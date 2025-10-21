@@ -15,7 +15,6 @@
 package s3
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -24,8 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
-
-const bufferSize = 4096 * 1024
 
 // s3Getter is an interface for s3 client. Used for mocking tests.
 type s3Getter interface {
@@ -73,12 +70,6 @@ func newRangeReader(ctx context.Context, client s3Getter, bucket, key *string) (
 	}, nil
 }
 
-// bufferedReadCloser is a wrapper for io.ReadCloser that buffers the data.
-type bufferedReadCloser struct {
-	*bufio.Reader
-	io.Closer
-}
-
 // OpenRange opens a file by range.
 func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
@@ -92,10 +83,7 @@ func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.Re
 		return nil, fmt.Errorf("failed to get object %s: %w", *r.key, err)
 	}
 
-	return &bufferedReadCloser{
-		Reader: bufio.NewReaderSize(resp.Body, bufferSize),
-		Closer: resp.Body,
-	}, nil
+	return resp.Body, nil
 }
 
 // GetSize returns file size.

@@ -40,6 +40,7 @@ import (
 const (
 	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
 	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
+	s3DefaultUploadConcurrency = 2
 )
 
 // Writer represents a s3 storage writer.
@@ -86,6 +87,10 @@ func NewWriter(
 
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
+	}
+
+	if w.UploadConcurrency == 0 {
+		w.UploadConcurrency = s3DefaultUploadConcurrency
 	}
 
 	if w.IsDir {
@@ -171,7 +176,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		chunkSize:   w.ChunkSize,
 		logger:      w.Logger,
 		retryPolicy: w.RetryPolicy,
-		workersPool: pool.NewPool(3),
+		workersPool: pool.NewPool(w.UploadConcurrency),
 	}, nil
 }
 
@@ -220,11 +225,11 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		partNumber := w.partNumber.Load()
 
 		buf := w.buffer.Bytes()
-
+		// Upload part in a separate goroutine.
 		w.workersPool.Submit(func() {
 			w.uploadPart(buf, partNumber)
 		})
-
+		// Reset buffer not to overflow memory.
 		w.buffer = new(bytes.Buffer)
 	}
 
@@ -259,13 +264,14 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 
 		return
 	}
-
+	// Nullify the buffer to avoid memory leak. So GC can collect it.
 	p = nil
 
 	w.cpMu.Lock()
 	w.completedParts = append(w.completedParts, types.CompletedPart{
-		PartNumber:    &partNumber,
-		ETag:          response.ETag,
+		PartNumber: &partNumber,
+		ETag:       response.ETag,
+		// Fill checksums from response.
 		ChecksumCRC32: response.ChecksumCRC32,
 	})
 	w.cpMu.Unlock()
@@ -284,7 +290,7 @@ func (w *s3Writer) Close() error {
 
 		w.uploadPart(lastPart, partNumber)
 	}
-
+	// Wait for all workers to finish.
 	w.workersPool.Wait()
 
 	if err := w.uploadErr.Load(); err != nil {
@@ -318,7 +324,7 @@ func (w *s3Writer) Close() error {
 			},
 		})
 	if err != nil {
-		// Try to abort even if complete failed.
+		// Try to abort even if complete upload failed.
 		_ = w.abortUpload(err)
 		return fmt.Errorf("failed to complete multipart upload, %w", err)
 	}
@@ -330,7 +336,7 @@ func (w *s3Writer) Close() error {
 
 // abortUpload aborts the multipart upload and cleans up partial data
 func (w *s3Writer) abortUpload(originalErr error) error {
-	// Use a fresh context for cleanup (not the cancelled one)
+	// Use a fresh context for cleanup (not the cancelled one).
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

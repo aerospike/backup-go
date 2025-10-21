@@ -85,6 +85,7 @@ func NewReader(
 
 	// Set default val.
 	r.PollWarmDuration = common.DefaultPollWarmDuration
+	// Discard handler.
 	r.Logger = slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.Level(1024)}))
 
 	for _, opt := range opts {
@@ -399,7 +400,7 @@ func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.Acc
 			RehydratePriority: &priority,
 		})
 	if err != nil {
-		return fmt.Errorf("starting rehydration: %w", err)
+		return fmt.Errorf("failed to set tier: %w", err)
 	}
 
 	return nil
@@ -464,7 +465,7 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 		switch state {
 		case objStatusArchived:
 			if err = r.rehydrateObject(ctx, object, tier); err != nil {
-				return fmt.Errorf("failed to restore object: %w", err)
+				return fmt.Errorf("failed to rehydrate object: %w", err)
 			}
 
 			r.objectsToWarm = append(r.objectsToWarm, object)

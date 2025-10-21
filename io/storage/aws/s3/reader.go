@@ -93,6 +93,7 @@ func NewReader(
 
 	// Set default val.
 	r.PollWarmDuration = common.DefaultPollWarmDuration
+	// Discard handler.
 	r.Logger = slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.Level(1024)}))
 
 	for _, opt := range opts {

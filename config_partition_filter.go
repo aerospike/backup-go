@@ -254,10 +254,10 @@ func ParsePartitionFilterListString(namespace, filters string) ([]*a.PartitionFi
 	filterSlice := strings.Split(filters, ",")
 	partitionFilters := make([]*a.PartitionFilter, 0, len(filterSlice))
 
-	for i := range filterSlice {
-		partitionFilter, err := ParsePartitionFilterString(namespace, filterSlice[i])
+	for _, filter := range filterSlice {
+		partitionFilter, err := ParsePartitionFilterString(namespace, filter)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse partition filter, filter: %s, err: %v", filterSlice[i], err)
+			return nil, fmt.Errorf("failed to parse partition filter, filter: %s, err: %w", filter, err)
 		}
 
 		partitionFilters = append(partitionFilters, partitionFilter)

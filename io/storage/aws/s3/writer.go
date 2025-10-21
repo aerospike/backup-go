@@ -259,7 +259,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 
 		return
 	}
-	
+
 	p = nil
 
 	w.cpMu.Lock()
@@ -277,15 +277,10 @@ func (w *s3Writer) Close() error {
 	}
 
 	if w.buffer.Len() > 0 {
-		lastPart := make([]byte, w.buffer.Len())
-
-		_, err := w.buffer.Read(lastPart)
-		if err != nil {
-			return err
-		}
-
 		w.partNumber.Add(1)
 		partNumber := w.partNumber.Load()
+
+		lastPart := w.buffer.Bytes()
 
 		w.uploadPart(lastPart, partNumber)
 	}

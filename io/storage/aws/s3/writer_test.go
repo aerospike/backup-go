@@ -195,7 +195,7 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, false)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -249,7 +249,7 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, false)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -285,7 +285,7 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile, false)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContentAsb))
 	s.Require().NoError(err)

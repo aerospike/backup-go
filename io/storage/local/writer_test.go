@@ -40,7 +40,7 @@ func Test_openBackupFile(t *testing.T) {
 	factory, err := NewWriter(ctx, options.WithRemoveFiles(), options.WithDir(tmpDir))
 	require.NoError(t, err)
 
-	w, err := factory.NewWriter(context.Background(), "test")
+	w, err := factory.NewWriter(context.Background(), "test", false)
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
@@ -420,7 +420,7 @@ func TestWriter_NewWriter_CanceledContext(t *testing.T) {
 		},
 	}
 
-	_, err := w.NewWriter(ctx, testFileName)
+	_, err := w.NewWriter(ctx, testFileName, false)
 	require.Error(t, err)
 	require.Equal(t, ctx.Err(), err)
 }
@@ -437,7 +437,7 @@ func TestWriter_NewWriter_CreateDirError(t *testing.T) {
 		},
 	}
 
-	_, err := w.NewWriter(context.Background(), testFileName)
+	_, err := w.NewWriter(context.Background(), testFileName, false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to prepare backup directory")
 }
@@ -457,7 +457,7 @@ func TestWriter_NewWriter_WithFile(t *testing.T) {
 		},
 	}
 
-	writer, err := w.NewWriter(context.Background(), "ignored.txt")
+	writer, err := w.NewWriter(context.Background(), "ignored.txt", false)
 	require.NoError(t, err)
 
 	_, err = writer.Write([]byte("test data"))
@@ -485,7 +485,7 @@ func TestWriter_NewWriter_WithDir(t *testing.T) {
 	}
 
 	fileName := testFileName
-	writer, err := w.NewWriter(context.Background(), fileName)
+	writer, err := w.NewWriter(context.Background(), fileName, false)
 	require.NoError(t, err)
 
 	_, err = writer.Write([]byte("test data"))
@@ -515,11 +515,11 @@ func TestWriter_NewWriter_ParallelWithFile_Error(t *testing.T) {
 		},
 	}
 
-	writer1, err := w.NewWriter(context.Background(), "ignored1.txt")
+	writer1, err := w.NewWriter(context.Background(), "ignored1.txt", false)
 	require.NoError(t, err)
 	defer writer1.Close()
 
-	_, err = w.NewWriter(context.Background(), "ignored2.txt")
+	_, err = w.NewWriter(context.Background(), "ignored2.txt", false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "parallel running for single file is not allowed")
 }

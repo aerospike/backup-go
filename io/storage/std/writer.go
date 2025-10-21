@@ -60,8 +60,8 @@ func (w *stdoutWriteCloser) Close() error {
 }
 
 // NewWriter creates a new stdout writer closer.
-// The file name is ignored for stdout.
-func (w *Writer) NewWriter(ctx context.Context, _ string) (io.WriteCloser, error) {
+// The file name and isMeta is ignored for stdout.
+func (w *Writer) NewWriter(ctx context.Context, _ string, _ bool) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

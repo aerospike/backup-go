@@ -132,7 +132,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 	)
 	s.Require().NoError(err)
 
-	writer, err := writers.NewWriter(ctx, filename)
+	writer, err := writers.NewWriter(ctx, filename, false)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}
@@ -207,7 +207,7 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 	)
 	s.Require().NoError(err)
 
-	writer, err := writers.NewWriter(ctx, filename)
+	writer, err := writers.NewWriter(ctx, filename, false)
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}

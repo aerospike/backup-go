@@ -1198,7 +1198,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 		options.WithDir(directory),
 	)
 	require.NoError(t, err)
-	w, err := writer.NewWriter(ctx, fmt.Sprintf("%s-%s.asb", testASNamespace, setName))
+	w, err := writer.NewWriter(ctx, fmt.Sprintf("%s-%s.asb", testASNamespace, setName), false)
 	require.NoError(t, err)
 	require.NotNil(t, w)
 

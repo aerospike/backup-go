@@ -83,8 +83,8 @@ func (_c *MockWriter_GetType_Call) RunAndReturn(run func() string) *MockWriter_G
 }
 
 // NewWriter provides a mock function for the type MockWriter
-func (_mock *MockWriter) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
-	ret := _mock.Called(ctx, filename)
+func (_mock *MockWriter) NewWriter(ctx context.Context, filename string, isMeta bool) (io.WriteCloser, error) {
+	ret := _mock.Called(ctx, filename, isMeta)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewWriter")
@@ -92,18 +92,18 @@ func (_mock *MockWriter) NewWriter(ctx context.Context, filename string) (io.Wri
 
 	var r0 io.WriteCloser
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (io.WriteCloser, error)); ok {
-		return returnFunc(ctx, filename)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (io.WriteCloser, error)); ok {
+		return returnFunc(ctx, filename, isMeta)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) io.WriteCloser); ok {
-		r0 = returnFunc(ctx, filename)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) io.WriteCloser); ok {
+		r0 = returnFunc(ctx, filename, isMeta)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(io.WriteCloser)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, filename)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = returnFunc(ctx, filename, isMeta)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -118,13 +118,14 @@ type MockWriter_NewWriter_Call struct {
 // NewWriter is a helper method to define mock.On call
 //   - ctx
 //   - filename
-func (_e *MockWriter_Expecter) NewWriter(ctx interface{}, filename interface{}) *MockWriter_NewWriter_Call {
-	return &MockWriter_NewWriter_Call{Call: _e.mock.On("NewWriter", ctx, filename)}
+//   - isMeta
+func (_e *MockWriter_Expecter) NewWriter(ctx interface{}, filename interface{}, isMeta interface{}) *MockWriter_NewWriter_Call {
+	return &MockWriter_NewWriter_Call{Call: _e.mock.On("NewWriter", ctx, filename, isMeta)}
 }
 
-func (_c *MockWriter_NewWriter_Call) Run(run func(ctx context.Context, filename string)) *MockWriter_NewWriter_Call {
+func (_c *MockWriter_NewWriter_Call) Run(run func(ctx context.Context, filename string, isMeta bool)) *MockWriter_NewWriter_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(bool))
 	})
 	return _c
 }
@@ -134,7 +135,7 @@ func (_c *MockWriter_NewWriter_Call) Return(writeCloser io.WriteCloser, err erro
 	return _c
 }
 
-func (_c *MockWriter_NewWriter_Call) RunAndReturn(run func(ctx context.Context, filename string) (io.WriteCloser, error)) *MockWriter_NewWriter_Call {
+func (_c *MockWriter_NewWriter_Call) RunAndReturn(run func(ctx context.Context, filename string, isMeta bool) (io.WriteCloser, error)) *MockWriter_NewWriter_Call {
 	_c.Call.Return(run)
 	return _c
 }

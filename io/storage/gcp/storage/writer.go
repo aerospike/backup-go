@@ -109,10 +109,11 @@ func NewWriter(
 }
 
 // NewWriter returns a new GCP storage writer for the provided path.
-func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+// isMeta describe if the file is a metadata file.
+func (w *Writer) NewWriter(ctx context.Context, filename string, isMeta bool) (io.WriteCloser, error) {
 	// protection for single file backup.
 	if !w.IsDir {
-		if !w.called.CompareAndSwap(false, true) {
+		if !isMeta && !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 		// If we use backup to single file, we overwrite the file name.

@@ -42,7 +42,8 @@ type Writer interface {
 	// a new writer, they might be working in parallel. Backup logic will close
 	// the writer after backup is done. Header func is executed on a writer
 	// after creation (on each one in case of multipart file).
-	NewWriter(ctx context.Context, filename string) (io.WriteCloser, error)
+	// isMeta describe if the file is a metadata file.
+	NewWriter(ctx context.Context, filename string, isMeta bool) (io.WriteCloser, error)
 
 	// GetType returns the type of storage. Used in logging.
 	GetType() string

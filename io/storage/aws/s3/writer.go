@@ -219,8 +219,10 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		w.partNumber.Add(1)
 		partNumber := w.partNumber.Load()
 
+		buf := w.buffer.Bytes()
+
 		w.workersPool.Submit(func() {
-			w.uploadPart(w.buffer.Bytes(), partNumber)
+			w.uploadPart(buf, partNumber)
 		})
 
 		w.buffer = new(bytes.Buffer)

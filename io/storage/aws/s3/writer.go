@@ -259,6 +259,8 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 
 		return
 	}
+	
+	p = nil
 
 	w.cpMu.Lock()
 	w.completedParts = append(w.completedParts, types.CompletedPart{

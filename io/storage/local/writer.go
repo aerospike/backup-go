@@ -222,6 +222,7 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string, isMeta bool) (i
 	}
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
 	var filePath string
+
 	switch {
 	case w.IsDir:
 		// If it is directory.

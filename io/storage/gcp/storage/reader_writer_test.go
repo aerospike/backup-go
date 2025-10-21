@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -758,8 +759,8 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 	s.Require().NoError(err)
 
 	pathList := []string{
-		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 0)),
-		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 2)),
+		path.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 0)),
+		path.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 2)),
 	}
 
 	reader, err := NewReader(
@@ -805,8 +806,8 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 	s.Require().NoError(err)
 
 	pathList := []string{
-		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 0)),
-		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 2)),
+		path.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 0)),
+		path.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 2)),
 	}
 
 	reader, err := NewReader(

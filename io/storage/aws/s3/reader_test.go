@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -311,8 +312,8 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 	})
 
 	pathList := []string{
-		filepath.Join(testFolderPathList, "1732519390025"),
-		filepath.Join(testFolderPathList, "1732519590025"),
+		path.Join(testFolderPathList, "1732519390025"),
+		path.Join(testFolderPathList, "1732519590025"),
 	}
 
 	reader, err := NewReader(
@@ -362,8 +363,8 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	})
 
 	pathList := []string{
-		filepath.Join(testFolderFileList, "backup_1.asb"),
-		filepath.Join(testFolderFileList, "backup_2.asb"),
+		path.Join(testFolderFileList, "backup_1.asb"),
+		path.Join(testFolderFileList, "backup_2.asb"),
 	}
 
 	reader, err := NewReader(
@@ -1002,8 +1003,8 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 
 	// Define a list of objects to stream
 	objectsToStream := []string{
-		filepath.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 0)),
-		filepath.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 1)),
+		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 0)),
+		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 1)),
 	}
 
 	// Set the objects to stream

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"sync"
 	"testing"
 
@@ -87,13 +86,13 @@ func createAwsCredentials() error {
 		return fmt.Errorf("error getting home directory: %w", err)
 	}
 
-	awsDir := filepath.Join(home, ".aws")
+	awsDir := path.Join(home, ".aws")
 	err = os.MkdirAll(awsDir, 0o700)
 	if err != nil {
 		return fmt.Errorf("error creating .aws directory: %w", err)
 	}
 
-	filePath := filepath.Join(awsDir, "credentials")
+	filePath := path.Join(awsDir, "credentials")
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		credentialsFileBytes := []byte(`[minio]

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
@@ -116,12 +117,22 @@ func (w *Writer) NewWriter(ctx context.Context, filename string, isMeta bool) (i
 		if !isMeta && !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
-		// If we use backup to single file, we overwrite the file name.
-		filename = w.PathList[0]
 	}
 
-	filename = fmt.Sprintf("%s%s", w.prefix, filename)
-	sw := w.bucketHandle.Object(filename).NewWriter(ctx)
+	var fullPath string
+
+	switch {
+	case w.IsDir:
+		fullPath = path.Join(w.prefix, filename)
+	case isMeta && !w.IsDir:
+		// If it is metadata file and we backup to one file.
+		fullPath = path.Join(path.Dir(w.PathList[0]), filename)
+	default:
+		// If we use backup to single file, we overwrite the file name.
+		fullPath = path.Join(w.prefix, w.PathList[0])
+	}
+
+	sw := w.bucketHandle.Object(fullPath).NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass

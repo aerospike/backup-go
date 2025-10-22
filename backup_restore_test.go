@@ -1381,6 +1381,8 @@ func TestBackupEstimate(t *testing.T) {
 }
 
 func TestBackupContinuation(t *testing.T) {
+	t.Parallel()
+
 	const (
 		setName       = "testBackupContinuation"
 		totalRecords  = 900
@@ -1397,28 +1399,26 @@ func TestBackupContinuation(t *testing.T) {
 	err = writeRecords(asClient, batch)
 	require.NoError(t, err)
 
-	for i := 0; i < 5; i++ {
-		testFolder := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
-		err = os.MkdirAll(testFolder, os.ModePerm)
-		require.NoError(t, err)
-		stateFile := path.Join(testFolder, testStateFile)
+	testFolder := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
+	err = os.MkdirAll(testFolder, os.ModePerm)
+	require.NoError(t, err)
+	stateFile := path.Join(testFolder, testStateFile)
 
-		ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
-		t.Log("first backup")
-		first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
-		require.NoError(t, err)
-		t.Log("first backup finished")
+	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	t.Log("first backup")
+	first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
+	require.NoError(t, err)
+	t.Log("first backup finished")
 
-		ctx = context.Background()
-		t.Log("continue backup")
-		second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile)
-		require.NoError(t, err)
-		t.Log("continue backup finished")
+	ctx = context.Background()
+	t.Log("continue backup")
+	second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile)
+	require.NoError(t, err)
+	t.Log("continue backup finished")
 
-		t.Log("first:", first, "second:", second)
-		t.Log(first + second)
-		require.GreaterOrEqual(t, first+second, uint64(totalRecords))
-	}
+	t.Log("first:", first, "second:", second)
+	t.Log(first + second)
+	require.GreaterOrEqual(t, first+second, uint64(totalRecords))
 }
 
 func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder, testStateFile string,

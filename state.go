@@ -168,6 +168,11 @@ func (s *State) serve() {
 }
 
 func (s *State) dump(n int) error {
+	// Skip meta data.
+	if n == -1 {
+		return nil
+	}
+
 	file, err := s.writer.NewWriter(s.ctx, s.FileName)
 	if err != nil {
 		return fmt.Errorf("failed to create state file %s: %w", s.FileName, err)

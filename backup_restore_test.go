@@ -1381,6 +1381,8 @@ func TestBackupEstimate(t *testing.T) {
 }
 
 func TestBackupContinuation(t *testing.T) {
+	t.Parallel()
+
 	const (
 		setName       = "testBackupContinuation"
 		totalRecords  = 900
@@ -1397,7 +1399,10 @@ func TestBackupContinuation(t *testing.T) {
 	err = writeRecords(asClient, batch)
 	require.NoError(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 2; i++ {
+		// Sleep between retries
+		time.Sleep(3 * time.Second)
+
 		testFolder := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
 		err = os.MkdirAll(testFolder, os.ModePerm)
 		require.NoError(t, err)

@@ -40,7 +40,7 @@ import (
 const (
 	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
 	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
-	s3DefaultUploadConcurrency = 2
+	s3DefaultUploadConcurrency = 1
 )
 
 // Writer represents a s3 storage writer.

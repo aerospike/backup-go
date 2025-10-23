@@ -1198,13 +1198,13 @@ func TestRestoreExpiredRecords(t *testing.T) {
 		options.WithDir(directory),
 	)
 	require.NoError(t, err)
-	w, err := writer.NewWriter(ctx, fmt.Sprintf("%s-%s.asb", testASNamespace, setName), false)
+	w, err := writer.NewWriter(ctx, fmt.Sprintf("%s-%s.asb", testASNamespace, setName), true)
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
 	encoder := NewEncoder[*models.Token](EncoderTypeASB, testASNamespace, false, false)
 
-	header := encoder.GetHeader(0, false)
+	header := encoder.GetHeader(0, true)
 
 	_, err = w.Write(header)
 	require.NoError(t, err)

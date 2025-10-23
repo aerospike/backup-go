@@ -168,7 +168,7 @@ func (s *State) serve() {
 }
 
 func (s *State) dump(n int) error {
-	file, err := s.writer.NewWriter(s.ctx, s.FileName, true)
+	file, err := s.writer.NewWriter(s.ctx, s.FileName, false)
 	if err != nil {
 		return fmt.Errorf("failed to create state file %s: %w", s.FileName, err)
 	}

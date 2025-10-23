@@ -17,6 +17,7 @@ package common
 import (
 	"fmt"
 	"path"
+	"sync/atomic"
 )
 
 // GetFullPath returns full path for file or directory, according to params.
@@ -37,4 +38,16 @@ func GetFullPath(prefix, filename string, pathList []string, isDir, isRecords bo
 		// If we use backup to a single file, we overwrite the file name.
 		return path.Join(prefix, pathList[0]), nil
 	}
+}
+
+// RestrictParallelBackup checks if we can run backup in parallel for single file or directory.
+func RestrictParallelBackup(called *atomic.Bool, isDir, isRecords bool) error {
+	// protection for single file backup.
+	if !isDir {
+		if isRecords && !called.CompareAndSwap(false, true) {
+			return fmt.Errorf("parallel running for single file is not allowed")
+		}
+	}
+
+	return nil
 }

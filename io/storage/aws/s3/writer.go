@@ -141,13 +141,11 @@ func NewWriter(
 }
 
 // NewWriter returns a new S3 writer to the specified path.
-// isRecords describe if the file contains record data.
+// isRecords indicates whether the file contains record data.
 func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.IsDir {
-		if isRecords && !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
-		}
+	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
+		return nil, err
 	}
 
 	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
@@ -227,9 +225,13 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 
 		buf := w.buffer.Bytes()
 		// Upload part in a separate goroutine.
-		w.workersPool.Submit(func() {
+		if err := w.workersPool.Submit(func() {
 			w.uploadPart(buf, partNumber)
-		})
+		}); err != nil {
+			if w.logger != nil {
+				return 0, fmt.Errorf("failed to submit upload part task: %w", err)
+			}
+		}
 		// Reset buffer for the next chunk.
 		w.buffer = new(bytes.Buffer)
 	}
@@ -338,7 +340,7 @@ func (w *s3Writer) Close() error {
 			}
 		}
 
-		return fmt.Errorf("failed to complete multipart upload, %w", err)
+		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
 	w.cpMu.Unlock()

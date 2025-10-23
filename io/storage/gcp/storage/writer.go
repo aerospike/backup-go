@@ -112,10 +112,8 @@ func NewWriter(
 // isRecords describe if the file contains record data.
 func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.IsDir {
-		if isRecords && !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
-		}
+	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
+		return nil, err
 	}
 
 	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)

@@ -17,6 +17,8 @@ package pool
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 const defaultPoolSize = 3
@@ -26,10 +28,11 @@ func TestPool_Wait(t *testing.T) {
 	gPool := NewPool(defaultPoolSize)
 	for i := 0; i < 10; i++ {
 		taskID := i
-		gPool.Submit(func() {
+		err := gPool.Submit(func() {
 			t.Logf("working on task %d\n", taskID)
 			time.Sleep(1 * time.Second)
 		})
+		require.NoError(t, err)
 	}
 	gPool.Wait()
 	t.Log("done")

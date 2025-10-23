@@ -225,13 +225,9 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 
 		buf := w.buffer.Bytes()
 		// Upload part in a separate goroutine.
-		if err := w.workersPool.Submit(func() {
+		w.workersPool.Submit(func() {
 			w.uploadPart(buf, partNumber)
-		}); err != nil {
-			if w.logger != nil {
-				return 0, fmt.Errorf("failed to submit upload part task: %w", err)
-			}
-		}
+		})
 		// Reset buffer for the next chunk.
 		w.buffer = new(bytes.Buffer)
 	}

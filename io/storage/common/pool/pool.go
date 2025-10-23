@@ -15,17 +15,14 @@
 package pool
 
 import (
-	"fmt"
 	"sync"
-	"sync/atomic"
 )
 
 // Pool simple pool for goroutines.
 type Pool struct {
-	workers   int
-	wg        sync.WaitGroup
-	workChan  chan struct{}
-	isWaiting atomic.Bool
+	workers  int
+	wg       sync.WaitGroup
+	workChan chan struct{}
 }
 
 // NewPool returns new goroutine pool.
@@ -39,10 +36,7 @@ func NewPool(workers int) *Pool {
 }
 
 // Submit adds new goroutine to pool.
-func (p *Pool) Submit(f func()) error {
-	if p.isWaiting.Load() {
-		return fmt.Errorf("pool doesn't accept new jobs, wait till all jobs will be finished")
-	}
+func (p *Pool) Submit(f func()) {
 	// Adding one to a waiting group.
 	p.wg.Add(1)
 	// Adding empty field to chanel to take one worker place.
@@ -55,12 +49,9 @@ func (p *Pool) Submit(f func()) error {
 		// Remove message from channel to release space for new worker.
 		<-p.workChan
 	}()
-
-	return nil
 }
 
 // Wait waits till all goroutines will be finished.
 func (p *Pool) Wait() {
-	p.isWaiting.Store(true)
 	p.wg.Wait()
 }

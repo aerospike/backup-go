@@ -177,12 +177,12 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	// If it is set, we use it as a prefix.
 	prefix := fw.prefix
 	// Is it a metadata file?
-	var isMeta bool
+	isRecords := true
 
 	if n == -1 {
 		// For metadata writer create a separate file.
 		prefix = metadataFileNamePrefix
-		isMeta = true
+		isRecords = false
 	}
 
 	if prefix == "" {
@@ -193,7 +193,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 
 	// Create a file writer.
-	storageWriter, err := fw.writer.NewWriter(ctx, filename, isMeta)
+	storageWriter, err := fw.writer.NewWriter(ctx, filename, isRecords)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage writer: %w", err)
 	}
@@ -220,7 +220,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	}
 
 	// Write file header.
-	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isMeta))
+	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isRecords))
 	if err != nil {
 		return nil, fmt.Errorf("failed to write header: %w", err)
 	}

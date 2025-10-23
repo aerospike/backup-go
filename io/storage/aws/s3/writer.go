@@ -17,11 +17,11 @@ package s3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-	"path"
 	"sort"
 	"strings"
 	"sync"
@@ -141,26 +141,18 @@ func NewWriter(
 }
 
 // NewWriter returns a new S3 writer to the specified path.
-// isMeta describe if the file is a metadata file.
-func (w *Writer) NewWriter(ctx context.Context, filename string, isMeta bool) (io.WriteCloser, error) {
+// isRecords describe if the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
 	if !w.IsDir {
-		if !isMeta && !w.called.CompareAndSwap(false, true) {
+		if isRecords && !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 	}
 
-	var fullPath string
-
-	switch {
-	case w.IsDir:
-		fullPath = path.Join(w.prefix, filename)
-	case isMeta && !w.IsDir:
-		// If it is metadata file and we backup to one file.
-		fullPath = path.Join(path.Dir(w.PathList[0]), filename)
-	default:
-		// If we use backup to single file, we overwrite the file name.
-		fullPath = path.Join(w.prefix, w.PathList[0])
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
 
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
@@ -212,7 +204,7 @@ type s3Writer struct {
 
 	chunkSize   int
 	partNumber  atomic.Int32
-	closed      bool
+	closed      atomic.Bool
 	logger      *slog.Logger
 	retryPolicy *models.RetryPolicy
 	workersPool *pool.Pool
@@ -222,7 +214,7 @@ type s3Writer struct {
 var _ io.WriteCloser = (*s3Writer)(nil)
 
 func (w *s3Writer) Write(p []byte) (int, error) {
-	if w.closed {
+	if w.closed.Load() {
 		return 0, os.ErrClosed
 	}
 
@@ -231,15 +223,14 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer.Len() >= w.chunkSize {
-		w.partNumber.Add(1)
-		partNumber := w.partNumber.Load()
+		partNumber := w.partNumber.Add(1)
 
 		buf := w.buffer.Bytes()
 		// Upload part in a separate goroutine.
 		w.workersPool.Submit(func() {
 			w.uploadPart(buf, partNumber)
 		})
-		// Reset buffer not to overflow memory.
+		// Reset buffer for the next chunk.
 		w.buffer = new(bytes.Buffer)
 	}
 
@@ -274,8 +265,6 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 
 		return
 	}
-	// Nullify the buffer to avoid memory leak. So GC can collect it.
-	p = nil
 
 	w.cpMu.Lock()
 	w.completedParts = append(w.completedParts, types.CompletedPart{
@@ -288,13 +277,12 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 }
 
 func (w *s3Writer) Close() error {
-	if w.closed {
+	if w.closed.Load() {
 		return os.ErrClosed
 	}
 
 	if w.buffer.Len() > 0 {
-		w.partNumber.Add(1)
-		partNumber := w.partNumber.Load()
+		partNumber := w.partNumber.Add(1)
 
 		lastPart := w.buffer.Bytes()
 
@@ -313,14 +301,20 @@ func (w *s3Writer) Close() error {
 		return *w.completedParts[i].PartNumber < *w.completedParts[j].PartNumber
 	})
 
-	parts := w.completedParts
-	w.cpMu.Unlock()
-
 	// Verify no gaps in part numbers.
-	for i, part := range parts {
+	for i, part := range w.completedParts {
 		expectedPartNum := int32(i + 1)
 		if *part.PartNumber != expectedPartNum {
-			return w.abortUpload(fmt.Errorf("missing part %d in upload sequence", expectedPartNum))
+			if err := w.abortUpload(fmt.Errorf("missing part %d in upload sequence", expectedPartNum)); err != nil {
+				if w.logger != nil {
+					w.logger.Error("failed to abort multipart upload",
+						slog.String("key", w.key),
+						slog.String("uploadID", *w.uploadID),
+						slog.Any("error", err))
+				}
+
+				return err
+			}
 		}
 	}
 
@@ -330,16 +324,26 @@ func (w *s3Writer) Close() error {
 			UploadId: w.uploadID,
 			Key:      &w.key,
 			MultipartUpload: &types.CompletedMultipartUpload{
-				Parts: parts,
+				Parts: w.completedParts,
 			},
 		})
 	if err != nil {
 		// Try to abort even if complete upload failed.
-		_ = w.abortUpload(err)
+		if abErr := w.abortUpload(err); abErr != nil {
+			if w.logger != nil {
+				w.logger.Error("failed to abort multipart upload",
+					slog.String("key", w.key),
+					slog.String("uploadID", *w.uploadID),
+					slog.Any("error", err))
+			}
+		}
+
 		return fmt.Errorf("failed to complete multipart upload, %w", err)
 	}
 
-	w.closed = true
+	w.cpMu.Unlock()
+
+	w.closed.Store(true)
 
 	return nil
 }
@@ -356,14 +360,7 @@ func (w *s3Writer) abortUpload(originalErr error) error {
 		UploadId: w.uploadID,
 	})
 
-	if err != nil {
-		w.logger.Error("failed to abort multipart upload",
-			slog.String("key", w.key),
-			slog.String("uploadID", *w.uploadID),
-			slog.Any("error", err))
-	}
-
-	return originalErr
+	return errors.Join(originalErr, err)
 }
 
 func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix string) (bool, error) {

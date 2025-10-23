@@ -71,12 +71,14 @@ func newRangeReader(ctx context.Context, client s3Getter, bucket, key *string) (
 
 // OpenRange opens a file by range.
 func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
+	// We can't validate checksum for range requests, so we don't set ChecksumMode param in GetObjectInput.
+	// Checksums are generated on upload by S3 for chunk, so when we request data by range, we can't validate its checksum.
+	// Link to issue: https://github.com/aws/aws-sdk-java-v2/issues/5421
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:  r.bucket,
 		Key:     r.key,
 		Range:   getRangeHeader(offset, count),
 		IfMatch: r.etag,
-		// We cant validate checksum for range requests.
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object %s: %w", *r.key, err)

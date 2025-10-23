@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
 	"sync/atomic"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -122,26 +121,18 @@ func NewWriter(
 }
 
 // NewWriter returns a new Azure blob writer to the specified path.
-// isMeta describe if the file is a metadata file.
-func (w *Writer) NewWriter(ctx context.Context, filename string, isMeta bool) (io.WriteCloser, error) {
+// isRecords describe if the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
 	if !w.IsDir {
-		if !isMeta && !w.called.CompareAndSwap(false, true) {
+		if isRecords && !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 	}
 
-	var fullPath string
-
-	switch {
-	case w.IsDir:
-		fullPath = path.Join(w.prefix, filename)
-	case isMeta && !w.IsDir:
-		// If it is metadata file and we backup to one file.
-		fullPath = path.Join(path.Dir(w.PathList[0]), filename)
-	default:
-		// If we use backup to single file, we overwrite the file name.
-		fullPath = path.Join(w.prefix, w.PathList[0])
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
 
 	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(fullPath)

@@ -202,8 +202,8 @@ func (bf *bufferedFile) Close() error {
 
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the specified fileName.
-// isMeta describe if the file is a metadata file.
-func (w *Writer) NewWriter(ctx context.Context, fileName string, isMeta bool) (io.WriteCloser, error) {
+// isRecords describe if the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, fileName string, isRecords bool) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -216,7 +216,7 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string, isMeta bool) (i
 
 	// protection for single file backup.
 	if !w.IsDir {
-		if !isMeta && !w.called.CompareAndSwap(false, true) {
+		if isRecords && !w.called.CompareAndSwap(false, true) {
 			return nil, fmt.Errorf("parallel running for single file is not allowed")
 		}
 	}
@@ -227,7 +227,7 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string, isMeta bool) (i
 	case w.IsDir:
 		// If it is directory.
 		filePath = filepath.Join(w.PathList[0], fileName)
-	case isMeta && !w.IsDir:
+	case !isRecords && !w.IsDir:
 		// If it is metadata file and we backup to one file.
 		filePath = filepath.Join(filepath.Dir(w.PathList[0]), fileName)
 	default:

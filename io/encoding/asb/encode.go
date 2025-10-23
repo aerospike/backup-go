@@ -103,11 +103,11 @@ func (e *Encoder[T]) encodeSIndex(sIndex *models.SIndex, buff *bytes.Buffer) (in
 	return sindexToASB(sIndex, buff)
 }
 
-func (e *Encoder[T]) GetHeader(_ uint64, isMeta bool) []byte {
+func (e *Encoder[T]) GetHeader(_ uint64, isRecords bool) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 1024))
 
-	writeVersionText(e.headerVersion(isMeta), buff)
+	writeVersionText(e.headerVersion(isRecords), buff)
 
 	writeNamespaceMetaText(e.config.Namespace, buff)
 
@@ -118,12 +118,12 @@ func (e *Encoder[T]) GetHeader(_ uint64, isMeta bool) []byte {
 	return buff.Bytes()
 }
 
-func (e *Encoder[T]) headerVersion(isMeta bool) string {
-	if isMeta {
-		return e.config.getVersion().toString()
+func (e *Encoder[T]) headerVersion(isRecords bool) string {
+	if isRecords {
+		return version31.toString()
 	}
 
-	return version31.toString()
+	return e.config.getVersion().toString()
 }
 
 // **** META DATA ****

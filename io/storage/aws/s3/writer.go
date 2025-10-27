@@ -240,24 +240,16 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 		return
 	}
 
-	var response *s3.UploadPartOutput
-
-	err := w.retryPolicy.Do(w.ctx, func() error {
-		var uploadErr error
-
-		response, uploadErr = w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-			Body:              bytes.NewReader(p),
-			Bucket:            &w.bucket,
-			Key:               &w.key,
-			PartNumber:        &partNumber,
-			UploadId:          w.uploadID,
-			ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
-		})
-
-		return uploadErr
+	response, uploadErr := w.client.UploadPart(w.ctx, &s3.UploadPartInput{
+		Body:              bytes.NewReader(p),
+		Bucket:            &w.bucket,
+		Key:               &w.key,
+		PartNumber:        &partNumber,
+		UploadId:          w.uploadID,
+		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
 	})
-	if err != nil {
-		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", w.partNumber.Load(), err)) {
+	if uploadErr != nil {
+		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", w.partNumber.Load(), uploadErr)) {
 			w.cancel()
 		}
 

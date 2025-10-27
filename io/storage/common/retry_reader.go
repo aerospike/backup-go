@@ -156,7 +156,7 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		readErr error
 	)
 
-	retryErr := r.retryPolicy.Do(r.ctx, func() error {
+	retryfunc := func() error {
 		n, readErr = r.reader.Read(p)
 		if readErr == nil {
 			// Success reading updated offset.
@@ -193,7 +193,9 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		}
 
 		return readErr
-	})
+	}
+
+	retryErr := retryfunc()
 
 	// If retry failed (context cancelled, etc), return retry error.
 	if retryErr != nil {

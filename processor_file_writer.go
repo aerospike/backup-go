@@ -166,7 +166,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 
 	// Create a file writer.
-	storageWriter, err := fw.writer.NewWriter(ctx, filename)
+	storageWriter, err := fw.writer.NewWriter(ctx, filename, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage writer: %w", err)
 	}

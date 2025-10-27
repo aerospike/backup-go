@@ -36,7 +36,7 @@ type StreamingReader interface {
 	// StreamFiles creates readers from files and sends them to the channel.
 	// In case of an error, the error is sent to the error channel.
 	// Must be run in a goroutine `go rh.reader.StreamFiles(ctx, readersCh, errorsCh)`.
-	StreamFiles(context.Context, chan<- models.File, chan<- error)
+	StreamFiles(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string)
 
 	// StreamFile creates a single file reader and sends io.Readers to the `readersCh`
 	// In case of an error, it is sent to the `errorsCh` channel.

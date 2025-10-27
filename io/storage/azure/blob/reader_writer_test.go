@@ -244,6 +244,7 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 		testContainerName,
 		options.WithDir(testReadFolderWithData),
 		options.WithValidator(validatorMock{}),
+		options.WithCalculateTotalSize(),
 	)
 	s.Require().NoError(err)
 

@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"sync"
 	"testing"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
@@ -87,13 +86,13 @@ func createAwsCredentials() error {
 		return fmt.Errorf("error getting home directory: %w", err)
 	}
 
-	awsDir := filepath.Join(home, ".aws")
+	awsDir := path.Join(home, ".aws")
 	err = os.MkdirAll(awsDir, 0o700)
 	if err != nil {
 		return fmt.Errorf("error creating .aws directory: %w", err)
 	}
 
-	filePath := filepath.Join(awsDir, "credentials")
+	filePath := path.Join(awsDir, "credentials")
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		credentialsFileBytes := []byte(`[minio]
@@ -187,15 +186,15 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testWriteFolderEmpty),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testWriteFolderEmpty),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -225,8 +224,8 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testWriteFolderWithDataError),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testWriteFolderWithDataError),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -241,15 +240,15 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testWriteFolderWithData),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithDir(testWriteFolderWithData),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -280,12 +279,12 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithFile(filePath),
-		ioStorage.WithChunkSize(testChunkSize),
+		options.WithFile(filePath),
+		options.WithChunkSize(testChunkSize),
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile, true)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContentAsb))
 	s.Require().NoError(err)
@@ -311,8 +310,8 @@ func (s *WriterSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucket,
-		ioStorage.WithDir(testFolderTypeCheck),
-		ioStorage.WithRemoveFiles(),
+		options.WithDir(testFolderTypeCheck),
+		options.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 

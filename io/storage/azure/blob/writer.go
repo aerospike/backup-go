@@ -23,7 +23,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/common"
+	"github.com/aerospike/backup-go/io/storage/options"
 )
 
 const (
@@ -35,7 +36,7 @@ const (
 // Writer represents a GCP storage writer.
 type Writer struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	client *azblob.Client
 	// containerName contains name of the container to read from.
@@ -52,7 +53,7 @@ func NewWriter(
 	ctx context.Context,
 	client *azblob.Client,
 	containerName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Writer, error) {
 	w := &Writer{
 		client: client,
@@ -77,7 +78,7 @@ func NewWriter(
 	}
 
 	if w.IsDir {
-		w.prefix = ioStorage.CleanPath(w.PathList[0], false)
+		w.prefix = common.CleanPath(w.PathList[0], false)
 	}
 
 	// Check if container exists.
@@ -120,18 +121,19 @@ func NewWriter(
 }
 
 // NewWriter returns a new Azure blob writer to the specified path.
-func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+// isRecords describe if the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.IsDir {
-		if !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
-		}
-		// If we use backup to single file, we overwrite the file name.
-		filename = w.PathList[0]
+	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
+		return nil, err
 	}
 
-	filename = fmt.Sprintf("%s%s", w.prefix, filename)
-	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full path: %w", err)
+	}
+
+	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(fullPath)
 
 	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, int64(w.ChunkSize)), nil
 }
@@ -242,7 +244,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		return nil
 	}
 
-	prefix := ioStorage.CleanPath(targetPath, false)
+	prefix := common.CleanPath(targetPath, false)
 	// Remove files from dir.
 	pager := w.client.NewListBlobsFlatPager(w.containerName, &azblob.ListBlobsFlatOptions{
 		Prefix: &prefix,
@@ -256,7 +258,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 
 		for _, blobItem := range page.Segment.BlobItems {
 			// Skip files in folders.
-			if ioStorage.IsDirectory(prefix, *blobItem.Name) && !w.WithNestedDir {
+			if common.IsDirectory(prefix, *blobItem.Name) && !w.WithNestedDir {
 				continue
 			}
 

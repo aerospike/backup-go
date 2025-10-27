@@ -17,26 +17,36 @@ package s3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-	"path"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/common"
+	"github.com/aerospike/backup-go/io/storage/common/pool"
+	"github.com/aerospike/backup-go/io/storage/options"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part
+const (
+	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
+	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
+	s3DefaultUploadConcurrency = 1
+)
 
 // Writer represents a s3 storage writer.
 type Writer struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	client *s3.Client
 	// bucketName contains name of the bucket to read from.
@@ -59,7 +69,7 @@ func NewWriter(
 	ctx context.Context,
 	client *s3.Client,
 	bucketName string,
-	opts ...ioStorage.Opt,
+	opts ...options.Opt,
 ) (*Writer, error) {
 	w := &Writer{}
 
@@ -79,8 +89,12 @@ func NewWriter(
 		w.ChunkSize = s3DefaultChunkSize
 	}
 
+	if w.UploadConcurrency == 0 {
+		w.UploadConcurrency = s3DefaultUploadConcurrency
+	}
+
 	if w.IsDir {
-		w.prefix = ioStorage.CleanPath(w.PathList[0], true)
+		w.prefix = common.CleanPath(w.PathList[0], true)
 	}
 
 	// Check if the bucket exists and we have permissions.
@@ -127,37 +141,42 @@ func NewWriter(
 }
 
 // NewWriter returns a new S3 writer to the specified path.
-func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+// isRecords indicates whether the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.IsDir {
-		if !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
-		}
-		// If we use backup to single file, we overwrite the file name.
-		filename = w.PathList[0]
+	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
+		return nil, err
 	}
 
-	fullPath := path.Join(w.prefix, filename)
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full path: %w", err)
+	}
 
 	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket:       &w.bucketName,
-		Key:          &fullPath,
-		StorageClass: w.storageClass,
+		Bucket:            &w.bucketName,
+		Key:               &fullPath,
+		StorageClass:      w.storageClass,
+		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &s3Writer{
-		ctx:        ctx,
-		uploadID:   upload.UploadId,
-		key:        fullPath,
-		client:     w.client,
-		bucket:     w.bucketName,
-		buffer:     new(bytes.Buffer),
-		partNumber: 1,
-		chunkSize:  w.ChunkSize,
-		logger:     w.Logger,
+		ctx:         ctx,
+		cancel:      cancel,
+		uploadID:    upload.UploadId,
+		key:         fullPath,
+		client:      w.client,
+		bucket:      w.bucketName,
+		buffer:      new(bytes.Buffer),
+		chunkSize:   w.ChunkSize,
+		logger:      w.Logger,
+		retryPolicy: w.RetryPolicy,
+		workersPool: pool.NewPool(w.UploadConcurrency),
 	}, nil
 }
 
@@ -169,70 +188,131 @@ func (w *Writer) GetType() string {
 // s3Writer wrapper for writing files, as S3 in not supporting creation of io.Writer.
 type s3Writer struct {
 	// ctx is stored internally so that it can be used in io.WriteCloser methods
-	ctx            context.Context
-	uploadID       *string
-	client         *s3.Client
-	buffer         *bytes.Buffer
-	key            string
-	bucket         string
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	uploadID *string
+	client   *s3.Client
+	buffer   *bytes.Buffer
+	key      string
+	bucket   string
+
+	cpMu           sync.Mutex
 	completedParts []types.CompletedPart
-	chunkSize      int
-	partNumber     int32
-	closed         bool
-	logger         *slog.Logger
+
+	chunkSize   int
+	partNumber  atomic.Int32
+	closed      atomic.Bool
+	logger      *slog.Logger
+	retryPolicy *models.RetryPolicy
+	workersPool *pool.Pool
+	uploadErr   atomic.Value
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
 
 func (w *s3Writer) Write(p []byte) (int, error) {
-	if w.closed {
+	if w.closed.Load() {
 		return 0, os.ErrClosed
 	}
 
+	if err := w.uploadErr.Load(); err != nil {
+		return 0, err.(error)
+	}
+
 	if w.buffer.Len() >= w.chunkSize {
-		err := w.uploadPart()
-		if err != nil {
-			return 0, fmt.Errorf("failed to upload part: %w", err)
-		}
+		partNumber := w.partNumber.Add(1)
+
+		buf := w.buffer.Bytes()
+		// Upload part in a separate goroutine.
+		w.workersPool.Submit(func() {
+			w.uploadPart(buf, partNumber)
+		})
+		// Reset buffer for the next chunk.
+		w.buffer = new(bytes.Buffer)
 	}
 
 	return w.buffer.Write(p)
 }
 
-func (w *s3Writer) uploadPart() error {
-	response, err := w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-		Body:       bytes.NewReader(w.buffer.Bytes()),
-		Bucket:     &w.bucket,
-		Key:        &w.key,
-		PartNumber: &w.partNumber,
-		UploadId:   w.uploadID,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to upload part: %w", err)
+func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
+	if w.ctx.Err() != nil || w.uploadErr.Load() != nil {
+		return
 	}
 
-	p := w.partNumber
-	w.completedParts = append(w.completedParts, types.CompletedPart{
-		PartNumber: &p,
-		ETag:       response.ETag,
+	var response *s3.UploadPartOutput
+
+	err := w.retryPolicy.Do(w.ctx, func() error {
+		var uploadErr error
+
+		response, uploadErr = w.client.UploadPart(w.ctx, &s3.UploadPartInput{
+			Body:              bytes.NewReader(p),
+			Bucket:            &w.bucket,
+			Key:               &w.key,
+			PartNumber:        &partNumber,
+			UploadId:          w.uploadID,
+			ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
+		})
+
+		return uploadErr
 	})
+	if err != nil {
+		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", w.partNumber.Load(), err)) {
+			w.cancel()
+		}
 
-	w.partNumber++
-	w.buffer.Reset()
+		return
+	}
 
-	return nil
+	w.cpMu.Lock()
+	w.completedParts = append(w.completedParts, types.CompletedPart{
+		PartNumber: &partNumber,
+		ETag:       response.ETag,
+		// Fill checksums from response.
+		ChecksumCRC32: response.ChecksumCRC32,
+	})
+	w.cpMu.Unlock()
 }
 
 func (w *s3Writer) Close() error {
-	if w.closed {
+	if w.closed.Load() {
 		return os.ErrClosed
 	}
 
 	if w.buffer.Len() > 0 {
-		err := w.uploadPart()
-		if err != nil {
-			return fmt.Errorf("failed to upload part: %w", err)
+		partNumber := w.partNumber.Add(1)
+
+		lastPart := w.buffer.Bytes()
+
+		w.uploadPart(lastPart, partNumber)
+	}
+	// Wait for all workers to finish.
+	w.workersPool.Wait()
+
+	if err := w.uploadErr.Load(); err != nil {
+		return err.(error)
+	}
+
+	// Sort completed parts by part number (required by S3).
+	w.cpMu.Lock()
+	sort.Slice(w.completedParts, func(i, j int) bool {
+		return *w.completedParts[i].PartNumber < *w.completedParts[j].PartNumber
+	})
+
+	// Verify no gaps in part numbers.
+	for i, part := range w.completedParts {
+		expectedPartNum := int32(i + 1)
+		if *part.PartNumber != expectedPartNum {
+			if err := w.abortUpload(fmt.Errorf("missing part %d in upload sequence", expectedPartNum)); err != nil {
+				if w.logger != nil {
+					w.logger.Error("failed to abort multipart upload",
+						slog.String("key", w.key),
+						slog.String("uploadID", *w.uploadID),
+						slog.Any("error", err))
+				}
+
+				return err
+			}
 		}
 	}
 
@@ -246,12 +326,39 @@ func (w *s3Writer) Close() error {
 			},
 		})
 	if err != nil {
-		return fmt.Errorf("failed to complete multipart upload, %w", err)
+		// Try to abort even if complete upload failed.
+		if abErr := w.abortUpload(err); abErr != nil {
+			if w.logger != nil {
+				w.logger.Error("failed to abort multipart upload",
+					slog.String("key", w.key),
+					slog.String("uploadID", *w.uploadID),
+					slog.Any("error", err))
+			}
+		}
+
+		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	w.closed = true
+	w.cpMu.Unlock()
+
+	w.closed.Store(true)
 
 	return nil
+}
+
+// abortUpload aborts the multipart upload and cleans up partial data
+func (w *s3Writer) abortUpload(originalErr error) error {
+	// Use a fresh context for cleanup (not the cancelled one).
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := w.client.AbortMultipartUpload(cleanupCtx, &s3.AbortMultipartUploadInput{
+		Bucket:   &w.bucket,
+		Key:      &w.key,
+		UploadId: w.uploadID,
+	})
+
+	return errors.Join(originalErr, err)
 }
 
 func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix string) (bool, error) {
@@ -293,7 +400,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove files from dir.
 	var continuationToken *string
 
-	prefix := ioStorage.CleanPath(targetPath, true)
+	prefix := common.CleanPath(targetPath, true)
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -306,7 +413,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || ioStorage.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
+			if p.Key == nil || common.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
 				continue
 			}
 

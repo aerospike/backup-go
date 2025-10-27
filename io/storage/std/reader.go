@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -99,7 +99,7 @@ func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
 	if ctx.Err() != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, ctx.Err())
+		common.ErrToChan(ctx, errorsCh, ctx.Err())
 		return
 	}
 
@@ -108,9 +108,15 @@ func (r *Reader) StreamFile(
 
 // StreamFiles opens stdin as files and sends io.Readers to the `readersCh`
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, _ []string,
 ) {
 	defer close(readersCh)
 
 	r.StreamFile(ctx, stdinType, readersCh, errorsCh)
+}
+
+// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// no-op func to satisfy interface.
+func (r *Reader) GetSkipped() []string {
+	return nil
 }

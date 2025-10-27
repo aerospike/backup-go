@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package s3
+package common
 
 import (
 	"context"
@@ -25,16 +25,9 @@ import (
 	"syscall"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
+	"github.com/aws/smithy-go"
 )
-
-type s3getter interface {
-	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
-	) (*s3.HeadObjectOutput, error)
-	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options),
-	) (*s3.GetObjectOutput, error)
-}
 
 // readerCloser interface for mocking tests.
 //
@@ -43,36 +36,38 @@ type readerCloser interface {
 	io.ReadCloser
 }
 
-// retryableReader is a wrapper around the s3 reader that implements the retryable interface.
-type retryableReader struct {
-	client      s3getter
-	retryPolicy *models.RetryPolicy
-
-	ctx    context.Context
-	reader io.ReadCloser
-	closed atomic.Bool
-
-	eTag      *string
-	bucket    string
-	key       string
-	position  int64
-	totalSize int64
-
-	logger *slog.Logger
+// rangeReader interface for range reader. That reads a file from a specific offset.
+type rangeReader interface {
+	OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error)
+	GetSize() int64
+	GetInfo() string
 }
 
-// newRetryableReader returns a new retryable reader.
-func newRetryableReader(
-	ctx context.Context, client s3getter, retryPolicy *models.RetryPolicy, logger *slog.Logger, bucket, key string,
-) (*retryableReader, error) {
-	// Get file size to calculate when to finish.
-	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
+// RetryableReader is a wrapper around the s3 reader that implements the retryable interface.
+type RetryableReader struct {
+	ctx         context.Context
+	rangeReader rangeReader
+	reader      io.ReadCloser
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get object size: %w", err)
+	retryPolicy *models.RetryPolicy
+	logger      *slog.Logger
+	offset      int64
+	totalSize   int64
+
+	closed atomic.Bool
+}
+
+// NewRetryableReader returns a new retryable reader.
+func NewRetryableReader(
+	ctx context.Context,
+	rangeReader rangeReader,
+	retryPolicy *models.RetryPolicy,
+	logger *slog.Logger,
+) (*RetryableReader, error) {
+	if logger != nil {
+		logger = logger.With(
+			slog.String("fileinfo", rangeReader.GetInfo()),
+		)
 	}
 
 	// Set the default retry policy if it is not set.
@@ -80,25 +75,14 @@ func newRetryableReader(
 		retryPolicy = models.NewDefaultRetryPolicy()
 	}
 
-	if logger != nil {
-		logger = logger.With(
-			slog.String("bucket", bucket),
-			slog.String("key", key),
-		)
-	}
+	totalSize := rangeReader.GetSize()
 
-	r := &retryableReader{
-		client:      client,
-		bucket:      bucket,
-		key:         key,
-		retryPolicy: retryPolicy,
+	r := &RetryableReader{
 		ctx:         ctx,
+		rangeReader: rangeReader,
+		retryPolicy: retryPolicy,
+		totalSize:   totalSize,
 		logger:      logger,
-		eTag:        head.ETag,
-	}
-
-	if head.ContentLength != nil {
-		r.totalSize = *head.ContentLength
 	}
 
 	if err := r.openStream(); err != nil {
@@ -115,45 +99,31 @@ func newRetryableReader(
 }
 
 // openStream opens a new stream with offset if needed.
-func (r *retryableReader) openStream() error {
+func (r *RetryableReader) openStream() error {
 	if r.closed.Load() {
 		return fmt.Errorf("reader is closed")
 	}
 
-	// Calc the range header if we need to resume the download.
-	var rangeHeader *string
-
-	if r.position > 0 {
-		// We read from the current position till the end of the file.
-		// Check https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges for more details.
-		rh := fmt.Sprintf("bytes=%d-", r.position)
+	if r.offset > 0 {
 		if r.logger != nil {
 			r.logger.Debug("start reading from",
-				slog.String("position", rh),
+				slog.Int64("offset", r.offset),
 			)
 		}
-
-		rangeHeader = &rh
 	}
-
-	resp, err := r.client.GetObject(r.ctx, &s3.GetObjectInput{
-		Bucket:  aws.String(r.bucket),
-		Key:     aws.String(r.key),
-		Range:   rangeHeader,
-		IfMatch: r.eTag,
-	})
-
+	// Count = 0 means read to the end of the file.
+	fReader, err := r.rangeReader.OpenRange(r.ctx, r.offset, 0)
 	if err != nil {
-		return fmt.Errorf("failed to get object: %w", err)
+		return fmt.Errorf("failed to get file: %w", err)
 	}
 
-	r.setReader(resp.Body)
+	r.setReader(fReader)
 
 	return nil
 }
 
 // setReader encapsulates set reader logic.
-func (r *retryableReader) setReader(body io.ReadCloser) {
+func (r *RetryableReader) setReader(body io.ReadCloser) {
 	// Close previous stream if exists.
 	if r.reader != nil {
 		err := r.reader.Close()
@@ -170,68 +140,72 @@ func (r *retryableReader) setReader(body io.ReadCloser) {
 }
 
 // Read reads from the stream.
-func (r *retryableReader) Read(p []byte) (int, error) {
+func (r *RetryableReader) Read(p []byte) (int, error) {
 	if r.closed.Load() {
 		return 0, fmt.Errorf("reader is closed")
 	}
 	// If we reached end of file, return EOF.
-	if r.position >= r.totalSize {
+	if r.offset >= r.totalSize {
 		return 0, io.EOF
 	}
 
 	var (
-		lastErr error
-		attempt uint
+		// n will contain a result of Read. Don't shadow it.
+		n int
+		// readErr contains reader error. We need to separate errors to return EOF correctly.
+		readErr error
 	)
 
-	for r.retryPolicy.AttemptsLeft(attempt) {
-		n, err := r.reader.Read(p)
-		if err == nil {
-			// Success reading updated position.
-			r.position += int64(n)
-
-			return n, err
+	retryErr := r.retryPolicy.Do(r.ctx, func() error {
+		n, readErr = r.reader.Read(p)
+		if readErr == nil {
+			// Success reading updated offset.
+			r.offset += int64(n)
+			return nil
 		}
-		// To return the last error at the end of execution.
-		lastErr = err
+
+		// EOF is not retryable - return success to stop retry.
+		if errors.Is(readErr, io.EOF) {
+			return nil
+		}
+
 		// Do not log EOF errors.
-		if r.logger != nil && !errors.Is(err, io.EOF) {
+		if r.logger != nil {
 			r.logger.Debug("retryable reader got error",
-				slog.Any("err", err),
+				slog.Any("error", readErr),
 			)
 		}
 
-		if isNetworkError(err) {
+		if isRetryableError(readErr) {
 			if r.logger != nil {
 				r.logger.Warn("retry read",
-					slog.Any("attempt", attempt),
-					slog.Any("err", err),
+					slog.Any("error", readErr),
 				)
 			}
-
-			r.retryPolicy.Sleep(attempt)
-
-			attempt++
 
 			// Open a new stream.
-			if rErr := r.openStream(); rErr != nil {
+			// Attention: we only log streamErr, as retry will work anyway.
+			if streamErr := r.openStream(); streamErr != nil {
 				r.logger.Warn("failed to reopen stream",
-					slog.Any("attempt", attempt),
-					slog.Any("err", rErr),
+					slog.Any("error", streamErr),
 				)
 			}
-
-			continue
 		}
 
-		return n, err
+		return readErr
+	})
+
+	// If retry failed (context cancelled, etc), return retry error.
+	if retryErr != nil {
+		return n, retryErr
 	}
 
-	return 0, fmt.Errorf("failed after %d attempts: %w", attempt, lastErr)
+	// Otherwise return what Read returned (might be io.EOF or nil)
+	return n, readErr
 }
 
 // Close closes the reader.
-func (r *retryableReader) Close() error {
+func (r *RetryableReader) Close() error {
 	if r.closed.Load() {
 		return nil
 	}
@@ -267,6 +241,29 @@ func isNetworkError(err error) bool {
 	var nErr net.Error
 	if errors.As(err, &nErr) && nErr.Timeout() {
 		return true
+	}
+
+	return false
+}
+
+func isRetryableError(err error) bool {
+	if isNetworkError(err) {
+		return true
+	}
+
+	// AWS service errors
+	var oe *smithy.OperationError
+	if errors.As(err, &oe) {
+		var httpErr *awshttp.ResponseError
+		if errors.As(oe.Err, &httpErr) {
+			statusCode := httpErr.HTTPStatusCode()
+			// Retry 500, 503, 429.
+			// Sources:
+			// https://repost.aws/knowledge-center/http-5xx-errors-s3
+			// https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
+			// OpenObject will be retried by ASW Client, but .Read() will be retried by us.
+			return statusCode == 500 || statusCode == 503 || statusCode == 429
+		}
 	}
 
 	return false

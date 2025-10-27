@@ -24,7 +24,8 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/common"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -33,7 +34,7 @@ const localType = "directory"
 // Reader represents local storage reader.
 type Reader struct {
 	// Optional parameters.
-	ioStorage.Options
+	options.Options
 
 	// objectsToStream is used to predefine a list of objects that must be read from storage.
 	// If objectsToStream is not set, we iterate through objects in storage and load them.
@@ -44,12 +45,15 @@ type Reader struct {
 	totalSize atomic.Int64
 	// total number of objects in a path.
 	totalNumber atomic.Int64
+
+	// If `skipPrefix` was set on the `StreamFiles` function, skipped file names will be stored here.
+	skipped *common.SkippedFiles
 }
 
 // NewReader creates a new local directory/file Reader.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithValidator(v validator) - optional.
-func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
+func NewReader(ctx context.Context, opts ...options.Opt) (*Reader, error) {
 	r := &Reader{}
 
 	for _, opt := range opts {
@@ -64,13 +68,13 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 		if !r.SkipDirCheck {
 			for _, path := range r.PathList {
 				if err := r.checkRestoreDirectory(path); err != nil {
-					return nil, fmt.Errorf("%w: %w", ioStorage.ErrEmptyStorage, err)
+					return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
 				}
 			}
 		}
 
 		if r.SortFiles && len(r.PathList) == 1 {
-			if err := ioStorage.PreSort(ctx, r, r.PathList[0]); err != nil {
+			if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
 				return nil, fmt.Errorf("failed to pre sort: %w", err)
 			}
 		}
@@ -84,8 +88,9 @@ func NewReader(ctx context.Context, opts ...ioStorage.Opt) (*Reader, error) {
 // StreamFiles reads file/directory from disk and sends io.Readers to the `readersCh`
 // communication channel for lazy loading.
 // In case of an error, it is sent to the `errorsCh` channel.
+// If `skipPrefix` is set, it will skip files that start with this prefix and save a skipped list of files.
 func (r *Reader) StreamFiles(
-	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error,
+	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
 	defer close(readersCh)
 
@@ -93,6 +98,10 @@ func (r *Reader) StreamFiles(
 	if len(r.objectsToStream) > 0 {
 		r.streamSetObjects(ctx, readersCh, errorsCh)
 		return
+	}
+	// Init file skipper when skipPrefix is set.
+	if len(skipPrefixes) > 0 {
+		r.skipped = common.NewSkippedFiles(skipPrefixes)
 	}
 
 	for _, path := range r.PathList {
@@ -102,7 +111,7 @@ func (r *Reader) StreamFiles(
 			if !r.SkipDirCheck {
 				err := r.checkRestoreDirectory(path)
 				if err != nil {
-					ioStorage.ErrToChan(ctx, errorsCh, err)
+					common.ErrToChan(ctx, errorsCh, err)
 					return
 				}
 			}
@@ -120,13 +129,13 @@ func (r *Reader) streamDirectory(
 ) {
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read path %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read path %s: %w", path, err))
 		return
 	}
 
 	for _, file := range fileInfo {
 		if err = ctx.Err(); err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, err)
+			common.ErrToChan(ctx, errorsCh, err)
 			return
 		}
 
@@ -145,7 +154,7 @@ func (r *Reader) streamDirectory(
 		// Skip empty files.
 		info, err := file.Info()
 		if err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s: %w", filePath, err))
 			return
 		}
 
@@ -162,11 +171,16 @@ func (r *Reader) streamDirectory(
 			}
 		}
 
+		// If skipPrefix is set we save skipped filepath and continue.
+		if r.skipped.Skip(filePath) {
+			continue
+		}
+
 		var reader io.ReadCloser
 
 		reader, err = os.Open(filePath)
 		if err != nil {
-			ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filePath, err))
 			return
 		}
 
@@ -179,13 +193,13 @@ func (r *Reader) streamDirectory(
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
 	if ctx.Err() != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, ctx.Err())
+		common.ErrToChan(ctx, errorsCh, ctx.Err())
 		return
 	}
 
 	reader, err := os.Open(filename)
 	if err != nil {
-		ioStorage.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filename, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filename, err))
 		return
 	}
 
@@ -397,4 +411,9 @@ func (r *Reader) GetSize() int64 {
 // GetNumber returns the number of asb/asbx files/dirs that was initialized.
 func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
+}
+
+// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+func (r *Reader) GetSkipped() []string {
+	return r.skipped.GetSkipped()
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package options
 
 import (
 	"log/slog"
@@ -160,7 +160,7 @@ func WithSorting() Opt {
 }
 
 // WithUploadConcurrency defines max number of concurrent uploads to be performed to upload the file.
-// Is used only for Azure Writer.
+// Is used only for Azure, S3 Writer.
 func WithUploadConcurrency(v int) Opt {
 	return func(r *Options) {
 		r.UploadConcurrency = v

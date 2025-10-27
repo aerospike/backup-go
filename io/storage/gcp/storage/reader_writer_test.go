@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -25,7 +26,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/internal/util"
-	ioStorage "github.com/aerospike/backup-go/io/storage"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -44,6 +45,7 @@ const (
 	testReadFolderPathList        = "folder_path_list/"
 	testReadFolderFileList        = "folder_file_list/"
 	testReadFolderSorted          = "folder_sorted/"
+	testReadFolderSkipped         = "folder_read_skipped/"
 
 	testWriteFolderEmpty         = "folder_write_empty/"
 	testWriteFolderWithData      = "folder_write_with_data/"
@@ -58,6 +60,7 @@ const (
 	testFileNameTemplateAsbx  = "%d_backup_%d.asbx"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
+	testMetadataPrefix        = "metadata_"
 
 	testFileContent        = "content"
 	testFileContentAsbx    = "content-asbx"
@@ -188,6 +191,18 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 			return err
 		}
 
+		// Skipped
+		fileName = fmt.Sprintf("%s%s", testReadFolderSkipped, fmt.Sprintf(testFileNameTemplate, i))
+		if i%2 == 0 {
+			fileName = fmt.Sprintf("%s%s", testReadFolderSkipped,
+				fmt.Sprintf("%s%s", testMetadataPrefix, fmt.Sprintf(testFileNameTemplate, i)))
+		}
+		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
+		sw.ContentType = fileType
+		if err := writeContent(sw, testFileContent); err != nil {
+			return err
+		}
+
 		// Path list.
 		fileName = fmt.Sprintf("%s%s%s",
 			testReadFolderPathList,
@@ -285,15 +300,15 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderWithData),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithDir(testReadFolderWithData),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -327,15 +342,15 @@ func (s *GCPSuite) TestReader_WithSorting() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderSorted),
-		ioStorage.WithSorting(),
+		options.WithDir(testReadFolderSorted),
+		options.WithSorting(),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -374,9 +389,9 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderEmpty),
-		ioStorage.WithValidator(validatorMock{}),
-		ioStorage.WithNestedDir(),
+		options.WithDir(testReadFolderEmpty),
+		options.WithValidator(validatorMock{}),
+		options.WithNestedDir(),
 	)
 	s.Require().ErrorContains(err, "is empty")
 }
@@ -396,15 +411,15 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderMixedData),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithDir(testReadFolderMixedData),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -437,8 +452,8 @@ func (s *GCPSuite) TestReader_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderMixedData),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithDir(testReadFolderMixedData),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
@@ -461,14 +476,14 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderEmpty),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderEmpty),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -493,8 +508,8 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderWithDataError),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderWithDataError),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }
@@ -514,15 +529,15 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderWithData),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderWithData),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -547,15 +562,15 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testWriteFolderMixedData),
-		ioStorage.WithRemoveFiles(),
-		ioStorage.WithChunkSize(defaultChunkSize),
+		options.WithDir(testWriteFolderMixedData),
+		options.WithRemoveFiles(),
+		options.WithChunkSize(defaultChunkSize),
 	)
 	s.Require().NoError(err)
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -580,8 +595,8 @@ func (s *GCPSuite) TestWriter_GetType() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testFolderTypeCheck),
-		ioStorage.WithRemoveFiles(),
+		options.WithDir(testFolderTypeCheck),
+		options.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
@@ -604,14 +619,14 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
+		options.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -644,14 +659,14 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
+		options.WithFile(fmt.Sprintf("%s%s", testReadFolderOneFile, "file_error")),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	for err = range eCH {
 		s.Require().ErrorContains(err, "object doesn't exist")
@@ -674,11 +689,11 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
+		options.WithFile(fmt.Sprintf("%s%s", testWriteFolderOneFile, testFileNameOneFile)),
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile, true)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContent))
 	s.Require().NoError(err)
@@ -704,17 +719,17 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testReadFolderWithStartOffset),
-		ioStorage.WithStartAfter(startOffset),
-		ioStorage.WithSkipDirCheck(),
-		ioStorage.WithNestedDir(),
+		options.WithDir(testReadFolderWithStartOffset),
+		options.WithStartAfter(startOffset),
+		options.WithSkipDirCheck(),
+		options.WithNestedDir(),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -744,24 +759,24 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 	s.Require().NoError(err)
 
 	pathList := []string{
-		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 0)),
-		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 2)),
+		path.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 0)),
+		path.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 2)),
 	}
 
 	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDirList(pathList),
-		ioStorage.WithValidator(validatorMock{}),
-		ioStorage.WithSkipDirCheck(),
+		options.WithDirList(pathList),
+		options.WithValidator(validatorMock{}),
+		options.WithSkipDirCheck(),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -791,23 +806,23 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 	s.Require().NoError(err)
 
 	pathList := []string{
-		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 0)),
-		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 2)),
+		path.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 0)),
+		path.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 2)),
 	}
 
 	reader, err := NewReader(
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithFileList(pathList),
-		ioStorage.WithValidator(validatorMock{}),
+		options.WithFileList(pathList),
+		options.WithValidator(validatorMock{}),
 	)
 	s.Require().NoError(err)
 
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -840,7 +855,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 		ctx,
 		client,
 		testBucketName,
-		ioStorage.WithDir(testFolderMixedBackups),
+		options.WithDir(testFolderMixedBackups),
 	)
 	s.Require().NoError(err)
 
@@ -853,7 +868,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 	rCH := make(chan models.File)
 	eCH := make(chan error)
 
-	go reader.StreamFiles(ctx, rCH, eCH)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
 
 	var filesCounter int
 
@@ -897,4 +912,50 @@ func readAll(r io.ReadCloser) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
+	s.T().Parallel()
+	s.suiteWg.Wait()
+
+	ctx := context.Background()
+	client, err := storage.NewClient(
+		ctx,
+		option.WithEndpoint(testServiceAddress),
+		option.WithoutAuthentication(),
+	)
+	s.Require().NoError(err)
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucketName,
+		options.WithDir(testReadFolderSkipped),
+		options.WithValidator(validatorMock{}),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+
+	go reader.StreamFiles(ctx, rCH, eCH, []string{testMetadataPrefix})
+
+	var filesCounter int
+
+	for {
+		select {
+		case err := <-eCH:
+			s.Require().NoError(err)
+		case _, ok := <-rCH:
+			if !ok {
+				require.Equal(s.T(), 2, filesCounter)
+				goto Done
+			}
+			filesCounter++
+		}
+	}
+
+Done:
+	skipped := reader.GetSkipped()
+	require.Equal(s.T(), 3, len(skipped))
 }

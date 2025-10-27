@@ -78,7 +78,12 @@ func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := context.Background()
-	streamingReader, err := NewReader(ctx, options.WithValidator(mockValidator), options.WithDir(dir))
+	streamingReader, err := NewReader(
+		ctx,
+		options.WithValidator(mockValidator),
+		options.WithDir(dir),
+		options.WithCalculateTotalSize(),
+	)
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)

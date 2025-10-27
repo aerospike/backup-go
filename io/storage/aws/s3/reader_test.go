@@ -322,6 +322,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 		options.WithDirList(pathList),
 		options.WithValidator(mockValidator),
 		options.WithSkipDirCheck(),
+		options.WithCalculateTotalSize(),
 	)
 	s.Require().NoError(err)
 

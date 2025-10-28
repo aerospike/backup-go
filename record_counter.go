@@ -55,11 +55,6 @@ func newRecordCounter(
 }
 
 func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter) (uint64, error) {
-	rc.logger.Debug("counting records",
-		slog.Bool("isProcessedByNodes", rc.config.isProcessedByNodes()),
-		slog.Bool("isDefaultPartitionFilter", rc.config.isDefaultPartitionFilter()),
-	)
-
 	if rc.config.withoutFilter() {
 		rc.logger.Debug("counting records using info client")
 
@@ -88,15 +83,10 @@ func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, err
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	var err error
-
 	filters := rc.config.PartitionFilters
 
 	if rc.config.isProcessedByNodes() {
-		filters, err = rc.readerProcessor.newPartitionGroupsFromNodes(ctx)
-		if err != nil {
-			return 0, fmt.Errorf("failed to create partition groups: %w", err)
-		}
+		return rc.countRecordsUsingScanByNode(ctx, &scanPolicy)
 	}
 
 	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy, filters)
@@ -120,6 +110,31 @@ func (rc *recordCounter) countRecordsUsingScanByPartitions(
 	}
 
 	return count * uint64(sumPartition(filters)), nil
+}
+
+func (rc *recordCounter) countRecordsUsingScanByNode(
+	ctx context.Context, scanPolicy *a.ScanPolicy,
+) (uint64, error) {
+	partIDs, err := rc.readerProcessor.getPrimaryPartitions(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get primary partitions: %w", err)
+	}
+	//nolint:gosec // G404. No need crypto random for approximate count.
+	randomPartID := partIDs[rand.Intn(len(partIDs))]
+
+	partitionFilter := NewPartitionFilterByID(randomPartID)
+	readerConfig := rc.readerProcessor.newRecordReaderConfig(partitionFilter, scanPolicy)
+
+	recordReader := aerospike.NewRecordReader(
+		ctx, rc.aerospikeClient, readerConfig, rc.logger, aerospike.NewRecordsetCloser())
+	defer recordReader.Close()
+
+	count, err := countRecords(ctx, recordReader)
+	if err != nil {
+		return 0, err
+	}
+
+	return count * uint64(len(partIDs)), nil
 }
 
 // countRecords counts the records returned by the given reader.

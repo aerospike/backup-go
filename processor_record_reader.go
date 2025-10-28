@@ -128,6 +128,20 @@ func (rr *recordReaderProcessor[T]) newPartitionGroups() ([]*a.PartitionFilter, 
 }
 
 func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(ctx context.Context) ([]*a.PartitionFilter, error) {
+	partIDs, err := rr.getPrimaryPartitions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get primary partitions: %w", err)
+	}
+
+	partitionGroups, err := splitPartitionIDs(partIDs, rr.config.ParallelRead)
+	if err != nil {
+		return nil, fmt.Errorf("failed to split partition ids: %w", err)
+	}
+
+	return partitionGroups, nil
+}
+
+func (rr *recordReaderProcessor[T]) getPrimaryPartitions(ctx context.Context) ([]int, error) {
 	nodes, err := rr.getNodes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get nodes: %w", err)
@@ -148,12 +162,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(ctx context.Cont
 		partIDs = append(partIDs, parts...)
 	}
 
-	partitionGroups, err := splitPartitionIDs(partIDs, rr.config.ParallelRead)
-	if err != nil {
-		return nil, fmt.Errorf("failed to split partition ids: %w", err)
-	}
-
-	return partitionGroups, nil
+	return partIDs, nil
 }
 
 func (rr *recordReaderProcessor[T]) getNodes(ctx context.Context) ([]*a.Node, error) {

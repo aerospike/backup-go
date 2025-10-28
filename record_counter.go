@@ -79,26 +79,19 @@ func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, err
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	var err error
-
-	filters := rc.config.PartitionFilters
-
 	if rc.config.isProcessedByNodes() {
-		filters, err = rc.readerProcessor.newPartitionGroupsFromNodes(ctx)
-		if err != nil {
-			return 0, fmt.Errorf("failed to create partition groups: %w", err)
-		}
+		return rc.countRecordsUsingScanByNode(ctx, &scanPolicy)
 	}
 
-	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy, filters)
+	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
 }
 
 func (rc *recordCounter) countRecordsUsingScanByPartitions(
-	ctx context.Context, scanPolicy *a.ScanPolicy, filters []*a.PartitionFilter,
+	ctx context.Context, scanPolicy *a.ScanPolicy,
 ) (uint64, error) {
 	var count uint64
 
-	partitionFilter := randomPartition(filters)
+	partitionFilter := randomPartition(rc.config.PartitionFilters)
 	readerConfig := rc.readerProcessor.newRecordReaderConfig(partitionFilter, scanPolicy)
 
 	recordReader := aerospike.NewRecordReader(
@@ -110,7 +103,32 @@ func (rc *recordCounter) countRecordsUsingScanByPartitions(
 		return 0, err
 	}
 
-	return count * uint64(sumPartition(filters)), nil
+	return count * uint64(sumPartition(rc.config.PartitionFilters)), nil
+}
+
+func (rc *recordCounter) countRecordsUsingScanByNode(
+	ctx context.Context, scanPolicy *a.ScanPolicy,
+) (uint64, error) {
+	partIDs, err := rc.readerProcessor.getPrimaryPartitions(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get primary partitions: %w", err)
+	}
+	//nolint:gosec // G404. No need crypto random for approximate count.
+	randomPartID := partIDs[rand.Intn(len(partIDs))]
+
+	partitionFilter := NewPartitionFilterByID(randomPartID)
+	readerConfig := rc.readerProcessor.newRecordReaderConfig(partitionFilter, scanPolicy)
+
+	recordReader := aerospike.NewRecordReader(
+		ctx, rc.aerospikeClient, readerConfig, rc.logger, aerospike.NewRecordsetCloser())
+	defer recordReader.Close()
+
+	count, err := countRecords(ctx, recordReader)
+	if err != nil {
+		return 0, err
+	}
+
+	return count * uint64(len(partIDs)), nil
 }
 
 // countRecords counts the records returned by the given reader.

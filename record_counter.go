@@ -56,12 +56,8 @@ func newRecordCounter(
 
 func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter) (uint64, error) {
 	if rc.config.withoutFilter() {
-		rc.logger.Debug("counting records using info client")
-
 		return rc.countUsingInfoClient(ctx, infoClient)
 	}
-
-	rc.logger.Debug("counting records using scan")
 
 	return rc.countRecordsUsingScan(ctx)
 }

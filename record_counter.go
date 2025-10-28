@@ -83,21 +83,19 @@ func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, err
 	scanPolicy.IncludeBinData = false
 	scanPolicy.MaxRecords = 0
 
-	filters := rc.config.PartitionFilters
-
 	if rc.config.isProcessedByNodes() {
 		return rc.countRecordsUsingScanByNode(ctx, &scanPolicy)
 	}
 
-	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy, filters)
+	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
 }
 
 func (rc *recordCounter) countRecordsUsingScanByPartitions(
-	ctx context.Context, scanPolicy *a.ScanPolicy, filters []*a.PartitionFilter,
+	ctx context.Context, scanPolicy *a.ScanPolicy,
 ) (uint64, error) {
 	var count uint64
 
-	partitionFilter := randomPartition(filters)
+	partitionFilter := randomPartition(rc.config.PartitionFilters)
 	readerConfig := rc.readerProcessor.newRecordReaderConfig(partitionFilter, scanPolicy)
 
 	recordReader := aerospike.NewRecordReader(
@@ -109,7 +107,7 @@ func (rc *recordCounter) countRecordsUsingScanByPartitions(
 		return 0, err
 	}
 
-	return count * uint64(sumPartition(filters)), nil
+	return count * uint64(sumPartition(rc.config.PartitionFilters)), nil
 }
 
 func (rc *recordCounter) countRecordsUsingScanByNode(

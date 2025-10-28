@@ -162,8 +162,12 @@ func (c *ConfigBackup) isStateContinue() bool {
 	return c.StateFile != "" && c.Continue
 }
 
+// withoutFilter checks if the backup is done without any filter.
 func (c *ConfigBackup) withoutFilter() bool {
-	return c.ModAfter == nil && c.ScanPolicy.FilterExpression == nil
+	return c.ModAfter == nil &&
+		c.ScanPolicy.FilterExpression == nil &&
+		!c.isProcessedByNodes() &&
+		c.isDefaultPartitionFilter()
 }
 
 // validate validates the ConfigBackup.

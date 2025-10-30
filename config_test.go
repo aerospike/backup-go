@@ -70,6 +70,22 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.EncoderType = EncoderTypeASBX
 	assert.ErrorContains(t, config.validate(), "encoder type")
+
+	config = NewDefaultBackupConfig()
+	config.RackList = []int{1, 1}
+	assert.ErrorContains(t, config.validate(), "rack list contains duplicates")
+
+	config = NewDefaultBackupConfig()
+	config.NodeList = []string{"node1", "node1"}
+	assert.ErrorContains(t, config.validate(), "node list contains duplicates")
+
+	config = NewDefaultBackupConfig()
+	config.SetList = []string{"set1", "set1"}
+	assert.ErrorContains(t, config.validate(), "set list contains duplicates")
+
+	config = NewDefaultBackupConfig()
+	config.BinList = []string{"bin1", "bin1"}
+	assert.ErrorContains(t, config.validate(), "bin list contains duplicates")
 }
 
 func TestRestoreConfig_validate(t *testing.T) {
@@ -110,6 +126,14 @@ func TestRestoreConfig_validate(t *testing.T) {
 	connectionType := "tcp"
 	config.SecretAgentConfig = &SecretAgentConfig{ConnectionType: &connectionType}
 	assert.ErrorContains(t, config.validate(), "secret agent")
+
+	config = NewDefaultRestoreConfig()
+	config.SetList = []string{"set1", "set1"}
+	assert.ErrorContains(t, config.validate(), "set list contains duplicates")
+
+	config = NewDefaultRestoreConfig()
+	config.BinList = []string{"bin1", "bin1"}
+	assert.ErrorContains(t, config.validate(), "bin list contains duplicates")
 }
 
 func TestRestoreNamespaceConfig_Validate(t *testing.T) {

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"sync"
 	"testing"
 
@@ -87,13 +86,13 @@ func createAwsCredentials() error {
 		return fmt.Errorf("error getting home directory: %w", err)
 	}
 
-	awsDir := filepath.Join(home, ".aws")
+	awsDir := path.Join(home, ".aws")
 	err = os.MkdirAll(awsDir, 0o700)
 	if err != nil {
 		return fmt.Errorf("error creating .aws directory: %w", err)
 	}
 
-	filePath := filepath.Join(awsDir, "credentials")
+	filePath := path.Join(awsDir, "credentials")
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		credentialsFileBytes := []byte(`[minio]
@@ -195,7 +194,7 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -249,7 +248,7 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -285,7 +284,7 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile, true)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContentAsb))
 	s.Require().NoError(err)

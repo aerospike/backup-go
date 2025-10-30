@@ -25,6 +25,8 @@ import (
 	"syscall"
 
 	"github.com/aerospike/backup-go/models"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
+	"github.com/aws/smithy-go"
 )
 
 // readerCloser interface for mocking tests.
@@ -174,7 +176,7 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 			)
 		}
 
-		if isNetworkError(readErr) {
+		if isRetryableError(readErr) {
 			if r.logger != nil {
 				r.logger.Warn("retry read",
 					slog.Any("error", readErr),
@@ -239,6 +241,29 @@ func isNetworkError(err error) bool {
 	var nErr net.Error
 	if errors.As(err, &nErr) && nErr.Timeout() {
 		return true
+	}
+
+	return false
+}
+
+func isRetryableError(err error) bool {
+	if isNetworkError(err) {
+		return true
+	}
+
+	// AWS service errors
+	var oe *smithy.OperationError
+	if errors.As(err, &oe) {
+		var httpErr *awshttp.ResponseError
+		if errors.As(oe.Err, &httpErr) {
+			statusCode := httpErr.HTTPStatusCode()
+			// Retry 500, 503, 429.
+			// Sources:
+			// https://repost.aws/knowledge-center/http-5xx-errors-s3
+			// https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
+			// OpenObject will be retried by ASW Client, but .Read() will be retried by us.
+			return statusCode == 500 || statusCode == 503 || statusCode == 429
+		}
 	}
 
 	return false

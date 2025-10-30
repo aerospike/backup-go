@@ -26,22 +26,27 @@ func CheckDuplicates[T comparable](items []T) error {
 		if _, exists := seen[v]; exists {
 			// append only if not already recorded as duplicate
 			already := false
+
 			for _, d := range dupes {
 				if d == v {
 					already = true
 					break
 				}
 			}
+
 			if !already {
 				dupes = append(dupes, v)
 			}
+
 			continue
 		}
+
 		seen[v] = struct{}{}
 	}
 
 	if len(dupes) > 0 {
 		return fmt.Errorf("found duplicate values: %v", dupes)
 	}
+
 	return nil
 }

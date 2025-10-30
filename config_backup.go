@@ -67,6 +67,7 @@ type ConfigBackup struct {
 	// Backup the given cluster nodes only.
 	// If it is set, ParallelNodes automatically set to true.
 	// This argument is mutually exclusive with partition-list/AfterDigest arguments.
+	// For proper work, an Aerospike client should be initialized with ClientPolicy.ReplicaPolicy = a.MASTER
 	NodeList []string
 	// SetList is the Aerospike set to back up (optional, given an empty list,
 	// all sets will be backed up).
@@ -76,6 +77,7 @@ type ConfigBackup struct {
 	BinList []string
 	// The list of rack ids.
 	// (optional, given an empty list, all racks will be backed up)
+	// For proper work, an Aerospike client should be initialized with ClientPolicy.ReplicaPolicy = a.MASTER
 	RackList []int
 	// EncoderType describes an Encoder type that will be used on backing up.
 	// Default `EncoderTypeASB` = 0.

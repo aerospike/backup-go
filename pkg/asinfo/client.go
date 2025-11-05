@@ -627,6 +627,7 @@ func (ic *Client) GetRackNodes(ctx context.Context, rackID int) ([]string, error
 	var nodes []string
 
 	rackKey := fmt.Sprintf("rack_%d", rackID)
+
 	for _, v := range resultMap {
 		for n, m := range v {
 			if strings.EqualFold(rackKey, n) {

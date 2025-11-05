@@ -26,6 +26,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
+	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 )
@@ -204,7 +205,8 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignore
 
 	switch {
 	case err == nil: // ok
-	case errors.Is(err, errInvalidToken):
+	case errors.Is(err, errInvalidToken),
+		compression.IsCorruptedError(err):
 		return nil, fmt.Errorf("error while reading %s header: %w. "+
 			"This may happen if the file was compressed/encrypted and the restore config does not"+
 			" contain the proper compression/encryption policy, or the file is corrupted", fileName, err)

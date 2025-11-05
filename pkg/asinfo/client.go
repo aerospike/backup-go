@@ -50,6 +50,7 @@ var (
 
 var (
 	ErrReplicationFactorZero = errors.New("replication factor is zero")
+	ErrNoNode                = errors.New("no node found")
 )
 
 func (av AerospikeVersion) String() string {
@@ -625,16 +626,18 @@ func (ic *Client) GetRackNodes(ctx context.Context, rackID int) ([]string, error
 
 	var nodes []string
 
+	rackKey := fmt.Sprintf("rack_%d", rackID)
+
 	for _, v := range resultMap {
 		for n, m := range v {
-			if strings.HasPrefix(fmt.Sprintf("rack_%d", rackID), n) {
+			if strings.EqualFold(rackKey, n) {
 				nodes = strings.Split(m, ",")
 			}
 		}
 	}
 
 	if len(nodes) == 0 {
-		return nil, fmt.Errorf("failed to find nodes for rack %d", rackID)
+		return nil, fmt.Errorf("failed to find nodes for rack %d: %w", rackID, ErrNoNode)
 	}
 
 	return nodes, nil

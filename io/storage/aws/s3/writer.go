@@ -39,7 +39,7 @@ import (
 
 const (
 	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
-	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
+	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc64nvme
 )
 
 // Writer represents a s3 storage writer.
@@ -264,7 +264,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 		PartNumber: &partNumber,
 		ETag:       response.ETag,
 		// Fill checksums from response.
-		ChecksumCRC32: response.ChecksumCRC32,
+		ChecksumCRC64NVME: response.ChecksumCRC64NVME,
 	})
 	w.cpMu.Unlock()
 }
@@ -311,7 +311,7 @@ func (w *s3Writer) Close() error {
 		}
 	}
 
-	_, err := w.client.CompleteMultipartUpload(w.ctx,
+	r, err := w.client.CompleteMultipartUpload(w.ctx,
 		&s3.CompleteMultipartUploadInput{
 			Bucket:   &w.bucket,
 			UploadId: w.uploadID,
@@ -332,6 +332,16 @@ func (w *s3Writer) Close() error {
 		}
 
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
+	}
+
+	if w.logger != nil {
+		w.logger.Debug("completed multipart upload",
+			slog.String("key", w.key),
+			slog.String("uploadID", *w.uploadID),
+			slog.Int("parts", len(w.completedParts)),
+			slog.String("etag", *r.ETag),
+			slog.String("checksum", *r.ChecksumCRC64NVME),
+		)
 	}
 
 	w.cpMu.Unlock()

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/internal/util"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -66,6 +67,7 @@ type ConfigBackup struct {
 	// Backup the given cluster nodes only.
 	// If it is set, ParallelNodes automatically set to true.
 	// This argument is mutually exclusive with partition-list/AfterDigest arguments.
+	// For proper work, an Aerospike client should be initialized with ClientPolicy.ReplicaPolicy = a.MASTER
 	NodeList []string
 	// SetList is the Aerospike set to back up (optional, given an empty list,
 	// all sets will be backed up).
@@ -75,6 +77,7 @@ type ConfigBackup struct {
 	BinList []string
 	// The list of rack ids.
 	// (optional, given an empty list, all racks will be backed up)
+	// For proper work, an Aerospike client should be initialized with ClientPolicy.ReplicaPolicy = a.MASTER
 	RackList []int
 	// EncoderType describes an Encoder type that will be used on backing up.
 	// Default `EncoderTypeASB` = 0.
@@ -162,8 +165,12 @@ func (c *ConfigBackup) isStateContinue() bool {
 	return c.StateFile != "" && c.Continue
 }
 
+// withoutFilter checks if the backup is done without any filter.
 func (c *ConfigBackup) withoutFilter() bool {
-	return c.ModAfter == nil && c.ScanPolicy.FilterExpression == nil
+	return c.ModAfter == nil &&
+		c.ScanPolicy.FilterExpression == nil &&
+		!c.isProcessedByNodes() &&
+		c.isDefaultPartitionFilter()
 }
 
 // validate validates the ConfigBackup.
@@ -238,6 +245,31 @@ func (c *ConfigBackup) validate() error {
 
 	if c.OutputFilePrefix == metadataFileNamePrefix {
 		return fmt.Errorf("prefix is reserved for metadata files, please use another prefix")
+	}
+
+	// Duplications check.
+	if len(c.NodeList) > 0 {
+		if err := util.CheckDuplicates(c.NodeList); err != nil {
+			return fmt.Errorf("node list contains duplicates: %w", err)
+		}
+	}
+
+	if len(c.RackList) > 0 {
+		if err := util.CheckDuplicates(c.RackList); err != nil {
+			return fmt.Errorf("rack list contains duplicates: %w", err)
+		}
+	}
+
+	if len(c.SetList) > 0 {
+		if err := util.CheckDuplicates(c.SetList); err != nil {
+			return fmt.Errorf("set list contains duplicates: %w", err)
+		}
+	}
+
+	if len(c.BinList) > 0 {
+		if err := util.CheckDuplicates(c.BinList); err != nil {
+			return fmt.Errorf("bin list contains duplicates: %w", err)
+		}
 	}
 
 	return nil

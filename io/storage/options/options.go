@@ -73,6 +73,9 @@ type Options struct {
 	// RetryPolicy is used to control the number of retries for failed requests.
 	// At the moment supported only for S3 Reader.
 	RetryPolicy *models.RetryPolicy
+
+	// CalculateTotalSize determines whether we need to calculate the total size of all files in a path on Reader creation.
+	CalculateTotalSize bool
 }
 
 type Opt func(*Options)
@@ -210,5 +213,13 @@ func WithChunkSize(bytes int) Opt {
 func WithRetryPolicy(policy *models.RetryPolicy) Opt {
 	return func(r *Options) {
 		r.RetryPolicy = policy
+	}
+}
+
+// WithCalculateTotalSize determines whether we need to calculate the total size of all files in a path.
+// Is used only for Reader.
+func WithCalculateTotalSize() Opt {
+	return func(r *Options) {
+		r.CalculateTotalSize = true
 	}
 }

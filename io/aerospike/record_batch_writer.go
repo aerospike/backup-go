@@ -155,7 +155,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				slog.Any("error", opErr),
 			)
 
-			return nil
+			return opErr
 		case shouldRetry(aerr):
 			rw.logger.Debug("Retryable error occurred",
 				slog.Any("error", aerr),

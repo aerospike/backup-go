@@ -302,6 +302,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 		testBucketName,
 		options.WithDir(testReadFolderWithData),
 		options.WithValidator(validatorMock{}),
+		options.WithCalculateTotalSize(),
 	)
 	s.Require().NoError(err)
 

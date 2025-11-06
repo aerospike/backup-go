@@ -15,8 +15,12 @@
 package pool
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const defaultPoolSize = 3
@@ -33,4 +37,35 @@ func TestPool_Wait(t *testing.T) {
 	}
 	gPool.Wait()
 	t.Log("done")
+}
+
+func TestPool_Submit_NilPool(t *testing.T) {
+	var p *Pool
+
+	executed := false
+	p.Submit(func() {
+		executed = true
+	})
+
+	assert.True(t, executed, "function should execute synchronously")
+}
+
+func TestPool_RaceCondition(t *testing.T) {
+	const (
+		workers = 10
+		tasks   = 10000
+	)
+
+	p := NewPool(workers)
+	require.NotNil(t, p)
+
+	var counter atomic.Int32
+	for i := 0; i < tasks; i++ {
+		p.Submit(func() {
+			counter.Add(1)
+		})
+	}
+
+	p.Wait()
+	assert.Equal(t, int32(tasks), counter.Load())
 }

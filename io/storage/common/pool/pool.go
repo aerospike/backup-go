@@ -26,7 +26,12 @@ type Pool struct {
 }
 
 // NewPool returns new goroutine pool.
+// workers <= 0 -> nil (sync mode).
 func NewPool(workers int) *Pool {
+	if workers <= 0 {
+		return nil
+	}
+
 	p := &Pool{
 		workers:  workers,
 		workChan: make(chan struct{}, workers),
@@ -36,22 +41,35 @@ func NewPool(workers int) *Pool {
 }
 
 // Submit adds new goroutine to pool.
+// If p == nil, runs synchronously.
 func (p *Pool) Submit(f func()) {
-	// Adding one to a waiting group.
-	p.wg.Add(1)
+	if p == nil {
+		f()
+
+		return
+	}
+
 	// Adding empty field to chanel to take one worker place.
 	p.workChan <- struct{}{}
+	// Adding one to a waiting group.
+	p.wg.Add(1)
+
 	go func() {
+		// Remove message from channel to release space for new worker.
+		defer func() { <-p.workChan }()
 		// When function will finish it's work we release a waiting group.
 		defer p.wg.Done()
 		// Run our goroutine.
 		f()
-		// Remove message from channel to release space for new worker.
-		<-p.workChan
 	}()
 }
 
-// Wait waits till all goroutines will be finished.
+// Wait waits until all submitted funcs complete.
+// No-op for nil pool.
 func (p *Pool) Wait() {
+	if p == nil {
+		return
+	}
+
 	p.wg.Wait()
 }

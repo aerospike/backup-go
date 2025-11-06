@@ -40,7 +40,6 @@ import (
 const (
 	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
 	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
-	s3DefaultUploadConcurrency = 1
 )
 
 // Writer represents a s3 storage writer.
@@ -87,10 +86,6 @@ func NewWriter(
 
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
-	}
-
-	if w.UploadConcurrency == 0 {
-		w.UploadConcurrency = s3DefaultUploadConcurrency
 	}
 
 	if w.IsDir {
@@ -257,7 +252,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 		return uploadErr
 	})
 	if err != nil {
-		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", w.partNumber.Load(), err)) {
+		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", partNumber, err)) {
 			w.cancel()
 		}
 

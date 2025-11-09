@@ -97,8 +97,8 @@ func (_c *MockazblobGetter_DownloadStream_Call) RunAndReturn(run func(ctx contex
 }
 
 // GetBlobProperties provides a mock function for the type MockazblobGetter
-func (_mock *MockazblobGetter) GetBlobProperties(ctx context.Context, container string, path string) (blob.GetPropertiesResponse, error) {
-	ret := _mock.Called(ctx, container, path)
+func (_mock *MockazblobGetter) GetBlobProperties(ctx context.Context, path string) (blob.GetPropertiesResponse, error) {
+	ret := _mock.Called(ctx, path)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBlobProperties")
@@ -106,16 +106,16 @@ func (_mock *MockazblobGetter) GetBlobProperties(ctx context.Context, container 
 
 	var r0 blob.GetPropertiesResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (blob.GetPropertiesResponse, error)); ok {
-		return returnFunc(ctx, container, path)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (blob.GetPropertiesResponse, error)); ok {
+		return returnFunc(ctx, path)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) blob.GetPropertiesResponse); ok {
-		r0 = returnFunc(ctx, container, path)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) blob.GetPropertiesResponse); ok {
+		r0 = returnFunc(ctx, path)
 	} else {
 		r0 = ret.Get(0).(blob.GetPropertiesResponse)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, container, path)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, path)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -129,15 +129,14 @@ type MockazblobGetter_GetBlobProperties_Call struct {
 
 // GetBlobProperties is a helper method to define mock.On call
 //   - ctx
-//   - container
 //   - path
-func (_e *MockazblobGetter_Expecter) GetBlobProperties(ctx interface{}, container interface{}, path interface{}) *MockazblobGetter_GetBlobProperties_Call {
-	return &MockazblobGetter_GetBlobProperties_Call{Call: _e.mock.On("GetBlobProperties", ctx, container, path)}
+func (_e *MockazblobGetter_Expecter) GetBlobProperties(ctx interface{}, path interface{}) *MockazblobGetter_GetBlobProperties_Call {
+	return &MockazblobGetter_GetBlobProperties_Call{Call: _e.mock.On("GetBlobProperties", ctx, path)}
 }
 
-func (_c *MockazblobGetter_GetBlobProperties_Call) Run(run func(ctx context.Context, container string, path string)) *MockazblobGetter_GetBlobProperties_Call {
+func (_c *MockazblobGetter_GetBlobProperties_Call) Run(run func(ctx context.Context, path string)) *MockazblobGetter_GetBlobProperties_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -147,7 +146,7 @@ func (_c *MockazblobGetter_GetBlobProperties_Call) Return(v blob.GetPropertiesRe
 	return _c
 }
 
-func (_c *MockazblobGetter_GetBlobProperties_Call) RunAndReturn(run func(ctx context.Context, container string, path string) (blob.GetPropertiesResponse, error)) *MockazblobGetter_GetBlobProperties_Call {
+func (_c *MockazblobGetter_GetBlobProperties_Call) RunAndReturn(run func(ctx context.Context, path string) (blob.GetPropertiesResponse, error)) *MockazblobGetter_GetBlobProperties_Call {
 	_c.Call.Return(run)
 	return _c
 }

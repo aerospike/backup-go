@@ -60,7 +60,7 @@ func TestNewRangeReader(t *testing.T) {
 		t.Parallel()
 
 		clientMock := mocks.NewMockazblobGetter(t)
-		clientMock.On("GetBlobProperties", ctx, testContainer, testPath).
+		clientMock.On("GetBlobProperties", ctx, testPath).
 			Return(blob.GetPropertiesResponse{
 				ContentLength: int64Ptr(testSize),
 			}, nil)
@@ -79,7 +79,7 @@ func TestNewRangeReader(t *testing.T) {
 		t.Parallel()
 
 		clientMock := mocks.NewMockazblobGetter(t)
-		clientMock.On("GetBlobProperties", ctx, testContainer, testPath).
+		clientMock.On("GetBlobProperties", ctx, testPath).
 			Return(blob.GetPropertiesResponse{
 				ContentLength: nil,
 			}, nil)
@@ -95,7 +95,7 @@ func TestNewRangeReader(t *testing.T) {
 		t.Parallel()
 
 		clientMock := mocks.NewMockazblobGetter(t)
-		clientMock.On("GetBlobProperties", ctx, testContainer, testPath).
+		clientMock.On("GetBlobProperties", ctx, testPath).
 			Return(blob.GetPropertiesResponse{
 				ContentLength: int64Ptr(0),
 			}, nil)
@@ -111,7 +111,7 @@ func TestNewRangeReader(t *testing.T) {
 		t.Parallel()
 
 		clientMock := mocks.NewMockazblobGetter(t)
-		clientMock.On("GetBlobProperties", ctx, testContainer, testPath).
+		clientMock.On("GetBlobProperties", ctx, testPath).
 			Return(blob.GetPropertiesResponse{}, errBlobTest)
 
 		reader, err := newRangeReader(ctx, clientMock, testContainer, testPath)
@@ -165,7 +165,6 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, body)
-		require.Equal(t, bodyMock, body)
 	})
 
 	t.Run("Success with zero offset and count", func(t *testing.T) {

@@ -15,30 +15,35 @@
 package blob
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
 const (
 	uploadStreamFileType           = "application/octet-stream"
-	uploadStreamBlockSize          = 5 * 1024 * 1024 // 5MB, minimum size of a part
+	uploadStreamBlockSize          = 5 * 1024 * 1024
 	uploadStreamConcurrencyDefault = 5
 )
 
-// Writer represents a GCP storage writer.
+// Writer represents a Azure storage writer.
 type Writer struct {
 	// Optional parameters.
 	options.Options
 
-	client *azblob.Client
+	client          *azblob.Client
+	containerClient *container.Client
 	// containerName contains name of the container to read from.
 	containerName string
 	// prefix contains folder name if we have folders inside the bucket.
@@ -81,8 +86,9 @@ func NewWriter(
 		w.prefix = common.CleanPath(w.PathList[0], false)
 	}
 
-	// Check if container exists.
-	if _, err := client.ServiceClient().NewContainerClient(containerName).GetProperties(ctx, nil); err != nil {
+	// Check if a container exists.
+	w.containerClient = client.ServiceClient().NewContainerClient(containerName)
+	if _, err := w.containerClient.GetProperties(ctx, nil); err != nil {
 		return nil, fmt.Errorf("unable to get container properties: %w", err)
 	}
 
@@ -132,7 +138,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}
 
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
-	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
+	blockBlobClient := w.containerClient.NewBlockBlobClient(filename)
 
 	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, int64(w.ChunkSize)), nil
 }
@@ -143,8 +149,11 @@ var _ io.WriteCloser = (*blobWriter)(nil)
 type blobWriter struct {
 	ctx               context.Context
 	blobClient        *blockblob.Client
+	tier              *blob.AccessTier
 	pipeReader        *io.PipeReader
 	pipeWriter        *io.PipeWriter
+	bw                *bufio.Writer
+	closeOnce         sync.Once
 	done              chan error
 	uploadConcurrency int
 	chunkSize         int64
@@ -156,47 +165,68 @@ func newBlobWriter(
 	pipeReader, pipeWriter := io.Pipe()
 
 	w := &blobWriter{
-		blobClient:        blobClient,
-		ctx:               ctx,
-		pipeReader:        pipeReader,
-		pipeWriter:        pipeWriter,
+		ctx:        ctx,
+		blobClient: blobClient,
+		tier:       tier,
+		pipeReader: pipeReader,
+		pipeWriter: pipeWriter,
+		// TODO: check if we can use bufio.WriterSize and set chunk size with int
+		bw:                bufio.NewWriterSize(pipeWriter, int(chunkSize)),
 		done:              make(chan error, 1),
 		uploadConcurrency: uploadConcurrency,
 		chunkSize:         chunkSize,
 	}
 
-	go w.uploadStream(tier)
+	go w.uploadStream()
 
 	return w
 }
 
-func (w *blobWriter) uploadStream(tier *blob.AccessTier) {
+func (w *blobWriter) uploadStream() {
 	contentType := uploadStreamFileType
-	_, err := w.blobClient.UploadStream(w.ctx, w.pipeReader, &azblob.UploadStreamOptions{
-		BlockSize:   w.chunkSize,
-		Concurrency: w.uploadConcurrency,
-		HTTPHeaders: &blob.HTTPHeaders{
-			BlobContentType: &contentType,
+	_, err := w.blobClient.UploadStream(
+		w.ctx,
+		w.pipeReader,
+		&azblob.UploadStreamOptions{
+			BlockSize:   w.chunkSize,
+			Concurrency: w.uploadConcurrency,
+			HTTPHeaders: &blob.HTTPHeaders{
+				BlobContentType: &contentType,
+			},
+			TransactionalValidation: blob.TransferValidationTypeComputeCRC64(),
+			AccessTier:              w.tier,
 		},
-		AccessTier: tier})
+	)
+
+	if err != nil {
+		w.pipeReader.CloseWithError(err)
+	}
+
+	w.pipeReader.Close()
+
 	w.done <- err
 	close(w.done)
 }
 
 func (w *blobWriter) Write(p []byte) (int, error) {
-	return w.pipeWriter.Write(p)
+	return w.bw.Write(p)
 }
 
 func (w *blobWriter) Close() error {
-	err := w.pipeWriter.Close()
-	if err != nil {
-		return err
-	}
+	var err error
 
-	return <-w.done
+	w.closeOnce.Do(func() {
+		flushErr := w.bw.Flush()
+		closeErr := w.pipeWriter.Close()
+		uploadErr := <-w.done
+
+		err = errors.Join(flushErr, closeErr, uploadErr)
+	})
+
+	return err
 }
 
-// GetType return `gcpStorageType` type of storage. Used in logging.
+// GetType return `azureBlobType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
 	return azureBlobType
 }

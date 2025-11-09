@@ -98,7 +98,7 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	// Check if container exists.
+	// Check if a container exists.
 	r.containerClient = client.ServiceClient().NewContainerClient(containerName)
 	if _, err := r.containerClient.GetProperties(ctx, nil); err != nil {
 		return nil, fmt.Errorf("unable to get container properties: %w", err)
@@ -149,7 +149,7 @@ func NewReader(
 }
 
 // StreamFiles streams file/directory form Azure cloud storage to `readersCh`.
-// If error occurs, it will be sent to `errorsCh.`
+// If an error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {

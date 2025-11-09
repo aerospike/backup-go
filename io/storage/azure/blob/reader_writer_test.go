@@ -245,6 +245,7 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 		options.WithDir(testReadFolderWithData),
 		options.WithValidator(validatorMock{}),
 		options.WithCalculateTotalSize(),
+		options.WithAccessTier("Hot"),
 	)
 	s.Require().NoError(err)
 
@@ -262,6 +263,8 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 		case _, ok := <-rCH:
 			if !ok {
 				require.Equal(s.T(), testFilesNumber, filesCounter)
+				require.Equal(s.T(), int64(testFilesNumber), reader.GetNumber())
+				require.Equal(s.T(), int64(testFilesNumber*testFileContentLength), reader.GetSize())
 				return
 			}
 			filesCounter++
@@ -283,6 +286,7 @@ func (s *AzureSuite) TestReader_WithSorting() {
 		client,
 		testContainerName,
 		options.WithDir(testReadFolderSorted),
+		options.WithCalculateTotalSize(),
 		options.WithSorting(),
 	)
 	s.Require().NoError(err)
@@ -348,6 +352,7 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 		testContainerName,
 		options.WithDir(testReadFolderMixedData),
 		options.WithValidator(validatorMock{}),
+		options.WithCalculateTotalSize(),
 	)
 	s.Require().NoError(err)
 
@@ -475,6 +480,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 		testContainerName,
 		options.WithDir(testWriteFolderEmpty),
 		options.WithChunkSize(uploadStreamBlockSize),
+		options.WithAccessTier("Hot"),
 	)
 	s.Require().NoError(err)
 
@@ -505,6 +511,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 		testContainerName,
 		options.WithDir(testWriteFolderWithDataError),
 		options.WithChunkSize(uploadStreamBlockSize),
+		options.WithAccessTier("Hot"),
 	)
 	s.Require().ErrorContains(err, "backup folder must be empty or set RemoveFiles = true")
 }

@@ -54,7 +54,7 @@ type Reader struct {
 	// Optional parameters.
 	options.Options
 
-	client *s3.Client
+	client s3Client
 
 	// bucketName contains the name of the bucket to read from.
 	bucketName string
@@ -85,7 +85,7 @@ type Reader struct {
 //   - WithHTTPClient using timeouts to prevent socket locks on errors.
 func NewReader(
 	ctx context.Context,
-	client *s3.Client,
+	client s3Client,
 	bucketName string,
 	opts ...options.Opt,
 ) (*Reader, error) {

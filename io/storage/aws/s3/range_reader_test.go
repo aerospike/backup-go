@@ -50,7 +50,7 @@ func TestNewRangeReader(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("HeadObject", ctx, &s3.HeadObjectInput{
 			Bucket: bucket,
 			Key:    key,
@@ -73,7 +73,7 @@ func TestNewRangeReader(t *testing.T) {
 	t.Run("Success with nil ContentLength", func(t *testing.T) {
 		t.Parallel()
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("HeadObject", ctx, &s3.HeadObjectInput{
 			Bucket: bucket,
 			Key:    key,
@@ -93,7 +93,7 @@ func TestNewRangeReader(t *testing.T) {
 	t.Run("Success with zero ContentLength", func(t *testing.T) {
 		t.Parallel()
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("HeadObject", ctx, &s3.HeadObjectInput{
 			Bucket: bucket,
 			Key:    key,
@@ -112,7 +112,7 @@ func TestNewRangeReader(t *testing.T) {
 	t.Run("Success with nil ETag", func(t *testing.T) {
 		t.Parallel()
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("HeadObject", ctx, &s3.HeadObjectInput{
 			Bucket: bucket,
 			Key:    key,
@@ -131,7 +131,7 @@ func TestNewRangeReader(t *testing.T) {
 	t.Run("Error HeadObject failed", func(t *testing.T) {
 		t.Parallel()
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("HeadObject", ctx, &s3.HeadObjectInput{
 			Bucket: bucket,
 			Key:    key,
@@ -160,7 +160,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		bodyMock := closerMock.NewMockreaderCloser(t)
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
 			Bucket:  bucket,
 			Key:     key,
@@ -190,7 +190,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		bodyMock := closerMock.NewMockreaderCloser(t)
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
 			Bucket:  bucket,
 			Key:     key,
@@ -220,7 +220,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 		differentRange := aws.String("bytes=1024-2047")
 		bodyMock := closerMock.NewMockreaderCloser(t)
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
 			Bucket:  bucket,
 			Key:     key,
@@ -247,7 +247,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 	t.Run("Error GetObject failed", func(t *testing.T) {
 		t.Parallel()
 
-		clientMock := mocks.NewMocks3Getter(t)
+		clientMock := mocks.NewMocks3Client(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
 			Bucket:  bucket,
 			Key:     key,

@@ -39,15 +39,39 @@ import (
 
 const (
 	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
-	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc64nvme
+	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
 )
+
+// s3Client an interface for S3 client, for unit testing purposes.
+type s3Client interface {
+	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options),
+	) (*s3.CreateMultipartUploadOutput, error)
+	UploadPart(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options),
+	) (*s3.UploadPartOutput, error)
+	CompleteMultipartUpload(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options),
+	) (*s3.CompleteMultipartUploadOutput, error)
+	AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options),
+	) (*s3.AbortMultipartUploadOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options),
+	) (*s3.ListObjectsV2Output, error)
+	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options),
+	) (*s3.DeleteObjectOutput, error)
+	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options),
+	) (*s3.HeadBucketOutput, error)
+	RestoreObject(ctx context.Context, params *s3.RestoreObjectInput, optFns ...func(*s3.Options,
+	)) (*s3.RestoreObjectOutput, error)
+	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
+	) (*s3.HeadObjectOutput, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options),
+	) (*s3.GetObjectOutput, error)
+}
 
 // Writer represents a s3 storage writer.
 type Writer struct {
 	// Optional parameters.
 	options.Options
 
-	client *s3.Client
+	client s3Client
 	// bucketName contains name of the bucket to read from.
 	bucketName string
 	// prefix contains folder name if we have folders inside the bucket.
@@ -66,7 +90,7 @@ type Writer struct {
 //   - o.BaseEndpoint = &endpoint - if endpoint != ""
 func NewWriter(
 	ctx context.Context,
-	client *s3.Client,
+	client s3Client,
 	bucketName string,
 	opts ...options.Opt,
 ) (*Writer, error) {
@@ -187,7 +211,7 @@ type s3Writer struct {
 	cancel context.CancelFunc
 
 	uploadID *string
-	client   *s3.Client
+	client   s3Client
 	buffer   *bytes.Buffer
 	key      string
 	bucket   string
@@ -264,7 +288,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 		PartNumber: &partNumber,
 		ETag:       response.ETag,
 		// Fill checksums from response.
-		ChecksumCRC64NVME: response.ChecksumCRC64NVME,
+		ChecksumCRC32: response.ChecksumCRC32,
 	})
 	w.cpMu.Unlock()
 }
@@ -340,7 +364,7 @@ func (w *s3Writer) Close() error {
 			slog.String("uploadID", *w.uploadID),
 			slog.Int("parts", len(w.completedParts)),
 			slog.String("etag", *r.ETag),
-			slog.String("checksum", *r.ChecksumCRC64NVME),
+			slog.String("checksum", *r.ChecksumCRC32),
 		)
 	}
 
@@ -366,7 +390,7 @@ func (w *s3Writer) abortUpload(originalErr error) error {
 	return errors.Join(originalErr, err)
 }
 
-func isEmptyDirectory(ctx context.Context, client *s3.Client, bucketName, prefix string) (bool, error) {
+func isEmptyDirectory(ctx context.Context, client s3Client, bucketName, prefix string) (bool, error) {
 	resp, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:  &bucketName,
 		Prefix:  &prefix,

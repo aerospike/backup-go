@@ -78,6 +78,7 @@ func NewWriter(
 	}
 
 	bucketHandler := client.Bucket(bucketName)
+	w.bucketName = bucketName
 	// Check if bucketHandler exists, to avoid errors.
 	_, err := bucketHandler.Attrs(ctx)
 	if err != nil {
@@ -124,6 +125,10 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass
+
+	if w.WithChecksum {
+		sw.SendCRC32C = true
+	}
 
 	return sw, nil
 }

@@ -140,7 +140,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	filename = fmt.Sprintf("%s%s", w.prefix, filename)
 	blockBlobClient := w.containerClient.NewBlockBlobClient(filename)
 
-	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, int64(w.ChunkSize)), nil
+	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, int64(w.ChunkSize), w.WithChecksum), nil
 }
 
 var _ io.WriteCloser = (*blobWriter)(nil)
@@ -157,10 +157,16 @@ type blobWriter struct {
 	done              chan error
 	uploadConcurrency int
 	chunkSize         int64
+	withChecksum      bool
 }
 
 func newBlobWriter(
-	ctx context.Context, blobClient *blockblob.Client, uploadConcurrency int, tier *blob.AccessTier, chunkSize int64,
+	ctx context.Context,
+	blobClient *blockblob.Client,
+	uploadConcurrency int,
+	tier *blob.AccessTier,
+	chunkSize int64,
+	withChecksum bool,
 ) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
 
@@ -170,11 +176,12 @@ func newBlobWriter(
 		tier:       tier,
 		pipeReader: pipeReader,
 		pipeWriter: pipeWriter,
-		// TODO: check if we can use bufio.WriterSize and set chunk size with int
+		// TODO: check if we can use bufio.WriterSize and set chunk size with int. Also check if it affects performance.
 		bw:                bufio.NewWriterSize(pipeWriter, int(chunkSize)),
 		done:              make(chan error, 1),
 		uploadConcurrency: uploadConcurrency,
 		chunkSize:         chunkSize,
+		withChecksum:      withChecksum,
 	}
 
 	go w.uploadStream()
@@ -183,19 +190,27 @@ func newBlobWriter(
 }
 
 func (w *blobWriter) uploadStream() {
+	defer close(w.done)
+
 	contentType := uploadStreamFileType
+
+	usOpt := &azblob.UploadStreamOptions{
+		BlockSize:   w.chunkSize,
+		Concurrency: w.uploadConcurrency,
+		HTTPHeaders: &blob.HTTPHeaders{
+			BlobContentType: &contentType,
+		},
+		AccessTier: w.tier,
+	}
+
+	if w.withChecksum {
+		usOpt.TransactionalValidation = blob.TransferValidationTypeComputeCRC64()
+	}
+
 	_, err := w.blobClient.UploadStream(
 		w.ctx,
 		w.pipeReader,
-		&azblob.UploadStreamOptions{
-			BlockSize:   w.chunkSize,
-			Concurrency: w.uploadConcurrency,
-			HTTPHeaders: &blob.HTTPHeaders{
-				BlobContentType: &contentType,
-			},
-			TransactionalValidation: blob.TransferValidationTypeComputeCRC64(),
-			AccessTier:              w.tier,
-		},
+		usOpt,
 	)
 
 	if err != nil {
@@ -205,7 +220,6 @@ func (w *blobWriter) uploadStream() {
 	w.pipeReader.Close()
 
 	w.done <- err
-	close(w.done)
 }
 
 func (w *blobWriter) Write(p []byte) (int, error) {

@@ -172,12 +172,17 @@ func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool)
 		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
 
-	upload, err := w.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket:            &w.bucketName,
-		Key:               &fullPath,
-		StorageClass:      w.storageClass,
-		ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
-	})
+	muInput := &s3.CreateMultipartUploadInput{
+		Bucket:       &w.bucketName,
+		Key:          &fullPath,
+		StorageClass: w.storageClass,
+	}
+
+	if w.WithChecksum {
+		muInput.ChecksumAlgorithm = s3DefaultChecksumAlgorithm
+	}
+
+	upload, err := w.client.CreateMultipartUpload(ctx, muInput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
@@ -185,17 +190,18 @@ func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool)
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &s3Writer{
-		ctx:         ctx,
-		cancel:      cancel,
-		uploadID:    upload.UploadId,
-		key:         fullPath,
-		client:      w.client,
-		bucket:      w.bucketName,
-		buffer:      new(bytes.Buffer),
-		chunkSize:   w.ChunkSize,
-		logger:      w.Logger,
-		retryPolicy: w.RetryPolicy,
-		workersPool: pool.NewPool(w.UploadConcurrency),
+		ctx:          ctx,
+		cancel:       cancel,
+		uploadID:     upload.UploadId,
+		key:          fullPath,
+		client:       w.client,
+		bucket:       w.bucketName,
+		buffer:       new(bytes.Buffer),
+		chunkSize:    w.ChunkSize,
+		logger:       w.Logger,
+		retryPolicy:  w.RetryPolicy,
+		workersPool:  pool.NewPool(w.UploadConcurrency),
+		withChecksum: w.WithChecksum,
 	}, nil
 }
 
@@ -226,6 +232,8 @@ type s3Writer struct {
 	retryPolicy *models.RetryPolicy
 	workersPool *pool.Pool
 	uploadErr   atomic.Value
+
+	withChecksum bool
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
@@ -264,14 +272,19 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 	err := w.retryPolicy.Do(w.ctx, func() error {
 		var uploadErr error
 
-		response, uploadErr = w.client.UploadPart(w.ctx, &s3.UploadPartInput{
-			Body:              bytes.NewReader(p),
-			Bucket:            &w.bucket,
-			Key:               &w.key,
-			PartNumber:        &partNumber,
-			UploadId:          w.uploadID,
-			ChecksumAlgorithm: s3DefaultChecksumAlgorithm,
-		})
+		ipInput := &s3.UploadPartInput{
+			Body:       bytes.NewReader(p),
+			Bucket:     &w.bucket,
+			Key:        &w.key,
+			PartNumber: &partNumber,
+			UploadId:   w.uploadID,
+		}
+
+		if w.withChecksum {
+			ipInput.ChecksumAlgorithm = s3DefaultChecksumAlgorithm
+		}
+
+		response, uploadErr = w.client.UploadPart(w.ctx, ipInput)
 
 		return uploadErr
 	})
@@ -284,12 +297,16 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 	}
 
 	w.cpMu.Lock()
-	w.completedParts = append(w.completedParts, types.CompletedPart{
+	part := types.CompletedPart{
 		PartNumber: &partNumber,
 		ETag:       response.ETag,
-		// Fill checksums from response.
-		ChecksumCRC32: response.ChecksumCRC32,
-	})
+	}
+
+	if w.withChecksum {
+		part.ChecksumCRC32 = response.ChecksumCRC32
+	}
+
+	w.completedParts = append(w.completedParts, part)
 	w.cpMu.Unlock()
 }
 
@@ -326,7 +343,7 @@ func (w *s3Writer) Close() error {
 				if w.logger != nil {
 					w.logger.Error("failed to abort multipart upload",
 						slog.String("key", w.key),
-						slog.String("uploadID", *w.uploadID),
+						slog.String("uploadID", common.StringFromPointer(w.uploadID)),
 						slog.Any("error", err))
 				}
 
@@ -350,7 +367,7 @@ func (w *s3Writer) Close() error {
 			if w.logger != nil {
 				w.logger.Error("failed to abort multipart upload",
 					slog.String("key", w.key),
-					slog.String("uploadID", *w.uploadID),
+					slog.String("uploadID", common.StringFromPointer(w.uploadID)),
 					slog.Any("error", err))
 			}
 		}
@@ -361,10 +378,10 @@ func (w *s3Writer) Close() error {
 	if w.logger != nil {
 		w.logger.Debug("completed multipart upload",
 			slog.String("key", w.key),
-			slog.String("uploadID", *w.uploadID),
+			slog.String("uploadID", common.StringFromPointer(w.uploadID)),
 			slog.Int("parts", len(w.completedParts)),
-			slog.String("etag", *r.ETag),
-			slog.String("checksum", *r.ChecksumCRC32),
+			slog.String("etag", common.StringFromPointer(r.ETag)),
+			slog.String("checksum", common.StringFromPointer(r.ChecksumCRC32)),
 		)
 	}
 
@@ -442,13 +459,13 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || common.IsDirectory(prefix, *p.Key) && !w.WithNestedDir {
+			if p.Key == nil || common.IsDirectory(prefix, common.StringFromPointer(p.Key)) && !w.WithNestedDir {
 				continue
 			}
 
 			// If validator is set, remove only valid files.
 			if w.Validator != nil {
-				if err = w.Validator.Run(*p.Key); err != nil {
+				if err = w.Validator.Run(common.StringFromPointer(p.Key)); err != nil {
 					continue
 				}
 			}
@@ -458,7 +475,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 				Key:    p.Key,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to delete object %s: %w", *p.Key, err)
+				return fmt.Errorf("failed to delete object %s: %w", common.StringFromPointer(p.Key), err)
 			}
 		}
 

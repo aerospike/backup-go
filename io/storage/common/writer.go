@@ -51,3 +51,12 @@ func RestrictParallelBackup(called *atomic.Bool, isDir, isRecords bool) error {
 
 	return nil
 }
+
+// StringFromPointer returns string from pointer. If pointer is nil, returns empty string.
+func StringFromPointer(p *string) string {
+	if p == nil {
+		return ""
+	}
+
+	return *p
+}

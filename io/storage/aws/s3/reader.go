@@ -331,7 +331,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 			switch {
 			case r.Validator != nil:
 				// If we found a valid file, return.
-				if err = r.Validator.Run(*p.Key); err == nil {
+				if err = r.Validator.Run(common.StringFromPointer(p.Key)); err == nil {
 					return nil
 				}
 			default:
@@ -375,12 +375,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 
 			if p.Key != nil {
 				if r.Validator != nil {
-					if err = r.Validator.Run(*p.Key); err != nil {
+					if err = r.Validator.Run(common.StringFromPointer(p.Key)); err != nil {
 						continue
 					}
 				}
 
-				result = append(result, *p.Key)
+				result = append(result, common.StringFromPointer(p.Key))
 			}
 		}
 
@@ -396,7 +396,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 // shouldSkip performs check, is we should skip files.
 // Current types.Object is too heavy to copy to this function, so we pass only name and size.
 func (r *Reader) shouldSkip(path string, name *string, size *int64) bool {
-	return name == nil || common.IsDirectory(path, *name) && !r.WithNestedDir ||
+	return name == nil || common.IsDirectory(path, common.StringFromPointer(name)) && !r.WithNestedDir ||
 		(size != nil && *size == 0)
 }
 

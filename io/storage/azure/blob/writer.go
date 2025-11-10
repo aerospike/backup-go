@@ -213,11 +213,11 @@ func (w *blobWriter) uploadStream() {
 		usOpt,
 	)
 
-	if err != nil {
-		w.pipeReader.CloseWithError(err)
-	}
+	cErr := w.pipeReader.CloseWithError(err)
 
-	w.pipeReader.Close()
+	if err != nil || (cErr != nil && !errors.Is(cErr, io.ErrClosedPipe)) {
+		err = errors.Join(err, cErr)
+	}
 
 	w.done <- err
 }

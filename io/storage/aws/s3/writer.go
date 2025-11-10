@@ -42,7 +42,7 @@ const (
 	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
 )
 
-// s3Client an interface for S3 client, for unit testing purposes.
+// s3Client is an interface for S3 client, for unit testing purposes.
 type s3Client interface {
 	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options),
 	) (*s3.CreateMultipartUploadOutput, error)
@@ -251,7 +251,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		partNumber := w.partNumber.Add(1)
 
 		buf := w.buffer.Bytes()
-		// Upload part in a separate goroutine.
+		// Submit the part for upload.
 		w.workersPool.Submit(func() {
 			w.uploadPart(buf, partNumber)
 		})
@@ -343,7 +343,7 @@ func (w *s3Writer) Close() error {
 				if w.logger != nil {
 					w.logger.Error("failed to abort multipart upload",
 						slog.String("key", w.key),
-						slog.String("uploadID", common.StringFromPointer(w.uploadID)),
+						slog.String("uploadID", common.Deref(w.uploadID)),
 						slog.Any("error", err))
 				}
 
@@ -367,7 +367,7 @@ func (w *s3Writer) Close() error {
 			if w.logger != nil {
 				w.logger.Error("failed to abort multipart upload",
 					slog.String("key", w.key),
-					slog.String("uploadID", common.StringFromPointer(w.uploadID)),
+					slog.String("uploadID", common.Deref(w.uploadID)),
 					slog.Any("error", err))
 			}
 		}
@@ -378,10 +378,10 @@ func (w *s3Writer) Close() error {
 	if w.logger != nil {
 		w.logger.Debug("completed multipart upload",
 			slog.String("key", w.key),
-			slog.String("uploadID", common.StringFromPointer(w.uploadID)),
+			slog.String("uploadID", common.Deref(w.uploadID)),
 			slog.Int("parts", len(w.completedParts)),
-			slog.String("etag", common.StringFromPointer(r.ETag)),
-			slog.String("checksum", common.StringFromPointer(r.ChecksumCRC32)),
+			slog.String("etag", common.Deref(r.ETag)),
+			slog.String("checksum", common.Deref(r.ChecksumCRC32)),
 		)
 	}
 
@@ -459,13 +459,13 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || common.IsDirectory(prefix, common.StringFromPointer(p.Key)) && !w.WithNestedDir {
+			if p.Key == nil || common.IsDirectory(prefix, common.Deref(p.Key)) && !w.WithNestedDir {
 				continue
 			}
 
 			// If validator is set, remove only valid files.
 			if w.Validator != nil {
-				if err = w.Validator.Run(common.StringFromPointer(p.Key)); err != nil {
+				if err = w.Validator.Run(common.Deref(p.Key)); err != nil {
 					continue
 				}
 			}
@@ -475,7 +475,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 				Key:    p.Key,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to delete object %s: %w", common.StringFromPointer(p.Key), err)
+				return fmt.Errorf("failed to delete object %s: %w", common.Deref(p.Key), err)
 			}
 		}
 

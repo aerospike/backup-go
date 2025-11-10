@@ -18,7 +18,7 @@ import (
 	"sync"
 )
 
-// Pool simple pool for goroutines.
+// Pool is a simple goroutine pool.
 type Pool struct {
 	workers  int
 	wg       sync.WaitGroup

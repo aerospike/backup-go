@@ -30,15 +30,9 @@ func GetFullPath(prefix, filename string, pathList []string, isDir, isRecords bo
 	case isDir:
 		return path.Join(prefix, filename), nil
 	case !isRecords:
-		if len(pathList) == 0 {
-			return "", fmt.Errorf("path list can't be empty")
-		}
 		// If it is a metadata file and we backup to one file.
 		return path.Join(path.Dir(pathList[0]), filename), nil
 	default:
-		if len(pathList) == 0 {
-			return "", fmt.Errorf("path list can't be empty")
-		}
 		// If we use backup to a single file, we overwrite the file name.
 		return path.Join(prefix, pathList[0]), nil
 	}

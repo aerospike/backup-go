@@ -311,7 +311,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 }
 
 func (w *s3Writer) Close() error {
-	if w.closed.Load() {
+	if !w.closed.CompareAndSwap(false, true) {
 		return os.ErrClosed
 	}
 
@@ -386,10 +386,6 @@ func (w *s3Writer) Close() error {
 	}
 
 	w.cpMu.Unlock()
-
-	if !w.closed.CompareAndSwap(false, true) {
-		return os.ErrClosed
-	}
 
 	return nil
 }

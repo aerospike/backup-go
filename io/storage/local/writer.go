@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
@@ -202,7 +203,8 @@ func (bf *bufferedFile) Close() error {
 
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the specified fileName.
-func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser, error) {
+// isRecords specifies whether the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, fileName string, isRecords bool) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -214,15 +216,23 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string) (io.WriteCloser
 	}
 
 	// protection for single file backup.
-	if !w.IsDir {
-		if !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
-		}
+	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
+		return nil, err
 	}
+
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
-	filePath := w.PathList[0]
-	if w.IsDir {
+	var filePath string
+
+	switch {
+	case w.IsDir:
+		// If it is directory.
 		filePath = filepath.Join(w.PathList[0], fileName)
+	case !isRecords && !w.IsDir:
+		// If it is metadata file and we backup to one file.
+		filePath = filepath.Join(filepath.Dir(w.PathList[0]), fileName)
+	default:
+		// If we backup to one file.
+		filePath = w.PathList[0]
 	}
 
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)

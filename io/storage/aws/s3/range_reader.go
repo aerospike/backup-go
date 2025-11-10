@@ -23,17 +23,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// s3Getter is an interface for s3 client. Used for mocking tests.
-type s3Getter interface {
-	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
-	) (*s3.HeadObjectOutput, error)
-	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options),
-	) (*s3.GetObjectOutput, error)
-}
-
 // rangeReader encapsulates getting a file by range and file size logic. To use with retry reader.
 type rangeReader struct {
-	client s3Getter
+	client s3Client
 	bucket *string
 	key    *string
 	etag   *string
@@ -42,7 +34,7 @@ type rangeReader struct {
 }
 
 // newRangeReader creates a new file reader.
-func newRangeReader(ctx context.Context, client s3Getter, bucket, key *string) (*rangeReader, error) {
+func newRangeReader(ctx context.Context, client s3Client, bucket, key *string) (*rangeReader, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key is nil")
 	}
@@ -71,6 +63,9 @@ func newRangeReader(ctx context.Context, client s3Getter, bucket, key *string) (
 
 // OpenRange opens a file by range.
 func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
+	// We can't validate checksum for range requests, so we don't set ChecksumMode param in GetObjectInput.
+	// Checksums are generated on upload by S3 for chunk, so when we request data by range, we can't validate its checksum.
+	// Link to issue: https://github.com/aws/aws-sdk-java-v2/issues/5421
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:  r.bucket,
 		Key:     r.key,

@@ -77,6 +77,7 @@ type Options struct {
 	// CalculateTotalSize determines whether we need to calculate the total size of all files in a path on Reader creation.
 	CalculateTotalSize bool
 
+	// WithChecksum enables checksum validation on upload.
 	WithChecksum bool
 }
 

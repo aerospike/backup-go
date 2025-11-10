@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -486,7 +487,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -537,7 +538,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -568,7 +569,7 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName)
+		w, err := writer.NewWriter(ctx, fileName, true)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -596,7 +597,7 @@ func (s *AzureSuite) TestWriter_WriteSingleFile() {
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile, true)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContent))
 	s.Require().NoError(err)
@@ -681,8 +682,8 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 	s.Require().NoError(err)
 
 	pathList := []string{
-		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 0)),
-		filepath.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 2)),
+		path.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 0)),
+		path.Join(testReadFolderPathList, fmt.Sprintf(testFolderNameTemplate, 2)),
 	}
 
 	reader, err := NewReader(
@@ -726,8 +727,8 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 	s.Require().NoError(err)
 
 	pathList := []string{
-		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 0)),
-		filepath.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 2)),
+		path.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 0)),
+		path.Join(testReadFolderFileList, fmt.Sprintf(testFileNameTemplate, 2)),
 	}
 
 	reader, err := NewReader(

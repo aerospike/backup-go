@@ -190,11 +190,11 @@ func TestGetHeaderFirst(t *testing.T) {
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
 	encoder := NewEncoder[*models.Token](testEncoderConfig)
-	firstHeader := encoder.GetHeader(0, false)
+	firstHeader := encoder.GetHeader(0, true)
 	require.Equal(t, expected, string(firstHeader))
 
 	secondExpected := "Version 3.1\n# namespace test\n"
-	secondHeader := encoder.GetHeader(0, false)
+	secondHeader := encoder.GetHeader(0, true)
 	require.Equal(t, secondExpected, string(secondHeader))
 }
 

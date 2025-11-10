@@ -110,18 +110,19 @@ func NewWriter(
 }
 
 // NewWriter returns a new GCP storage writer for the provided path.
-func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+// isRecords describe if the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.IsDir {
-		if !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
-		}
-		// If we use backup to single file, we overwrite the file name.
-		filename = w.PathList[0]
+	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
+		return nil, err
 	}
 
-	filename = fmt.Sprintf("%s%s", w.prefix, filename)
-	sw := w.bucketHandle.Object(filename).NewWriter(ctx)
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full path: %w", err)
+	}
+
+	sw := w.bucketHandle.Object(fullPath).NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass

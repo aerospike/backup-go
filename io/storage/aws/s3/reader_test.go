@@ -17,14 +17,18 @@ package s3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/io/storage/aws/s3/mocks"
 	"github.com/aerospike/backup-go/io/storage/options"
 	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/aerospike/backup-go/models"
@@ -311,8 +315,8 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 	})
 
 	pathList := []string{
-		filepath.Join(testFolderPathList, "1732519390025"),
-		filepath.Join(testFolderPathList, "1732519590025"),
+		path.Join(testFolderPathList, "1732519390025"),
+		path.Join(testFolderPathList, "1732519590025"),
 	}
 
 	reader, err := NewReader(
@@ -363,8 +367,8 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	})
 
 	pathList := []string{
-		filepath.Join(testFolderFileList, "backup_1.asb"),
-		filepath.Join(testFolderFileList, "backup_2.asb"),
+		path.Join(testFolderFileList, "backup_1.asb"),
+		path.Join(testFolderFileList, "backup_2.asb"),
 	}
 
 	reader, err := NewReader(
@@ -1003,8 +1007,8 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 
 	// Define a list of objects to stream
 	objectsToStream := []string{
-		filepath.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 0)),
-		filepath.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 1)),
+		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 0)),
+		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 1)),
 	}
 
 	// Set the objects to stream
@@ -1082,4 +1086,625 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 Done:
 	skipped := reader.GetSkipped()
 	require.Equal(s.T(), 3, len(skipped))
+}
+
+// TestNewReader_WithAccessTier_Standard tests warming with Standard tier.
+func TestNewReader_WithAccessTier_Standard(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For warmDirectory - ListObjects.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For checkObjectAvailability - object already available
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			StorageClass: types.StorageClassStandard,
+		}, nil).
+		Once()
+
+	opts := func(o *options.Options) {
+		o.PathList = []string{testDir}
+		o.IsDir = true
+		o.AccessTier = "Standard"
+		o.PollWarmDuration = 10 * time.Millisecond
+	}
+
+	reader, err := NewReader(ctx, mockClient, testBucket, opts)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, reader)
+}
+
+// TestNewReader_WithAccessTier_Expedited tests warming with Expedited tier.
+func TestNewReader_WithAccessTier_Expedited(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For warmDirectory.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For checkObjectAvailability - archived.
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			StorageClass: types.StorageClassGlacier,
+		}, nil).
+		Once()
+
+	// For restoreObject.
+	mockClient.EXPECT().
+		RestoreObject(ctx, mock.Anything).
+		Return(&s3.RestoreObjectOutput{}, nil).
+		Once()
+
+	// For pollWarmDirStatus - now available.
+	restoreStatus := restoreValueFinished
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			Restore: &restoreStatus,
+		}, nil).
+		Once()
+
+	opts := func(o *options.Options) {
+		o.PathList = []string{testDir}
+		o.IsDir = true
+		o.AccessTier = "Expedited"
+		o.PollWarmDuration = 10 * time.Millisecond
+	}
+
+	reader, err := NewReader(ctx, mockClient, testBucket, opts)
+
+	time.Sleep(15 * time.Millisecond)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, reader)
+}
+
+// TestReader_RestoreObject_Success tests successful object restoration.
+func TestReader_RestoreObject_Success(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+
+	mockClient.EXPECT().
+		RestoreObject(ctx, mock.MatchedBy(func(input *s3.RestoreObjectInput) bool {
+			return *input.Bucket == testBucket &&
+				*input.Key == testFile &&
+				input.RestoreRequest.GlacierJobParameters.Tier == types.TierStandard
+		})).
+		Return(&s3.RestoreObjectOutput{}, nil).
+		Once()
+
+	err = reader.restoreObject(ctx, testFile, types.TierStandard)
+
+	assert.NoError(t, err)
+}
+
+// TestReader_RestoreObject_Error tests error handling in restoreObject.
+func TestReader_RestoreObject_Error(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+
+	mockClient.EXPECT().
+		RestoreObject(ctx, mock.Anything).
+		Return(nil, errors.New("restore failed")).
+		Once()
+
+	err = reader.restoreObject(ctx, testFile, types.TierStandard)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to restore object")
+}
+
+// TestReader_WarmStorage_Success tests successful storage warming.
+func TestReader_WarmStorage_Success(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+	reader.PathList = []string{testDir}
+	reader.objectsToWarm = make([]string, 0)
+
+	// For ListObjects in warmDirectory.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For checkObjectAvailability - available.
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			StorageClass: types.StorageClassStandard,
+		}, nil).
+		Once()
+
+	err = reader.warmStorage(ctx, types.TierStandard)
+
+	assert.NoError(t, err)
+}
+
+// TestReader_WarmDirectory_ArchivedObject tests warming archived object.
+func TestReader_WarmDirectory_ArchivedObject(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+	reader.objectsToWarm = make([]string, 0)
+
+	// For ListObjects.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For checkObjectAvailability - archived.
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			StorageClass: types.StorageClassGlacier,
+		}, nil).
+		Once()
+
+	// For restoreObject.
+	mockClient.EXPECT().
+		RestoreObject(ctx, mock.Anything).
+		Return(&s3.RestoreObjectOutput{}, nil).
+		Once()
+
+	err = reader.warmDirectory(ctx, testDir, types.TierStandard)
+
+	assert.NoError(t, err)
+	assert.Len(t, reader.objectsToWarm, 1)
+	assert.Equal(t, "test-dir/file1.txt", reader.objectsToWarm[0])
+}
+
+// TestReader_WarmDirectory_RestoringObject tests warming already restoring object.
+func TestReader_WarmDirectory_RestoringObject(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+	reader.objectsToWarm = make([]string, 0)
+
+	// For ListObjects.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For checkObjectAvailability - restoring.
+	restoreStatus := restoreValueOngoing
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			Restore: &restoreStatus,
+		}, nil).
+		Once()
+
+	err = reader.warmDirectory(ctx, testDir, types.TierStandard)
+
+	assert.NoError(t, err)
+	assert.Len(t, reader.objectsToWarm, 1)
+}
+
+// TestReader_WarmDirectory_Error tests error in warmDirectory.
+func TestReader_WarmDirectory_Error(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+
+	// For ListObjects - error.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(nil, errors.New("list failed")).
+		Once()
+
+	err = reader.warmDirectory(ctx, testDir, types.TierStandard)
+
+	assert.Error(t, err)
+}
+
+// TestReader_CheckWarm_EmptyQueue tests checkWarm with empty queue.
+func TestReader_CheckWarm_EmptyQueue(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+	reader.objectsToWarm = []string{}
+
+	err = reader.checkWarm(ctx)
+
+	assert.NoError(t, err)
+}
+
+// TestReader_PollWarmDirStatus_Success tests successful polling.
+func TestReader_PollWarmDirStatus_Success(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	opts := func(o *options.Options) {
+		o.PathList = []string{testFile}
+		o.PollWarmDuration = 10 * time.Millisecond
+	}
+
+	reader, err := NewReader(ctx, mockClient, testBucket, opts)
+	assert.NoError(t, err)
+
+	// First poll - still restoring.
+	restoreOngoing := restoreValueOngoing
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			Restore: &restoreOngoing,
+		}, nil).
+		Once()
+
+	// Second poll - now available.
+	restoreFinished := restoreValueFinished
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			Restore: &restoreFinished,
+		}, nil).
+		Once()
+
+	err = reader.pollWarmDirStatus(ctx, testFile)
+
+	assert.NoError(t, err)
+}
+
+// TestReader_PollWarmDirStatus_ContextCancelled tests context cancellation.
+func TestReader_PollWarmDirStatus_ContextCancelled(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	opts := func(o *options.Options) {
+		o.PathList = []string{testFile}
+		o.PollWarmDuration = 10 * time.Millisecond
+	}
+
+	reader, err := NewReader(ctx, mockClient, testBucket, opts)
+	assert.NoError(t, err)
+
+	// Cancel context immediately.
+	cancel()
+
+	err = reader.pollWarmDirStatus(ctx, testFile)
+
+	// Should return nil on context cancellation.
+	assert.NoError(t, err)
+}
+
+// TestReader_PollWarmDirStatus_Error tests error in polling.
+func TestReader_PollWarmDirStatus_Error(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	opts := func(o *options.Options) {
+		o.PathList = []string{testFile}
+		o.PollWarmDuration = 10 * time.Millisecond
+	}
+
+	reader, err := NewReader(ctx, mockClient, testBucket, opts)
+	assert.NoError(t, err)
+
+	// Polling returns error.
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(nil, errors.New("head object failed")).
+		Once()
+
+	err = reader.pollWarmDirStatus(ctx, testFile)
+
+	assert.Error(t, err)
+}
+
+// TestReader_WarmStorage_RestoreFailed tests error in restore during warming.
+func TestReader_WarmStorage_RestoreFailed(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+	reader.PathList = []string{testDir}
+	reader.objectsToWarm = make([]string, 0)
+
+	// For ListObjects.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+			},
+		}, nil).
+		Once()
+
+	// For checkObjectAvailability - archived.
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(&s3.HeadObjectOutput{
+			StorageClass: types.StorageClassGlacier,
+		}, nil).
+		Once()
+
+	// For restoreObject - fails.
+	mockClient.EXPECT().
+		RestoreObject(ctx, mock.Anything).
+		Return(nil, errors.New("restore failed")).
+		Once()
+
+	err = reader.warmStorage(ctx, types.TierStandard)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to warm directory")
+}
+
+// TestReader_WarmStorage_MultipleFiles tests warming multiple files.
+func TestReader_WarmStorage_MultipleFiles(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithFile(testFile),
+	)
+	assert.NoError(t, err)
+	reader.PathList = []string{testDir}
+	reader.objectsToWarm = make([]string, 0)
+	reader.PollWarmDuration = 10 * time.Millisecond
+
+	// For ListObjects - return multiple files.
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.txt"), Size: aws.Int64(100)},
+				{Key: aws.String("test-dir/file2.txt"), Size: aws.Int64(200)},
+			},
+		}, nil).
+		Once()
+
+	// First file - archived, needs restore.
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.MatchedBy(func(input *s3.HeadObjectInput) bool {
+			return *input.Key == "test-dir/file1.txt"
+		})).
+		Return(&s3.HeadObjectOutput{
+			StorageClass: types.StorageClassGlacier,
+		}, nil).
+		Once()
+
+	mockClient.EXPECT().
+		RestoreObject(ctx, mock.MatchedBy(func(input *s3.RestoreObjectInput) bool {
+			return *input.Key == "test-dir/file1.txt"
+		})).
+		Return(&s3.RestoreObjectOutput{}, nil).
+		Once()
+
+	// Second file - already available.
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.MatchedBy(func(input *s3.HeadObjectInput) bool {
+			return *input.Key == "test-dir/file2.txt"
+		})).
+		Return(&s3.HeadObjectOutput{
+			StorageClass: types.StorageClassStandard,
+		}, nil).
+		Once()
+
+	// Polling for file1 - now available.
+	restoreFinished := restoreValueFinished
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.MatchedBy(func(input *s3.HeadObjectInput) bool {
+			return *input.Key == "test-dir/file1.txt"
+		})).
+		Return(&s3.HeadObjectOutput{
+			Restore: &restoreFinished,
+		}, nil).
+		Once()
+
+	err = reader.warmStorage(ctx, types.TierStandard)
+
+	assert.NoError(t, err)
+}
+
+// TestReader_CheckWarm_PollError tests error in checkWarm polling.
+func TestReader_CheckWarm_PollError(t *testing.T) {
+	mockClient := mocks.NewMocks3Client(t)
+	ctx := context.Background()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	opts := func(o *options.Options) {
+		o.PathList = []string{testFile}
+		o.PollWarmDuration = 10 * time.Millisecond
+	}
+
+	reader, err := NewReader(ctx, mockClient, testBucket, opts)
+	assert.NoError(t, err)
+	reader.objectsToWarm = []string{testFile}
+
+	// Polling returns error
+	mockClient.EXPECT().
+		HeadObject(ctx, mock.Anything).
+		Return(nil, errors.New("head object failed")).
+		Once()
+
+	err = reader.checkWarm(ctx)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to poll dir status")
 }

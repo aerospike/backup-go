@@ -387,7 +387,9 @@ func (w *s3Writer) Close() error {
 
 	w.cpMu.Unlock()
 
-	w.closed.Store(true)
+	if !w.closed.CompareAndSwap(false, true) {
+		return os.ErrClosed
+	}
 
 	return nil
 }

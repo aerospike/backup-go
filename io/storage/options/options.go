@@ -76,6 +76,9 @@ type Options struct {
 
 	// CalculateTotalSize determines whether we need to calculate the total size of all files in a path on Reader creation.
 	CalculateTotalSize bool
+
+	// WithChecksum enables checksum validation on upload.
+	WithChecksum bool
 }
 
 type Opt func(*Options)
@@ -221,5 +224,13 @@ func WithRetryPolicy(policy *models.RetryPolicy) Opt {
 func WithCalculateTotalSize() Opt {
 	return func(r *Options) {
 		r.CalculateTotalSize = true
+	}
+}
+
+// WithChecksum enables checksum validation on upload.
+// Is used only for Writer.
+func WithChecksum() Opt {
+	return func(r *Options) {
+		r.WithChecksum = true
 	}
 }

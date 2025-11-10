@@ -121,18 +121,19 @@ func NewWriter(
 }
 
 // NewWriter returns a new Azure blob writer to the specified path.
-func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+// isRecords describe if the file contains record data.
+func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
 	// protection for single file backup.
-	if !w.IsDir {
-		if !w.called.CompareAndSwap(false, true) {
-			return nil, fmt.Errorf("parallel running for single file is not allowed")
-		}
-		// If we use backup to single file, we overwrite the file name.
-		filename = w.PathList[0]
+	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
+		return nil, err
 	}
 
-	filename = fmt.Sprintf("%s%s", w.prefix, filename)
-	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(filename)
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full path: %w", err)
+	}
+
+	blockBlobClient := w.client.ServiceClient().NewContainerClient(w.containerName).NewBlockBlobClient(fullPath)
 
 	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, int64(w.ChunkSize)), nil
 }

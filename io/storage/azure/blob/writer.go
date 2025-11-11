@@ -172,13 +172,12 @@ func newBlobWriter(
 	pipeReader, pipeWriter := io.Pipe()
 
 	w := &blobWriter{
-		ctx:        ctx,
-		blobClient: blobClient,
-		tier:       tier,
-		pipeReader: pipeReader,
-		pipeWriter: pipeWriter,
-		// TODO: check if we can use bufio.WriterSize and set chunk size with int. Also check if it affects performance.
-		bw:                bufio.NewWriterSize(pipeWriter, int(chunkSize)),
+		ctx:               ctx,
+		blobClient:        blobClient,
+		tier:              tier,
+		pipeReader:        pipeReader,
+		pipeWriter:        pipeWriter,
+		bw:                bufio.NewWriterSize(pipeWriter, common.SafeInt64ToInt(chunkSize)),
 		done:              make(chan error, 1),
 		uploadConcurrency: uploadConcurrency,
 		chunkSize:         chunkSize,

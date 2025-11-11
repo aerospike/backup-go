@@ -16,6 +16,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 	"path"
 	"sync/atomic"
 )
@@ -59,4 +60,13 @@ func Deref[T any](ptr *T) T {
 	var zero T
 
 	return zero
+}
+
+// SafeInt64ToInt converts int64 to int safely.
+func SafeInt64ToInt(i int64) int {
+	if i < math.MaxInt {
+		return int(i)
+	}
+
+	return math.MaxInt
 }

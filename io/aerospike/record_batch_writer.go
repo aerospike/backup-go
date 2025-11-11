@@ -189,6 +189,10 @@ func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, e
 // processOperationResult increases statistics counters.
 // it returns true if operation should be retried.
 func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
+	if op.BatchRec().Err != nil && op.BatchRec().Err.IsInDoubt() {
+		rw.stats.IncrErrorsInDoubt()
+	}
+
 	code := op.BatchRec().ResultCode
 	switch code {
 	case atypes.RECORD_TOO_BIG,

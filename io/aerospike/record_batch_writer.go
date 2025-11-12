@@ -161,12 +161,12 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				slog.Any("error", aerr),
 				slog.Int("remainingOperations", len(rw.operationBuffer)),
 			)
-			rw.stats.IncrPolicyRetries()
+			rw.stats.IncrRetryPolicyAttempts()
 
 			return aerr
 		default:
 			// The default case is used for unexpected error.
-			rw.stats.IncrPolicyRetries()
+			rw.stats.IncrRetryPolicyAttempts()
 
 			return fmt.Errorf("%d operations failed: %w",
 				len(rw.operationBuffer), errors.Join(aerr, opErr))

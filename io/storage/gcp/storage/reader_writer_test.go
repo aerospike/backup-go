@@ -345,6 +345,7 @@ func (s *GCPSuite) TestReader_WithSorting() {
 		testBucketName,
 		options.WithDir(testReadFolderSorted),
 		options.WithSorting(),
+		options.WithCalculateTotalSize(),
 	)
 	s.Require().NoError(err)
 
@@ -479,6 +480,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		testBucketName,
 		options.WithDir(testWriteFolderEmpty),
 		options.WithChunkSize(defaultChunkSize),
+		options.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 

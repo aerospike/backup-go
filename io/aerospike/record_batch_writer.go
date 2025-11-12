@@ -138,7 +138,6 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 		if aerr != nil && aerr.IsInDoubt() {
 			rw.logger.Info("BATCH: in doubt error", slog.Any("error", aerr))
-			rw.stats.IncrErrorsInDoubt()
 		}
 
 		switch {

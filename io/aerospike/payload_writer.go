@@ -88,8 +88,13 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 
 			return nil
 		case shouldRetry(aerr):
+			p.stats.IncrPolicyRetries()
+
 			return aerr
 		default:
+			// The default case is used for unexpected error.
+			p.stats.IncrPolicyRetries()
+
 			return aerr
 		}
 	})

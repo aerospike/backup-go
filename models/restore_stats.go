@@ -47,6 +47,8 @@ type RestoreStats struct {
 	// * Generation counter greater than expected for some records.
 	// * Fresher records counter greater than expected.
 	errorsInDoubt atomic.Uint64
+	// The number of retries done by retry policy for write operations.
+	policyRetries atomic.Uint64
 }
 
 // NewRestoreStats returns new restore stats.
@@ -108,6 +110,14 @@ func (rs *RestoreStats) GetErrorsInDoubt() uint64 {
 	return rs.errorsInDoubt.Load()
 }
 
+func (rs *RestoreStats) IncrPolicyRetries() {
+	rs.policyRetries.Add(1)
+}
+
+func (rs *RestoreStats) GetPolicyRetries() uint64 {
+	return rs.policyRetries.Load()
+}
+
 // SumRestoreStats combines multiple RestoreStats.
 func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
 	result := NewRestoreStats()
@@ -127,6 +137,7 @@ func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
 		result.recordsFresher.Add(stat.GetRecordsFresher())
 		result.recordsInserted.Add(stat.GetRecordsInserted())
 		result.errorsInDoubt.Add(stat.GetErrorsInDoubt())
+		result.policyRetries.Add(stat.GetPolicyRetries())
 	}
 
 	return result

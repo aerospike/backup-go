@@ -137,7 +137,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
 
 		if aerr != nil && aerr.IsInDoubt() {
-			rw.logger.Info("BATCH: in doubt error", slog.Any("error", aerr))
+			rw.stats.IncrErrorsInDoubt()
 		}
 
 		switch {
@@ -190,7 +190,6 @@ func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, e
 // it returns true if operation should be retried.
 func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	if op.BatchRec().Err != nil && op.BatchRec().Err.IsInDoubt() {
-		rw.logger.Info("OP: in doubt error", slog.Any("error", op.BatchRec().Err))
 		rw.stats.IncrErrorsInDoubt()
 	}
 

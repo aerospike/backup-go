@@ -136,10 +136,6 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 		aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
 
-		if aerr != nil && aerr.IsInDoubt() {
-			rw.stats.IncrErrorsInDoubt()
-		}
-
 		switch {
 		case isNilOrAcceptableError(aerr),
 			rw.ignoreRecordError && shouldIgnore(aerr):

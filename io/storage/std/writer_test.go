@@ -128,7 +128,7 @@ func TestWriter_NewWriter(t *testing.T) {
 			r, writer, _ := os.Pipe()
 			os.Stdout = writer
 
-			writeCloser, err := w.NewWriter(tt.ctx, tt.filename, false)
+			writeCloser, err := w.NewWriter(tt.ctx, tt.filename)
 
 			writer.Close()
 			os.Stdout = oldStdout
@@ -198,7 +198,7 @@ func TestStdoutWriteCloser_Write(t *testing.T) {
 			os.Stdout = w
 
 			writer := &Writer{}
-			writeCloser, err := writer.NewWriter(context.Background(), "test", false)
+			writeCloser, err := writer.NewWriter(context.Background(), "test")
 			if err != nil {
 				t.Fatalf("Failed to create writer: %v", err)
 			}
@@ -265,7 +265,7 @@ func TestStdoutWriteCloser_Close(t *testing.T) {
 			os.Stdout = w
 
 			writer := &Writer{}
-			writeCloser, _ := writer.NewWriter(context.Background(), "test", false)
+			writeCloser, _ := writer.NewWriter(context.Background(), "test")
 
 			if tt.data != nil {
 				_, err := writeCloser.Write(tt.data)
@@ -315,7 +315,7 @@ func TestConcurrentWrites(t *testing.T) {
 	writers := make([]io.WriteCloser, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
-		writeCloser, err := writer.NewWriter(context.Background(), "concurrent-test", false)
+		writeCloser, err := writer.NewWriter(context.Background(), "concurrent-test")
 		if err != nil {
 			t.Fatalf("Failed to create writer %d: %v", i, err)
 		}

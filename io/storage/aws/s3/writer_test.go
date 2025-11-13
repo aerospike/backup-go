@@ -210,7 +210,7 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -264,7 +264,7 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContentAsb))
 		s.Require().NoError(err)
@@ -300,7 +300,7 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile, true)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContentAsb))
 	s.Require().NoError(err)
@@ -712,7 +712,7 @@ func TestWriter_NewWriter_Success(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -748,46 +748,10 @@ func TestWriter_NewWriter_CreateMultipartUploadError(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	_, err = writer.NewWriter(ctx, testFile, true)
+	_, err = writer.NewWriter(ctx, testFile)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create multipart upload")
-}
-
-// TestWriter_NewWriter_ParallelBackupProtection tests that parallel backup to single file is prevented
-func TestWriter_NewWriter_ParallelBackupProtection(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
-	ctx := context.Background()
-
-	mockClient.EXPECT().
-		HeadBucket(ctx, mock.Anything).
-		Return(&s3.HeadBucketOutput{}, nil).
-		Once()
-
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	writer, err := NewWriter(
-		ctx,
-		mockClient,
-		testBucket,
-		options.WithFile(testFile),
-	)
-	assert.NoError(t, err)
-
-	// First writer should succeed
-	w1, err := writer.NewWriter(ctx, testFile, true)
-	assert.NoError(t, err)
-	assert.NotNil(t, w1)
-
-	// Second writer should fail (parallel backup protection)
-	_, err = writer.NewWriter(ctx, testFile, true)
-	assert.Error(t, err)
 }
 
 // TestS3Writer_Write_Success tests successful Write operation
@@ -824,7 +788,7 @@ func TestS3Writer_Write_Success(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	n, err := w.Write(testData)
@@ -885,7 +849,7 @@ func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write data larger than chunk size to trigger multipart upload
@@ -945,7 +909,7 @@ func TestS3Writer_Write_AfterClose(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	err = w.Close()
@@ -997,7 +961,7 @@ func TestS3Writer_Write_WithUploadError(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write data to trigger upload
@@ -1064,7 +1028,7 @@ func TestS3Writer_Close_Success(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write some data
@@ -1126,7 +1090,7 @@ func TestS3Writer_Close_AfterClose(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write some data
@@ -1195,7 +1159,7 @@ func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write some data
@@ -1269,7 +1233,7 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	_, err = w.Write(testData)
@@ -1354,7 +1318,7 @@ func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write data to trigger upload
@@ -1412,7 +1376,7 @@ func TestS3Writer_ContextCancellation(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	data := make([]byte, 50)
@@ -1486,7 +1450,7 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 			defer wg.Done()
 
 			fileName := fmt.Sprintf("file-%d.txt", id)
-			w, err := writer.NewWriter(ctx, fileName, true)
+			w, err := writer.NewWriter(ctx, fileName)
 			assert.NoError(t, err)
 
 			data := []byte(fmt.Sprintf("test data %d", id))
@@ -1544,7 +1508,7 @@ func TestS3Writer_EmptyBuffer(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Close without any writes
@@ -2102,7 +2066,7 @@ func TestS3Writer_WriteZeroBytes(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write zero bytes
@@ -2157,7 +2121,7 @@ func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	_, err = writer.NewWriter(ctx, testFile, true)
+	_, err = writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 }
 
@@ -2213,7 +2177,7 @@ func TestS3Writer_WriteIncrementally(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write data in small increments
@@ -2283,7 +2247,7 @@ func TestS3Writer_LargeWrite(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	w, err := writer.NewWriter(ctx, testFile, true)
+	w, err := writer.NewWriter(ctx, testFile)
 	assert.NoError(t, err)
 
 	// Write 10KB in one call
@@ -2298,4 +2262,20 @@ func TestS3Writer_LargeWrite(t *testing.T) {
 
 	err = w.Close()
 	assert.NoError(t, err)
+}
+
+func TestWriter_GetOptions(t *testing.T) {
+	t.Parallel()
+
+	o1 := options.Options{
+		PathList: []string{testFile},
+		IsDir:    false,
+	}
+
+	w := &Writer{
+		Options: o1,
+	}
+
+	o2 := w.GetOptions()
+	require.Equal(t, o1, o2)
 }

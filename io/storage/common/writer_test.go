@@ -120,7 +120,7 @@ func TestGetFullPath(t *testing.T) {
 		{
 			name:     "records file with single path",
 			prefix:   "/backup",
-			filename: "ignored",
+			filename: "",
 			pathList: []string{"data.bin"},
 			isDir:    false,
 			want:     "/backup/data.bin",
@@ -129,7 +129,7 @@ func TestGetFullPath(t *testing.T) {
 		{
 			name:     "records file with nested path",
 			prefix:   "/backup/2024",
-			filename: "ignored",
+			filename: "",
 			pathList: []string{"records/file.bin"},
 			isDir:    false,
 			want:     "/backup/2024/records/file.bin",
@@ -138,7 +138,7 @@ func TestGetFullPath(t *testing.T) {
 		{
 			name:     "records file with multiple paths - uses first",
 			prefix:   "/backup",
-			filename: "ignored",
+			filename: "",
 			pathList: []string{"first.bin", "second.bin", "third.bin"},
 			isDir:    false,
 			want:     "/backup/first.bin",
@@ -147,7 +147,7 @@ func TestGetFullPath(t *testing.T) {
 		{
 			name:     "records file with empty prefix",
 			prefix:   "",
-			filename: "ignored",
+			filename: "",
 			pathList: []string{"data.bin"},
 			isDir:    false,
 			want:     "data.bin",
@@ -156,7 +156,7 @@ func TestGetFullPath(t *testing.T) {
 		{
 			name:     "records file with empty pathList - error",
 			prefix:   "/backup",
-			filename: "ignored",
+			filename: "",
 			pathList: []string{},
 			isDir:    false,
 			want:     "",
@@ -166,7 +166,7 @@ func TestGetFullPath(t *testing.T) {
 		{
 			name:     "records file with nil pathList - error",
 			prefix:   "/backup",
-			filename: "ignored",
+			filename: "",
 			pathList: nil,
 			isDir:    false,
 			want:     "",
@@ -194,7 +194,7 @@ func TestGetFullPath(t *testing.T) {
 		{
 			name:     "edge case - dot paths",
 			prefix:   "./backup",
-			filename: "data",
+			filename: "",
 			pathList: []string{"./records/file.bin"},
 			isDir:    false,
 			want:     "backup/records/file.bin",

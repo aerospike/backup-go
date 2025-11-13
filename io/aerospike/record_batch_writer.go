@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -38,6 +39,7 @@ type batchRecordWriter struct {
 	rpsCollector      *metrics.Collector
 	batchSize         int
 	ignoreRecordError bool
+	opErr             error
 }
 
 func newBatchRecordWriter(
@@ -127,47 +129,55 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("retryPolicy", rw.retryPolicy),
 	)
 
-	var opErr error
+	return rw.retryPolicy.Do(rw.ctx, rw.processBatchOperation)
+}
 
-	return rw.retryPolicy.Do(rw.ctx, func() error {
-		rw.logger.Debug("Attempting batch operation",
-			slog.Int("bufferSize", len(rw.operationBuffer)),
+func (rw *batchRecordWriter) processBatchOperation() error {
+	rw.logger.Debug("Attempting batch operation",
+		slog.Int("bufferSize", len(rw.operationBuffer)),
+	)
+
+	aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
+
+	// Lazy process in doubt errors.
+	{
+		var wg sync.WaitGroup
+
+		wg.Add(1)
+		defer wg.Wait()
+
+		go rw.lazyProcessInDoubt(&wg, aerr)
+	}
+
+	switch {
+	case isNilOrAcceptableError(aerr),
+		rw.ignoreRecordError && shouldIgnore(aerr):
+		rw.operationBuffer, rw.opErr = rw.processAndFilterOperations()
+
+		if len(rw.operationBuffer) == 0 {
+			rw.logger.Debug("All operations succeeded")
+			rw.opErr = nil
+
+			return nil
+		}
+
+		rw.logger.Debug("Not all operations succeeded",
+			slog.Int("remainingOperations", len(rw.operationBuffer)),
+			slog.Any("error", rw.opErr),
 		)
 
-		aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
+		return rw.opErr
+	case shouldRetry(aerr):
+		rw.logger.Debug("Retryable error occurred",
+			slog.Any("error", aerr),
+			slog.Int("remainingOperations", len(rw.operationBuffer)),
+		)
 
-		if aerr != nil && aerr.IsInDoubt() {
-			rw.stats.IncrErrorsInDoubt()
-		}
-
-		switch {
-		case isNilOrAcceptableError(aerr),
-			rw.ignoreRecordError && shouldIgnore(aerr):
-			rw.operationBuffer, opErr = rw.processAndFilterOperations()
-
-			if len(rw.operationBuffer) == 0 {
-				rw.logger.Debug("All operations succeeded")
-				return nil
-			}
-
-			rw.logger.Debug("Not all operations succeeded",
-				slog.Int("remainingOperations", len(rw.operationBuffer)),
-				slog.Any("error", opErr),
-			)
-
-			return opErr
-		case shouldRetry(aerr):
-			rw.logger.Debug("Retryable error occurred",
-				slog.Any("error", aerr),
-				slog.Int("remainingOperations", len(rw.operationBuffer)),
-			)
-
-			return aerr
-		default:
-			return fmt.Errorf("%d operations failed: %w",
-				len(rw.operationBuffer), errors.Join(aerr, opErr))
-		}
-	})
+		return aerr
+	default:
+		return fmt.Errorf("%d operations failed: %w",
+			len(rw.operationBuffer), errors.Join(aerr, rw.opErr))
+	}
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {
@@ -189,10 +199,6 @@ func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, e
 // processOperationResult increases statistics counters.
 // it returns true if operation should be retried.
 func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
-	if op.BatchRec().Err != nil && op.BatchRec().Err.IsInDoubt() {
-		rw.stats.IncrErrorsInDoubt()
-	}
-
 	code := op.BatchRec().ResultCode
 	switch code {
 	case atypes.RECORD_TOO_BIG,
@@ -216,6 +222,29 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	default:
 		return true
 	}
+}
+
+func (rw *batchRecordWriter) countInDoubt(batchErr a.Error) uint64 {
+	if batchErr != nil && batchErr.IsInDoubt() {
+		// If a batch error is in doubt, we mark all operations as in doubt.
+		return uint64(len(rw.operationBuffer))
+	}
+
+	var count uint64
+	// Count errors in doubt in the batch operations.
+	for _, op := range rw.operationBuffer {
+		if op.BatchRec().Err != nil && op.BatchRec().Err.IsInDoubt() {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (rw *batchRecordWriter) lazyProcessInDoubt(wg *sync.WaitGroup, batchErr a.Error) {
+	defer wg.Done()
+
+	rw.stats.AddErrorsInDoubt(rw.countInDoubt(batchErr))
 }
 
 func errMapToErr(errMap map[atypes.ResultCode]error) error {

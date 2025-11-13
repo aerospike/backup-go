@@ -69,8 +69,13 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	fileLimit uint64,
 	parallel int,
 	logger *slog.Logger,
-) *fileWriterProcessor[T] {
+) (*fileWriterProcessor[T], error) {
 	logger.Debug("created new file writer processor")
+
+	// Check writer and parallelism.
+	if !writer.GetOptions().IsDir && parallel > 1 {
+		return nil, fmt.Errorf("parallel running for single file is not allowed")
+	}
 
 	return &fileWriterProcessor[T]{
 		prefix:            prefix,
@@ -86,7 +91,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		fileLimit:         fileLimit,
 		parallel:          parallel,
 		logger:            logger,
-	}
+	}, nil
 }
 
 // newDataWriters returns initialized pipeline workers for write operations.
@@ -173,27 +178,11 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int,
 // configureWriter returns configured writer.
 func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, sizeCounter *atomic.Uint64,
 ) (io.WriteCloser, error) {
-	// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
-	// If it is set, we use it as a prefix.
-	prefix := fw.prefix
-	// Is it a metadata file?
-	isRecords := true
-
-	if n == -1 {
-		// For metadata writer create a separate file.
-		prefix = metadataFileNamePrefix
-		isRecords = false
-	}
-
-	if prefix == "" {
-		prefix = fmt.Sprintf("%d_", n)
-	}
-
 	// Generate file name.
-	filename := fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
+	filename := fw.getFileName(n)
 
 	// Create a file writer.
-	storageWriter, err := fw.writer.NewWriter(ctx, filename, isRecords)
+	storageWriter, err := fw.writer.NewWriter(ctx, filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage writer: %w", err)
 	}
@@ -220,6 +209,12 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	}
 
 	// Write file header.
+	// Is it a metadata file?
+	var isRecords bool
+	if n > 0 {
+		isRecords = true
+	}
+
 	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isRecords))
 	if err != nil {
 		return nil, fmt.Errorf("failed to write header: %w", err)
@@ -229,6 +224,31 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	fw.stats.IncFiles()
 
 	return compressedWriter, nil
+}
+
+// getFileName generates a file name based on the current configuration.
+func (fw *fileWriterProcessor[T]) getFileName(n int) string {
+	// If it is a single file backup, we don't need to generate a file name.
+	if !fw.writer.GetOptions().IsDir && n > 0 {
+		return ""
+	}
+
+	var prefix string
+
+	switch {
+	case n == -1:
+		// For metadata writer create a separate file with a metadata prefix.
+		prefix = metadataFileNamePrefix
+	case fw.prefix != "":
+		// If prefix is set, we use it as a prefix.
+		prefix = fw.prefix
+	default:
+		// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
+		prefix = fmt.Sprintf("%d_", n)
+	}
+
+	// Generate file name.
+	return fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
 }
 
 // emptyPrefixSuffix returns empty string, to configure prefix and suffix generator.

@@ -73,7 +73,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	logger.Debug("created new file writer processor")
 
 	// Check writer and parallelism.
-	if !writer.GetOptions().IsDir && parallel > 1 {
+	if writer != nil && !writer.GetOptions().IsDir && parallel > 1 {
 		return nil, fmt.Errorf("parallel running for single file is not allowed")
 	}
 
@@ -229,7 +229,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 // getFileName generates a file name based on the current configuration.
 func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 	// If it is a single file backup, we don't need to generate a file name.
-	if !fw.writer.GetOptions().IsDir && n > 0 {
+	if fw.writer != nil && !fw.writer.GetOptions().IsDir && n > 0 {
 		return ""
 	}
 

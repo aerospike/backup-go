@@ -102,7 +102,7 @@ func (s *writeReadTestSuite) TestWriteReadSingleFile() {
 
 	size := 500_000
 	times := 100
-	written := s.writeSingleFile("ns1.asb", size, times, s3Client)
+	written := s.writeSingleFile(size, times, s3Client)
 	read := s.readSingleFile(s3Client)
 
 	s.Equal(size*times, len(read))
@@ -195,7 +195,7 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 	return nil
 }
 
-func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, client *s3.Client) []byte {
+func (s *writeReadTestSuite) writeSingleFile(bytes, times int, client *s3.Client) []byte {
 	ctx := context.Background()
 	writers, err := s3Storasge.NewWriter(
 		ctx,
@@ -207,7 +207,7 @@ func (s *writeReadTestSuite) writeSingleFile(filename string, bytes, times int, 
 	)
 	s.Require().NoError(err)
 
-	writer, err := writers.NewWriter(ctx, filename)
+	writer, err := writers.NewWriter(ctx, "")
 	if err != nil {
 		s.FailNow("failed to create writer", err)
 	}

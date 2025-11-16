@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"sync/atomic"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
@@ -48,8 +47,6 @@ type Writer struct {
 	containerName string
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
-	// Sync for running backup to one file.
-	called atomic.Bool
 
 	tier *blob.AccessTier
 }
@@ -128,13 +125,8 @@ func NewWriter(
 
 // NewWriter returns a new Azure blob writer to the specified path.
 // isRecords describe if the file contains record data.
-func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
-	// protection for single file backup.
-	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
-		return nil, err
-	}
-
-	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
@@ -320,4 +312,9 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	}
 
 	return nil
+}
+
+// GetOptions returns initialized options for the writer.
+func (w *Writer) GetOptions() options.Options {
+	return w.Options
 }

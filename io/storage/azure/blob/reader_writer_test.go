@@ -109,9 +109,7 @@ func TestAzureSuite(t *testing.T) {
 
 //nolint:gocyclo // Long function to generate all kinds of data.
 func fillTestData(ctx context.Context, client *azblob.Client) error {
-	if _, err := client.CreateContainer(ctx, testContainerName, nil); err != nil {
-		return err
-	}
+	_, _ = client.CreateContainer(ctx, testContainerName, nil)
 
 	containerClient := client.ServiceClient().NewContainerClient(testContainerName)
 
@@ -487,7 +485,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -538,7 +536,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -569,7 +567,7 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -597,7 +595,7 @@ func (s *AzureSuite) TestWriter_WriteSingleFile() {
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile, true)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContent))
 	s.Require().NoError(err)
@@ -969,4 +967,20 @@ func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
 Done:
 	skipped := reader.GetSkipped()
 	require.Equal(s.T(), 3, len(skipped))
+}
+
+func TestWriter_GetOptions(t *testing.T) {
+	t.Parallel()
+
+	o1 := options.Options{
+		PathList: []string{testPath},
+		IsDir:    false,
+	}
+
+	w := &Writer{
+		Options: o1,
+	}
+
+	o2 := w.GetOptions()
+	require.Equal(t, o1, o2)
 }

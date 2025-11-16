@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -80,7 +81,9 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 }
 
 func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
-	return rw.retryPolicy.Do(rw.ctx, func() error {
+	var unknownErr error
+
+	err := rw.retryPolicy.Do(rw.ctx, func() error {
 		aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
 
 		if aerr != nil && aerr.IsInDoubt() {
@@ -108,12 +111,13 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 
 			return aerr
 		default:
-			// The default case is used for unexpected error.
-			rw.stats.IncrRetryPolicyAttempts()
-
-			return aerr
+			// Don't retry on unknown errors.
+			unknownErr = aerr
+			return nil
 		}
 	})
+
+	return errors.Join(err, unknownErr)
 }
 
 func (rw *singleRecordWriter) close() error {

@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"context"
+	"errors"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -64,7 +65,9 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 	t.Payload = xdr.SetGenerationBit(p.writePolicy.GenerationPolicy, t.Payload)
 	t.Payload = xdr.SetRecordExistsActionBit(p.writePolicy.RecordExistsAction, t.Payload)
 
-	return p.retryPolicy.Do(p.ctx, func() error {
+	var unknownErr error
+
+	err := p.retryPolicy.Do(p.ctx, func() error {
 		aerr := p.dbWriter.PutPayload(p.writePolicy, t.Key, t.Payload)
 
 		if aerr != nil && aerr.IsInDoubt() {
@@ -92,10 +95,11 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 
 			return aerr
 		default:
-			// The default case is used for unexpected error.
-			p.stats.IncrRetryPolicyAttempts()
-
-			return aerr
+			// Don't retry on unknown errors.
+			unknownErr = aerr
+			return nil
 		}
 	})
+
+	return errors.Join(err, unknownErr)
 }

@@ -166,7 +166,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 				return aerr
 			default:
-				// If we have an unknown error, we don't retry.
+				// Don't retry on unknown errors.
 				unknownErr = aerr
 				return nil
 			}

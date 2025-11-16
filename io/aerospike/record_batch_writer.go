@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -138,21 +137,15 @@ func (rw *batchRecordWriter) processBatchOperation() error {
 	)
 
 	aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
-
-	// Lazy process in doubt errors.
-	{
-		var wg sync.WaitGroup
-
-		wg.Add(1)
-		defer wg.Wait()
-
-		go rw.lazyProcessInDoubt(&wg, aerr)
+	if aerr != nil && aerr.IsInDoubt() {
+		// If a batch error is in doubt, we mark all operations as in doubt.
+		rw.stats.AddErrorsInDoubt(uint64(len(rw.operationBuffer)))
 	}
 
 	switch {
 	case isNilOrAcceptableError(aerr),
 		rw.ignoreRecordError && shouldIgnore(aerr):
-		rw.operationBuffer, rw.opErr = rw.processAndFilterOperations()
+		rw.operationBuffer, rw.opErr = rw.processAndFilterOperations(aerr)
 
 		if len(rw.operationBuffer) == 0 {
 			rw.logger.Debug("All operations succeeded")
@@ -180,12 +173,14 @@ func (rw *batchRecordWriter) processBatchOperation() error {
 	}
 }
 
-func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {
+func (rw *batchRecordWriter) processAndFilterOperations(batchError a.Error) ([]a.BatchRecordIfc, error) {
 	failedOps := make([]a.BatchRecordIfc, 0)
 
 	errMap := make(map[atypes.ResultCode]error)
 
 	for _, op := range rw.operationBuffer {
+		rw.processOpInDoubtError(batchError, op.BatchRec().Err)
+
 		if rw.processOperationResult(op) {
 			errMap[op.BatchRec().ResultCode] = op.BatchRec().Err
 
@@ -224,27 +219,15 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 	}
 }
 
-func (rw *batchRecordWriter) countInDoubt(batchErr a.Error) uint64 {
+func (rw *batchRecordWriter) processOpInDoubtError(batchErr, opErr a.Error) {
+	// If a batchError already has in doubt, do nothing.
 	if batchErr != nil && batchErr.IsInDoubt() {
-		// If a batch error is in doubt, we mark all operations as in doubt.
-		return uint64(len(rw.operationBuffer))
+		return
 	}
-
-	var count uint64
-	// Count errors in doubt in the batch operations.
-	for _, op := range rw.operationBuffer {
-		if op.BatchRec().Err != nil && op.BatchRec().Err.IsInDoubt() {
-			count++
-		}
+	// Otherwise, mark an operation as in doubt.
+	if opErr != nil && opErr.IsInDoubt() {
+		rw.stats.IncrErrorsInDoubt()
 	}
-
-	return count
-}
-
-func (rw *batchRecordWriter) lazyProcessInDoubt(wg *sync.WaitGroup, batchErr a.Error) {
-	defer wg.Done()
-
-	rw.stats.AddErrorsInDoubt(rw.countInDoubt(batchErr))
 }
 
 func errMapToErr(errMap map[atypes.ResultCode]error) error {

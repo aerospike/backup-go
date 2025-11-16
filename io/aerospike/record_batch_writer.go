@@ -126,9 +126,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("retryPolicy", rw.retryPolicy),
 	)
 
-	var unknownErr error
-
-	err := rw.retryPolicy.Do(rw.ctx,
+	return rw.retryPolicy.Do(rw.ctx,
 		func() error {
 			rw.logger.Debug("Attempting batch operation",
 				slog.Int("bufferSize", len(rw.operationBuffer)),
@@ -166,14 +164,11 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 				return aerr
 			default:
-				// Don't retry on unknown errors.
-				unknownErr = aerr
-				return nil
+				// Retry on unknown errors.
+				return aerr
 			}
 		},
 	)
-
-	return errors.Join(err, unknownErr)
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations(batchError a.Error) ([]a.BatchRecordIfc, error) {

@@ -17,7 +17,6 @@ package aerospike
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -38,7 +37,6 @@ type batchRecordWriter struct {
 	rpsCollector      *metrics.Collector
 	batchSize         int
 	ignoreRecordError bool
-	opErr             error
 }
 
 func newBatchRecordWriter(
@@ -128,49 +126,55 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("retryPolicy", rw.retryPolicy),
 	)
 
-	return rw.retryPolicy.Do(rw.ctx, rw.processBatchOperation)
-}
+	var unknownErr error
 
-func (rw *batchRecordWriter) processBatchOperation() error {
-	rw.logger.Debug("Attempting batch operation",
-		slog.Int("bufferSize", len(rw.operationBuffer)),
+	err := rw.retryPolicy.Do(rw.ctx,
+		func() error {
+			rw.logger.Debug("Attempting batch operation",
+				slog.Int("bufferSize", len(rw.operationBuffer)),
+			)
+
+			aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
+			if aerr != nil && aerr.IsInDoubt() {
+				// If a batch error is in doubt, we mark all operations as in doubt.
+				rw.stats.AddErrorsInDoubt(uint64(len(rw.operationBuffer)))
+			}
+
+			switch {
+			case isNilOrAcceptableError(aerr),
+				rw.ignoreRecordError && shouldIgnore(aerr):
+				var opErr error
+				rw.operationBuffer, opErr = rw.processAndFilterOperations(aerr)
+
+				if len(rw.operationBuffer) == 0 {
+					rw.logger.Debug("All operations succeeded")
+
+					return nil
+				}
+
+				rw.logger.Debug("Not all operations succeeded",
+					slog.Int("remainingOperations", len(rw.operationBuffer)),
+					slog.Any("error", opErr),
+				)
+
+				return opErr
+			case shouldRetry(aerr):
+				rw.logger.Debug("Retryable error occurred",
+					slog.Any("error", aerr),
+					slog.Int("remainingOperations", len(rw.operationBuffer)),
+				)
+
+				return aerr
+			default:
+				// If we have an unknown error, we don't retry.
+				unknownErr = aerr
+
+				return nil
+			}
+		},
 	)
 
-	aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
-	if aerr != nil && aerr.IsInDoubt() {
-		// If a batch error is in doubt, we mark all operations as in doubt.
-		rw.stats.AddErrorsInDoubt(uint64(len(rw.operationBuffer)))
-	}
-
-	switch {
-	case isNilOrAcceptableError(aerr),
-		rw.ignoreRecordError && shouldIgnore(aerr):
-		rw.operationBuffer, rw.opErr = rw.processAndFilterOperations(aerr)
-
-		if len(rw.operationBuffer) == 0 {
-			rw.logger.Debug("All operations succeeded")
-			rw.opErr = nil
-
-			return nil
-		}
-
-		rw.logger.Debug("Not all operations succeeded",
-			slog.Int("remainingOperations", len(rw.operationBuffer)),
-			slog.Any("error", rw.opErr),
-		)
-
-		return rw.opErr
-	case shouldRetry(aerr):
-		rw.logger.Debug("Retryable error occurred",
-			slog.Any("error", aerr),
-			slog.Int("remainingOperations", len(rw.operationBuffer)),
-		)
-
-		return aerr
-	default:
-		return fmt.Errorf("%d operations failed: %w",
-			len(rw.operationBuffer), errors.Join(aerr, rw.opErr))
-	}
+	return errors.Join(err, unknownErr)
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations(batchError a.Error) ([]a.BatchRecordIfc, error) {

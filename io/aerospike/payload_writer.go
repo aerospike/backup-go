@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"context"
+	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -31,6 +32,7 @@ type payloadWriter struct {
 	stats             *models.RestoreStats
 	retryPolicy       *models.RetryPolicy
 	metrics           *metrics.Collector
+	logger            *slog.Logger
 	ignoreRecordError bool
 }
 
@@ -42,6 +44,7 @@ func newPayloadWriter(
 	retryPolicy *models.RetryPolicy,
 	metricsCollector *metrics.Collector,
 	ignoreRecordError bool,
+	logger *slog.Logger,
 ) *payloadWriter {
 	if retryPolicy == nil {
 		retryPolicy = models.NewDefaultRetryPolicy()
@@ -55,6 +58,7 @@ func newPayloadWriter(
 		retryPolicy:       retryPolicy,
 		metrics:           metricsCollector,
 		ignoreRecordError: ignoreRecordError,
+		logger:            logger,
 	}
 }
 
@@ -92,9 +96,8 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 
 			return aerr
 		default:
-			// The default case is used for unexpected error.
-			p.stats.IncrRetryPolicyAttempts()
-
+			// Retry on unknown errors.
+			p.logger.Warn("Retrying unknown error", slog.Any("error", aerr))
 			return aerr
 		}
 	})

@@ -78,6 +78,10 @@ func (rs *RestoreStats) IncrErrorsInDoubt() {
 	rs.errorsInDoubt.Add(1)
 }
 
+func (rs *RestoreStats) AddErrorsInDoubt(n uint64) {
+	rs.errorsInDoubt.Add(n)
+}
+
 func (rs *RestoreStats) GetRecordsExisted() uint64 {
 	return rs.recordsExisted.Load()
 }

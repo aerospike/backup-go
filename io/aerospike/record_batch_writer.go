@@ -17,7 +17,6 @@ package aerospike
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -127,59 +126,60 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("retryPolicy", rw.retryPolicy),
 	)
 
-	var opErr error
+	return rw.retryPolicy.Do(rw.ctx,
+		func() error {
+			rw.logger.Debug("Attempting batch operation",
+				slog.Int("bufferSize", len(rw.operationBuffer)),
+			)
 
-	return rw.retryPolicy.Do(rw.ctx, func() error {
-		rw.logger.Debug("Attempting batch operation",
-			slog.Int("bufferSize", len(rw.operationBuffer)),
-		)
-
-		aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
-
-		if aerr != nil && aerr.IsInDoubt() {
-			rw.stats.IncrErrorsInDoubt()
-		}
-
-		switch {
-		case isNilOrAcceptableError(aerr),
-			rw.ignoreRecordError && shouldIgnore(aerr):
-			rw.operationBuffer, opErr = rw.processAndFilterOperations()
-
-			if len(rw.operationBuffer) == 0 {
-				rw.logger.Debug("All operations succeeded")
-				return nil
+			aerr := rw.asc.BatchOperate(rw.batchPolicy, rw.operationBuffer)
+			if aerr != nil && aerr.IsInDoubt() {
+				// If a batch error is in doubt, we mark all operations as in doubt.
+				rw.stats.AddErrorsInDoubt(uint64(len(rw.operationBuffer)))
 			}
 
-			rw.logger.Debug("Not all operations succeeded",
-				slog.Int("remainingOperations", len(rw.operationBuffer)),
-				slog.Any("error", opErr),
-			)
+			switch {
+			case isNilOrAcceptableError(aerr),
+				rw.ignoreRecordError && shouldIgnore(aerr):
+				var opErr error
+				rw.operationBuffer, opErr = rw.processAndFilterOperations(aerr)
 
-			return opErr
-		case shouldRetry(aerr):
-			rw.logger.Debug("Retryable error occurred",
-				slog.Any("error", aerr),
-				slog.Int("remainingOperations", len(rw.operationBuffer)),
-			)
-			rw.stats.IncrRetryPolicyAttempts()
+				if len(rw.operationBuffer) == 0 {
+					rw.logger.Debug("All operations succeeded")
+					return nil
+				}
 
-			return aerr
-		default:
-			// The default case is used for unexpected error.
-			rw.stats.IncrRetryPolicyAttempts()
+				rw.logger.Debug("Not all operations succeeded",
+					slog.Int("remainingOperations", len(rw.operationBuffer)),
+					slog.Any("error", opErr),
+				)
 
-			return fmt.Errorf("%d operations failed: %w",
-				len(rw.operationBuffer), errors.Join(aerr, opErr))
-		}
-	})
+				return opErr
+			case shouldRetry(aerr):
+				rw.logger.Debug("Retryable error occurred",
+					slog.Any("error", aerr),
+					slog.Int("remainingOperations", len(rw.operationBuffer)),
+				)
+				rw.stats.IncrRetryPolicyAttempts()
+
+				return aerr
+			default:
+				// Retry on unknown errors.
+				rw.logger.Warn("Retrying unknown error", slog.Any("error", aerr))
+				return aerr
+			}
+		},
+	)
 }
 
-func (rw *batchRecordWriter) processAndFilterOperations() ([]a.BatchRecordIfc, error) {
+func (rw *batchRecordWriter) processAndFilterOperations(batchError a.Error) ([]a.BatchRecordIfc, error) {
 	failedOps := make([]a.BatchRecordIfc, 0)
 
 	errMap := make(map[atypes.ResultCode]error)
 
 	for _, op := range rw.operationBuffer {
+		rw.processOpInDoubtError(batchError, op.BatchRec().Err)
+
 		if rw.processOperationResult(op) {
 			errMap[op.BatchRec().ResultCode] = op.BatchRec().Err
 
@@ -215,6 +215,17 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 		return false
 	default:
 		return true
+	}
+}
+
+func (rw *batchRecordWriter) processOpInDoubtError(batchErr, opErr a.Error) {
+	// If a batchError already has in doubt, do nothing.
+	if batchErr != nil && batchErr.IsInDoubt() {
+		return
+	}
+	// Otherwise, mark an operation as in doubt.
+	if opErr != nil && opErr.IsInDoubt() {
+		rw.stats.IncrErrorsInDoubt()
 	}
 }
 

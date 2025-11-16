@@ -109,8 +109,7 @@ func TestAzureSuite(t *testing.T) {
 
 //nolint:gocyclo // Long function to generate all kinds of data.
 func fillTestData(ctx context.Context, client *azblob.Client) error {
-	//nolint:errcheck // Skip error if container already exists. For local runs.
-	client.CreateContainer(ctx, testContainerName, nil)
+	_, _ = client.CreateContainer(ctx, testContainerName, nil)
 
 	containerClient := client.ServiceClient().NewContainerClient(testContainerName)
 

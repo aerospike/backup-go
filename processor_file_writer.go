@@ -32,7 +32,11 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 )
 
-const metadataFileNamePrefix = "metadata_"
+const (
+	metadataFileNamePrefix = "metadata_"
+	// metadataFileID is used to identify metadata file writer.
+	metadataFileID = -1
+)
 
 // fileWriterProcessor configures and creates file writers pipelines.
 type fileWriterProcessor[T models.TokenConstraint] struct {
@@ -114,7 +118,7 @@ func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Wr
 
 // newMetaWriter creates a new writer for metadata based on the current configuration.
 func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context) (io.WriteCloser, error) {
-	w, err := fw.newWriter(ctx, -1)
+	w, err := fw.newWriter(ctx, metadataFileID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create meta writer: %w", err)
 	}
@@ -208,13 +212,10 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 		return nil, err
 	}
 
-	// Write file header.
 	// Is it a metadata file?
-	var isRecords bool
-	if n > 0 {
-		isRecords = true
-	}
+	isRecords := n != metadataFileID
 
+	// Write file header.
 	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isRecords))
 	if err != nil {
 		return nil, fmt.Errorf("failed to write header: %w", err)
@@ -236,7 +237,7 @@ func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 	var prefix string
 
 	switch {
-	case n == -1:
+	case n == metadataFileID:
 		// For metadata writer create a separate file with a metadata prefix.
 		prefix = metadataFileNamePrefix
 	case fw.prefix != "":

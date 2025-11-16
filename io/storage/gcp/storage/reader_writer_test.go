@@ -105,8 +105,8 @@ func TestGCPSuite(t *testing.T) {
 //nolint:gocyclo //it is a test function for filling data. No need to split it.
 func fillTestData(ctx context.Context, client *storage.Client) error {
 	bucket := client.Bucket(testBucketName)
-	//nolint:errcheck // Skip error if bucket already exists. For local runs.
-	bucket.Create(ctx, testProjectID, nil)
+
+	_ = bucket.Create(ctx, testProjectID, nil)
 
 	// empty folders.
 	sw := client.Bucket(testBucketName).Object(testReadFolderEmpty).NewWriter(ctx)

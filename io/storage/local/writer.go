@@ -21,9 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 
-	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
@@ -33,8 +31,6 @@ const bufferSize = 4096 * 1024 // 4mb
 type Writer struct {
 	// Optional parameters.
 	options.Options
-	// Sync for running backup to one file.
-	called atomic.Bool
 }
 
 // NewWriter creates a new writer for local directory/file writes.
@@ -204,7 +200,7 @@ func (bf *bufferedFile) Close() error {
 // NewWriter creates a new backup file in the given directory.
 // The file name is based on the specified fileName.
 // isRecords specifies whether the file contains record data.
-func (w *Writer) NewWriter(ctx context.Context, fileName string, isRecords bool) (io.WriteCloser, error) {
+func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -215,21 +211,16 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string, isRecords bool)
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
-	// protection for single file backup.
-	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
-		return nil, err
-	}
-
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
 	var filePath string
 
 	switch {
 	case w.IsDir:
 		// If it is directory.
-		filePath = filepath.Join(w.PathList[0], fileName)
-	case !isRecords && !w.IsDir:
+		filePath = filepath.Join(w.PathList[0], filename)
+	case !w.IsDir && filename != "":
 		// If it is metadata file and we backup to one file.
-		filePath = filepath.Join(filepath.Dir(w.PathList[0]), fileName)
+		filePath = filepath.Join(filepath.Dir(w.PathList[0]), filename)
 	default:
 		// If we backup to one file.
 		filePath = w.PathList[0]
@@ -246,4 +237,9 @@ func (w *Writer) NewWriter(ctx context.Context, fileName string, isRecords bool)
 // GetType returns the `localType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
 	return localType
+}
+
+// GetOptions returns initialized options for the writer.
+func (w *Writer) GetOptions() options.Options {
+	return w.Options
 }

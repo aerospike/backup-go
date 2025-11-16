@@ -109,7 +109,7 @@ func newBackupXDRHandler(
 		logger,
 	)
 
-	writerProcessor := newFileWriterProcessor[*models.ASBXToken](
+	writerProcessor, err := newFileWriterProcessor[*models.ASBXToken](
 		"",
 		emptyPrefixSuffix,
 		writer,
@@ -124,6 +124,10 @@ func newBackupXDRHandler(
 		config.ParallelWrite,
 		logger,
 	)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
 
 	return &HandlerBackupXDR{
 		id:              id,

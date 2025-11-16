@@ -105,9 +105,8 @@ func TestGCPSuite(t *testing.T) {
 //nolint:gocyclo //it is a test function for filling data. No need to split it.
 func fillTestData(ctx context.Context, client *storage.Client) error {
 	bucket := client.Bucket(testBucketName)
-	if err := bucket.Create(ctx, testProjectID, nil); err != nil {
-		return err
-	}
+
+	_ = bucket.Create(ctx, testProjectID, nil)
 
 	// empty folders.
 	sw := client.Bucket(testBucketName).Object(testReadFolderEmpty).NewWriter(ctx)
@@ -345,6 +344,7 @@ func (s *GCPSuite) TestReader_WithSorting() {
 		testBucketName,
 		options.WithDir(testReadFolderSorted),
 		options.WithSorting(),
+		options.WithCalculateTotalSize(),
 	)
 	s.Require().NoError(err)
 
@@ -479,12 +479,13 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 		testBucketName,
 		options.WithDir(testWriteFolderEmpty),
 		options.WithChunkSize(defaultChunkSize),
+		options.WithRemoveFiles(),
 	)
 	s.Require().NoError(err)
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -538,7 +539,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -571,7 +572,7 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 
 	for i := 0; i < testFilesNumber; i++ {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
-		w, err := writer.NewWriter(ctx, fileName, true)
+		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
 		s.Require().NoError(err)
@@ -694,7 +695,7 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 	)
 	s.Require().NoError(err)
 
-	w, err := writer.NewWriter(ctx, testFileNameOneFile, true)
+	w, err := writer.NewWriter(ctx, testFileNameOneFile)
 	s.Require().NoError(err)
 	n, err := w.Write([]byte(testFileContent))
 	s.Require().NoError(err)
@@ -959,4 +960,20 @@ func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
 Done:
 	skipped := reader.GetSkipped()
 	require.Equal(s.T(), 3, len(skipped))
+}
+
+func TestWriter_GetOptions(t *testing.T) {
+	t.Parallel()
+
+	o1 := options.Options{
+		PathList: []string{testPath},
+		IsDir:    false,
+	}
+
+	w := &Writer{
+		Options: o1,
+	}
+
+	o2 := w.GetOptions()
+	require.Equal(t, o1, o2)
 }

@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/aerospike/backup-go/io/storage/options"
 )
 
 const (
@@ -61,7 +63,7 @@ func (w *stdoutWriteCloser) Close() error {
 
 // NewWriter creates a new stdout writer closer.
 // The file name and isRecords are ignored for stdout.
-func (w *Writer) NewWriter(ctx context.Context, _ string, _ bool) (io.WriteCloser, error) {
+func (w *Writer) NewWriter(ctx context.Context, _ string) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -84,4 +86,9 @@ func (w *Writer) Remove(_ context.Context, _ string) error {
 // GetType returns the `stdType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
 	return stdoutType
+}
+
+// GetOptions returns initialized options for the writer.
+func (w *Writer) GetOptions() options.Options {
+	return options.Options{}
 }

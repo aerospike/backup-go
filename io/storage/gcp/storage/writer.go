@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync/atomic"
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/io/storage/common"
@@ -42,8 +41,6 @@ type Writer struct {
 	bucketHandle *storage.BucketHandle
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
-	// Sync for running backup to one file.
-	called atomic.Bool
 }
 
 // NewWriter creates a new writer for GCP storage directory/file writes.
@@ -78,6 +75,7 @@ func NewWriter(
 	}
 
 	bucketHandler := client.Bucket(bucketName)
+	w.bucketName = bucketName
 	// Check if bucketHandler exists, to avoid errors.
 	_, err := bucketHandler.Attrs(ctx)
 	if err != nil {
@@ -110,13 +108,8 @@ func NewWriter(
 
 // NewWriter returns a new GCP storage writer for the provided path.
 // isRecords describe if the file contains record data.
-func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error) {
-	// protection for single file backup.
-	if err := common.RestrictParallelBackup(&w.called, w.IsDir, isRecords); err != nil {
-		return nil, err
-	}
-
-	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir, isRecords)
+func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
@@ -125,6 +118,10 @@ func (w *Writer) NewWriter(ctx context.Context, filename string, isRecords bool)
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass
+
+	if w.WithChecksum {
+		sw.SendCRC32C = true
+	}
 
 	return sw, nil
 }
@@ -185,6 +182,11 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 // GetType returns the `gcpStorageType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
 	return gcpStorageType
+}
+
+// GetOptions returns initialized options for the writer.
+func (w *Writer) GetOptions() options.Options {
+	return w.Options
 }
 
 func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, prefix string) (bool, error) {

@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -43,12 +44,13 @@ const (
 	objStatusRestoring
 )
 
-// Reader represents GCP storage reader.
+// Reader represents Azure storage reader.
 type Reader struct {
 	// Optional parameters.
 	options.Options
 
-	client *azblob.Client
+	client          *azblob.Client
+	containerClient *container.Client
 
 	// containerName contains name of the container to read from.
 	containerName string
@@ -96,8 +98,9 @@ func NewReader(
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	// Check if container exists.
-	if _, err := client.ServiceClient().NewContainerClient(containerName).GetProperties(ctx, nil); err != nil {
+	// Check if a container exists.
+	r.containerClient = client.ServiceClient().NewContainerClient(containerName)
+	if _, err := r.containerClient.GetProperties(ctx, nil); err != nil {
 		return nil, fmt.Errorf("unable to get container properties: %w", err)
 	}
 
@@ -145,8 +148,8 @@ func NewReader(
 	return r, nil
 }
 
-// StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
-// If error occurs, it will be sent to `errorsCh.`
+// StreamFiles streams file/directory form Azure cloud storage to `readersCh`.
+// If an error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
@@ -248,7 +251,7 @@ func (r *Reader) openObject(
 		return
 	}
 
-	rReader, err := newRangeReader(ctx, newAzureBlobClient(r.client), r.containerName, path)
+	rReader, err := newRangeReader(ctx, newAzureBlobClient(r.client, r.containerClient), r.containerName, path)
 	if err != nil {
 		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
 		return
@@ -272,7 +275,7 @@ func (r *Reader) openObject(
 	}
 }
 
-// StreamFile opens a single file from GCP cloud storage and sends io.Readers to the `readersCh`
+// StreamFile opens a single file from Azure cloud storage and sends io.Readers to the `readersCh`
 // In case of an error, it is sent to the `errorsCh` channel.
 func (r *Reader) StreamFile(
 	ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error) {
@@ -288,7 +291,7 @@ func (r *Reader) shouldSkip(path, fileName string, fileSize int64) bool {
 		fileSize == 0
 }
 
-// GetType return `gcpStorageType` type of storage. Used in logging.
+// GetType return `azureBlobType` type of storage. Used in logging.
 func (r *Reader) GetType() string {
 	return azureBlobType
 }
@@ -390,8 +393,7 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 
 func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.AccessTier) error {
 	r.Logger.Debug("starting rehydration", slog.String("path", path))
-	bClient := r.client.ServiceClient().
-		NewContainerClient(r.containerName).
+	bClient := r.containerClient.
 		NewBlobClient(path)
 
 	priority := blob.RehydratePriorityHigh
@@ -411,8 +413,7 @@ func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.Acc
 
 // checkObjectAvailability check if an object is available for download.
 func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int, error) {
-	bClient := r.client.ServiceClient().
-		NewContainerClient(r.containerName).
+	bClient := r.containerClient.
 		NewBlobClient(path)
 
 	objProps, err := bClient.GetProperties(ctx, nil)
@@ -601,8 +602,7 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
 	// if we have file to calculate.
 	if !r.IsDir {
-		objProps, err := r.client.ServiceClient().
-			NewContainerClient(r.containerName).
+		objProps, err := r.containerClient.
 			NewBlobClient(path).GetProperties(ctx, nil)
 		if err != nil {
 			return 0, 0, fmt.Errorf("failed to get object properties: %s: %w", path, err)

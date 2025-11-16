@@ -148,7 +148,6 @@ func (rw *batchRecordWriter) flushBuffer() error {
 
 				if len(rw.operationBuffer) == 0 {
 					rw.logger.Debug("All operations succeeded")
-
 					return nil
 				}
 
@@ -163,12 +162,12 @@ func (rw *batchRecordWriter) flushBuffer() error {
 					slog.Any("error", aerr),
 					slog.Int("remainingOperations", len(rw.operationBuffer)),
 				)
+				rw.stats.IncrRetryPolicyAttempts()
 
 				return aerr
 			default:
 				// If we have an unknown error, we don't retry.
 				unknownErr = aerr
-
 				return nil
 			}
 		},

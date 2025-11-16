@@ -29,6 +29,7 @@ import (
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/io/aerospike"
+	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
@@ -43,7 +44,7 @@ type Writer interface {
 	// the writer after backup is done. Header func is executed on a writer
 	// after creation (on each one in case of multipart file).
 	// isRecords indicates whether the file contains records data.
-	NewWriter(ctx context.Context, filename string, isRecords bool) (io.WriteCloser, error)
+	NewWriter(ctx context.Context, filename string) (io.WriteCloser, error)
 
 	// GetType returns the type of storage. Used in logging.
 	GetType() string
@@ -54,6 +55,9 @@ type Writer interface {
 	// Remove removes a file or directory at the specified path from the backup storage.
 	// Returns an error if the operation fails.
 	Remove(ctx context.Context, path string) error
+
+	// GetOptions returns initialized options for the writer.
+	GetOptions() options.Options
 }
 
 // BackupHandler handles a backup job.
@@ -204,7 +208,7 @@ func newBackupHandler(
 		done:                   make(chan struct{}, 1),
 	}
 
-	writerProcessor := newFileWriterProcessor[*models.Token](
+	writerProcessor, err := newFileWriterProcessor[*models.Token](
 		config.OutputFilePrefix,
 		bh.stateSuffixGenerator,
 		writer,
@@ -219,6 +223,10 @@ func newBackupHandler(
 		config.ParallelWrite,
 		logger,
 	)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
 
 	bh.writerProcessor = writerProcessor
 

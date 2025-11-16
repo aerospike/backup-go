@@ -104,8 +104,13 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 
 			return nil
 		case shouldRetry(aerr):
+			rw.stats.IncrRetryPolicyAttempts()
+
 			return aerr
 		default:
+			// The default case is used for unexpected error.
+			rw.stats.IncrRetryPolicyAttempts()
+
 			return aerr
 		}
 	})

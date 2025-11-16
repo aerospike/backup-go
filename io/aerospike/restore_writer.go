@@ -95,6 +95,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 			retryPolicy,
 			rpsCollector,
 			ignoreRecordError,
+			logger,
 		),
 		logger: logger,
 	}
@@ -134,6 +135,7 @@ func newRecordWriter(
 		retryPolicy,
 		rpsCollector,
 		ignoreRecordError,
+		logger,
 	)
 }
 

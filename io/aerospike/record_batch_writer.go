@@ -165,6 +165,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				return aerr
 			default:
 				// Retry on unknown errors.
+				rw.logger.Warn("Retrying unknown error", slog.Any("error", aerr))
 				return aerr
 			}
 		},

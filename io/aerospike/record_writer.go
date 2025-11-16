@@ -17,6 +17,7 @@ package aerospike
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -31,6 +32,7 @@ type singleRecordWriter struct {
 	stats             *models.RestoreStats
 	retryPolicy       *models.RetryPolicy
 	rpsCollector      *metrics.Collector
+	logger            *slog.Logger
 	ignoreRecordError bool
 }
 
@@ -42,6 +44,7 @@ func newSingleRecordWriter(
 	retryPolicy *models.RetryPolicy,
 	rpsCollector *metrics.Collector,
 	ignoreRecordError bool,
+	logger *slog.Logger,
 ) *singleRecordWriter {
 	if retryPolicy == nil {
 		retryPolicy = models.NewDefaultRetryPolicy()
@@ -55,6 +58,7 @@ func newSingleRecordWriter(
 		retryPolicy:       retryPolicy,
 		rpsCollector:      rpsCollector,
 		ignoreRecordError: ignoreRecordError,
+		logger:            logger,
 	}
 }
 
@@ -109,6 +113,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return aerr
 		default:
 			// Retry on unknown errors.
+			rw.logger.Warn("Retrying unknown error", slog.Any("error", aerr))
 			return aerr
 		}
 	})

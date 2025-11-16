@@ -60,6 +60,7 @@ func TestPayloadWriterSuccess(t *testing.T) {
 		nil,
 		rpsCollector,
 		false,
+		slog.Default(),
 	)
 
 	err := writer.writePayload(token)
@@ -112,6 +113,7 @@ func TestPayloadWriterRetry(t *testing.T) {
 		retryPolicy,
 		rpsCollector,
 		false,
+		slog.Default(),
 	)
 
 	err := writer.writePayload(token)
@@ -162,6 +164,7 @@ func TestPayloadWriterRetryExhausted(t *testing.T) {
 		retryPolicy,
 		rpsCollector,
 		false,
+		slog.Default(),
 	)
 
 	err := writer.writePayload(token)
@@ -211,6 +214,7 @@ func TestPayloadWriterNonRetryableError(t *testing.T) {
 		retryPolicy,
 		rpsCollector,
 		false,
+		slog.Default(),
 	)
 
 	err := writer.writePayload(token)

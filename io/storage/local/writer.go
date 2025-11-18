@@ -25,7 +25,7 @@ import (
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
-const bufferSize = 4096 * 1024 // 4mb
+const defaultBufferSize = 4096 * 1024 // 4mb
 
 // Writer represents a local storage writer.
 type Writer struct {
@@ -52,6 +52,10 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 	path := w.PathList[0]
 	if !w.IsDir {
 		path = filepath.Dir(w.PathList[0])
+	}
+
+	if w.ChunkSize == 0 {
+		w.ChunkSize = defaultBufferSize
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -231,7 +235,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 
-	return &bufferedFile{bufio.NewWriterSize(file, bufferSize), file}, nil
+	return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
 }
 
 // GetType returns the `localType` type of storage. Used in logging.

@@ -30,7 +30,10 @@ type writer struct {
 // Every Write to it is compressed and passed to an inner writer.
 // On Close, both writers are closed.
 func NewWriter(w io.WriteCloser, level int) (io.WriteCloser, error) {
-	zstWriter, err := zstd.NewWriter(w, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
+	zstWriter, err := zstd.NewWriter(w,
+		zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)),
+		zstd.WithAllLitEntropyCompression(true),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zstd writer: %w", err)
 	}

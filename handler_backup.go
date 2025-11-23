@@ -333,12 +333,12 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 }
 
 func (bh *BackupHandler) backup(ctx context.Context) error {
-	dataWriters, err := bh.writerProcessor.newDataWriters(ctx)
+	writers, dataWriters, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed create write workers: %w", err)
 	}
 
-	if err = bh.backupMetadata(ctx); err != nil {
+	if err = bh.backupMetadata(ctx, writers[0]); err != nil {
 		return fmt.Errorf("failed to backup metadata: %w", err)
 	}
 
@@ -360,6 +360,11 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		}
 	}
 
+	return bh.runBackupPipeline(ctx, dataWriters)
+}
+
+func (bh *BackupHandler) runBackupPipeline(ctx context.Context, dataWriters []pipe.Writer[*models.Token]) error {
+	// Setup data processors
 	dataProcessors := newDataProcessor(
 		processors.NewRecordCounter[*models.Token](&bh.stats.ReadRecords),
 		processors.NewVoidTimeSetter[*models.Token](bh.logger),
@@ -367,16 +372,19 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 			ctx, bh.config.RecordsPerSecond),
 	)
 
+	// Setup readers
 	dataReaders, err := bh.readerProcessor.newAerospikeReadWorkers(ctx)
 	if err != nil {
 		return err
 	}
 
+	// Determine pipeline mode
 	pipelineMode := pipe.RoundRobin
 	if bh.config.StateFile != "" || len(dataReaders) == len(dataWriters) {
 		pipelineMode = pipe.Fixed
 	}
 
+	// Create and run pipeline
 	pl, err := pipe.NewPipe(
 		dataProcessors,
 		dataReaders,
@@ -394,8 +402,8 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	return pl.Run(ctx)
 }
 
-func (bh *BackupHandler) backupMetadata(ctx context.Context) error {
-	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx)
+func (bh *BackupHandler) backupMetadata(ctx context.Context, writer io.WriteCloser) error {
+	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx, writer)
 	if err != nil {
 		return err
 	}

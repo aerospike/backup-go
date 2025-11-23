@@ -99,10 +99,10 @@ func newFileWriterProcessor[T models.TokenConstraint](
 }
 
 // newDataWriters returns initialized pipeline workers for write operations.
-func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Writer[T], error) {
+func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.WriteCloser, []pipe.Writer[T], error) {
 	writers, err := fw.newWriters(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create storage writers: %w", err)
+		return nil, nil, fmt.Errorf("failed to create storage writers: %w", err)
 	}
 
 	dataWriters := make([]pipe.Writer[T], len(writers))
@@ -113,11 +113,17 @@ func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Wr
 
 	fw.logger.Debug("created data writers", slog.Int("count", len(writers)))
 
-	return dataWriters, nil
+	return writers, dataWriters, nil
 }
 
 // newMetaWriter creates a new writer for metadata based on the current configuration.
-func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context) (io.WriteCloser, error) {
+func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context, writer io.WriteCloser) (io.WriteCloser, error) {
+	wOpts := fw.writer.GetOptions()
+	// If it is backup to file, we return the same writer.
+	if !wOpts.IsDir {
+		return writer, nil
+	}
+	// Else we will init separate writer for metadata.
 	w, err := fw.newWriter(ctx, metadataFileID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create meta writer: %w", err)

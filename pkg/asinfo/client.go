@@ -372,7 +372,7 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint6
 	var totalRemaining uint64
 
 	for i := range resultMap {
-		result, ok, err := resultMap[i].parseUint("migrate_tx_partitions_remaining")
+		result, ok, err := resultMap[i].parseUint64("migrate_tx_partitions_remaining")
 		if err != nil {
 			return 0, err
 		}
@@ -381,7 +381,7 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint6
 			totalRemaining += result
 		}
 
-		result, ok, err = resultMap[i].parseUint("migrate_rx_partitions_remaining")
+		result, ok, err = resultMap[i].parseUint64("migrate_rx_partitions_remaining")
 		if err != nil {
 			return 0, err
 		}
@@ -1316,7 +1316,7 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 	}
 
 	for i := range resultMap {
-		result, ok, err := resultMap[i].parseUint("objects")
+		result, ok, err := resultMap[i].parseUint64("objects")
 		if err != nil {
 			return 0, err
 		}
@@ -1398,9 +1398,9 @@ func parseUDF(udfMap infoMap) (*models.UDF, error) {
 
 type infoMap map[string]string
 
-// parseUint returns the parsed uint64 value from the map for the given key if found.
+// parseUint64 returns the parsed uint64 value from the map for the given key if found.
 // ok = true if the key was found.
-func (m infoMap) parseUint(key string) (result uint64, ok bool, err error) {
+func (m infoMap) parseUint64(key string) (result uint64, ok bool, err error) {
 	if val, ok := m[key]; ok {
 		result, err = strconv.ParseUint(val, 10, 64)
 		if err != nil {

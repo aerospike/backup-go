@@ -2100,3 +2100,17 @@ func TestClient_GetReplicas(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, b)
 }
+
+func TestClient_GetPendingMigrations(t *testing.T) {
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	result, err := ic.GetPendingMigrations(ctx, testASNamespace)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), result)
+}

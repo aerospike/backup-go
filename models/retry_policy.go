@@ -15,13 +15,12 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 // RetryPolicy defines the configuration for retry attempts in case of failures.

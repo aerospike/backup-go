@@ -164,34 +164,37 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 
 // GetVersion returns lowest node version from cluster.
 func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
-	nodes := ic.cluster.GetNodes()
-	if len(nodes) == 0 {
-		return AerospikeVersion{}, fmt.Errorf("no nodes available in cluster")
-	}
+	var result AerospikeVersion
 
-	var lowestVersion AerospikeVersion
-
-	for i, node := range nodes {
-		var currentVersion AerospikeVersion
-
-		err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-			var retryErr error
-			currentVersion, retryErr = ic.getAerospikeVersion(node, ic.policy)
-
-			return retryErr
-		})
-
-		if err != nil {
-			return AerospikeVersion{}, fmt.Errorf("failed to get version from node %v: %w", node, err)
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		nodes := ic.cluster.GetNodes()
+		if len(nodes) == 0 {
+			return fmt.Errorf("no nodes available in cluster")
 		}
 
-		// For the first iteration or if the current version is greater we overwrite lowestVersion.
-		if i == 0 || lowestVersion.IsGreater(currentVersion) {
-			lowestVersion = currentVersion
+		var lowestVersion AerospikeVersion
+
+		for i, node := range nodes {
+			currentVersion, err := ic.getAerospikeVersion(node, ic.policy)
+			if err != nil {
+				return fmt.Errorf("failed to get version from node %s: %w", node.String(), err)
+			}
+
+			if i == 0 || lowestVersion.IsGreater(currentVersion) {
+				lowestVersion = currentVersion
+			}
 		}
+
+		result = lowestVersion
+
+		return nil
+	})
+
+	if err != nil {
+		return AerospikeVersion{}, err
 	}
 
-	return lowestVersion, nil
+	return result, nil
 }
 
 // HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.
@@ -311,6 +314,84 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 	})
 
 	return count, err
+}
+
+// GetPendingMigrations returns the number of pending migrations.
+func (ic *Client) GetPendingMigrations(ctx context.Context, namespace string) (uint64, error) {
+	var (
+		result uint64
+		err    error
+	)
+
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
+		result, err = ic.getClusterTotalMigrations(namespace)
+		if err != nil {
+			return fmt.Errorf("failed to fetch migration stats: %w", err)
+		}
+
+		return err
+	})
+
+	return result, err
+}
+
+// getClusterTotalMigrations sums up migrations from ALL nodes at once
+func (ic *Client) getClusterTotalMigrations(namespace string) (uint64, error) {
+	nodes := ic.cluster.GetNodes()
+	if len(nodes) == 0 {
+		return 0, fmt.Errorf("no nodes connected")
+	}
+
+	var total uint64
+
+	for _, node := range nodes {
+		migrations, err := ic.getPendingMigrations(node, namespace)
+		if err != nil {
+			return 0, err
+		}
+
+		total += migrations
+	}
+
+	return total, nil
+}
+
+func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint64, error) {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
+
+	response, aerr := node.RequestInfo(ic.policy, cmd)
+	if aerr != nil {
+		return 0, fmt.Errorf("failed to get request info: %w", aerr)
+	}
+
+	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse record info request: %w", err)
+	}
+
+	var totalRemaining uint64
+
+	for i := range resultMap {
+		result, ok, err := resultMap[i].parseUint64("migrate_tx_partitions_remaining")
+		if err != nil {
+			return 0, err
+		}
+
+		if ok {
+			totalRemaining += result
+		}
+
+		result, ok, err = resultMap[i].parseUint64("migrate_rx_partitions_remaining")
+		if err != nil {
+			return 0, err
+		}
+
+		if ok {
+			totalRemaining += result
+		}
+	}
+
+	return totalRemaining, nil
 }
 
 // StartXDR creates xdr config and starts replication.
@@ -689,25 +770,31 @@ func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
 	var stats Stats
 
 	for i := range resultMap {
-		if val, ok := resultMap[i]["lag"]; ok {
-			stats.Lag, err = strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return Stats{}, fmt.Errorf("failed to parse lag: %w", err)
-			}
+		lag, ok, err := resultMap[i].parseInt64("lag")
+		if err != nil {
+			return Stats{}, err
 		}
 
-		if val, ok := resultMap[i]["recoveries"]; ok {
-			stats.Recoveries, err = strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return Stats{}, fmt.Errorf("failed to parse recoveries: %w", err)
-			}
+		if ok {
+			stats.Lag = lag
 		}
 
-		if val, ok := resultMap[i]["recoveries_pending"]; ok {
-			stats.RecoveriesPending, err = strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return Stats{}, fmt.Errorf("failed to parse recoveries_pending: %w", err)
-			}
+		recoveries, ok, err := resultMap[i].parseInt64("recoveries")
+		if err != nil {
+			return Stats{}, err
+		}
+
+		if ok {
+			stats.Recoveries = recoveries
+		}
+
+		recoveriesPending, ok, err := resultMap[i].parseInt64("recoveries_pending")
+		if err != nil {
+			return Stats{}, err
+		}
+
+		if ok {
+			stats.RecoveriesPending = recoveriesPending
 		}
 	}
 
@@ -1220,7 +1307,7 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 
 	response, aerr := node.RequestInfo(policy, cmd)
 	if aerr != nil {
-		return 0, fmt.Errorf("failed to get record count: %w", aerr)
+		return 0, fmt.Errorf("failed to request info: %w", aerr)
 	}
 
 	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -1229,12 +1316,12 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 	}
 
 	for i := range resultMap {
-		if val, ok := resultMap[i]["objects"]; ok {
-			result, err := strconv.ParseUint(val, 10, 64)
-			if err != nil {
-				return 0, fmt.Errorf("failed to parse objects count: %w", err)
-			}
+		result, ok, err := resultMap[i].parseUint64("objects")
+		if err != nil {
+			return 0, err
+		}
 
+		if ok {
 			return result, nil
 		}
 	}
@@ -1310,6 +1397,36 @@ func parseUDF(udfMap infoMap) (*models.UDF, error) {
 }
 
 type infoMap map[string]string
+
+// parseUint64 returns the parsed uint64 value from the map for the given key if found.
+// ok = true if the key was found.
+func (m infoMap) parseUint64(key string) (result uint64, ok bool, err error) {
+	if val, ok := m[key]; ok {
+		result, err = strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			return 0, ok, fmt.Errorf("failed to parse %s: %w", key, err)
+		}
+
+		return result, ok, nil
+	}
+
+	return 0, false, nil
+}
+
+// parseInt64 returns the parsed int64 value from the map for the given key if found.
+// ok = true if the key was found.
+func (m infoMap) parseInt64(key string) (result int64, ok bool, err error) {
+	if val, ok := m[key]; ok {
+		result, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return 0, ok, fmt.Errorf("failed to parse %s: %w", key, err)
+		}
+
+		return result, ok, nil
+	}
+
+	return 0, false, nil
+}
 
 // parseInfoResponse parses a single info response format string.
 // the string may contain multiple response objects each separated by a semicolon

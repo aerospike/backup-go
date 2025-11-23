@@ -164,34 +164,35 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 
 // GetVersion returns lowest node version from cluster.
 func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
-	nodes := ic.cluster.GetNodes()
-	if len(nodes) == 0 {
-		return AerospikeVersion{}, fmt.Errorf("no nodes available in cluster")
-	}
+	var result AerospikeVersion
 
-	var lowestVersion AerospikeVersion
-
-	for i, node := range nodes {
-		var currentVersion AerospikeVersion
-
-		err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-			var retryErr error
-			currentVersion, retryErr = ic.getAerospikeVersion(node, ic.policy)
-
-			return retryErr
-		})
-
-		if err != nil {
-			return AerospikeVersion{}, fmt.Errorf("failed to get version from node %v: %w", node, err)
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		nodes := ic.cluster.GetNodes()
+		if len(nodes) == 0 {
+			return fmt.Errorf("no nodes available in cluster")
 		}
 
-		// For the first iteration or if the current version is greater we overwrite lowestVersion.
-		if i == 0 || lowestVersion.IsGreater(currentVersion) {
-			lowestVersion = currentVersion
+		var lowestVersion AerospikeVersion
+		for i, node := range nodes {
+			currentVersion, err := ic.getAerospikeVersion(node, ic.policy)
+			if err != nil {
+				return fmt.Errorf("failed to get version from node %v: %w", node, err)
+			}
+
+			if i == 0 || lowestVersion.IsGreater(currentVersion) {
+				lowestVersion = currentVersion
+			}
 		}
+
+		result = lowestVersion
+		return nil
+	})
+
+	if err != nil {
+		return AerospikeVersion{}, err
 	}
 
-	return lowestVersion, nil
+	return result, nil
 }
 
 // HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.

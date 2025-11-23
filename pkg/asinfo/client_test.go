@@ -2101,7 +2101,7 @@ func TestClient_GetReplicas(t *testing.T) {
 	require.NotNil(t, b)
 }
 
-func TestClient_WaitForMigrations(t *testing.T) {
+func TestClient_GetPendingMigrations(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 

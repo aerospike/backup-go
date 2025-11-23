@@ -2110,6 +2110,7 @@ func TestClient_WaitForMigrations(t *testing.T) {
 
 	ctx := context.Background()
 
-	err = ic.WaitForMigrations(ctx, testASNamespace)
+	result, err := ic.GetPendingMigrations(ctx, testASNamespace)
 	require.NoError(t, err)
+	require.Equal(t, uint64(0), result)
 }

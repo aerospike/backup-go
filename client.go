@@ -100,7 +100,7 @@ type InfoGetter interface {
 	HasExpressionSIndex(ctx context.Context, namespace string) (bool, error)
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetNodesNames() []string
-	WaitForMigrations(ctx context.Context, namespace string) error
+	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
 }
 
 // Client is the main entry point for the backup package.

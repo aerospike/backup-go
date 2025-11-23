@@ -76,12 +76,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 ) (*fileWriterProcessor[T], error) {
 	logger.Debug("created new file writer processor")
 
-	// Check writer and parallelism.
-	if writer != nil && !writer.GetOptions().IsDir && parallel > 1 {
-		return nil, fmt.Errorf("parallel running for single file is not allowed")
-	}
-
-	return &fileWriterProcessor[T]{
+	p := &fileWriterProcessor[T]{
 		prefix:            prefix,
 		suffixGenerator:   suffixGenerator,
 		writer:            writer,
@@ -95,7 +90,14 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		fileLimit:         fileLimit,
 		parallel:          parallel,
 		logger:            logger,
-	}, nil
+	}
+
+	// Check writer and parallelism.
+	if p.isSingleFileBackup() && parallel > 1 {
+		return nil, fmt.Errorf("parallel running for single file is not allowed")
+	}
+
+	return p, nil
 }
 
 // newDataWriters returns initialized pipeline workers for write operations.
@@ -118,9 +120,8 @@ func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.Writ
 
 // newMetaWriter creates a new writer for metadata based on the current configuration.
 func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context, writer io.WriteCloser) (io.WriteCloser, error) {
-	wOpts := fw.writer.GetOptions()
 	// If it is backup to file, we return the same writer.
-	if !wOpts.IsDir {
+	if fw.isSingleFileBackup() {
 		return writer, nil
 	}
 	// Else we will init separate writer for metadata.
@@ -236,7 +237,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 // getFileName generates a file name based on the current configuration.
 func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 	// If it is a single file backup, we don't need to generate a file name.
-	if fw.writer != nil && !fw.writer.GetOptions().IsDir && n >= 0 {
+	if fw.isSingleFileBackup() && n >= 0 {
 		return ""
 	}
 
@@ -256,6 +257,11 @@ func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 
 	// Generate file name.
 	return fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
+}
+
+// isSingleFileBackup returns true if the backup is single file backup.
+func (fw *fileWriterProcessor[T]) isSingleFileBackup() bool {
+	return fw.writer != nil && !fw.writer.GetOptions().IsDir
 }
 
 // emptyPrefixSuffix returns empty string, to configure prefix and suffix generator.

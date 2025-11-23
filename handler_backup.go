@@ -451,6 +451,10 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 			return fmt.Errorf("failed to backup secondary indexes: %w", err)
 		}
 	}
+	// If it is directory backup, close meta writer.
+	if !bh.writerProcessor.isSingleFileBackup() {
+		return writer.Close()
+	}
 
 	return nil
 }

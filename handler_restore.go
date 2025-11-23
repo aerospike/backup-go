@@ -184,20 +184,28 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 
 	// Apply metadata at the end.
 	if rh.config.ApplyMetadataLast {
-		metadataReaders := rh.readProcessor.newMetadataReaders(ctx)
-
-		if len(metadataReaders) == 0 {
-			rh.logger.Debug("metadata readers not found")
-
-			return nil
+		if err := rh.restoreMetadata(ctx); err != nil {
+			return err
 		}
-
-		if err := rh.runPipeline(ctx, metadataReaders); err != nil {
-			return fmt.Errorf("failed to apply metadata: %w", err)
-		}
-
-		rh.logger.Info("metadata applied after records")
 	}
+
+	return nil
+}
+
+func (rh *RestoreHandler[T]) restoreMetadata(ctx context.Context) error {
+	metadataReaders := rh.readProcessor.newMetadataReaders(ctx)
+
+	if len(metadataReaders) == 0 {
+		rh.logger.Debug("metadata readers not found")
+
+		return nil
+	}
+
+	if err := rh.runPipeline(ctx, metadataReaders); err != nil {
+		return fmt.Errorf("failed to apply metadata: %w", err)
+	}
+
+	rh.logger.Info("metadata applied after records")
 
 	return nil
 }

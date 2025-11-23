@@ -76,12 +76,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 ) (*fileWriterProcessor[T], error) {
 	logger.Debug("created new file writer processor")
 
-	// Check writer and parallelism.
-	if writer != nil && !writer.GetOptions().IsDir && parallel > 1 {
-		return nil, fmt.Errorf("parallel running for single file is not allowed")
-	}
-
-	return &fileWriterProcessor[T]{
+	p := &fileWriterProcessor[T]{
 		prefix:            prefix,
 		suffixGenerator:   suffixGenerator,
 		writer:            writer,
@@ -95,14 +90,28 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		fileLimit:         fileLimit,
 		parallel:          parallel,
 		logger:            logger,
-	}, nil
+	}
+
+	// Check writer and parallelism.
+	if p.isSingleFileBackup() && parallel > 1 {
+		return nil, fmt.Errorf("parallel running for single file is not allowed")
+	}
+
+	return p, nil
 }
 
-// newDataWriters returns initialized pipeline workers for write operations.
-func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Writer[T], error) {
+// newDataWriters returns:
+//   - Raw writers that satisfy io.WriteCloser interface.
+//     That is used for metadata backup in case of backup to one file.
+//     As we need to use the same writer for metadata and records.
+//     In the case of backup to directory, it won't be used.
+//   - Initialized pipeline workers pipe.Writer[T] that should be passed directly to the pipeline,
+//     for records data backup.
+//   - Error if any.
+func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.WriteCloser, []pipe.Writer[T], error) {
 	writers, err := fw.newWriters(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create storage writers: %w", err)
+		return nil, nil, fmt.Errorf("failed to create storage writers: %w", err)
 	}
 
 	dataWriters := make([]pipe.Writer[T], len(writers))
@@ -113,11 +122,18 @@ func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Wr
 
 	fw.logger.Debug("created data writers", slog.Int("count", len(writers)))
 
-	return dataWriters, nil
+	return writers, dataWriters, nil
 }
 
 // newMetaWriter creates a new writer for metadata based on the current configuration.
-func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context) (io.WriteCloser, error) {
+// In the case of backup to one file, it returns the same writer that was passed.
+// Otherwise, it creates a separate writer for metadata.
+func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context, writer io.WriteCloser) (io.WriteCloser, error) {
+	// If it is backup to file, we return the same writer.
+	if fw.isSingleFileBackup() {
+		return writer, nil
+	}
+	// Else we will init separate writer for metadata.
 	w, err := fw.newWriter(ctx, metadataFileID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create meta writer: %w", err)
@@ -230,7 +246,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 // getFileName generates a file name based on the current configuration.
 func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 	// If it is a single file backup, we don't need to generate a file name.
-	if fw.writer != nil && !fw.writer.GetOptions().IsDir && n > 0 {
+	if fw.isSingleFileBackup() && n >= 0 {
 		return ""
 	}
 
@@ -250,6 +266,11 @@ func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 
 	// Generate file name.
 	return fw.encoder.GenerateFilename(prefix, fw.suffixGenerator())
+}
+
+// isSingleFileBackup returns true if the backup is single file backup.
+func (fw *fileWriterProcessor[T]) isSingleFileBackup() bool {
+	return fw.writer != nil && !fw.writer.GetOptions().IsDir
 }
 
 // emptyPrefixSuffix returns empty string, to configure prefix and suffix generator.

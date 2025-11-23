@@ -176,7 +176,7 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	}
 
 	// Write workers.
-	writeWorkers, err := bh.writerProcessor.newDataWriters(ctx)
+	_, writeWorkers, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed create write workers: %w", err)
 	}

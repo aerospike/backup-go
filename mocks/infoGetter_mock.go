@@ -1059,3 +1059,49 @@ func (_c *MockInfoGetter_UnBlockMRTWrites_Call) RunAndReturn(run func(ctx contex
 	_c.Call.Return(run)
 	return _c
 }
+
+// WaitForMigrations provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) WaitForMigrations(ctx context.Context, namespace string) error {
+	ret := _mock.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitForMigrations")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, namespace)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockInfoGetter_WaitForMigrations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForMigrations'
+type MockInfoGetter_WaitForMigrations_Call struct {
+	*mock.Call
+}
+
+// WaitForMigrations is a helper method to define mock.On call
+//   - ctx
+//   - namespace
+func (_e *MockInfoGetter_Expecter) WaitForMigrations(ctx interface{}, namespace interface{}) *MockInfoGetter_WaitForMigrations_Call {
+	return &MockInfoGetter_WaitForMigrations_Call{Call: _e.mock.On("WaitForMigrations", ctx, namespace)}
+}
+
+func (_c *MockInfoGetter_WaitForMigrations_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_WaitForMigrations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_WaitForMigrations_Call) Return(err error) *MockInfoGetter_WaitForMigrations_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockInfoGetter_WaitForMigrations_Call) RunAndReturn(run func(ctx context.Context, namespace string) error) *MockInfoGetter_WaitForMigrations_Call {
+	_c.Call.Return(run)
+	return _c
+}

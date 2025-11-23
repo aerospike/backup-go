@@ -175,6 +175,7 @@ func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
 		}
 
 		var lowestVersion AerospikeVersion
+
 		for i, node := range nodes {
 			currentVersion, err := ic.getAerospikeVersion(node, ic.policy)
 			if err != nil {
@@ -187,6 +188,7 @@ func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
 		}
 
 		result = lowestVersion
+
 		return nil
 	})
 
@@ -291,6 +293,7 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 			if !node.IsActive() {
 				continue
 			}
+
 			var recordCountForNode uint64
 
 			switch {
@@ -315,12 +318,14 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 	return count, err
 }
 
-// WaitForMigrations blocks until the cluster is fully rebalanced.
+// WaitForMigrations requests cluster info and waits until all migrations are completed.
+// This function is used to wait for cluster rebalance to complete.
+// It is not recommended to use it for other purposes, as it blocks until the cluster is fully rebalanced.
 func (ic *Client) WaitForMigrations(ctx context.Context, namespace string) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	slog.Info("Waiting for cluster migrations to complete", slog.String("namespace", namespace))
+	slog.Debug("waiting for cluster migrations to complete", slog.String("namespace", namespace))
 
 	for {
 		select {
@@ -330,17 +335,18 @@ func (ic *Client) WaitForMigrations(ctx context.Context, namespace string) error
 		case <-ticker.C:
 			totalPending, err := ic.getClusterTotalMigrations(namespace)
 			if err != nil {
-				// Log error but retry (cluster might be unstable during rebalance)
-				slog.Warn("Failed to fetch migration stats, retrying...", slog.Any("error", err))
+				// Log error but retry (cluster might be unstable during rebalance).
+				slog.Warn("failed to fetch migration stats, retrying...", slog.Any("error", err))
 				continue
 			}
 
 			if totalPending == 0 {
-				slog.Info("Cluster is stable. No migrations remaining.")
+				// Cluster is stable.
+				slog.Debug("cluster is stable. No migrations remaining.")
 				return nil
 			}
 
-			slog.Info("Migrations active", slog.Int64("partitions_remaining", totalPending))
+			slog.Debug("migrations active", slog.Int64("pending", totalPending))
 		}
 	}
 }
@@ -359,6 +365,7 @@ func (ic *Client) getClusterTotalMigrations(namespace string) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
+
 		total += migrations
 	}
 
@@ -367,6 +374,7 @@ func (ic *Client) getClusterTotalMigrations(namespace string) (int64, error) {
 
 func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (int64, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
+
 	response, aerr := node.RequestInfo(ic.policy, cmd)
 	if aerr != nil {
 		return 0, fmt.Errorf("failed to get request info: %w", aerr)
@@ -378,19 +386,23 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (int64
 	}
 
 	var totalRemaining int64
+
 	for i := range resultMap {
 		if val, ok := resultMap[i]["migrate_tx_partitions_remaining"]; ok {
 			result, err := strconv.ParseInt(val, 10, 64)
 			if err != nil {
 				return 0, fmt.Errorf("failed to parse objects count: %w", err)
 			}
+
 			totalRemaining += result
 		}
+
 		if val, ok := resultMap[i]["migrate_rx_partitions_remaining"]; ok {
 			result, err := strconv.ParseInt(val, 10, 64)
 			if err != nil {
 				return 0, fmt.Errorf("failed to parse objects count: %w", err)
 			}
+
 			totalRemaining += result
 		}
 	}

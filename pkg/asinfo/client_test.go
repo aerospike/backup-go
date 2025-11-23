@@ -2100,3 +2100,16 @@ func TestClient_GetReplicas(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, b)
 }
+
+func TestClient_WaitForMigrations(t *testing.T) {
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	err = ic.WaitForMigrations(ctx, testASNamespace)
+	require.NoError(t, err)
+}

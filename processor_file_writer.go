@@ -236,7 +236,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 // getFileName generates a file name based on the current configuration.
 func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 	// If it is a single file backup, we don't need to generate a file name.
-	if fw.writer != nil && !fw.writer.GetOptions().IsDir && n > 0 {
+	if fw.writer != nil && !fw.writer.GetOptions().IsDir && n >= 0 {
 		return ""
 	}
 

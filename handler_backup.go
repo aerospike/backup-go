@@ -452,7 +452,7 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 		}
 	}
 
-	return writer.Close()
+	return nil
 }
 
 // GetStats returns the stats of the backup job.

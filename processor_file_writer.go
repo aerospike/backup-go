@@ -100,7 +100,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	return p, nil
 }
 
-// newDataWriters returns initialized pipeline workers for write operations.
+// newDataWriters returns raw writers for metadata processing and initialized pipeline workers for write operations.
 func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.WriteCloser, []pipe.Writer[T], error) {
 	writers, err := fw.newWriters(ctx)
 	if err != nil {

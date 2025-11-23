@@ -18,9 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
@@ -289,6 +291,10 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 			if !node.IsActive() {
 				continue
 			}
+			err := ic.WaitForMigrations(node, a.NewInfoPolicy(), namespace)
+			if err != nil {
+				return fmt.Errorf("failed to wait for migrations: %w", err)
+			}
 
 			var recordCountForNode uint64
 
@@ -312,6 +318,31 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 	})
 
 	return count, err
+}
+
+// WaitForMigrations blocks until the cluster is fully rebalanced.
+func (ic *Client) WaitForMigrations(node infoGetter, policy *a.InfoPolicy, namespace string) error {
+	start := time.Now()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-time.After(30*time.Second - time.Since(start)):
+			return fmt.Errorf("timeout waiting for migrations")
+		case <-ticker.C:
+			pending, err := ic.getPendingMigrations(node, policy, namespace)
+			if err != nil {
+				continue
+			}
+
+			if pending == 0 {
+				return nil
+			}
+
+			slog.Info("Migrations active", slog.Int64("partitions remaining", pending))
+		}
+	}
 }
 
 // StartXDR creates xdr config and starts replication.
@@ -1215,13 +1246,46 @@ func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, n
 	return recordsNumber, nil
 }
 
+func (ic *Client) getPendingMigrations(node infoGetter, policy *a.InfoPolicy, namespace string) (int64, error) {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
+	response, aerr := node.RequestInfo(policy, cmd)
+	if aerr != nil {
+		return 0, fmt.Errorf("failed to get request info: %w", aerr)
+	}
+
+	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse record info request: %w", err)
+	}
+
+	var totalRemaining int64
+	for i := range resultMap {
+		if val, ok := resultMap[i]["migrate_tx_partitions_remaining"]; ok {
+			result, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse objects count: %w", err)
+			}
+			totalRemaining += result
+		}
+		if val, ok := resultMap[i]["migrate_rx_partitions_remaining"]; ok {
+			result, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse objects count: %w", err)
+			}
+			totalRemaining += result
+		}
+	}
+
+	return totalRemaining, nil
+}
+
 func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.InfoPolicy, namespace string,
 ) (uint64, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
 
 	response, aerr := node.RequestInfo(policy, cmd)
 	if aerr != nil {
-		return 0, fmt.Errorf("failed to get record count: %w", aerr)
+		return 0, fmt.Errorf("failed to request info: %w", aerr)
 	}
 
 	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")

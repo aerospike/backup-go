@@ -17,6 +17,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"math/rand/v2"
 	"time"
@@ -144,7 +145,7 @@ func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
 			// Success.
 			return nil
 		}
-
+		slog.Info("will retry", slog.Any("attempt", attempt), slog.Any("lastErr", lastErr))
 		// If this was the last attempt, exit.
 		if attempt >= totalAttempts-1 {
 			break

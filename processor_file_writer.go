@@ -100,7 +100,14 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	return p, nil
 }
 
-// newDataWriters returns raw writers for metadata processing and initialized pipeline workers for write operations.
+// newDataWriters returns:
+//   - Raw writers that satisfy io.WriteCloser interface.
+//     That is used for metadata backup in case of backup to one file.
+//     As we need to use the same writer for metadata and records.
+//     In the case of backup to directory, it won't be used.
+//   - Initialized pipeline workers pipe.Writer[T] that should be passed directly to the pipeline,
+//     for records data backup.
+//   - Error if any.
 func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.WriteCloser, []pipe.Writer[T], error) {
 	writers, err := fw.newWriters(ctx)
 	if err != nil {
@@ -119,6 +126,8 @@ func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.Writ
 }
 
 // newMetaWriter creates a new writer for metadata based on the current configuration.
+// In the case of backup to one file, it returns the same writer that was passed.
+// Otherwise, it creates a separate writer for metadata.
 func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context, writer io.WriteCloser) (io.WriteCloser, error) {
 	// If it is backup to file, we return the same writer.
 	if fw.isSingleFileBackup() {

@@ -108,7 +108,7 @@ func SortBackupFiles(files []string) ([]string, error) {
 			// If slice empty, increase empty counter for this i iteration.
 			e++
 		}
-		// If we hve more subslices in current iteration, increase i.
+		// If we have more subslices in current iteration, increase i.
 		if i < len(presort)-1 {
 			i++
 		} else {

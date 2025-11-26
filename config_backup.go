@@ -194,7 +194,7 @@ func (c *ConfigBackup) validate() error {
 	}
 
 	if c.PageSize > 0 && len(c.PartitionFilters) == 0 {
-		return fmt.Errorf("partion filters must be set for paginated backup")
+		return fmt.Errorf("partition filters must be set for paginated backup")
 	}
 
 	if c.RecordsPerSecond < 0 {
@@ -236,7 +236,7 @@ func (c *ConfigBackup) validate() error {
 	}
 
 	if c.EncoderType != EncoderTypeASB {
-		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
+		return fmt.Errorf("unsupported encoder type: %d", c.EncoderType)
 	}
 
 	if c.ScanPolicy.ReplicaPolicy == a.PREFER_RACK && (len(c.RackList) != 0 || len(c.NodeList) != 0) {

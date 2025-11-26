@@ -36,6 +36,8 @@ func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.
 	}
 }
 
+// Process removes bins from records if they are in the binsToRemove list.
+// If the record has no bins left after removal, it is filtered out.
 func (p filterByBin[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {

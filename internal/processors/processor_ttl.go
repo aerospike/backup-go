@@ -37,7 +37,7 @@ type expirationSetter[T models.TokenConstraint] struct {
 	logger   *slog.Logger
 }
 
-// NewExpirationSetter creates a new expirationSetter processor
+// NewExpirationSetter creates a new expirationSetter processor.
 func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extraTTL int64, logger *slog.Logger,
 ) processor[T] {
 	id := uuid.NewString()
@@ -52,7 +52,7 @@ func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extra
 	}
 }
 
-// errExpiredRecord is returned when a record is expired
+// errExpiredRecord is returned when a record is expired.
 // by embedding errFilteredOut, the processor worker will filter out the token
 // containing the expired record
 var errExpiredRecord = fmt.Errorf("%w: record is expired", models.ErrFilteredOut)

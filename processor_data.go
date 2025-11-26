@@ -19,10 +19,12 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 )
 
+// dataProcessor is a processor that executes a list of processors in sequence.
 type dataProcessor[T models.TokenConstraint] struct {
 	execs []pipe.Processor[T]
 }
 
+// newDataProcessor returns a new data processor.
 func newDataProcessor[T models.TokenConstraint](execs ...pipe.Processor[T]) pipe.ProcessorCreator[T] {
 	return func() pipe.Processor[T] {
 		return &dataProcessor[T]{
@@ -31,6 +33,8 @@ func newDataProcessor[T models.TokenConstraint](execs ...pipe.Processor[T]) pipe
 	}
 }
 
+// Process executes the list of processors in sequence and returns the result
+// of the last processor. If any processor returns an error, the error is returned.
 func (p *dataProcessor[T]) Process(data T) (T, error) {
 	var err error
 	for _, processor := range p.execs {

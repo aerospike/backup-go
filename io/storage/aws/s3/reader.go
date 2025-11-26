@@ -595,6 +595,7 @@ func parseAccessTier(tier string) (types.Tier, error) {
 	return result, nil
 }
 
+// calculateTotalSize calculates the total size and number of objects in all paths.
 func (r *Reader) calculateTotalSize(ctx context.Context) {
 	var (
 		totalSize int64
@@ -626,6 +627,7 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 	r.totalNumber.Store(totalNum)
 }
 
+// calculateTotalSizeForPath calculates the total size and number of objects in a path.
 func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
 	// if we have file to calculate.
 	if !r.IsDir {

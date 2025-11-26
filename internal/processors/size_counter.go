@@ -20,16 +20,19 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+// sizeCounter counts the size of tokens.
 type sizeCounter[T models.TokenConstraint] struct {
 	counter *atomic.Uint64
 }
 
+// NewSizeCounter creates a new sizeCounter processor.
 func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) processor[T] {
 	return &sizeCounter[T]{
 		counter: counter,
 	}
 }
 
+// Process aggregates the size of a token.
 func (c sizeCounter[T]) Process(token T) (T, error) {
 	c.counter.Add(token.GetSize())
 	return token, nil

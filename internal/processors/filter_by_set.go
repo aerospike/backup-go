@@ -36,7 +36,7 @@ func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.
 	}
 }
 
-// Process filters out records that does not belong to setsToRestore
+// Process filters out records that do not belong to setsToRestore.
 func (p filterBySet[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {

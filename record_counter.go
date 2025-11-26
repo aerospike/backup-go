@@ -38,6 +38,7 @@ type recordCounter struct {
 	logger *slog.Logger
 }
 
+// newRecordCounter returns a new record counter.
 func newRecordCounter(
 	aerospikeClient AerospikeClient,
 	infoClient InfoGetter,
@@ -54,6 +55,7 @@ func newRecordCounter(
 	}
 }
 
+// countRecords counts the records using the info client or scan.
 func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter) (uint64, error) {
 	if rc.config.withoutFilter() {
 		return rc.countUsingInfoClient(ctx, infoClient)
@@ -62,6 +64,7 @@ func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter
 	return rc.countRecordsUsingScan(ctx)
 }
 
+// countUsingInfoClient counts the records using the info client.
 func (rc *recordCounter) countUsingInfoClient(ctx context.Context, infoClient InfoGetter) (uint64, error) {
 	totalRecordCount, err := infoClient.GetRecordCount(ctx, rc.config.Namespace, rc.config.SetList)
 	if err != nil {
@@ -73,6 +76,7 @@ func (rc *recordCounter) countUsingInfoClient(ctx context.Context, infoClient In
 	return totalRecordCount * partitionsToScan / MaxPartitions, nil
 }
 
+// countRecordsUsingScan counts the records using the scan.
 func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, error) {
 	scanPolicy := *rc.config.ScanPolicy
 
@@ -86,6 +90,7 @@ func (rc *recordCounter) countRecordsUsingScan(ctx context.Context) (uint64, err
 	return rc.countRecordsUsingScanByPartitions(ctx, &scanPolicy)
 }
 
+// countRecordsUsingScanByPartitions counts the records using the scan by partitions.
 func (rc *recordCounter) countRecordsUsingScanByPartitions(
 	ctx context.Context, scanPolicy *a.ScanPolicy,
 ) (uint64, error) {
@@ -106,6 +111,7 @@ func (rc *recordCounter) countRecordsUsingScanByPartitions(
 	return count * uint64(sumPartition(rc.config.PartitionFilters)), nil
 }
 
+// countRecordsUsingScanByNode counts the records using the scan by node.
 func (rc *recordCounter) countRecordsUsingScanByNode(
 	ctx context.Context, scanPolicy *a.ScanPolicy,
 ) (uint64, error) {
@@ -131,7 +137,7 @@ func (rc *recordCounter) countRecordsUsingScanByNode(
 	return count * uint64(len(partIDs)), nil
 }
 
-// countRecords counts the records returned by the given reader.
+// countRecords counts the records returned by the given record reader.
 func countRecords(ctx context.Context, recordReader aerospike.RecordReader) (uint64, error) {
 	var count uint64
 
@@ -150,7 +156,7 @@ func countRecords(ctx context.Context, recordReader aerospike.RecordReader) (uin
 	return count, nil
 }
 
-// randomPartition returns a random partition from the given list of filters.
+// randomPartition returns a random partition from the given list of partition filters.
 // #nosec G404
 func randomPartition(partitionFilters []*a.PartitionFilter) *a.PartitionFilter {
 	if len(partitionFilters) == 0 { // no filter => return any random partition.
@@ -166,7 +172,7 @@ func randomPartition(partitionFilters []*a.PartitionFilter) *a.PartitionFilter {
 	return a.NewPartitionFilterById(randomFilter.Begin + offset)
 }
 
-// sumPartition returns total number of partitions in filters list.
+// sumPartition returns total number of partitions in partition filters list.
 func sumPartition(partitionFilters []*a.PartitionFilter) int {
 	if len(partitionFilters) == 0 { // no filter => scan all partitions.
 		return MaxPartitions

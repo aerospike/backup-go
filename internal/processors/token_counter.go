@@ -33,6 +33,7 @@ func NewTokenCounter[T models.TokenConstraint](counter *atomic.Uint64) processor
 	}
 }
 
+// Process counts the number of processed tokens.
 func (c TokenCounter[T]) Process(token T) (T, error) {
 	c.counter.Add(1)
 

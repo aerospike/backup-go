@@ -67,6 +67,7 @@ func (v *version) greaterOrEqual(other *version) bool {
 	return v.compare(other) >= 0
 }
 
+// compare compares the current version with another version.
 func (v *version) compare(other *version) int {
 	if v.Major != other.Major {
 		if v.Major < other.Major {
@@ -87,6 +88,7 @@ func (v *version) compare(other *version) int {
 	return 0
 }
 
+// toString returns the version as a string.
 func (v *version) toString() string {
 	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
 }

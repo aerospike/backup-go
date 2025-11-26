@@ -17,6 +17,7 @@ package local
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -47,8 +48,8 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	// If directory not exists, we don't need to check it for emptiness.
-	// For writer wi don't support pathList, so our path will always be the first element.
+	// If directory does not exist, we don't need to check it for emptiness.
+	// For writer we don't support PathList, so our path will always be the first element of PathList.
 	path := w.PathList[0]
 	if !w.IsDir {
 		path = filepath.Dir(w.PathList[0])
@@ -187,18 +188,18 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	return nil
 }
 
+// bufferedFile is a wrapper around a `bufio.Writer` and a `io.Closer`.
 type bufferedFile struct {
 	*bufio.Writer
 	closer io.Closer
 }
 
+// Close flushes the writer and closes the closer.
 func (bf *bufferedFile) Close() error {
-	err := bf.Flush()
-	if err != nil {
-		return err
-	}
+	flushErr := bf.Flush()
+	closeErr := bf.closer.Close()
 
-	return bf.closer.Close()
+	return errors.Join(flushErr, closeErr)
 }
 
 // NewWriter creates a new backup file in the given directory.

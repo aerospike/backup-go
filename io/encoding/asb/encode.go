@@ -103,6 +103,8 @@ func (e *Encoder[T]) encodeSIndex(sIndex *models.SIndex, buff *bytes.Buffer) (in
 	return sindexToASB(sIndex, buff)
 }
 
+// GetHeader returns the header of the ASB file as a byte slice.
+// The header contains the version, namespace, and first file flag.
 func (e *Encoder[T]) GetHeader(_ uint64, isRecords bool) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 1024))

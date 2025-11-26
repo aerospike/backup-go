@@ -255,6 +255,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	return w.buffer.Write(p)
 }
 
+// uploadPart uploads a part of the file to S3.
 func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 	if w.ctx.Err() != nil || w.uploadErr.Load() != nil {
 		return
@@ -479,6 +480,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	return nil
 }
 
+// parseStorageClass parses the storage class from a string.
 func parseStorageClass(class string) (types.StorageClass, error) {
 	// To correct case: CLASS
 	class = strings.ToUpper(class)

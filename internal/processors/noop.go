@@ -25,6 +25,7 @@ type processor[T models.TokenConstraint] interface {
 // noopProcessor is a no-op implementation of a processor.
 type noopProcessor[T models.TokenConstraint] struct{}
 
+// NewNoop creates a new noop processor.
 func NewNoop[T models.TokenConstraint]() processor[T] {
 	return &noopProcessor[T]{}
 }

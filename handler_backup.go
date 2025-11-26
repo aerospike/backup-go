@@ -332,12 +332,15 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	return samples, samplesData, nil
 }
 
+// backup starts the backup operation. It blocks until the backup is completed.
 func (bh *BackupHandler) backup(ctx context.Context) error {
+	// Create the data writers.
 	writers, dataWriters, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed create write workers: %w", err)
 	}
 
+	// Backup the metadata using the first writer.
 	if err = bh.backupMetadata(ctx, writers[0]); err != nil {
 		return fmt.Errorf("failed to backup metadata: %w", err)
 	}

@@ -84,7 +84,7 @@ func (rr *recordReaderProcessorXDR[T]) recordReaderConfigForXDR() *xdr.RecordRea
 		rr.xdrConfig.Rewind,
 		localHostPort,
 		tcpConfig,
-		rr.xdrConfig.InfoPolingPeriod,
+		rr.xdrConfig.InfoPollingPeriod,
 		rr.xdrConfig.StartTimeout,
 		rr.xdrConfig.MaxThroughput,
 		rr.xdrConfig.Forward,

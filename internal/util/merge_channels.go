@@ -16,6 +16,9 @@ package util
 
 import "sync"
 
+// MergeChannels merges multiple channels into a single channel by sending values
+// concurrently from each input channel to the output channel.
+// The output channel is closed when all the input channels are closed.
 func MergeChannels[T any](channels []<-chan T) <-chan T {
 	out := make(chan T)
 

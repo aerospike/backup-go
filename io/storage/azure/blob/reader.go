@@ -186,6 +186,9 @@ func (r *Reader) StreamFiles(
 	}
 }
 
+// streamDirectory streams a directory from Azure blob storage.
+// It sends io.Readers to the `readersCh` communication channel for lazy loading.
+// In case of an error, it sends the error to the `errorsCh` channel.
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
@@ -201,6 +204,7 @@ func (r *Reader) streamDirectory(
 			return
 		}
 
+		// Iterate over the blobs in the page.
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
 				common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get object attributes for %s", path))
@@ -227,12 +231,14 @@ func (r *Reader) streamDirectory(
 				continue
 			}
 
+			// Open the object and send it to the `readersCh` communication channel.
 			r.openObject(ctx, *blobItem.Name, readersCh, errorsCh, true)
 		}
 	}
 }
 
-// openObject creates object readers and sends them readersCh.
+// openObject creates object readers and sends them to the `readersCh` communication channel.
+// In case of an error, it sends the error to the `errorsCh` channel.
 func (r *Reader) openObject(
 	ctx context.Context,
 	path string,
@@ -531,6 +537,7 @@ func (r *Reader) pollWarmDirStatus(ctx context.Context, path string) error {
 	}
 }
 
+// parseAccessTier parses the access tier from a string.
 func parseAccessTier(tier string) (blob.AccessTier, error) {
 	// To correct case: Tier
 	tier = cases.Title(language.English).String(tier)
@@ -556,6 +563,7 @@ func parseAccessTier(tier string) (blob.AccessTier, error) {
 	}
 }
 
+// isSkippedByStartAfter checks if the file name is skipped by start after.
 func isSkippedByStartAfter(startAfter, fileName string) bool {
 	if startAfter == "" {
 		return false
@@ -568,6 +576,7 @@ func isSkippedByStartAfter(startAfter, fileName string) bool {
 	return false
 }
 
+// calculateTotalSize calculates the total size and number of objects in all paths.
 func (r *Reader) calculateTotalSize(ctx context.Context) {
 	var (
 		totalSize int64
@@ -599,8 +608,9 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 	r.totalNumber.Store(totalNum)
 }
 
+// calculateTotalSizeForPath calculates the total size and number of objects in a path.
 func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
-	// if we have file to calculate.
+	// If we have a file to calculate.
 	if !r.IsDir {
 		objProps, err := r.containerClient.
 			NewBlobClient(path).GetProperties(ctx, nil)

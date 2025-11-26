@@ -75,6 +75,9 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context)
 		err             error
 	)
 
+	// If the records are processed by nodes, we create the partition groups from
+	// the primary partitions for the configured nodes.
+	// Otherwise, we create the partition groups from the partition filters.
 	if rr.config.isProcessedByNodes() {
 		partitionGroups, err = rr.newPartitionGroupsFromNodes(ctx)
 	} else {
@@ -88,6 +91,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context)
 	// If we have multiply partition filters, we shrink workers to number of filters.
 	readers := make([]pipe.Reader[*models.Token], len(partitionGroups))
 
+	// Create record readers for each partition group.
 	for i := range partitionGroups {
 		recordReaderConfig := rr.newRecordReaderConfig(partitionGroups[i], &scanPolicy)
 
@@ -105,6 +109,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context)
 	return readers, nil
 }
 
+// newPartitionGroups creates the partition groups from the partition filters.
 func (rr *recordReaderProcessor[T]) newPartitionGroups() ([]*a.PartitionFilter, error) {
 	var err error
 
@@ -127,6 +132,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroups() ([]*a.PartitionFilter, 
 	return partitionGroups, nil
 }
 
+// newPartitionGroupsFromNodes creates the partition groups from the primary partitions for the configured nodes.
 func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(ctx context.Context) ([]*a.PartitionFilter, error) {
 	partIDs, err := rr.getPrimaryPartitions(ctx)
 	if err != nil {
@@ -141,6 +147,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(ctx context.Cont
 	return partitionGroups, nil
 }
 
+// getPrimaryPartitions gets the primary partitions for the configured nodes.
 func (rr *recordReaderProcessor[T]) getPrimaryPartitions(ctx context.Context) ([]int, error) {
 	nodes, err := rr.getNodes(ctx)
 	if err != nil {
@@ -165,6 +172,8 @@ func (rr *recordReaderProcessor[T]) getPrimaryPartitions(ctx context.Context) ([
 	return partIDs, nil
 }
 
+// getNodes gets active nodes from the cluster. The nodes are filtered by the node list and rack list
+// if provided.
 func (rr *recordReaderProcessor[T]) getNodes(ctx context.Context) ([]*a.Node, error) {
 	nodesToFilter := rr.config.NodeList
 
@@ -211,32 +220,32 @@ func (rr *recordReaderProcessor[T]) filterNodes(ctx context.Context, nodesList [
 
 	filteredNodes := make([]*a.Node, 0, len(nodesList))
 
-	for i := range nodes {
-		if !nodes[i].IsActive() {
+	for _, node := range nodes {
+		if !node.IsActive() {
 			continue
 		}
 
-		nodeServiceAddress, err := rr.infoClient.GetService(ctx, nodes[i].GetName())
+		nodeServiceAddress, err := rr.infoClient.GetService(ctx, node.GetName())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get node %s service: %w", nodes[i].GetName(), err)
+			return nil, fmt.Errorf("failed to get node %s service: %w", node.GetName(), err)
 		}
 
 		rr.logger.Info("got service for node",
-			slog.String("node", nodes[i].GetName()),
-			slog.String("host", nodes[i].GetHost().String()),
+			slog.String("node", node.GetName()),
+			slog.String("host", node.GetHost().String()),
 			slog.String("service", nodeServiceAddress),
 		)
 
 		_, ok := nodesMap[nodeServiceAddress]
 		if ok {
-			filteredNodes = append(filteredNodes, nodes[i])
+			filteredNodes = append(filteredNodes, node)
 			continue
 		}
 
 		// If nodeList contains node names instead of address.
-		_, ok = nodesMap[nodes[i].GetName()]
+		_, ok = nodesMap[node.GetName()]
 		if ok {
-			filteredNodes = append(filteredNodes, nodes[i])
+			filteredNodes = append(filteredNodes, node)
 		}
 	}
 
@@ -249,6 +258,7 @@ func (rr *recordReaderProcessor[T]) filterNodes(ctx context.Context, nodesList [
 	return filteredNodes, nil
 }
 
+// newRecordReaderConfig creates a new record reader config for the given partition filter and scan policy.
 func (rr *recordReaderProcessor[T]) newRecordReaderConfig(
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,

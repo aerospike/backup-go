@@ -171,7 +171,7 @@ func (rw *RestoreWriter[T]) writeASBXToken(token *models.ASBXToken) (int, error)
 	return len(token.Payload), rw.writePayload(token)
 }
 
-// Close satisfies the DataWriter interface.
+// Close satisfies the pipe.Writer interface.
 func (rw *RestoreWriter[T]) Close() error {
 	rw.logger.Debug("close restore writer")
 	return rw.close()

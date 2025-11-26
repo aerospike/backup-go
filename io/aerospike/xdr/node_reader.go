@@ -103,7 +103,7 @@ func (r *NodeReader) Run() error {
 }
 
 func (r *NodeReader) serve() {
-	ticker := time.NewTicker(r.config.infoPolingPeriod)
+	ticker := time.NewTicker(r.config.infoPollingPeriod)
 	defer ticker.Stop()
 	defer r.close()
 

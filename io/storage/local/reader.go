@@ -320,6 +320,7 @@ func (r *Reader) GetType() string {
 	return localType
 }
 
+// calculateTotalSize calculates the total size and number of objects in all paths.
 func (r *Reader) calculateTotalSize() {
 	var (
 		totalSize int64
@@ -351,6 +352,7 @@ func (r *Reader) calculateTotalSize() {
 	r.totalNumber.Store(totalNum)
 }
 
+// calculateTotalSizeForPath calculates the total size and number of objects in a path.
 func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int64, err error) {
 	dirInfo, err := os.Stat(path)
 	if err != nil {

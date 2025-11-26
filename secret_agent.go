@@ -27,6 +27,7 @@ import (
 
 const secretPrefix = "secrets:"
 
+// getSecret gets the secret from the secret agent. It returns the secret value or an error if any.
 func getSecret(config *SecretAgentConfig, key string) (string, error) {
 	if config == nil {
 		return "", fmt.Errorf("secret config not initialized")
@@ -80,6 +81,7 @@ func getSecret(config *SecretAgentConfig, key string) (string, error) {
 	return result, nil
 }
 
+// getResourceKey returns the resource and secret key for the given secret key.
 func getResourceKey(key string) (resource, secretKey string, err error) {
 	if !isSecret(key) {
 		return "", "",
@@ -94,7 +96,7 @@ func getResourceKey(key string) (resource, secretKey string, err error) {
 	return keyArr[1], keyArr[2], nil
 }
 
-// getTlSConfig returns *tls.Config if caFile is set, or nil if caFile is not set.
+// getTlSConfig returns the TLS configuration for the given CA file if it is set.
 func getTlSConfig(caFile *string) (*tls.Config, error) {
 	if caFile == nil {
 		return nil, nil

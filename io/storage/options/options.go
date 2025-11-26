@@ -74,7 +74,8 @@ type Options struct {
 	// At the moment supported only for S3 Reader.
 	RetryPolicy *models.RetryPolicy
 
-	// CalculateTotalSize determines whether we need to calculate the total size of all files in a path on Reader creation.
+	// CalculateTotalSize determines whether we need to calculate the total size of all
+	// files in a path on Reader creation.
 	CalculateTotalSize bool
 
 	// WithChecksum enables checksum validation on upload.
@@ -219,7 +220,7 @@ func WithRetryPolicy(policy *models.RetryPolicy) Opt {
 	}
 }
 
-// WithCalculateTotalSize determines whether we need to calculate the total size of all files in a path.
+// WithCalculateTotalSize determines whether we need to calculate the total size of all files in the path.
 // Is used only for Reader.
 func WithCalculateTotalSize() Opt {
 	return func(r *Options) {

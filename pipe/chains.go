@@ -158,6 +158,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 					return fmt.Errorf("failed to write data: %w", err)
 				}
 
+				// Wait for the bandwidth limiter if it is set.
 				if limiter != nil {
 					limiter.Wait(n)
 				}

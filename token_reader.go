@@ -47,6 +47,7 @@ func newTokenReader[T models.TokenConstraint](
 	}
 }
 
+// Read reads the next token from the token reader.
 func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
 	for {
 		if tr.decoder != nil {
@@ -99,8 +100,8 @@ func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
 	}
 }
 
-// Close satisfies the DataReader interface
-// but is a no-op for the tokenReader.
+// Close satisfies the pipe.Reader interface.
+// It is a no-op for tokenReader.
 func (tr *tokenReader[T]) Close() {
 	tr.logger.Debug("closed token reader")
 }

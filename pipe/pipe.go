@@ -58,7 +58,7 @@ func NewPipe[T models.TokenConstraint](
 	}, nil
 }
 
-// Run start pipe with readers, writers and fanout.
+// Run starts the pipe with readers, writers and fanout.
 func (p *Pipe[T]) Run(ctx context.Context) error {
 	errGroup, ctx := errgroup.WithContext(ctx)
 

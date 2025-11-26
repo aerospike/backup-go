@@ -169,7 +169,7 @@ func (s *State) serve() {
 
 func (s *State) dump(n int) error {
 	// Skip meta data.
-	if n == -1 {
+	if n == metadataFileID {
 		return nil
 	}
 

@@ -45,9 +45,9 @@ type RecordReaderConfig struct {
 	currentHostPort string
 	// TCP server config to serve XDR backup.
 	tcpConfig *TCPConfig
-	// infoPolingPeriod how often stats will be requested.
+	// infoPollingPeriod how often stats will be requested.
 	// To measure recovery state and lag.
-	infoPolingPeriod time.Duration
+	infoPollingPeriod time.Duration
 	// Timeout for reading the first message after XDR start.
 	startTimeout time.Duration
 	// XDR max throughput number.
@@ -63,21 +63,21 @@ func NewRecordReaderConfig(
 	rewind string,
 	currentHostPort string,
 	tcpConfig *TCPConfig,
-	infoPolingPeriod time.Duration,
+	infoPollingPeriod time.Duration,
 	startTimeout time.Duration,
 	maxThroughput int,
 	xdrForward bool,
 ) *RecordReaderConfig {
 	return &RecordReaderConfig{
-		dc:               dc,
-		namespace:        namespace,
-		rewind:           rewind,
-		currentHostPort:  currentHostPort,
-		tcpConfig:        tcpConfig,
-		infoPolingPeriod: infoPolingPeriod,
-		startTimeout:     startTimeout,
-		maxThroughput:    maxThroughput,
-		xdrForward:       xdrForward,
+		dc:                dc,
+		namespace:         namespace,
+		rewind:            rewind,
+		currentHostPort:   currentHostPort,
+		tcpConfig:         tcpConfig,
+		infoPollingPeriod: infoPollingPeriod,
+		startTimeout:      startTimeout,
+		maxThroughput:     maxThroughput,
+		xdrForward:        xdrForward,
 	}
 }
 
@@ -316,7 +316,7 @@ func (r *RecordReader) watchNodes() {
 
 // watchCluster monitor cluster, and if new node was added, we start new node reader for it.
 func (r *RecordReader) watchCluster(nodes []string, wg *sync.WaitGroup) {
-	ticker := time.NewTicker(r.config.infoPolingPeriod)
+	ticker := time.NewTicker(r.config.infoPollingPeriod)
 	defer ticker.Stop()
 
 	time.Sleep(statsPollingDelay)

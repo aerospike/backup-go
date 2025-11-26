@@ -30,6 +30,7 @@ func NewReader(r io.ReadCloser, c *Collector) *Reader {
 	}
 }
 
+// Read reads data from the reader and collects metrics on the number of bytes read.
 func (r *Reader) Read(p []byte) (n int, err error) {
 	n, err = r.reader.Read(p)
 
@@ -38,6 +39,7 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Close closes the reader.
 func (r *Reader) Close() error {
 	return r.reader.Close()
 }

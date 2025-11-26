@@ -61,6 +61,7 @@ func NewWriter(w io.WriteCloser, key []byte) (io.WriteCloser, error) {
 	}, nil
 }
 
+// Write writes the data to the writer and encrypts it.
 func (ew *writer) Write(p []byte) (int, error) {
 	encrypted := make([]byte, len(p))
 	ew.stream.XORKeyStream(encrypted, p)
@@ -68,10 +69,12 @@ func (ew *writer) Write(p []byte) (int, error) {
 	return ew.writer.Write(encrypted)
 }
 
+// Close closes the writer and returns the error from the underlying writer.
 func (ew *writer) Close() error {
 	return ew.writer.Close()
 }
 
+// encryptedReader is a reader that decrypts the data from the underlying reader.
 type encryptedReader struct {
 	reader io.ReadCloser
 	stream cipher.Stream

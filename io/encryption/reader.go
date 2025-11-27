@@ -47,6 +47,7 @@ func NewEncryptedReader(r io.ReadCloser, key []byte) (io.ReadCloser, error) {
 	}, nil
 }
 
+// Read reads the data from the reader and decrypts it.
 func (er *encryptedReader) Read(p []byte) (int, error) {
 	n, err := er.reader.Read(p)
 	if n > 0 {
@@ -56,6 +57,7 @@ func (er *encryptedReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// Close closes the reader and returns the error from the underlying reader.
 func (er *encryptedReader) Close() error {
 	return er.reader.Close()
 }

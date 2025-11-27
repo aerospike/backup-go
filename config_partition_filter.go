@@ -178,6 +178,7 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	return result, nil
 }
 
+// splitPartitionIDs splits the partition ids to groups. Returns a slice of `aerospike.PartitionFilter`s.
 func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) {
 	if numWorkers <= 0 {
 		return nil, fmt.Errorf("number of workers is less than 1, cannot split partition ids")

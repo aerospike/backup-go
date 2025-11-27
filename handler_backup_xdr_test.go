@@ -170,7 +170,7 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 		ResultQueueSize:   testAckQueueSize,
 		AckQueueSize:      testResultQueueSize,
 		MaxConnections:    testMaxConnections,
-		InfoPolingPeriod:  10,
+		InfoPollingPeriod: 10,
 		StartTimeout:      testTimeout,
 	}
 
@@ -221,7 +221,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 		ResultQueueSize:   testAckQueueSize,
 		AckQueueSize:      testResultQueueSize,
 		MaxConnections:    testMaxConnections,
-		InfoPolingPeriod:  10,
+		InfoPollingPeriod: 10,
 		StartTimeout:      testTimeout,
 	}
 

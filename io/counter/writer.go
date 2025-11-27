@@ -29,6 +29,7 @@ type Writer struct {
 	fileSize *atomic.Uint64
 }
 
+// NewWriter creates a new counter writer.
 func NewWriter(w io.WriteCloser, total, fileSize *atomic.Uint64) *Writer {
 	return &Writer{
 		writer:   w,
@@ -37,6 +38,7 @@ func NewWriter(w io.WriteCloser, total, fileSize *atomic.Uint64) *Writer {
 	}
 }
 
+// Write writes the data to the writer and counts the number of bytes written.
 func (cw *Writer) Write(p []byte) (n int, err error) {
 	n, err = cw.writer.Write(p)
 	cw.total.Add(uint64(n))
@@ -48,6 +50,7 @@ func (cw *Writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Close closes the writer and returns the error from the underlying writer.
 func (cw *Writer) Close() error {
 	return cw.writer.Close()
 }

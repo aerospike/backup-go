@@ -160,6 +160,7 @@ func (bh *HandlerBackupXDR) run() {
 	})
 }
 
+// backup starts the backup operation. It blocks until the backup is completed.
 func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	// Count total records.
 	records, err := bh.infoClient.GetRecordCount(ctx, bh.config.Namespace, nil)
@@ -169,22 +170,24 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 
 	bh.stats.TotalRecords.Store(records)
 
-	// Read workers.
+	// Create the data readers.
 	readWorkers, err := bh.readerProcessor.newReadWorkersXDR(ctx)
 	if err != nil {
 		return fmt.Errorf("failed create read workers: %w", err)
 	}
 
-	// Write workers.
+	// Create the data writers.
 	_, writeWorkers, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed create write workers: %w", err)
 	}
 
+	// Create the data processor.
 	proc := newDataProcessor(
 		processors.NewTokenCounter[*models.ASBXToken](&bh.stats.ReadRecords),
 	)
 
+	// Create and run the pipeline.
 	pl, err := pipe.NewPipe(
 		proc,
 		readWorkers,

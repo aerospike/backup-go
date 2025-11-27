@@ -77,8 +77,7 @@ func NewWriter(
 	bucketHandler := client.Bucket(bucketName)
 	w.bucketName = bucketName
 	// Check if bucketHandler exists, to avoid errors.
-	_, err := bucketHandler.Attrs(ctx)
-	if err != nil {
+	if _, err := bucketHandler.Attrs(ctx); err != nil {
 		return nil, fmt.Errorf("failed to get bucketHandler %s attributes: %w", bucketName, err)
 	}
 
@@ -98,7 +97,7 @@ func NewWriter(
 
 	if w.IsRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucketHandler.
-		if err = w.RemoveFiles(ctx); err != nil {
+		if err := w.RemoveFiles(ctx); err != nil {
 			return nil, fmt.Errorf("failed to remove files from folder: %w", err)
 		}
 	}

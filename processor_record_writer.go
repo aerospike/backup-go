@@ -25,6 +25,7 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 )
 
+// recordWriterProcessor configures and creates record writers pipelines for restoring data.
 type recordWriterProcessor[T models.TokenConstraint] struct {
 	aerospikeClient  AerospikeClient
 	config           *ConfigRestore
@@ -35,6 +36,7 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 	logger *slog.Logger
 }
 
+// newRecordWriterProcessor returns a new record writer processor.
 func newRecordWriterProcessor[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
 	config *ConfigRestore,
@@ -55,9 +57,11 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	}
 }
 
+// newDataWriters creates the data writers for restoring data.
 func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Writer[T], error) {
 	var parallelism int
 
+	// Determine the parallelism based on the encoder type and batch writes support.
 	switch {
 	case rw.config.EncoderType == EncoderTypeASBX, rw.config.DisableBatchWrites:
 		parallelism = rw.config.Parallel
@@ -70,6 +74,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
 	}
 
+	// Check if batch writes are supported.
 	useBatchWrites, err := rw.useBatchWrites(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check batch writes: %w", err)
@@ -97,6 +102,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 	return dataWriters, nil
 }
 
+// useBatchWrites checks if batch writes are supported.
 func (rw *recordWriterProcessor[T]) useBatchWrites(ctx context.Context) (bool, error) {
 	if rw.config.DisableBatchWrites {
 		return false, nil

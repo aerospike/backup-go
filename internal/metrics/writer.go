@@ -32,6 +32,7 @@ func NewWriter(w io.WriteCloser, c *Collector) *Writer {
 	}
 }
 
+// Write writes data to the writer and collects metrics on the number of bytes written.
 func (w *Writer) Write(p []byte) (n int, err error) {
 	n, err = w.writer.Write(p)
 
@@ -40,6 +41,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Close closes the writer.
 func (w *Writer) Close() error {
 	return w.writer.Close()
 }

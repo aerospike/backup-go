@@ -30,7 +30,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-// fileReaderProcessor configures and creates file readers pipelines.
+// fileReaderProcessor configures and creates file readers pipelines for restoring data.
 type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *ConfigRestore
@@ -46,6 +46,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	parallel int
 }
 
+// newFileReaderProcessor returns a new file reader processor.
 func newFileReaderProcessor[T models.TokenConstraint](
 	reader StreamingReader,
 	config *ConfigRestore,
@@ -67,6 +68,7 @@ func newFileReaderProcessor[T models.TokenConstraint](
 	}
 }
 
+// newDataReaders creates the data readers for restoring data.
 func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Reader[T] {
 	var skipPrefixes []string
 	if fr.config.ApplyMetadataLast {
@@ -81,7 +83,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 	switch fr.config.EncoderType {
 	case EncoderTypeASB:
 		for i := 0; i < fr.parallel; i++ {
-			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.decoderFun)
+			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.initDecoder)
 		}
 	case EncoderTypeASBX:
 		workersReadChans := make([]chan models.File, fr.parallel)
@@ -89,7 +91,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 		for i := 0; i < fr.parallel; i++ {
 			rCh := make(chan models.File)
 			workersReadChans[i] = rCh
-			readWorkers[i] = newTokenReader(rCh, fr.logger, fr.decoderFun)
+			readWorkers[i] = newTokenReader(rCh, fr.logger, fr.initDecoder)
 		}
 
 		go distributeFiles(fr.readersCh, workersReadChans, fr.errorsCh)
@@ -98,7 +100,8 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 	return readWorkers
 }
 
-func (fr *fileReaderProcessor[T]) decoderFun(r io.ReadCloser, fileNumber uint64, fileName string) (Decoder[T], error) {
+// initDecoder initializes the decoder for the given reader.
+func (fr *fileReaderProcessor[T]) initDecoder(r io.ReadCloser, fileNumber uint64, fileName string) (Decoder[T], error) {
 	reader, err := fr.wrapReader(r)
 	if err != nil {
 		return nil, err
@@ -121,6 +124,7 @@ func (fr *fileReaderProcessor[T]) decoderFun(r io.ReadCloser, fileNumber uint64,
 	return d, nil
 }
 
+// newMetadataReaders creates the metadata readers for restoring metadata.
 func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe.Reader[T] {
 	mdFiles := fr.reader.GetSkipped()
 
@@ -140,7 +144,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 
 	readWorkers := make([]pipe.Reader[T], fr.parallel)
 	for i := 0; i < fr.parallel; i++ {
-		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.decoderFun)
+		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.initDecoder)
 	}
 
 	return readWorkers
@@ -236,6 +240,7 @@ func distributeFiles(input chan models.File, output []chan models.File, errors c
 
 		output[num] <- file
 	}
+
 	// Close channels at the end.
 	for i := range output {
 		close(output[i])

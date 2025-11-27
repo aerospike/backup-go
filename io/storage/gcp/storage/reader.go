@@ -147,6 +147,9 @@ func (r *Reader) StreamFiles(
 	}
 }
 
+// streamDirectory streams a directory from GCP cloud storage.
+// It sends io.Readers to the `readersCh` communication channel for lazy loading.
+// In case of an error, it sends the error to the `errorsCh` channel.
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
@@ -189,11 +192,13 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
+		// Open the object and send it to the `readersCh` communication channel.
 		r.openObject(ctx, objAttrs.Name, readersCh, errorsCh, true)
 	}
 }
 
-// openObject creates object readers and sends them to the readersCh.
+// openObject creates object readers and sends them to the `readersCh` communication channel.
+// In case of an error, it sends the error to the `errorsCh` channel.
 func (r *Reader) openObject(
 	ctx context.Context,
 	path string,
@@ -340,6 +345,7 @@ func (r *Reader) shouldSkip(path string, attr *storage.ObjectAttrs) bool {
 	return (common.IsDirectory(path, attr.Name) && !r.WithNestedDir) || attr.Size == 0
 }
 
+// calculateTotalSize calculates the total size and number of objects in all paths.
 func (r *Reader) calculateTotalSize(ctx context.Context) {
 	var (
 		totalSize int64
@@ -372,6 +378,7 @@ func (r *Reader) calculateTotalSize(ctx context.Context) {
 	r.totalNumber.Store(totalNum)
 }
 
+// calculateTotalSizeForPath calculates the total size and number of objects in a path.
 func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (totalSize, totalNum int64, err error) {
 	// if we have file to calculate.
 	if !r.IsDir {

@@ -82,6 +82,6 @@ func (r *SindexReader) Read(ctx context.Context) (*models.Token, error) {
 	return nil, io.EOF
 }
 
-// Close satisfies the DataReader interface
-// but is a no-op for the SIndexReader.
+// Close satisfies the pipe.Reader interface.
+// It is a no-op for the SIndexReader.
 func (r *SindexReader) Close() {}

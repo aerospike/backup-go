@@ -46,7 +46,7 @@ func NewVoidTimeSetter[T models.TokenConstraint](logger *slog.Logger) processor[
 	}
 }
 
-// Process sets the VoidTime of a record based on its TTL
+// Process sets the VoidTime of a record based on its TTL.
 func (p *voidTimeSetter[T]) Process(token T) (T, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {

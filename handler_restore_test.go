@@ -94,7 +94,7 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 		ResultQueueSize:   testAckQueueSize,
 		AckQueueSize:      testResultQueueSize,
 		MaxConnections:    testMaxConnections,
-		InfoPolingPeriod:  10,
+		InfoPollingPeriod: 10,
 		StartTimeout:      testTimeout,
 	}
 

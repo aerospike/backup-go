@@ -55,6 +55,7 @@ func NewWriter(
 	}, nil
 }
 
+// Write writes the data to the writer.
 func (f *Writer) Write(p []byte) (n int, err error) {
 	if f.sizeCounter.Load() >= f.limit {
 		err = f.writer.Close()
@@ -84,6 +85,7 @@ func (f *Writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Close closes the writer and returns the error from the underlying writer.
 func (f *Writer) Close() error {
 	if f.writer == nil { // in case there were no writes
 		return nil

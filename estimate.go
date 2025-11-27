@@ -27,11 +27,13 @@ import (
 // lies within the calculated confidence interval.
 const zScore = 2.576
 
+// estimateStats contains the mean and variance of the data.
 type estimateStats struct {
 	Mean     float64
 	Variance float64
 }
 
+// getEstimate calculates the estimated backup file size.
 func getEstimate(data []float64, total float64, logger *slog.Logger) float64 {
 	stats := calculateStats(data)
 
@@ -46,6 +48,7 @@ func getEstimate(data []float64, total float64, logger *slog.Logger) float64 {
 	return total * avg
 }
 
+// calculateStats calculates the mean and variance of the data.
 func calculateStats(data []float64) estimateStats {
 	n := len(data)
 	if n == 0 {
@@ -80,6 +83,7 @@ func calculateStats(data []float64) estimateStats {
 	}
 }
 
+// confidenceInterval calculates the confidence interval of the data.
 func confidenceInterval(stats estimateStats, sampleSize int) (low, high float64) {
 	if sampleSize == 0 {
 		return 0, 0
@@ -94,6 +98,7 @@ func confidenceInterval(stats estimateStats, sampleSize int) (low, high float64)
 	return low, high
 }
 
+// getCompressRatio calculates the compress ratio of the data.
 func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, error) {
 	// Create an io.WriteCloser from samplesData to calculate the compress ratio.
 	bytesWriter := util.NewBytesWriteCloser([]byte{})

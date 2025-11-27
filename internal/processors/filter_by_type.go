@@ -30,7 +30,7 @@ type filterByType[T models.TokenConstraint] struct {
 	skipped *atomic.Uint64
 }
 
-// NewFilterByType creates new filterByType processor
+// NewFilterByType creates a new filterByType processor with the given flags.
 func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool, skipped *atomic.Uint64) processor[T] {
 	if !noRecords && !noIndexes && !noUdf {
 		return &noopProcessor[T]{}

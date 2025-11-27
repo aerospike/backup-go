@@ -51,6 +51,7 @@ type Writer struct {
 	tier *blob.AccessTier
 }
 
+// NewWriter creates a new writer for Azure blob storage directory/file writing.
 func NewWriter(
 	ctx context.Context,
 	client *azblob.Client,
@@ -124,8 +125,9 @@ func NewWriter(
 }
 
 // NewWriter returns a new Azure blob writer to the specified path.
-// isRecords describe if the file contains record data.
+// isRecords indicates if the file contains record data.
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
+	// Get the full path for the file.
 	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get full path: %w", err)
@@ -153,6 +155,7 @@ type blobWriter struct {
 	withChecksum      bool
 }
 
+// newBlobWriter creates a new blob writer.
 func newBlobWriter(
 	ctx context.Context,
 	blobClient *blockblob.Client,
@@ -214,10 +217,12 @@ func (w *blobWriter) uploadStream() {
 	w.done <- err
 }
 
+// Write writes the data to the writer.
 func (w *blobWriter) Write(p []byte) (int, error) {
 	return w.bw.Write(p)
 }
 
+// Close closes the writer.
 func (w *blobWriter) Close() error {
 	var err error
 

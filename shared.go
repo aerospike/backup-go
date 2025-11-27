@@ -23,6 +23,7 @@ import (
 	"github.com/segmentio/asm/base64"
 )
 
+// handlePanic handles the panic and sends the error to the errors channel.
 func handlePanic(errors chan<- error, logger *slog.Logger) {
 	if r := recover(); r != nil {
 		var err error
@@ -41,6 +42,7 @@ func handlePanic(errors chan<- error, logger *slog.Logger) {
 	}
 }
 
+// doWork executes the given work function and sends the error to the errors channel if any.
 func doWork(errors chan<- error, done chan<- struct{}, logger *slog.Logger, work func() error) {
 	defer handlePanic(errors, logger)
 
@@ -58,6 +60,8 @@ func doWork(errors chan<- error, done chan<- struct{}, logger *slog.Logger, work
 	done <- struct{}{}
 }
 
+// newKeyByDigest creates a new key with the given namespace and digest.
+// It returns the key or an error if any.
 func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 	digestBytes, err := base64.StdEncoding.DecodeString(digest)
 	if err != nil {

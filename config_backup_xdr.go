@@ -75,7 +75,7 @@ type ConfigBackupXDR struct {
 	MaxConnections int
 	// How often a backup client will send info commands to check aerospike cluster stats.
 	// To measure recovery state and lag.
-	InfoPolingPeriod time.Duration
+	InfoPollingPeriod time.Duration
 	// Timeout for starting TCP server for XDR.
 	// If the TCP server for XDR does not receive any data within this timeout period, it will shut down.
 	// This situation can occur if the LocalAddress and LocalPort options are misconfigured.
@@ -144,8 +144,8 @@ func (c *ConfigBackupXDR) validate() error {
 		return fmt.Errorf("max connections must not be less than 1, got %d", c.MaxConnections)
 	}
 
-	if c.InfoPolingPeriod < 1 {
-		return fmt.Errorf("info poling period must not be less than 1, got %d", c.InfoPolingPeriod)
+	if c.InfoPollingPeriod < 1 {
+		return fmt.Errorf("info polling period must not be less than 1, got %d", c.InfoPollingPeriod)
 	}
 
 	if err := c.CompressionPolicy.validate(); err != nil {
@@ -161,7 +161,7 @@ func (c *ConfigBackupXDR) validate() error {
 	}
 
 	if c.EncoderType != EncoderTypeASBX {
-		return fmt.Errorf("unsuported encoder type: %d", c.EncoderType)
+		return fmt.Errorf("unsupported encoder type: %d", c.EncoderType)
 	}
 
 	if c.MaxThroughput%100 != 0 {

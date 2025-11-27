@@ -31,16 +31,16 @@ import (
 )
 
 const (
-	testDC               = "DCTest"
-	testNamespace        = "test"
-	testRewind           = "all"
-	testCurrentHost      = ":8081"
-	testCurrentHost2     = ":8082"
-	testCurrentHost3     = ":8083"
-	testCurrentHost4     = ":8084"
-	testCurrentHost5     = ":8085"
-	testInfoPolingPeriod = 1 * time.Second
-	testStartTimeout     = 10 * time.Second
+	testDC                = "DCTest"
+	testNamespace         = "test"
+	testRewind            = "all"
+	testCurrentHost       = ":8081"
+	testCurrentHost2      = ":8082"
+	testCurrentHost3      = ":8083"
+	testCurrentHost4      = ":8084"
+	testCurrentHost5      = ":8085"
+	testInfoPollingPeriod = 1 * time.Second
+	testStartTimeout      = 10 * time.Second
 )
 
 func testTCPConfig(host string) *TCPConfig {
@@ -61,7 +61,7 @@ func testRecordReaderConfig(host ...string) *RecordReaderConfig {
 		testRewind,
 		hostToUse,
 		testTCPConfig(hostToUse),
-		testInfoPolingPeriod,
+		testInfoPollingPeriod,
 		testStartTimeout,
 		0,
 		true,

@@ -28,7 +28,7 @@ type udfWriter struct {
 	logger      *slog.Logger
 }
 
-// writeUDF writes a UDF to Aerospike.
+// writeUDF writes a UDF to the Aerospike database.
 func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	var UDFLang a.Language
 

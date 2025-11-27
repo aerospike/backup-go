@@ -14,7 +14,8 @@
 
 package util
 
-// Diff finds the difference between two slices. Returns elements from s1 that s2 don't contain.
+// Diff finds the difference between two slices by returning elements from
+// s1 that are not in s2.
 func Diff[S ~[]E, E comparable](s1, s2 S) S {
 	// Fill the map.
 	m2 := make(map[E]struct{}, len(s2))

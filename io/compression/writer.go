@@ -41,10 +41,12 @@ func NewWriter(w io.WriteCloser, level int) (io.WriteCloser, error) {
 	}, nil
 }
 
+// Write writes the data to the zstd writer.
 func (cw *writer) Write(data []byte) (int, error) {
 	return cw.zstdWriter.Write(data)
 }
 
+// Close closes the zstd writer and the underlying writer.
 func (cw *writer) Close() error {
 	err := cw.zstdWriter.Close()
 	if err != nil {

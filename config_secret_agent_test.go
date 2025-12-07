@@ -23,7 +23,7 @@ import (
 )
 
 func testSecretAgentConfig() *SecretAgentConfig {
-	cType := saClient.ConnectionTypeTCP
+	cType := saClient.ConnectionTypeTCP.String()
 	address := "127.0.0.1"
 	port := testSAPort
 	timeout := 1000

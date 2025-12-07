@@ -56,9 +56,11 @@ func (s *SecretAgentConfig) validate() error {
 		return fmt.Errorf("connection type is required")
 	}
 
-	if s.ConnectionType != nil &&
-		(*s.ConnectionType != saClient.ConnectionTypeTCP && *s.ConnectionType != saClient.ConnectionTypeUDS) {
-		return fmt.Errorf("unsupported connection type: %s", *s.ConnectionType)
+	if s.ConnectionType != nil {
+		ct := saClient.ConnectionType(*s.ConnectionType)
+		if ct != saClient.ConnectionTypeTCP && ct != saClient.ConnectionTypeUDS {
+			return fmt.Errorf("unsupported connection type: %s", *s.ConnectionType)
+		}
 	}
 
 	return nil

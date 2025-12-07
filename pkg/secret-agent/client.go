@@ -33,6 +33,7 @@ const (
 	ConnectionTypeUDS ConnectionType = "unix"
 )
 
+// String returns string value of connection type.
 func (t ConnectionType) String() string {
 	return string(t)
 }

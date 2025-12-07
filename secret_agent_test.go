@@ -65,7 +65,7 @@ ah87+EsQLgoao6VWDlepN54P`
 )
 
 func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error) {
-	listener, err := net.Listen(saClient.ConnectionTypeTCP, address)
+	listener, err := net.Listen(saClient.ConnectionTypeTCP.String(), address)
 	if err != nil {
 		return nil, err
 	}

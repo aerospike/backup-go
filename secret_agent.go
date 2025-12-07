@@ -63,7 +63,7 @@ func getSecret(config *SecretAgentConfig, key string) (string, error) {
 
 	// Initializing client.
 	client, err := saClient.NewClient(
-		*config.ConnectionType,
+		saClient.ConnectionType(*config.ConnectionType),
 		address,
 		timeout,
 		isBase64,

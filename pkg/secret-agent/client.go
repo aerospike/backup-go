@@ -24,12 +24,18 @@ import (
 	"github.com/segmentio/asm/base64"
 )
 
+type ConnectionType string
+
 const (
 	// ConnectionTypeTCP connection type for TCP.
-	ConnectionTypeTCP = "tcp"
+	ConnectionTypeTCP ConnectionType = "tcp"
 	// ConnectionTypeUDS connection type for unix socket.
-	ConnectionTypeUDS = "unix"
+	ConnectionTypeUDS ConnectionType = "unix"
 )
+
+func (t ConnectionType) String() string {
+	return string(t)
+}
 
 // Client represents the client to communicate with Aerospike Secret Agent.
 type Client struct {
@@ -37,7 +43,7 @@ type Client struct {
 	tlsConfig *tls.Config
 	// connectionType describes connection.go type. Use `ConnectionTypeUDS` and
 	// `ConnectionTypeTCP` constants to define.
-	connectionType string
+	connectionType ConnectionType
 	// address contains the address of the Aerospike Secret Agent.
 	// for `ConnectionTypeTCP` it will be host + port, e.g.: "127.0.0.1:3005"
 	// for `ConnectionTypeUDS` it will be path to unix socket, e.g.: "/tmp/test.sock"
@@ -50,7 +56,7 @@ type Client struct {
 }
 
 // NewClient returns a new Aerospike Secret Agent client.
-func NewClient(connectionType, address string, timeout time.Duration, isBase64 bool,
+func NewClient(connectionType ConnectionType, address string, timeout time.Duration, isBase64 bool,
 	tlsConfig *tls.Config,
 ) (*Client, error) {
 	if tlsConfig != nil && connectionType != ConnectionTypeTCP {
@@ -70,7 +76,7 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 // in the external service, the corresponding value will be returned. Otherwise,
 // an empty value and an error will be returned.
 func (c *Client) GetSecret(resource, secretKey string) (string, error) {
-	conn, err := connection.Get(c.connectionType, c.address, c.timeout, c.tlsConfig)
+	conn, err := connection.Get(c.connectionType.String(), c.address, c.timeout, c.tlsConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to secret agent: %w", err)
 	}

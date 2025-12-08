@@ -353,7 +353,7 @@ func TestNewSecretAgentClient_Success(t *testing.T) {
 	require.NotNil(t, client)
 }
 
-func generateTempCertAndKey(t *testing.T) (certFile string, keyFile string) {
+func generateTempCertAndKey(t *testing.T) (certFile, keyFile string) {
 	t.Helper()
 
 	// Generate RSA private key

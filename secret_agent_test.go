@@ -155,17 +155,17 @@ func TestSecretAgent_getTlSConfig(t *testing.T) {
 	filePemWrong := "tests/integration/pkey_test"
 
 	testCases := []struct {
-		file       *string
+		config     *SecretAgentConfig
 		errContent string
 	}{
-		{nil, ""},
-		{&filePem, ""},
-		{&filePemNotExist, "unable to read ca file"},
-		{&filePemWrong, "nothing to append to ca cert pool"},
+		{&SecretAgentConfig{CaFile: nil}, ""},
+		{&SecretAgentConfig{CaFile: &filePem}, ""},
+		{&SecretAgentConfig{CaFile: &filePemNotExist}, "unable to read ca file"},
+		{&SecretAgentConfig{CaFile: &filePemWrong}, "nothing to append to ca cert pool"},
 	}
 
 	for i, tt := range testCases {
-		_, err := getTlSConfig(tt.file)
+		_, err := getTlSConfig(tt.config)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
 		} else {

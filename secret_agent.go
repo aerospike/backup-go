@@ -29,18 +29,108 @@ const secretPrefix = "secrets:"
 
 // getSecret gets the secret from the secret agent. It returns the secret value or an error if any.
 func getSecret(config *SecretAgentConfig, key string) (string, error) {
-	if config == nil {
-		return "", fmt.Errorf("secret config not initialized")
+	client, err := NewSecretAgentClient(config)
+	if err != nil {
+		return "", err
 	}
+
 	// Getting resource and key.
 	resource, secretKey, err := getResourceKey(key)
 	if err != nil {
 		return "", err
 	}
-	// Getting tls config.
-	tlsConfig, err := getTlSConfig(config.CaFile)
+
+	result, err := client.GetSecret(resource, secretKey)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get secret from secret agent: %w", err)
+	}
+
+	return result, nil
+}
+
+// getResourceKey returns the resource and secret key for the given secret key.
+func getResourceKey(key string) (resource, secretKey string, err error) {
+	if !isSecret(key) {
+		return "", "",
+			fmt.Errorf("invalid secret key format, must be secrets:<resource>:<secret>")
+	}
+
+	keyArr := strings.Split(key, ":")
+	if len(keyArr) != 3 {
+		return "", "", fmt.Errorf("invalid secret key format")
+	}
+	// We believe that keyArr[0] == secretPrefix
+	return keyArr[1], keyArr[2], nil
+}
+
+// getTlSConfig returns the TLS configuration for the given CA file if it is set.
+func getTlSConfig(config *SecretAgentConfig) (*tls.Config, error) {
+	if config.CaFile == nil {
+		return nil, nil
+	}
+
+	caCert, err := os.ReadFile(*config.CaFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read ca file: %w", err)
+	}
+
+	caCertPool := x509.NewCertPool()
+
+	ok := caCertPool.AppendCertsFromPEM(caCert)
+	if !ok {
+		return nil, fmt.Errorf("nothing to append to ca cert pool")
+	}
+
+	//nolint:gosec // we must support any tls configuration for legacy.
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	if config.TLSName != nil && *config.TLSName != "" {
+		tlsConfig.ServerName = *config.TLSName
+	}
+
+	// If cert and key files are specified, we load them.
+	if config.CertFile != nil && config.KeyFile != nil {
+		cert, err := tls.LoadX509KeyPair(*config.CertFile, *config.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+		}
+
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	return tlsConfig, nil
+}
+
+// isSecret checks if string is secret. e.g.: secrets:resource2:cacert
+func isSecret(secret string) bool {
+	return strings.HasPrefix(secret, secretPrefix)
+}
+
+// ParseSecret checks if the provided string contains a secret key and attempts
+// to retrieve the actual secret value from a secret agent, if configured.
+//
+// If the input string does not contain a secret key it is returned as is,
+// without any modification.
+func ParseSecret(config *SecretAgentConfig, secret string) (string, error) {
+	// If value doesn't contain the secret, we return it as is.
+	if !isSecret(secret) {
+		return secret, nil
+	}
+
+	return getSecret(config, secret)
+}
+
+// NewSecretAgentClient initializes a new secret agent client.
+func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
+	if config == nil {
+		return nil, fmt.Errorf("secret config not initialized")
+	}
+	// Getting tls config.
+	tlsConfig, err := getTlSConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
 	// Parsing config values.
@@ -70,73 +160,8 @@ func getSecret(config *SecretAgentConfig, key string) (string, error) {
 		tlsConfig,
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to initialize secret agent client: %w", err)
+		return nil, fmt.Errorf("failed to initialize secret agent client: %w", err)
 	}
 
-	result, err := client.GetSecret(resource, secretKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to get secret from secret agent: %w", err)
-	}
-
-	return result, nil
-}
-
-// getResourceKey returns the resource and secret key for the given secret key.
-func getResourceKey(key string) (resource, secretKey string, err error) {
-	if !isSecret(key) {
-		return "", "",
-			fmt.Errorf("invalid secret key format, must be secrets:<resource>:<secret>")
-	}
-
-	keyArr := strings.Split(key, ":")
-	if len(keyArr) != 3 {
-		return "", "", fmt.Errorf("invalid secret key format")
-	}
-	// We believe that keyArr[0] == secretPrefix
-	return keyArr[1], keyArr[2], nil
-}
-
-// getTlSConfig returns the TLS configuration for the given CA file if it is set.
-func getTlSConfig(caFile *string) (*tls.Config, error) {
-	if caFile == nil {
-		return nil, nil
-	}
-
-	caCert, err := os.ReadFile(*caFile)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read ca file: %w", err)
-	}
-
-	caCertPool := x509.NewCertPool()
-
-	ok := caCertPool.AppendCertsFromPEM(caCert)
-	if !ok {
-		return nil, fmt.Errorf("nothing to append to ca cert pool")
-	}
-
-	//nolint:gosec // we must support any tls configuration for legacy.
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
-	}
-
-	return tlsConfig, nil
-}
-
-// isSecret checks if string is secret. e.g.: secrets:resource2:cacert
-func isSecret(secret string) bool {
-	return strings.HasPrefix(secret, secretPrefix)
-}
-
-// ParseSecret checks if the provided string contains a secret key and attempts
-// to retrieve the actual secret value from a secret agent, if configured.
-//
-// If the input string does not contain a secret key it is returned as is,
-// without any modification.
-func ParseSecret(config *SecretAgentConfig, secret string) (string, error) {
-	// If value doesn't contain the secret, we return it as is.
-	if !isSecret(secret) {
-		return secret, nil
-	}
-
-	return getSecret(config, secret)
+	return client, nil
 }

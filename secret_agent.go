@@ -63,8 +63,8 @@ func getResourceKey(key string) (resource, secretKey string, err error) {
 	return keyArr[1], keyArr[2], nil
 }
 
-// getTlSConfig returns the TLS configuration for the given CA file if it is set.
-func getTlSConfig(config *SecretAgentConfig) (*tls.Config, error) {
+// getTLSConfig returns the TLS configuration for the given CA file if it is set.
+func getTLSConfig(config *SecretAgentConfig) (*tls.Config, error) {
 	if config.CaFile == nil {
 		return nil, nil
 	}
@@ -128,7 +128,7 @@ func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
 		return nil, fmt.Errorf("secret config not initialized")
 	}
 	// Getting tls config.
-	tlsConfig, err := getTlSConfig(config)
+	tlsConfig, err := getTLSConfig(config)
 	if err != nil {
 		return nil, err
 	}

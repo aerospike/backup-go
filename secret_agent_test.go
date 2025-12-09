@@ -172,7 +172,7 @@ func TestSecretAgent_getTlSConfig(t *testing.T) {
 	}
 
 	for i, tt := range testCases {
-		_, err := getTlSConfig(tt.config)
+		_, err := getTLSConfig(tt.config)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
 		} else {
@@ -276,7 +276,7 @@ func TestSecretAgent_getTlSConfig_WithTLSNameAndClientCert(t *testing.T) {
 		KeyFile:  &keyPath,
 	}
 
-	tlsConfig, err := getTlSConfig(cfg)
+	tlsConfig, err := getTLSConfig(cfg)
 	require.NoError(t, err)
 	require.NotNil(t, tlsConfig)
 	require.Equal(t, serverName, tlsConfig.ServerName)
@@ -296,7 +296,7 @@ func TestSecretAgent_getTlSConfig_InvalidClientCert(t *testing.T) {
 		KeyFile:  &badCertAndKey,
 	}
 
-	_, err := getTlSConfig(cfg)
+	_, err := getTLSConfig(cfg)
 	require.ErrorContains(t, err, "failed to load client certificate")
 }
 
@@ -310,7 +310,7 @@ func TestNewSecretAgentClient_NilConfig(t *testing.T) {
 func TestNewSecretAgentClient_TLSConfigError(t *testing.T) {
 	t.Parallel()
 
-	// Point CaFile at a non-existing file so getTlSConfig fails and bubbles up.
+	// Point CaFile at a non-existing file so getTLSConfig fails and bubbles up.
 	addr := "127.0.0.1:0"
 	connectionType := saClient.ConnectionTypeTCP
 	badCa := "tests/integration/smth.pem"

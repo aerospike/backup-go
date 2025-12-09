@@ -24,18 +24,24 @@ import (
 type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
 	// Use constants form `secret-agent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
-	ConnectionType *string `yaml:"sa-connection-type,omitempty" json:"sa-connection-type,omitempty"`
+	ConnectionType *string
 	// Secret agent host for TCP connection or socket file path for UDS connection.
-	Address *string `yaml:"sa-address,omitempty" json:"sa-address,omitempty"`
+	Address *string
 	// Secret agent port (only for TCP connection).
-	Port *int `yaml:"sa-port,omitempty" json:"sa-port,omitempty"`
+	Port *int
 	// Secret agent connection and reading timeout.
 	// Default: 1000 millisecond.
-	TimeoutMillisecond *int `yaml:"sa-timeout-millisecond,omitempty" json:"sa-timeout-millisecond,omitempty"`
-	// Path to ca file for encrypted connection.
-	CaFile *string `yaml:"sa-ca-file,omitempty" json:"sa-ca-file,omitempty"`
+	TimeoutMillisecond *int
+	// Path to a ca file for encrypted connection.
+	CaFile *string
+	// TLSName used on ca creation (ServerName for SNI).
+	TLSName *string
+	// Path to a client certificate file for mutual TLS authentication.
+	CertFile *string
+	// Path to a client private key file for mutual TLS authentication.
+	KeyFile *string
 	// Flag that shows if secret agent responses are encrypted with base64.
-	IsBase64 *bool `yaml:"sa-is-base64,omitempty" json:"sa-is-base64,omitempty"`
+	IsBase64 *bool
 }
 
 // validate validates the SecretAgentConfig.
@@ -59,6 +65,14 @@ func (s *SecretAgentConfig) validate() error {
 	if s.ConnectionType != nil &&
 		(*s.ConnectionType != saClient.ConnectionTypeTCP && *s.ConnectionType != saClient.ConnectionTypeUDS) {
 		return fmt.Errorf("unsupported connection type: %s", *s.ConnectionType)
+	}
+
+	if s.CertFile != nil && s.KeyFile == nil {
+		return fmt.Errorf("key file is required when cert file is set")
+	}
+
+	if s.KeyFile != nil && s.CertFile == nil {
+		return fmt.Errorf("cert file is required when key file is set")
 	}
 
 	return nil

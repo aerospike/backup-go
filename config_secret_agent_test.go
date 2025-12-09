@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"fmt"
 	"testing"
 
 	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
@@ -41,14 +40,34 @@ func testSecretAgentConfig() *SecretAgentConfig {
 func TestConfigSecretAgent_validate(t *testing.T) {
 	t.Parallel()
 
-	cfg := testSecretAgentConfig()
+	cfgValid := testSecretAgentConfig()
+
+	cfgValidUDS := testSecretAgentConfig()
+	cTypeUDS := saClient.ConnectionTypeUDS
+	addrUDS := "/tmp/secret-agent.sock"
+	cfgValidUDS.ConnectionType = &cTypeUDS
+	cfgValidUDS.Address = &addrUDS
+
+	cfgValidTLS := testSecretAgentConfig()
+	caFile := "/path/to/ca.pem"
+	tlsName := "server.local"
+	certFile := "/path/to/cert.pem"
+	keyFile := "/path/to/key.pem"
+	cfgValidTLS.CaFile = &caFile
+	cfgValidTLS.TLSName = &tlsName
+	cfgValidTLS.CertFile = &certFile
+	cfgValidTLS.KeyFile = &keyFile
 
 	cfgNoAddressNil := testSecretAgentConfig()
 	cfgNoAddressNil.Address = nil
 
 	cfgNoAddressEmpty := testSecretAgentConfig()
-	addr := ""
-	cfgNoAddressEmpty.Address = &addr
+	addrEmpty := ""
+	cfgNoAddressEmpty.Address = &addrEmpty
+
+	cfgZeroTimeout := testSecretAgentConfig()
+	zeroTimeout := 0
+	cfgZeroTimeout.TimeoutMillisecond = &zeroTimeout
 
 	cfgNegTimeout := testSecretAgentConfig()
 	negTimeout := -10
@@ -57,43 +76,95 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 	cfgConTypeNil := testSecretAgentConfig()
 	cfgConTypeNil.ConnectionType = nil
 
-	cfgConTypeErr := testSecretAgentConfig()
-	cTypeErr := "err"
-	cfgConTypeErr.ConnectionType = &cTypeErr
+	cfgConTypeInvalid := testSecretAgentConfig()
+	cTypeInvalid := "invalid"
+	cfgConTypeInvalid.ConnectionType = &cTypeInvalid
+
+	cfgCertNoKey := testSecretAgentConfig()
+	cert := "/path/to/cert.pem"
+	cfgCertNoKey.CertFile = &cert
+
+	cfgKeyNoCert := testSecretAgentConfig()
+	key := "/path/to/key.pem"
+	cfgKeyNoCert.KeyFile = &key
 
 	testCases := []struct {
+		name       string
 		config     *SecretAgentConfig
 		errContent string
 	}{
 		{
-			nil, "",
+			name:       "nil config",
+			config:     nil,
+			errContent: "",
 		},
 		{
-			cfg, "",
+			name:       "valid TCP config",
+			config:     cfgValid,
+			errContent: "",
 		},
 		{
-			cfgNoAddressNil, "address is required",
+			name:       "valid UDS config",
+			config:     cfgValidUDS,
+			errContent: "",
 		},
 		{
-			cfgNoAddressEmpty, "address is required",
+			name:       "valid config with TLS",
+			config:     cfgValidTLS,
+			errContent: "",
 		},
 		{
-			cfgNegTimeout, "invalid timeout",
+			name:       "address is nil",
+			config:     cfgNoAddressNil,
+			errContent: "address is required",
 		},
 		{
-			cfgConTypeNil, "connection type is required",
+			name:       "address is empty",
+			config:     cfgNoAddressEmpty,
+			errContent: "address is required",
 		},
 		{
-			cfgConTypeErr, "unsupported connection type",
+			name:       "timeout is zero",
+			config:     cfgZeroTimeout,
+			errContent: "invalid timeout",
+		},
+		{
+			name:       "timeout is negative",
+			config:     cfgNegTimeout,
+			errContent: "invalid timeout",
+		},
+		{
+			name:       "connection type is nil",
+			config:     cfgConTypeNil,
+			errContent: "connection type is required",
+		},
+		{
+			name:       "connection type is invalid",
+			config:     cfgConTypeInvalid,
+			errContent: "unsupported connection type",
+		},
+		{
+			name:       "cert file without key file",
+			config:     cfgCertNoKey,
+			errContent: "key file is required when cert file is set",
+		},
+		{
+			name:       "key file without cert file",
+			config:     cfgKeyNoCert,
+			errContent: "cert file is required when key file is set",
 		},
 	}
 
-	for i, tt := range testCases {
-		err := tt.config.validate()
-		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
-		} else {
-			require.NoError(t, err, fmt.Sprintf("case %d", i))
-		}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.config.validate()
+			if tt.errContent != "" {
+				require.ErrorContains(t, err, tt.errContent)
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }

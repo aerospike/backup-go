@@ -15,10 +15,17 @@
 package backup
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/binary"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -155,17 +162,17 @@ func TestSecretAgent_getTlSConfig(t *testing.T) {
 	filePemWrong := "tests/integration/pkey_test"
 
 	testCases := []struct {
-		file       *string
+		config     *SecretAgentConfig
 		errContent string
 	}{
-		{nil, ""},
-		{&filePem, ""},
-		{&filePemNotExist, "unable to read ca file"},
-		{&filePemWrong, "nothing to append to ca cert pool"},
+		{&SecretAgentConfig{CaFile: nil}, ""},
+		{&SecretAgentConfig{CaFile: &filePem}, ""},
+		{&SecretAgentConfig{CaFile: &filePemNotExist}, "unable to read ca file"},
+		{&SecretAgentConfig{CaFile: &filePemWrong}, "nothing to append to ca cert pool"},
 	}
 
 	for i, tt := range testCases {
-		_, err := getTlSConfig(tt.file)
+		_, err := getTLSConfig(tt.config)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
 		} else {
@@ -206,4 +213,197 @@ func TestSecretAgent_getSecret(t *testing.T) {
 			require.NoError(t, err, fmt.Sprintf("case %d", i))
 		}
 	}
+}
+
+func TestParseSecret_ReturnsPlainValueWhenNotSecret(t *testing.T) {
+	t.Parallel()
+
+	cfg := &SecretAgentConfig{}
+	value, err := ParseSecret(cfg, "plain-value")
+
+	require.NoError(t, err)
+	require.Equal(t, "plain-value", value)
+}
+
+func TestParseSecret_SecretValueIsResolved(t *testing.T) {
+	// We intentionally do NOT call t.Parallel here because we spin up a real TCP listener
+	// and want to avoid any flakiness around timing / port reuse.
+
+	// Use mockTCPServer with an ephemeral port.
+	listener, err := mockTCPServer("127.0.0.1:0", mockHandler)
+	require.NoError(t, err)
+	defer listener.Close()
+
+	// Give the server a tiny bit of time to start accepting.
+	time.Sleep(20 * time.Millisecond)
+
+	addr := listener.Addr().String()
+	connectionType := saClient.ConnectionTypeTCP
+	timeoutMs := 1000
+	isBase64 := false
+
+	cfg := &SecretAgentConfig{
+		Address:            &addr,
+		ConnectionType:     &connectionType,
+		TimeoutMillisecond: &timeoutMs,
+		IsBase64:           &isBase64,
+	}
+
+	value, err := ParseSecret(cfg, testSASecretKey)
+	require.NoError(t, err)
+	require.Equal(t, testPKey, value)
+}
+
+func TestParseSecret_SecretAgentError(t *testing.T) {
+	t.Parallel()
+
+	// nil config should propagate the NewSecretAgentClient error out of ParseSecret.
+	value, err := ParseSecret(nil, testSASecretKey)
+	require.ErrorContains(t, err, "secret config not initialized")
+	require.Empty(t, value)
+}
+
+func TestSecretAgent_getTlSConfig_WithTLSNameAndClientCert(t *testing.T) {
+	t.Parallel()
+
+	certPath, keyPath := generateTempCertAndKey(t)
+	serverName := "example.com"
+
+	cfg := &SecretAgentConfig{
+		CaFile:   &certPath, // also acts as CA here
+		TLSName:  &serverName,
+		CertFile: &certPath,
+		KeyFile:  &keyPath,
+	}
+
+	tlsConfig, err := getTLSConfig(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tlsConfig)
+	require.Equal(t, serverName, tlsConfig.ServerName)
+	require.NotEmpty(t, tlsConfig.Certificates, "client certificate should be loaded")
+}
+
+func TestSecretAgent_getTlSConfig_InvalidClientCert(t *testing.T) {
+	t.Parallel()
+
+	// same key file used as both cert and key should cause LoadX509KeyPair to fail
+	filePem := testCaFile
+	badCertAndKey := "tests/integration/pkey_test"
+
+	cfg := &SecretAgentConfig{
+		CaFile:   &filePem,
+		CertFile: &badCertAndKey,
+		KeyFile:  &badCertAndKey,
+	}
+
+	_, err := getTLSConfig(cfg)
+	require.ErrorContains(t, err, "failed to load client certificate")
+}
+
+func TestNewSecretAgentClient_NilConfig(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewSecretAgentClient(nil)
+	require.ErrorContains(t, err, "secret config not initialized")
+}
+
+func TestNewSecretAgentClient_TLSConfigError(t *testing.T) {
+	t.Parallel()
+
+	// Point CaFile at a non-existing file so getTLSConfig fails and bubbles up.
+	addr := "127.0.0.1:0"
+	connectionType := saClient.ConnectionTypeTCP
+	badCa := "tests/integration/smth.pem"
+
+	cfg := &SecretAgentConfig{
+		Address:        &addr,
+		ConnectionType: &connectionType,
+		CaFile:         &badCa,
+	}
+
+	_, err := NewSecretAgentClient(cfg)
+	require.ErrorContains(t, err, "unable to read ca file")
+}
+
+func TestNewSecretAgentClient_Success(t *testing.T) {
+	// As with the ParseSecret success test, avoid t.Parallel since we spin up a real listener.
+
+	listener, err := mockTCPServer("127.0.0.1:0", mockHandler)
+	require.NoError(t, err)
+	defer listener.Close()
+
+	// Give the server a tiny bit of time to start accepting.
+	time.Sleep(20 * time.Millisecond)
+
+	addr := listener.Addr().String()
+	connectionType := saClient.ConnectionTypeTCP
+	timeoutMs := 1500
+	isBase64 := true
+
+	cfg := &SecretAgentConfig{
+		Address:            &addr,
+		ConnectionType:     &connectionType,
+		TimeoutMillisecond: &timeoutMs,
+		IsBase64:           &isBase64,
+		// CaFile is nil here on purpose to also cover the "no TLS config" path.
+	}
+
+	client, err := NewSecretAgentClient(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+}
+
+func generateTempCertAndKey(t *testing.T) (certFile, keyFile string) {
+	t.Helper()
+
+	// Generate RSA private key
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	// Self-signed certificate template
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	require.NoError(t, err)
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName:   "Test Cert",
+			Organization: []string{"Aerospike"},
+		},
+		NotBefore: time.Now().Add(-time.Hour),
+		NotAfter:  time.Now().Add(24 * time.Hour),
+
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	require.NoError(t, err)
+
+	// Write cert to temp file
+	dir := t.TempDir()
+
+	certPath := dir + "/cert.pem"
+	keyPath := dir + "/key.pem"
+
+	certOut, err := os.Create(certPath)
+	require.NoError(t, err)
+	defer certOut.Close()
+
+	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	require.NoError(t, err)
+
+	// Write key to temp file
+	keyOut, err := os.Create(keyPath)
+	require.NoError(t, err)
+	defer keyOut.Close()
+
+	keyBytes := x509.MarshalPKCS1PrivateKey(priv)
+	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
+	require.NoError(t, err)
+
+	return certPath, keyPath
 }

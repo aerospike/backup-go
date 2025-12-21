@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"unicode"
 )
 
 // readPrivateKey parses and loads a private key according to the EncryptionPolicy
@@ -144,8 +143,10 @@ func decodeKeyContent(key string) ([]byte, error) {
 		return nil, errors.New("key is empty")
 	}
 
-	// Clean up input whitespace (newlines, spaces, tabs) for reliable processing
 	keyTrimmed := strings.TrimSpace(key)
+	if keyTrimmed == "" {
+		return nil, errors.New("key contains only whitespace")
+	}
 
 	// --- SCENARIO 1: Raw PEM ---
 	// Check if it already has the PEM header.
@@ -154,23 +155,10 @@ func decodeKeyContent(key string) ([]byte, error) {
 		return []byte(keyTrimmed), nil
 	}
 
-	// Normalize
-	cleanKey := strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-
-		return r
-	}, key)
-
-	if cleanKey == "" {
-		return nil, errors.New("key contains only whitespace")
-	}
-
 	// Attempt First Decode
-	decodedBytes, err := base64.StdEncoding.DecodeString(cleanKey)
+	decodedBytes, err := base64.StdEncoding.DecodeString(keyTrimmed)
 	if err != nil {
-		return nil, errors.New("invalid key format: input is neither a PEM block nor valid Base64")
+		return nil, fmt.Errorf("failed to decode PEM block containing private key: %w", err)
 	}
 
 	// --- SCENARIO 2: Base64 encoded PEM ---
@@ -186,7 +174,7 @@ func decodeKeyContent(key string) ([]byte, error) {
 	// B) A Text String (MII...) which is *another* Base64 layer. This is Scenario 4.
 
 	// We try to decode one more time.
-	innerBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(decodedString))
+	innerBytes, err := base64.StdEncoding.DecodeString(decodedString)
 	if err == nil {
 		// Success! The payload was text and valid Base64.
 		// This means the input was "Double Base64".

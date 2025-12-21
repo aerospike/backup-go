@@ -140,7 +140,7 @@ func readPemFromSecret(secret string, config *SecretAgentConfig) ([]byte, error)
 // 3. Raw Body (Base64 encoded DER)
 // 4. Base64 encoded Raw Body (Double Base64)
 func decodeKeyContent(key string) ([]byte, error) {
-	if len(key) == 0 {
+	if key == "" {
 		return nil, errors.New("key is empty")
 	}
 
@@ -159,10 +159,11 @@ func decodeKeyContent(key string) ([]byte, error) {
 		if unicode.IsSpace(r) {
 			return -1
 		}
+
 		return r
 	}, key)
 
-	if len(cleanKey) == 0 {
+	if cleanKey == "" {
 		return nil, errors.New("key contains only whitespace")
 	}
 

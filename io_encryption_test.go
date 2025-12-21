@@ -15,9 +15,11 @@
 package backup
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -94,8 +96,7 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 
 	listener, err := mockTCPServer(testEncSAAddress, mockHandler)
 	require.NoError(t, err)
-	defer listener.Close()
-
+	defer func() { _ = listener.Close() }()
 	// Wait for server start.
 	time.Sleep(1 * time.Second)
 
@@ -284,6 +285,115 @@ func Test_parsePK_WithPEM(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, got)
+			}
+		})
+	}
+}
+
+func TestProcessKeyContent(t *testing.T) {
+	dummyDER := []byte{ // Random binary
+		0x30, 0x82, 0x01, 0x22, 0x02, 0x01, 0x00, 0x02, 0x81, 0x81,
+		0x00, 0xAF, 0xCD, 0x12, 0x99, 0x22, 0x33, 0x44, 0xFF, 0xEE,
+	}
+
+	// The expected Standard PEM Output
+	expectedBody := base64.StdEncoding.EncodeToString(dummyDER)
+	expectedPEM := []byte("-----BEGIN PRIVATE KEY-----\n" + expectedBody + "\n-----END PRIVATE KEY-----\n")
+
+	// Prepare Input Variants
+	// Variant 1: Raw PEM
+	rawPEM := string(expectedPEM)
+	// Variant 2: Base64 encoded PEM
+	b64PEM := base64.StdEncoding.EncodeToString(expectedPEM)
+
+	// Variant 3: Raw Body (Base64 of DER)
+	rawBody := expectedBody
+
+	// Variant 4: Double Base64 (Base64 of Raw Body)
+	doubleB64 := base64.StdEncoding.EncodeToString([]byte(rawBody))
+
+	// Variant 5: Raw Body with Newlines (Simulating email copy-paste)
+	messyBody := rawBody[:10] + "\n" + rawBody[10:20] + "\r\n" + rawBody[20:]
+
+	tests := []struct {
+		name      string
+		input     string
+		wantBytes []byte
+		wantErr   bool
+	}{
+		{
+			name:      "Raw PEM",
+			input:     rawPEM,
+			wantErr:   false,
+			wantBytes: expectedPEM,
+		},
+		{
+			name:      "Base64 Encoded PEM",
+			input:     b64PEM,
+			wantErr:   false,
+			wantBytes: expectedPEM,
+		},
+		{
+			name:      "Raw Body (Base64 DER)",
+			input:     rawBody,
+			wantErr:   false,
+			wantBytes: expectedPEM,
+		},
+		{
+			name:      "Scenario 4: Double Base64",
+			input:     doubleB64,
+			wantErr:   false,
+			wantBytes: expectedPEM,
+		},
+		{
+			name:      "Scenario 5: Messy Whitespace in Base64",
+			input:     messyBody,
+			wantErr:   false,
+			wantBytes: expectedPEM,
+		},
+		{
+			name:      "Scenario 6: Preamble support",
+			input:     "Some comments here...\n" + rawPEM,
+			wantErr:   false,
+			wantBytes: []byte("Some comments here...\n" + rawPEM), // It preserves preamble for Raw PEM
+		},
+		{
+			name:    "Failure: Garbage String",
+			input:   "This is not a key",
+			wantErr: true,
+		},
+		{
+			name:    "Failure: Invalid Base64 Characters",
+			input:   "Invalid@Key!Characters",
+			wantErr: true,
+		},
+		{
+			name:    "Failure: Empty String",
+			input:   "",
+			wantErr: true,
+		},
+		{
+			name:    "Failure: Whitespace only",
+			input:   "   \n  \t ",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decodeKeyContent(tt.input)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("decodeKeyContent() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			if !bytes.Equal(bytes.TrimSpace(got), bytes.TrimSpace(tt.wantBytes)) {
+				t.Errorf("decodeKeyContent() got = \n%s\n, want \n%s", got, tt.wantBytes)
 			}
 		})
 	}

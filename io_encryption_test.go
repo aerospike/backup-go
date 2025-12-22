@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -315,6 +316,12 @@ func TestProcessKeyContent(t *testing.T) {
 	// Variant 5: Raw Body with Newlines (Simulating email copy-paste)
 	messyBody := rawBody[:10] + "\n" + rawBody[10:20] + "\r\n" + rawBody[20:]
 
+	// Variant 6: One-line PEM (BEGIN + base64 + END all on one line, no spaces in base64)
+	oneLinePEM := "-----BEGIN PRIVATE KEY-----" + expectedBody + "-----END PRIVATE KEY-----"
+
+	// Variant 7: PEM newlines replaced with spaces (common UI/Secrets behavior)
+	spacesInsteadOfNewlinesPEM := strings.ReplaceAll(string(expectedPEM), "\n", " ")
+
 	tests := []struct {
 		name      string
 		input     string
@@ -376,6 +383,18 @@ func TestProcessKeyContent(t *testing.T) {
 			name:    "Failure: Whitespace only",
 			input:   "   \n  \t ",
 			wantErr: true,
+		},
+		{
+			name:      "One-line PEM",
+			input:     oneLinePEM,
+			wantErr:   false,
+			wantBytes: expectedPEM,
+		},
+		{
+			name:      "PEM newlines replaced by spaces",
+			input:     spacesInsteadOfNewlinesPEM,
+			wantErr:   false,
+			wantBytes: expectedPEM,
 		},
 	}
 

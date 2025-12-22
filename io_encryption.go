@@ -18,13 +18,13 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 )
-
-const pemTemplate = "-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----"
 
 // readPrivateKey parses and loads a private key according to the EncryptionPolicy
 // configuration. It can load the private key from a file, env variable or Secret Agent.
@@ -118,10 +118,7 @@ func readPemFromEnv(keyEnv string) ([]byte, error) {
 		return nil, fmt.Errorf("environment variable %s not set", keyEnv)
 	}
 
-	// add header and footer to make it parsable
-	pemKey := fmt.Sprintf(pemTemplate, key)
-
-	return []byte(pemKey), nil
+	return decodeKeyContent(key)
 }
 
 // readPemFromSecret reads the key from secret agent without a header
@@ -132,7 +129,67 @@ func readPemFromSecret(secret string, config *SecretAgentConfig) ([]byte, error)
 		return nil, fmt.Errorf("unable to read secret config key: %w", err)
 	}
 
-	pemKey := fmt.Sprintf(pemTemplate, key)
+	return decodeKeyContent(key)
+}
 
-	return []byte(pemKey), nil
+// decodeKeyContent handles various formats of the key string.
+// It supports:
+// 1. Raw PEM (contains -----BEGIN)
+// 2. Base64 encoded PEM
+// 3. Raw Body (Base64 encoded DER)
+// 4. Base64 encoded Raw Body (Double Base64)
+func decodeKeyContent(key string) ([]byte, error) {
+	if key == "" {
+		return nil, errors.New("key is empty")
+	}
+
+	keyTrimmed := strings.TrimSpace(key)
+	if keyTrimmed == "" {
+		return nil, errors.New("key contains only whitespace")
+	}
+
+	// --- SCENARIO 1: Raw PEM ---
+	// Check if it already has the PEM header.
+	// We use Contains because PEM files allow text (preamble) before the header.
+	if strings.Contains(keyTrimmed, "-----BEGIN") {
+		return []byte(keyTrimmed), nil
+	}
+
+	// Attempt First Decode
+	decodedBytes, err := base64.StdEncoding.DecodeString(keyTrimmed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode PEM block containing private key: %w", err)
+	}
+
+	// --- SCENARIO 2: Base64 encoded PEM ---
+	// We decoded it, and found it contains a PEM header inside.
+	decodedString := string(decodedBytes)
+	if strings.Contains(decodedString, "-----BEGIN") {
+		return decodedBytes, nil
+	}
+
+	// --- SCENARIO 3 vs 4 (The "Double Base64" Check) ---
+	// At this point, 'decodedBytes' is either:
+	// A) Binary Key Data (DER). This corresponds to Scenario 3.
+	// B) A Text String (MII...) which is *another* Base64 layer. This is Scenario 4.
+
+	// We try to decode one more time.
+	innerBytes, err := base64.StdEncoding.DecodeString(decodedString)
+	if err == nil {
+		// Success! The payload was text and valid Base64.
+		// This means the input was "Double Base64".
+		return encodeToPEM(innerBytes), nil
+	}
+
+	// Failure! The payload was binary DER (or just invalid text).
+	// This means the input was standard "Raw Body" (Scenario 3).
+	return encodeToPEM(decodedBytes), nil
+}
+
+// encodeToPEM wraps binary DER data into a canonical PEM block.
+func encodeToPEM(der []byte) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: der,
+	})
 }

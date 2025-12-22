@@ -27,6 +27,11 @@ import (
 	"strings"
 )
 
+var (
+	beginMarkerRegex = regexp.MustCompile(`(-{5}BEGIN [^-]+-{5})\s*`)
+	endMarkerRegex   = regexp.MustCompile(`\s*(-{5}END [^-]+-{5})`)
+)
+
 // readPrivateKey parses and loads a private key according to the EncryptionPolicy
 // configuration. It can load the private key from a file, env variable or Secret Agent.
 // A valid agent parameter is required to load the key from Aerospike Secret Agent.
@@ -201,10 +206,10 @@ func ensurePEMMarkerNewlines(s string) string {
 	s = strings.TrimSpace(s)
 
 	// put a newline after BEGIN ...----- if missing
-	s = regexp.MustCompile(`(-{5}BEGIN [^-]+-{5})\s*`).ReplaceAllString(s, "$1\n")
+	s = beginMarkerRegex.ReplaceAllString(s, "$1\n")
 
 	// put a newline before -----END ...----- if missing
-	s = regexp.MustCompile(`\s*(-{5}END [^-]+-{5})`).ReplaceAllString(s, "\n$1")
+	s = endMarkerRegex.ReplaceAllString(s, "\n$1")
 
 	return s
 }

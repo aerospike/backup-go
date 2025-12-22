@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -148,6 +149,8 @@ func decodeKeyContent(key string) ([]byte, error) {
 		return nil, errors.New("key contains only whitespace")
 	}
 
+	keyTrimmed = ensurePEMMarkerNewlines(keyTrimmed)
+
 	// --- SCENARIO 1: Raw PEM ---
 	// Check if it already has the PEM header.
 	// We use Contains because PEM files allow text (preamble) before the header.
@@ -192,4 +195,16 @@ func encodeToPEM(der []byte) []byte {
 		Type:  "PRIVATE KEY",
 		Bytes: der,
 	})
+}
+
+func ensurePEMMarkerNewlines(s string) string {
+	s = strings.TrimSpace(s)
+
+	// put a newline after BEGIN ...----- if missing
+	s = regexp.MustCompile(`(-{5}BEGIN [^-]+-{5})\s*`).ReplaceAllString(s, "$1\n")
+
+	// put a newline before -----END ...----- if missing
+	s = regexp.MustCompile(`\s*(-{5}END [^-]+-{5})`).ReplaceAllString(s, "\n$1")
+
+	return s
 }

@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
@@ -61,9 +60,7 @@ type StreamingReader interface {
 
 // RestoreHandler handles a restore job using the given reader.
 type RestoreHandler[T models.TokenConstraint] struct {
-	// Global backup context for a whole restore process.
-	ctx    context.Context
-	cancel context.CancelFunc
+	*handlerBase
 
 	readProcessor  *fileReaderProcessor[T]
 	writeProcessor *recordWriterProcessor[T]
@@ -77,12 +74,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	rpsCollector  *metrics.Collector
 	kbpsCollector *metrics.Collector
 
-	id     string
-	errors chan error
-	done   chan struct{}
-
-	// For graceful shutdown.
-	wg sync.WaitGroup
+	id string
 }
 
 // newRestoreHandler creates a new RestoreHandler.
@@ -97,18 +89,17 @@ func newRestoreHandler[T models.TokenConstraint](
 	id := uuid.NewString()
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id)
-	// redefine context cancel.
-	ctx, cancel := context.WithCancel(ctx)
+
+	// Create handler base first to get the derived context.
+	base := newHandlerBase(ctx)
 
 	// Channel for transferring readers.
 	readersCh := make(chan models.File)
-	// Channel for processing errors from readers or writers.
-	errorsCh := make(chan error, 1)
 
 	stats := models.NewRestoreStats()
 
 	rpsCollector := metrics.NewCollector(
-		ctx,
+		base.ctx,
 		logger,
 		metrics.RecordsPerSecond,
 		metricMessage,
@@ -116,7 +107,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	)
 
 	kbpsCollector := metrics.NewCollector(
-		ctx,
+		base.ctx,
 		logger,
 		metrics.KilobytesPerSecond,
 		metricMessage,
@@ -128,7 +119,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		config,
 		kbpsCollector,
 		readersCh,
-		errorsCh,
+		base.errors,
 		logger,
 	)
 
@@ -143,13 +134,12 @@ func newRestoreHandler[T models.TokenConstraint](
 
 	limiter, err := bandwidth.NewLimiter(config.Bandwidth)
 	if err != nil {
-		cancel()
+		base.cancel()
 		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
 	}
 
 	return &RestoreHandler[T]{
-		ctx:            ctx,
-		cancel:         cancel,
+		handlerBase:    base,
 		readProcessor:  readProcessor,
 		writeProcessor: writeProcessor,
 		config:         config,
@@ -157,8 +147,6 @@ func newRestoreHandler[T models.TokenConstraint](
 		id:             id,
 		logger:         logger,
 		limiter:        limiter,
-		errors:         errorsCh,
-		done:           make(chan struct{}, 1),
 		rpsCollector:   rpsCollector,
 		kbpsCollector:  kbpsCollector,
 	}, nil
@@ -294,28 +282,9 @@ func (rh *RestoreHandler[T]) GetStats() *models.RestoreStats {
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
 func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
-	var err error
+	err := rh.waitForCompletion(ctx)
 
-	select {
-	case <-rh.ctx.Done():
-		// Wait for global context.
-		err = rh.ctx.Err()
-	case <-ctx.Done():
-		// Process local context.
-		rh.cancel()
-
-		err = ctx.Err()
-	case err = <-rh.errors:
-		// On error, we cancel global context.
-		// To stop all goroutines and prevent leaks.
-		rh.cancel()
-	case <-rh.done: // Success
-	}
-
-	// Wait when all routines ended.
-	rh.wg.Wait()
-
-	rh.cleanup()
+	rh.cleanup() // clean up resources.
 
 	return err
 }

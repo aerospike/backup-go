@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
 
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
@@ -30,10 +29,9 @@ import (
 
 // HandlerBackupXDR handles a backup job over XDR protocol.
 type HandlerBackupXDR struct {
-	id string
+	*handlerBase
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	id string
 
 	readerProcessor *recordReaderProcessorXDR[*models.ASBXToken]
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
@@ -43,11 +41,6 @@ type HandlerBackupXDR struct {
 	stats           *models.BackupStats
 
 	logger *slog.Logger
-
-	errors chan error
-	done   chan struct{}
-	// For graceful shutdown.
-	wg sync.WaitGroup
 
 	pl *pipe.Pipe[*models.ASBXToken]
 
@@ -70,12 +63,12 @@ func newBackupXDRHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
-	// redefine context cancel.
-	ctx, cancel := context.WithCancel(ctx)
+	// Create handler base first to get the derived context.
+	base := newHandlerBase(ctx)
 
-	hasExprSind, err := infoClient.HasExpressionSIndex(ctx, config.Namespace)
+	hasExprSind, err := infoClient.HasExpressionSIndex(base.ctx, config.Namespace)
 	if err != nil {
-		cancel()
+		base.cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
 	}
 
@@ -84,7 +77,7 @@ func newBackupXDRHandler(
 	stats := models.NewBackupStats()
 
 	rpsCollector := metrics.NewCollector(
-		ctx,
+		base.ctx,
 		logger,
 		metrics.RecordsPerSecond,
 		metricMessage,
@@ -92,7 +85,7 @@ func newBackupXDRHandler(
 	)
 
 	kbpsCollector := metrics.NewCollector(
-		ctx,
+		base.ctx,
 		logger,
 		metrics.KilobytesPerSecond,
 		metricMessage,
@@ -125,14 +118,13 @@ func newBackupXDRHandler(
 		logger,
 	)
 	if err != nil {
-		cancel()
+		base.cancel()
 		return nil, err
 	}
 
 	return &HandlerBackupXDR{
+		handlerBase:     base,
 		id:              id,
-		ctx:             ctx,
-		cancel:          cancel,
 		encoder:         encoder,
 		readerProcessor: readerProcessor,
 		writerProcessor: writerProcessor,
@@ -140,8 +132,6 @@ func newBackupXDRHandler(
 		infoClient:      infoClient,
 		stats:           stats,
 		logger:          logger,
-		errors:          make(chan error, 1),
-		done:            make(chan struct{}, 1),
 		rpsCollector:    rpsCollector,
 		kbpsCollector:   kbpsCollector,
 	}, nil
@@ -207,32 +197,9 @@ func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *HandlerBackupXDR) Wait(ctx context.Context) error {
-	var err error
+	err := bh.waitForCompletion(ctx)
 
-	select {
-	case <-bh.ctx.Done():
-		// When global context is done, wait until all routines finish their work properly.
-		// Global context - is context that was passed to Backup() method.
-		err = bh.ctx.Err()
-	case <-ctx.Done():
-		// When local context is done, we cancel global context.
-		// Then wait until all routines finish their work properly.
-		// Local context - is context that was passed to Wait() method.
-		bh.cancel()
-
-		err = ctx.Err()
-	case err = <-bh.errors:
-		// On error, we cancel global context.
-		// To stop all goroutines and prevent leaks.
-		bh.cancel()
-	case <-bh.done: // Success
-	}
-
-	// Wait when all routines ended.
-	bh.wg.Wait()
-
-	// Clean.
-	bh.cleanup()
+	bh.cleanup() // clean up resources.
 
 	return err
 }

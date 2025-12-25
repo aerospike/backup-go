@@ -31,13 +31,9 @@ import (
 )
 
 func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
-	t.Parallel()
-
+	// Not running in parallel to measure goroutines globally
 	testDir := t.TempDir()
 	stateFile := filepath.Join(testDir, "state_file")
-
-	// Count goroutines before test
-	initialGoroutines := runtime.NumGoroutine()
 
 	// Setup mocks
 	mockAerospikeClient := mocks.NewMockAerospikeClient(t)
@@ -66,7 +62,13 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	cfg.NoUDFs = true
 	cfg.NoIndexes = true
 
-	// Create backup handler
+	// Count goroutines after setup, before creating handler
+	// This isolates the handler's goroutine impact
+	runtime.GC()
+	time.Sleep(50 * time.Millisecond)
+	initialGoroutines := runtime.NumGoroutine()
+
+	// Create backup handler (spawns State goroutines)
 	handler, err := newBackupHandler(
 		context.Background(),
 		cfg,
@@ -81,10 +83,9 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	require.NotNil(t, handler)
 
 	// Simulate successful backup completion
-	// This is what happens in handler.run() when backup succeeds
 	handler.done <- struct{}{}
 
-	// Call Wait which should clean up
+	// Call Wait which should clean up all handler goroutines when returns
 	err = handler.Wait(context.Background())
 	require.NoError(t, err)
 
@@ -96,7 +97,7 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	finalGoroutines := runtime.NumGoroutine()
 	leaked := finalGoroutines - initialGoroutines
 
-	// Spawned goroutines should be cleaned up
+	// No goroutines should be leaked by the handler
 	require.LessOrEqual(t, leaked, 0,
 		"goroutine leak detected: started with %d, ended with %d (leaked %d).",
 		initialGoroutines, finalGoroutines, leaked)

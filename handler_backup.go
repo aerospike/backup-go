@@ -488,6 +488,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 		// To stop all goroutines and prevent leaks.
 		bh.cancel()
 	case <-bh.done: // Success
+		bh.cancel() // cancel global context to stop all goroutines and prevent leaks.
 	}
 
 	// Wait when all routines ended.

@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash"
+	"hash/crc32"
 	"io"
 
 	"cloud.google.com/go/storage"
@@ -120,6 +122,8 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 	if w.WithChecksum {
 		sw.SendCRC32C = true
+
+		return newCrcWriter(sw), nil
 	}
 
 	return sw, nil
@@ -213,4 +217,34 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 	}
 
 	return true, nil
+}
+
+// crcWriter wrapper for storage.Writer to calculate checksum.
+type crcWriter struct {
+	*storage.Writer
+	crc hash.Hash32
+}
+
+// newCrcWriter returns a new crcWriter.
+func newCrcWriter(w *storage.Writer) *crcWriter {
+	return &crcWriter{
+		Writer: w,
+		crc:    crc32.New(crc32.MakeTable(crc32.Castagnoli)),
+	}
+}
+
+// Write writes the data to the underlying storage.Writer and calculates the checksum.
+func (w *crcWriter) Write(p []byte) (n int, err error) {
+	// Write to the hash calculator
+	w.crc.Write(p)
+	// Write to the actual GCP writer
+	return w.Writer.Write(p)
+}
+
+// Close closes the underlying storage.Writer and calculates the checksum.
+func (w *crcWriter) Close() error {
+	// Before closing, we manually set the calculated CRC32C
+	w.CRC32C = w.crc.Sum32()
+
+	return w.Writer.Close()
 }

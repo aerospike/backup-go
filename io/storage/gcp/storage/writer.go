@@ -21,7 +21,6 @@ import (
 	"hash"
 	"hash/crc32"
 	"io"
-	"log/slog"
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/io/storage/common"
@@ -223,7 +222,7 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 type crcWriter struct {
 	ctx    context.Context
 	writer *storage.Writer
-	// For rollback, we need object to delete.
+	// For rollback, we need an object to delete.
 	objectHandle *storage.ObjectHandle
 	hash32       hash.Hash32
 }
@@ -255,15 +254,9 @@ func (c *crcWriter) Close() error {
 		return err
 	}
 
-	// Before closing, we manually set the calculated CRC32C
-	slog.Info("Closing writer",
-		slog.Uint64("crc32c", uint64(c.hash32.Sum32())),
-		slog.Uint64("writer", uint64(c.writer.Attrs().CRC32C)),
-	)
-
 	// Check crc ourself.
-	if c.hash32.Sum32() == c.writer.Attrs().CRC32C {
-		// Clean up if checksum mismatch.
+	if c.hash32.Sum32() != c.writer.Attrs().CRC32C {
+		// Clean up if checksum mismatches.
 		if err := c.objectHandle.Delete(c.ctx); err != nil {
 			return fmt.Errorf("checksum mismatch: %d != %d and failed to delete object: %w",
 				c.hash32.Sum32(), c.writer.Attrs().CRC32C, err)

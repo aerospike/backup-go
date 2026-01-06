@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash"
+	"hash/crc32"
 	"io"
 
 	"cloud.google.com/go/storage"
@@ -113,13 +115,14 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
 
-	sw := w.bucketHandle.Object(fullPath).NewWriter(ctx)
+	oh := w.bucketHandle.Object(fullPath)
+	sw := oh.NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass
 
 	if w.WithChecksum {
-		sw.SendCRC32C = true
+		return newCrcWriter(ctx, sw, oh), nil
 	}
 
 	return sw, nil
@@ -213,4 +216,57 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 	}
 
 	return true, nil
+}
+
+// crcWriter wrapper for storage.Writer to calculate checksum.
+type crcWriter struct {
+	ctx    context.Context
+	writer *storage.Writer
+	// For rollback, we need an object to delete.
+	objectHandle *storage.ObjectHandle
+	hash32       hash.Hash32
+}
+
+// newCrcWriter returns a new crcWriter.
+func newCrcWriter(ctx context.Context, w *storage.Writer, o *storage.ObjectHandle) *crcWriter {
+	return &crcWriter{
+		ctx:          ctx,
+		writer:       w,
+		hash32:       crc32.New(crc32.MakeTable(crc32.Castagnoli)),
+		objectHandle: o,
+	}
+}
+
+// Write writes the data to the underlying storage.Writer and calculates the checksum.
+func (c *crcWriter) Write(p []byte) (int, error) {
+	n, err := c.writer.Write(p)
+	if n > 0 {
+		// Write to the hash calculator only hash bytes actually written.
+		c.hash32.Write(p[:n])
+	}
+
+	return n, err
+}
+
+// Close closes the underlying storage.Writer and calculates the checksum.
+func (c *crcWriter) Close() error {
+	if err := c.writer.Close(); err != nil {
+		return err
+	}
+
+	local := c.hash32.Sum32()
+	remote := c.writer.Attrs().CRC32C
+
+	// Check crc ourself.
+	if local != remote {
+		// Clean up if checksum mismatches.
+		if err := c.objectHandle.Delete(c.ctx); err != nil {
+			return fmt.Errorf("checksum mismatch: %d != %d and failed to delete object: %w",
+				local, remote, err)
+		}
+
+		return fmt.Errorf("checksum mismatch: %d != %d", local, remote)
+	}
+
+	return nil
 }

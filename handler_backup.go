@@ -21,7 +21,6 @@ import (
 	"io"
 	"log/slog"
 	"math"
-	"sync"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
@@ -62,9 +61,7 @@ type Writer interface {
 
 // BackupHandler handles a backup job.
 type BackupHandler struct {
-	// Global backup context for a whole backup process.
-	ctx    context.Context
-	cancel context.CancelFunc
+	*handlerBase
 
 	readerProcessor *recordReaderProcessor[*models.Token]
 	writerProcessor *fileWriterProcessor[*models.Token]
@@ -78,15 +75,11 @@ type BackupHandler struct {
 	limiter                *bandwidth.Limiter
 	infoClient             InfoGetter
 	scanLimiter            *semaphore.Weighted
-	errors                 chan error
-	done                   chan struct{}
 	id                     string
 
 	stats *models.BackupStats
 	// Backup state for continuation.
 	state *State
-	// For graceful shutdown.
-	wg sync.WaitGroup
 
 	pl atomic.Pointer[pipe.Pipe[*models.Token]]
 
@@ -117,17 +110,18 @@ func newBackupHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
-	// Derive a new cancellable context from the existing one.
-	ctx, cancel := context.WithCancel(ctx)
+	// Create handler base first to get the derived context.
+	base := newHandlerBase(ctx)
 
+	// State is used to store the backup state and resume the backup operation.
 	var state *State
 
 	if config.StateFile != "" {
 		var err error
 
-		state, err = NewState(ctx, config, reader, writer, logger)
+		state, err = NewState(base.ctx, config, reader, writer, logger)
 		if err != nil {
-			cancel()
+			base.cancel()
 			return nil, fmt.Errorf("failed to initialize state: %w", err)
 		}
 
@@ -136,15 +130,15 @@ func newBackupHandler(
 			// change filters in config.
 			config.PartitionFilters, err = state.loadPartitionFilters()
 			if err != nil {
-				cancel()
+				base.cancel()
 				return nil, fmt.Errorf("failed to load partition filters: %w", err)
 			}
 		}
 	}
 
-	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(ctx, config.Namespace)
+	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(base.ctx, config.Namespace)
 	if err != nil {
-		cancel()
+		base.cancel()
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
 	}
 
@@ -153,7 +147,7 @@ func newBackupHandler(
 	stats := models.NewBackupStats()
 
 	rpsCollector := metrics.NewCollector(
-		ctx,
+		base.ctx,
 		logger,
 		metrics.RecordsPerSecond,
 		metricMessage,
@@ -161,7 +155,7 @@ func newBackupHandler(
 	)
 
 	kbpsCollector := metrics.NewCollector(
-		ctx,
+		base.ctx,
 		logger,
 		metrics.KilobytesPerSecond,
 		metricMessage,
@@ -182,13 +176,12 @@ func newBackupHandler(
 
 	limiter, err := bandwidth.NewLimiter(config.Bandwidth)
 	if err != nil {
-		cancel()
+		base.cancel()
 		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
 	}
 
 	bh := &BackupHandler{
-		ctx:                    ctx,
-		cancel:                 cancel,
+		handlerBase:            base,
 		config:                 config,
 		aerospikeClient:        ac,
 		id:                     id,
@@ -204,8 +197,6 @@ func newBackupHandler(
 		stats:                  stats,
 		rpsCollector:           rpsCollector,
 		kbpsCollector:          kbpsCollector,
-		errors:                 make(chan error, 1),
-		done:                   make(chan struct{}, 1),
 	}
 
 	writerProcessor, err := newFileWriterProcessor[*models.Token](
@@ -224,7 +215,7 @@ func newBackupHandler(
 		logger,
 	)
 	if err != nil {
-		cancel()
+		bh.cancel()
 		return nil, err
 	}
 
@@ -469,40 +460,17 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
 func (bh *BackupHandler) Wait(ctx context.Context) error {
-	var err error
-
-	select {
-	case <-bh.ctx.Done():
-		// When global context is done, wait until all routine finish their work properly.
-		// Global context - is context that was passed to Backup() method.
-		err = bh.ctx.Err()
-	case <-ctx.Done():
-		// When local context is done, we cancel global context.
-		// Then wait until all routines finish their work properly.
-		// Local context - is context that was passed to Wait() method.
-		bh.cancel()
-
-		err = ctx.Err()
-	case err = <-bh.errors:
-		// On error, we cancel global context.
-		// To stop all goroutines and prevent leaks.
-		bh.cancel()
-	case <-bh.done: // Success
-	}
-
-	// Wait when all routines ended.
-	bh.wg.Wait()
+	err := bh.waitForCompletion(ctx)
 
 	// If the err is nil, we can remove the state file.
 	if err == nil && bh.state != nil {
-		// Clen only if err == nil and state is not nil.
+		// Clean only if err == nil and state is not nil.
 		if err = bh.state.cleanup(ctx); err != nil {
 			bh.logger.Error("failed to cleanup state", slog.Any("error", err))
 		}
 	}
 
-	// Clean.
-	bh.cleanup()
+	bh.cleanup() // clean up resources.
 
 	return err
 }

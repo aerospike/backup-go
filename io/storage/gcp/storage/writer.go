@@ -116,13 +116,14 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
 
-	sw := w.bucketHandle.Object(fullPath).NewWriter(ctx)
+	oh := w.bucketHandle.Object(fullPath)
+	sw := oh.NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass
 
 	if w.WithChecksum {
-		return newCrcWriter(sw), nil
+		return newCrcWriter(ctx, sw, oh), nil
 	}
 
 	return sw, nil
@@ -220,41 +221,55 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 
 // crcWriter wrapper for storage.Writer to calculate checksum.
 type crcWriter struct {
-	*storage.Writer
-	crc hash.Hash32
+	ctx    context.Context
+	writer *storage.Writer
+	// For rollback, we need object to delete.
+	objectHandle *storage.ObjectHandle
+	hash32       hash.Hash32
 }
 
 // newCrcWriter returns a new crcWriter.
-func newCrcWriter(w *storage.Writer) *crcWriter {
+func newCrcWriter(ctx context.Context, w *storage.Writer, o *storage.ObjectHandle) *crcWriter {
 	return &crcWriter{
-		Writer: w,
-		crc:    crc32.New(crc32.MakeTable(crc32.Castagnoli)),
+		ctx:          ctx,
+		writer:       w,
+		hash32:       crc32.New(crc32.MakeTable(crc32.Castagnoli)),
+		objectHandle: o,
 	}
 }
 
 // Write writes the data to the underlying storage.Writer and calculates the checksum.
-func (w *crcWriter) Write(p []byte) (n int, err error) {
-	// Write to the hash calculator
-	w.crc.Write(p)
-	// Write to the actual GCP writer
-	return w.Writer.Write(p)
+func (c *crcWriter) Write(p []byte) (int, error) {
+	n, err := c.writer.Write(p)
+	if n > 0 {
+		// Write to the hash calculator only hash bytes actually written.
+		c.hash32.Write(p[:n])
+	}
+
+	return n, err
 }
 
 // Close closes the underlying storage.Writer and calculates the checksum.
-func (w *crcWriter) Close() error {
-	if err := w.Writer.Close(); err != nil {
+func (c *crcWriter) Close() error {
+	if err := c.writer.Close(); err != nil {
 		return err
 	}
 
 	// Before closing, we manually set the calculated CRC32C
 	slog.Info("Closing writer",
-		slog.Uint64("crc32c", uint64(w.crc.Sum32())),
-		slog.Uint64("writer", uint64(w.Attrs().CRC32C)),
+		slog.Uint64("crc32c", uint64(c.hash32.Sum32())),
+		slog.Uint64("writer", uint64(c.writer.Attrs().CRC32C)),
 	)
 
 	// Check crc ourself.
-	if w.crc.Sum32() != w.Attrs().CRC32C {
-		return fmt.Errorf("checksum mismatch: %d != %d", w.crc.Sum32(), w.Attrs().CRC32C)
+	if c.hash32.Sum32() != c.writer.Attrs().CRC32C {
+		// Clean up if checksum mismatch.
+		if err := c.objectHandle.Delete(c.ctx); err != nil {
+			return fmt.Errorf("checksum mismatch: %d != %d and failed to delete object: %w",
+				c.hash32.Sum32(), c.writer.Attrs().CRC32C, err)
+		}
+
+		return fmt.Errorf("checksum mismatch: %d != %d", c.hash32.Sum32(), c.writer.Attrs().CRC32C)
 	}
 
 	return nil

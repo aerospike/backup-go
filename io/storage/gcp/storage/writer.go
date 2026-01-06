@@ -254,15 +254,18 @@ func (c *crcWriter) Close() error {
 		return err
 	}
 
+	local := c.hash32.Sum32()
+	remote := c.writer.Attrs().CRC32C
+
 	// Check crc ourself.
-	if c.hash32.Sum32() != c.writer.Attrs().CRC32C {
+	if local != remote {
 		// Clean up if checksum mismatches.
 		if err := c.objectHandle.Delete(c.ctx); err != nil {
 			return fmt.Errorf("checksum mismatch: %d != %d and failed to delete object: %w",
-				c.hash32.Sum32(), c.writer.Attrs().CRC32C, err)
+				local, remote, err)
 		}
 
-		return fmt.Errorf("checksum mismatch: %d != %d", c.hash32.Sum32(), c.writer.Attrs().CRC32C)
+		return fmt.Errorf("checksum mismatch: %d != %d", local, remote)
 	}
 
 	return nil

@@ -245,9 +245,10 @@ func (w *crcWriter) Write(p []byte) (n int, err error) {
 // Close closes the underlying storage.Writer and calculates the checksum.
 func (w *crcWriter) Close() error {
 	// Before closing, we manually set the calculated CRC32C
-	w.CRC32C = w.crc.Sum32()
-
-	slog.Info("CRC32C:", w.CRC32C)
+	slog.Info("Closing writer",
+		slog.Uint64("crc32c", uint64(w.crc.Sum32())),
+		slog.Uint64("writer", uint64(w.CRC32C)),
+	)
 
 	return w.Writer.Close()
 }

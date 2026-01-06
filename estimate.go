@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"fmt"
 	"log/slog"
 	"math"
 
@@ -118,8 +119,8 @@ func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, e
 
 	// Check outLen for safety reasons.
 	outLen := bytesWriter.Buffer().Len()
-	if outLen == 0 {
-		return 1, nil
+	if outLen == 0 && len(samplesData) > 0 {
+		return 0, fmt.Errorf("output length is zero, but samples data is not empty")
 	}
 
 	return float64(len(samplesData)) / float64(outLen), nil

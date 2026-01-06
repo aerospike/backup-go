@@ -122,8 +122,6 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	sw.StorageClass = w.StorageClass
 
 	if w.WithChecksum {
-		sw.SendCRC32C = true
-
 		return newCrcWriter(sw), nil
 	}
 
@@ -244,11 +242,20 @@ func (w *crcWriter) Write(p []byte) (n int, err error) {
 
 // Close closes the underlying storage.Writer and calculates the checksum.
 func (w *crcWriter) Close() error {
+	if err := w.Writer.Close(); err != nil {
+		return err
+	}
+
 	// Before closing, we manually set the calculated CRC32C
 	slog.Info("Closing writer",
 		slog.Uint64("crc32c", uint64(w.crc.Sum32())),
-		slog.Uint64("writer", uint64(w.CRC32C)),
+		slog.Uint64("writer", uint64(w.Attrs().CRC32C)),
 	)
 
-	return w.Writer.Close()
+	// Check crc ourself.
+	if w.crc.Sum32() != w.Attrs().CRC32C {
+		return fmt.Errorf("checksum mismatch: %d != %d", w.crc.Sum32(), w.Attrs().CRC32C)
+	}
+
+	return nil
 }

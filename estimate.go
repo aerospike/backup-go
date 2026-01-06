@@ -119,8 +119,12 @@ func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, e
 
 	// Check outLen for safety reasons.
 	outLen := bytesWriter.Buffer().Len()
-	if outLen == 0 && len(samplesData) > 0 {
-		return 0, fmt.Errorf("output length is zero, but samples data is not empty")
+	if outLen == 0 {
+		if len(samplesData) > 0 {
+			return 0, fmt.Errorf("output length is zero, but samples data is not empty")
+		}
+
+		return 1, nil
 	}
 
 	return float64(len(samplesData)) / float64(outLen), nil

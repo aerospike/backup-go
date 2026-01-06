@@ -21,6 +21,7 @@ import (
 	"hash"
 	"hash/crc32"
 	"io"
+	"log/slog"
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/io/storage/common"
@@ -245,6 +246,8 @@ func (w *crcWriter) Write(p []byte) (n int, err error) {
 func (w *crcWriter) Close() error {
 	// Before closing, we manually set the calculated CRC32C
 	w.CRC32C = w.crc.Sum32()
+
+	slog.Info("CRC32C:", w.CRC32C)
 
 	return w.Writer.Close()
 }

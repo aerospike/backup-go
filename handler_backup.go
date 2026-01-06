@@ -257,6 +257,10 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 		return 0, fmt.Errorf("failed to count records: %w", err)
 	}
 
+	if totalCount == 0 {
+		return 0, nil
+	}
+
 	// Calculate records size.
 	samples, samplesData, err := bh.getEstimateSamples(ctx, recordsNumber)
 	if err != nil {

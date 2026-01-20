@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/metrics"
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
 	"github.com/aerospike/backup-go/io/encryption"
@@ -223,7 +223,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 		return nil, fmt.Errorf("failed to set compression: %w", err)
 	}
 
-	num, err := util.GetFileNumber(filename)
+	num, err := files.GetFileNumber(filename)
 	if err != nil {
 		return nil, err
 	}

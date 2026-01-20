@@ -12,30 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package asb
+package collections
 
-import (
-	"fmt"
-	"path/filepath"
-
-	"github.com/aerospike/backup-go/internal/util/files"
-)
-
-// Validator represents backup files validator.
-type Validator struct {
-}
-
-// NewValidator returns new validator instance for files validation.
-func NewValidator() *Validator {
-	return &Validator{}
-}
-
-// Run performs backup files validation.
-func (v *Validator) Run(fileName string) error {
-	if filepath.Ext(fileName) != files.ASB {
-		return fmt.Errorf("restore file %s is in an invalid format, expected extension: .asb, got: %s",
-			fileName, filepath.Ext(fileName))
+// Diff finds the difference between two slices by returning elements from
+// s1 that are not in s2.
+func Diff[S ~[]E, E comparable](s1, s2 S) S {
+	// Fill the map.
+	m2 := make(map[E]struct{}, len(s2))
+	for _, v := range s2 {
+		m2[v] = struct{}{}
 	}
 
-	return nil
+	res := make(S, 0, len(s1))
+
+	for _, v := range s1 {
+		if _, exists := m2[v]; !exists {
+			res = append(res, v)
+		}
+	}
+
+	return res
 }

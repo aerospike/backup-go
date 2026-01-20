@@ -20,7 +20,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -84,7 +84,7 @@ func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
 				err error
 			)
 			// Validate only .asbx files.
-			num, err = util.GetFileNumber(file.Name)
+			num, err = files.GetFileNumber(file.Name)
 			if err != nil {
 				return nil, err
 			}

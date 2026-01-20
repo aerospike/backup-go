@@ -12,24 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package files
 
-// Diff finds the difference between two slices by returning elements from
-// s1 that are not in s2.
-func Diff[S ~[]E, E comparable](s1, s2 S) S {
-	// Fill the map.
-	m2 := make(map[E]struct{}, len(s2))
-	for _, v := range s2 {
-		m2[v] = struct{}{}
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// GetFileNumber returns file number from name.
+// Return 0 nil for non-asbx files
+func GetFileNumber(filename string) (uint64, error) {
+	// Skip non asbx files.
+	if !strings.HasSuffix(filename, ASBX) {
+		return 0, nil
 	}
 
-	res := make(S, 0, len(s1))
+	name := strings.TrimSuffix(filename, ASBX)
+	parts := strings.SplitN(name, "_", 3)
 
-	for _, v := range s1 {
-		if _, exists := m2[v]; !exists {
-			res = append(res, v)
-		}
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("invalid file name %q", filename)
 	}
 
-	return res
+	num, err := strconv.ParseUint(parts[2], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse file number %q: %w", filename, err)
+	}
+
+	return num, nil
 }

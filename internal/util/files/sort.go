@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package files
 
 import (
 	"fmt"
@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	FileExtAsbx = ".asbx"
-	FileExtAsb  = ".asb"
+	ASBX = ".asbx"
+	ASB  = ".asb"
 )
 
 // backupFile is used for sorting files.
@@ -52,7 +52,7 @@ func parseFileName(name string) (backupFile, error) {
 	// Parse suffix number (after _ns1_).
 	suffixWithExt := parts[2]
 
-	suffix, err := strconv.Atoi(strings.TrimSuffix(suffixWithExt, FileExtAsbx))
+	suffix, err := strconv.Atoi(strings.TrimSuffix(suffixWithExt, ASBX))
 	if err != nil {
 		return backupFile{}, fmt.Errorf("invalid suffix number: %s", suffixWithExt)
 	}

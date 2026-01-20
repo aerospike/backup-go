@@ -26,7 +26,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
@@ -222,7 +222,7 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 type validatorMock struct{}
 
 func (mock validatorMock) Run(fileName string) error {
-	if !strings.HasSuffix(fileName, util.FileExtAsb) {
+	if !strings.HasSuffix(fileName, files.ASB) {
 		return fmt.Errorf("file name must end with .asb")
 	}
 	return nil
@@ -905,9 +905,9 @@ func TestParseAccessTier(t *testing.T) {
 func filterList(list []string) (asbList, asbxList []string) {
 	for i := range list {
 		switch filepath.Ext(list[i]) {
-		case util.FileExtAsb:
+		case files.ASB:
 			asbList = append(asbList, list[i])
-		case util.FileExtAsbx:
+		case files.ASBX:
 			asbxList = append(asbxList, list[i])
 		}
 	}

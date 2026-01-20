@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/io/storage/options"
 	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/stretchr/testify/mock"
@@ -358,7 +358,7 @@ func TestWriter_RemoveFiles_Dir_WithValidator(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == util.FileExtAsb {
+		if filepath.Ext(fileName) == files.ASB {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")

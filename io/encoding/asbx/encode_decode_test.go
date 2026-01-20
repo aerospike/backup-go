@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/require"
@@ -66,7 +66,7 @@ func TestEncoder_Decoder(t *testing.T) {
 	fileName := enc.GenerateFilename("0_", "")
 	require.Equal(t, testFileName, fileName)
 
-	num, err := util.GetFileNumber(fileName)
+	num, err := files.GetFileNumber(fileName)
 	require.NoError(t, err)
 
 	h := enc.GetHeader(num, false)
@@ -106,7 +106,7 @@ func TestDecoder_ErrorToken(t *testing.T) {
 	require.Equal(t, testFileName, fileName)
 
 	content := make([]byte, 0)
-	num, err := util.GetFileNumber(fileName)
+	num, err := files.GetFileNumber(fileName)
 	require.NoError(t, err)
 
 	h := enc.GetHeader(num, false)

@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/collections"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -151,13 +151,13 @@ func (c *ConfigRestore) validate() error {
 
 	// Duplications check.
 	if len(c.SetList) > 0 {
-		if err := util.CheckDuplicates(c.SetList); err != nil {
+		if err := collections.CheckDuplicates(c.SetList); err != nil {
 			return fmt.Errorf("set list contains duplicates: %w", err)
 		}
 	}
 
 	if len(c.BinList) > 0 {
-		if err := util.CheckDuplicates(c.BinList); err != nil {
+		if err := collections.CheckDuplicates(c.BinList); err != nil {
 			return fmt.Errorf("bin list contains duplicates: %w", err)
 		}
 	}

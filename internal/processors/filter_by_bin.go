@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/collections"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -31,7 +31,7 @@ type filterByBin[T models.TokenConstraint] struct {
 // NewFilterByBin creates new filterByBin processor with given binList.
 func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.Uint64) processor[T] {
 	return &filterByBin[T]{
-		binsToRemove: util.ListToMap(binList),
+		binsToRemove: collections.ListToMap(binList),
 		skipped:      skipped,
 	}
 }

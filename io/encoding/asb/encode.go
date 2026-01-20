@@ -29,14 +29,6 @@ import (
 	"github.com/segmentio/asm/base64"
 )
 
-var needsEscape [256]bool // control characters
-
-func init() {
-	needsEscape['\\'] = true
-	needsEscape[' '] = true
-	needsEscape['\n'] = true
-}
-
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
 type Encoder[T models.TokenConstraint] struct {
@@ -631,6 +623,12 @@ func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
 	returnBase64Buffer(encoded)
 
 	return n, err
+}
+
+var needsEscape = [256]bool{ // control characters
+	'\\': true,
+	' ':  true,
+	'\n': true,
 }
 
 func escapeASB(s string) []byte {

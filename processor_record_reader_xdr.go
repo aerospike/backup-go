@@ -96,8 +96,8 @@ func (rr *recordReaderProcessorXDR[T]) recordReaderConfigForXDR() *xdr.RecordRea
 func (rr *recordReaderProcessorXDR[T]) newReadWorkersXDR(ctx context.Context,
 ) ([]pipe.Reader[*models.ASBXToken], error) {
 	readerConfig := rr.recordReaderConfigForXDR()
-	reader, err := xdr.NewRecordReader(ctx, rr.infoClient, readerConfig, rr.logger)
 
+	reader, err := xdr.NewRecordReader(ctx, rr.infoClient, readerConfig, rr.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create xdr reader: %w", err)
 	}

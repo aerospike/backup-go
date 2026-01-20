@@ -403,8 +403,8 @@ func readBytes(conn net.Conn, length int64) ([]byte, error) {
 
 func fieldToInt64(header []byte) int64 {
 	var num int64
-	for i := 0; i < len(header); i++ {
-		num = (num << 8) | int64(header[i])
+	for _, b := range header {
+		num = (num << 8) | int64(b)
 	}
 
 	return num
@@ -412,8 +412,8 @@ func fieldToInt64(header []byte) int64 {
 
 func fieldToInt32(header []byte) int32 {
 	var num int32
-	for i := 0; i < len(header); i++ {
-		num = (num << 8) | int32(header[i])
+	for _, b := range header {
+		num = (num << 8) | int32(b)
 	}
 
 	return num
@@ -429,8 +429,8 @@ func fieldToInt8(header []byte) int8 {
 
 func fieldToInt16(header []byte) int16 {
 	var num int16
-	for i := 0; i < len(header); i++ {
-		num = (num << 8) | int16(header[i])
+	for _, b := range header {
+		num = (num << 8) | int16(b)
 	}
 
 	return num
@@ -461,25 +461,30 @@ func NewAerospikeKey(fields []*Field) (*aerospike.Key, error) {
 	)
 
 	for i := range fields {
-		switch fields[i].Type {
+		field := fields[i]
+		switch field.Type {
 		case FieldTypeNamespace:
-			namespace = string(fields[i].Data)
+			namespace = string(field.Data)
 		case FieldTypeSet:
-			set = string(fields[i].Data)
+			set = string(field.Data)
 		case FieldTypeUserKey:
-			typeByte := fieldToInt32(fields[i].Data[:1])
+			if len(field.Data) < 1 {
+				return nil, errors.New("invalid user key field")
+			}
+
+			typeByte := fieldToInt32(field.Data[:1])
 			switch typeByte {
 			case UserKeyTypeInt:
-				key = fieldToInt32(fields[i].Data[1:])
+				key = fieldToInt32(field.Data[1:])
 			case UserKeyTypeString:
-				key = string(fields[i].Data[1:])
+				key = string(field.Data[1:])
 			case UserKeyTypeBlob:
-				key = fields[i].Data[1:]
+				key = field.Data[1:]
 			default:
 				return nil, fmt.Errorf("unsupported key type %d", typeByte)
 			}
 		case FieldTypeDigest:
-			digest = fields[i].Data
+			digest = field.Data
 		default:
 			// Skip any other fields, as we don't need them for key.
 			continue

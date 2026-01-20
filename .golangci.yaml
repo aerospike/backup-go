@@ -28,7 +28,7 @@ linters:
     - unparam
     - unused
     - whitespace
-    - wsl
+    - wsl_v5
   settings:
     goconst:
       min-len: 2
@@ -70,7 +70,8 @@ linters:
           - goconst
           - govet
           - lll
-          - wsl
+          - wsl_v5
+          - prealloc
         path: (.+)test\.go
       - path: (.+)test\.go
         text: importShadow

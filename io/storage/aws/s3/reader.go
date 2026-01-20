@@ -208,7 +208,6 @@ func (r *Reader) streamDirectory(
 			ContinuationToken: continuationToken,
 			StartAfter:        &r.StartAfter,
 		})
-
 		if err != nil {
 			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to list objects: %w", err))
 			return
@@ -318,7 +317,6 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 			ContinuationToken: continuationToken,
 			StartAfter:        &r.StartAfter,
 		})
-
 		if err != nil {
 			return fmt.Errorf("failed to list objects: %w", err)
 		}
@@ -579,6 +577,7 @@ func parseAccessTier(tier string) (types.Tier, error) {
 	tier = cases.Title(language.English).String(tier)
 
 	var result types.Tier
+
 	possible := result.Values()
 
 	for _, possibleTier := range possible {
@@ -655,7 +654,6 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			ContinuationToken: continuationToken,
 			StartAfter:        &r.StartAfter,
 		})
-
 		if err != nil {
 			return 0, 0, fmt.Errorf("failed to list objects: %w", err)
 		}

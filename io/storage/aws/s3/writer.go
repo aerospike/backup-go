@@ -291,6 +291,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 	}
 
 	w.cpMu.Lock()
+
 	part := types.CompletedPart{
 		PartNumber: &partNumber,
 		ETag:       response.ETag,
@@ -486,6 +487,7 @@ func parseStorageClass(class string) (types.StorageClass, error) {
 	class = strings.ToUpper(class)
 
 	var result types.StorageClass
+
 	possible := result.Values()
 
 	for _, possibleClass := range possible {

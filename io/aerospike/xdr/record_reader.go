@@ -235,6 +235,7 @@ func (r *RecordReader) serve() {
 	r.activeNodes = make([]*NodeReader, 0, len(nodes))
 
 	r.createNodeReaders(nodes, &wg)
+
 	go r.watchCluster(nodes, &wg)
 	go r.watchNodes()
 

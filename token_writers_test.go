@@ -16,7 +16,6 @@ package backup
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -26,7 +25,6 @@ import (
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipe/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -87,21 +85,19 @@ func TestTokenWriter(t *testing.T) {
 	writer := newTokenWriter[*models.Token](mockEncoder, dst, slog.Default(), nil)
 	require.NotNil(t, writer)
 
-	ctx := context.Background()
-
-	_, err := writer.Write(ctx, recToken)
+	_, err := writer.Write(recToken)
 	require.NoError(t, err)
 	require.Equal(t, "encoded rec ", b.String())
 
-	_, err = writer.Write(ctx, SIndexToken)
+	_, err = writer.Write(SIndexToken)
 	require.NoError(t, err)
 	require.Equal(t, "encoded rec encoded sindex ", b.String())
 
-	_, err = writer.Write(ctx, UDFToken)
+	_, err = writer.Write(UDFToken)
 	require.NoError(t, err)
 	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
 
-	_, err = writer.Write(ctx, &models.Token{Type: models.TokenTypeInvalid})
+	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
 	require.NotNil(t, err)
 	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
 
@@ -110,7 +106,7 @@ func TestTokenWriter(t *testing.T) {
 	}
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
-	_, err = writer.Write(ctx, failRecToken)
+	_, err = writer.Write(failRecToken)
 	require.NotNil(t, err)
 
 	err = writer.Close()
@@ -122,10 +118,10 @@ func TestTokenStatsWriter(t *testing.T) {
 
 	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
 
-	mockWriter.EXPECT().Write(mock.Anything, models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
-	mockWriter.EXPECT().Write(mock.Anything, models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
-	mockWriter.EXPECT().Write(mock.Anything, models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
-	mockWriter.EXPECT().Write(mock.Anything, &models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
+	mockWriter.EXPECT().Write(models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
+	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(models.NewUDFToken(&models.UDF{}, 0)).Return(1, nil)
+	mockWriter.EXPECT().Write(&models.Token{Type: models.TokenTypeInvalid}).Return(0, errors.New("error"))
 	mockWriter.EXPECT().Close().Return(nil)
 
 	mockStats := mocks.NewMockstatsSetterToken(t)
@@ -135,18 +131,16 @@ func TestTokenStatsWriter(t *testing.T) {
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	require.NotNil(t, writer)
 
-	ctx := context.Background()
-
-	_, err := writer.Write(ctx, models.NewRecordToken(&models.Record{}, 0, nil))
+	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0, nil))
 	require.NoError(t, err)
 
-	_, err = writer.Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0))
+	_, err = writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))
 	require.NoError(t, err)
 
-	_, err = writer.Write(ctx, models.NewUDFToken(&models.UDF{}, 0))
+	_, err = writer.Write(models.NewUDFToken(&models.UDF{}, 0))
 	require.NoError(t, err)
 
-	_, err = writer.Write(ctx, &models.Token{Type: models.TokenTypeInvalid})
+	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
 	require.NotNil(t, err)
 
 	err = writer.Close()
@@ -158,15 +152,13 @@ func TestTokenStatsWriterWriterFailed(t *testing.T) {
 
 	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
 
-	mockWriter.EXPECT().Write(mock.Anything, models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
+	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
 	mockStats := mocks.NewMockstatsSetterToken(t)
 
 	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
 	require.NotNil(t, writer)
 
-	ctx := context.Background()
-
-	_, err := writer.Write(ctx, models.NewSIndexToken(&models.SIndex{}, 0))
+	_, err := writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))
 	require.Error(t, err)
 }

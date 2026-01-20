@@ -1,3 +1,17 @@
+// Copyright 2026 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package asb
 
 import (
@@ -140,3 +154,24 @@ func BenchmarkEscapeNew_LongTrailing(b *testing.B) {
 		escapeASB(longStr)
 	}
 }
+
+/* Test results
+goos: darwin
+goarch: arm64
+pkg: github.com/aerospike/backup-go/io/encoding/asb
+cpu: Apple M1 Pro
+BenchmarkEscapeOld_Clean
+BenchmarkEscapeOld_Clean-10           	 5330002	       219.0 ns/op
+BenchmarkEscapeNew_Clean
+BenchmarkEscapeNew_Clean-10           	40598774	        29.72 ns/op
+BenchmarkEscapeOld_Dirty
+BenchmarkEscapeOld_Dirty-10           	 2212435	       540.5 ns/op
+BenchmarkEscapeNew_Dirty
+BenchmarkEscapeNew_Dirty-10           	18033327	        64.95 ns/op
+BenchmarkEscapeOld_LongTrailing
+BenchmarkEscapeOld_LongTrailing-10    	 1563889	       754.5 ns/op
+BenchmarkEscapeNew_LongTrailing
+BenchmarkEscapeNew_LongTrailing-10    	28877912	        41.75 ns/op
+PASS
+
+*/

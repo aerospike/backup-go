@@ -1,6 +1,7 @@
 package asb
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -11,7 +12,8 @@ var asbEscapedChars = map[byte]struct{}{
 	'\n': {},
 }
 
-func escapeASB_old(s string) []byte {
+// deprecated function, keeping it to compare performance.
+func escapeASBOld(s string) []byte {
 	escapeCount := 0
 
 	for _, c := range s {
@@ -40,6 +42,61 @@ func escapeASB_old(s string) []byte {
 	return escaped
 }
 
+func TestEscapeASB(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []byte
+	}{
+		{
+			name:     "Empty string",
+			input:    "",
+			expected: []byte(""),
+		},
+		{
+			name:     "No special characters",
+			input:    "Aerospike",
+			expected: []byte("Aerospike"),
+		},
+		{
+			name:     "Only spaces",
+			input:    "  ",
+			expected: []byte(`\ \ `),
+		},
+		{
+			name:     "Start with special",
+			input:    " name",
+			expected: []byte(`\ name`),
+		},
+		{
+			name:     "End with special",
+			input:    "name\n",
+			expected: []byte("name\\\n"),
+		},
+		{
+			name:     "Backslash only",
+			input:    "\\",
+			expected: []byte(`\\`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test both to ensure logic parity
+			resOld := escapeASBOld(tt.input)
+			resNew := escapeASB(tt.input)
+
+			if !bytes.Equal(resOld, tt.expected) {
+				t.Errorf("Old implementation failed [%s]: expected %q, got %q", tt.name, tt.expected, resOld)
+			}
+
+			if !bytes.Equal(resNew, tt.expected) {
+				t.Errorf("New implementation failed [%s]: expected %q, got %q", tt.name, tt.expected, resNew)
+			}
+		})
+	}
+}
+
 // --- Benchmarks ---
 
 var (
@@ -50,7 +107,7 @@ var (
 
 func BenchmarkEscapeOld_Clean(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		escapeASB_old(cleanStr)
+		escapeASBOld(cleanStr)
 	}
 }
 
@@ -62,7 +119,7 @@ func BenchmarkEscapeNew_Clean(b *testing.B) {
 
 func BenchmarkEscapeOld_Dirty(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		escapeASB_old(dirtyStr)
+		escapeASBOld(dirtyStr)
 	}
 }
 
@@ -74,7 +131,7 @@ func BenchmarkEscapeNew_Dirty(b *testing.B) {
 
 func BenchmarkEscapeOld_LongTrailing(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		escapeASB_old(longStr)
+		escapeASBOld(longStr)
 	}
 }
 

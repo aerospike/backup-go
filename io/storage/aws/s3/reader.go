@@ -33,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/ptr"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -329,7 +330,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 			switch {
 			case r.Validator != nil:
 				// If we found a valid file, return.
-				if err = r.Validator.Run(common.Deref(p.Key)); err == nil {
+				if err = r.Validator.Run(ptr.ToString(p.Key)); err == nil {
 					return nil
 				}
 			default:
@@ -373,12 +374,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 
 			if p.Key != nil {
 				if r.Validator != nil {
-					if err = r.Validator.Run(common.Deref(p.Key)); err != nil {
+					if err = r.Validator.Run(ptr.ToString(p.Key)); err != nil {
 						continue
 					}
 				}
 
-				result = append(result, common.Deref(p.Key))
+				result = append(result, ptr.ToString(p.Key))
 			}
 		}
 
@@ -394,7 +395,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 // shouldSkip performs check, is we should skip files.
 // Current types.Object is too heavy to copy to this function, so we pass only name and size.
 func (r *Reader) shouldSkip(path string, name *string, size *int64) bool {
-	return name == nil || common.IsDirectory(path, common.Deref(name)) && !r.WithNestedDir ||
+	return name == nil || common.IsDirectory(path, ptr.ToString(name)) && !r.WithNestedDir ||
 		(size != nil && *size == 0)
 }
 

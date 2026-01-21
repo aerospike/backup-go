@@ -1,6 +1,7 @@
 version: "2"
 run:
   issues-exit-code: 1
+
 linters:
   default: none
   enable:
@@ -65,6 +66,9 @@ linters:
       - linters:
           - revive
         text: 'exported: type name will be used as backup.(BackupStats|BackupHandler|BackupConfig|BackupToDirectoryConfig|BackupToDirectoryStats|BackupToDirectoryHandler) by other packages, and that stutters'
+      - linters:
+          - revive
+        path: ^io/storage/common/
       - linters:
           - dupl
           - goconst

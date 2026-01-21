@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go/ptr"
 )
 
 const (
@@ -338,7 +339,7 @@ func (w *s3Writer) Close() error {
 				if w.logger != nil {
 					w.logger.Error("failed to abort multipart upload",
 						slog.String("key", w.key),
-						slog.String("uploadID", common.Deref(w.uploadID)),
+						slog.String("uploadID", ptr.ToString(w.uploadID)),
 						slog.Any("error", err))
 				}
 
@@ -362,7 +363,7 @@ func (w *s3Writer) Close() error {
 			if w.logger != nil {
 				w.logger.Error("failed to abort multipart upload",
 					slog.String("key", w.key),
-					slog.String("uploadID", common.Deref(w.uploadID)),
+					slog.String("uploadID", ptr.ToString(w.uploadID)),
 					slog.Any("error", err))
 			}
 		}
@@ -373,10 +374,10 @@ func (w *s3Writer) Close() error {
 	if w.logger != nil {
 		w.logger.Debug("completed multipart upload",
 			slog.String("key", w.key),
-			slog.String("uploadID", common.Deref(w.uploadID)),
+			slog.String("uploadID", ptr.ToString(w.uploadID)),
 			slog.Int("parts", len(w.completedParts)),
-			slog.String("etag", common.Deref(r.ETag)),
-			slog.String("checksum", common.Deref(r.ChecksumCRC32)),
+			slog.String("etag", ptr.ToString(r.ETag)),
+			slog.String("checksum", ptr.ToString(r.ChecksumCRC32)),
 		)
 	}
 
@@ -452,13 +453,13 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		for _, p := range listResponse.Contents {
-			if p.Key == nil || common.IsDirectory(prefix, common.Deref(p.Key)) && !w.WithNestedDir {
+			if p.Key == nil || common.IsDirectory(prefix, ptr.ToString(p.Key)) && !w.WithNestedDir {
 				continue
 			}
 
 			// If validator is set, remove only valid files.
 			if w.Validator != nil {
-				if err = w.Validator.Run(common.Deref(p.Key)); err != nil {
+				if err = w.Validator.Run(ptr.ToString(p.Key)); err != nil {
 					continue
 				}
 			}
@@ -468,7 +469,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 				Key:    p.Key,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to delete object %s: %w", common.Deref(p.Key), err)
+				return fmt.Errorf("failed to delete object %s: %w", ptr.ToString(p.Key), err)
 			}
 		}
 

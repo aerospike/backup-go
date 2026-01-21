@@ -5,6 +5,8 @@
 package mocks
 
 import (
+	"io"
+
 	"github.com/aerospike/backup-go/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -182,6 +184,61 @@ func (_c *MockEncoder_GetHeader_Call[T]) Return(bytes []byte) *MockEncoder_GetHe
 }
 
 func (_c *MockEncoder_GetHeader_Call[T]) RunAndReturn(run func(v uint64, b bool) []byte) *MockEncoder_GetHeader_Call[T] {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WriteToken provides a mock function for the type MockEncoder
+func (_mock *MockEncoder[T]) WriteToken(v T, writer io.Writer) (int, error) {
+	ret := _mock.Called(v, writer)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WriteToken")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(T, io.Writer) (int, error)); ok {
+		return returnFunc(v, writer)
+	}
+	if returnFunc, ok := ret.Get(0).(func(T, io.Writer) int); ok {
+		r0 = returnFunc(v, writer)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(T, io.Writer) error); ok {
+		r1 = returnFunc(v, writer)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockEncoder_WriteToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WriteToken'
+type MockEncoder_WriteToken_Call[T models.TokenConstraint] struct {
+	*mock.Call
+}
+
+// WriteToken is a helper method to define mock.On call
+//   - v
+//   - writer
+func (_e *MockEncoder_Expecter[T]) WriteToken(v interface{}, writer interface{}) *MockEncoder_WriteToken_Call[T] {
+	return &MockEncoder_WriteToken_Call[T]{Call: _e.mock.On("WriteToken", v, writer)}
+}
+
+func (_c *MockEncoder_WriteToken_Call[T]) Run(run func(v T, writer io.Writer)) *MockEncoder_WriteToken_Call[T] {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(T), args[1].(io.Writer))
+	})
+	return _c
+}
+
+func (_c *MockEncoder_WriteToken_Call[T]) Return(n int, err error) *MockEncoder_WriteToken_Call[T] {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockEncoder_WriteToken_Call[T]) RunAndReturn(run func(v T, writer io.Writer) (int, error)) *MockEncoder_WriteToken_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }

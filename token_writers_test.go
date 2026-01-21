@@ -22,9 +22,11 @@ import (
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipe/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,10 +77,16 @@ func TestTokenWriter(t *testing.T) {
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
 	mockEncoder := mocks.NewMockEncoder[*models.Token](t)
-	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
-	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
-	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded udf "), nil)
-	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().WriteToken(recToken, mock.Anything).RunAndReturn(func(_ *models.Token, w io.Writer) (int, error) {
+		return w.Write([]byte("encoded rec "))
+	})
+	mockEncoder.EXPECT().WriteToken(SIndexToken, mock.Anything).RunAndReturn(func(_ *models.Token, w io.Writer) (int, error) {
+		return w.Write([]byte("encoded sindex "))
+	})
+	mockEncoder.EXPECT().WriteToken(UDFToken, mock.Anything).RunAndReturn(func(_ *models.Token, w io.Writer) (int, error) {
+		return w.Write([]byte("encoded udf "))
+	})
+	mockEncoder.EXPECT().WriteToken(invalidToken, mock.Anything).Return(0, errors.New("error"))
 
 	b := bytes.Buffer{}
 	dst := newBufferWriteCloser(&b)
@@ -105,7 +113,7 @@ func TestTokenWriter(t *testing.T) {
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
-	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().WriteToken(failRecToken, mock.Anything).Return(0, errors.New("error"))
 	_, err = writer.Write(failRecToken)
 	require.NotNil(t, err)
 
@@ -161,4 +169,86 @@ func TestTokenStatsWriterWriterFailed(t *testing.T) {
 
 	_, err := writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))
 	require.Error(t, err)
+}
+
+// BenchmarkTokenWriter_Write benchmarks the full tokenWriter.Write path
+// which encodes a token and writes it to the output.
+func BenchmarkTokenWriter_Write(b *testing.B) {
+	encoder := asb.NewEncoder[*models.Token](asb.NewEncoderConfig("test", false, false))
+	output := newNoCloseWriter(io.Discard)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	writer := newTokenWriter[*models.Token](encoder, output, logger, nil)
+
+	key, _ := a.NewKey("test", "test", "key1")
+	record := &models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"bin1": "value1",
+				"bin2": int64(123),
+				"bin3": []byte{1, 2, 3, 5, 6, 7, 8, 9, 10},
+			},
+		},
+	}
+	token := &models.Token{
+		Type:   models.TokenTypeRecord,
+		Record: record,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := writer.Write(token)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkTokenWriter_Write_LargeRecord benchmarks with a larger record payload.
+func BenchmarkTokenWriter_Write_LargeRecord(b *testing.B) {
+	encoder := asb.NewEncoder[*models.Token](asb.NewEncoderConfig("test", false, false))
+	output := newNoCloseWriter(io.Discard)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	writer := newTokenWriter[*models.Token](encoder, output, logger, nil)
+
+	// Create a larger record with more bins and data
+	largeBytes := make([]byte, 1024)
+	for i := range largeBytes {
+		largeBytes[i] = byte(i % 256)
+	}
+
+	key, _ := a.NewKey("test", "test", "key1")
+	record := &models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"bin1":  "value1",
+				"bin2":  int64(123),
+				"bin3":  largeBytes,
+				"bin4":  "a longer string value that takes more space",
+				"bin5":  int64(9876543210),
+				"bin6":  float64(3.14159265359),
+				"bin7":  true,
+				"bin8":  a.GeoJSONValue(`{"type": "Point", "coordinates": [100.0, 0.0]}`),
+				"bin9":  []byte("another blob of binary data"),
+				"bin10": "yet another string",
+			},
+			Generation: 42,
+		},
+		VoidTime: 1234567890,
+	}
+	token := &models.Token{
+		Type:   models.TokenTypeRecord,
+		Record: record,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := writer.Write(token)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }

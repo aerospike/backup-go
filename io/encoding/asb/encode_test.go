@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"io"
 	mRand "math/rand"
 	"reflect"
 	"sort"
@@ -1652,6 +1653,111 @@ func BenchmarkEncodeRecord(b *testing.B) {
 		_, _ = encoder.encodeRecord(rec, buff)
 		output.Write(buff.Bytes())
 	}
+}
+
+// BenchmarkEncodeToken_vs_WriteToken compares the performance of EncodeToken and WriteToken.
+// EncodeToken allocates an intermediate buffer, while WriteToken writes directly to the output.
+func BenchmarkEncodeToken_vs_WriteToken(b *testing.B) {
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
+
+	key, _ := a.NewKey("test", "demo", "key1")
+	token := &models.Token{
+		Type: models.TokenTypeRecord,
+		Record: &models.Record{
+			Record: &a.Record{
+				Key: key,
+				Bins: a.BinMap{
+					"bin1": "value1",
+					"bin2": int64(123),
+					"bin3": []byte{1, 2, 3, 5, 6, 7, 8, 9, 10},
+				},
+				Generation: 1,
+			},
+			VoidTime: 100,
+		},
+	}
+
+	b.Run("EncodeToken", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			data, err := encoder.EncodeToken(token)
+			if err != nil {
+				b.Fatal(err)
+			}
+			// Simulate writing to output (like tokenWriter does)
+			_, _ = io.Discard.Write(data)
+		}
+	})
+
+	b.Run("WriteToken", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := encoder.WriteToken(token, io.Discard)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// BenchmarkEncodeToken_vs_WriteToken_LargeRecord tests with larger record payloads.
+func BenchmarkEncodeToken_vs_WriteToken_LargeRecord(b *testing.B) {
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
+
+	// Create a larger record with more bins and data
+	largeBytes := make([]byte, 1024)
+	for i := range largeBytes {
+		largeBytes[i] = byte(i % 256)
+	}
+
+	key, _ := a.NewKey("test", "demo", "key1")
+	token := &models.Token{
+		Type: models.TokenTypeRecord,
+		Record: &models.Record{
+			Record: &a.Record{
+				Key: key,
+				Bins: a.BinMap{
+					"bin1":  "value1",
+					"bin2":  int64(123),
+					"bin3":  largeBytes,
+					"bin4":  "a longer string value that takes more space",
+					"bin5":  int64(9876543210),
+					"bin6":  float64(3.14159265359),
+					"bin7":  true,
+					"bin8":  a.GeoJSONValue(`{"type": "Point", "coordinates": [100.0, 0.0]}`),
+					"bin9":  []byte("another blob of binary data"),
+					"bin10": "yet another string",
+				},
+				Generation: 42,
+			},
+			VoidTime: 1234567890,
+		},
+	}
+
+	b.Run("EncodeToken", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			data, err := encoder.EncodeToken(token)
+			if err != nil {
+				b.Fatal(err)
+			}
+			_, _ = io.Discard.Write(data)
+		}
+	})
+
+	b.Run("WriteToken", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := encoder.WriteToken(token, io.Discard)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 // base64EncodeNative old encoding mechanism, using a default library.

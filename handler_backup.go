@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -315,13 +316,15 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 			return nil, nil, fmt.Errorf("failed to process token: %w", err)
 		}
 
-		data, err := bh.encoder.EncodeToken(t)
+		var buf bytes.Buffer
+
+		n, err := bh.encoder.WriteToken(t, &buf)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to encode token: %w", err)
 		}
 
-		samples = append(samples, float64(len(data)))
-		samplesData = append(samplesData, data...)
+		samples = append(samples, float64(n))
+		samplesData = append(samplesData, buf.Bytes()...)
 	}
 
 	return samples, samplesData, nil

@@ -37,7 +37,17 @@ const (
 //
 //go:generate mockery --name Encoder
 type Encoder[T models.TokenConstraint] interface {
+	// WriteToken encodes a token and writes it directly to the provided writer.
+	// It returns the number of bytes written and an error if the encoding fails.
+	// This is the preferred method as it avoids intermediate buffer allocation.
+	WriteToken(T, io.Writer) (int, error)
+
+	// EncodeToken encodes a token and returns it as a byte slice.
+	//
+	// Deprecated: Use WriteToken instead, which writes directly to an io.Writer
+	// and avoids intermediate buffer allocation.
 	EncodeToken(T) ([]byte, error)
+
 	GetHeader(uint64, bool) []byte
 	GenerateFilename(prefix, suffix string) string
 }

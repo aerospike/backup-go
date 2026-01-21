@@ -52,8 +52,48 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 	return prefix + e.config.Namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
+// WriteToken encodes a token to the ASB format and writes it directly to the provided writer.
+// It returns the number of bytes written and an error if the encoding fails.
+// This method is more efficient than EncodeToken as it avoids intermediate buffer allocation.
+func (e *Encoder[T]) WriteToken(token T, w io.Writer) (int, error) {
+	t, ok := any(token).(*models.Token)
+	if !ok {
+		return 0, fmt.Errorf("unsupported token type %T for ASB encoder", token)
+	}
+
+	var (
+		n   int
+		err error
+	)
+
+	switch t.Type {
+	case models.TokenTypeRecord:
+		n, err = e.encodeRecord(t.Record, w)
+	case models.TokenTypeUDF:
+		n, err = e.encodeUDF(t.UDF, w)
+	case models.TokenTypeSIndex:
+		n, err = e.encodeSIndex(t.SIndex, w)
+	case models.TokenTypeInvalid:
+		n, err = 0, errors.New("invalid token")
+	default:
+		n, err = 0, fmt.Errorf("invalid token type: %v", t.Type)
+	}
+
+	if err != nil {
+		return n, fmt.Errorf("error encoding token at byte %d: %w", n, err)
+	}
+
+	// keep smoothed last value
+	e.estimatedRecordSize.Store((e.estimatedRecordSize.Load() + uint32(n)) / 2)
+
+	return n, nil
+}
+
 // EncodeToken encodes a token to the ASB format.
 // It returns a byte slice of the encoded token and an error if the encoding fails.
+//
+// Deprecated: Use WriteToken instead, which writes directly to an io.Writer
+// and avoids intermediate buffer allocation.
 func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	t, ok := any(token).(*models.Token)
 	if !ok {
@@ -91,16 +131,16 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
-func (e *Encoder[T]) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
-	return recordToASB(e.config.Compact, rec, buff)
+func (e *Encoder[T]) encodeRecord(rec *models.Record, w io.Writer) (int, error) {
+	return recordToASB(e.config.Compact, rec, w)
 }
 
-func (e *Encoder[T]) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
-	return udfToASB(udf, buff)
+func (e *Encoder[T]) encodeUDF(udf *models.UDF, w io.Writer) (int, error) {
+	return udfToASB(udf, w)
 }
 
-func (e *Encoder[T]) encodeSIndex(sIndex *models.SIndex, buff *bytes.Buffer) (int, error) {
-	return sindexToASB(sIndex, buff)
+func (e *Encoder[T]) encodeSIndex(sIndex *models.SIndex, w io.Writer) (int, error) {
+	return sindexToASB(sIndex, w)
 }
 
 // GetHeader returns the header of the ASB file as a byte slice.

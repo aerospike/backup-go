@@ -1217,10 +1217,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 		}
 
 		token := models.NewRecordToken(modelRec, 0, nil)
-		v, err := encoder.EncodeToken(token)
-		require.NoError(t, err)
-
-		_, err = w.Write(v)
+		_, err = encoder.WriteToken(token, w)
 		require.NoError(t, err)
 	}
 

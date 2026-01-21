@@ -16,6 +16,7 @@ package asbx
 
 import (
 	"fmt"
+	"io"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
@@ -51,9 +52,56 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 	return fmt.Sprintf("%s%s_%d%s.asbx", prefix, e.namespace, e.fileNumber.Add(1), suffix)
 }
 
+// WriteToken encodes a token to the ASBX format and writes it directly to the provided writer.
+// It returns the number of bytes written and an error if the encoding fails.
+func (e *Encoder[T]) WriteToken(token T, w io.Writer) (int, error) {
+	t, ok := any(token).(*models.ASBXToken)
+	if !ok {
+		return 0, fmt.Errorf("unsupported token type %T for ASBX encoder", token)
+	}
+
+	// Message contains:
+	// Digest - 20 bytes.
+	// Payload Size - 6 bytes.
+	// Payload - contains a raw message from tcp protocol.
+	pLen := len(t.Payload)
+
+	// Write digest (20 bytes)
+	n1, err := w.Write(t.Key.Digest())
+	if err != nil {
+		return n1, err
+	}
+
+	// Write payload length (6 bytes)
+	header := [6]byte{
+		byte(pLen >> 40),
+		byte(pLen >> 32),
+		byte(pLen >> 24),
+		byte(pLen >> 16),
+		byte(pLen >> 8),
+		byte(pLen),
+	}
+
+	n2, err := w.Write(header[:])
+	if err != nil {
+		return n1 + n2, err
+	}
+
+	// Write payload
+	n3, err := w.Write(t.Payload)
+	if err != nil {
+		return n1 + n2 + n3, err
+	}
+
+	return n1 + n2 + n3, nil
+}
+
 // EncodeToken encodes a token to the ASBX format.
 // It returns a byte slice of the encoded token and an error if the encoding
 // fails.
+//
+// Deprecated: Use WriteToken instead, which writes directly to an io.Writer
+// and avoids intermediate buffer allocation.
 func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	t, ok := any(token).(*models.ASBXToken)
 	if !ok {

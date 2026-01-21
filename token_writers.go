@@ -127,11 +127,11 @@ func newTokenWriter[T models.TokenConstraint](
 	}
 }
 
-// Write encodes v and writes it to the output.
+// Write encodes v and writes it directly to the output.
 func (w *tokenWriter[T]) Write(v T) (int, error) {
-	data, err := w.encoder.EncodeToken(v)
+	n, err := w.encoder.WriteToken(v, w.output)
 	if err != nil {
-		return 0, fmt.Errorf("error encoding token: %w", err)
+		return n, fmt.Errorf("error encoding token: %w", err)
 	}
 
 	// We set state only for ASB Tokens at the moment.
@@ -144,7 +144,7 @@ func (w *tokenWriter[T]) Write(v T) (int, error) {
 		}
 	}
 
-	return w.output.Write(data)
+	return n, nil
 }
 
 // Close releases resources associated with the tokenWriter and ensures the underlying writer is properly closed.

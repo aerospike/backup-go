@@ -41,7 +41,7 @@ type Writer struct {
 	// Optional parameters.
 	options.Options
 
-	client          *azblob.Client
+	client          Client
 	containerClient *container.Client
 	// containerName contains name of the container to read from.
 	containerName string
@@ -54,7 +54,7 @@ type Writer struct {
 // NewWriter creates a new writer for Azure blob storage directory/file writing.
 func NewWriter(
 	ctx context.Context,
-	client *azblob.Client,
+	client Client,
 	containerName string,
 	opts ...options.Opt,
 ) (*Writer, error) {
@@ -242,7 +242,7 @@ func (w *Writer) GetType() string {
 	return azureBlobType
 }
 
-func isEmptyDirectory(ctx context.Context, client *azblob.Client, containerName, prefix string) (bool, error) {
+func isEmptyDirectory(ctx context.Context, client Client, containerName, prefix string) (bool, error) {
 	maxResults := int32(1)
 	pager := client.NewListBlobsFlatPager(containerName, &azblob.ListBlobsFlatOptions{
 		Prefix:     &prefix,

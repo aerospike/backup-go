@@ -50,7 +50,7 @@ type Writer struct {
 // Can be called with WithRemoveFiles() - optional.
 func NewWriter(
 	ctx context.Context,
-	client *storage.Client,
+	client Client,
 	bucketName string,
 	opts ...options.Opt,
 ) (*Writer, error) {

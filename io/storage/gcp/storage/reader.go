@@ -32,6 +32,12 @@ import (
 
 const gcpStorageType = "gcp-storage"
 
+// Client is an interface for *storage.Client. Used for testing purposes.
+type Client interface {
+	// Bucket returns a BucketHandle, which provides operations on the named bucket.
+	Bucket(name string) *storage.BucketHandle
+}
+
 // Reader represents GCP storage reader.
 type Reader struct {
 	// Optional parameters.
@@ -62,7 +68,7 @@ type Reader struct {
 // Can be called with WithValidator(v validator) - optional.
 func NewReader(
 	ctx context.Context,
-	client *storage.Client,
+	client Client,
 	bucketName string,
 	opts ...options.Opt,
 ) (*Reader, error) {

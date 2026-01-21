@@ -5,8 +5,6 @@
 package mocks
 
 import (
-	"context"
-
 	"github.com/aerospike/backup-go/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -83,8 +81,8 @@ func (_c *MockWriter_Close_Call[T]) RunAndReturn(run func() error) *MockWriter_C
 }
 
 // Write provides a mock function for the type MockWriter
-func (_mock *MockWriter[T]) Write(context1 context.Context, v T) (int, error) {
-	ret := _mock.Called(context1, v)
+func (_mock *MockWriter[T]) Write(v T) (int, error) {
+	ret := _mock.Called(v)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Write")
@@ -92,16 +90,16 @@ func (_mock *MockWriter[T]) Write(context1 context.Context, v T) (int, error) {
 
 	var r0 int
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, T) (int, error)); ok {
-		return returnFunc(context1, v)
+	if returnFunc, ok := ret.Get(0).(func(T) (int, error)); ok {
+		return returnFunc(v)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, T) int); ok {
-		r0 = returnFunc(context1, v)
+	if returnFunc, ok := ret.Get(0).(func(T) int); ok {
+		r0 = returnFunc(v)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, T) error); ok {
-		r1 = returnFunc(context1, v)
+	if returnFunc, ok := ret.Get(1).(func(T) error); ok {
+		r1 = returnFunc(v)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -114,15 +112,14 @@ type MockWriter_Write_Call[T models.TokenConstraint] struct {
 }
 
 // Write is a helper method to define mock.On call
-//   - context1
 //   - v
-func (_e *MockWriter_Expecter[T]) Write(context1 interface{}, v interface{}) *MockWriter_Write_Call[T] {
-	return &MockWriter_Write_Call[T]{Call: _e.mock.On("Write", context1, v)}
+func (_e *MockWriter_Expecter[T]) Write(v interface{}) *MockWriter_Write_Call[T] {
+	return &MockWriter_Write_Call[T]{Call: _e.mock.On("Write", v)}
 }
 
-func (_c *MockWriter_Write_Call[T]) Run(run func(context1 context.Context, v T)) *MockWriter_Write_Call[T] {
+func (_c *MockWriter_Write_Call[T]) Run(run func(v T)) *MockWriter_Write_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(T))
+		run(args[0].(T))
 	})
 	return _c
 }
@@ -132,7 +129,7 @@ func (_c *MockWriter_Write_Call[T]) Return(n int, err error) *MockWriter_Write_C
 	return _c
 }
 
-func (_c *MockWriter_Write_Call[T]) RunAndReturn(run func(context1 context.Context, v T) (int, error)) *MockWriter_Write_Call[T] {
+func (_c *MockWriter_Write_Call[T]) RunAndReturn(run func(v T) (int, error)) *MockWriter_Write_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }

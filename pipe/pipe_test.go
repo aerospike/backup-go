@@ -54,10 +54,10 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	readersMock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
+		m := mocks.NewMockProcessor[*models.Token](t)
+		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-		return mock
+		return m
 	}
 
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
@@ -66,7 +66,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		writeMutex       sync.Mutex
 	)
 
-	writersMocks.EXPECT().Write(mock.Anything, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
+	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		writeMutex.Lock()
 		mockCounterWrite++
 		writeMutex.Unlock()
@@ -125,16 +125,16 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 	readersMock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
+		m := mocks.NewMockProcessor[*models.Token](t)
+		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-		return mock
+		return m
 	}
 
 	writersMocks := mocks.NewMockWriter[*models.Token](t)
 	var mockCounterWrite int
 	var writeMutex sync.Mutex
-	writersMocks.EXPECT().Write(mock.Anything, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
+	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		writeMutex.Lock()
 		currentCount := mockCounterWrite
 		if currentCount < testCount {
@@ -170,10 +170,10 @@ func TestPipe_NewBackupPipeError(t *testing.T) {
 	t.Parallel()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
+		m := mocks.NewMockProcessor[*models.Token](t)
+		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-		return mock
+		return m
 	}
 
 	p, err := NewPipe(

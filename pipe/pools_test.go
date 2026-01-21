@@ -57,10 +57,10 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 	readMock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
+		m := mocks.NewMockProcessor[*models.Token](t)
+		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-		return mock
+		return m
 	}
 
 	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{readMock, readMock, readMock}, newProcessorMock)
@@ -107,10 +107,10 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 	readMock.EXPECT().Close()
 
 	newProcessorMock := func() Processor[*models.Token] {
-		mock := mocks.NewMockProcessor[*models.Token](t)
-		mock.EXPECT().Process(testToken()).Return(testToken(), nil)
+		m := mocks.NewMockProcessor[*models.Token](t)
+		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-		return mock
+		return m
 	}
 
 	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{readMock, readMock, readMock}, newProcessorMock)
@@ -129,7 +129,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 		writeMutex       sync.Mutex
 	)
 
-	writeMock.EXPECT().Write(mock.Anything, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
+	writeMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		writeMutex.Lock()
 		mockCounterWrite++
 		writeMutex.Unlock()
@@ -176,7 +176,7 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 		counterMutex sync.Mutex
 	)
 
-	writeMock.EXPECT().Write(mock.Anything, testToken()).RunAndReturn(func(context.Context, *models.Token) (int, error) {
+	writeMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		counterMutex.Lock()
 		currentCount := mockCounter
 		if currentCount < testCount {

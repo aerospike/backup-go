@@ -38,7 +38,6 @@ import (
 )
 
 const (
-	s3type               = "s3"
 	restoreValueOngoing  = "ongoing-request=\"true\""
 	restoreValueFinished = "ongoing-request=\"false\""
 )
@@ -54,7 +53,7 @@ type Reader struct {
 	// Optional parameters.
 	options.Options
 
-	client s3Client
+	client Client
 
 	// bucketName contains the name of the bucket to read from.
 	bucketName string
@@ -85,7 +84,7 @@ type Reader struct {
 //   - WithHTTPClient using timeouts to prevent socket locks on errors.
 func NewReader(
 	ctx context.Context,
-	client s3Client,
+	client Client,
 	bucketName string,
 	opts ...options.Opt,
 ) (*Reader, error) {

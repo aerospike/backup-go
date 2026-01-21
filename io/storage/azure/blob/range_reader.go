@@ -35,14 +35,14 @@ type azblobGetter interface {
 	) (azblob.DownloadStreamResponse, error)
 }
 
-// azureBlobClient is a wrapper around *azblob.Client, primarily for testing purposes.
+// azureBlobClient is a wrapper around Client, primarily for testing purposes.
 type azureBlobClient struct {
-	client          *azblob.Client
+	client          Client
 	containerClient *container.Client
 }
 
-// newAzureBlobClient creates a new wrapper for *azblob.Client for testing.
-func newAzureBlobClient(client *azblob.Client, containerClient *container.Client) azblobGetter {
+// newAzureBlobClient creates a new wrapper for Client for testing.
+func newAzureBlobClient(client Client, containerClient *container.Client) azblobGetter {
 	return &azureBlobClient{client: client, containerClient: containerClient}
 }
 

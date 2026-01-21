@@ -36,8 +36,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-const azureBlobType = "azure-blob"
-
 const (
 	objStatusAvailable = iota
 	objStatusArchived
@@ -49,7 +47,7 @@ type Reader struct {
 	// Optional parameters.
 	options.Options
 
-	client          *azblob.Client
+	client          Client
 	containerClient *container.Client
 
 	// containerName contains name of the container to read from.
@@ -77,7 +75,7 @@ type Reader struct {
 // Can be called with WithValidator(v validator) - optional.
 func NewReader(
 	ctx context.Context,
-	client *azblob.Client,
+	client Client,
 	containerName string,
 	opts ...options.Opt,
 ) (*Reader, error) {

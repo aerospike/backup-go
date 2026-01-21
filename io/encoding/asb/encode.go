@@ -83,9 +83,6 @@ func (e *Encoder[T]) WriteToken(token T, w io.Writer) (int, error) {
 		return n, fmt.Errorf("error encoding token at byte %d: %w", n, err)
 	}
 
-	// keep smoothed last value
-	e.estimatedRecordSize.Store((e.estimatedRecordSize.Load() + uint32(n)) / 2)
-
 	return n, nil
 }
 

@@ -625,44 +625,45 @@ func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
 	return n, err
 }
 
-// **** SINDEX ****
-
-// control characters
-var asbEscapedChars = map[byte]struct{}{
-	'\\': {},
-	' ':  {},
-	'\n': {},
+var needsEscape = [256]bool{ // control characters
+	'\\': true,
+	' ':  true,
+	'\n': true,
 }
 
 func escapeASB(s string) []byte {
-	escapeCount := 0
+	idx := -1
 
-	for _, c := range s {
-		if _, ok := asbEscapedChars[byte(c)]; ok {
-			escapeCount++
+	for i := range len(s) {
+		if needsEscape[s[i]] {
+			idx = i
+			break
 		}
 	}
 
-	if escapeCount == 0 {
+	// No escaping needed. Return the string as bytes
+	if idx == -1 {
 		return []byte(s)
 	}
 
-	escaped := make([]byte, len(s)+escapeCount)
-	i := 0
+	// We found an escape at 'idx'.
+	// Now we start building the result.
+	out := make([]byte, 0, len(s)+2)
+	out = append(out, s[:idx]...)
 
-	for _, c := range s {
-		if _, ok := asbEscapedChars[byte(c)]; ok {
-			escaped[i] = '\\'
-			i++
+	for i := idx; i < len(s); i++ {
+		c := s[i]
+		if needsEscape[c] {
+			out = append(out, '\\')
 		}
 
-		escaped[i] = byte(c)
-		i++
+		out = append(out, c)
 	}
 
-	return escaped
+	return out
 }
 
+// **** SINDEX ****
 func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 	// sindexes only ever use 1 path for now
 	numPaths := 1

@@ -42,40 +42,6 @@ const (
 	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
 )
 
-// Client is an interface for *s3.Client. Used for testing purposes.
-type Client interface {
-	// CreateMultipartUpload initiates a multipart upload and returns an upload ID.
-	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options),
-	) (*s3.CreateMultipartUploadOutput, error)
-	// UploadPart uploads a part in a multipart upload.
-	UploadPart(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options),
-	) (*s3.UploadPartOutput, error)
-	// CompleteMultipartUpload completes a multipart upload by assembling previously uploaded parts.
-	CompleteMultipartUpload(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options),
-	) (*s3.CompleteMultipartUploadOutput, error)
-	// AbortMultipartUpload aborts a multipart upload.
-	AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options),
-	) (*s3.AbortMultipartUploadOutput, error)
-	// ListObjectsV2 returns some or all objects in a bucket with pagination.
-	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options),
-	) (*s3.ListObjectsV2Output, error)
-	// DeleteObject removes an object from a bucket.
-	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options),
-	) (*s3.DeleteObjectOutput, error)
-	// HeadBucket checks if a bucket exists and you have permission to access it.
-	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options),
-	) (*s3.HeadBucketOutput, error)
-	// RestoreObject restores an archived copy of an object.
-	RestoreObject(ctx context.Context, params *s3.RestoreObjectInput, optFns ...func(*s3.Options,
-	)) (*s3.RestoreObjectOutput, error)
-	// HeadObject retrieves metadata from an object without returning the object itself.
-	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options),
-	) (*s3.HeadObjectOutput, error)
-	// GetObject retrieves an object from a bucket.
-	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options),
-	) (*s3.GetObjectOutput, error)
-}
-
 // Writer represents a s3 storage writer.
 type Writer struct {
 	// Optional parameters.

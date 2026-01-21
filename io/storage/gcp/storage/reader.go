@@ -30,14 +30,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const gcpStorageType = "gcp-storage"
-
-// Client is an interface for *storage.Client. Used for testing purposes.
-type Client interface {
-	// Bucket returns a BucketHandle, which provides operations on the named bucket.
-	Bucket(name string) *storage.BucketHandle
-}
-
 // Reader represents GCP storage reader.
 type Reader struct {
 	// Optional parameters.

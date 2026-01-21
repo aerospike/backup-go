@@ -38,7 +38,6 @@ import (
 )
 
 const (
-	s3type               = "s3"
 	restoreValueOngoing  = "ongoing-request=\"true\""
 	restoreValueFinished = "ongoing-request=\"false\""
 )

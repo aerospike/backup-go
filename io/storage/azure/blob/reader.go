@@ -26,11 +26,9 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -38,25 +36,11 @@ import (
 	"golang.org/x/text/language"
 )
 
-const azureBlobType = "azure-blob"
-
 const (
 	objStatusAvailable = iota
 	objStatusArchived
 	objStatusRestoring
 )
-
-// Client is an interface for *azblob.Client. Used for testing purposes.
-type Client interface {
-	// ServiceClient returns a pointer to the container's service.Client.
-	ServiceClient() *service.Client
-	// NewListBlobsFlatPager returns a pager for listing blobs in a container.
-	NewListBlobsFlatPager(containerName string, o *azblob.ListBlobsFlatOptions) *runtime.Pager[azblob.ListBlobsFlatResponse]
-	// DeleteBlob deletes a blob from the container.
-	DeleteBlob(ctx context.Context, containerName string, blobName string, o *azblob.DeleteBlobOptions) (azblob.DeleteBlobResponse, error)
-	// DownloadStream reads a blob from the container into a stream.
-	DownloadStream(ctx context.Context, containerName string, blobName string, o *azblob.DownloadStreamOptions) (azblob.DownloadStreamResponse, error)
-}
 
 // Reader represents Azure storage reader.
 type Reader struct {

@@ -1468,25 +1468,6 @@ func _expectChar(src *countingReader, c byte) error {
 	return fmt.Errorf("invalid character, read %c, expected %c", b, c)
 }
 
-func _expectAnyChar(src *countingReader, chars []byte) error {
-	b, err := src.ReadByte()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range chars {
-		if b == c {
-			return nil
-		}
-	}
-
-	if len(chars) == 1 {
-		return fmt.Errorf("invalid character, read %c, expected %c", b, chars[0])
-	}
-
-	return fmt.Errorf("invalid character, read %c, expected one of %s", b, string(chars))
-}
-
 func _expectToken(src *countingReader, token string) error {
 	data, err := _readNBytes(src, int64(len(token)))
 	if err != nil {

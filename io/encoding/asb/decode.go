@@ -1497,7 +1497,7 @@ func _expectToken(src *countingReader, token string) error {
 	returnBigBuffer(data)
 
 	if result != token {
-		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, string(data), token)
+		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, result, token)
 	}
 
 	return nil

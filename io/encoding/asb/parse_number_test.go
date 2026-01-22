@@ -129,8 +129,15 @@ func TestReadSignedInt(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "invalid character",
+			name:    "invalid character in middle",
 			input:   "12a3\n",
+			delim:   '\n',
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name:    "invalid character at start",
+			input:   "abc\n",
 			delim:   '\n',
 			want:    0,
 			wantErr: true,
@@ -246,8 +253,15 @@ func TestReadUnsignedInt(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "invalid character",
+			name:    "invalid character in middle",
 			input:   "12a3\n",
+			delim:   '\n',
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name:    "invalid character at start",
+			input:   "abc\n",
 			delim:   '\n',
 			want:    0,
 			wantErr: true,

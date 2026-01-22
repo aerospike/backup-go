@@ -2601,7 +2601,7 @@ func Test_readFloat(t *testing.T) {
 	}
 }
 
-func Test_readInteger(t *testing.T) {
+func Test_readSignedInt(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src   *countingReader
@@ -2647,19 +2647,19 @@ func Test_readInteger(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readInteger(tt.args.src, tt.args.delim)
+			got, err := _readSignedInt(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readInteger() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("_readSignedInt() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("_readInteger() = %v, want %v", got, tt.want)
+				t.Errorf("_readSignedInt() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readSize(t *testing.T) {
+func Test_readUnsignedInt(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src   *countingReader
@@ -2725,13 +2725,13 @@ func Test_readSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readSize(tt.args.src, tt.args.delim)
+			got, err := _readUnsignedInt(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readSize() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("_readUnsignedInt() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("_readSize() = %v, want %v", got, tt.want)
+				t.Errorf("_readUnsignedInt() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -497,7 +497,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 
 	// NOTE: the number of paths is always 1 for now
 	// this means we read the value but don't use it
-	npaths, err := _readSize(r.reader, ' ')
+	npaths, err := _readUnsignedInt(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -638,7 +638,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	length, err := _readSize(r.reader, ' ')
+	length, err := _readUnsignedInt(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -944,7 +944,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	case binTypeBool:
 		return _readBool(r.reader)
 	case binTypeInt:
-		return _readInteger(r.reader, asbNewLine)
+		return _readSignedInt(r.reader, asbNewLine)
 	case binTypeFloat:
 		return _readFloat(r.reader, asbNewLine)
 	case binTypeString:
@@ -1056,7 +1056,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 
 	switch keyTypeChar {
 	case keyTypeInt:
-		keyVal, err := _readInteger(r.reader, asbNewLine)
+		keyVal, err := _readSignedInt(r.reader, asbNewLine)
 		if err != nil {
 			return nil, err
 		}
@@ -1122,12 +1122,12 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 }
 
 func (r *Decoder[T]) readBinCount() (uint16, error) {
-	binCount, err := _readInteger(r.reader, asbNewLine)
+	binCount, err := _readUnsignedInt(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
 
-	if binCount > maxBinCount || binCount < 0 {
+	if binCount > maxBinCount {
 		return 0, fmt.Errorf("invalid bin offset %d", binCount)
 	}
 
@@ -1142,7 +1142,7 @@ func (r *Decoder[T]) readBinCount() (uint16, error) {
 // it expects that r has been advanced past the expiration line marker '+ t '
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 func (r *Decoder[T]) readExpiration() (int64, error) {
-	exp, err := _readInteger(r.reader, asbNewLine)
+	exp, err := _readSignedInt(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
@@ -1159,12 +1159,12 @@ func (r *Decoder[T]) readExpiration() (int64, error) {
 }
 
 func (r *Decoder[T]) readGeneration() (uint32, error) {
-	gen, err := _readInteger(r.reader, asbNewLine)
+	gen, err := _readUnsignedInt(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
 
-	if gen < 0 || gen > maxGeneration {
+	if gen > maxGeneration {
 		return 0, fmt.Errorf("invalid generation offset %d", gen)
 	}
 
@@ -1172,7 +1172,7 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 		return 0, err
 	}
 
-	return uint32(gen), nil
+	return gen, nil
 }
 
 func (r *Decoder[T]) readSet() (string, error) {
@@ -1241,7 +1241,7 @@ func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) 
 }
 
 func _readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
-	size, err := _readSize(src, sizeDelim)
+	size, err := _readUnsignedInt(src, sizeDelim)
 	if err != nil {
 		return nil, err
 	}
@@ -1306,7 +1306,7 @@ func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 }
 
 func _readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
-	length, err := _readSize(src, sizeDelim)
+	length, err := _readUnsignedInt(src, sizeDelim)
 	if err != nil {
 		return nil, err
 	}
@@ -1343,15 +1343,6 @@ func _readFloat(src *countingReader, delim byte) (float64, error) {
 	return strconv.ParseFloat(data, 64)
 }
 
-func _readInteger(src *countingReader, delim byte) (int64, error) {
-	data, err := _readUntil(src, delim, false)
-	if err != nil {
-		return 0, err
-	}
-
-	return strconv.ParseInt(data, 10, 64)
-}
-
 func _readGeoJSON(src *countingReader, sizeDelim byte) (a.GeoJSONValue, error) {
 	val, err := _readStringSized(src, sizeDelim)
 	if err != nil {
@@ -1372,19 +1363,6 @@ func _readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 	returnBigBuffer(data)
 
 	return result, nil
-}
-
-// _readSize reads a size or length token from the asb format
-// the value should fit in a uint32
-func _readSize(src *countingReader, delim byte) (uint32, error) {
-	data, err := _readUntil(src, delim, false)
-	if err != nil {
-		return 0, err
-	}
-
-	num, err := strconv.ParseUint(data, 10, 32)
-
-	return uint32(num), err
 }
 
 func _readUntil(src *countingReader, delim byte, escaped bool) (string, error) {

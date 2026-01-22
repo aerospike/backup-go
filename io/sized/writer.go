@@ -64,7 +64,12 @@ func (f *Writer) Write(p []byte) (n int, err error) {
 		}
 
 		if f.saveCommandChan != nil {
-			f.saveCommandChan <- f.n
+			// Use select with context to avoid blocking if receiver has exited.
+			select {
+			case <-f.ctx.Done():
+				return 0, f.ctx.Err()
+			case f.saveCommandChan <- f.n:
+			}
 		}
 
 		f.writer = nil

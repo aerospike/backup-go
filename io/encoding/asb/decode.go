@@ -1456,7 +1456,16 @@ func _readNBytes(src *countingReader, n int64) ([]byte, error) {
 }
 
 func _expectChar(src *countingReader, c byte) error {
-	return _expectAnyChar(src, []byte{c})
+	b, err := src.ReadByte()
+	if err != nil {
+		return err
+	}
+
+	if b == c {
+		return nil
+	}
+
+	return fmt.Errorf("invalid character, read %c, expected %c", b, c)
 }
 
 func _expectAnyChar(src *countingReader, chars []byte) error {

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package secretagent
+//nolint:revive,nolintlint // We want to use package name with underscore.
+package secret_agent
 
 import (
 	"crypto/tls"

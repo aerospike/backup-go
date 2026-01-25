@@ -30,8 +30,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const gcpStorageType = "gcp-storage"
-
 // Reader represents GCP storage reader.
 type Reader struct {
 	// Optional parameters.
@@ -62,7 +60,7 @@ type Reader struct {
 // Can be called with WithValidator(v validator) - optional.
 func NewReader(
 	ctx context.Context,
-	client *storage.Client,
+	client Client,
 	bucketName string,
 	opts ...options.Opt,
 ) (*Reader, error) {

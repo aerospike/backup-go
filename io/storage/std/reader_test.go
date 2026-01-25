@@ -188,34 +188,6 @@ func TestReader_StreamFile(t *testing.T) {
 	}
 }
 
-func TestStdinReadCloser(t *testing.T) {
-	oldStdin := os.Stdin
-	r, w, _ := os.Pipe()
-	os.Stdin = r
-	defer func() { os.Stdin = oldStdin }()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer w.Close()
-		defer wg.Done()
-		_, err := w.WriteString(testData)
-		require.NoError(t, err)
-	}()
-
-	readCloser := newStdinReadCloser(defaultBufferSize)
-	require.NotNil(t, readCloser)
-
-	wg.Wait()
-	data, err := io.ReadAll(readCloser)
-	require.NoError(t, err)
-	require.Equal(t, testData, string(data))
-
-	err = readCloser.Close()
-	require.NoError(t, err)
-}
-
 func TestReader_EmptyStdin(t *testing.T) {
 	oldStdin := os.Stdin
 	r, w, _ := os.Pipe()

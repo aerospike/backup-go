@@ -1090,7 +1090,7 @@ Done:
 
 // TestNewReader_WithAccessTier_Standard tests warming with Standard tier.
 func TestNewReader_WithAccessTier_Standard(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1140,7 +1140,7 @@ func TestNewReader_WithAccessTier_Standard(t *testing.T) {
 
 // TestNewReader_WithAccessTier_Expedited tests warming with Expedited tier.
 func TestNewReader_WithAccessTier_Expedited(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1207,7 +1207,7 @@ func TestNewReader_WithAccessTier_Expedited(t *testing.T) {
 
 // TestReader_RestoreObject_Success tests successful object restoration.
 func TestReader_RestoreObject_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1239,7 +1239,7 @@ func TestReader_RestoreObject_Success(t *testing.T) {
 
 // TestReader_RestoreObject_Error tests error handling in restoreObject.
 func TestReader_RestoreObject_Error(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1268,7 +1268,7 @@ func TestReader_RestoreObject_Error(t *testing.T) {
 
 // TestReader_WarmStorage_Success tests successful storage warming.
 func TestReader_WarmStorage_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1311,7 +1311,7 @@ func TestReader_WarmStorage_Success(t *testing.T) {
 
 // TestReader_WarmDirectory_ArchivedObject tests warming archived object.
 func TestReader_WarmDirectory_ArchivedObject(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1361,7 +1361,7 @@ func TestReader_WarmDirectory_ArchivedObject(t *testing.T) {
 
 // TestReader_WarmDirectory_RestoringObject tests warming already restoring object.
 func TestReader_WarmDirectory_RestoringObject(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1405,7 +1405,7 @@ func TestReader_WarmDirectory_RestoringObject(t *testing.T) {
 
 // TestReader_WarmDirectory_Error tests error in warmDirectory.
 func TestReader_WarmDirectory_Error(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1434,7 +1434,7 @@ func TestReader_WarmDirectory_Error(t *testing.T) {
 
 // TestReader_CheckWarm_EmptyQueue tests checkWarm with empty queue.
 func TestReader_CheckWarm_EmptyQueue(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1458,7 +1458,7 @@ func TestReader_CheckWarm_EmptyQueue(t *testing.T) {
 
 // TestReader_PollWarmDirStatus_Success tests successful polling.
 func TestReader_PollWarmDirStatus_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1499,7 +1499,7 @@ func TestReader_PollWarmDirStatus_Success(t *testing.T) {
 
 // TestReader_PollWarmDirStatus_ContextCancelled tests context cancellation.
 func TestReader_PollWarmDirStatus_ContextCancelled(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mockClient.EXPECT().
@@ -1526,7 +1526,7 @@ func TestReader_PollWarmDirStatus_ContextCancelled(t *testing.T) {
 
 // TestReader_PollWarmDirStatus_Error tests error in polling.
 func TestReader_PollWarmDirStatus_Error(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1555,7 +1555,7 @@ func TestReader_PollWarmDirStatus_Error(t *testing.T) {
 
 // TestReader_WarmStorage_RestoreFailed tests error in restore during warming.
 func TestReader_WarmStorage_RestoreFailed(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1605,7 +1605,7 @@ func TestReader_WarmStorage_RestoreFailed(t *testing.T) {
 
 // TestReader_WarmStorage_MultipleFiles tests warming multiple files.
 func TestReader_WarmStorage_MultipleFiles(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1680,7 +1680,7 @@ func TestReader_WarmStorage_MultipleFiles(t *testing.T) {
 
 // TestReader_CheckWarm_PollError tests error in checkWarm polling.
 func TestReader_CheckWarm_PollError(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().

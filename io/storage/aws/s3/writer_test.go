@@ -337,7 +337,7 @@ func (s *WriterSuite) TestWriter_GetType() {
 
 // TestNewWriter_Success tests successful Writer creation
 func TestNewWriter_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -367,7 +367,7 @@ func TestNewWriter_Success(t *testing.T) {
 
 // TestNewWriter_NoPath tests error when no path provided
 func TestNewWriter_NoPath(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	_, err := NewWriter(ctx, mockClient, testBucket)
@@ -378,7 +378,7 @@ func TestNewWriter_NoPath(t *testing.T) {
 
 // TestNewWriter_MultiplePaths tests error when multiple paths provided
 func TestNewWriter_MultiplePaths(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	opts := func(o *options.Options) {
@@ -393,7 +393,7 @@ func TestNewWriter_MultiplePaths(t *testing.T) {
 
 // TestNewWriter_NegativeChunkSize tests error for negative chunk size
 func TestNewWriter_NegativeChunkSize(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	_, err := NewWriter(
@@ -410,7 +410,7 @@ func TestNewWriter_NegativeChunkSize(t *testing.T) {
 
 // TestNewWriter_DefaultChunkSize tests that default chunk size is set
 func TestNewWriter_DefaultChunkSize(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -438,7 +438,7 @@ func TestNewWriter_DefaultChunkSize(t *testing.T) {
 
 // TestNewWriter_BucketNotExists tests error when bucket doesn't exist
 func TestNewWriter_BucketNotExists(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -459,7 +459,7 @@ func TestNewWriter_BucketNotExists(t *testing.T) {
 
 // TestNewWriter_DirectoryNotEmpty tests error when directory is not empty and RemoveFiles not set
 func TestNewWriter_DirectoryNotEmpty(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -489,7 +489,7 @@ func TestNewWriter_DirectoryNotEmpty(t *testing.T) {
 
 // TestNewWriter_DirectoryNotEmptyWithRemoveFiles tests successful cleanup when RemoveFiles is set
 func TestNewWriter_DirectoryNotEmptyWithRemoveFiles(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -525,7 +525,7 @@ func TestNewWriter_DirectoryNotEmptyWithRemoveFiles(t *testing.T) {
 
 // TestNewWriter_InvalidStorageClass tests error for invalid storage class
 func TestNewWriter_InvalidStorageClass(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -578,7 +578,7 @@ func TestNewWriter_ValidStorageClass(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockClient := mocks.NewMocks3Client(t)
+			mockClient := mocks.NewMockClient(t)
 			ctx := context.Background()
 
 			mockClient.EXPECT().
@@ -609,7 +609,7 @@ func TestNewWriter_ValidStorageClass(t *testing.T) {
 
 // TestNewWriter_FileMode tests successful Writer creation for single file
 func TestNewWriter_FileMode(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -631,7 +631,7 @@ func TestNewWriter_FileMode(t *testing.T) {
 
 // TestNewWriter_SkipDirCheck tests that directory check is skipped when SkipDirCheck is true
 func TestNewWriter_SkipDirCheck(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -653,7 +653,7 @@ func TestNewWriter_SkipDirCheck(t *testing.T) {
 
 // TestWriter_GetType tests GetType method
 func TestWriter_GetType(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -681,7 +681,7 @@ func TestWriter_GetType(t *testing.T) {
 
 // TestWriter_NewWriter_Success tests successful creation of s3Writer
 func TestWriter_NewWriter_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -720,7 +720,7 @@ func TestWriter_NewWriter_Success(t *testing.T) {
 
 // TestWriter_NewWriter_CreateMultipartUploadError tests error in CreateMultipartUpload
 func TestWriter_NewWriter_CreateMultipartUploadError(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -756,7 +756,7 @@ func TestWriter_NewWriter_CreateMultipartUploadError(t *testing.T) {
 
 // TestS3Writer_Write_Success tests successful Write operation
 func TestS3Writer_Write_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -799,7 +799,7 @@ func TestS3Writer_Write_Success(t *testing.T) {
 
 // TestS3Writer_Write_TriggerMultipart tests that Write triggers multipart upload when buffer exceeds chunk size
 func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -868,7 +868,7 @@ func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 
 // TestS3Writer_Write_AfterClose tests that Write after Close returns error
 func TestS3Writer_Write_AfterClose(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -924,7 +924,7 @@ func TestS3Writer_Write_AfterClose(t *testing.T) {
 
 // TestS3Writer_Write_WithUploadError tests that Write returns error when upload fails
 func TestS3Writer_Write_WithUploadError(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -979,7 +979,7 @@ func TestS3Writer_Write_WithUploadError(t *testing.T) {
 
 // TestS3Writer_Close_Success tests successful Close operation
 func TestS3Writer_Close_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1041,7 +1041,7 @@ func TestS3Writer_Close_Success(t *testing.T) {
 
 // TestS3Writer_Close_AfterClose tests that Close after Close returns error
 func TestS3Writer_Close_AfterClose(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1108,7 +1108,7 @@ func TestS3Writer_Close_AfterClose(t *testing.T) {
 
 // TestS3Writer_Close_CompleteMultipartUploadError tests error handling when CompleteMultipartUpload fails
 func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1173,7 +1173,7 @@ func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
 
 // TestS3Writer_Close_AbortMultipartUploadError tests error handling when both Complete and Abort fail
 func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	var buf bytes.Buffer
@@ -1247,7 +1247,7 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 
 // TestS3Writer_UploadPart_WithRetryPolicy tests uploadPart with retry policy
 func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1335,7 +1335,7 @@ func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
 
 // TestS3Writer_ContextCancellation tests that context cancellation stops uploads
 func TestS3Writer_ContextCancellation(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mockClient.EXPECT().
@@ -1391,7 +1391,7 @@ func TestS3Writer_ContextCancellation(t *testing.T) {
 
 // TestS3Writer_ConcurrentWrites tests concurrent writes to different files
 func TestS3Writer_ConcurrentWrites(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1467,7 +1467,7 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 
 // TestS3Writer_EmptyBuffer tests Close with empty buffer (no writes)
 func TestS3Writer_EmptyBuffer(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1517,7 +1517,7 @@ func TestS3Writer_EmptyBuffer(t *testing.T) {
 }
 
 func TestWriter_RemoveFiles_Success(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1554,7 +1554,7 @@ func TestWriter_RemoveFiles_Success(t *testing.T) {
 
 // TestWriter_RemoveFiles_WithPagination tests RemoveFiles with pagination
 func TestWriter_RemoveFiles_WithPagination(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1618,7 +1618,7 @@ func TestWriter_RemoveFiles_WithPagination(t *testing.T) {
 
 // TestWriter_Remove_SingleFile tests removing a single file
 func TestWriter_Remove_SingleFile(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1645,7 +1645,7 @@ func TestWriter_Remove_SingleFile(t *testing.T) {
 
 // TestWriter_Remove_Directory tests removing a directory
 func TestWriter_Remove_Directory(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1688,7 +1688,7 @@ func TestWriter_Remove_Directory(t *testing.T) {
 
 // TestWriter_Remove_DirectoryWithNestedDir tests removing directory with nested directories
 func TestWriter_Remove_DirectoryWithNestedDir(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1738,7 +1738,7 @@ func TestWriter_Remove_DirectoryWithNestedDir(t *testing.T) {
 
 // TestWriter_Remove_SkipDirectory tests that directories are skipped during removal
 func TestWriter_Remove_SkipDirectory(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1785,7 +1785,7 @@ func TestWriter_Remove_SkipDirectory(t *testing.T) {
 
 // TestWriter_Remove_NullKey tests handling of null keys in ListObjectsV2 response
 func TestWriter_Remove_NullKey(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1829,7 +1829,7 @@ func TestWriter_Remove_NullKey(t *testing.T) {
 
 // TestWriter_Remove_ListObjectsError tests error handling when ListObjects fails
 func TestWriter_Remove_ListObjectsError(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1864,7 +1864,7 @@ func TestWriter_Remove_ListObjectsError(t *testing.T) {
 
 // TestWriter_Remove_DeleteObjectError tests error handling when DeleteObject fails
 func TestWriter_Remove_DeleteObjectError(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1940,7 +1940,7 @@ func TestIsEmptyDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := mocks.NewMocks3Client(t)
+			mockClient := mocks.NewMockClient(t)
 			ctx := context.Background()
 
 			mockClient.EXPECT().
@@ -1960,7 +1960,7 @@ func TestIsEmptyDirectory(t *testing.T) {
 
 // TestIsEmptyDirectory_Error tests isEmptyDirectory error handling
 func TestIsEmptyDirectory_Error(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -1995,7 +1995,7 @@ func TestNewWriter_CleanPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := mocks.NewMocks3Client(t)
+			mockClient := mocks.NewMockClient(t)
 			ctx := context.Background()
 
 			mockClient.EXPECT().
@@ -2025,7 +2025,7 @@ func TestNewWriter_CleanPath(t *testing.T) {
 
 // TestS3Writer_WriteZeroBytes tests writing zero bytes
 func TestS3Writer_WriteZeroBytes(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -2080,7 +2080,7 @@ func TestS3Writer_WriteZeroBytes(t *testing.T) {
 
 // TestWriter_NewWriter_WithStorageClass tests that storage class is passed to CreateMultipartUpload
 func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -2127,7 +2127,7 @@ func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
 
 // TestS3Writer_WriteIncrementally tests writing data incrementally
 func TestS3Writer_WriteIncrementally(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().
@@ -2197,7 +2197,7 @@ func TestS3Writer_WriteIncrementally(t *testing.T) {
 
 // TestS3Writer_LargeWrite tests single large write operation
 func TestS3Writer_LargeWrite(t *testing.T) {
-	mockClient := mocks.NewMocks3Client(t)
+	mockClient := mocks.NewMockClient(t)
 	ctx := context.Background()
 
 	mockClient.EXPECT().

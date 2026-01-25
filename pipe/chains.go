@@ -37,7 +37,7 @@ type Reader[T models.TokenConstraint] interface {
 
 // Writer describes data writers.
 type Writer[T models.TokenConstraint] interface {
-	Write(context.Context, T) (n int, err error)
+	Write(T) (n int, err error)
 	Close() (err error)
 }
 
@@ -153,7 +153,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 					return nil
 				}
 
-				n, err := w.Write(ctx, data)
+				n, err := w.Write(data)
 				if err != nil {
 					return fmt.Errorf("failed to write data: %w", err)
 				}

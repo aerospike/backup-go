@@ -25,7 +25,7 @@ import (
 
 // rangeReader encapsulates getting a file by range and file size logic. To use with retry reader.
 type rangeReader struct {
-	client s3Client
+	client Client
 	bucket *string
 	key    *string
 	etag   *string
@@ -34,7 +34,7 @@ type rangeReader struct {
 }
 
 // newRangeReader creates a new file reader.
-func newRangeReader(ctx context.Context, client s3Client, bucket, key *string) (*rangeReader, error) {
+func newRangeReader(ctx context.Context, client Client, bucket, key *string) (*rangeReader, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key is nil")
 	}

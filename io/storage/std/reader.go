@@ -55,23 +55,6 @@ func (r *Reader) GetType() string {
 	return stdinType
 }
 
-// stdinReadCloser implements io.ReadCloser for stdin.
-type stdinReadCloser struct {
-	io.Reader
-}
-
-// Close is a no-op for stdin.
-func (r *stdinReadCloser) Close() error {
-	return nil
-}
-
-// newStdinReadCloser returns an io.ReadCloser for os.Stdin.
-func newStdinReadCloser(bufferSize int) io.ReadCloser {
-	return &stdinReadCloser{
-		Reader: bufio.NewReaderSize(os.Stdin, bufferSize),
-	}
-}
-
 // GetSize returns -1 for stdin, indicating that estimates should not be calculated.
 func (r *Reader) GetSize() int64 {
 	// No need to wait calculations for stdin.
@@ -103,7 +86,9 @@ func (r *Reader) StreamFile(
 		return
 	}
 
-	readersCh <- models.File{Reader: newStdinReadCloser(r.bufferSize), Name: filepath.Base(filename)}
+	readCloser := io.NopCloser(bufio.NewReaderSize(os.Stdin, r.bufferSize))
+
+	readersCh <- models.File{Reader: readCloser, Name: filepath.Base(filename)}
 }
 
 // StreamFiles opens stdin as files and sends io.Readers to the `readersCh`

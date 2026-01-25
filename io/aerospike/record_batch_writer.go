@@ -142,7 +142,6 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			case isNilOrAcceptableError(aerr),
 				rw.ignoreRecordError && shouldIgnore(aerr):
 				var opErr error
-
 				rw.operationBuffer, opErr = rw.processAndFilterOperations(aerr)
 
 				if len(rw.operationBuffer) == 0 {

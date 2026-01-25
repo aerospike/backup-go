@@ -578,7 +578,6 @@ func parseAccessTier(tier string) (types.Tier, error) {
 	tier = cases.Title(language.English).String(tier)
 
 	var result types.Tier
-
 	possible := result.Values()
 
 	for _, possibleTier := range possible {

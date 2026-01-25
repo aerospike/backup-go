@@ -52,6 +52,9 @@ linters:
     nolintlint:
       require-explanation: true
       require-specific: true
+    wsl_v5:
+      disable:
+        - assign
   exclusions:
     generated: lax
     presets:

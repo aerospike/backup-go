@@ -226,7 +226,6 @@ func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.
 		}
 
 		var indErr error
-
 		indexes, indErr = ic.getSIndexes(node, namespace, ic.policy)
 
 		return indErr

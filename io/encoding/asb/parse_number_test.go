@@ -176,7 +176,7 @@ func TestReadSignedInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			reader := newCountingReader(strings.NewReader(tt.input), "test")
-			got, err := _readSignedInt(reader, tt.delim)
+			got, err := readSignedInt(reader, tt.delim)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -293,7 +293,7 @@ func TestReadUnsignedInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			reader := newCountingReader(strings.NewReader(tt.input), "test")
-			got, err := _readUnsignedInt(reader, tt.delim)
+			got, err := readUnsignedInt(reader, tt.delim)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -333,7 +333,7 @@ func TestIntegerParsingEquivalence(t *testing.T) {
 
 			// Test optimized
 			reader2 := newCountingReader(strings.NewReader(input), "test")
-			opt, optErr := _readSignedInt(reader2, '\n')
+			opt, optErr := readSignedInt(reader2, '\n')
 
 			assert.Equal(t, origErr != nil, optErr != nil, "error mismatch: original=%v, optimized=%v", origErr, optErr)
 			assert.Equal(t, orig, opt, "value mismatch")
@@ -362,7 +362,7 @@ func TestSizeParsingEquivalence(t *testing.T) {
 
 			// Test optimized
 			reader2 := newCountingReader(strings.NewReader(input), "test")
-			opt, optErr := _readUnsignedInt(reader2, '\n')
+			opt, optErr := readUnsignedInt(reader2, '\n')
 
 			assert.Equal(t, origErr != nil, optErr != nil, "error mismatch: original=%v, optimized=%v", origErr, optErr)
 			assert.Equal(t, orig, opt, "value mismatch")
@@ -419,7 +419,7 @@ func BenchmarkIntegerParsing_Optimized(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				reader := newCountingReader(strings.NewReader(input.value), "test")
-				_, err := _readSignedInt(reader, '\n')
+				_, err := readSignedInt(reader, '\n')
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -471,7 +471,7 @@ func BenchmarkSizeParsing_Optimized(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				reader := newCountingReader(strings.NewReader(input.value), "test")
-				_, err := _readUnsignedInt(reader, '\n')
+				_, err := readUnsignedInt(reader, '\n')
 				if err != nil {
 					b.Fatal(err)
 				}

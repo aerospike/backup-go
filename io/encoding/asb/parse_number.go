@@ -19,8 +19,8 @@ import (
 	"math"
 )
 
-// _readSignedInt reads a signed int64 directly from the reader without string allocation.
-func _readSignedInt(src *countingReader, delim byte) (int64, error) {
+// readSignedInt reads a signed int64 directly from the reader without string allocation.
+func readSignedInt(src *countingReader, delim byte) (int64, error) {
 	var result uint64
 
 	negative := false
@@ -70,8 +70,8 @@ func _readSignedInt(src *countingReader, delim byte) (int64, error) {
 	return int64(result), nil
 }
 
-// _readUnsignedInt reads an unsigned uint32 directly from the reader without string allocation.
-func _readUnsignedInt(src *countingReader, delim byte) (uint32, error) {
+// readUnsignedInt reads an unsigned uint32 directly from the reader without string allocation.
+func readUnsignedInt(src *countingReader, delim byte) (uint32, error) {
 	var result uint64
 
 	hasDigits := false

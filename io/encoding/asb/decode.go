@@ -497,7 +497,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 
 	// NOTE: the number of paths is always 1 for now
 	// this means we read the value but don't use it
-	npaths, err := _readUnsignedInt(r.reader, ' ')
+	npaths, err := readUnsignedInt(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -638,7 +638,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	length, err := _readUnsignedInt(r.reader, ' ')
+	length, err := readUnsignedInt(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -944,7 +944,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	case binTypeBool:
 		return _readBool(r.reader)
 	case binTypeInt:
-		return _readSignedInt(r.reader, asbNewLine)
+		return readSignedInt(r.reader, asbNewLine)
 	case binTypeFloat:
 		return _readFloat(r.reader, asbNewLine)
 	case binTypeString:
@@ -1056,7 +1056,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 
 	switch keyTypeChar {
 	case keyTypeInt:
-		keyVal, err := _readSignedInt(r.reader, asbNewLine)
+		keyVal, err := readSignedInt(r.reader, asbNewLine)
 		if err != nil {
 			return nil, err
 		}
@@ -1122,7 +1122,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 }
 
 func (r *Decoder[T]) readBinCount() (uint16, error) {
-	binCount, err := _readUnsignedInt(r.reader, asbNewLine)
+	binCount, err := readUnsignedInt(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
@@ -1142,7 +1142,7 @@ func (r *Decoder[T]) readBinCount() (uint16, error) {
 // it expects that r has been advanced past the expiration line marker '+ t '
 // NOTE: we don't check the expiration against any bounds because negative (large) expirations are valid
 func (r *Decoder[T]) readExpiration() (int64, error) {
-	exp, err := _readSignedInt(r.reader, asbNewLine)
+	exp, err := readSignedInt(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
@@ -1159,7 +1159,7 @@ func (r *Decoder[T]) readExpiration() (int64, error) {
 }
 
 func (r *Decoder[T]) readGeneration() (uint32, error) {
-	gen, err := _readUnsignedInt(r.reader, asbNewLine)
+	gen, err := readUnsignedInt(r.reader, asbNewLine)
 	if err != nil {
 		return 0, err
 	}
@@ -1241,7 +1241,7 @@ func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) 
 }
 
 func _readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
-	size, err := _readUnsignedInt(src, sizeDelim)
+	size, err := readUnsignedInt(src, sizeDelim)
 	if err != nil {
 		return nil, err
 	}
@@ -1306,7 +1306,7 @@ func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 }
 
 func _readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
-	length, err := _readUnsignedInt(src, sizeDelim)
+	length, err := readUnsignedInt(src, sizeDelim)
 	if err != nil {
 		return nil, err
 	}

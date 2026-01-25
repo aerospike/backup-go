@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/collections"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -31,7 +31,7 @@ type filterBySet[T models.TokenConstraint] struct {
 // NewFilterBySet creates new filterBySet processor with given setList.
 func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.Uint64) processor[T] {
 	return &filterBySet[T]{
-		setsToRestore: util.ListToMap(setList),
+		setsToRestore: collections.ListToMap(setList),
 		skipped:       skipped,
 	}
 }

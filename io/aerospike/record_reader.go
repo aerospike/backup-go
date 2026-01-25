@@ -129,6 +129,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
 		// Start scan with the global context.
 		r.logger.Debug("scan started")
+
 		go r.startScan(r.ctx)
 	})
 

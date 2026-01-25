@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package files
 
 import (
 	"fmt"
@@ -20,25 +20,15 @@ import (
 	"strings"
 )
 
-// ListToMap converts a slice of strings to a map of strings with boolean true values.
-func ListToMap(slice []string) map[string]bool {
-	result := make(map[string]bool, len(slice))
-
-	for _, value := range slice {
-		result[value] = true
-	}
-
-	return result
-}
-
 // GetFileNumber returns file number from name.
+// Return (0, nil) for non-asbx files
 func GetFileNumber(filename string) (uint64, error) {
 	// Skip non asbx files.
-	if !strings.HasSuffix(filename, FileExtAsbx) {
+	if !strings.HasSuffix(filename, ExtensionASBX) {
 		return 0, nil
 	}
 
-	name := strings.TrimSuffix(filename, FileExtAsbx)
+	name := strings.TrimSuffix(filename, ExtensionASBX)
 	parts := strings.SplitN(name, "_", 3)
 
 	if len(parts) != 3 {

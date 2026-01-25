@@ -135,7 +135,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 	blockBlobClient := w.containerClient.NewBlockBlobClient(fullPath)
 
-	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, int64(w.ChunkSize), w.WithChecksum), nil
+	return newBlobWriter(ctx, blockBlobClient, w.UploadConcurrency, w.tier, w.ChunkSize, w.WithChecksum), nil
 }
 
 var _ io.WriteCloser = (*blobWriter)(nil)
@@ -151,7 +151,7 @@ type blobWriter struct {
 	closeOnce         sync.Once
 	done              chan error
 	uploadConcurrency int
-	chunkSize         int64
+	chunkSize         int
 	withChecksum      bool
 }
 
@@ -161,7 +161,7 @@ func newBlobWriter(
 	blobClient *blockblob.Client,
 	uploadConcurrency int,
 	tier *blob.AccessTier,
-	chunkSize int64,
+	chunkSize int,
 	withChecksum bool,
 ) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
@@ -172,7 +172,7 @@ func newBlobWriter(
 		tier:              tier,
 		pipeReader:        pipeReader,
 		pipeWriter:        pipeWriter,
-		bw:                bufio.NewWriterSize(pipeWriter, common.SafeInt64ToInt(chunkSize)),
+		bw:                bufio.NewWriterSize(pipeWriter, chunkSize),
 		done:              make(chan error, 1),
 		uploadConcurrency: uploadConcurrency,
 		chunkSize:         chunkSize,
@@ -190,7 +190,7 @@ func (w *blobWriter) uploadStream() {
 	contentType := uploadStreamFileType
 
 	usOpt := &azblob.UploadStreamOptions{
-		BlockSize:   w.chunkSize,
+		BlockSize:   int64(w.chunkSize),
 		Concurrency: w.uploadConcurrency,
 		HTTPHeaders: &blob.HTTPHeaders{
 			BlobContentType: &contentType,

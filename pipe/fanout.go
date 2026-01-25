@@ -95,6 +95,7 @@ func (f *Fanout[T]) Run(ctx context.Context) {
 
 		go func(index int, in <-chan T) {
 			defer wg.Done()
+
 			f.processInput(ctx, index, in)
 		}(i, input)
 	}

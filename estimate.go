@@ -15,11 +15,11 @@
 package backup
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
-
-	"github.com/aerospike/backup-go/internal/util"
 )
 
 // zScore represents the number of standard deviations a given value is from the mean of a distribution.
@@ -99,12 +99,18 @@ func confidenceInterval(stats estimateStats, sampleSize int) (low, high float64)
 	return low, high
 }
 
+type nopWriteCloser struct{ io.Writer }
+
+func (nopWriteCloser) Close() error { return nil }
+
 // getCompressRatio calculates the compress ratio of the data.
 func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, error) {
 	// Create an io.WriteCloser from samplesData to calculate the compress ratio.
-	bytesWriter := util.NewBytesWriteCloser([]byte{})
+	var buf bytes.Buffer
+
+	wc := nopWriteCloser{Writer: &buf} // satisfies io.WriteCloser
 	// Create a compression writer similarly to the backup.
-	encodedWriter, err := newCompressionWriter(policy, bytesWriter)
+	encodedWriter, err := newCompressionWriter(policy, wc)
 	if err != nil {
 		return 0, err
 	}
@@ -117,9 +123,8 @@ func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, e
 		return 0, err
 	}
 
-	// Check outLen for safety reasons.
-	outLen := bytesWriter.Buffer().Len()
-	if outLen == 0 {
+	// Check buf.len for safety reasons.
+	if buf.Len() == 0 {
 		if len(samplesData) > 0 {
 			return 0, fmt.Errorf("output length is zero, but samples data is not empty")
 		}
@@ -127,5 +132,5 @@ func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, e
 		return 1, nil
 	}
 
-	return float64(len(samplesData)) / float64(outLen), nil
+	return float64(len(samplesData)) / float64(buf.Len()), nil
 }

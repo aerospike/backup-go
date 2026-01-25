@@ -276,7 +276,6 @@ func TestVersionGreaterOrEqual(t *testing.T) {
 	}
 }
 
-// Интеграционный тест - проверяем весь flow вместе
 func TestVersionValidationFlow(t *testing.T) {
 	t.Parallel()
 

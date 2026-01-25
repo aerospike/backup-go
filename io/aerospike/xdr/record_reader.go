@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/collections"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
 )
@@ -235,6 +235,7 @@ func (r *RecordReader) serve() {
 	r.activeNodes = make([]*NodeReader, 0, len(nodes))
 
 	r.createNodeReaders(nodes, &wg)
+
 	go r.watchCluster(nodes, &wg)
 	go r.watchNodes()
 
@@ -331,7 +332,7 @@ func (r *RecordReader) watchCluster(nodes []string, wg *sync.WaitGroup) {
 				continue
 			}
 
-			diff := util.Diff(curNodes, nodes)
+			diff := collections.Diff(curNodes, nodes)
 			if len(diff) > 0 {
 				r.logger.Debug("new nodes detected",
 					slog.Any("diff", diff),

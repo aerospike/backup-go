@@ -16,7 +16,6 @@ package common
 
 import (
 	"fmt"
-	"math"
 	"path"
 )
 
@@ -36,24 +35,4 @@ func GetFullPath(prefix, filename string, pathList []string, isDir bool) (string
 		// If we use backup to a single file, we overwrite the file name.
 		return path.Join(prefix, pathList[0]), nil
 	}
-}
-
-// Deref returns the value pointed to by ptr, or the zero value of T if ptr is nil.
-func Deref[T any](ptr *T) T {
-	if ptr != nil {
-		return *ptr
-	}
-
-	var zero T
-
-	return zero
-}
-
-// SafeInt64ToInt converts int64 to int safely.
-func SafeInt64ToInt(i int64) int {
-	if i < math.MaxInt {
-		return int(i)
-	}
-
-	return math.MaxInt
 }

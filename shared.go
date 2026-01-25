@@ -51,12 +51,14 @@ func doWork(errors chan<- error, done chan<- struct{}, logger *slog.Logger, work
 	err := work()
 	if err != nil {
 		logger.Debug("job failed", "error", err)
+
 		errors <- err
 
 		return
 	}
 
 	logger.Debug("job done")
+
 	done <- struct{}{}
 }
 

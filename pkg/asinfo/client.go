@@ -189,7 +189,6 @@ func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return AerospikeVersion{}, err
 	}
@@ -977,8 +976,8 @@ func parseResultResponse(cmd string, result map[string]string) (string, error) {
 
 func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext
-	version, err := ic.getAerospikeVersion(node, policy)
 
+	version, err := ic.getAerospikeVersion(node, policy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
 	}

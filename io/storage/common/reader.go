@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/files"
 )
 
 // DefaultPollWarmDuration is the interval between requests to cloud providers,
@@ -49,7 +49,7 @@ func PreSort(ctx context.Context, r reader, path string) error {
 	}
 
 	// Sort files.
-	list, err = util.SortBackupFiles(list)
+	list, err = files.SortBackupFiles(list)
 	if err != nil {
 		return err
 	}

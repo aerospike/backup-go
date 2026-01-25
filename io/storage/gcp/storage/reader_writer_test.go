@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
-	"github.com/aerospike/backup-go/internal/util"
+	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
@@ -277,7 +277,7 @@ func writeContent(sw *storage.Writer, content string) error {
 type validatorMock struct{}
 
 func (mock validatorMock) Run(fileName string) error {
-	if !strings.HasSuffix(fileName, util.FileExtAsb) {
+	if !strings.HasSuffix(fileName, files.ExtensionASB) {
 		return fmt.Errorf("file name must end with .asb")
 	}
 	return nil
@@ -895,9 +895,9 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 func filterList(list []string) (asbList, asbxList []string) {
 	for i := range list {
 		switch filepath.Ext(list[i]) {
-		case util.FileExtAsb:
+		case files.ExtensionASB:
 			asbList = append(asbList, list[i])
-		case util.FileExtAsbx:
+		case files.ExtensionASBX:
 			asbxList = append(asbxList, list[i])
 		}
 	}

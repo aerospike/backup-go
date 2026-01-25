@@ -137,6 +137,7 @@ func (r *NodeReader) serve() {
 			// Recovery finished. Notify the reader to stop MRT writes.
 			if !stateSent {
 				r.nodesRecovered <- struct{}{}
+
 				r.isRecovered.Store(true)
 
 				stateSent = true

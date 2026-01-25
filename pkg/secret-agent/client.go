@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//nolint:revive // We want to use package name with underscore.
+//nolint:revive,nolintlint // We want to use package name with underscore.
 package secret_agent
 
 import (
@@ -91,8 +91,8 @@ func (c *Client) GetSecret(resource, secretKey string) (string, error) {
 	// we need to decode the response.
 	if c.isBase64 {
 		var decoded []byte
-		decoded, err = base64.StdEncoding.DecodeString(response)
 
+		decoded, err = base64.StdEncoding.DecodeString(response)
 		if err != nil {
 			return "", err
 		}

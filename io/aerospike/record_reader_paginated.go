@@ -85,6 +85,7 @@ func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *
 func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	r.scanOnce.Do(func() {
 		r.logger.Debug("scan started")
+
 		go r.startScan()
 	})
 
@@ -206,6 +207,7 @@ func (r *paginatedRecordReader) scanPage(
 
 			continue
 		}
+
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}
 

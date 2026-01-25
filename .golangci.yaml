@@ -1,6 +1,7 @@
 version: "2"
 run:
   issues-exit-code: 1
+
 linters:
   default: none
   enable:
@@ -28,7 +29,7 @@ linters:
     - unparam
     - unused
     - whitespace
-    - wsl
+    - wsl_v5
   settings:
     goconst:
       min-len: 2
@@ -51,6 +52,9 @@ linters:
     nolintlint:
       require-explanation: true
       require-specific: true
+    wsl_v5:
+      disable:
+        - assign
   exclusions:
     generated: lax
     presets:
@@ -66,11 +70,15 @@ linters:
           - revive
         text: 'exported: type name will be used as backup.(BackupStats|BackupHandler|BackupConfig|BackupToDirectoryConfig|BackupToDirectoryStats|BackupToDirectoryHandler) by other packages, and that stutters'
       - linters:
+          - revive
+        path: ^io/storage/common/
+      - linters:
           - dupl
           - goconst
           - govet
           - lll
-          - wsl
+          - wsl_v5
+          - prealloc
         path: (.+)test\.go
       - path: (.+)test\.go
         text: importShadow

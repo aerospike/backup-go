@@ -69,7 +69,6 @@ func GetFileSizes(dirName string) string {
 
 		return nil
 	})
-
 	if err != nil {
 		return err.Error()
 	}

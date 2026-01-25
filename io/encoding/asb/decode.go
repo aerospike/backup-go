@@ -255,7 +255,6 @@ func (r *Decoder[T]) NextToken() (T, error) {
 
 		return v, err
 	}()
-
 	if err != nil {
 		return nil, newDecoderError(r.reader.tracker, err)
 	}
@@ -263,6 +262,7 @@ func (r *Decoder[T]) NextToken() (T, error) {
 	size := r.reader.tracker.offset - countBefore
 
 	var t *models.Token
+
 	switch v := v.(type) {
 	case *models.SIndex:
 		t = models.NewSIndexToken(v, size)
@@ -904,7 +904,6 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 	}
 
 	binVal, binErr := fetchBinValue(r, binType, base64Encoded)
-
 	if binErr != nil {
 		return binErr
 	}

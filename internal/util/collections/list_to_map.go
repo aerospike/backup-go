@@ -12,24 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package collections
 
-// Diff finds the difference between two slices by returning elements from
-// s1 that are not in s2.
-func Diff[S ~[]E, E comparable](s1, s2 S) S {
-	// Fill the map.
-	m2 := make(map[E]struct{}, len(s2))
-	for _, v := range s2 {
-		m2[v] = struct{}{}
+// ListToMap converts a slice of strings to a map of strings with boolean true values.
+func ListToMap(slice []string) map[string]bool {
+	result := make(map[string]bool, len(slice))
+
+	for _, value := range slice {
+		result[value] = true
 	}
 
-	res := make(S, 0, len(s1))
-
-	for _, v := range s1 {
-		if _, exists := m2[v]; !exists {
-			res = append(res, v)
-		}
-	}
-
-	return res
+	return result
 }

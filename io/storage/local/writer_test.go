@@ -358,7 +358,7 @@ func TestWriter_RemoveFiles_Dir_WithValidator(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ASB {
+		if filepath.Ext(fileName) == files.ExtensionASB {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")

@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	ASBX = ".asbx"
-	ASB  = ".asb"
+	ExtensionASBX = ".asbx"
+	ExtensionASB  = ".asb"
 )
 
 // backupFile is used for sorting files.
@@ -52,7 +52,7 @@ func parseFileName(name string) (backupFile, error) {
 	// Parse suffix number (after _ns1_).
 	suffixWithExt := parts[2]
 
-	suffix, err := strconv.Atoi(strings.TrimSuffix(suffixWithExt, ASBX))
+	suffix, err := strconv.Atoi(strings.TrimSuffix(suffixWithExt, ExtensionASBX))
 	if err != nil {
 		return backupFile{}, fmt.Errorf("invalid suffix number: %s", suffixWithExt)
 	}

@@ -32,7 +32,7 @@ func NewValidator() *Validator {
 
 // Run performs backup files validation.
 func (v *Validator) Run(fileName string) error {
-	if filepath.Ext(fileName) != files.ASB {
+	if filepath.Ext(fileName) != files.ExtensionASB {
 		return fmt.Errorf("restore file %s is in an invalid format, expected extension: .asb, got: %s",
 			fileName, filepath.Ext(fileName))
 	}

@@ -24,11 +24,11 @@ import (
 // Return 0 nil for non-asbx files
 func GetFileNumber(filename string) (uint64, error) {
 	// Skip non asbx files.
-	if !strings.HasSuffix(filename, ASBX) {
+	if !strings.HasSuffix(filename, ExtensionASBX) {
 		return 0, nil
 	}
 
-	name := strings.TrimSuffix(filename, ASBX)
+	name := strings.TrimSuffix(filename, ExtensionASBX)
 	parts := strings.SplitN(name, "_", 3)
 
 	if len(parts) != 3 {

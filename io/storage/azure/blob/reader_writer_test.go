@@ -222,7 +222,7 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 type validatorMock struct{}
 
 func (mock validatorMock) Run(fileName string) error {
-	if !strings.HasSuffix(fileName, files.ASB) {
+	if !strings.HasSuffix(fileName, files.ExtensionASB) {
 		return fmt.Errorf("file name must end with .asb")
 	}
 	return nil
@@ -905,9 +905,9 @@ func TestParseAccessTier(t *testing.T) {
 func filterList(list []string) (asbList, asbxList []string) {
 	for i := range list {
 		switch filepath.Ext(list[i]) {
-		case files.ASB:
+		case files.ExtensionASB:
 			asbList = append(asbList, list[i])
-		case files.ASBX:
+		case files.ExtensionASBX:
 			asbxList = append(asbxList, list[i])
 		}
 	}

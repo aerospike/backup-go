@@ -262,7 +262,6 @@ func (r *Decoder[T]) NextToken() (T, error) {
 	size := r.reader.tracker.offset - countBefore
 
 	var t *models.Token
-
 	switch v := v.(type) {
 	case *models.SIndex:
 		t = models.NewSIndexToken(v, size)

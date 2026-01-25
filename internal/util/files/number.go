@@ -21,7 +21,7 @@ import (
 )
 
 // GetFileNumber returns file number from name.
-// Return 0 nil for non-asbx files
+// Return (0, nil) for non-asbx files
 func GetFileNumber(filename string) (uint64, error) {
 	// Skip non asbx files.
 	if !strings.HasSuffix(filename, ExtensionASBX) {

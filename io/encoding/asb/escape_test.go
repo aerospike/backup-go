@@ -120,37 +120,37 @@ var (
 )
 
 func BenchmarkEscapeOld_Clean(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		escapeASBOld(cleanStr)
 	}
 }
 
 func BenchmarkEscapeNew_Clean(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		escapeASB(cleanStr)
 	}
 }
 
 func BenchmarkEscapeOld_Dirty(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		escapeASBOld(dirtyStr)
 	}
 }
 
 func BenchmarkEscapeNew_Dirty(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		escapeASB(dirtyStr)
 	}
 }
 
 func BenchmarkEscapeOld_LongTrailing(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		escapeASBOld(longStr)
 	}
 }
 
 func BenchmarkEscapeNew_LongTrailing(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		escapeASB(longStr)
 	}
 }

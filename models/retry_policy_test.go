@@ -412,7 +412,7 @@ func TestRetryPolicy_Do_ThreadSafety(t *testing.T) {
 	const numGoroutines = 100
 	errChan := make(chan error, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			ctx := context.Background()
 			callCount := 0
@@ -430,7 +430,7 @@ func TestRetryPolicy_Do_ThreadSafety(t *testing.T) {
 	}
 
 	// Collect results
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		err := <-errChan
 		require.NoError(t, err)
 	}

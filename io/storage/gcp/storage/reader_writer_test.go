@@ -139,7 +139,7 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 	}
 
 	// not an empty folders.
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		// for reading tests.
 		fileName := fmt.Sprintf("%s%s", testReadFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
 		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
@@ -483,7 +483,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
@@ -537,7 +537,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
@@ -570,7 +570,7 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)

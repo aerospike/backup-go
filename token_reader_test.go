@@ -81,7 +81,7 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	tr := newTokenReader(readersCh, logger, convertFn)
 	ctx := context.Background()
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		token, err := tr.Read(ctx)
 		assert.NoError(t, err)
 		assert.NotNil(t, token)

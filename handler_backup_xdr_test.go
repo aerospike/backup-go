@@ -84,7 +84,7 @@ func fillTestData(client *a.Client, setName string) error {
 		bin1 *a.Bin
 	)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if i%2 == 0 {
 			key, _ = a.NewKey(testASNamespace, setName, fmt.Sprintf("map-key-%d", i))
 			bin1 = generateMap()
@@ -102,7 +102,7 @@ func fillTestData(client *a.Client, setName string) error {
 }
 
 func generateMap() *a.Bin {
-	mapBin := a.NewBin("myMapBin", map[interface{}]interface{}{
+	mapBin := a.NewBin("myMapBin", map[any]any{
 		"name":    generateRandomString(10),
 		"age":     rand.Int(),
 		"balance": rand.Float64(),
@@ -112,7 +112,7 @@ func generateMap() *a.Bin {
 
 func generateList() *a.Bin {
 	listBin := a.NewBin(
-		"myListBin", []interface{}{
+		"myListBin", []any{
 			rand.Int(),
 			rand.Int(),
 			generateRandomString(10),

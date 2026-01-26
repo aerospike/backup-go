@@ -34,7 +34,7 @@ func TestSplitPartitions_SinglePartitionRange(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result, numWorkers, "The result should contain 5 split partitions")
 
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		assert.Equal(t, i*20, result[i].Begin)
 		assert.Equal(t, 20, result[i].Count)
 	}
@@ -60,7 +60,7 @@ func TestSplitPartitions_MultiplePartitionsRange(t *testing.T) {
 		{Begin: 100, Count: 25},
 		{Begin: 125, Count: 25},
 	}
-	for i := 0; i < len(expectedResults); i++ {
+	for i := range expectedResults {
 		assert.Equal(t, expectedResults[i].Begin, result[i].Begin)
 		assert.Equal(t, expectedResults[i].Count, result[i].Count)
 	}
@@ -143,7 +143,7 @@ func TestSplitPartitionRange(t *testing.T) {
 
 	assert.Len(t, result, numWorkers, "The result should contain 5 split partitions")
 
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		assert.Equal(t, i*20, result[i].Begin)
 		assert.Equal(t, 20, result[i].Count)
 	}

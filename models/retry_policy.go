@@ -103,11 +103,7 @@ func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
 	baseDelay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
 
 	jitter := p.calculateJitter(baseDelay)
-	delay := baseDelay + jitter
-
-	if delay < 0 {
-		delay = 0
-	}
+	delay := max(baseDelay+jitter, 0)
 
 	return delay
 }
@@ -136,7 +132,7 @@ func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
 
 	totalAttempts := p.totalAttempts()
 
-	for attempt := uint(0); attempt < totalAttempts; attempt++ {
+	for attempt := range totalAttempts {
 		// Execute operation.
 		lastErr = operation()
 		if lastErr == nil {

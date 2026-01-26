@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"path/filepath"
 	"sync"
 	"time"
@@ -139,9 +140,7 @@ func newStateFromFile(
 	s.Counter++
 
 	// Init current state.
-	for k, v := range s.RecordStatesSaved {
-		s.RecordStates[k] = v
-	}
+	maps.Copy(s.RecordStates, s.RecordStatesSaved)
 
 	logger.Debug("loaded state file successfully", slog.Int("filters loaded", len(s.RecordStatesSaved)))
 

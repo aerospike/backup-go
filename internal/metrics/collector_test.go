@@ -54,8 +54,7 @@ func TestNewPerSecondCollector(t *testing.T) {
 				Level: slog.LevelDebug,
 			}))
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
 
 			assert.NotNil(t, collector)
@@ -125,7 +124,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, true)
 	assert.NotNil(t, collector)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		collector.Increment()
 	}
 
@@ -139,7 +138,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	prevResult := collector.GetLastResult()
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		collector.Increment()
 	}
 
@@ -180,8 +179,7 @@ func TestPerSecondCollector_Increment(t *testing.T) {
 				Level: slog.LevelDebug,
 			}))
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
 
 			for i := 0; i < tc.numCalls; i++ {
@@ -224,8 +222,7 @@ func TestPerSecondCollector_Add(t *testing.T) {
 				Level: slog.LevelDebug,
 			}))
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
 
 			collector.Add(tc.value)

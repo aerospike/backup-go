@@ -138,7 +138,7 @@ func fillWriterTestData(ctx context.Context, client *s3.Client) error {
 	}
 
 	// Create folder with data for error test
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithDataError, fmt.Sprintf(testFileNameAsbTemplate, i))
 		_, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
@@ -151,7 +151,7 @@ func fillWriterTestData(ctx context.Context, client *s3.Client) error {
 	}
 
 	// Create folder with data for removal test
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, i))
 		_, err := client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(testBucket),
@@ -164,7 +164,7 @@ func fillWriterTestData(ctx context.Context, client *s3.Client) error {
 	}
 
 	// Create folder with mixed data
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameAsbTemplate, i))
 		if i%2 == 0 {
 			fileName = fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplateWrong, i))
@@ -208,7 +208,7 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
@@ -220,7 +220,7 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 	}
 
 	// Verify files were written
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := path.Join(testWriteFolderEmpty, fmt.Sprintf(testFileNameAsbTemplate, i))
 		_, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 			Bucket: aws.String(testBucket),
@@ -262,7 +262,7 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf(testFileNameAsbTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
@@ -274,7 +274,7 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 	}
 
 	// Verify files were written
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := path.Join(testWriteFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, i))
 		_, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 			Bucket: aws.String(testBucket),
@@ -1445,7 +1445,7 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numWriters)
 
-	for i := 0; i < numWriters; i++ {
+	for i := range numWriters {
 		go func(id int) {
 			defer wg.Done()
 
@@ -1453,7 +1453,7 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 			w, err := writer.NewWriter(ctx, fileName)
 			assert.NoError(t, err)
 
-			data := []byte(fmt.Sprintf("test data %d", id))
+			data := fmt.Appendf(nil, "test data %d", id)
 			_, err = w.Write(data)
 			assert.NoError(t, err)
 
@@ -2182,7 +2182,7 @@ func TestS3Writer_WriteIncrementally(t *testing.T) {
 
 	// Write data in small increments
 	totalBytes := 0
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		data := []byte{byte(i)}
 		n, err := w.Write(data)
 		assert.NoError(t, err)

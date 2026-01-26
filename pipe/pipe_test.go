@@ -43,7 +43,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		if currentCount < testCount*testParallel {
 			mockCounter++
 			counterMutex.Unlock()
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 		counterMutex.Unlock()
@@ -115,7 +115,7 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 		if currentCount < testCount {
 			mockCounter++
 			counterMutex.Unlock()
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 		counterMutex.Unlock()
@@ -143,7 +143,7 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 			mockCounter++
 			counterMutex.Unlock()
 			writeMutex.Unlock()
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testSize, nil
 		}
 		writeMutex.Unlock()

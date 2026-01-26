@@ -98,7 +98,7 @@ func TestFanout_RunDefault(t *testing.T) {
 		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				inputs[n] <- testToken()
 			}
 		}(i)
@@ -149,7 +149,7 @@ func TestFanout_RunStraight(t *testing.T) {
 		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				inputs[n] <- testToken()
 			}
 		}(i)
@@ -200,7 +200,7 @@ func TestFanout_RunSplit(t *testing.T) {
 		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				token, err := testASBXToken()
 				require.NoError(t, err)
 				inputs[n] <- token
@@ -255,7 +255,7 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				inputs[n] <- testToken()
 			}
 		}(i)
@@ -312,7 +312,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		go func(n int) {
 			defer close(inputs[n])
 			for range testCount {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				inputs[n] <- testToken()
 			}
 		}(i)
@@ -370,7 +370,7 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 		go func(n int) {
 			defer close(inputs[n])
 			for j := range testCount {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				token := testToken()
 				token.Size = uint64(j + n)
 				inputs[n] <- token

@@ -120,7 +120,7 @@ func TestRecordReader(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			msg, err := newMessage(testMessageB64)
 			require.NoError(t, err)
 			err = sendMessage(tcpClient, msg)
@@ -166,8 +166,7 @@ func TestRecordReaderServeNoNodes(t *testing.T) {
 
 func TestRecordReaderWatchNodes(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
 

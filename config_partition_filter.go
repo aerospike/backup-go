@@ -200,7 +200,7 @@ func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) 
 	remainder := len(ids) % numWorkers
 	startIdx := 0
 
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		currentSize := baseSize
 		if i < remainder {
 			currentSize++
@@ -230,7 +230,7 @@ func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) ([
 	}
 
 	result := make([]*a.PartitionFilter, numWorkers)
-	for j := 0; j < numWorkers; j++ {
+	for j := range numWorkers {
 		result[j] = &a.PartitionFilter{}
 		result[j].Begin = (j * partitionFilters.Count) / numWorkers
 		result[j].Count = (((j + 1) * partitionFilters.Count) / numWorkers) - result[j].Begin

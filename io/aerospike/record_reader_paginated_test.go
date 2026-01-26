@@ -610,7 +610,7 @@ func TestAerospikeRecordReaderPaginatedLargePageSize(t *testing.T) {
 	// Create recordset with several records
 	mockRecordSet := &a.Recordset{}
 	mockResults := make(chan *a.Result, 5)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		rec := &a.Record{
 			Bins: a.BinMap{"key": fmt.Sprintf("value%d", i)},
 			Key:  key,
@@ -656,7 +656,7 @@ func TestAerospikeRecordReaderPaginatedLargePageSize(t *testing.T) {
 	require.NotNil(t, reader)
 
 	// Read all 5 records
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		token, err := reader.Read(ctx)
 		require.Nil(t, err)
 		require.NotNil(t, token)
@@ -730,7 +730,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 	var errors []error
 	var mu sync.Mutex
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		go func() {
 			defer func() { done <- true }()
 			token, err := reader.Read(ctx)
@@ -752,7 +752,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 
 	validTokens := 0
 	eofErrors := 0
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if tokens[i] != nil {
 			validTokens++
 		}

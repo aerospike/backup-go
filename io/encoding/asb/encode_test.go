@@ -431,9 +431,9 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: a.HLLValue("hello"),
 			},
-			want: []byte(fmt.Sprintf("- Y binName %d %s\n",
+			want: fmt.Appendf(nil, "- Y binName %d %s\n",
 				len(base64.StdEncoding.EncodeToString([]byte("hello"))),
-				base64.StdEncoding.EncodeToString([]byte("hello")))),
+				base64.StdEncoding.EncodeToString([]byte("hello"))),
 		},
 		{
 			name: "positive GeoJSON bin",
@@ -441,7 +441,7 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: a.GeoJSONValue(geoJSONStr),
 			},
-			want: []byte(fmt.Sprintf("- G binName %d %s\n", len(geoJSONStr), geoJSONStr)),
+			want: fmt.Appendf(nil, "- G binName %d %s\n", len(geoJSONStr), geoJSONStr),
 		},
 		{
 			name: "positive bytes bin",
@@ -449,9 +449,9 @@ func Test_binToASB(t *testing.T) {
 				k: "binName",
 				v: []byte("123"),
 			},
-			want: []byte(fmt.Sprintf("- B binName %d %s\n",
+			want: fmt.Appendf(nil, "- B binName %d %s\n",
 				len(base64.StdEncoding.EncodeToString([]byte("123"))),
-				base64.StdEncoding.EncodeToString([]byte("123")))),
+				base64.StdEncoding.EncodeToString([]byte("123"))),
 		},
 		{
 			name: "positive map raw blob bin",
@@ -462,9 +462,9 @@ func Test_binToASB(t *testing.T) {
 					Data:         []byte("123"),
 				},
 			},
-			want: []byte(fmt.Sprintf("- M binName %d %s\n",
+			want: fmt.Appendf(nil, "- M binName %d %s\n",
 				len(base64.StdEncoding.EncodeToString([]byte("123"))),
-				base64.StdEncoding.EncodeToString([]byte("123")))),
+				base64.StdEncoding.EncodeToString([]byte("123"))),
 		},
 		{
 			name: "positive list raw blob bin",
@@ -475,9 +475,9 @@ func Test_binToASB(t *testing.T) {
 					Data:         []byte("123"),
 				},
 			},
-			want: []byte(fmt.Sprintf("- L binName %d %s\n",
+			want: fmt.Appendf(nil, "- L binName %d %s\n",
 				len(base64.StdEncoding.EncodeToString([]byte("123"))),
-				base64.StdEncoding.EncodeToString([]byte("123")))),
+				base64.StdEncoding.EncodeToString([]byte("123"))),
 		},
 		{
 			name: "negative invalid raw bin type",
@@ -679,7 +679,7 @@ func Test_userKeyToASB(t *testing.T) {
 			args: args{
 				userKey: a.NewValue([]byte("hello")),
 			},
-			want: []byte(fmt.Sprintf("+ k B %d %s\n", len(encVal), encVal)),
+			want: fmt.Appendf(nil, "+ k B %d %s\n", len(encVal), encVal),
 		},
 		{
 			name: "negative unknown user key",
@@ -728,21 +728,21 @@ func Test_keyToASB(t *testing.T) {
 			args: args{
 				k: NoSetKey,
 			},
-			want: []byte(fmt.Sprintf("+ k I 1\n+ n ns\n+ d %s\n", base64Encode(NoSetKey.Digest()))),
+			want: fmt.Appendf(nil, "+ k I 1\n+ n ns\n+ d %s\n", base64Encode(NoSetKey.Digest())),
 		},
 		{
 			name: "positive string key",
 			args: args{
 				k: stringKey,
 			},
-			want: []byte(fmt.Sprintf("+ k S 5 hello\n+ n ns\n+ d %s\n+ s set\n", base64Encode(stringKey.Digest()))),
+			want: fmt.Appendf(nil, "+ k S 5 hello\n+ n ns\n+ d %s\n+ s set\n", base64Encode(stringKey.Digest())),
 		},
 		{
 			name: "positive escaped key",
 			args: args{
 				k: escKey,
 			},
-			want: []byte(fmt.Sprintf("+ k S 5 hello\n+ n \\\\n\\ s\n+ d %s\n+ s set\\\n\n", base64Encode(escKey.Digest()))),
+			want: fmt.Appendf(nil, "+ k S 5 hello\n+ n \\\\n\\ s\n+ d %s\n+ s set\\\n\n", base64Encode(escKey.Digest())),
 		},
 	}
 	for _, tt := range tests {
@@ -795,8 +795,8 @@ func Test_recordToASB(t *testing.T) {
 					VoidTime: recExpr,
 				},
 			},
-			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ "+
-				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), recExpr)),
+			want: fmt.Appendf(nil, "+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t %d\n+ "+
+				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(key.Digest()), recExpr),
 		},
 		{
 			name: "positive escaped key",
@@ -813,8 +813,8 @@ func Test_recordToASB(t *testing.T) {
 					VoidTime: recExpr,
 				},
 			},
-			want: []byte(fmt.Sprintf("+ k S 4 1234\n+ n test\\\n\n+ d %s\n+ s de\\ mo\n+ g 1234\n+ t %d\n+ "+
-				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), recExpr)),
+			want: fmt.Appendf(nil, "+ k S 4 1234\n+ n test\\\n\n+ d %s\n+ s de\\ mo\n+ g 1234\n+ t %d\n+ "+
+				"b 2\n- I bin1 0\n- S bin2 5 hello\n", base64Encode(escKey.Digest()), recExpr),
 		},
 	}
 	for _, tt := range tests {
@@ -1646,8 +1646,7 @@ func BenchmarkEncodeRecord(b *testing.B) {
 		VoidTime: 10,
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		buff := &bytes.Buffer{}
 		_, _ = encoder.encodeRecord(rec, buff)
 		output.Write(buff.Bytes())
@@ -1740,7 +1739,7 @@ func genKey() *a.Key {
 	case string:
 		userKey = k + fmt.Sprint(i)
 	case []byte:
-		k = append(k, []byte(fmt.Sprint(i))...)
+		k = fmt.Appendf(k, "%d", i)
 		userKey = k
 	}
 	key, err = a.NewKey("test", "demo", userKey)
@@ -1870,7 +1869,7 @@ func Test_blobBinToASB(t *testing.T) {
 				bytesType: 'B',
 				name:      "binName",
 			},
-			want: []byte(fmt.Sprintf("B binName %d %s\n", len([]byte("hello")), []byte("hello"))),
+			want: fmt.Appendf(nil, "B binName %d %s\n", len([]byte("hello")), []byte("hello")),
 		},
 	}
 	for _, tt := range tests {

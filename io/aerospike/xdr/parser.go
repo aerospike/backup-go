@@ -401,10 +401,18 @@ func readBytes(conn net.Conn, length int64) ([]byte, error) {
 	return buffer, nil
 }
 
-func fieldToInt64(header []byte) int64 {
-	var num int64
+func fieldToInt8(header []byte) int8 {
+	if len(header) == 0 {
+		return 0
+	}
+
+	return int8(header[0])
+}
+
+func fieldToInt16(header []byte) int16 {
+	var num int16
 	for _, b := range header {
-		num = (num << 8) | int64(b)
+		num = (num << 8) | int16(b)
 	}
 
 	return num
@@ -419,18 +427,10 @@ func fieldToInt32(header []byte) int32 {
 	return num
 }
 
-func fieldToInt8(header []byte) int8 {
-	if len(header) == 0 {
-		return 0
-	}
-
-	return int8(header[0])
-}
-
-func fieldToInt16(header []byte) int16 {
-	var num int16
+func fieldToInt64(header []byte) int64 {
+	var num int64
 	for _, b := range header {
-		num = (num << 8) | int16(b)
+		num = (num << 8) | int64(b)
 	}
 
 	return num

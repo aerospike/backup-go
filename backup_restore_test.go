@@ -1526,7 +1526,7 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 func genRecords(namespace, set string, numRec int, bins a.BinMap) ([]*a.Record, error) {
 	userKeys := []any{1, "string", []byte("bytes")}
 	recs := make([]*a.Record, numRec)
-	for i := 0; i < numRec; i++ {
+	for i := range numRec {
 		userKey := userKeys[i%len(userKeys)]
 		switch k := userKey.(type) {
 		case int:
@@ -1534,7 +1534,7 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) ([]*a.Record, 
 		case string:
 			userKey = k + fmt.Sprint(i)
 		case []byte:
-			k = append(k, []byte(fmt.Sprint(i))...)
+			k = fmt.Appendf(k, "%d", i)
 			userKey = k
 		}
 		key, err := a.NewKey(namespace, set, userKey)

@@ -314,7 +314,7 @@ func TestConcurrentWrites(t *testing.T) {
 	var wg sync.WaitGroup
 	writers := make([]io.WriteCloser, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		writeCloser, err := writer.NewWriter(context.Background(), "concurrent-test")
 		if err != nil {
 			t.Fatalf("Failed to create writer %d: %v", i, err)
@@ -322,13 +322,13 @@ func TestConcurrentWrites(t *testing.T) {
 		writers[i] = writeCloser
 	}
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(id int, writeCloser io.WriteCloser) {
 			defer wg.Done()
 			defer writeCloser.Close()
 
-			for j := 0; j < writesPerGoroutine; j++ {
+			for j := range writesPerGoroutine {
 				data := []byte("goroutine-" + string(rune(id+'0')) + "-write-" + string(rune(j+'0')) + "\n")
 				_, err := writeCloser.Write(data)
 				if err != nil {

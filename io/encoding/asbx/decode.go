@@ -123,8 +123,8 @@ func (d *Decoder[T]) NextToken() (T, error) {
 // Because binary.BigEndian works only with standard sizes (uint16, uint32, uint64).
 func fieldToInt64(header []byte) int64 {
 	var num int64
-	for i := 0; i < len(header); i++ {
-		num = (num << 8) | int64(header[i])
+	for _, b := range header {
+		num = (num << 8) | int64(b)
 	}
 
 	return num

@@ -14,7 +14,10 @@
 
 package collections
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // CheckDuplicates checks if a slice of ints or strings contains duplicates.
 // It returns an error listing the duplicated values, or nil if all unique.
@@ -25,14 +28,7 @@ func CheckDuplicates[T comparable](items []T) error {
 	for _, v := range items {
 		if _, exists := seen[v]; exists {
 			// append only if not already recorded as duplicate
-			already := false
-
-			for _, d := range dupes {
-				if d == v {
-					already = true
-					break
-				}
-			}
+			already := slices.Contains(dupes, v)
 
 			if !already {
 				dupes = append(dupes, v)

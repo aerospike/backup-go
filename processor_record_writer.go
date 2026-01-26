@@ -131,7 +131,7 @@ func newDiscardWriters[T models.TokenConstraint](
 	logger *slog.Logger,
 ) []pipe.Writer[T] {
 	dataWriters := make([]pipe.Writer[T], parallelism)
-	for i := 0; i < parallelism; i++ {
+	for i := range parallelism {
 		dataWriters[i] = newWriterWithTokenStats[T](&discardWriter[T]{}, stats, logger)
 	}
 

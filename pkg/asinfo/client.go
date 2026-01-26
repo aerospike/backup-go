@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -932,9 +933,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	var base64Res string
 	// Looks like the "replicas" response didn't look like any known info responses,
 	// so we can't use standard parsing func.
-	nsResults := strings.Split(result, ";")
-
-	for _, nsRes := range nsResults {
+	for nsRes := range strings.SplitSeq(result, ";") {
 		res := strings.Split(nsRes, ":")
 		if len(res) != 2 {
 			// Skip potentially broken response.
@@ -1282,7 +1281,7 @@ func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, n
 			continue
 		}
 
-		if len(sets) == 0 || contains(sets, setName) {
+		if len(sets) == 0 || slices.Contains(sets, setName) {
 			objectCount, ok := setInfo["objects"]
 			if !ok {
 				return 0, fmt.Errorf("objects number missing in response %s", response[cmd])
@@ -1326,16 +1325,6 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 	}
 
 	return 0, fmt.Errorf("failed to parse record info request")
-}
-
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoPolicy, namespace string,

@@ -138,7 +138,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 	}
 
 	var allBytesWritten []byte
-	for i := 0; i < times; i++ {
+	for range times {
 		bytes := randomBytes(bytes)
 		n, err := writer.Write(bytes)
 		if err != nil {
@@ -213,7 +213,7 @@ func (s *writeReadTestSuite) writeSingleFile(bytes, times int, client *s3.Client
 	}
 
 	var allBytesWritten []byte
-	for i := 0; i < times; i++ {
+	for range times {
 		bytes := randomBytes(bytes)
 		n, err := writer.Write(bytes)
 		if err != nil {

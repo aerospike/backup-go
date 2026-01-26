@@ -458,7 +458,7 @@ func keyToASB(k *a.Key, w io.Writer) (int, error) {
 
 // base64BufferPool is a pool of byte slices used for base64 encoding
 var base64BufferPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		// The buffer size is arbitrary and will be grown if needed
 		return make([]byte, 0, 1024)
 	},

@@ -133,7 +133,7 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 		return err
 	}
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testReadFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
 		if _, err := client.UploadStream(ctx, testContainerName, fileName, strings.NewReader(testFileContent), nil); err != nil {
 			return err
@@ -483,7 +483,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
@@ -534,7 +534,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
@@ -565,7 +565,7 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 	)
 	s.Require().NoError(err)
 
-	for i := 0; i < testFilesNumber; i++ {
+	for i := range testFilesNumber {
 		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)

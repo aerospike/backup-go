@@ -74,7 +74,7 @@ func TestTCPServer(t *testing.T) {
 
 	go func() {
 		// Send 3 valid messages.
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			msg, err := newMessage(testMessageB64)
 			require.NoError(t, err)
 			err = sendMessage(client, msg)

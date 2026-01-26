@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -38,13 +39,13 @@ var errInvalidToken = errors.New("invalid token")
 var (
 	// bigBufPool is a pool of big byte slices used for decoding.
 	bigBufPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return make([]byte, 0, 512)
 		},
 	}
 	// smallBufPool is a pool of small byte slices used for decoding.
 	smallBufPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return make([]byte, 0, 64)
 		},
 	}
@@ -802,7 +803,7 @@ func (r *Decoder[T]) prepareRecord(recData *recordData) (*a.Record, error) {
 func (r *Decoder[T]) readBins(count uint16) (a.BinMap, error) {
 	bins := make(a.BinMap, count)
 
-	for i := uint16(0); i < count; i++ {
+	for range count {
 		if err := _expectChar(r.reader, markerRecordBins); err != nil {
 			return nil, err
 		}
@@ -1383,7 +1384,7 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 
 	var esc bool
 
-	for i := 0; i < maxTokenSize; i++ {
+	for range maxTokenSize {
 		b, err := src.ReadByte()
 		if err != nil {
 			return nil, err
@@ -1395,10 +1396,8 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 		}
 
 		if !esc {
-			for _, delim := range delims {
-				if b == delim {
-					return buf, src.UnreadByte()
-				}
+			if slices.Contains(delims, b) {
+				return buf, src.UnreadByte()
 			}
 		}
 

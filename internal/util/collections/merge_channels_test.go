@@ -25,7 +25,7 @@ func TestMergeMultipleChannels(t *testing.T) {
 	ch3 := make(chan int)
 
 	go func() {
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			ch1 <- i
 			ch2 <- i
 			ch3 <- i

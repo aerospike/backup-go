@@ -119,7 +119,7 @@ func BenchmarkHighConcurrency(b *testing.B) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					for j := 0; j < opsPerGoroutine; j++ {
+					for range opsPerGoroutine {
 						bucket.Wait(1)
 					}
 				}()
@@ -139,7 +139,7 @@ func BenchmarkHighConcurrency(b *testing.B) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					for j := 0; j < opsPerGoroutine; j++ {
+					for range opsPerGoroutine {
 						//nolint:errcheck // No need to check error on benchmark.
 						limiter.Wait(ctx)
 					}

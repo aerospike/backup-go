@@ -28,7 +28,7 @@ const defaultPoolSize = 3
 func TestPool_Wait(t *testing.T) {
 	t.Parallel()
 	gPool := NewPool(defaultPoolSize)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		taskID := i
 		gPool.Submit(func() {
 			t.Logf("working on task %d\n", taskID)
@@ -60,7 +60,7 @@ func TestPool_RaceCondition(t *testing.T) {
 	require.NotNil(t, p)
 
 	var counter atomic.Int32
-	for i := 0; i < tasks; i++ {
+	for range tasks {
 		p.Submit(func() {
 			counter.Add(1)
 		})

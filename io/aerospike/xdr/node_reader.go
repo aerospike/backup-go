@@ -224,7 +224,7 @@ func (r *NodeReader) getStats() (*asinfo.Stats, error) {
 		delay += time.Second
 	}
 
-	for retries := 0; retries < getStatsAttempts; retries++ {
+	for range getStatsAttempts {
 		time.Sleep(delay)
 
 		stats, err := r.infoClient.GetStats(r.ctx, r.nodeName, r.config.dc, r.config.namespace)

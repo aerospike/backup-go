@@ -16,6 +16,7 @@ package backup
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -229,10 +230,8 @@ func (c *ConfigBackup) validate() error {
 		return fmt.Errorf("secret agent invalid: %w", err)
 	}
 
-	for i := range c.SetList {
-		if c.SetList[i] == models.MonitorRecordsSetName {
-			return fmt.Errorf("mrt monitor set is not allowed for backup")
-		}
+	if slices.Contains(c.SetList, models.MonitorRecordsSetName) {
+		return fmt.Errorf("mrt monitor set is not allowed for backup")
 	}
 
 	if c.EncoderType != EncoderTypeASB {

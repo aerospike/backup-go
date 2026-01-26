@@ -17,9 +17,7 @@ package pipe
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
-	"sync"
 	"testing"
 	"time"
 
@@ -27,12 +25,13 @@ import (
 	"github.com/aerospike/backup-go/pipe/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
 	testCount     = 5
 	testSize      = 10
-	testDealy     = 100 * time.Millisecond
+	testDelay     = 100 * time.Millisecond
 	testLongDelay = 300 * time.Millisecond
 )
 
@@ -56,7 +55,7 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		if mockCounter < testCount {
 			mockCounter++
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 
@@ -72,16 +71,19 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
-	go func() {
-		err := readChain.Run(context.Background())
-		require.NoError(t, err)
-	}()
+	g := &errgroup.Group{}
+
+	g.Go(func() error {
+		return readChain.Run(context.Background())
+	})
 
 	var resultCounter int
 	for range output {
 		resultCounter++
 	}
 
+	err := g.Wait()
+	require.NoError(t, err)
 	require.Equal(t, testCount, resultCounter)
 }
 
@@ -92,7 +94,7 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
-		time.Sleep(testDealy)
+		time.Sleep(testDelay)
 		return testToken(), nil
 	})
 
@@ -110,14 +112,17 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 		cancel()
 	}()
 
-	go func() {
-		err := readChain.Run(ctx)
-		require.ErrorIs(t, err, context.Canceled)
-	}()
+	g := &errgroup.Group{}
+	g.Go(func() error {
+		return readChain.Run(ctx)
+	})
 
 	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
+
+	err := g.Wait()
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
@@ -130,7 +135,7 @@ func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		if mockCounter < testCount {
 			mockCounter++
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 
@@ -146,37 +151,32 @@ func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
 	go func() {
-		defer wg.Done()
 		time.Sleep(testLongDelay)
 		cancel()
 	}()
 
-	go func() {
-		defer wg.Done()
-		err := readChain.Run(ctx)
-		require.ErrorIs(t, err, context.Canceled)
-	}()
+	g := &errgroup.Group{}
+	g.Go(func() error {
+		return readChain.Run(ctx)
+	})
 
 	<-output
 
-	wg.Wait()
+	err := g.Wait()
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
-	ctx := context.Background()
 
 	var mockCounter int
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		if mockCounter < testCount {
 			mockCounter++
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 
@@ -192,24 +192,27 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
-	go func() {
-		err := readChain.Run(ctx)
-		require.ErrorIs(t, err, errTest)
-	}()
+	g := &errgroup.Group{}
+
+	g.Go(func() error {
+		return readChain.Run(context.Background())
+	})
 
 	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
+
+	err := g.Wait()
+	require.ErrorIs(t, err, errTest)
 }
 
 func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
-	ctx := context.Background()
 
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
-		time.Sleep(testDealy)
+		time.Sleep(testDelay)
 		return testToken(), nil
 	})
 
@@ -222,27 +225,30 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
-	go func() {
-		err := readChain.Run(ctx)
-		require.ErrorIs(t, err, errTest)
-	}()
+	g := &errgroup.Group{}
+
+	g.Go(func() error {
+		return readChain.Run(context.Background())
+	})
 
 	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
+
+	err := g.Wait()
+	require.ErrorIs(t, err, errTest)
 }
 
 func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
-	ctx := context.Background()
 
 	var mockCounterRead int
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		if mockCounterRead < testCount*2 {
 			mockCounterRead++
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 
@@ -256,7 +262,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	processorMock.EXPECT().Process(testToken()).RunAndReturn(func(*models.Token) (*models.Token, error) {
 		if mockCounterProc < testCount {
 			mockCounterProc++
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), models.ErrFilteredOut
 		}
 
@@ -267,14 +273,18 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
-	go func() {
-		err := readChain.Run(ctx)
-		require.NoError(t, err)
-	}()
+	g := &errgroup.Group{}
+
+	g.Go(func() error {
+		return readChain.Run(context.Background())
+	})
 
 	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
 	}
+
+	err := g.Wait()
+	require.NoError(t, err)
 }
 
 func TestChains_WriterBackupChain(t *testing.T) {
@@ -294,26 +304,24 @@ func TestChains_WriterBackupChain(t *testing.T) {
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	g := &errgroup.Group{}
 
-	go func() {
-		defer wg.Done()
-		err := writeChain.Run(t.Context())
-		require.NoError(t, err)
-	}()
+	g.Go(func() error {
+		return writeChain.Run(context.Background())
+	})
 
-	go func() {
-		defer wg.Done()
+	g.Go(func() error {
 		for range testCount {
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			input <- testToken()
 		}
 
 		close(input)
-	}()
+		return nil
+	})
 
-	wg.Wait()
+	err := g.Wait()
+	require.NoError(t, err)
 	require.Equal(t, testCount, mockCounterWrite)
 }
 
@@ -335,29 +343,27 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
 	go func() {
 		time.Sleep(testLongDelay)
 		cancel()
 	}()
 
-	go func() {
-		defer wg.Done()
-		err := writeChain.Run(ctx)
-		require.ErrorIs(t, err, context.Canceled)
-	}()
+	g := &errgroup.Group{}
+	g.Go(func() error {
+		return writeChain.Run(ctx)
+	})
 
-	go func() {
-		defer wg.Done()
+	g.Go(func() error {
 		for range testCount {
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			input <- testToken()
 		}
-	}()
+		return nil
+	})
 
-	wg.Wait()
+	err := g.Wait()
+	require.ErrorIs(t, err, context.Canceled)
+	require.Positive(t, mockCounterWrite)
 }
 
 func TestChains_WriterBackupChainWriterError(t *testing.T) {
@@ -375,26 +381,24 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	g := &errgroup.Group{}
 
-	go func() {
-		defer wg.Done()
-		err := writeChain.Run(t.Context())
-		require.ErrorIs(t, err, errTest)
-	}()
+	g.Go(func() error {
+		return writeChain.Run(context.Background())
+	})
 
-	go func() {
-		defer wg.Done()
+	g.Go(func() error {
 		for range testCount {
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			input <- testToken()
 		}
 
 		close(input)
-	}()
+		return nil
+	})
 
-	wg.Wait()
+	err := g.Wait()
+	require.ErrorIs(t, err, errTest)
 }
 
 func TestChains_WriterBackupChainCloseError(t *testing.T) {
@@ -412,27 +416,25 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	g := &errgroup.Group{}
 
-	go func() {
-		defer wg.Done()
-		err := writeChain.Run(t.Context())
-		fmt.Println(err)
-		require.ErrorIs(t, err, errTest)
-	}()
+	g.Go(func() error {
+		err := writeChain.Run(context.Background())
+		return err
+	})
 
-	go func() {
-		defer wg.Done()
+	g.Go(func() error {
 		for range testCount {
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			input <- testToken()
 		}
 
 		close(input)
-	}()
+		return nil
+	})
 
-	wg.Wait()
+	err := g.Wait()
+	require.ErrorIs(t, err, errTest)
 }
 
 func TestChains_WriterBackupChainBothError(t *testing.T) {
@@ -450,27 +452,25 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	g := &errgroup.Group{}
 
-	go func() {
-		defer wg.Done()
-		err := writeChain.Run(t.Context())
-		fmt.Println(err)
-		require.ErrorIs(t, err, errTest)
-		require.ErrorContains(t, err, "write error")
-		require.ErrorContains(t, err, "close error")
-	}()
+	g.Go(func() error {
+		err := writeChain.Run(context.Background())
+		return err
+	})
 
-	go func() {
-		defer wg.Done()
+	g.Go(func() error {
 		for range testCount {
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			input <- testToken()
 		}
 
 		close(input)
-	}()
+		return nil
+	})
 
-	wg.Wait()
+	err := g.Wait()
+	require.ErrorIs(t, err, errTest)
+	require.ErrorContains(t, err, "write error")
+	require.ErrorContains(t, err, "close error")
 }

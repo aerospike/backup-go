@@ -17,7 +17,6 @@ package metrics
 import (
 	"context"
 	"errors"
-	"io"
 	"log/slog"
 	"testing"
 
@@ -49,7 +48,7 @@ func TestNewWriter(t *testing.T) {
 
 	// Create a collector
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
 	// Create a new Writer
@@ -112,7 +111,7 @@ func TestWriter_Write(t *testing.T) {
 
 			// Create a collector
 			ctx := context.Background()
-			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, tc.collectorEnabled)
 
 			// Create a new Writer
@@ -170,7 +169,7 @@ func TestWriter_Close(t *testing.T) {
 
 			// Create a collector
 			ctx := context.Background()
-			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
 			// Create a new Writer

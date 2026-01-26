@@ -47,7 +47,7 @@ func TestNewReader(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
 	reader := NewReader(mockReader, collector)
@@ -120,7 +120,7 @@ func TestReader_Read(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, tc.collectorEnabled)
 
 			reader := NewReader(mockReader, collector)
@@ -173,7 +173,7 @@ func TestReader_Close(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
 			reader := NewReader(mockReader, collector)

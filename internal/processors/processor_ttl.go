@@ -76,7 +76,7 @@ func (p *expirationSetter[T]) Process(token T) (T, error) {
 		ttl := record.VoidTime - now.Seconds + p.extraTTL
 		if ttl <= 0 {
 			// the record is expired
-			p.logger.Debug("record is expired", "digest", record.Key.Digest())
+			p.logger.Debug("record is expired", slog.Any("digest", record.Key.Digest()))
 			p.expired.Add(1)
 
 			return nil, errExpiredRecord

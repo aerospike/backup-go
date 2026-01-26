@@ -130,7 +130,7 @@ func (r *RetryableReader) setReader(body io.ReadCloser) {
 		// Log error, as it is not critical, doesn't interrupt the process.
 		if err != nil && r.logger != nil {
 			r.logger.Error("failed to close previous stream",
-				slog.Any("err", err),
+				slog.Any("error", err),
 			)
 		}
 	}

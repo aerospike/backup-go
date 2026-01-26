@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -727,7 +728,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 	// Try to read concurrently (should be handled gracefully)
 	done := make(chan bool, 2)
 	var tokens []*models.Token
-	var errors []error
+	var errs []error
 	var mu sync.Mutex
 
 	for range 2 {
@@ -736,7 +737,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 			token, err := reader.Read(ctx)
 			mu.Lock()
 			tokens = append(tokens, token)
-			errors = append(errors, err)
+			errs = append(errs, err)
 			mu.Unlock()
 		}()
 	}
@@ -748,7 +749,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 	// One should get the record, one should get EOF or nil
 	mu.Lock()
 	require.Len(t, tokens, 2)
-	require.Len(t, errors, 2)
+	require.Len(t, errs, 2)
 
 	validTokens := 0
 	eofErrors := 0
@@ -756,7 +757,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 		if tokens[i] != nil {
 			validTokens++
 		}
-		if errors[i] == io.EOF {
+		if errors.Is(errs[i], io.EOF) {
 			eofErrors++
 		}
 	}

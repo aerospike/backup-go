@@ -142,7 +142,7 @@ func newStateFromFile(
 	// Init current state.
 	maps.Copy(s.RecordStates, s.RecordStatesSaved)
 
-	logger.Debug("loaded state file successfully", slog.Int("filters loaded", len(s.RecordStatesSaved)))
+	logger.Debug("loaded state file successfully", slog.Int("filtersLoaded", len(s.RecordStatesSaved)))
 
 	// Run watcher on initialization.
 	go s.serve()

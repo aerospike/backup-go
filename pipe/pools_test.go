@@ -46,7 +46,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 		if currentCount < testCount*testParallel {
 			mockCounter++
 			counterMutex.Unlock()
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 		counterMutex.Unlock()
@@ -96,7 +96,7 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 		if currentCount < testCount {
 			mockCounter++
 			counterMutex.Unlock()
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testToken(), nil
 		}
 		counterMutex.Unlock()
@@ -149,7 +149,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 	go func() {
 		for range testCount {
 			for i := range pool.Inputs {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				pool.Inputs[i] <- testToken()
 			}
 		}
@@ -182,7 +182,7 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 		if currentCount < testCount {
 			mockCounter++
 			counterMutex.Unlock()
-			time.Sleep(testDealy)
+			time.Sleep(testDelay)
 			return testSize, nil
 		}
 		counterMutex.Unlock()
@@ -198,7 +198,7 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 	go func() {
 		for range testCount * 2 {
 			for i := range pool.Inputs {
-				time.Sleep(testDealy)
+				time.Sleep(testDelay)
 				pool.Inputs[i] <- testToken()
 			}
 		}

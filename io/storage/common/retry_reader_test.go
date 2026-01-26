@@ -15,7 +15,6 @@
 package common
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -43,7 +42,7 @@ var (
 
 func TestRetryableReader_New(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	policy := models.NewDefaultRetryPolicy()
 	logger := slog.Default()
 
@@ -95,7 +94,7 @@ func TestRetryableReader_New(t *testing.T) {
 func TestRetryableReader_Read(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	policy := models.NewDefaultRetryPolicy()
 	logger := slog.Default()
 
@@ -358,7 +357,7 @@ func TestIsNetworkErrorValid(t *testing.T) {
 			t.Parallel()
 
 			result := isNetworkError(w3Err)
-			assert.Equal(t, true, result)
+			assert.True(t, result)
 		})
 	}
 }
@@ -367,8 +366,8 @@ func TestIsNetworkErrorInvalid(t *testing.T) {
 	t.Parallel()
 
 	result := isNetworkError(errors.New("some other error"))
-	assert.Equal(t, false, result)
+	assert.False(t, result)
 
 	result = isNetworkError(nil)
-	assert.Equal(t, false, result)
+	assert.False(t, result)
 }

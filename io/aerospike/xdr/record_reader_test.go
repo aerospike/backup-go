@@ -15,7 +15,6 @@
 package xdr
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/aerospike/backup-go/io/aerospike/xdr/mocks"
 	"github.com/aerospike/backup-go/pkg/asinfo"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -88,7 +88,7 @@ func newInfoMock(t *testing.T) infoCommander {
 
 func TestRecordReader(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		// Level: slog.LevelDebug,
 	}))
@@ -103,13 +103,13 @@ func TestRecordReader(t *testing.T) {
 			token, err := r.Read(ctx)
 			switch {
 			case err == nil:
-				require.Equal(t, testKeyString, token.Key.String())
+				assert.Equal(t, testKeyString, token.Key.String())
 				counter.Add(1)
 				continue
 			case errors.Is(err, io.EOF):
 				return
 			default:
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
 		}
 	}()
@@ -122,9 +122,9 @@ func TestRecordReader(t *testing.T) {
 	go func() {
 		for range 3 {
 			msg, err := newMessage(testMessageB64)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			err = sendMessage(tcpClient, msg)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}
 	}()
 
@@ -137,7 +137,7 @@ func TestRecordReader(t *testing.T) {
 
 func TestRecordReaderCloseNotRunning(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
 
 	ic := mocks.NewMockinfoCommander(t)
@@ -150,7 +150,7 @@ func TestRecordReaderCloseNotRunning(t *testing.T) {
 
 func TestRecordReaderServeNoNodes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
 
 	ic := mocks.NewMockinfoCommander(t)

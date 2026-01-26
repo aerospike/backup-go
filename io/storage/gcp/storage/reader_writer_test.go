@@ -284,7 +284,6 @@ func (mock validatorMock) Run(fileName string) error {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesOk() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 
 	ctx := context.Background()
@@ -318,7 +317,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), testFilesNumber, filesCounter)
+				s.Require().Equal(testFilesNumber, filesCounter)
 				return
 			}
 			filesCounter++
@@ -327,7 +326,6 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 }
 
 func (s *GCPSuite) TestReader_WithSorting() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 
 	ctx := context.Background()
@@ -361,7 +359,7 @@ func (s *GCPSuite) TestReader_WithSorting() {
 			s.Require().NoError(err)
 		case f, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
+				s.Require().Equal(3, filesCounter)
 				return
 			}
 			filesCounter++
@@ -376,7 +374,6 @@ func (s *GCPSuite) TestReader_WithSorting() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesEmpty() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -398,7 +395,6 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesMixed() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -430,7 +426,7 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -439,7 +435,6 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 }
 
 func (s *GCPSuite) TestReader_GetType() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -459,11 +454,10 @@ func (s *GCPSuite) TestReader_GetType() {
 	s.Require().NoError(err)
 
 	result := reader.GetType()
-	require.Equal(s.T(), gcpStorageType, result)
+	s.Require().Equal(gcpStorageType, result)
 }
 
 func (s *GCPSuite) TestWriter_WriteEmptyDir() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -496,7 +490,6 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 }
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -517,7 +510,6 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 }
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -550,7 +542,6 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 }
 
 func (s *GCPSuite) TestWriter_WriteMixedDir() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -583,7 +574,6 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 }
 
 func (s *GCPSuite) TestWriter_GetType() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -603,11 +593,10 @@ func (s *GCPSuite) TestWriter_GetType() {
 	s.Require().NoError(err)
 
 	result := writer.GetType()
-	require.Equal(s.T(), gcpStorageType, result)
+	s.Require().Equal(gcpStorageType, result)
 }
 
 func (s *GCPSuite) TestReader_OpenFileOk() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -638,7 +627,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 1, filesCounter)
+				s.Require().Equal(1, filesCounter)
 				return
 			}
 			filesCounter++
@@ -647,7 +636,6 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 }
 
 func (s *GCPSuite) TestReader_OpenFileErr() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -677,7 +665,6 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 }
 
 func (s *GCPSuite) TestWriter_WriteSingleFile() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -705,7 +692,6 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 }
 
 func (s *GCPSuite) TestReader_WithStartOffset() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -741,7 +727,7 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
+				s.Require().Equal(3, filesCounter)
 				return
 			}
 			filesCounter++
@@ -750,7 +736,6 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 }
 
 func (s *GCPSuite) TestReader_StreamPathList() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -788,7 +773,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -797,7 +782,6 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesList() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -834,7 +818,7 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -843,7 +827,6 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 }
 
 func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := storage.NewClient(
@@ -880,7 +863,7 @@ func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 			s.Require().NoError(err)
 		case f, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 5, filesCounter)
+				s.Require().Equal(5, filesCounter)
 				return
 			}
 			filesCounter++
@@ -917,7 +900,6 @@ func readAll(r io.ReadCloser) (string, error) {
 }
 
 func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 
 	ctx := context.Background()
@@ -950,7 +932,7 @@ func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				goto Done
 			}
 			filesCounter++
@@ -959,7 +941,7 @@ func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
 
 Done:
 	skipped := reader.GetSkipped()
-	require.Equal(s.T(), 3, len(skipped))
+	s.Require().Len(skipped, 3)
 }
 
 func TestWriter_GetOptions(t *testing.T) {

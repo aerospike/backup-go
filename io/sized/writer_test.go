@@ -56,9 +56,9 @@ func Test_writeCloserSized(t *testing.T) {
 		return writer2, nil
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(t.Context(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	defer wcs.Close()
 
@@ -112,9 +112,9 @@ func Test_writeCloserSized_WithSaveCommandChan(t *testing.T) {
 		return writer2, nil
 	}
 
-	wcs, err := NewWriter(context.Background(), 5, saveCommandChan, 10, open)
+	wcs, err := NewWriter(t.Context(), 5, saveCommandChan, 10, open)
 	require.NotNil(t, wcs)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	defer wcs.Close()
 
@@ -152,9 +152,9 @@ func Test_writeCloserSized_CloseError(t *testing.T) {
 		return nil, fmt.Errorf("should not be called")
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(t.Context(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	n, err := wcs.Write([]byte("test"))
 	wcs.sizeCounter.Add(4)
@@ -175,9 +175,9 @@ func Test_writeCloserSized_OpenError(t *testing.T) {
 		return nil, fmt.Errorf("open error")
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(t.Context(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = wcs.Write([]byte("test"))
 	require.Error(t, err)
@@ -191,9 +191,9 @@ func Test_writeCloserSized_CloseNilWriter(t *testing.T) {
 		return nil, fmt.Errorf("open error")
 	}
 
-	wcs, err := NewWriter(context.Background(), 1, nil, 10, open)
+	wcs, err := NewWriter(t.Context(), 1, nil, 10, open)
 	require.NotNil(t, wcs)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = wcs.Close()
 	require.NoError(t, err)

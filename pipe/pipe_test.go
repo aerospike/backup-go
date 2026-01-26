@@ -35,8 +35,6 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 		mockCounter  int
 		counterMutex sync.Mutex
 	)
-	ctx := context.Background()
-
 	readersMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		counterMutex.Lock()
 		currentCount := mockCounter
@@ -90,7 +88,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	err = p.Run(ctx)
+	err = p.Run(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, testCount*testParallel, mockCounterWrite)
 
@@ -107,8 +105,6 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 		mockCounter  int
 		counterMutex sync.Mutex
 	)
-	ctx := context.Background()
-
 	readersMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		counterMutex.Lock()
 		currentCount := mockCounter
@@ -162,7 +158,7 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	err = p.Run(ctx)
+	err = p.Run(t.Context())
 	require.ErrorIs(t, err, errTest)
 }
 

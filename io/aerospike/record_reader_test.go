@@ -15,7 +15,6 @@
 package aerospike
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -74,7 +73,7 @@ func TestAerospikeRecordReader(t *testing.T) {
 		nil,
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
@@ -98,7 +97,7 @@ func TestAerospikeRecordReader(t *testing.T) {
 
 	v, err := reader.Read(ctx)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	require.Equal(t, expectedRecToken, v)
 	mockScanner.AssertExpectations(t)
@@ -142,7 +141,7 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 		nil,
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
@@ -165,7 +164,7 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 	require.NotNil(t, reader)
 
 	v, err := reader.Read(ctx)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Nil(t, v)
 
 	time.Sleep(10 * time.Millisecond)
@@ -194,7 +193,7 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 		mockRecordSet,
 		nil,
 	)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
@@ -239,7 +238,7 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 		a.ErrInvalidParam,
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	defer closer.AssertExpectations(t)
@@ -261,7 +260,7 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 	require.NotNil(t, reader)
 
 	v, err := reader.Read(ctx)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Nil(t, v)
 	mockScanner.AssertExpectations(t)
 }
@@ -313,7 +312,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 		nil,
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
 	defer closer.AssertExpectations(t)
@@ -335,7 +334,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 	require.NotNil(t, reader)
 
 	v, err := reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedRecToken := models.NewRecordToken(mockRec, 0, nil)
 	require.Equal(t, expectedRecToken, v)
 
@@ -370,14 +369,14 @@ func TestSIndexReader(t *testing.T) {
 		expectedSIndexTokens = append(expectedSIndexTokens, models.NewSIndexToken(sindex, 0))
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	v, err := reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, v, expectedSIndexTokens[0])
 
 	v, err = reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, v, expectedSIndexTokens[1])
 
 	v, err = reader.Read(ctx)
@@ -400,7 +399,7 @@ func TestSIndexReader(t *testing.T) {
 	require.NotNil(t, reader)
 
 	v, err = reader.Read(ctx)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Nil(t, v)
 
 	mockSIndexGetter.AssertExpectations(t)
@@ -431,14 +430,14 @@ func TestUDFReader(t *testing.T) {
 		expectedUDFTokens = append(expectedUDFTokens, models.NewUDFToken(udf, 0))
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	v, err := reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, v, expectedUDFTokens[0])
 
 	v, err = reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, v, expectedUDFTokens[1])
 
 	v, err = reader.Read(ctx)
@@ -460,8 +459,8 @@ func TestUDFReaderReadFailed(t *testing.T) {
 	reader := NewUDFReader(mockUDFGetter, slog.Default())
 	require.NotNil(t, reader)
 
-	v, err := reader.Read(context.Background())
-	require.NotNil(t, err)
+	v, err := reader.Read(t.Context())
+	require.Error(t, err)
 	require.Nil(t, v)
 }
 

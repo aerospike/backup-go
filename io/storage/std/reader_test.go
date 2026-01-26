@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +35,7 @@ const (
 func TestReader_GetType(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
@@ -44,7 +45,7 @@ func TestReader_GetType(t *testing.T) {
 func TestReader_NegativeBuffer(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, -10)
 	require.Error(t, err)
 	require.Nil(t, r)
@@ -53,7 +54,7 @@ func TestReader_NegativeBuffer(t *testing.T) {
 func TestReader_GetSize(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
@@ -63,7 +64,7 @@ func TestReader_GetSize(t *testing.T) {
 func TestReader_GetNumber(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
@@ -73,7 +74,7 @@ func TestReader_GetNumber(t *testing.T) {
 func TestReader_CtxCancelled(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	r, err := NewReader(ctx, defaultBufferSize)
 	require.Error(t, err)
@@ -83,7 +84,7 @@ func TestReader_CtxCancelled(t *testing.T) {
 func TestReader_ListObjects(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
@@ -111,10 +112,10 @@ func TestReader_StreamFiles(t *testing.T) {
 		defer w.Close()
 		defer wg.Done()
 		_, err := w.WriteString(testData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
@@ -160,10 +161,10 @@ func TestReader_StreamFile(t *testing.T) {
 		defer w.Close()
 		defer wg.Done()
 		_, err := w.WriteString(testData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 
@@ -196,7 +197,7 @@ func TestReader_EmptyStdin(t *testing.T) {
 
 	w.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)
 	require.NoError(t, err)
 

@@ -15,7 +15,6 @@
 package aerospike
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
@@ -59,7 +58,7 @@ func (f *mockDBWriter) PutPayload(*a.WritePolicy, *a.Key, []byte) a.Error { retu
 func newTestWriter(t *testing.T, asc dbWriter) *batchRecordWriter {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	wp := &a.WritePolicy{}
 	stats := &models.RestoreStats{}
 	logger := slog.New(slog.DiscardHandler)

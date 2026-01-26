@@ -31,7 +31,7 @@ const (
 
 func TestLazyWriter(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	filePath := path.Join(t.TempDir(), testFileName)
 

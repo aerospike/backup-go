@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -45,7 +44,7 @@ func TestState(t *testing.T) {
 		NewPartitionFilterByID(2),
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cfg := NewDefaultBackupConfig()
 	cfg.StateFile = tempFile
@@ -98,11 +97,11 @@ func TestState(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check restore.
-	newCtx := context.Background()
+	newCtx := t.Context()
 	cfg.Continue = true
 	newState, err := NewState(newCtx, cfg, reader, writer, logger)
 	require.NoError(t, err)
 	newPf, err := newState.loadPartitionFilters()
 	require.NoError(t, err)
-	require.Equal(t, len(testFilters), len(newPf))
+	require.Len(t, newPf, len(testFilters))
 }

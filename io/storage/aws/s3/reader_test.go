@@ -259,7 +259,6 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 }
 
 func (s *AwsSuite) TestReader_WithStartAfter() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -291,7 +290,7 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -300,7 +299,6 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 }
 
 func (s *AwsSuite) TestReader_StreamPathList() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -343,7 +341,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -352,7 +350,6 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesList() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -393,7 +390,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -402,7 +399,6 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 }
 
 func (s *AwsSuite) TestReader_WithSorting() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -439,7 +435,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 			s.Require().NoError(err)
 		case f, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
+				s.Require().Equal(3, filesCounter)
 				return
 			}
 			filesCounter++
@@ -454,7 +450,6 @@ func (s *AwsSuite) TestReader_WithSorting() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -488,7 +483,7 @@ func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 			s.Require().NoError(err)
 		case f, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 5, filesCounter)
+				s.Require().Equal(5, filesCounter)
 				return
 			}
 			filesCounter++
@@ -525,7 +520,6 @@ func readAll(r io.ReadCloser) (string, error) {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesOk() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -561,7 +555,7 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), testFilesNumber, filesCounter)
+				s.Require().Equal(testFilesNumber, filesCounter)
 				return
 			}
 			filesCounter++
@@ -570,7 +564,6 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesEmpty() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -595,7 +588,6 @@ func (s *AwsSuite) TestReader_StreamFilesEmpty() {
 }
 
 func (s *AwsSuite) TestReader_StreamFilesMixed() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -631,7 +623,7 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), testFilesNumber/2, filesCounter) // Only half of the files have .asb extension
+				s.Require().Equal(testFilesNumber/2, filesCounter) // Only half of the files have .asb extension
 				return
 			}
 			filesCounter++
@@ -640,7 +632,6 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 }
 
 func (s *AwsSuite) TestReader_GetType() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -655,11 +646,10 @@ func (s *AwsSuite) TestReader_GetType() {
 	s.Require().NoError(err)
 
 	result := reader.GetType()
-	require.Equal(s.T(), s3type, result)
+	s.Require().Equal(s3type, result)
 }
 
 func (s *AwsSuite) TestReader_OpenFileOk() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -686,7 +676,7 @@ func (s *AwsSuite) TestReader_OpenFileOk() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 1, filesCounter)
+				s.Require().Equal(1, filesCounter)
 				return
 			}
 			filesCounter++
@@ -695,7 +685,6 @@ func (s *AwsSuite) TestReader_OpenFileOk() {
 }
 
 func (s *AwsSuite) TestReader_OpenFileErr() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -812,10 +801,10 @@ func TestParseStorageClass(t *testing.T) {
 			result, err := parseStorageClass(tc.class)
 
 			if tc.expectedError != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tc.expectedError.Error(), err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tc.expected, result)
@@ -879,10 +868,10 @@ func TestParseAccessTier(t *testing.T) {
 			result, err := parseAccessTier(tc.tier)
 
 			if tc.expectedError != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tc.expectedError.Error(), err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tc.expected, result)
@@ -891,7 +880,6 @@ func TestParseAccessTier(t *testing.T) {
 }
 
 func (s *AwsSuite) TestReader_ListObjects() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -912,7 +900,7 @@ func (s *AwsSuite) TestReader_ListObjects() {
 	s.Require().NoError(err)
 
 	// Check that the correct number of objects is returned
-	s.Require().Equal(testFilesNumber, len(objects), "Expected number of objects to be equal to testFilesNumber")
+	s.Require().Len(objects, testFilesNumber, "Expected number of objects to be equal to testFilesNumber")
 
 	// Check that all objects have the correct prefix
 	for _, obj := range objects {
@@ -989,7 +977,6 @@ func TestReader_ShouldSkip(t *testing.T) {
 }
 
 func (s *AwsSuite) TestReader_SetObjectsToStream() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -1031,7 +1018,7 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), len(objectsToStream), filesCounter)
+				s.Require().Equal(len(objectsToStream), filesCounter)
 				return
 			}
 			filesCounter++
@@ -1040,7 +1027,6 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 }
 
 func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	client, err := testClient(ctx)
@@ -1076,7 +1062,7 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				goto Done
 			}
 			filesCounter++
@@ -1085,13 +1071,13 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 
 Done:
 	skipped := reader.GetSkipped()
-	require.Equal(s.T(), 3, len(skipped))
+	s.Require().Len(skipped, 3)
 }
 
 // TestNewReader_WithAccessTier_Standard tests warming with Standard tier.
 func TestNewReader_WithAccessTier_Standard(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1134,14 +1120,14 @@ func TestNewReader_WithAccessTier_Standard(t *testing.T) {
 
 	reader, err := NewReader(ctx, mockClient, testBucket, opts)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, reader)
 }
 
 // TestNewReader_WithAccessTier_Expedited tests warming with Expedited tier.
 func TestNewReader_WithAccessTier_Expedited(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1201,14 +1187,14 @@ func TestNewReader_WithAccessTier_Expedited(t *testing.T) {
 
 	time.Sleep(15 * time.Millisecond)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, reader)
 }
 
 // TestReader_RestoreObject_Success tests successful object restoration.
 func TestReader_RestoreObject_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1221,7 +1207,7 @@ func TestReader_RestoreObject_Success(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		RestoreObject(ctx, mock.MatchedBy(func(input *s3.RestoreObjectInput) bool {
@@ -1234,13 +1220,13 @@ func TestReader_RestoreObject_Success(t *testing.T) {
 
 	err = reader.restoreObject(ctx, testFile, types.TierStandard)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestReader_RestoreObject_Error tests error handling in restoreObject.
 func TestReader_RestoreObject_Error(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1253,7 +1239,7 @@ func TestReader_RestoreObject_Error(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		RestoreObject(ctx, mock.Anything).
@@ -1262,14 +1248,14 @@ func TestReader_RestoreObject_Error(t *testing.T) {
 
 	err = reader.restoreObject(ctx, testFile, types.TierStandard)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to restore object")
 }
 
 // TestReader_WarmStorage_Success tests successful storage warming.
 func TestReader_WarmStorage_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1282,7 +1268,7 @@ func TestReader_WarmStorage_Success(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	reader.PathList = []string{testDir}
 	reader.objectsToWarm = make([]string, 0)
 
@@ -1306,13 +1292,13 @@ func TestReader_WarmStorage_Success(t *testing.T) {
 
 	err = reader.warmStorage(ctx, types.TierStandard)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestReader_WarmDirectory_ArchivedObject tests warming archived object.
 func TestReader_WarmDirectory_ArchivedObject(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1325,7 +1311,7 @@ func TestReader_WarmDirectory_ArchivedObject(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	reader.objectsToWarm = make([]string, 0)
 
 	// For ListObjects.
@@ -1354,7 +1340,7 @@ func TestReader_WarmDirectory_ArchivedObject(t *testing.T) {
 
 	err = reader.warmDirectory(ctx, testDir, types.TierStandard)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, reader.objectsToWarm, 1)
 	assert.Equal(t, "test-dir/file1.txt", reader.objectsToWarm[0])
 }
@@ -1362,7 +1348,7 @@ func TestReader_WarmDirectory_ArchivedObject(t *testing.T) {
 // TestReader_WarmDirectory_RestoringObject tests warming already restoring object.
 func TestReader_WarmDirectory_RestoringObject(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1375,7 +1361,7 @@ func TestReader_WarmDirectory_RestoringObject(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	reader.objectsToWarm = make([]string, 0)
 
 	// For ListObjects.
@@ -1399,14 +1385,14 @@ func TestReader_WarmDirectory_RestoringObject(t *testing.T) {
 
 	err = reader.warmDirectory(ctx, testDir, types.TierStandard)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, reader.objectsToWarm, 1)
 }
 
 // TestReader_WarmDirectory_Error tests error in warmDirectory.
 func TestReader_WarmDirectory_Error(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1419,7 +1405,7 @@ func TestReader_WarmDirectory_Error(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// For ListObjects - error.
 	mockClient.EXPECT().
@@ -1435,7 +1421,7 @@ func TestReader_WarmDirectory_Error(t *testing.T) {
 // TestReader_CheckWarm_EmptyQueue tests checkWarm with empty queue.
 func TestReader_CheckWarm_EmptyQueue(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1448,18 +1434,18 @@ func TestReader_CheckWarm_EmptyQueue(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	reader.objectsToWarm = []string{}
 
 	err = reader.checkWarm(ctx)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestReader_PollWarmDirStatus_Success tests successful polling.
 func TestReader_PollWarmDirStatus_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1472,7 +1458,7 @@ func TestReader_PollWarmDirStatus_Success(t *testing.T) {
 	}
 
 	reader, err := NewReader(ctx, mockClient, testBucket, opts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// First poll - still restoring.
 	restoreOngoing := restoreValueOngoing
@@ -1494,13 +1480,13 @@ func TestReader_PollWarmDirStatus_Success(t *testing.T) {
 
 	err = reader.pollWarmDirStatus(ctx, testFile)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestReader_PollWarmDirStatus_ContextCancelled tests context cancellation.
 func TestReader_PollWarmDirStatus_ContextCancelled(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1513,7 +1499,7 @@ func TestReader_PollWarmDirStatus_ContextCancelled(t *testing.T) {
 	}
 
 	reader, err := NewReader(ctx, mockClient, testBucket, opts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Cancel context immediately.
 	cancel()
@@ -1521,13 +1507,13 @@ func TestReader_PollWarmDirStatus_ContextCancelled(t *testing.T) {
 	err = reader.pollWarmDirStatus(ctx, testFile)
 
 	// Should return nil on context cancellation.
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestReader_PollWarmDirStatus_Error tests error in polling.
 func TestReader_PollWarmDirStatus_Error(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1540,7 +1526,7 @@ func TestReader_PollWarmDirStatus_Error(t *testing.T) {
 	}
 
 	reader, err := NewReader(ctx, mockClient, testBucket, opts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Polling returns error.
 	mockClient.EXPECT().
@@ -1556,7 +1542,7 @@ func TestReader_PollWarmDirStatus_Error(t *testing.T) {
 // TestReader_WarmStorage_RestoreFailed tests error in restore during warming.
 func TestReader_WarmStorage_RestoreFailed(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1569,7 +1555,7 @@ func TestReader_WarmStorage_RestoreFailed(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	reader.PathList = []string{testDir}
 	reader.objectsToWarm = make([]string, 0)
 
@@ -1599,14 +1585,14 @@ func TestReader_WarmStorage_RestoreFailed(t *testing.T) {
 
 	err = reader.warmStorage(ctx, types.TierStandard)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to warm directory")
 }
 
 // TestReader_WarmStorage_MultipleFiles tests warming multiple files.
 func TestReader_WarmStorage_MultipleFiles(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1619,7 +1605,7 @@ func TestReader_WarmStorage_MultipleFiles(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	reader.PathList = []string{testDir}
 	reader.objectsToWarm = make([]string, 0)
 	reader.PollWarmDuration = 10 * time.Millisecond
@@ -1675,13 +1661,13 @@ func TestReader_WarmStorage_MultipleFiles(t *testing.T) {
 
 	err = reader.warmStorage(ctx, types.TierStandard)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestReader_CheckWarm_PollError tests error in checkWarm polling.
 func TestReader_CheckWarm_PollError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1694,7 +1680,7 @@ func TestReader_CheckWarm_PollError(t *testing.T) {
 	}
 
 	reader, err := NewReader(ctx, mockClient, testBucket, opts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	reader.objectsToWarm = []string{testFile}
 
 	// Polling returns error
@@ -1705,6 +1691,6 @@ func TestReader_CheckWarm_PollError(t *testing.T) {
 
 	err = reader.checkWarm(ctx)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to poll dir status")
 }

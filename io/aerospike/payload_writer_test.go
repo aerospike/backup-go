@@ -15,7 +15,6 @@
 package aerospike
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -47,13 +46,11 @@ func TestPayloadWriterSuccess(t *testing.T) {
 	mockDBWriter.EXPECT().PutPayload(policy, key, payload).Return(nil)
 
 	stats := models.NewRestoreStats()
-	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
+	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	ctx := context.Background()
-
 	writer := newPayloadWriter(
-		ctx,
+		t.Context(),
 		mockDBWriter,
 		policy,
 		stats,
@@ -64,7 +61,7 @@ func TestPayloadWriterSuccess(t *testing.T) {
 	)
 
 	err := writer.writePayload(token)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 1, int(stats.GetRecordsInserted()))
 
 	mockDBWriter.AssertExpectations(t)
@@ -100,10 +97,10 @@ func TestPayloadWriterRetry(t *testing.T) {
 		Multiplier:  1,
 		MaxRetries:  2,
 	}
-	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
+	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	writer := newPayloadWriter(
 		ctx,
@@ -117,7 +114,7 @@ func TestPayloadWriterRetry(t *testing.T) {
 	)
 
 	err := writer.writePayload(token)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 1, int(stats.GetRecordsInserted()))
 
 	mockDBWriter.AssertExpectations(t)
@@ -151,10 +148,10 @@ func TestPayloadWriterRetryExhausted(t *testing.T) {
 		Multiplier:  1,
 		MaxRetries:  3,
 	}
-	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
+	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	writer := newPayloadWriter(
 		ctx,
@@ -168,7 +165,7 @@ func TestPayloadWriterRetryExhausted(t *testing.T) {
 	)
 
 	err := writer.writePayload(token)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Equal(t, 0, int(stats.GetRecordsInserted()))
 
 	mockDBWriter.AssertExpectations(t)
@@ -201,10 +198,10 @@ func TestPayloadWriterNonRetryableError(t *testing.T) {
 		Multiplier:  1,
 		MaxRetries:  2,
 	}
-	rpsCollector := metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond,
+	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		"test metric message", true)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	writer := newPayloadWriter(
 		ctx,
@@ -218,7 +215,7 @@ func TestPayloadWriterNonRetryableError(t *testing.T) {
 	)
 
 	err := writer.writePayload(token)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Equal(t, 0, int(stats.GetRecordsInserted()))
 
 	mockDBWriter.AssertExpectations(t)

@@ -38,8 +38,6 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 		counterMutex sync.Mutex
 	)
 
-	ctx := context.Background()
-
 	readMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		counterMutex.Lock()
 		currentCount := mockCounter
@@ -66,7 +64,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{readMock, readMock, readMock}, newProcessorMock)
 	require.NotNil(t, pool)
 
-	err := pool.Run(ctx)
+	err := pool.Run(t.Context())
 	require.NoError(t, err)
 
 	var resultCounter int
@@ -87,8 +85,6 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 		mockCounter  int
 		counterMutex sync.Mutex
 	)
-
-	ctx := context.Background()
 
 	readMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		counterMutex.Lock()
@@ -116,7 +112,7 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{readMock, readMock, readMock}, newProcessorMock)
 	require.NotNil(t, pool)
 
-	err := pool.Run(ctx)
+	err := pool.Run(t.Context())
 	require.ErrorIs(t, err, errTest)
 }
 
@@ -159,9 +155,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 		}
 	}()
 
-	ctx := context.Background()
-
-	err := pool.Run(ctx)
+	err := pool.Run(t.Context())
 	require.NoError(t, err)
 
 	require.Equal(t, testCount*testParallel, mockCounterWrite)
@@ -208,8 +202,6 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 		}
 	}()
 
-	ctx := context.Background()
-
-	err := pool.Run(ctx)
+	err := pool.Run(t.Context())
 	require.ErrorIs(t, err, errTest)
 }

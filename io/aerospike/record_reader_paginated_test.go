@@ -83,7 +83,7 @@ func TestAerospikeRecordReaderPaginated(t *testing.T) {
 		set,
 	).Return(mockRecordSet2, nil).Once()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet1).Return(nil)
@@ -109,14 +109,14 @@ func TestAerospikeRecordReaderPaginated(t *testing.T) {
 
 	// Read first record
 	token1, err := reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, token1)
 	require.Equal(t, "value1", token1.Record.Bins["key"])
 	require.NotNil(t, token1.Filter) // Should have partition filter
 
 	// Read second record
 	token2, err := reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, token2)
 	require.Equal(t, "value2", token2.Record.Bins["key"])
 	require.NotNil(t, token2.Filter)
@@ -162,7 +162,7 @@ func TestAerospikeRecordReaderPaginatedRecordError(t *testing.T) {
 		set,
 	).Return(mockRecordSet, nil)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
@@ -186,7 +186,7 @@ func TestAerospikeRecordReaderPaginatedRecordError(t *testing.T) {
 	require.NotNil(t, reader)
 
 	v, err := reader.Read(ctx)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Nil(t, v)
 	mockScanner.AssertExpectations(t)
 }
@@ -206,7 +206,7 @@ func TestAerospikeRecordReaderPaginatedScanFailed(t *testing.T) {
 		set,
 	).Return(nil, a.ErrInvalidParam)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	defer closer.AssertExpectations(t)
@@ -229,7 +229,7 @@ func TestAerospikeRecordReaderPaginatedScanFailed(t *testing.T) {
 	require.NotNil(t, reader)
 
 	v, err := reader.Read(ctx)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Nil(t, v)
 	mockScanner.AssertExpectations(t)
 }
@@ -307,7 +307,7 @@ func TestAerospikeRecordReaderPaginatedMultipleSets(t *testing.T) {
 		set2,
 	).Return(mockRecordSet2End, nil).Once()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet1).Return(nil)
@@ -339,7 +339,7 @@ func TestAerospikeRecordReaderPaginatedMultipleSets(t *testing.T) {
 
 	for recordsRead < 2 {
 		token, err := reader.Read(ctx)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, token)
 		require.NotNil(t, token.Filter)
 
@@ -377,7 +377,7 @@ func TestAerospikeRecordReaderPaginatedContextCanceled(t *testing.T) {
 	mockScanner := mocks.NewMockscanner(t)
 	closer := mocks.NewMockRecordsetCloser(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	reader := NewRecordReader(
 		ctx,
@@ -440,7 +440,7 @@ func TestAerospikeRecordReaderPaginatedWithScanLimiter(t *testing.T) {
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
 	closer.EXPECT().Close(mockRecordSetEnd).Return(nil)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	scanLimiter := semaphore.NewWeighted(1) // Only allow 1 concurrent scan
 
 	reader := NewRecordReader(
@@ -462,7 +462,7 @@ func TestAerospikeRecordReaderPaginatedWithScanLimiter(t *testing.T) {
 
 	// Read record
 	token, err := reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, token)
 	require.Equal(t, "value", token.Record.Bins["key"])
 
@@ -517,7 +517,7 @@ func TestAerospikeRecordReaderPaginatedIgnoreInvalidNodeError(t *testing.T) {
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
 	closer.EXPECT().Close(mockRecordSetEnd).Return(nil)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	reader := NewRecordReader(
 		ctx,
@@ -537,7 +537,7 @@ func TestAerospikeRecordReaderPaginatedIgnoreInvalidNodeError(t *testing.T) {
 
 	// Should read valid record (invalid node error ignored)
 	token, err := reader.Read(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, token)
 	require.Equal(t, "value1", token.Record.Bins["key"])
 
@@ -573,7 +573,7 @@ func TestAerospikeRecordReaderPaginatedRecordsetCloseError(t *testing.T) {
 	closer := mocks.NewMockRecordsetCloser(t)
 	closer.EXPECT().Close(mockRecordSet).Return(a.ErrNetwork).Once()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	reader := NewRecordReader(
 		ctx,
@@ -592,7 +592,7 @@ func TestAerospikeRecordReaderPaginatedRecordsetCloseError(t *testing.T) {
 	require.NotNil(t, reader)
 
 	token, err := reader.Read(ctx)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to close record set")
 	require.Nil(t, token)
 
@@ -638,7 +638,7 @@ func TestAerospikeRecordReaderPaginatedLargePageSize(t *testing.T) {
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
 	closer.EXPECT().Close(mockRecordSetEnd).Return(nil)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	reader := NewRecordReader(
 		ctx,
@@ -659,7 +659,7 @@ func TestAerospikeRecordReaderPaginatedLargePageSize(t *testing.T) {
 	// Read all 5 records
 	for i := range 5 {
 		token, err := reader.Read(ctx)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, token)
 		require.Equal(t, fmt.Sprintf("value%d", i), token.Record.Bins["key"])
 	}
@@ -707,7 +707,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 	closer.EXPECT().Close(mockRecordSet).Return(nil)
 	closer.EXPECT().Close(mockRecordSetEnd).Return(nil)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	reader := NewRecordReader(
 		ctx,

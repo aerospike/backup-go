@@ -22,6 +22,7 @@ import (
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilterBin_NonRecordToken(t *testing.T) {
@@ -36,7 +37,7 @@ func TestFilterBin_NonRecordToken(t *testing.T) {
 
 	result, err := processor.Process(token)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, token, result)
 	assert.Equal(t, uint64(0), skipped.Load())
 }
@@ -58,7 +59,7 @@ func TestFilterBin_RecordWithNoBins(t *testing.T) {
 
 	result, err := processor.Process(token)
 
-	assert.ErrorIs(t, err, models.ErrFilteredOut)
+	require.ErrorIs(t, err, models.ErrFilteredOut)
 	assert.Nil(t, result)
 	assert.Equal(t, uint64(1), skipped.Load())
 }
@@ -87,7 +88,7 @@ func TestFilterBin_RecordWithBinsToKeep(t *testing.T) {
 
 	result, err := processor.Process(token)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, expectedBins, result.Record.Bins)
 	assert.Equal(t, uint64(0), skipped.Load())
@@ -112,7 +113,7 @@ func TestFilterBin_RecordWithAllBinsRemoved(t *testing.T) {
 
 	result, err := processor.Process(token)
 
-	assert.ErrorIs(t, err, models.ErrFilteredOut)
+	require.ErrorIs(t, err, models.ErrFilteredOut)
 	assert.Nil(t, result)
 	assert.Equal(t, uint64(1), skipped.Load())
 }

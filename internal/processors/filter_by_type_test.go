@@ -15,12 +15,12 @@
 package processors
 
 import (
-	"errors"
 	"sync/atomic"
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewFilterByType(t *testing.T) {
@@ -184,11 +184,11 @@ func TestFilterByTypeProcess(t *testing.T) {
 
 			if tt.expectError {
 				assert.Nil(t, result)
-				assert.Error(t, err)
-				assert.True(t, errors.Is(err, models.ErrFilteredOut))
+				require.Error(t, err)
+				require.ErrorIs(t, err, models.ErrFilteredOut)
 				assert.Contains(t, err.Error(), tt.errorMessage)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.token, result)
 			}
 		})

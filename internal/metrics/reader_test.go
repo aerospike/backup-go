@@ -15,13 +15,13 @@
 package metrics
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockReadCloser is a mock implementation of io.ReadCloser for testing
@@ -46,7 +46,7 @@ func TestNewReader(t *testing.T) {
 		closeFunc: func() error { return nil },
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := slog.New(slog.DiscardHandler)
 	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
@@ -119,7 +119,7 @@ func TestReader_Read(t *testing.T) {
 				closeFunc: func() error { return nil },
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, tc.collectorEnabled)
 
@@ -130,10 +130,10 @@ func TestReader_Read(t *testing.T) {
 
 			assert.Equal(t, tc.expectedBytes, n)
 			if tc.expectedErr != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if tc.collectorEnabled && tc.readBytes > 0 {
@@ -172,7 +172,7 @@ func TestReader_Close(t *testing.T) {
 				closeFunc: func() error { return tc.closeErr },
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
@@ -181,10 +181,10 @@ func TestReader_Close(t *testing.T) {
 			err := reader.Close()
 
 			if tc.expectedErr != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

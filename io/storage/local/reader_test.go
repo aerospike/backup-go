@@ -15,7 +15,6 @@
 package local
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -45,7 +44,7 @@ func TestCheckRestoreDirectory_Negative_EmptyDir(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	reader, err := NewReader(
 		ctx,
 		options.WithValidator(mockValidator),
@@ -77,7 +76,7 @@ func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	streamingReader, err := NewReader(
 		ctx,
 		options.WithValidator(mockValidator),
@@ -88,7 +87,7 @@ func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go streamingReader.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -121,13 +120,13 @@ func TestDirectoryReader_StreamFiles_OneFile(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, options.WithValidator(mockValidator), options.WithDir(dir))
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -158,7 +157,7 @@ func TestDirectoryReader_StreamFiles_ErrEmptyDir(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err = NewReader(ctx, options.WithValidator(mockValidator), options.WithDir(dir))
 	require.ErrorContains(t, err, "is empty")
 }
@@ -178,7 +177,7 @@ func TestDirectoryReader_StreamFiles_ErrNoSuchFile(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	streamingReader, err := NewReader(
 		ctx,
 		options.WithValidator(mockValidator),
@@ -189,7 +188,7 @@ func TestDirectoryReader_StreamFiles_ErrNoSuchFile(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go streamingReader.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -220,7 +219,7 @@ func TestDirectoryReader_GetType(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(
 		ctx,
 		options.WithValidator(mockValidator),
@@ -268,13 +267,13 @@ func TestDirectoryReader_OpenFile(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, options.WithValidator(mockValidator), options.WithFile(filepath.Join(dir, fileName)))
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -302,13 +301,13 @@ func TestDirectoryReader_OpenFileErr(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(ctx, options.WithValidator(mockValidator), options.WithFile(filepath.Join(dir, "error")))
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -350,7 +349,7 @@ func TestDirectoryReader_StreamFiles_Nested_OK(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	streamingReader, err := NewReader(
 		ctx,
 		options.WithValidator(mockValidator),
@@ -361,7 +360,7 @@ func TestDirectoryReader_StreamFiles_Nested_OK(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go streamingReader.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -409,7 +408,7 @@ func TestDirectoryReader_StreamFilesList(t *testing.T) {
 		filepath.Join(dir, "nested2", "file2.asb"),
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	r, err := NewReader(
 		ctx,
@@ -420,7 +419,7 @@ func TestDirectoryReader_StreamFilesList(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -466,7 +465,7 @@ func TestDirectoryReader_StreamPathList(t *testing.T) {
 		filepath.Join(dir, "nested2"),
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	r, err := NewReader(
 		ctx,
@@ -477,7 +476,7 @@ func TestDirectoryReader_StreamPathList(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -509,7 +508,7 @@ func TestReader_WithSorting(t *testing.T) {
 	require.NoError(t, err)
 	err = createTmpFile(dir, "0_file_2.asbx")
 	require.NoError(t, err)
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := NewReader(
 		ctx,
 		options.WithDir(dir),
@@ -519,7 +518,7 @@ func TestReader_WithSorting(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	result := make([]string, 0, 3)
 	for {
@@ -542,7 +541,7 @@ func TestReader_StreamFilesPreloaded(t *testing.T) {
 	dir := path.Join(t.TempDir(), "TestReader_StreamFilesPreloaded")
 	err := os.MkdirAll(dir, os.ModePerm)
 	require.NoError(t, err)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	expResult := []string{"file3.asb", "0_file_2.asbx", "file1.asb", "file2.asb", "0_file_1.asbx"}
 
@@ -573,7 +572,7 @@ func TestReader_StreamFilesPreloaded(t *testing.T) {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go r.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
 
 	var counter int
 	for {
@@ -623,13 +622,13 @@ func TestReader_ListObjectsWithNestedDir(t *testing.T) {
 	require.NoError(t, err)
 
 	r, err := NewReader(
-		context.Background(),
+		t.Context(),
 		options.WithDir(dir),
 		options.WithNestedDir(),
 	)
 	require.NoError(t, err)
 
-	list, err := r.ListObjects(context.Background(), dir)
+	list, err := r.ListObjects(t.Context(), dir)
 	require.NoError(t, err)
 	require.Len(t, list, 3)
 	require.Contains(t, list, filepath.Join(dir, "nested1", "file1.asb"))
@@ -639,14 +638,14 @@ func TestReader_ListObjectsWithNestedDir(t *testing.T) {
 
 func TestReader_ListObjectsUnexistingDir(t *testing.T) {
 	r, err := NewReader(
-		context.Background(),
+		t.Context(),
 		options.WithDir("some folder"),
 		options.WithNestedDir(),
 		options.WithSkipDirCheck(),
 	)
 	require.NoError(t, err)
 
-	listObjects, err := r.ListObjects(context.Background(), "subfolder")
+	listObjects, err := r.ListObjects(t.Context(), "subfolder")
 	require.NoError(t, err)
 	require.Empty(t, listObjects)
 }
@@ -675,14 +674,14 @@ func TestReader_StreamFiles_Skipped(t *testing.T) {
 		}
 		return fmt.Errorf("invalid file extension")
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	streamingReader, err := NewReader(ctx, options.WithValidator(mockValidator), options.WithDir(dir))
 	require.NoError(t, err)
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
 
-	go streamingReader.StreamFiles(context.Background(), readerChan, errorChan, []string{prefix})
+	go streamingReader.StreamFiles(t.Context(), readerChan, errorChan, []string{prefix})
 
 	var counter int
 	for {
@@ -701,5 +700,5 @@ func TestReader_StreamFiles_Skipped(t *testing.T) {
 
 Done:
 	skipped := streamingReader.GetSkipped()
-	require.Equal(t, 2, len(skipped))
+	require.Len(t, skipped, 2)
 }

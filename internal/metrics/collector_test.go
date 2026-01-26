@@ -113,7 +113,7 @@ func TestPerSecondCollector_GetLastResult(t *testing.T) {
 func TestPerSecondCollector_Report(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, true)
@@ -126,7 +126,7 @@ func TestPerSecondCollector_Report(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond)
 
 	result := collector.GetLastResult()
-	assert.Greater(t, result, uint64(0), "Expected RecordsPerSecond to be greater than 0")
+	assert.Positive(t, result, "Expected RecordsPerSecond to be greater than 0")
 
 	cancel()
 
@@ -226,7 +226,7 @@ func TestPerSecondCollector_Add(t *testing.T) {
 func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
@@ -239,7 +239,7 @@ func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond)
 
 	result := collector.GetLastResult()
-	assert.Greater(t, result, uint64(0), "Expected KilobytesPerSecond to be greater than 0")
+	assert.Positive(t, result, "Expected KilobytesPerSecond to be greater than 0")
 
 	// The result should be approximately 1 KB/s (with some tolerance for timing variations)
 	// Since we added 1024 bytes and waited ~1 second

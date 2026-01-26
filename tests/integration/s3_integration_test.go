@@ -15,7 +15,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -87,7 +86,7 @@ func (s *writeReadTestSuite) TestWriteRead() {
 	written := s.write("ns1.asb", size, times, s3Client)
 	read := s.read(s3Client)
 
-	s.Equal(size*times, len(read))
+	s.Len(read, size*times)
 	s.Equal(written, read)
 }
 
@@ -105,7 +104,7 @@ func (s *writeReadTestSuite) TestWriteReadSingleFile() {
 	written := s.writeSingleFile(size, times, s3Client)
 	read := s.readSingleFile(s3Client)
 
-	s.Equal(size*times, len(read))
+	s.Len(read, size*times)
 	s.Equal(written, read)
 }
 
@@ -190,7 +189,7 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 		_ = r.Reader.Close()
 		return buffer
 	case err = <-errorChan:
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 	}
 	return nil
 }
@@ -255,7 +254,7 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 		_ = r.Reader.Close()
 		return buffer
 	case err = <-errorChan:
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 	}
 	return nil
 }

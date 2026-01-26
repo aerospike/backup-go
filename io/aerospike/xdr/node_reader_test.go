@@ -15,7 +15,6 @@
 package xdr
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"os"
@@ -31,7 +30,7 @@ func TestNodeReader_Run(t *testing.T) {
 	t.Parallel()
 	t.Run("StartXDRError", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("StartXDR", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
@@ -58,7 +57,7 @@ func TestNodeReader_BlockMrt(t *testing.T) {
 	t.Parallel()
 	t.Run("SuccessfulBlock", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("BlockMRTWrites", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -80,7 +79,7 @@ func TestNodeReader_BlockMrt(t *testing.T) {
 
 	t.Run("BlockError", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("BlockMRTWrites", mock.Anything, mock.Anything, mock.Anything).
@@ -107,7 +106,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 	t.Parallel()
 	t.Run("SuccessfulGetStats", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -136,7 +135,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 
 	t.Run("GetStatsError", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("GetStats", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -159,7 +158,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 
 	t.Run("DCNotFoundError", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 
@@ -196,7 +195,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 
 	t.Run("MaxRetriesExceeded", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 
@@ -224,7 +223,7 @@ func TestNodeReader_Close(t *testing.T) {
 	t.Parallel()
 	t.Run("CloseWithoutRecovery", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -251,7 +250,7 @@ func TestNodeReader_Close(t *testing.T) {
 
 	t.Run("CloseWithRecovery", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -281,7 +280,7 @@ func TestNodeReader_Close(t *testing.T) {
 
 	t.Run("CloseWithMrtStopped", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		ic := mocks.NewMockinfoCommander(t)
 		ic.On("StopXDR", mock.Anything, mock.Anything, mock.Anything).Return(nil)

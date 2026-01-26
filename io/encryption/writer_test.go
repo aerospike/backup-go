@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEncryptedWriterAndReader(t *testing.T) {
@@ -30,19 +31,19 @@ func TestEncryptedWriterAndReader(t *testing.T) {
 	key := generateKey(t)
 
 	encryptedWriter, err := NewWriter(&writeCloserBuffer{buf}, key)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testData := []byte("Hello, encrypted world!")
 	n, err := encryptedWriter.Write(testData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(testData), n)
 	err = encryptedWriter.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.NotEqual(t, testData, buf.Bytes())
 
 	encryptedReader, err := NewEncryptedReader(io.NopCloser(buf), key)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	decrypted := make([]byte, len(testData))
 	n, err = io.ReadFull(encryptedReader, decrypted)
@@ -51,7 +52,7 @@ func TestEncryptedWriterAndReader(t *testing.T) {
 	}
 
 	assert.Equal(t, decrypted, testData)
-	assert.Equal(t, n, len(testData))
+	assert.Len(t, testData, n)
 }
 
 func TestNegative(t *testing.T) {
@@ -76,7 +77,7 @@ func generateKey(t *testing.T) []byte {
 	t.Helper()
 	key := make([]byte, 32)
 	_, err := io.ReadFull(rand.Reader, key)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return key
 }
 

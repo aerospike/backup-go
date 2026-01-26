@@ -15,155 +15,155 @@
 package backup
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBackupConfig_validate(t *testing.T) {
 	config := NewDefaultBackupConfig()
-	assert.NoError(t, config.validate())
-	assert.Equal(t, true, config.withoutFilter())
+	require.NoError(t, config.validate())
+	assert.True(t, config.withoutFilter())
 
 	config.ParallelRead = -1
-	assert.ErrorContains(t, config.validate(), "parallel")
+	require.ErrorContains(t, config.validate(), "parallel")
 	config = NewDefaultBackupConfig()
 
 	config.ParallelWrite = -1
-	assert.ErrorContains(t, config.validate(), "parallel")
+	require.ErrorContains(t, config.validate(), "parallel")
 	config = NewDefaultBackupConfig()
 
 	before := time.Now()
 	after := before.Add(time.Minute)
 	config.ModBefore = &before
 	config.ModAfter = &after
-	assert.ErrorContains(t, config.validate(), "modified before")
+	require.ErrorContains(t, config.validate(), "modified before")
 	config = NewDefaultBackupConfig()
 
 	config.RecordsPerSecond = -1
-	assert.ErrorContains(t, config.validate(), "rps")
+	require.ErrorContains(t, config.validate(), "rps")
 	config = NewDefaultBackupConfig()
 
 	config.Bandwidth = -1
-	assert.ErrorContains(t, config.validate(), "bandwidth")
+	require.ErrorContains(t, config.validate(), "bandwidth")
 	config = NewDefaultBackupConfig()
 
 	config.CompressionPolicy = NewCompressionPolicy(CompressZSTD, -2)
-	assert.ErrorContains(t, config.validate(), "compression")
+	require.ErrorContains(t, config.validate(), "compression")
 	config = NewDefaultBackupConfig()
 
 	config.EncryptionPolicy = &EncryptionPolicy{}
-	assert.ErrorContains(t, config.validate(), "encryption")
+	require.ErrorContains(t, config.validate(), "encryption")
 	config = NewDefaultBackupConfig()
 
 	connectionType := "tcp"
 	config.SecretAgentConfig = &SecretAgentConfig{ConnectionType: &connectionType}
-	assert.ErrorContains(t, config.validate(), "secret agent")
+	require.ErrorContains(t, config.validate(), "secret agent")
 	config = NewDefaultBackupConfig()
 
 	config.SetList = append(config.SetList, models.MonitorRecordsSetName)
-	assert.ErrorContains(t, config.validate(), "mrt monitor set is not allowed")
+	require.ErrorContains(t, config.validate(), "mrt monitor set is not allowed")
 	config = NewDefaultBackupConfig()
 
 	config.EncoderType = EncoderTypeASBX
-	assert.ErrorContains(t, config.validate(), "encoder type")
+	require.ErrorContains(t, config.validate(), "encoder type")
 
 	config = NewDefaultBackupConfig()
 	config.RackList = []int{1, 1}
-	assert.ErrorContains(t, config.validate(), "rack list contains duplicates")
+	require.ErrorContains(t, config.validate(), "rack list contains duplicates")
 
 	config = NewDefaultBackupConfig()
 	config.NodeList = []string{"node1", "node1"}
-	assert.ErrorContains(t, config.validate(), "node list contains duplicates")
+	require.ErrorContains(t, config.validate(), "node list contains duplicates")
 
 	config = NewDefaultBackupConfig()
 	config.SetList = []string{"set1", "set1"}
-	assert.ErrorContains(t, config.validate(), "set list contains duplicates")
+	require.ErrorContains(t, config.validate(), "set list contains duplicates")
 
 	config = NewDefaultBackupConfig()
 	config.BinList = []string{"bin1", "bin1"}
-	assert.ErrorContains(t, config.validate(), "bin list contains duplicates")
+	require.ErrorContains(t, config.validate(), "bin list contains duplicates")
 }
 
 func TestRestoreConfig_validate(t *testing.T) {
 	config := NewDefaultRestoreConfig()
 
 	config.Parallel = -1
-	assert.ErrorContains(t, config.validate(), "parallel")
+	require.ErrorContains(t, config.validate(), "parallel")
 	config = NewDefaultRestoreConfig()
 
 	config.Namespace = &RestoreNamespaceConfig{}
-	assert.ErrorContains(t, config.validate(), "source namespace")
+	require.ErrorContains(t, config.validate(), "source namespace")
 	config = NewDefaultRestoreConfig()
 
 	config.Bandwidth = -1
-	assert.ErrorContains(t, config.validate(), "bandwidth")
+	require.ErrorContains(t, config.validate(), "bandwidth")
 	config = NewDefaultRestoreConfig()
 
 	config.RecordsPerSecond = -1
-	assert.ErrorContains(t, config.validate(), "rps")
+	require.ErrorContains(t, config.validate(), "rps")
 	config = NewDefaultRestoreConfig()
 
 	config.BatchSize = -1
-	assert.ErrorContains(t, config.validate(), "batch size")
+	require.ErrorContains(t, config.validate(), "batch size")
 	config = NewDefaultRestoreConfig()
 
 	config.MaxAsyncBatches = -1
-	assert.ErrorContains(t, config.validate(), "async batches")
+	require.ErrorContains(t, config.validate(), "async batches")
 	config = NewDefaultRestoreConfig()
 
 	config.CompressionPolicy = NewCompressionPolicy(CompressZSTD, -2)
-	assert.ErrorContains(t, config.validate(), "compression")
+	require.ErrorContains(t, config.validate(), "compression")
 	config = NewDefaultRestoreConfig()
 
 	config.EncryptionPolicy = &EncryptionPolicy{}
-	assert.ErrorContains(t, config.validate(), "encryption")
+	require.ErrorContains(t, config.validate(), "encryption")
 	config = NewDefaultRestoreConfig()
 
 	connectionType := "tcp"
 	config.SecretAgentConfig = &SecretAgentConfig{ConnectionType: &connectionType}
-	assert.ErrorContains(t, config.validate(), "secret agent")
+	require.ErrorContains(t, config.validate(), "secret agent")
 
 	config = NewDefaultRestoreConfig()
 	config.SetList = []string{"set1", "set1"}
-	assert.ErrorContains(t, config.validate(), "set list contains duplicates")
+	require.ErrorContains(t, config.validate(), "set list contains duplicates")
 
 	config = NewDefaultRestoreConfig()
 	config.BinList = []string{"bin1", "bin1"}
-	assert.ErrorContains(t, config.validate(), "bin list contains duplicates")
+	require.ErrorContains(t, config.validate(), "bin list contains duplicates")
 }
 
 func TestRestoreNamespaceConfig_Validate(t *testing.T) {
 	var config RestoreNamespaceConfig
-	assert.ErrorContains(t, config.validate(), "source namespace")
+	require.ErrorContains(t, config.validate(), "source namespace")
 	source := "ns1"
 	config.Source = &source
-	assert.ErrorContains(t, config.validate(), "destination namespace")
+	require.ErrorContains(t, config.validate(), "destination namespace")
 }
 
 func TestCompressionPolicy_Validate(t *testing.T) {
 	var policy CompressionPolicy
 	policy.Mode = "NA"
-	assert.ErrorContains(t, policy.validate(), "invalid compression mode")
+	require.ErrorContains(t, policy.validate(), "invalid compression mode")
 	policy.Mode = CompressNone
 	policy.Level = -2
-	assert.ErrorContains(t, policy.validate(), "invalid compression level")
+	require.ErrorContains(t, policy.validate(), "invalid compression level")
 }
 
 func TestEncryptionPolicy_Validate(t *testing.T) {
 	var policy EncryptionPolicy
 	policy.Mode = "NA"
-	assert.ErrorContains(t, policy.validate(), "invalid encryption mode")
+	require.ErrorContains(t, policy.validate(), "invalid encryption mode")
 	policy.Mode = CompressNone
-	assert.NoError(t, policy.validate())
+	require.NoError(t, policy.validate())
 	keyFile := "keyFile"
 	policy.KeyFile = &keyFile
 	keyEnv := "keyEnv"
 	policy.KeyEnv = &keyEnv
-	assert.ErrorContains(t, policy.validate(), "only one encryption key source may be specified")
+	require.ErrorContains(t, policy.validate(), "only one encryption key source may be specified")
 }
 
 func TestConfigRestore_IsValidForASBX(t *testing.T) {
@@ -279,11 +279,11 @@ func TestConfigRestore_IsValidForASBX(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.isValidForASBX()
 			if tt.wantErr != "" {
-				assert.Error(t, err)
-				assert.True(t, strings.Contains(err.Error(), tt.wantErr),
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr,
 					"expected error containing '%s', got '%s'", tt.wantErr, err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

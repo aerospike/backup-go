@@ -74,7 +74,7 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		return readChain.Run(context.Background())
+		return readChain.Run(t.Context())
 	})
 
 	var resultCounter int
@@ -91,7 +91,7 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		time.Sleep(testDelay)
@@ -129,7 +129,7 @@ func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
 	t.Parallel()
 
 	readerMock := mocks.NewMockReader[*models.Token](t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	var mockCounter int
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
@@ -195,7 +195,7 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		return readChain.Run(context.Background())
+		return readChain.Run(t.Context())
 	})
 
 	//nolint:revive // Read from output to avoid deadlock.
@@ -228,7 +228,7 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		return readChain.Run(context.Background())
+		return readChain.Run(t.Context())
 	})
 
 	//nolint:revive // Read from output to avoid deadlock.
@@ -276,7 +276,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		return readChain.Run(context.Background())
+		return readChain.Run(t.Context())
 	})
 
 	//nolint:revive // Read from output to avoid deadlock.
@@ -307,7 +307,7 @@ func TestChains_WriterBackupChain(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		return writeChain.Run(context.Background())
+		return writeChain.Run(t.Context())
 	})
 
 	g.Go(func() error {
@@ -329,7 +329,7 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 	t.Parallel()
 
 	writerMock := mocks.NewMockWriter[*models.Token](t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	var mockCounterWrite int
 	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
@@ -384,7 +384,7 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		return writeChain.Run(context.Background())
+		return writeChain.Run(t.Context())
 	})
 
 	g.Go(func() error {
@@ -419,7 +419,7 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		err := writeChain.Run(context.Background())
+		err := writeChain.Run(t.Context())
 		return err
 	})
 
@@ -455,7 +455,7 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 	g := &errgroup.Group{}
 
 	g.Go(func() error {
-		err := writeChain.Run(context.Background())
+		err := writeChain.Run(t.Context())
 		return err
 	})
 

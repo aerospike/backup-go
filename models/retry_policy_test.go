@@ -39,7 +39,7 @@ func TestNewRetryPolicy(t *testing.T) {
 
 		require.NotNil(t, policy)
 		require.Equal(t, testBaseTimeout, policy.BaseTimeout)
-		require.Equal(t, testMultiplier, policy.Multiplier)
+		require.InDelta(t, testMultiplier, policy.Multiplier, 1e-6)
 		require.Equal(t, uint(testMaxRetries), policy.MaxRetries)
 	})
 
@@ -50,7 +50,7 @@ func TestNewRetryPolicy(t *testing.T) {
 
 		require.NotNil(t, policy)
 		require.Equal(t, time.Duration(0), policy.BaseTimeout)
-		require.Equal(t, 1.0, policy.Multiplier)
+		require.InDelta(t, 1.0, policy.Multiplier, 1e-6)
 		require.Equal(t, uint(0), policy.MaxRetries)
 	})
 
@@ -65,7 +65,7 @@ func TestNewRetryPolicy(t *testing.T) {
 
 		require.NotNil(t, policy)
 		require.Equal(t, largeTimeout, policy.BaseTimeout)
-		require.Equal(t, largeMultiplier, policy.Multiplier)
+		require.InDelta(t, largeMultiplier, policy.Multiplier, 1e-6)
 		require.Equal(t, largeMaxRetries, policy.MaxRetries)
 	})
 
@@ -75,7 +75,7 @@ func TestNewRetryPolicy(t *testing.T) {
 		policy := NewRetryPolicy(testBaseTimeout, 1.5, testMaxRetries)
 
 		require.NotNil(t, policy)
-		require.Equal(t, 1.5, policy.Multiplier)
+		require.InDelta(t, 1.5, policy.Multiplier, 1e-6)
 	})
 }
 
@@ -89,7 +89,7 @@ func TestNewDefaultRetryPolicy(t *testing.T) {
 
 		require.NotNil(t, policy)
 		require.Equal(t, 1000*time.Millisecond, policy.BaseTimeout)
-		require.Equal(t, 2.0, policy.Multiplier)
+		require.InDelta(t, 2.0, policy.Multiplier, 1e-6)
 		require.Equal(t, uint(3), policy.MaxRetries)
 	})
 }
@@ -347,7 +347,7 @@ func TestRetryPolicy_Do(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if tt.contextTimeout > 0 {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, tt.contextTimeout)
@@ -376,7 +376,7 @@ func TestRetryPolicy_Do_ErrorMessages(t *testing.T) {
 		t.Parallel()
 
 		policy := NewRetryPolicy(10*time.Millisecond, 2.0, 2)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		err := policy.Do(ctx, func() error {
 			return errors.New("test error")
@@ -391,7 +391,7 @@ func TestRetryPolicy_Do_ErrorMessages(t *testing.T) {
 		t.Parallel()
 
 		policy := NewRetryPolicy(100*time.Millisecond, 2.0, 5)
-		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
 		defer cancel()
 
 		err := policy.Do(ctx, func() error {
@@ -414,7 +414,7 @@ func TestRetryPolicy_Do_ThreadSafety(t *testing.T) {
 
 	for range numGoroutines {
 		go func() {
-			ctx := context.Background()
+			ctx := t.Context()
 			callCount := 0
 
 			err := policy.Do(ctx, func() error {

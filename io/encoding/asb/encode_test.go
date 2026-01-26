@@ -179,7 +179,7 @@ func TestEncodeSIndex(t *testing.T) {
 	expected := []byte("* i ns  name N 1 bin S\n")
 	buff := &bytes.Buffer{}
 	n, err := encoder.encodeSIndex(sindex, buff)
-	require.Equal(t, len(expected), n)
+	require.Len(t, expected, n)
 	require.NoError(t, err)
 	require.Equal(t, expected, buff.Bytes())
 }

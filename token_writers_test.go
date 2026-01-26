@@ -98,7 +98,7 @@ func TestTokenWriter(t *testing.T) {
 	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
 
 	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
 
 	failRec := &models.Record{
@@ -107,7 +107,7 @@ func TestTokenWriter(t *testing.T) {
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
 	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
 	_, err = writer.Write(failRecToken)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	err = writer.Close()
 	require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestTokenStatsWriter(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	err = writer.Close()
 	require.NoError(t, err)

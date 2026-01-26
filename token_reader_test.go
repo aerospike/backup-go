@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"context"
 	"io"
 	"log/slog"
 	"testing"
@@ -24,6 +23,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // MockReadCloser is a mock implementation of io.ReadCloser
@@ -56,8 +56,8 @@ func TestTokenReader_ReadSingleToken(t *testing.T) {
 
 	tr := newTokenReader(readersCh, logger, convertFn)
 
-	token, err := tr.Read(context.Background())
-	assert.NoError(t, err)
+	token, err := tr.Read(t.Context())
+	require.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.Equal(t, models.TokenTypeRecord, token.Type)
 
@@ -79,11 +79,10 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	}
 
 	tr := newTokenReader(readersCh, logger, convertFn)
-	ctx := context.Background()
 
 	for range 3 {
-		token, err := tr.Read(ctx)
-		assert.NoError(t, err)
+		token, err := tr.Read(t.Context())
+		require.NoError(t, err)
 		assert.NotNil(t, token)
 		assert.Equal(t, models.TokenTypeRecord, token.Type)
 	}
@@ -91,7 +90,7 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	close(readersCh)
 	mockReader.On("Close").Return(nil).Once()
 
-	_, err := tr.Read(ctx)
+	_, err := tr.Read(t.Context())
 	assert.Equal(t, io.EOF, err)
 
 	mockDecoder.AssertExpectations(t)
@@ -122,11 +121,11 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 	}
 
 	tr := newTokenReader(readersCh, logger, convertFn)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Read from first decoder
 	token, err := tr.Read(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.Equal(t, models.TokenTypeRecord, token.Type)
 
@@ -134,7 +133,7 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 
 	// Read from second decoder
 	token, err = tr.Read(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.Equal(t, models.TokenTypeUDF, token.Type)
 
@@ -150,7 +149,7 @@ func TestTokenReader_ReadFromClosedChannel(t *testing.T) {
 
 	tr := newTokenReader[*models.Token](readersCh, logger, nil)
 
-	token, err := tr.Read(context.Background())
+	token, err := tr.Read(t.Context())
 	assert.Equal(t, io.EOF, err)
 	assert.Nil(t, token)
 }
@@ -171,8 +170,8 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 
 	tr := newTokenReader(readersCh, logger, convertFn)
 
-	token, err := tr.Read(context.Background())
-	assert.Error(t, err)
+	token, err := tr.Read(t.Context())
+	require.Error(t, err)
 	assert.Equal(t, expectedErr, err)
 	assert.Nil(t, token)
 

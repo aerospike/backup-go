@@ -1281,7 +1281,7 @@ func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, n
 			continue
 		}
 
-		if len(sets) == 0 || contains(sets, setName) {
+		if len(sets) == 0 || slices.Contains(sets, setName) {
 			objectCount, ok := setInfo["objects"]
 			if !ok {
 				return 0, fmt.Errorf("objects number missing in response %s", response[cmd])
@@ -1325,10 +1325,6 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 	}
 
 	return 0, fmt.Errorf("failed to parse record info request")
-}
-
-func contains(s []string, str string) bool {
-	return slices.Contains(s, str)
 }
 
 func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoPolicy, namespace string,

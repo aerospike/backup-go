@@ -1534,7 +1534,7 @@ func genRecords(namespace, set string, numRec int, bins a.BinMap) ([]*a.Record, 
 		case string:
 			userKey = k + fmt.Sprint(i)
 		case []byte:
-			k = append(k, fmt.Append(nil, i)...)
+			k = fmt.Appendf(k, "%d", i)
 			userKey = k
 		}
 		key, err := a.NewKey(namespace, set, userKey)

@@ -1739,7 +1739,7 @@ func genKey() *a.Key {
 	case string:
 		userKey = k + fmt.Sprint(i)
 	case []byte:
-		k = append(k, fmt.Append(nil, i)...)
+		k = fmt.Appendf(k, "%d", i)
 		userKey = k
 	}
 	key, err = a.NewKey("test", "demo", userKey)

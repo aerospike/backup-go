@@ -17,7 +17,6 @@ package aerospike
 import (
 	"context"
 	"errors"
-	"io"
 	"log/slog"
 	"testing"
 
@@ -63,7 +62,7 @@ func newTestWriter(t *testing.T, asc dbWriter) *batchRecordWriter {
 	ctx := context.Background()
 	wp := &a.WritePolicy{}
 	stats := &models.RestoreStats{}
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	logger := slog.New(slog.DiscardHandler)
 
 	// One attempt, no sleep.
 	rp := models.NewRetryPolicy(0, 1, 1)

@@ -16,7 +16,6 @@ package metrics
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -50,9 +49,7 @@ func TestNewPerSecondCollector(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-				Level: slog.LevelDebug,
-			}))
+			logger := slog.New(slog.DiscardHandler)
 
 			ctx := t.Context()
 			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
@@ -114,9 +111,7 @@ func TestPerSecondCollector_GetLastResult(t *testing.T) {
 }
 
 func TestPerSecondCollector_Report(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
+	logger := slog.New(slog.DiscardHandler)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -175,9 +170,7 @@ func TestPerSecondCollector_Increment(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-				Level: slog.LevelDebug,
-			}))
+			logger := slog.New(slog.DiscardHandler)
 
 			ctx := t.Context()
 			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
@@ -218,9 +211,7 @@ func TestPerSecondCollector_Add(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-				Level: slog.LevelDebug,
-			}))
+			logger := slog.New(slog.DiscardHandler)
 
 			ctx := t.Context()
 			collector := NewCollector(ctx, logger, RecordsPerSecond, testMetricMessage, tc.enabled)
@@ -233,9 +224,7 @@ func TestPerSecondCollector_Add(t *testing.T) {
 }
 
 func TestPerSecondCollector_KilobytesPerSecond(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
+	logger := slog.New(slog.DiscardHandler)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

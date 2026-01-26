@@ -113,7 +113,7 @@ func sendMessage(conn net.Conn, message []byte) error {
 	}
 
 	if _, err := conn.Write(message); err != nil {
-		return fmt.Errorf("failed to send message: %v", err)
+		return fmt.Errorf("failed to send message: %w", err)
 	}
 
 	return nil

@@ -9,6 +9,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
+    - errorlint
     - goconst
     - gocritic
     - gocyclo
@@ -19,6 +20,7 @@ linters:
     - misspell
     - modernize
     - nakedret
+    - nilerr
     - nolintlint
     - prealloc
     - predeclared
@@ -29,6 +31,8 @@ linters:
     - unconvert
     - unparam
     - unused
+    - sloglint
+    - usestdlibvars
     - whitespace
     - wsl_v5
   settings:
@@ -53,6 +57,11 @@ linters:
     nolintlint:
       require-explanation: true
       require-specific: true
+    sloglint:
+      attr-only: true
+      key-naming-case: camel
+      forbidden-keys:
+        - err # let's only use slog.Any("error", err)
     wsl_v5:
       disable:
         - assign

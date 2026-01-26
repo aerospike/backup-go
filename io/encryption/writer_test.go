@@ -17,6 +17,7 @@ package encryption
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"io"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestEncryptedWriterAndReader(t *testing.T) {
 
 	decrypted := make([]byte, len(testData))
 	n, err = io.ReadFull(encryptedReader, decrypted)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		t.Fatalf("Failed to read decrypted data: %v", err)
 	}
 

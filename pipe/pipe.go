@@ -62,6 +62,12 @@ func NewPipe[T models.TokenConstraint](
 func (p *Pipe[T]) Run(ctx context.Context) error {
 	errGroup, ctx := errgroup.WithContext(ctx)
 
+	// Fanout runs goroutine for each reader channel that routes messages to writers according to pipe strategy.
+	errGroup.Go(func() error {
+		p.fanout.Run(ctx)
+		return nil
+	})
+
 	// Run a readers pool. Each reader in a pool has an output channel, that sends data to fanout.
 	errGroup.Go(func() error {
 		return p.readPool.Run(ctx)
@@ -74,12 +80,6 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 			return err
 		}
 
-		return nil
-	})
-
-	// Fanout runs goroutine for each reader channel that routes messages to writers according to pipe strategy.
-	errGroup.Go(func() error {
-		p.fanout.Run(ctx)
 		return nil
 	})
 

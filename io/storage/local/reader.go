@@ -388,16 +388,19 @@ func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int6
 
 	for _, file := range fileInfo {
 		if file.IsDir() {
-			// Iterate over nested dirs recursively.
-			if r.WithNestedDir {
-				nestedDir := filepath.Join(path, file.Name())
-				// If the nested folder is ok, then return nil.
-				if nestedSize, nestedNum, err := r.calculateTotalSizeForPath(nestedDir); err == nil {
-					totalSize += nestedSize
-					totalNum += nestedNum
-				}
+			if !r.WithNestedDir {
+				continue
 			}
 
+			// Iterate over nested dirs recursively.
+			nestedDir := filepath.Join(path, file.Name())
+			// If the nested folder is ok, then return nil.
+			if nestedSize, nestedNum, err := r.calculateTotalSizeForPath(nestedDir); err == nil {
+				totalSize += nestedSize
+				totalNum += nestedNum
+			} else {
+				return 0, 0, err
+			}
 			continue
 		}
 

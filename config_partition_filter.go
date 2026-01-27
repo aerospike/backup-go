@@ -93,19 +93,8 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 	}
 
 	// Validations.
-	for i := range partitionFilters {
-		if partitionFilters[i].Begin < 0 {
-			return nil, fmt.Errorf("start partition is less than 0, cannot split partition filters")
-		}
-
-		if partitionFilters[i].Count < 1 {
-			return nil, fmt.Errorf("partitions count is less than 1, cannot split partition filters")
-		}
-
-		if partitionFilters[i].Begin+partitionFilters[i].Count > MaxPartitions {
-			return nil, fmt.Errorf("start partition + partitions count is greater than the max partition filters: %d",
-				MaxPartitions)
-		}
+	if err := validatePartitionFilters(partitionFilters); err != nil {
+		return nil, err
 	}
 
 	// If we have one partition filter with range.
@@ -118,6 +107,29 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 		return partitionFilters, nil
 	}
 
+	return distributePartitions(partitionFilters, numWorkers)
+}
+
+func validatePartitionFilters(partitionFilters []*a.PartitionFilter) error {
+	for i := range partitionFilters {
+		if partitionFilters[i].Begin < 0 {
+			return fmt.Errorf("start partition is less than 0, cannot split partition filters")
+		}
+
+		if partitionFilters[i].Count < 1 {
+			return fmt.Errorf("partitions count is less than 1, cannot split partition filters")
+		}
+
+		if partitionFilters[i].Begin+partitionFilters[i].Count > MaxPartitions {
+			return fmt.Errorf("start partition + partitions count is greater than the max partition filters: %d",
+				MaxPartitions)
+		}
+	}
+
+	return nil
+}
+
+func distributePartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
 	// If we have more workers than filters.
 	allWorkers := numWorkers
 

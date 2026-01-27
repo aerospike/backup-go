@@ -363,21 +363,7 @@ func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int
 		return r.calculateTotalSizeForDir(path)
 	}
 
-	return r.calculateTotalSizeForFile(path)
-}
-
-func (r *Reader) calculateTotalSizeForFile(path string) (totalSize, totalNum int64, err error) {
-	reader, err := os.Open(path)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to open %s: %w", path, err)
-	}
-
-	stat, err := reader.Stat()
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
-	}
-
-	return stat.Size(), 1, nil
+	return dirInfo.Size(), 1, nil
 }
 
 func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int64, err error) {

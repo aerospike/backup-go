@@ -30,6 +30,8 @@ type udfWriter struct {
 
 // writeUDF writes a UDF to the Aerospike database.
 func (rw udfWriter) writeUDF(udf *models.UDF) error {
+	rw.logger.Debug("--------started writing udf", slog.Any("udf", udf))
+
 	var UDFLang a.Language
 
 	switch udf.UDFType {
@@ -38,7 +40,7 @@ func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	default:
 		return fmt.Errorf("error registering UDF %s: invalid UDF language %b", udf.Name, udf.UDFType)
 	}
-
+	rw.logger.Debug("--------register udf job")
 	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, UDFLang)
 	if aerr != nil {
 		return fmt.Errorf("error registering UDF %s: %w", udf.Name, aerr)
@@ -47,17 +49,17 @@ func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	if job == nil {
 		return fmt.Errorf("error registering UDF %s: job is nil", udf.Name)
 	}
-
+	rw.logger.Debug("--------get udf job complete")
 	errs := job.OnComplete()
 	if errs == nil {
 		return fmt.Errorf("error registering UDF %s: OnComplete returned nil channel", udf.Name)
 	}
-
+	rw.logger.Debug("--------wait for error from chan")
 	err := <-errs
 	if err != nil {
 		return fmt.Errorf("error registering UDF %s: %w", udf.Name, err)
 	}
-
+	rw.logger.Debug("--------got smth from chan", slog.Any("err", err))
 	rw.logger.Debug("registered UDF", slog.String("name", udf.Name))
 
 	return nil

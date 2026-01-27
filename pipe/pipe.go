@@ -69,7 +69,12 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 	// Run a writers pool. Each writer has an input channel in which it receives data to write.
 	errGroup.Go(func() error {
-		return p.writePool.Run(ctx)
+		if err := p.writePool.Run(ctx); err != nil {
+			fmt.Println("+++++PIPE ERR:", err)
+			return err
+		}
+
+		return nil
 	})
 
 	// Fanout runs goroutine for each reader channel that routes messages to writers according to pipe strategy.

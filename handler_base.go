@@ -55,19 +55,16 @@ func (h *handlerBase) waitForCompletion(waitCtx context.Context) error {
 	case <-h.ctx.Done():
 		// Global context is done.
 		err = h.ctx.Err()
-		// Always cancel to stop all goroutines and prevent leaks.
-		h.cancel()
 	case <-waitCtx.Done():
 		// Wait context is done.
 		err = waitCtx.Err()
-		// Always cancel to stop all goroutines and prevent leaks.
-		h.cancel()
 	case err = <-h.errors:
 		// Operation failed.
-		// Always cancel to stop all goroutines and prevent leaks.
-		h.cancel()
 	case <-h.done: // Success.
 	}
+
+	// Always cancel to stop all goroutines and prevent leaks.
+	h.cancel()
 
 	// Wait for all goroutines to finish.
 	h.wg.Wait()

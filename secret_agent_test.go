@@ -147,9 +147,9 @@ func TestSecretAgent_getResourceKey(t *testing.T) {
 		require.Equal(t, tt.resource, res)
 		require.Equal(t, tt.secretKey, sk)
 		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
-			require.NoError(t, err, fmt.Sprintf("case %d", i))
+			require.NoError(t, err, "case %d", i)
 		}
 	}
 }
@@ -174,9 +174,9 @@ func TestSecretAgent_getTlSConfig(t *testing.T) {
 	for i, tt := range testCases {
 		_, err := getTLSConfig(tt.config)
 		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
-			require.NoError(t, err, fmt.Sprintf("case %d", i))
+			require.NoError(t, err, "case %d", i)
 		}
 	}
 }
@@ -208,9 +208,9 @@ func TestSecretAgent_getSecret(t *testing.T) {
 	for i, tt := range testCases {
 		_, err = getSecret(tt.config, tt.key)
 		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
-			require.NoError(t, err, fmt.Sprintf("case %d", i))
+			require.NoError(t, err, "case %d", i)
 		}
 	}
 }

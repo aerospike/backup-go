@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -70,7 +69,7 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 
 	// Create backup handler (spawns State goroutines)
 	handler, err := newBackupHandler(
-		context.Background(),
+		t.Context(),
 		cfg,
 		mockAerospikeClient,
 		logger,
@@ -86,7 +85,7 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	handler.done <- struct{}{}
 
 	// Call Wait which should clean up all handler goroutines when returns
-	err = handler.Wait(context.Background())
+	err = handler.Wait(t.Context())
 	require.NoError(t, err)
 
 	// Give goroutines time to exit

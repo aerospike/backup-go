@@ -25,14 +25,16 @@ linters:
     - prealloc
     - predeclared
     - revive
+    - sloglint
     - staticcheck
+    - testifylint
     - thelper
     - tparallel
     - unconvert
     - unparam
     - unused
-    - sloglint
     - usestdlibvars
+    - usetesting
     - whitespace
     - wsl_v5
   settings:
@@ -62,6 +64,11 @@ linters:
       key-naming-case: camel
       forbidden-keys:
         - err # let's only use slog.Any("error", err)
+    usetesting:
+      context-background: true
+      context-todo: true
+      os-temp-dir: true
+      os-setenv: true
     wsl_v5:
       disable:
         - assign

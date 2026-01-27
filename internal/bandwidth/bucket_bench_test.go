@@ -15,7 +15,6 @@
 package bandwidth
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -48,7 +47,7 @@ func BenchmarkSingleToken(b *testing.B) {
 
 		b.Run("StdLibRate_"+tt.name, func(b *testing.B) {
 			limiter := rate.NewLimiter(rate.Limit(float64(tt.limit)/tt.interval.Seconds()), int(tt.limit))
-			ctx := context.Background()
+			ctx := b.Context()
 			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
@@ -84,7 +83,7 @@ func BenchmarkBatchTokens(b *testing.B) {
 
 		b.Run("StdLibRate_"+tt.name, func(b *testing.B) {
 			limiter := rate.NewLimiter(rate.Limit(float64(tt.limit)/tt.interval.Seconds()), int(tt.limit))
-			ctx := context.Background()
+			ctx := b.Context()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				//nolint:errcheck // No need to check error on benchmark.
@@ -129,7 +128,7 @@ func BenchmarkHighConcurrency(b *testing.B) {
 
 		b.Run("StdLibRate_"+tt.name, func(b *testing.B) {
 			limiter := rate.NewLimiter(rate.Limit(float64(tt.limit)/tt.interval.Seconds()), int(tt.limit))
-			ctx := context.Background()
+			ctx := b.Context()
 			b.ResetTimer()
 
 			var wg sync.WaitGroup
@@ -205,7 +204,7 @@ func BenchmarkTimingAccuracy(b *testing.B) {
 
 		b.Run("StdLibRate_"+tt.name, func(b *testing.B) {
 			limiter := rate.NewLimiter(rate.Limit(float64(tt.limit)/tt.interval.Seconds()), int(tt.limit))
-			ctx := context.Background()
+			ctx := b.Context()
 			start := time.Now()
 
 			for i := 0; i < int(tt.limit); i++ {
@@ -249,7 +248,7 @@ func BenchmarkBurstTraffic(b *testing.B) {
 
 		b.Run("StdLibRate_"+tt.name, func(b *testing.B) {
 			limiter := rate.NewLimiter(rate.Limit(float64(tt.limit)/tt.interval.Seconds()), int(tt.limit))
-			ctx := context.Background()
+			ctx := b.Context()
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {

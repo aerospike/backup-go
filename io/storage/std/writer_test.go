@@ -35,19 +35,19 @@ func TestNewWriter(t *testing.T) {
 	}{
 		{
 			name:    "success",
-			ctx:     context.Background(),
+			ctx:     t.Context(),
 			buffer:  0,
 			wantErr: false,
 		},
 		{
 			name:    "cancelled context",
-			ctx:     func() context.Context { ctx, cancel := context.WithCancel(context.Background()); cancel(); return ctx }(),
+			ctx:     func() context.Context { ctx, cancel := context.WithCancel(t.Context()); cancel(); return ctx }(),
 			buffer:  0,
 			wantErr: true,
 		},
 		{
 			name:    "negative buffer",
-			ctx:     context.Background(),
+			ctx:     t.Context(),
 			buffer:  -10,
 			wantErr: true,
 		},
@@ -86,32 +86,32 @@ func TestWriter_NewWriter(t *testing.T) {
 	}{
 		{
 			name:     "success with valid filename",
-			ctx:      context.Background(),
+			ctx:      t.Context(),
 			filename: "test.dat",
 			wantErr:  false,
 		},
 		{
 			name:     "success with empty filename",
-			ctx:      context.Background(),
+			ctx:      t.Context(),
 			filename: "",
 			wantErr:  false,
 		},
 		{
 			name:     "success filename ignored anyway",
-			ctx:      context.Background(),
+			ctx:      t.Context(),
 			filename: "/invalid/path/file.dat",
 			wantErr:  false,
 		},
 		{
 			name:     "error with cancelled context",
-			ctx:      func() context.Context { ctx, cancel := context.WithCancel(context.Background()); cancel(); return ctx }(),
+			ctx:      func() context.Context { ctx, cancel := context.WithCancel(t.Context()); cancel(); return ctx }(),
 			filename: "test.dat",
 			wantErr:  true,
 		},
 		{
 			name: "error with deadline exceeded",
 			ctx: func() context.Context {
-				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Hour))
+				ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Hour))
 				defer cancel()
 				return ctx
 			}(),
@@ -198,7 +198,7 @@ func TestStdoutWriteCloser_Write(t *testing.T) {
 			os.Stdout = w
 
 			writer := &Writer{}
-			writeCloser, err := writer.NewWriter(context.Background(), "test")
+			writeCloser, err := writer.NewWriter(t.Context(), "test")
 			if err != nil {
 				t.Fatalf("Failed to create writer: %v", err)
 			}
@@ -265,7 +265,7 @@ func TestStdoutWriteCloser_Close(t *testing.T) {
 			os.Stdout = w
 
 			writer := &Writer{}
-			writeCloser, _ := writer.NewWriter(context.Background(), "test")
+			writeCloser, _ := writer.NewWriter(t.Context(), "test")
 
 			if tt.data != nil {
 				_, err := writeCloser.Write(tt.data)
@@ -315,7 +315,7 @@ func TestConcurrentWrites(t *testing.T) {
 	writers := make([]io.WriteCloser, numGoroutines)
 
 	for i := range numGoroutines {
-		writeCloser, err := writer.NewWriter(context.Background(), "concurrent-test")
+		writeCloser, err := writer.NewWriter(t.Context(), "concurrent-test")
 		if err != nil {
 			t.Fatalf("Failed to create writer %d: %v", i, err)
 		}
@@ -356,7 +356,7 @@ func TestConcurrentWrites(t *testing.T) {
 func TestStdout_Remove(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	w, err := NewWriter(ctx, defaultBufferSize)
 	require.NoError(t, err)
@@ -371,7 +371,7 @@ func TestStdout_Remove(t *testing.T) {
 func TestStdout_GetType(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	w, err := NewWriter(ctx, defaultBufferSize)
 	require.NoError(t, err)

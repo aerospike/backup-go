@@ -96,10 +96,10 @@ func TestSetFilter(t *testing.T) {
 			resToken, resErr := tc.setFilter.Process(tc.token)
 			if tc.shouldBeFiltered {
 				assert.Nil(t, resToken)
-				assert.NotNil(t, resErr)
+				assert.Error(t, resErr)
 			} else {
 				assert.Equal(t, tc.token, resToken)
-				assert.Nil(t, resErr)
+				assert.NoError(t, resErr)
 			}
 		})
 	}

@@ -20,6 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // mockReader implements the reader interface for testing
@@ -68,7 +69,7 @@ func TestPreSort(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 			r := new(mockReader)
 
 			r.On("ListObjects", ctx, "test/path").Return(tt.inputFiles, nil)
@@ -77,9 +78,9 @@ func TestPreSort(t *testing.T) {
 			err := PreSort(ctx, r, "test/path")
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			r.AssertExpectations(t)
 		})

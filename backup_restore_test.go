@@ -158,7 +158,7 @@ func runBackupRestoreLocal(
 func TestBackupRestoreIndexUdf(t *testing.T) {
 	t.Parallel()
 	const setName = "testIndexUdf"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -192,7 +192,7 @@ func TestBackupRestoreIndexUdf(t *testing.T) {
 	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
 	require.NoError(t, err)
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -218,13 +218,13 @@ func TestBackupRestoreIndexUdf(t *testing.T) {
 	require.NoError(t, err)
 	dbIndexes, err := readAllSIndexes(ctx, infoClient, testASNamespace)
 	require.NoError(t, err)
-	require.EqualValues(t, indexes, dbIndexes)
+	require.Equal(t, indexes, dbIndexes)
 }
 
 func TestBackupRestoreIOEncryptionFile(t *testing.T) {
 	t.Parallel()
 	const setName = "testEncryptionFile"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -268,7 +268,7 @@ func TestBackupRestoreIOEncryptionFile(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -283,7 +283,7 @@ func TestBackupRestoreNamespace(t *testing.T) {
 	t.Parallel()
 	const setName = "testNamespace"
 
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -323,7 +323,7 @@ func TestBackupRestoreNamespace(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -338,7 +338,7 @@ func TestBackupRestoreCompression(t *testing.T) {
 	t.Parallel()
 	const setName = "testCompression"
 
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -374,14 +374,14 @@ func TestBackupRestoreCompression(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
 			t.Errorf("expected record not found: %v", expRec.Key)
 			return
 		}
-		require.EqualValues(t, expRec.Bins, actual.Bins)
+		require.Equal(t, expRec.Bins, actual.Bins)
 	}
 }
 
@@ -389,7 +389,7 @@ func TestBackupRestoreBinFilter(t *testing.T) {
 	t.Parallel()
 	const setName = "testBinFilter"
 
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -434,7 +434,7 @@ func TestBackupRestoreBinFilter(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
-	require.Equal(t, dbRecords.Len(), len(expected))
+	require.Len(t, expected, dbRecords.Len())
 	for _, expRec := range expected {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -449,7 +449,7 @@ func TestBackupRestoreTimestampFilter(t *testing.T) {
 	t.Parallel()
 	const setName = "testTimestampFilter"
 
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -509,7 +509,7 @@ func TestBackupRestoreTimestampFilter(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
-	require.Equal(t, dbRecords.Len(), len(expected))
+	require.Len(t, expected, dbRecords.Len())
 	for _, expRec := range expected {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -529,7 +529,7 @@ func TestBackupRestoreRps(t *testing.T) {
 		epsilon = 2 * float64(time.Second)
 	)
 	// Extend timeout as we need ~11 seconds for test.
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout*2)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout*2)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -575,7 +575,7 @@ func TestBackupRestoreRps(t *testing.T) {
 func TestBackupRestoreNodeList(t *testing.T) {
 	t.Parallel()
 	const setName = "testNodeList"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -608,7 +608,7 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
 	require.NoError(t, err)
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -629,7 +629,7 @@ func TestBackupRestoreNodeList(t *testing.T) {
 func TestBackupRestoreRackList(t *testing.T) {
 	t.Parallel()
 	const setName = "testRackList"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -656,7 +656,7 @@ func TestBackupRestoreRackList(t *testing.T) {
 	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
 	require.NoError(t, err)
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -677,7 +677,7 @@ func TestBackupRestoreRackList(t *testing.T) {
 func TestBackupRestorePartitionList(t *testing.T) {
 	t.Parallel()
 	const setName = "testPartList"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -716,7 +716,7 @@ func TestBackupRestorePartitionList(t *testing.T) {
 	dbRecords, err := readAllRecords(asClient, testASNamespace, setName)
 	require.NoError(t, err)
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -737,7 +737,7 @@ func TestBackupRestorePartitionList(t *testing.T) {
 func TestBackupRestoreAfterDigest(t *testing.T) {
 	t.Parallel()
 	const setName = "testAfterDigest"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -784,7 +784,7 @@ func TestBackupRestoreAfterDigest(t *testing.T) {
 func TestBackupRestoreDefault(t *testing.T) {
 	t.Parallel()
 	const setName = "testDefault"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -821,7 +821,7 @@ func TestBackupRestoreDefault(t *testing.T) {
 	require.Equal(t, dirSize, bStat.GetBytesWritten())
 	require.Less(t, rStat.GetTotalBytesRead(), dirSize) // restore size doesn't include asb control characters
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -835,7 +835,7 @@ func TestBackupRestoreDefault(t *testing.T) {
 func TestBackupRestoreDisableBatchWrites(t *testing.T) {
 	t.Parallel()
 	const setName = "testDisableBatchWrites"
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -869,7 +869,7 @@ func TestBackupRestoreDisableBatchWrites(t *testing.T) {
 	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
 	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -883,7 +883,7 @@ func TestBackupRestoreDisableBatchWrites(t *testing.T) {
 func TestBackupRestoreFileLimit(t *testing.T) {
 	t.Parallel()
 	const setName = "testFileLimit"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -921,7 +921,7 @@ func TestBackupRestoreFileLimit(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(len(backupFiles)), bStat.GetFileCount())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -935,7 +935,7 @@ func TestBackupRestoreFileLimit(t *testing.T) {
 func TestBackupRestoreFileLimitDisableBatch(t *testing.T) {
 	t.Parallel()
 	const setName = "testFileLimitDisableBatch"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -975,7 +975,7 @@ func TestBackupRestoreFileLimitDisableBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(len(backupFiles)), bStat.GetFileCount())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -989,7 +989,7 @@ func TestBackupRestoreFileLimitDisableBatch(t *testing.T) {
 func TestBackupRestoreParallelDisableBatch(t *testing.T) {
 	t.Parallel()
 	const setName = "testParallelDBW"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -1029,7 +1029,7 @@ func TestBackupRestoreParallelDisableBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(len(backupFiles)), bStat.GetFileCount())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -1043,7 +1043,7 @@ func TestBackupRestoreParallelDisableBatch(t *testing.T) {
 func TestBackupRestoreParallelFileLimit(t *testing.T) {
 	t.Parallel()
 	const setName = "testParallelFileLimit"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -1083,7 +1083,7 @@ func TestBackupRestoreParallelFileLimit(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(len(backupFiles)), bStat.GetFileCount())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -1097,7 +1097,7 @@ func TestBackupRestoreParallelFileLimit(t *testing.T) {
 func TestBackupRestoreWithPartitions(t *testing.T) {
 	t.Parallel()
 	const setName = "testWithPartitions"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	asClient, err := testAerospikeClient()
@@ -1167,7 +1167,7 @@ func TestBackupRestoreWithPartitions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(len(backupFiles)), bStat.GetFileCount())
 
-	require.Equal(t, dbRecords.Len(), len(records))
+	require.Len(t, records, dbRecords.Len())
 	for _, expRec := range records {
 		actual, ok := dbRecords.Get(string(expRec.Key.Digest()))
 		if !ok {
@@ -1181,7 +1181,7 @@ func TestBackupRestoreWithPartitions(t *testing.T) {
 func TestRestoreExpiredRecords(t *testing.T) {
 	t.Parallel()
 	const setName = "TestRestoreExpiredRecords"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	numRec := 100
@@ -1261,7 +1261,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 func TestBackupContextCancel(t *testing.T) {
 	t.Parallel()
 	const setName = "TestBackupContextCancel"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	cancel()
 
 	asClient, err := testAerospikeClient()
@@ -1298,7 +1298,7 @@ func TestBackupContextCancel(t *testing.T) {
 func TestRestoreContextCancel(t *testing.T) {
 	t.Parallel()
 	const setName = "TestRestoreContextCancel"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	cancel()
 
 	asClient, err := testAerospikeClient()
@@ -1334,7 +1334,7 @@ func TestRestoreContextCancel(t *testing.T) {
 func TestBackupEstimate(t *testing.T) {
 	t.Parallel()
 	const setName = "testEstimate"
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	t.Cleanup(func() { cancel() })
 
 	asClient, err := testAerospikeClient()
@@ -1404,13 +1404,13 @@ func TestBackupContinuation(t *testing.T) {
 	require.NoError(t, err)
 	stateFile := path.Join(testFolder, testStateFile)
 
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, _ := context.WithTimeout(t.Context(), 1*time.Second)
 	t.Log("first backup")
 	first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 	require.NoError(t, err)
 	t.Log("first backup finished")
 
-	ctx = context.Background()
+	ctx = t.Context()
 	t.Log("continue backup")
 	second, err := runContinueBackup(ctx, asClient, setName, testFolder, stateFile)
 	require.NoError(t, err)

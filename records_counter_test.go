@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -96,14 +95,12 @@ func TestCountUsingInfoClient(t *testing.T) {
 				},
 			}
 
-			ctx := context.Background()
-
-			result, err := handler.countUsingInfoClient(ctx, mockInfoClient)
+			result, err := handler.countUsingInfoClient(t.Context(), mockInfoClient)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 

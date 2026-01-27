@@ -25,6 +25,7 @@ import (
 
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/segmentio/asm/base64"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,7 +62,7 @@ func TestTCPServer(t *testing.T) {
 		logger,
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	results, err := srv.Start(ctx)
 	require.NoError(t, err)
@@ -76,21 +77,21 @@ func TestTCPServer(t *testing.T) {
 		// Send 3 valid messages.
 		for range 3 {
 			msg, err := newMessage(testMessageB64)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			err = sendMessage(client, msg)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}
 		// Send one invalid message.
 		msg, err := newMessage(testErrorMessageB64)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		err = sendMessage(client, msg)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 
 	go func() {
 		time.Sleep(5 + time.Second)
-		err = srv.Stop()
-		require.NoError(t, err)
+		stopErr := srv.Stop()
+		assert.NoError(t, stopErr)
 	}()
 
 	var counter int
@@ -140,7 +141,7 @@ func TestTCPServer_DoubleStart(t *testing.T) {
 		logger,
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := srv.Start(ctx)
 	require.NoError(t, err)
@@ -161,7 +162,7 @@ func TestTCPServer_DoubleStop(t *testing.T) {
 		logger,
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := srv.Start(ctx)
 	require.NoError(t, err)

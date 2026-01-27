@@ -229,7 +229,6 @@ func (mock validatorMock) Run(fileName string) error {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesOk() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -261,9 +260,9 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), testFilesNumber, filesCounter)
-				require.Equal(s.T(), int64(testFilesNumber), reader.GetNumber())
-				require.Equal(s.T(), int64(testFilesNumber*testFileContentLength), reader.GetSize())
+				s.Require().Equal(testFilesNumber, filesCounter)
+				s.Require().Equal(int64(testFilesNumber), reader.GetNumber())
+				s.Require().Equal(int64(testFilesNumber*testFileContentLength), reader.GetSize())
 				return
 			}
 			filesCounter++
@@ -272,7 +271,6 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 }
 
 func (s *AzureSuite) TestReader_WithSorting() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -303,7 +301,7 @@ func (s *AzureSuite) TestReader_WithSorting() {
 			s.Require().NoError(err)
 		case f, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 3, filesCounter)
+				s.Require().Equal(3, filesCounter)
 				return
 			}
 			filesCounter++
@@ -318,7 +316,6 @@ func (s *AzureSuite) TestReader_WithSorting() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesEmpty() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -337,7 +334,6 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesMixed() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -368,7 +364,7 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -377,7 +373,6 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 }
 
 func (s *AzureSuite) TestReader_GetType() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -395,11 +390,10 @@ func (s *AzureSuite) TestReader_GetType() {
 	s.Require().NoError(err)
 
 	result := reader.GetType()
-	require.Equal(s.T(), azureBlobType, result)
+	s.Require().Equal(azureBlobType, result)
 }
 
 func (s *AzureSuite) TestReader_OpenFileOk() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -428,7 +422,7 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 1, filesCounter)
+				s.Require().Equal(1, filesCounter)
 				return
 			}
 			filesCounter++
@@ -437,7 +431,6 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 }
 
 func (s *AzureSuite) TestReader_OpenFileErr() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -465,7 +458,6 @@ func (s *AzureSuite) TestReader_OpenFileErr() {
 }
 
 func (s *AzureSuite) TestWriter_WriteEmptyDir() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -496,7 +488,6 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 }
 
 func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -516,7 +507,6 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 }
 
 func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -547,7 +537,6 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 }
 
 func (s *AzureSuite) TestWriter_WriteMixedDir() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -578,7 +567,6 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 }
 
 func (s *AzureSuite) TestWriter_WriteSingleFile() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -605,7 +593,6 @@ func (s *AzureSuite) TestWriter_WriteSingleFile() {
 }
 
 func (s *AzureSuite) TestWriter_GetType() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -623,11 +610,10 @@ func (s *AzureSuite) TestWriter_GetType() {
 	s.Require().NoError(err)
 
 	result := writer.GetType()
-	require.Equal(s.T(), azureBlobType, result)
+	s.Require().Equal(azureBlobType, result)
 }
 
 func (s *AzureSuite) TestReader_WithMarker() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -662,7 +648,7 @@ func (s *AzureSuite) TestReader_WithMarker() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -671,7 +657,6 @@ func (s *AzureSuite) TestReader_WithMarker() {
 }
 
 func (s *AzureSuite) TestReader_StreamPathList() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -707,7 +692,7 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -716,7 +701,6 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesList() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -751,7 +735,7 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				return
 			}
 			filesCounter++
@@ -760,7 +744,6 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 }
 
 func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -795,7 +778,7 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 			s.Require().NoError(err)
 		case f, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 5, filesCounter)
+				s.Require().Equal(5, filesCounter)
 				return
 			}
 			filesCounter++
@@ -808,7 +791,6 @@ func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 }
 
 func (s *AzureSuite) TestIsSkippedByStartAfter() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	tests := []struct {
 		name       string
@@ -843,12 +825,9 @@ func (s *AzureSuite) TestIsSkippedByStartAfter() {
 	}
 
 	for _, tt := range tests {
-		s.T().Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		s.Run(tt.name, func() {
 			result := isSkippedByStartAfter(tt.startAfter, tt.fileName)
-			if result != tt.expected {
-				t.Errorf("expected %v, got %v", tt.expected, result)
-			}
+			s.Equal(tt.expected, result)
 		})
 	}
 }
@@ -895,7 +874,7 @@ func TestParseAccessTier(t *testing.T) {
 			if tt.expectedError != nil {
 				assert.EqualError(t, err, tt.expectedError.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedTier, tier)
 			}
 		})
@@ -927,7 +906,6 @@ func readAll(r io.ReadCloser) (string, error) {
 }
 
 func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
-	s.T().Parallel()
 	s.suiteWg.Wait()
 	ctx := context.Background()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
@@ -957,7 +935,7 @@ func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
 			s.Require().NoError(err)
 		case _, ok := <-rCH:
 			if !ok {
-				require.Equal(s.T(), 2, filesCounter)
+				s.Require().Equal(2, filesCounter)
 				goto Done
 			}
 			filesCounter++
@@ -966,7 +944,7 @@ func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
 
 Done:
 	skipped := reader.GetSkipped()
-	require.Equal(s.T(), 3, len(skipped))
+	s.Require().Len(skipped, 3)
 }
 
 func TestWriter_GetOptions(t *testing.T) {

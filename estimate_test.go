@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCalculateStats(t *testing.T) {
@@ -53,8 +54,8 @@ func TestCalculateStats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stats := calculateStats(tt.data)
-			assert.Equal(t, tt.expected.Mean, stats.Mean, "Mean should be calculated correctly")
-			assert.Equal(t, tt.expected.Variance, stats.Variance, "Variance should be calculated correctly")
+			assert.InDelta(t, tt.expected.Mean, stats.Mean, 1e-6, "Mean should be calculated correctly")
+			assert.InDelta(t, tt.expected.Variance, stats.Variance, 1e-6, "Variance should be calculated correctly")
 		})
 	}
 }
@@ -102,8 +103,8 @@ func TestConfidenceInterval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			low, high := confidenceInterval(tt.stats, tt.sampleSize)
-			assert.Equal(t, tt.expectedLo, low, "Low should be calculated correctly")
-			assert.Equal(t, tt.expectedHi, high, "High should be calculated correctly")
+			assert.InDelta(t, tt.expectedLo, low, 1e-3, "Low should be calculated correctly")
+			assert.InDelta(t, tt.expectedHi, high, 1e-3, "High should be calculated correctly")
 		})
 	}
 }
@@ -136,8 +137,8 @@ func TestGetCompressRatio(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ratio, err := getCompressRatio(tt.policy, tt.data)
-			assert.Nil(t, err, "Error should be nil")
-			assert.Equal(t, tt.result, ratio, "Ratio should be correct")
+			require.NoError(t, err, "Error should be nil")
+			assert.InDelta(t, tt.result, ratio, 1e-6, "Ratio should be correct")
 		})
 	}
 }
@@ -174,7 +175,7 @@ func TestGetEstimate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := getEstimate(tt.data, tt.total, logger)
-			assert.Equal(t, tt.expected, result, "Estimate should be calculated correctly")
+			assert.InDelta(t, tt.expected, result, 1e-6, "Estimate should be calculated correctly")
 		})
 	}
 }

@@ -15,7 +15,6 @@
 package storage
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -40,7 +39,7 @@ var (
 func TestNewRangeReader(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
@@ -136,7 +135,7 @@ func TestNewRangeReader(t *testing.T) {
 func TestRangeReader_OpenRange(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("Success with offset and count", func(t *testing.T) {
 		t.Parallel()

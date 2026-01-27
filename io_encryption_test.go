@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -39,8 +38,6 @@ const (
 )
 
 func TestIOEncryption_readPemFromFile(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		file       string
 		errContent string
@@ -52,20 +49,17 @@ func TestIOEncryption_readPemFromFile(t *testing.T) {
 	for i, tt := range testCases {
 		_, err := readPemFromFile(tt.file)
 		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
-			require.NoError(t, err, fmt.Sprintf("case %d", i))
+			require.NoError(t, err, "case %d", i)
 		}
 	}
 }
 
 func TestIOEncryption_readPemFromEnv(t *testing.T) {
-	t.Parallel()
-
 	pemData, err := os.ReadFile(testPKeyFile)
 	require.NoError(t, err)
-	err = os.Setenv(testPKeyEnv, string(pemData))
-	require.NoError(t, err)
+	t.Setenv(testPKeyEnv, string(pemData))
 
 	testCases := []struct {
 		keyEnv     string
@@ -78,22 +72,18 @@ func TestIOEncryption_readPemFromEnv(t *testing.T) {
 	for i, tt := range testCases {
 		_, err = readPemFromEnv(tt.keyEnv)
 		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
-			require.NoError(t, err, fmt.Sprintf("case %d", i))
+			require.NoError(t, err, "case %d", i)
 		}
 	}
 }
 
 func TestIOEncryption_readPrivateKey(t *testing.T) {
-	t.Parallel()
-
 	pemData, err := os.ReadFile(testPKeyFile)
 	require.NoError(t, err)
-	err = os.Setenv(testPKeyEnv, string(pemData))
-	require.NoError(t, err)
-	err = os.Setenv(testPKeyEnvErrContent, testPKeyEnvErrContent)
-	require.NoError(t, err)
+	t.Setenv(testPKeyEnv, string(pemData))
+	t.Setenv(testPKeyEnvErrContent, testPKeyEnvErrContent)
 
 	listener, err := mockTCPServer(testEncSAAddress, mockHandler)
 	require.NoError(t, err)
@@ -168,9 +158,9 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 	for i, tt := range testCases {
 		_, err = readPrivateKey(tt.encPolicy, tt.saConfig)
 		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, fmt.Sprintf("case %d", i))
+			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
-			require.NoError(t, err, fmt.Sprintf("case %d", i))
+			require.NoError(t, err, "case %d", i)
 		}
 	}
 }
@@ -223,16 +213,16 @@ func Test_parsePK(t *testing.T) {
 			got, err := parsePK(tt.block)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errCheck != nil {
 					assert.True(t, tt.errCheck(err), "error doesn't match expected condition")
 				}
 				assert.Nil(t, got)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, got)
 				// Verify it's a valid RSA key by checking basic properties
-				assert.True(t, got.N.BitLen() > 0)
+				assert.Positive(t, got.N.BitLen())
 				assert.NotNil(t, got.D)
 			}
 		})
@@ -284,7 +274,7 @@ func Test_parsePK_WithPEM(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, got)
 			}
 		})

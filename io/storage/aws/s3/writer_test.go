@@ -332,13 +332,13 @@ func (s *WriterSuite) TestWriter_GetType() {
 	s.Require().NoError(err)
 
 	result := writer.GetType()
-	require.Equal(s.T(), s3type, result)
+	s.Require().Equal(s3type, result)
 }
 
 // TestNewWriter_Success tests successful Writer creation
 func TestNewWriter_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -359,7 +359,7 @@ func TestNewWriter_Success(t *testing.T) {
 		options.WithDir(testDir),
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.Equal(t, testBucket, writer.bucketName)
 	assert.Equal(t, testDir, writer.prefix)
@@ -368,18 +368,18 @@ func TestNewWriter_Success(t *testing.T) {
 // TestNewWriter_NoPath tests error when no path provided
 func TestNewWriter_NoPath(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := NewWriter(ctx, mockClient, testBucket)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "one path is required")
 }
 
 // TestNewWriter_MultiplePaths tests error when multiple paths provided
 func TestNewWriter_MultiplePaths(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	opts := func(o *options.Options) {
 		o.PathList = []string{"path1", "path2"}
@@ -387,14 +387,14 @@ func TestNewWriter_MultiplePaths(t *testing.T) {
 
 	_, err := NewWriter(ctx, mockClient, testBucket, opts)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "one path is required")
 }
 
 // TestNewWriter_NegativeChunkSize tests error for negative chunk size
 func TestNewWriter_NegativeChunkSize(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := NewWriter(
 		ctx,
@@ -404,14 +404,14 @@ func TestNewWriter_NegativeChunkSize(t *testing.T) {
 		options.WithChunkSize(-1),
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "chunk size must be positive")
 }
 
 // TestNewWriter_DefaultChunkSize tests that default chunk size is set
 func TestNewWriter_DefaultChunkSize(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -432,14 +432,14 @@ func TestNewWriter_DefaultChunkSize(t *testing.T) {
 		options.WithDir(testDir),
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, s3DefaultChunkSize, writer.ChunkSize)
 }
 
 // TestNewWriter_BucketNotExists tests error when bucket doesn't exist
 func TestNewWriter_BucketNotExists(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -453,14 +453,14 @@ func TestNewWriter_BucketNotExists(t *testing.T) {
 		options.WithDir(testDir),
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "does not exist or you don't have access")
 }
 
 // TestNewWriter_DirectoryNotEmpty tests error when directory is not empty and RemoveFiles not set
 func TestNewWriter_DirectoryNotEmpty(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -483,14 +483,14 @@ func TestNewWriter_DirectoryNotEmpty(t *testing.T) {
 		options.WithDir(testDir),
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "backup folder must be empty or set RemoveFiles = true")
 }
 
 // TestNewWriter_DirectoryNotEmptyWithRemoveFiles tests successful cleanup when RemoveFiles is set
 func TestNewWriter_DirectoryNotEmptyWithRemoveFiles(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -519,14 +519,14 @@ func TestNewWriter_DirectoryNotEmptyWithRemoveFiles(t *testing.T) {
 		options.WithRemoveFiles(),
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, writer)
 }
 
 // TestNewWriter_InvalidStorageClass tests error for invalid storage class
 func TestNewWriter_InvalidStorageClass(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -548,7 +548,7 @@ func TestNewWriter_InvalidStorageClass(t *testing.T) {
 
 	_, err := NewWriter(ctx, mockClient, testBucket, opts)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse storage class")
 }
 
@@ -579,7 +579,7 @@ func TestNewWriter_ValidStorageClass(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockClient := mocks.NewMockClient(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			mockClient.EXPECT().
 				HeadBucket(ctx, mock.Anything).
@@ -601,7 +601,7 @@ func TestNewWriter_ValidStorageClass(t *testing.T) {
 
 			writer, err := NewWriter(ctx, mockClient, testBucket, opts)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, writer.storageClass)
 		})
 	}
@@ -610,7 +610,7 @@ func TestNewWriter_ValidStorageClass(t *testing.T) {
 // TestNewWriter_FileMode tests successful Writer creation for single file
 func TestNewWriter_FileMode(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -624,7 +624,7 @@ func TestNewWriter_FileMode(t *testing.T) {
 		options.WithFile(testFile),
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, writer)
 	assert.False(t, writer.IsDir)
 }
@@ -632,7 +632,7 @@ func TestNewWriter_FileMode(t *testing.T) {
 // TestNewWriter_SkipDirCheck tests that directory check is skipped when SkipDirCheck is true
 func TestNewWriter_SkipDirCheck(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -647,14 +647,14 @@ func TestNewWriter_SkipDirCheck(t *testing.T) {
 
 	writer, err := NewWriter(ctx, mockClient, testBucket, opts)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, writer)
 }
 
 // TestWriter_GetType tests GetType method
 func TestWriter_GetType(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -675,14 +675,14 @@ func TestWriter_GetType(t *testing.T) {
 		options.WithDir(testDir),
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, s3type, writer.GetType())
 }
 
 // TestWriter_NewWriter_Success tests successful creation of s3Writer
 func TestWriter_NewWriter_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -710,18 +710,18 @@ func TestWriter_NewWriter_Success(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, w)
 }
 
 // TestWriter_NewWriter_CreateMultipartUploadError tests error in CreateMultipartUpload
 func TestWriter_NewWriter_CreateMultipartUploadError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -746,18 +746,18 @@ func TestWriter_NewWriter_CreateMultipartUploadError(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = writer.NewWriter(ctx, testFile)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create multipart upload")
 }
 
 // TestS3Writer_Write_Success tests successful Write operation
 func TestS3Writer_Write_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -786,21 +786,21 @@ func TestS3Writer_Write_Success(t *testing.T) {
 		options.WithDir(testDir),
 		options.WithChunkSize(100), // Small chunk for testing
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	n, err := w.Write(testData)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(testData), n)
 }
 
 // TestS3Writer_Write_TriggerMultipart tests that Write triggers multipart upload when buffer exceeds chunk size
 func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -847,10 +847,10 @@ func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 		options.WithDir(testDir),
 		options.WithChunkSize(10), // Very small chunk for testing
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write data larger than chunk size to trigger multipart upload
 	data := make([]byte, 50)
@@ -859,17 +859,17 @@ func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 	}
 
 	n, err := w.Write(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(data), n)
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestS3Writer_Write_AfterClose tests that Write after Close returns error
 func TestS3Writer_Write_AfterClose(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -907,25 +907,25 @@ func TestS3Writer_Write_AfterClose(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Try to write after close
 	_, err = w.Write([]byte("test"))
 
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, os.ErrClosed)
+	require.Error(t, err)
+	require.ErrorIs(t, err, os.ErrClosed)
 }
 
 // TestS3Writer_Write_WithUploadError tests that Write returns error when upload fails
 func TestS3Writer_Write_WithUploadError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -959,15 +959,15 @@ func TestS3Writer_Write_WithUploadError(t *testing.T) {
 		options.WithDir(testDir),
 		options.WithChunkSize(10),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write data to trigger upload
 	data := make([]byte, 50)
 	n, err := w.Write(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(data), n)
 
 	time.Sleep(100 * time.Millisecond)
@@ -980,7 +980,7 @@ func TestS3Writer_Write_WithUploadError(t *testing.T) {
 // TestS3Writer_Close_Success tests successful Close operation
 func TestS3Writer_Close_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1026,23 +1026,23 @@ func TestS3Writer_Close_Success(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write some data
 	_, err = w.Write(testData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestS3Writer_Close_AfterClose tests that Close after Close returns error
 func TestS3Writer_Close_AfterClose(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1088,28 +1088,28 @@ func TestS3Writer_Close_AfterClose(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write some data
 	_, err = w.Write(testData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Try to close again
 	err = w.Close()
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, os.ErrClosed)
+	require.Error(t, err)
+	require.ErrorIs(t, err, os.ErrClosed)
 }
 
 // TestS3Writer_Close_CompleteMultipartUploadError tests error handling when CompleteMultipartUpload fails
 func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1157,24 +1157,24 @@ func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write some data
 	_, err = w.Write(testData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = w.Close()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to complete multipart upload")
 }
 
 // TestS3Writer_Close_AbortMultipartUploadError tests error handling when both Complete and Abort fail
 func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -1231,16 +1231,16 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 		testBucket,
 		opts,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = w.Write(testData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = w.Close()
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	assert.Contains(t, err.Error(), "complete failed")
 }
@@ -1248,7 +1248,7 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 // TestS3Writer_UploadPart_WithRetryPolicy tests uploadPart with retry policy
 func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1316,18 +1316,18 @@ func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
 		testBucket,
 		opts,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write data to trigger upload
 	data := make([]byte, 50)
 	_, err = w.Write(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify UploadPart was called 3 times (2 retries + 1 success)
 	assert.GreaterOrEqual(t, callCount, 3)
@@ -1336,7 +1336,7 @@ func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
 // TestS3Writer_ContextCancellation tests that context cancellation stops uploads
 func TestS3Writer_ContextCancellation(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1374,14 +1374,14 @@ func TestS3Writer_ContextCancellation(t *testing.T) {
 		options.WithDir(testDir),
 		options.WithChunkSize(10),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data := make([]byte, 50)
 	n, err := w.Write(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(data), n)
 
 	_, _ = w.Write(data)
@@ -1392,7 +1392,7 @@ func TestS3Writer_ContextCancellation(t *testing.T) {
 // TestS3Writer_ConcurrentWrites tests concurrent writes to different files
 func TestS3Writer_ConcurrentWrites(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1439,7 +1439,7 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 		options.WithDir(testDir),
 		options.WithChunkSize(10),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	numWriters := 5
 	var wg sync.WaitGroup
@@ -1468,7 +1468,7 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 // TestS3Writer_EmptyBuffer tests Close with empty buffer (no writes)
 func TestS3Writer_EmptyBuffer(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1506,19 +1506,19 @@ func TestS3Writer_EmptyBuffer(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Close without any writes
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestWriter_RemoveFiles_Success(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1548,14 +1548,14 @@ func TestWriter_RemoveFiles_Success(t *testing.T) {
 		options.WithRemoveFiles(),
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, writer)
 }
 
 // TestWriter_RemoveFiles_WithPagination tests RemoveFiles with pagination
 func TestWriter_RemoveFiles_WithPagination(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1613,13 +1613,13 @@ func TestWriter_RemoveFiles_WithPagination(t *testing.T) {
 		options.WithRemoveFiles(),
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestWriter_Remove_SingleFile tests removing a single file
 func TestWriter_Remove_SingleFile(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1637,16 +1637,16 @@ func TestWriter_Remove_SingleFile(t *testing.T) {
 		testBucket,
 		options.WithFile(testFile),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = writer.Remove(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestWriter_Remove_Directory tests removing a directory
 func TestWriter_Remove_Directory(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1666,7 +1666,7 @@ func TestWriter_Remove_Directory(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		ListObjectsV2(ctx, mock.Anything).
@@ -1683,13 +1683,13 @@ func TestWriter_Remove_Directory(t *testing.T) {
 		Once()
 
 	err = writer.Remove(ctx, testDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestWriter_Remove_DirectoryWithNestedDir tests removing directory with nested directories
 func TestWriter_Remove_DirectoryWithNestedDir(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1715,7 +1715,7 @@ func TestWriter_Remove_DirectoryWithNestedDir(t *testing.T) {
 		testBucket,
 		opts,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		ListObjectsV2(ctx, mock.Anything).
@@ -1733,13 +1733,13 @@ func TestWriter_Remove_DirectoryWithNestedDir(t *testing.T) {
 		Times(2)
 
 	err = writer.Remove(ctx, testDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestWriter_Remove_SkipDirectory tests that directories are skipped during removal
 func TestWriter_Remove_SkipDirectory(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1759,7 +1759,7 @@ func TestWriter_Remove_SkipDirectory(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		ListObjectsV2(ctx, mock.Anything).
@@ -1780,13 +1780,13 @@ func TestWriter_Remove_SkipDirectory(t *testing.T) {
 		Once()
 
 	err = writer.Remove(ctx, testDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestWriter_Remove_NullKey tests handling of null keys in ListObjectsV2 response
 func TestWriter_Remove_NullKey(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1806,7 +1806,7 @@ func TestWriter_Remove_NullKey(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		ListObjectsV2(ctx, mock.Anything).
@@ -1824,13 +1824,13 @@ func TestWriter_Remove_NullKey(t *testing.T) {
 		Once()
 
 	err = writer.Remove(ctx, testDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestWriter_Remove_ListObjectsError tests error handling when ListObjects fails
 func TestWriter_Remove_ListObjectsError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1850,7 +1850,7 @@ func TestWriter_Remove_ListObjectsError(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		ListObjectsV2(ctx, mock.Anything).
@@ -1858,14 +1858,14 @@ func TestWriter_Remove_ListObjectsError(t *testing.T) {
 		Once()
 
 	err = writer.Remove(ctx, testDir)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list objects")
 }
 
 // TestWriter_Remove_DeleteObjectError tests error handling when DeleteObject fails
 func TestWriter_Remove_DeleteObjectError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -1885,7 +1885,7 @@ func TestWriter_Remove_DeleteObjectError(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockClient.EXPECT().
 		ListObjectsV2(ctx, mock.Anything).
@@ -1902,7 +1902,7 @@ func TestWriter_Remove_DeleteObjectError(t *testing.T) {
 		Once()
 
 	err = writer.Remove(ctx, testDir)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete object")
 }
 
@@ -1941,7 +1941,7 @@ func TestIsEmptyDirectory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := mocks.NewMockClient(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			mockClient.EXPECT().
 				ListObjectsV2(ctx, mock.Anything).
@@ -1952,7 +1952,7 @@ func TestIsEmptyDirectory(t *testing.T) {
 
 			result, err := isEmptyDirectory(ctx, mockClient, testBucket, tt.prefix)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -1961,7 +1961,7 @@ func TestIsEmptyDirectory(t *testing.T) {
 // TestIsEmptyDirectory_Error tests isEmptyDirectory error handling
 func TestIsEmptyDirectory_Error(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		ListObjectsV2(ctx, mock.Anything).
@@ -1970,7 +1970,7 @@ func TestIsEmptyDirectory_Error(t *testing.T) {
 
 	_, err := isEmptyDirectory(ctx, mockClient, testBucket, testDir)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list bucket objects")
 }
 
@@ -1996,7 +1996,7 @@ func TestNewWriter_CleanPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := mocks.NewMockClient(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			mockClient.EXPECT().
 				HeadBucket(ctx, mock.Anything).
@@ -2017,7 +2017,7 @@ func TestNewWriter_CleanPath(t *testing.T) {
 				options.WithDir(tt.inputPath),
 			)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectedPath, writer.prefix)
 		})
 	}
@@ -2026,7 +2026,7 @@ func TestNewWriter_CleanPath(t *testing.T) {
 // TestS3Writer_WriteZeroBytes tests writing zero bytes
 func TestS3Writer_WriteZeroBytes(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -2064,24 +2064,24 @@ func TestS3Writer_WriteZeroBytes(t *testing.T) {
 		testBucket,
 		options.WithDir(testDir),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write zero bytes
 	n, err := w.Write([]byte{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 0, n)
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestWriter_NewWriter_WithStorageClass tests that storage class is passed to CreateMultipartUpload
 func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -2119,16 +2119,16 @@ func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
 		testBucket,
 		opts,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestS3Writer_WriteIncrementally tests writing data incrementally
 func TestS3Writer_WriteIncrementally(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -2175,22 +2175,22 @@ func TestS3Writer_WriteIncrementally(t *testing.T) {
 		options.WithDir(testDir),
 		options.WithChunkSize(100),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write data in small increments
 	totalBytes := 0
 	for i := range 200 {
 		data := []byte{byte(i)}
 		n, err := w.Write(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		totalBytes += n
 	}
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, 200, totalBytes)
 }
@@ -2198,7 +2198,7 @@ func TestS3Writer_WriteIncrementally(t *testing.T) {
 // TestS3Writer_LargeWrite tests single large write operation
 func TestS3Writer_LargeWrite(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockClient.EXPECT().
 		HeadBucket(ctx, mock.Anything).
@@ -2245,10 +2245,10 @@ func TestS3Writer_LargeWrite(t *testing.T) {
 		options.WithDir(testDir),
 		options.WithChunkSize(1024), // 1KB chunks
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write 10KB in one call
 	largeData := make([]byte, 10*1024)
@@ -2257,11 +2257,11 @@ func TestS3Writer_LargeWrite(t *testing.T) {
 	}
 
 	n, err := w.Write(largeData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(largeData), n)
 
 	err = w.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestWriter_GetOptions(t *testing.T) {

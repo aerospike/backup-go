@@ -35,12 +35,12 @@ const testFileName = "test.asb"
 func Test_openBackupFile(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "Test_openBackupFile")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	factory, err := NewWriter(ctx, options.WithRemoveFiles(), options.WithDir(tmpDir))
 	require.NoError(t, err)
 
-	w, err := factory.NewWriter(context.Background(), "test")
+	w, err := factory.NewWriter(t.Context(), "test")
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
@@ -73,7 +73,7 @@ func TestPrepareBackupDirectory_Positive_CreateDir(t *testing.T) {
 func TestDirectoryWriter_GetType(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "Test_openBackupFile")
-	ctx := context.Background()
+	ctx := t.Context()
 	w, err := NewWriter(ctx, options.WithRemoveFiles(), options.WithDir(tmpDir))
 	require.NoError(t, err)
 
@@ -82,7 +82,7 @@ func TestDirectoryWriter_GetType(t *testing.T) {
 
 func TestNewWriter_NoPath(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := NewWriter(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "one path is required")
@@ -92,7 +92,7 @@ func TestNewWriter_WithFile(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "TestNewWriter_WithFile")
 	filePath := filepath.Join(tmpDir, "test.asb")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	w, err := NewWriter(ctx, options.WithFile(filePath))
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestNewWriter_WithFile(t *testing.T) {
 func TestNewWriter_WithDir_NonExistent(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "TestNewWriter_WithDir_NonExistent", "nonexistent")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	w, err := NewWriter(ctx, options.WithDir(tmpDir))
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestNewWriter_WithDir_Empty(t *testing.T) {
 	err := os.MkdirAll(tmpDir, os.ModePerm)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	w, err := NewWriter(ctx, options.WithDir(tmpDir))
 	require.NoError(t, err)
 	require.NotNil(t, w)
@@ -139,7 +139,7 @@ func TestNewWriter_WithDir_NonEmpty_NoRemove(t *testing.T) {
 	err = file.Close()
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err = NewWriter(ctx, options.WithDir(tmpDir))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backup folder must be empty or set RemoveFiles = true")
@@ -157,7 +157,7 @@ func TestNewWriter_WithDir_NonEmpty_WithRemove(t *testing.T) {
 	err = file.Close()
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	w, err := NewWriter(ctx, options.WithDir(tmpDir), options.WithRemoveFiles())
 	require.NoError(t, err)
 	require.NotNil(t, w)
@@ -179,7 +179,7 @@ func TestNewWriter_WithDir_SkipDirCheck(t *testing.T) {
 	err = file.Close()
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	w, err := NewWriter(ctx, options.WithDir(tmpDir), options.WithSkipDirCheck())
 	require.NoError(t, err)
 	require.NotNil(t, w)
@@ -262,7 +262,7 @@ func Test_isEmptyDirectory_NonExistent(t *testing.T) {
 func TestWriter_RemoveFiles_NonExistent(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "TestWriter_RemoveFiles_NonExistent", "nonexistent")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	w := &Writer{
 		Options: options.Options{
@@ -287,7 +287,7 @@ func TestWriter_RemoveFiles_File(t *testing.T) {
 	err = file.Close()
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	w := &Writer{
 		Options: options.Options{
 			PathList: []string{filePath},
@@ -318,7 +318,7 @@ func TestWriter_RemoveFiles_Dir_WithNestedDir(t *testing.T) {
 	err = file.Close()
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	w := &Writer{
 		Options: options.Options{
 			PathList:      []string{tmpDir},
@@ -364,7 +364,7 @@ func TestWriter_RemoveFiles_Dir_WithValidator(t *testing.T) {
 		return fmt.Errorf("invalid file extension")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	w := &Writer{
 		Options: options.Options{
 			PathList:  []string{tmpDir},
@@ -389,7 +389,7 @@ func TestWriter_RemoveFiles_CanceledContext(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "TestWriter_RemoveFiles_CanceledContext")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	// Cancel the context immediately
 	cancel()
 
@@ -409,7 +409,7 @@ func TestWriter_NewWriter_CanceledContext(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "TestWriter_NewWriter_CanceledContext")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	// Cancel the context immediately
 	cancel()
 
@@ -437,7 +437,7 @@ func TestWriter_NewWriter_CreateDirError(t *testing.T) {
 		},
 	}
 
-	_, err := w.NewWriter(context.Background(), testFileName)
+	_, err := w.NewWriter(t.Context(), testFileName)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to prepare backup directory")
 }
@@ -457,7 +457,7 @@ func TestWriter_NewWriter_WithFile(t *testing.T) {
 		},
 	}
 
-	writer, err := w.NewWriter(context.Background(), "")
+	writer, err := w.NewWriter(t.Context(), "")
 	require.NoError(t, err)
 
 	_, err = writer.Write([]byte("test data"))
@@ -485,7 +485,7 @@ func TestWriter_NewWriter_WithDir(t *testing.T) {
 	}
 
 	fileName := testFileName
-	writer, err := w.NewWriter(context.Background(), fileName)
+	writer, err := w.NewWriter(t.Context(), fileName)
 	require.NoError(t, err)
 
 	_, err = writer.Write([]byte("test data"))

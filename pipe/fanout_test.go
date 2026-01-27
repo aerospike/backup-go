@@ -23,6 +23,7 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -123,7 +124,7 @@ func TestFanout_RunDefault(t *testing.T) {
 		}(i)
 	}
 
-	fan.Run(context.Background())
+	fan.Run(t.Context())
 
 	wg.Wait()
 	// Compare results, after all our calculating routines are finished.
@@ -174,7 +175,7 @@ func TestFanout_RunStraight(t *testing.T) {
 		}(i)
 	}
 
-	fan.Run(context.Background())
+	fan.Run(t.Context())
 
 	wg.Wait()
 	// Compare results, after all our calculating routines are finished.
@@ -202,7 +203,7 @@ func TestFanout_RunSplit(t *testing.T) {
 			for range testCount {
 				time.Sleep(testDelay)
 				token, err := testASBXToken()
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				inputs[n] <- token
 			}
 		}(i)
@@ -226,7 +227,7 @@ func TestFanout_RunSplit(t *testing.T) {
 		}
 	}()
 
-	fan.Run(context.Background())
+	fan.Run(t.Context())
 
 	wg.Wait()
 	// Compare results, after all our calculating routines are finished.
@@ -279,7 +280,7 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		}(i)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(testLongDelay)
 		cancel()
@@ -337,7 +338,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		}(i)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(testLongDelay)
 		cancel()
@@ -395,7 +396,7 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 		}
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(testLongDelay)
 		cancel()

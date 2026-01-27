@@ -19,6 +19,7 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSplitPartitions_SinglePartitionRange(t *testing.T) {
@@ -31,7 +32,7 @@ func TestSplitPartitions_SinglePartitionRange(t *testing.T) {
 
 	result, err := splitPartitions(partitionFilters, numWorkers)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, numWorkers, "The result should contain 5 split partitions")
 
 	for i := range numWorkers {
@@ -51,7 +52,7 @@ func TestSplitPartitions_MultiplePartitionsRange(t *testing.T) {
 
 	result, err := splitPartitions(partitionFilters, numWorkers)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, numWorkers, "The result should contain 4 split partitions")
 
 	expectedResults := []*aerospike.PartitionFilter{
@@ -78,7 +79,7 @@ func TestSplitPartitions_SingleCountFilters(t *testing.T) {
 
 	result, err := splitPartitions(partitionFilters, numWorkers)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, numWorkers, "The result should contain 3 partitions")
 
 	for i := range result {
@@ -98,7 +99,7 @@ func TestSplitPartitions_MixedFilters(t *testing.T) {
 
 	result, err := splitPartitions(partitionFilters, numWorkers)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, numWorkers, "The result should contain 5 partitions")
 
 	assert.Equal(t, 20, result[0].Begin)
@@ -128,7 +129,7 @@ func TestSplitPartitions_NumWorkersLessThanFilters(t *testing.T) {
 
 	_, err := splitPartitions(partitionFilters, numWorkers)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "number of workers is less than partition filters, cannot split partition filters", err.Error())
 }
 
@@ -139,7 +140,7 @@ func TestSplitPartitionRange(t *testing.T) {
 	numWorkers := 5
 
 	result, err := splitPartitionRange(partitionFilter, numWorkers)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Len(t, result, numWorkers, "The result should contain 5 split partitions")
 
@@ -153,7 +154,7 @@ func TestParsePartitionFilterByRange_Valid(t *testing.T) {
 	t.Parallel()
 	filter := "100-200"
 	parsedFilter, err := parsePartitionFilterByRange(filter)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, parsedFilter)
 }
 
@@ -161,7 +162,7 @@ func TestParsePartitionFilterByRange_InvalidRange(t *testing.T) {
 	t.Parallel()
 	filter := "invalid-range"
 	parsedFilter, err := parsePartitionFilterByRange(filter)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, parsedFilter)
 	assert.Contains(t, err.Error(), "invalid partition filter")
 }
@@ -170,7 +171,7 @@ func TestParsePartitionFilterByID_Valid(t *testing.T) {
 	t.Parallel()
 	filter := "1234"
 	parsedFilter, err := parsePartitionFilterByID(filter)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, parsedFilter)
 }
 
@@ -178,7 +179,7 @@ func TestParsePartitionFilterByID_InvalidID(t *testing.T) {
 	t.Parallel()
 	filter := "invalid-id"
 	parsedFilter, err := parsePartitionFilterByID(filter)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, parsedFilter)
 	assert.Contains(t, err.Error(), "invalid partition filter")
 }
@@ -188,7 +189,7 @@ func TestParsePartitionFilterByDigest_Valid(t *testing.T) {
 	namespace := "test-namespace"
 	filter := "EjRWeJq83vEjRRI0VniavN7xI0U=" // Base64-encoded digest
 	parsedFilter, err := parsePartitionFilterByDigest(namespace, filter)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, parsedFilter)
 }
 
@@ -197,7 +198,7 @@ func TestParsePartitionFilterByDigest_InvalidDigest(t *testing.T) {
 	namespace := "test-namespace"
 	filter := "invalid-digest"
 	parsedFilter, err := parsePartitionFilterByDigest(namespace, filter)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, parsedFilter)
 	assert.Contains(t, err.Error(), "failed to decode after-digest")
 }
@@ -207,7 +208,7 @@ func TestParsePartitionFilter_InvalidFilter(t *testing.T) {
 	namespace := "test-namespace"
 	filter := "invalid-filter"
 	parsedFilter, err := ParsePartitionFilterString(namespace, filter)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, parsedFilter)
 	assert.Contains(t, err.Error(), "failed to parse partition filter")
 }
@@ -217,7 +218,7 @@ func TestParsePartitionFilterListString_Valid(t *testing.T) {
 	namespace := "test-namespace"
 	filter := "0-1000,1000-1000,2222,EjRWeJq83vEjRRI0VniavN7xI0U="
 	parsedFilter, err := ParsePartitionFilterListString(namespace, filter)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, parsedFilter)
 }
 
@@ -226,7 +227,7 @@ func TestParsePartitionFilterListString_Empty(t *testing.T) {
 	namespace := "test-namespace"
 	filter := ""
 	parsedFilter, err := ParsePartitionFilterListString(namespace, filter)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, parsedFilter)
 	assert.Contains(t, err.Error(), "empty filters")
 }
@@ -236,7 +237,7 @@ func TestParsePartitionFilterListString_Err(t *testing.T) {
 	namespace := "test-namespace"
 	filter := "EjRWeJq83vEjR"
 	parsedFilter, err := ParsePartitionFilterListString(namespace, filter)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, parsedFilter)
 	assert.Contains(t, err.Error(), "failed to parse partition filter")
 }
@@ -248,7 +249,7 @@ func TestSplitPartitionRange_ErrNumPartLessWorkers(t *testing.T) {
 	numWorkers := 5
 
 	result, err := splitPartitionRange(partitionFilter, numWorkers)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "number of partitions is less than workers number, cannot split partitions")
 }
@@ -264,7 +265,7 @@ func TestSplitPartition_ErrNumWorkersLess1(t *testing.T) {
 	numWorkers := 0
 
 	result, err := splitPartitions(partitionFilters, numWorkers)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "number of workers is less than 1, cannot split partition filters")
 }
@@ -339,7 +340,7 @@ func TestPartitionFilter_splitPartitionIDs(t *testing.T) {
 
 			result, err := splitPartitionIDs(tt.ids, tt.numWorkers)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			}
 			assert.EqualExportedValues(t, tt.result, result)
 		})

@@ -1811,7 +1811,7 @@ func TestASBReader_readRecord(t *testing.T) {
 				t.Errorf("ASBReader.readRecord() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.EqualValues(t, got, tt.want)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

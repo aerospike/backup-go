@@ -15,12 +15,12 @@
 package metrics
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockWriteCloser is a mock implementation of io.WriteCloser for testing
@@ -47,7 +47,7 @@ func TestNewWriter(t *testing.T) {
 	}
 
 	// Create a collector
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := slog.New(slog.DiscardHandler)
 	collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
@@ -110,7 +110,7 @@ func TestWriter_Write(t *testing.T) {
 			}
 
 			// Create a collector
-			ctx := context.Background()
+			ctx := t.Context()
 			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, tc.collectorEnabled)
 
@@ -123,10 +123,10 @@ func TestWriter_Write(t *testing.T) {
 			// Verify the results
 			assert.Equal(t, tc.expectedBytes, n)
 			if tc.expectedErr != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			// Verify the collector was updated correctly
@@ -168,7 +168,7 @@ func TestWriter_Close(t *testing.T) {
 			}
 
 			// Create a collector
-			ctx := context.Background()
+			ctx := t.Context()
 			logger := slog.New(slog.DiscardHandler)
 			collector := NewCollector(ctx, logger, KilobytesPerSecond, testMetricMessage, true)
 
@@ -180,10 +180,10 @@ func TestWriter_Close(t *testing.T) {
 
 			// Verify the results
 			if tc.expectedErr != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

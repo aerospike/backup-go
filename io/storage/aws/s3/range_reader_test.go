@@ -15,7 +15,6 @@
 package s3
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -42,7 +41,7 @@ var (
 func TestNewRangeReader(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	bucket := aws.String(testBucket)
 	key := aws.String(testKey)
 	etag := aws.String(testETag)
@@ -149,7 +148,7 @@ func TestNewRangeReader(t *testing.T) {
 func TestRangeReader_OpenRange(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	bucket := aws.String(testBucket)
 	key := aws.String(testKey)
 	etag := aws.String(testETag)

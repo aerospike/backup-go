@@ -70,20 +70,30 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 
 	// Run a readers pool. Each reader in a pool has an output channel, that sends data to fanout.
 	errGroup.Go(func() error {
-		return p.readPool.Run(ctx)
-	})
-
-	// Run a writers pool. Each writer has an input channel in which it receives data to write.
-	errGroup.Go(func() error {
-		if err := p.writePool.Run(ctx); err != nil {
-			fmt.Println("+++++PIPE ERR:", err)
+		if err := p.readPool.Run(ctx); err != nil {
+			fmt.Println("+++++PIPE READ ERR:", err)
 			return err
 		}
 
 		return nil
 	})
 
-	return errGroup.Wait()
+	// Run a writers pool. Each writer has an input channel in which it receives data to write.
+	errGroup.Go(func() error {
+		if err := p.writePool.Run(ctx); err != nil {
+			fmt.Println("+++++PIPE WRITE ERR:", err)
+			return err
+		}
+
+		return nil
+	})
+
+	if err := errGroup.Wait(); err != nil {
+		fmt.Println("===PIPE ERR:", err)
+		return err
+	}
+
+	return nil
 }
 
 // GetMetrics returns the accumulated length for input and output channels.

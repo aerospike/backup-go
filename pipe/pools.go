@@ -55,6 +55,8 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 		return err
 	}
 
+	fmt.Println("#####EXITING POOL #####")
+
 	return nil
 }
 

@@ -165,13 +165,11 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
-		if r.Validator != nil {
-			if err = r.Validator.Run(filePath); err != nil {
-				// Since we are passing invalid files, we don't need to handle this
-				// error and write a test for it. Maybe we should log this information
-				// for the user so they know what is going on.
-				continue
-			}
+		if r.shouldSkip(filePath) {
+			// Since we are passing invalid files, we don't need to handle this
+			// error and write a test for it. Maybe we should log this information
+			// for the user so they know what is going on.
+			continue
 		}
 
 		// If skipPrefix is set we save skipped filepath and continue.

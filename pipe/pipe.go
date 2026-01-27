@@ -75,6 +75,8 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 			return err
 		}
 
+		fmt.Println("+++++PIPE READ OK")
+
 		return nil
 	})
 
@@ -84,6 +86,8 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 			fmt.Println("+++++PIPE WRITE ERR:", err)
 			return err
 		}
+
+		fmt.Println("+++++PIPE WRITE OK")
 
 		return nil
 	})

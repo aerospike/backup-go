@@ -399,8 +399,8 @@ func (r *Reader) processEntry(path string, file os.DirEntry) (size, num int64, e
 
 	// it's a file
 
-	if r.Validator != nil && r.Validator.Run(file.Name()) != nil {
-		return 0, 0, nil //nolint:nilerr //skip file when validation error
+	if r.shouldSkip(file.Name()) {
+		return 0, 0, nil
 	}
 
 	info, err := file.Info()
@@ -409,6 +409,11 @@ func (r *Reader) processEntry(path string, file os.DirEntry) (size, num int64, e
 	}
 
 	return info.Size(), 1, nil
+}
+
+// shouldSkip performs check, is we should skip files.
+func (r *Reader) shouldSkip(name string) bool {
+	return r.Validator != nil && r.Validator.Run(name) != nil
 }
 
 // GetSize returns the size of asb/asbx file/dir that was initialized.

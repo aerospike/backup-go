@@ -16,6 +16,7 @@ package pipe
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
@@ -40,7 +41,12 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 		chain := p.Chains[i]
 
 		errGroup.Go(func() error {
-			return chain.Run(ctx)
+			if err := chain.Run(ctx); err != nil {
+				fmt.Println("----POOL ERROR: ", err)
+				return err
+			}
+
+			return nil
 		})
 	}
 

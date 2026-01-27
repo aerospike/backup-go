@@ -142,6 +142,8 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 				// In case we have a Writer error and close error, we combine them into one error.
 				err = fmt.Errorf("write error: %w, close error: %w", err, cErr)
 			}
+
+			fmt.Println("----RETURNING:", err)
 		}()
 
 		for {

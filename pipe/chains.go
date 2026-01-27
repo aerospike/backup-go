@@ -155,6 +155,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 
 				n, err := w.Write(data)
 				if err != nil {
+					fmt.Println("chaio ERROR:", err)
 					return fmt.Errorf("failed to write data: %w", err)
 				}
 

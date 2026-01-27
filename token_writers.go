@@ -60,6 +60,7 @@ func newWriterWithTokenStats[T models.TokenConstraint](
 func (tw *tokenStatsWriter[T]) Write(data T) (int, error) {
 	n, err := tw.writer.Write(data)
 	if err != nil {
+		tw.logger.Error("tokenStatsWriter ERROR", slog.Any("error", err))
 		return 0, err
 	}
 

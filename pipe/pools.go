@@ -50,7 +50,12 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 		})
 	}
 
-	return errGroup.Wait()
+	if err := errGroup.Wait(); err != nil {
+		fmt.Println("===POOL TOTAL ERR:", err)
+		return err
+	}
+
+	return nil
 }
 
 // ProcessorCreator is a function type that defines a creator for a Processor.

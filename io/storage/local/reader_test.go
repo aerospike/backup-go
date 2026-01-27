@@ -702,3 +702,109 @@ Done:
 	skipped := streamingReader.GetSkipped()
 	require.Len(t, skipped, 2)
 }
+
+func TestReader_calculateTotalSizeForPath(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// Structure:
+	// dir/
+	//   file1.asb (12 bytes)
+	//   nested1/
+	//     file2.asb (12 bytes)
+	//     nested2/
+	//       file3.asb (12 bytes)
+	//   nested3/ (empty, should contribute 0 size 0 count)
+	//   other.txt (ignored by validator)
+
+	err := createTmpFile(dir, "file1.asb")
+	require.NoError(t, err)
+
+	err = createTempNestedDir(dir, "nested1")
+	require.NoError(t, err)
+	err = createTmpFile(dir, "nested1/file2.asb")
+	require.NoError(t, err)
+
+	err = createTempNestedDir(dir, "nested1/nested2")
+	require.NoError(t, err)
+	err = createTmpFile(dir, "nested1/nested2/file3.asb")
+	require.NoError(t, err)
+
+	err = createTempNestedDir(dir, "nested3")
+	require.NoError(t, err)
+
+	err = createTmpFile(dir, "other.txt")
+	require.NoError(t, err)
+
+	mockValidator := new(optMocks.Mockvalidator)
+	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
+		if filepath.Ext(fileName) == files.ExtensionASB {
+			return nil
+		}
+		return fmt.Errorf("invalid file extension")
+	})
+
+	tests := []struct {
+		name      string
+		newReader func() (*Reader, error)
+		path      string
+		wantNum   int64
+		wantSize  int64
+	}{
+		{
+			name: "recursive directory",
+			newReader: func() (*Reader, error) {
+				return NewReader(
+					t.Context(),
+					options.WithDir(dir),
+					options.WithValidator(mockValidator),
+					options.WithNestedDir(),
+				)
+			},
+			path:     dir,
+			wantNum:  3,
+			wantSize: 36,
+		},
+		{
+			name: "non-recursive directory",
+			newReader: func() (*Reader, error) {
+				return NewReader(
+					t.Context(),
+					options.WithDir(dir),
+					options.WithValidator(mockValidator),
+				)
+			},
+			path:     dir,
+			wantNum:  1,
+			wantSize: 12,
+		},
+		{
+			name: "single file",
+			newReader: func() (*Reader, error) {
+				return NewReader(
+					t.Context(),
+					options.WithFile(filepath.Join(dir, "file1.asb")),
+					options.WithValidator(mockValidator),
+				)
+			},
+			path:     filepath.Join(dir, "file1.asb"),
+			wantNum:  1,
+			wantSize: 12,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			r, err := tt.newReader()
+			require.NoError(t, err)
+
+			size, num, err := r.calculateTotalSizeForPath(tt.path)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantNum, num)
+			require.Equal(t, tt.wantSize, size)
+		})
+	}
+}

@@ -399,7 +399,7 @@ func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int6
 	return totalSize, totalNum, nil
 }
 
-func (r *Reader) processEntry(path string, file os.DirEntry) (int64, int64, error) {
+func (r *Reader) processEntry(path string, file os.DirEntry) (size, num int64, err error) {
 	if file.IsDir() {
 		if !r.WithNestedDir {
 			return 0, 0, nil
@@ -414,7 +414,7 @@ func (r *Reader) processEntry(path string, file os.DirEntry) (int64, int64, erro
 	// it's a file
 
 	if r.Validator != nil && r.Validator.Run(file.Name()) != nil {
-		return 0, 0, nil
+		return 0, 0, nil //nolint:nilerr //skip file when validation error
 	}
 
 	info, err := file.Info()

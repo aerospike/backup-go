@@ -360,19 +360,27 @@ func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int
 	}
 
 	if !dirInfo.IsDir() {
-		reader, err := os.Open(path)
-		if err != nil {
-			return 0, 0, fmt.Errorf("failed to open %s: %w", path, err)
-		}
-
-		stat, err := reader.Stat()
-		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
-		}
-
-		return stat.Size(), 1, nil
+		return r.calculateTotalSizeForFile(path)
 	}
 
+	return r.calculateTotalSizeForDir(path)
+}
+
+func (r *Reader) calculateTotalSizeForFile(path string) (totalSize, totalNum int64, err error) {
+	reader, err := os.Open(path)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to open %s: %w", path, err)
+	}
+
+	stat, err := reader.Stat()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
+	}
+
+	return stat.Size(), 1, nil
+}
+
+func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int64, err error) {
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to read path %s: %w", path, err)
@@ -384,8 +392,9 @@ func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int
 			if r.WithNestedDir {
 				nestedDir := filepath.Join(path, file.Name())
 				// If the nested folder is ok, then return nil.
-				if totalSize, totalNum, err = r.calculateTotalSizeForPath(nestedDir); err == nil {
-					return totalSize, totalNum, nil
+				if nestedSize, nestedNum, err := r.calculateTotalSizeForPath(nestedDir); err == nil {
+					totalSize += nestedSize
+					totalNum += nestedNum
 				}
 			}
 

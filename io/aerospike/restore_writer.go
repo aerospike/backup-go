@@ -153,6 +153,8 @@ func (rw *RestoreWriter[T]) Write(data T) (int, error) {
 }
 
 func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
+	fmt.Println("Write TOKEN:", token)
+
 	switch token.Type {
 	case models.TokenTypeRecord:
 		return int(token.Size), rw.writeRecord(token.Record)

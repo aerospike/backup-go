@@ -85,10 +85,6 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 
 func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *models.Record) error {
 	return rw.retryPolicy.Do(rw.ctx, func() error {
-		if rw.ctx.Err() != nil {
-			return rw.ctx.Err()
-		}
-
 		aerr := rw.asc.Put(writePolicy, record.Key, record.Bins)
 
 		if aerr != nil && aerr.IsInDoubt() {

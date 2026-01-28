@@ -89,6 +89,15 @@ func NewFanout[T models.TokenConstraint](
 // Run starts routing messages in separate goroutines based on the defined fanout strategy.
 func (f *Fanout[T]) Run(ctx context.Context) {
 	var wg sync.WaitGroup
+	closeOnce := sync.Once{}
+
+	// Close output channels when context is cancelled
+	go func() {
+		<-ctx.Done()
+		closeOnce.Do(func() {
+			f.Close()
+		})
+	}()
 
 	for i, input := range f.Inputs {
 		wg.Add(1)
@@ -101,7 +110,10 @@ func (f *Fanout[T]) Run(ctx context.Context) {
 	}
 
 	wg.Wait()
-	f.Close()
+	// Ensure channels are closed even if context wasn't cancelled
+	closeOnce.Do(func() {
+		f.Close()
+	})
 }
 
 // Close closes all output channels.

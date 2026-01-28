@@ -157,6 +157,8 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 					return nil
 				}
 
+				// Write data - this may block, but we can't cancel it
+				// The channel will be closed when context is cancelled, allowing us to exit on next iteration
 				n, err := w.Write(data)
 				if err != nil {
 					fmt.Println("EXIT Writer, error occured:", err)
@@ -164,13 +166,9 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 				}
 
 				// Wait for the bandwidth limiter if it is set.
-				// Note: limiter.Wait() doesn't respect context, so we check context after
+				// Note: limiter.Wait() doesn't respect context, but it's typically fast
 				if limiter != nil {
 					limiter.Wait(n)
-					// Check context after limiter wait to ensure we exit promptly on cancellation
-					if ctx.Err() != nil {
-						return ctx.Err()
-					}
 				}
 			}
 		}

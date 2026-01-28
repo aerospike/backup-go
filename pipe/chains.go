@@ -132,7 +132,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 	// Don't replace it with `var err error`.
 	return func(ctx context.Context) (err error) {
 		defer func() {
-			fmt.Println("EXIT Writer")
+			fmt.Println("DEFER EXIT Writer")
 
 			cErr := w.Close()
 			// Process errors, not to lose any of them.
@@ -153,14 +153,13 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 				return ctx.Err()
 			case data, ok := <-input:
 				if !ok {
+					fmt.Println("last data:", data)
 					return nil
 				}
 
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
 				n, err := w.Write(data)
 				if err != nil {
+					fmt.Println("EXIT Writer, error occured:", err)
 					return fmt.Errorf("failed to write data: %w", err)
 				}
 

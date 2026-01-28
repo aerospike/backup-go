@@ -111,6 +111,8 @@ func (f *Fanout[T]) Close() {
 	for _, output := range f.Outputs {
 		close(output)
 	}
+
+	fmt.Println("Closing outputs: ", len(f.Outputs))
 }
 
 // processInput listens for incoming data on the input channel

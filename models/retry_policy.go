@@ -133,6 +133,9 @@ func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
 	totalAttempts := p.totalAttempts()
 
 	for attempt := range totalAttempts {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		// Execute operation.
 		lastErr = operation()
 		if lastErr == nil {

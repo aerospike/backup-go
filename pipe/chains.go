@@ -147,9 +147,11 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 		for {
 			select {
 			case <-ctx.Done():
+				fmt.Println("+++CTX DONE")
 				return ctx.Err()
 			case data, ok := <-input:
 				if !ok {
+					fmt.Println("+++INPUT CLOSED")
 					return nil
 				}
 
@@ -163,6 +165,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 				// Wait for the bandwidth limiter if it is set.
 				// Note: limiter.Wait() doesn't respect context, but it's typically fast
 				if limiter != nil {
+					fmt.Println("Wait for limiter")
 					limiter.Wait(n)
 				}
 			}

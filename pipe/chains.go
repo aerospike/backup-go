@@ -147,11 +147,9 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 		for {
 			select {
 			case <-ctx.Done():
-				fmt.Println("+++CTX DONE")
 				return ctx.Err()
 			case data, ok := <-input:
 				if !ok {
-					fmt.Println("+++INPUT CLOSED")
 					return nil
 				}
 

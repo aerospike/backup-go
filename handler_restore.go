@@ -167,7 +167,6 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 	dataReaders := rh.readProcessor.newDataReaders(ctx)
 
 	if err := rh.runPipeline(ctx, dataReaders); err != nil {
-		fmt.Println("RESTORE FAILED:", err)
 		return err
 	}
 

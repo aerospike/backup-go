@@ -156,6 +156,9 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 					return nil
 				}
 
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				n, err := w.Write(data)
 				if err != nil {
 					return fmt.Errorf("failed to write data: %w", err)

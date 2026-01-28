@@ -109,7 +109,6 @@ func (f *Fanout[T]) Run(ctx context.Context) {
 // Close closes all output channels.
 func (f *Fanout[T]) Close() {
 	for _, output := range f.Outputs {
-		fmt.Println("========CLOSE OUTPUT=========")
 		close(output)
 	}
 }

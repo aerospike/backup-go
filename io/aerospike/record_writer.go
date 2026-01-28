@@ -124,5 +124,6 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 }
 
 func (rw *singleRecordWriter) close() error {
+	fmt.Println("------ CLOSE RECORD WRITER")
 	return nil
 }

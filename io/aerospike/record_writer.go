@@ -65,7 +65,7 @@ func newSingleRecordWriter(
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 	uuid, _ := uuid.NewRandom()
-	fmt.Printf("\nWrite RECORD TOKEN:%s:%+v", uuid, record)
+	fmt.Printf("\nWrite RECORD TOKEN:%s:%+v\n", uuid, record)
 	defer fmt.Println("UDF RECORD TOKEN:", uuid)
 	// To prevent data race, we must create copy of value.
 	writePolicy := *rw.writePolicy

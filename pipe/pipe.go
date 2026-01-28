@@ -98,7 +98,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		fmt.Println("===PIPE ERR:", err)
 		return err
 	}
-
+	fmt.Println("===EXIT PIPE")
 	return nil
 }
 

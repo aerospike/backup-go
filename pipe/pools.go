@@ -40,17 +40,19 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 	for i := range p.Chains {
 		chainIndex := i
 		errGroup.Go(func() error {
+			fmt.Println("++++++POOL STARTED:")
 			chain := p.Chains[chainIndex]
 			if err := chain.Run(ctx); err != nil {
 				fmt.Println("----POOL ERROR: ", err)
 				return err
 			}
-
+			fmt.Println("++++++EXIT POOL:")
 			return nil
 		})
 	}
-
-	if err := errGroup.Wait(); err != nil {
+	fmt.Println("#####START WAITING POOL #####")
+	err := errGroup.Wait()
+	if err != nil {
 		fmt.Println("===POOL TOTAL ERR:", err)
 		return err
 	}

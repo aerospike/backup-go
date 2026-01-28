@@ -93,13 +93,6 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		if aErr.Matches(atypes.INDEX_FOUND) {
 			rw.logger.Debug("secondary index already exists, replacing it", slog.String("name", si.Name))
 
-			fmt.Println("START DROPPPING INDEX:", si.Namespace, si.Set, si.Name)
-			err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
-			if err != nil {
-				return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
-			}
-			fmt.Println("FINISH DROPPPING INDEX:", si.Name)
-
 			job, err = rw.createIndex(
 				rw.writePolicy,
 				si,

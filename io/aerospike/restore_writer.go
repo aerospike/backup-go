@@ -153,10 +153,6 @@ func (rw *RestoreWriter[T]) Write(data T) (int, error) {
 }
 
 func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
-	uuid, _ := uuid.NewRandom()
-	fmt.Println("Write TOKEN:", uuid)
-	defer fmt.Println("DONE TOKEN:", uuid)
-
 	switch token.Type {
 	case models.TokenTypeRecord:
 		return int(token.Size), rw.writeRecord(token.Record)

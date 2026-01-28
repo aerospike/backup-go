@@ -20,6 +20,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 )
 
 type udfWriter struct {
@@ -30,6 +31,10 @@ type udfWriter struct {
 
 // writeUDF writes a UDF to the Aerospike database.
 func (rw udfWriter) writeUDF(udf *models.UDF) error {
+	uuid, _ := uuid.NewRandom()
+	fmt.Println("Write UDF TOKEN:", uuid)
+	defer fmt.Println("UDF DONE TOKEN:", uuid)
+
 	var UDFLang a.Language
 
 	switch udf.UDFType {

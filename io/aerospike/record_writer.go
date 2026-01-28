@@ -23,6 +23,7 @@ import (
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
+	"github.com/google/uuid"
 )
 
 type singleRecordWriter struct {
@@ -63,6 +64,9 @@ func newSingleRecordWriter(
 }
 
 func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
+	uuid, _ := uuid.NewRandom()
+	fmt.Println("Write RECORD TOKEN:", uuid)
+	defer fmt.Println("UDF RECORD TOKEN:", uuid)
 	// To prevent data race, we must create copy of value.
 	writePolicy := *rw.writePolicy
 	if rw.writePolicy.GenerationPolicy == a.EXPECT_GEN_GT {

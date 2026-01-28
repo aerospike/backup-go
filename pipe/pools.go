@@ -16,7 +16,6 @@ package pipe
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
@@ -40,26 +39,12 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 	for i := range p.Chains {
 		chainIndex := i
 		errGroup.Go(func() error {
-			fmt.Println("++++++POOL STARTED:")
 			chain := p.Chains[chainIndex]
-			if err := chain.Run(ctx); err != nil {
-				fmt.Println("----POOL ERROR: ", err)
-				return err
-			}
-			fmt.Println("++++++EXIT POOL:")
-			return nil
+			return chain.Run(ctx)
 		})
 	}
-	fmt.Println("#####START WAITING POOL #####")
-	err := errGroup.Wait()
-	if err != nil {
-		fmt.Println("===POOL TOTAL ERR:", err)
-		return err
-	}
 
-	fmt.Println("#####EXITING POOL #####")
-
-	return nil
+	return errGroup.Wait()
 }
 
 // ProcessorCreator is a function type that defines a creator for a Processor.

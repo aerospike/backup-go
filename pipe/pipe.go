@@ -78,11 +78,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 		return p.writePool.Run(ctx)
 	})
 
-	if err := errGroup.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return errGroup.Wait()
 }
 
 // GetMetrics returns the accumulated length for input and output channels.

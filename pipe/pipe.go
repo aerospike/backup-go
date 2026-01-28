@@ -65,6 +65,8 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 	// Fanout runs goroutine for each reader channel that routes messages to writers according to pipe strategy.
 	errGroup.Go(func() error {
 		p.fanout.Run(ctx)
+
+		fmt.Println("+++++PIPE FANOUT OK")
 		return nil
 	})
 
@@ -87,11 +89,11 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 			return err
 		}
 
-		fmt.Println("+++++PIPE WRITE OK")
+		fmt.Println("+++++PIPE READ OK")
 
 		return nil
 	})
-
+	fmt.Println("===Start waiting pipe err")
 	if err := errGroup.Wait(); err != nil {
 		fmt.Println("===PIPE ERR:", err)
 		return err

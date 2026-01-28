@@ -32,7 +32,7 @@ type udfWriter struct {
 // writeUDF writes a UDF to the Aerospike database.
 func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	uuid, _ := uuid.NewRandom()
-	fmt.Println("Write UDF TOKEN:", uuid)
+	fmt.Printf("\nWrite UDF TOKEN:%s:%s", uuid, string(udf.Content))
 	defer fmt.Println("UDF DONE TOKEN:", uuid)
 
 	var UDFLang a.Language

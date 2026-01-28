@@ -38,9 +38,9 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 	errGroup, ctx := errgroup.WithContext(ctx)
 
 	for i := range p.Chains {
-		chain := p.Chains[i]
-
+		chainIndex := i
 		errGroup.Go(func() error {
+			chain := p.Chains[chainIndex]
 			if err := chain.Run(ctx); err != nil {
 				fmt.Println("----POOL ERROR: ", err)
 				return err

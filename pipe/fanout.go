@@ -138,6 +138,11 @@ func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 		index = f.splitFunc(data)
 	}
 
+	// Ensure index is valid
+	if index < 0 || index >= len(f.Outputs) {
+		return
+	}
+
 	select {
 	case <-ctx.Done():
 		return

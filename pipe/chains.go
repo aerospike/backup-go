@@ -159,8 +159,13 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 				}
 
 				// Wait for the bandwidth limiter if it is set.
+				// Note: limiter.Wait() doesn't respect context, so we check context after
 				if limiter != nil {
 					limiter.Wait(n)
+					// Check context after limiter wait to ensure we exit promptly on cancellation
+					if ctx.Err() != nil {
+						return ctx.Err()
+					}
 				}
 			}
 		}

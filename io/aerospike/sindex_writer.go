@@ -17,6 +17,7 @@ package aerospike
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -99,7 +100,7 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 				return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
 			}
 			fmt.Println("FINISH DROPPPING INDEX:", si.Name)
-
+			time.Sleep(123 * time.Millisecond)
 			job, err = rw.createIndex(
 				rw.writePolicy,
 				si,

@@ -90,27 +90,27 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		ctx...,
 	)
 	if aErr != nil {
-		if aErr.Matches(atypes.INDEX_FOUND) {
-			rw.logger.Debug("secondary index already exists, replacing it", slog.String("name", si.Name))
-
-			err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
-			if err != nil {
-				return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
-			}
-
-			job, err = rw.createIndex(
-				rw.writePolicy,
-				si,
-				sIndexType,
-				sIndexCollectionType,
-				exp,
-				ctx...,
-			)
-			if err != nil {
-				return fmt.Errorf("error creating replacement sindex %s: %w", si.Name, err)
-			}
-		} else {
+		if !aErr.Matches(atypes.INDEX_FOUND) {
 			return fmt.Errorf("error creating sindex %s: %w", si.Name, aErr)
+		}
+
+		rw.logger.Debug("secondary index already exists, replacing it", slog.String("name", si.Name))
+
+		err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
+		if err != nil {
+			return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
+		}
+
+		job, err = rw.createIndex(
+			rw.writePolicy,
+			si,
+			sIndexType,
+			sIndexCollectionType,
+			exp,
+			ctx...,
+		)
+		if err != nil {
+			return fmt.Errorf("error creating replacement sindex %s: %w", si.Name, err)
 		}
 	}
 

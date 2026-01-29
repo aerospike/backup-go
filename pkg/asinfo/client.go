@@ -1124,7 +1124,7 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 		return nil, fmt.Errorf("sindex missing indextype")
 	}
 
-	if val, ok := sindexMap["bin"]; ok {
+	if val, ok := sindexMap["bin"]; ok { //nolint:nestif // parsing optional map fields: bin → type → context
 		path := models.SIndexPath{
 			BinName: val,
 		}

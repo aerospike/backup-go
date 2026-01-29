@@ -64,19 +64,17 @@ func NewReader(ctx context.Context, opts ...options.Opt) (*Reader, error) {
 		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	if r.IsDir {
-		if !r.SkipDirCheck {
-			for _, path := range r.PathList {
-				if err := r.checkRestoreDirectory(path); err != nil {
-					return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
-				}
+	if r.IsDir && !r.SkipDirCheck {
+		for _, path := range r.PathList {
+			if err := r.checkRestoreDirectory(path); err != nil {
+				return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
 			}
 		}
+	}
 
-		if r.SortFiles && len(r.PathList) == 1 {
-			if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
-				return nil, fmt.Errorf("failed to pre sort: %w", err)
-			}
+	if r.IsDir && r.SortFiles && len(r.PathList) == 1 {
+		if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
+			return nil, fmt.Errorf("failed to pre sort: %w", err)
 		}
 	}
 

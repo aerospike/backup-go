@@ -533,7 +533,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	if b == ' ' {
+	if b == ' ' { //nolint:nestif // optional context: two clear branches (expression vs CDT context)
 		if err := _expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}

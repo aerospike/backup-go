@@ -20,6 +20,7 @@ linters:
     - misspell
     - modernize
     - nakedret
+    - nestif
     - nilerr
     - nolintlint
     - prealloc

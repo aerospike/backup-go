@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.57.2
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3
-	github.com/aerospike/aerospike-client-go/v8 v8.5.0
+	github.com/aerospike/aerospike-client-go/v8 v8.2.3-0.20260129193700-627b3c3fbec9
 	github.com/aws/aws-sdk-go-v2 v1.40.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.93.0

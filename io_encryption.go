@@ -38,7 +38,7 @@ var (
 // readPrivateKey parses and loads a private key according to the EncryptionPolicy
 // configuration. It can load the private key from a file, env variable or Secret Agent.
 // secretAgent must be non-nil when using KeySecret; pass nil for file/env-only loading.
-func readPrivateKey(encPolicy *EncryptionPolicy, secretAgent *saClient.Client) ([]byte, error) {
+func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgent *saClient.Client) ([]byte, error) {
 	var (
 		pemData []byte
 		err     error
@@ -56,7 +56,7 @@ func readPrivateKey(encPolicy *EncryptionPolicy, secretAgent *saClient.Client) (
 			return nil, fmt.Errorf("unable to read PEM from ENV: %w", err)
 		}
 	case encPolicy.KeySecret != nil:
-		pemData, err = readPemFromSecret(*encPolicy.KeySecret, secretAgent)
+		pemData, err = readPemFromSecret(ctx, *encPolicy.KeySecret, secretAgent)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read PEM from secret agent: %w", err)
 		}
@@ -104,13 +104,13 @@ func resolveEncryptionKey(
 	if secretAgentConfig != nil {
 		var err error
 
-		secretAgentClient, err = NewSecretAgentClient(ctx, secretAgentConfig)
+		secretAgentClient, err = NewSecretAgentClient(secretAgentConfig)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	key, err := readPrivateKey(encryptionPolicy, secretAgentClient)
+	key, err := readPrivateKey(ctx, encryptionPolicy, secretAgentClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve encryption key: %w", err)
 	}
@@ -163,8 +163,8 @@ func readPemFromEnv(keyEnv string) ([]byte, error) {
 
 // readPemFromSecret reads the key from secret agent without a header
 // and footer, decrypts it adding the header and footer.
-func readPemFromSecret(secret string, client *saClient.Client) ([]byte, error) {
-	key, err := getSecret(client, secret)
+func readPemFromSecret(ctx context.Context, secret string, client *saClient.Client) ([]byte, error) {
+	key, err := getSecret(ctx, client, secret)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read secret config key: %w", err)
 	}

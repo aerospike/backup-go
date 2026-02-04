@@ -166,7 +166,7 @@ func mockInvalidBase64Handler(conn net.Conn) {
 
 func TestNewClient(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		client, err := NewClient(t.Context(), ConnectionTypeTCP, testAddress, testTimeout, true, nil)
+		client, err := NewClient(ConnectionTypeTCP, testAddress, testTimeout, true, nil)
 		require.NoError(t, err)
 		require.NotNil(t, client)
 		require.Equal(t, ConnectionTypeTCP, client.connectionType)
@@ -179,7 +179,7 @@ func TestNewClient(t *testing.T) {
 	t.Run("Error with TLS and non-TCP", func(t *testing.T) {
 		//nolint:gosec // For test we can use default unsecured TLS version.
 		tlsConfig := &tls.Config{}
-		client, err := NewClient(t.Context(), ConnectionTypeUDS, testAddress, testTimeout, true, tlsConfig)
+		client, err := NewClient(ConnectionTypeUDS, testAddress, testTimeout, true, tlsConfig)
 		require.Error(t, err)
 		require.Nil(t, client)
 		require.Contains(t, err.Error(), "tls connection type unix is not supported")
@@ -195,10 +195,10 @@ func TestClient_GetSecret(t *testing.T) {
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
 
-		client, err := NewClient(t.Context(), ConnectionTypeTCP, testAddress, testTimeout, false, nil)
+		client, err := NewClient(ConnectionTypeTCP, testAddress, testTimeout, false, nil)
 		require.NoError(t, err)
 
-		secret, err := client.GetSecret("", testSecretKey)
+		secret, err := client.GetSecret(t.Context(), "", testSecretKey)
 		require.NoError(t, err)
 		require.Equal(t, testPKey, secret)
 	})
@@ -211,10 +211,10 @@ func TestClient_GetSecret(t *testing.T) {
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
 
-		client, err := NewClient(t.Context(), ConnectionTypeTCP, ":1112", testTimeout, true, nil)
+		client, err := NewClient(ConnectionTypeTCP, ":1112", testTimeout, true, nil)
 		require.NoError(t, err)
 
-		secret, err := client.GetSecret("", testSecretKey)
+		secret, err := client.GetSecret(t.Context(), "", testSecretKey)
 		require.NoError(t, err)
 		require.Equal(t, "testValue", secret)
 	})
@@ -227,10 +227,10 @@ func TestClient_GetSecret(t *testing.T) {
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
 
-		client, err := NewClient(t.Context(), ConnectionTypeTCP, ":1113", testTimeout, false, nil)
+		client, err := NewClient(ConnectionTypeTCP, ":1113", testTimeout, false, nil)
 		require.NoError(t, err)
 
-		_, err = client.GetSecret("", testSecretKey)
+		_, err = client.GetSecret(t.Context(), "", testSecretKey)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "test error")
 	})
@@ -243,19 +243,19 @@ func TestClient_GetSecret(t *testing.T) {
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
 
-		client, err := NewClient(t.Context(), ConnectionTypeTCP, ":1114", testTimeout, true, nil)
+		client, err := NewClient(ConnectionTypeTCP, ":1114", testTimeout, true, nil)
 		require.NoError(t, err)
 
-		_, err = client.GetSecret("", testSecretKey)
+		_, err = client.GetSecret(t.Context(), "", testSecretKey)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "illegal base64")
 	})
 
 	t.Run("Connection Error", func(t *testing.T) {
-		client, err := NewClient(t.Context(), ConnectionTypeTCP, "invalid-address", testTimeout, false, nil)
+		client, err := NewClient(ConnectionTypeTCP, "invalid-address", testTimeout, false, nil)
 		require.NoError(t, err)
 
-		_, err = client.GetSecret("", testSecretKey)
+		_, err = client.GetSecret(t.Context(), "", testSecretKey)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to connect to secret agent")
 	})

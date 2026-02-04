@@ -29,7 +29,7 @@ import (
 const secretPrefix = "secrets:"
 
 // getSecret gets the secret from the secret agent using the given client.
-func getSecret(client *saClient.Client, key string) (string, error) {
+func getSecret(ctx context.Context, client *saClient.Client, key string) (string, error) {
 	if client == nil {
 		return "", fmt.Errorf("secret config not initialized")
 	}
@@ -39,7 +39,7 @@ func getSecret(client *saClient.Client, key string) (string, error) {
 		return "", err
 	}
 
-	result, err := client.GetSecret(resource, secretKey)
+	result, err := client.GetSecret(ctx, resource, secretKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret from secret agent: %w", err)
 	}
@@ -112,24 +112,23 @@ func isSecret(secret string) bool {
 //
 // If the input string does not contain a secret key it is returned as is,
 // without any modification.
-func ParseSecret(config *SecretAgentConfig, secret string) (string, error) {
+func ParseSecret(ctx context.Context, config *SecretAgentConfig, secret string) (string, error) {
 	// If value doesn't contain the secret, we return it as is.
 	if !isSecret(secret) {
 		return secret, nil
 	}
 
-	client, err := NewSecretAgentClient(context.Background(), config)
+	client, err := NewSecretAgentClient(config)
 	if err != nil {
 		return "", err
 	}
 
-	return getSecret(client, secret)
+	return getSecret(ctx, client, secret)
 }
 
-// NewSecretAgentClient initializes a new secret agent client. The context is
-// used for connection cancellation; pass the operation context when the client
-// is long-lived (e.g. in backup/restore), or context.Background() for one-off use.
-func NewSecretAgentClient(ctx context.Context, config *SecretAgentConfig) (*saClient.Client, error) {
+// NewSecretAgentClient initializes a new secret agent client from config.
+// Pass context to GetSecret when performing requests (for cancellation).
+func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
 	if config == nil {
 		return nil, fmt.Errorf("secret config not initialized")
 	}
@@ -159,7 +158,6 @@ func NewSecretAgentClient(ctx context.Context, config *SecretAgentConfig) (*saCl
 
 	// Initializing client.
 	client, err := saClient.NewClient(
-		ctx,
 		*config.ConnectionType,
 		address,
 		timeout,

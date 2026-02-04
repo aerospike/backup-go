@@ -30,6 +30,7 @@ import (
 	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
+	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
 const (
@@ -46,7 +47,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 	writer            Writer
 	encoder           Encoder[T]
 	encryptionPolicy  *EncryptionPolicy
-	secretAgentConfig *SecretAgentConfig
+	secretAgentClient *saClient.Client
 	compressionPolicy *CompressionPolicy
 	state             *State
 	stats             *models.BackupStats
@@ -59,13 +60,14 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 }
 
 // newFileWriterProcessor returns a new file writer processor instance.
+// secretAgentClient is optional; pass nil when encryption does not use the secret agent.
 func newFileWriterProcessor[T models.TokenConstraint](
 	prefix string,
 	suffixGenerator func() string,
 	writer Writer,
 	encoder Encoder[T],
 	encryptionPolicy *EncryptionPolicy,
-	secretAgentConfig *SecretAgentConfig,
+	secretAgentClient *saClient.Client,
 	compressionPolicy *CompressionPolicy,
 	state *State,
 	stats *models.BackupStats,
@@ -82,7 +84,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		writer:            writer,
 		encoder:           encoder,
 		encryptionPolicy:  encryptionPolicy,
-		secretAgentConfig: secretAgentConfig,
+		secretAgentClient: secretAgentClient,
 		compressionPolicy: compressionPolicy,
 		state:             state,
 		stats:             stats,
@@ -210,7 +212,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	// Apply encryption (if it is enabled).
 	encryptedWriter, err := newEncryptionWriter(
 		fw.encryptionPolicy,
-		fw.secretAgentConfig,
+		fw.secretAgentClient,
 		counter.NewWriter(storageWriter, &fw.stats.BytesWritten, sizeCounter),
 	)
 	if err != nil {
@@ -295,13 +297,13 @@ func newCompressionWriter(
 
 // newEncryptionWriter returns an encryption writer for encrypting backup.
 func newEncryptionWriter(
-	policy *EncryptionPolicy, saConfig *SecretAgentConfig, writer io.WriteCloser,
+	policy *EncryptionPolicy, secretAgent *saClient.Client, writer io.WriteCloser,
 ) (io.WriteCloser, error) {
 	if policy == nil || policy.Mode == EncryptNone {
 		return writer, nil
 	}
 
-	privateKey, err := readPrivateKey(policy, saConfig)
+	privateKey, err := readPrivateKey(policy, secretAgent)
 	if err != nil {
 		return nil, err
 	}

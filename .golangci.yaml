@@ -6,13 +6,21 @@ linters:
   default: none
   enable:
     - bodyclose
+    - containedctx
+    - copyloopvar
     - dogsled
     - dupl
     - errcheck
     - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - funlen
+    - gocognit
     - goconst
     - gocritic
     - gocyclo
+    - godot
     - gosec
     - govet
     - ineffassign
@@ -20,10 +28,14 @@ linters:
     - misspell
     - modernize
     - nakedret
+    - nestif
     - nilerr
+    - noctx
     - nolintlint
+    - perfsprint
     - prealloc
     - predeclared
+    - reassign
     - revive
     - sloglint
     - staticcheck

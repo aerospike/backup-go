@@ -50,20 +50,20 @@ func TestGet(t *testing.T) {
 		addr := listener.Addr().String()
 
 		// Test the Get function
-		conn, err := Get("tcp", addr, testTimeout, nil)
+		conn, err := Get(t.Context(), "tcp", addr, testTimeout, nil)
 		require.NoError(t, err)
 		require.NotNil(t, conn)
 		conn.Close()
 	})
 
 	t.Run("Error with Invalid Address", func(t *testing.T) {
-		conn, err := Get("tcp", "invalid-address:invalid-port", testTimeout, nil)
+		conn, err := Get(t.Context(), "tcp", "invalid-address:invalid-port", testTimeout, nil)
 		require.Error(t, err)
 		require.Nil(t, conn)
 	})
 
 	t.Run("Error with Invalid Connection Type", func(t *testing.T) {
-		conn, err := Get("invalid-type", testAddress, testTimeout, nil)
+		conn, err := Get(t.Context(), "invalid-type", testAddress, testTimeout, nil)
 		require.Error(t, err)
 		require.Nil(t, conn)
 	})

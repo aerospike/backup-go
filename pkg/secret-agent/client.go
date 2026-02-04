@@ -16,6 +16,7 @@
 package secret_agent
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"time"
@@ -32,7 +33,9 @@ const (
 )
 
 // Client represents the client to communicate with Aerospike Secret Agent.
+// Context passed at construction is used for dial cancellation (e.g. on shutdown).
 type Client struct {
+	ctx context.Context
 	// tlsConfig contains the TLS configuration for secure connection.go over TCP.
 	tlsConfig *tls.Config
 	// connectionType describes connection.go type. Use `ConnectionTypeUDS` and
@@ -49,8 +52,10 @@ type Client struct {
 	isBase64 bool
 }
 
-// NewClient returns a new Aerospike Secret Agent client.
-func NewClient(connectionType, address string, timeout time.Duration, isBase64 bool,
+// NewClient returns a new Aerospike Secret Agent client. The context is used for
+// connection dial cancellation (e.g. when the operation is cancelled). Pass
+// context.Background() when no cancellation is needed.
+func NewClient(ctx context.Context, connectionType, address string, timeout time.Duration, isBase64 bool,
 	tlsConfig *tls.Config,
 ) (*Client, error) {
 	if tlsConfig != nil && connectionType != ConnectionTypeTCP {
@@ -58,6 +63,7 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 	}
 
 	return &Client{
+		ctx:            ctx,
 		connectionType: connectionType,
 		address:        address,
 		timeout:        timeout,
@@ -70,7 +76,7 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 // in the external service, the corresponding value will be returned. Otherwise,
 // an empty value and an error will be returned.
 func (c *Client) GetSecret(resource, secretKey string) (string, error) {
-	conn, err := connection.Get(c.connectionType, c.address, c.timeout, c.tlsConfig)
+	conn, err := connection.Get(c.ctx, c.connectionType, c.address, c.timeout, c.tlsConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to secret agent: %w", err)
 	}

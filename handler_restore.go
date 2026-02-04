@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
+	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 	"github.com/google/uuid"
 )
 
@@ -114,9 +115,20 @@ func newRestoreHandler[T models.TokenConstraint](
 		config.MetricsEnabled,
 	)
 
+	var secretAgentClient *saClient.Client
+	if config.SecretAgentConfig != nil {
+		var err error
+		secretAgentClient, err = NewSecretAgentClient(base.ctx, config.SecretAgentConfig)
+		if err != nil {
+			base.cancel()
+			return nil, err
+		}
+	}
+
 	readProcessor := newFileReaderProcessor[T](
 		reader,
 		config,
+		secretAgentClient,
 		kbpsCollector,
 		readersCh,
 		base.errors,

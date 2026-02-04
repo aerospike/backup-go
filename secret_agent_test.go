@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -72,7 +73,8 @@ ah87+EsQLgoao6VWDlepN54P`
 )
 
 func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error) {
-	listener, err := net.Listen(saClient.ConnectionTypeTCP, address)
+	var lc net.ListenConfig
+	listener, err := lc.Listen(context.Background(), saClient.ConnectionTypeTCP, address)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +208,13 @@ func TestSecretAgent_getSecret(t *testing.T) {
 	}
 
 	for i, tt := range testCases {
-		_, err = getSecret(tt.config, tt.key)
+		var client *saClient.Client
+		if tt.config != nil {
+			var errClient error
+			client, errClient = NewSecretAgentClient(t.Context(), tt.config)
+			require.NoError(t, errClient, "case %d", i)
+		}
+		_, err = getSecret(client, tt.key)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
@@ -303,7 +311,7 @@ func TestSecretAgent_getTlSConfig_InvalidClientCert(t *testing.T) {
 func TestNewSecretAgentClient_NilConfig(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewSecretAgentClient(nil)
+	_, err := NewSecretAgentClient(t.Context(), nil)
 	require.ErrorContains(t, err, "secret config not initialized")
 }
 
@@ -321,7 +329,7 @@ func TestNewSecretAgentClient_TLSConfigError(t *testing.T) {
 		CaFile:         &badCa,
 	}
 
-	_, err := NewSecretAgentClient(cfg)
+	_, err := NewSecretAgentClient(t.Context(), cfg)
 	require.ErrorContains(t, err, "unable to read ca file")
 }
 
@@ -348,7 +356,7 @@ func TestNewSecretAgentClient_Success(t *testing.T) {
 		// CaFile is nil here on purpose to also cover the "no TLS config" path.
 	}
 
-	client, err := NewSecretAgentClient(cfg)
+	client, err := NewSecretAgentClient(t.Context(), cfg)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 }

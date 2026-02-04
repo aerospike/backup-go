@@ -15,6 +15,7 @@
 package connection
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
@@ -39,16 +40,18 @@ type connector interface {
 
 // Get returns a connector according to initialized params.
 func Get(
+	ctx context.Context,
 	connectionType, address string,
 	timeout time.Duration,
 	tlsConfig *tls.Config,
 ) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: timeout}
 	if tlsConfig != nil {
-		return tls.DialWithDialer(dialer, connectionType, address, tlsConfig)
+		tlsDialer := &tls.Dialer{Config: tlsConfig, NetDialer: dialer}
+		return tlsDialer.DialContext(ctx, connectionType, address)
 	}
 
-	return dialer.Dial(connectionType, address)
+	return dialer.DialContext(ctx, connectionType, address)
 }
 
 // Write forms and executes a request to the secret agent.

@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -27,14 +28,12 @@ import (
 
 const secretPrefix = "secrets:"
 
-// getSecret gets the secret from the secret agent. It returns the secret value or an error if any.
-func getSecret(config *SecretAgentConfig, key string) (string, error) {
-	client, err := NewSecretAgentClient(config)
-	if err != nil {
-		return "", err
+// getSecret gets the secret from the secret agent using the given client.
+func getSecret(client *saClient.Client, key string) (string, error) {
+	if client == nil {
+		return "", fmt.Errorf("secret config not initialized")
 	}
 
-	// Getting resource and key.
 	resource, secretKey, err := getResourceKey(key)
 	if err != nil {
 		return "", err
@@ -119,11 +118,18 @@ func ParseSecret(config *SecretAgentConfig, secret string) (string, error) {
 		return secret, nil
 	}
 
-	return getSecret(config, secret)
+	client, err := NewSecretAgentClient(context.Background(), config)
+	if err != nil {
+		return "", err
+	}
+
+	return getSecret(client, secret)
 }
 
-// NewSecretAgentClient initializes a new secret agent client.
-func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
+// NewSecretAgentClient initializes a new secret agent client. The context is
+// used for connection cancellation; pass the operation context when the client
+// is long-lived (e.g. in backup/restore), or context.Background() for one-off use.
+func NewSecretAgentClient(ctx context.Context, config *SecretAgentConfig) (*saClient.Client, error) {
 	if config == nil {
 		return nil, fmt.Errorf("secret config not initialized")
 	}
@@ -153,6 +159,7 @@ func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
 
 	// Initializing client.
 	client, err := saClient.NewClient(
+		ctx,
 		*config.ConnectionType,
 		address,
 		timeout,

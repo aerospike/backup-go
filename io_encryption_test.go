@@ -155,8 +155,11 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 			"unable to read PEM from secret agent"},
 	}
 
+	secretAgentClient, err := NewSecretAgentClient(t.Context(), saCfg)
+	require.NoError(t, err)
+
 	for i, tt := range testCases {
-		_, err = readPrivateKey(tt.encPolicy, tt.saConfig)
+		_, err = readPrivateKey(tt.encPolicy, secretAgentClient)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {

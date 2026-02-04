@@ -165,13 +165,11 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
-		if r.Validator != nil {
-			if err = r.Validator.Run(filePath); err != nil {
-				// Since we are passing invalid files, we don't need to handle this
-				// error and write a test for it. Maybe we should log this information
-				// for the user so they know what is going on.
-				continue
-			}
+		if r.shouldSkip(filePath) {
+			// Since we are passing invalid files, we don't need to handle this
+			// error and write a test for it. Maybe we should log this information
+			// for the user so they know what is going on.
+			continue
 		}
 
 		// If skipPrefix is set we save skipped filepath and continue.
@@ -359,53 +357,61 @@ func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int
 		return 0, 0, fmt.Errorf("failed to get path info %s: %w", path, err)
 	}
 
-	if !dirInfo.IsDir() {
-		reader, err := os.Open(path)
-		if err != nil {
-			return 0, 0, fmt.Errorf("failed to open %s: %w", path, err)
-		}
-
-		stat, err := reader.Stat()
-		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get file stats %s: %w", path, err)
-		}
-
-		return stat.Size(), 1, nil
+	if dirInfo.IsDir() {
+		return r.calculateTotalSizeForDir(path)
 	}
 
+	return dirInfo.Size(), 1, nil
+}
+
+func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int64, err error) {
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to read path %s: %w", path, err)
 	}
 
 	for _, file := range fileInfo {
-		if file.IsDir() {
-			// Iterate over nested dirs recursively.
-			if r.WithNestedDir {
-				nestedDir := filepath.Join(path, file.Name())
-				// If the nested folder is ok, then return nil.
-				if totalSize, totalNum, err = r.calculateTotalSizeForPath(nestedDir); err == nil {
-					return totalSize, totalNum, nil
-				}
-			}
-
-			continue
+		size, num, err := r.processEntry(path, file)
+		if err != nil {
+			return 0, 0, err
 		}
 
-		if r.Validator != nil {
-			if err = r.Validator.Run(file.Name()); err == nil {
-				info, err := file.Info()
-				if err != nil {
-					return 0, 0, fmt.Errorf("failed to get file info %s: %w", path, err)
-				}
-
-				totalNum++
-				totalSize += info.Size()
-			}
-		}
+		totalSize += size
+		totalNum += num
 	}
 
 	return totalSize, totalNum, nil
+}
+
+func (r *Reader) processEntry(path string, file os.DirEntry) (size, num int64, err error) {
+	if file.IsDir() {
+		if !r.WithNestedDir {
+			return 0, 0, nil
+		}
+
+		// Iterate over nested dirs recursively.
+		nestedDir := filepath.Join(path, file.Name())
+
+		return r.calculateTotalSizeForPath(nestedDir)
+	}
+
+	// it's a file
+
+	if r.shouldSkip(file.Name()) {
+		return 0, 0, nil
+	}
+
+	info, err := file.Info()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get file info %s: %w", path, err)
+	}
+
+	return info.Size(), 1, nil
+}
+
+// shouldSkip performs check, is we should skip files.
+func (r *Reader) shouldSkip(name string) bool {
+	return r.Validator != nil && r.Validator.Run(name) != nil
 }
 
 // GetSize returns the size of asb/asbx file/dir that was initialized.

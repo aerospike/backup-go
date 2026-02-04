@@ -538,7 +538,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 			return nil, err
 		}
 		// Expression filter has a base64 encoded expression and no CDT context.
-		// If it is not expression, we assume it is CDT contex.
+		// If it is not expression, we assume it is CDT context.
 		if isExpression {
 			res.Expression, err = _readUntil(r.reader, asbNewLine, false)
 			if err != nil {

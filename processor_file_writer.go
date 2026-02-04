@@ -30,7 +30,6 @@ import (
 	"github.com/aerospike/backup-go/io/sized"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
 const (
@@ -46,8 +45,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 
 	writer            Writer
 	encoder           Encoder[T]
-	encryptionPolicy  *EncryptionPolicy
-	secretAgentClient *saClient.Client
+	encryptionKey     []byte // nil = no encryption; resolved once at processor creation
 	compressionPolicy *CompressionPolicy
 	state             *State
 	stats             *models.BackupStats
@@ -60,14 +58,13 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 }
 
 // newFileWriterProcessor returns a new file writer processor instance.
-// secretAgentClient is optional; pass nil when encryption does not use the secret agent.
+// encryptionKey is the key for encryption; pass nil when encryption is disabled.
 func newFileWriterProcessor[T models.TokenConstraint](
 	prefix string,
 	suffixGenerator func() string,
 	writer Writer,
 	encoder Encoder[T],
-	encryptionPolicy *EncryptionPolicy,
-	secretAgentClient *saClient.Client,
+	encryptionKey []byte,
 	compressionPolicy *CompressionPolicy,
 	state *State,
 	stats *models.BackupStats,
@@ -83,8 +80,7 @@ func newFileWriterProcessor[T models.TokenConstraint](
 		suffixGenerator:   suffixGenerator,
 		writer:            writer,
 		encoder:           encoder,
-		encryptionPolicy:  encryptionPolicy,
-		secretAgentClient: secretAgentClient,
+		encryptionKey:     encryptionKey,
 		compressionPolicy: compressionPolicy,
 		state:             state,
 		stats:             stats,
@@ -211,8 +207,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 
 	// Apply encryption (if it is enabled).
 	encryptedWriter, err := newEncryptionWriter(
-		fw.encryptionPolicy,
-		fw.secretAgentClient,
+		fw.encryptionKey,
 		counter.NewWriter(storageWriter, &fw.stats.BytesWritten, sizeCounter),
 	)
 	if err != nil {
@@ -296,17 +291,11 @@ func newCompressionWriter(
 }
 
 // newEncryptionWriter returns an encryption writer for encrypting backup.
-func newEncryptionWriter(
-	policy *EncryptionPolicy, secretAgent *saClient.Client, writer io.WriteCloser,
-) (io.WriteCloser, error) {
-	if policy == nil || policy.Mode == EncryptNone {
+// Pass nil encryptionKey when encryption is disabled.
+func newEncryptionWriter(encryptionKey []byte, writer io.WriteCloser) (io.WriteCloser, error) {
+	if encryptionKey == nil {
 		return writer, nil
 	}
 
-	privateKey, err := readPrivateKey(policy, secretAgent)
-	if err != nil {
-		return nil, err
-	}
-
-	return encryption.NewWriter(writer, privateKey)
+	return encryption.NewWriter(writer, encryptionKey)
 }

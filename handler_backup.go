@@ -31,7 +31,6 @@ import (
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 )
@@ -200,14 +199,10 @@ func newBackupHandler(
 		kbpsCollector:          kbpsCollector,
 	}
 
-	var secretAgentClient *saClient.Client
-	if config.SecretAgentConfig != nil {
-		var err error
-		secretAgentClient, err = NewSecretAgentClient(base.ctx, config.SecretAgentConfig)
-		if err != nil {
-			base.cancel()
-			return nil, err
-		}
+	encryptionKey, err := resolveEncryptionKey(base.ctx, config.EncryptionPolicy, config.SecretAgentConfig)
+	if err != nil {
+		base.cancel()
+		return nil, err
 	}
 
 	writerProcessor, err := newFileWriterProcessor[*models.Token](
@@ -215,8 +210,7 @@ func newBackupHandler(
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,
-		config.EncryptionPolicy,
-		secretAgentClient,
+		encryptionKey,
 		config.CompressionPolicy,
 		state,
 		stats,

@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -83,6 +84,38 @@ func readPrivateKey(encPolicy *EncryptionPolicy, secretAgent *saClient.Client) (
 	}
 
 	return sum256[:], nil
+}
+
+// resolveEncryptionKey returns the encryption key for the given policy, creating a
+// secret agent client when config is set. Call this once at startup; pass the
+// result to the file writer/reader processor. Returns (nil, nil) when encryption
+// is disabled.
+func resolveEncryptionKey(
+	ctx context.Context,
+	encryptionPolicy *EncryptionPolicy,
+	secretAgentConfig *SecretAgentConfig,
+) ([]byte, error) {
+	if encryptionPolicy == nil || encryptionPolicy.Mode == EncryptNone {
+		return nil, nil
+	}
+
+	var secretAgentClient *saClient.Client
+
+	if secretAgentConfig != nil {
+		var err error
+
+		secretAgentClient, err = NewSecretAgentClient(ctx, secretAgentConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	key, err := readPrivateKey(encryptionPolicy, secretAgentClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve encryption key: %w", err)
+	}
+
+	return key, nil
 }
 
 // parsePK parses a private key from PKCS8 or PKCS1.

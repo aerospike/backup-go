@@ -27,7 +27,6 @@ import (
 	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -36,7 +35,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *ConfigRestore
 
-	secretAgentClient *saClient.Client
+	encryptionKey []byte // resolved once at processor creation; used for all readers
 	// kilobytes per second collector.
 	kbpsCollector *metrics.Collector
 
@@ -49,11 +48,11 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 }
 
 // newFileReaderProcessor returns a new file reader processor.
-// secretAgentClient is optional; pass nil when encryption does not use the secret agent.
+// encryptionKey is the key for decryption; pass nil when encryption is disabled.
 func newFileReaderProcessor[T models.TokenConstraint](
 	reader StreamingReader,
 	config *ConfigRestore,
-	secretAgentClient *saClient.Client,
+	encryptionKey []byte,
 	kbpsCollector *metrics.Collector,
 	readersCh chan models.File,
 	errorsCh chan error,
@@ -62,14 +61,14 @@ func newFileReaderProcessor[T models.TokenConstraint](
 	logger.Debug("created file reader processor")
 
 	return &fileReaderProcessor[T]{
-		reader:            reader,
-		config:            config,
-		secretAgentClient: secretAgentClient,
-		kbpsCollector:     kbpsCollector,
-		readersCh:         readersCh,
-		errorsCh:          errorsCh,
-		logger:            logger,
-		parallel:          config.Parallel,
+		reader:        reader,
+		config:        config,
+		encryptionKey: encryptionKey,
+		kbpsCollector: kbpsCollector,
+		readersCh:     readersCh,
+		errorsCh:      errorsCh,
+		logger:        logger,
+		parallel:      config.Parallel,
 	}
 }
 
@@ -157,7 +156,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 
 // wrapReader applies encryption and compression wrappers to the reader based on the configuration.
 func (fr *fileReaderProcessor[T]) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
-	r, err := newEncryptionReader(fr.config.EncryptionPolicy, fr.secretAgentClient, reader)
+	r, err := newEncryptionReader(fr.encryptionKey, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encryption reader: %w", err)
 	}
@@ -187,19 +186,13 @@ func newCompressionReader(
 }
 
 // newEncryptionReader returns an encryption reader for decrypting backup.
-func newEncryptionReader(
-	policy *EncryptionPolicy, secretAgent *saClient.Client, reader io.ReadCloser,
-) (io.ReadCloser, error) {
-	if policy == nil {
+// Pass nil encryptionKey when encryption is disabled.
+func newEncryptionReader(encryptionKey []byte, reader io.ReadCloser) (io.ReadCloser, error) {
+	if encryptionKey == nil {
 		return reader, nil
 	}
 
-	privateKey, err := readPrivateKey(policy, secretAgent)
-	if err != nil {
-		return nil, err
-	}
-
-	encryptedReader, err := encryption.NewEncryptedReader(reader, privateKey)
+	encryptedReader, err := encryption.NewEncryptedReader(reader, encryptionKey)
 	if err != nil {
 		return nil, err
 	}

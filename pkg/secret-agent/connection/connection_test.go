@@ -42,7 +42,8 @@ var errTest = errors.New("test error")
 func TestGet(t *testing.T) {
 	t.Run("Success with TCP", func(t *testing.T) {
 		// Create a listener to simulate a server
-		listener, err := net.Listen("tcp", "localhost:0")
+		var lc net.ListenConfig
+		listener, err := lc.Listen(t.Context(), "tcp", "localhost:0")
 		require.NoError(t, err)
 		defer listener.Close()
 

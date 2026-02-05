@@ -127,7 +127,6 @@ func ParseSecret(ctx context.Context, config *SecretAgentConfig, secret string) 
 }
 
 // NewSecretAgentClient initializes a new secret agent client from config.
-// Pass context to GetSecret when performing requests (for cancellation).
 func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
 	if config == nil {
 		return nil, fmt.Errorf("secret config not initialized")

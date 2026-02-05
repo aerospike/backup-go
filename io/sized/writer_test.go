@@ -198,3 +198,51 @@ func Test_writeCloserSized_CloseNilWriter(t *testing.T) {
 	err = wcs.Close()
 	require.NoError(t, err)
 }
+
+// Test_writeCloserSized_ContextCanceledDuringSaveSend verifies that Write does not
+// deadlock when the size limit is reached and the receiver of saveCommandChan has
+// already stopped (e.g. backup was canceled). Without the select+ctx.Done() in
+// Write, the send on saveCommandChan would block forever and the handler never
+// shuts down.
+func Test_writeCloserSized_ContextCanceledDuringSaveSend(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Unbuffered channel, and we never read from it. So "saveCommandChan <- n"
+	// would block forever if Write didn't check ctx.Done().
+	saveCommandChan := make(chan int)
+
+	buf := &bytes.Buffer{}
+	open := func(_ context.Context, _ int, _ *atomic.Uint64) (io.WriteCloser, error) {
+		return &mockWriteCloser{Writer: buf}, nil
+	}
+
+	writer, err := NewWriter(ctx, 1, saveCommandChan, 10, open)
+	require.NoError(t, err)
+	defer writer.Close()
+
+	// One write so we have an active writer. Then pretend we've hit the size limit.
+	_, err = writer.Write([]byte("first"))
+	require.NoError(t, err)
+	writer.sizeCounter.Store(10)
+
+	// Run the "at limit" Write in a goroutine.
+	// It will try to send on saveCommandChan;
+	writeDone := make(chan struct{})
+	var writeErr error
+	go func() {
+		defer close(writeDone)
+
+		// This write will close that writer and try to send on saveCommandChan.
+		_, writeErr = writer.Write([]byte("x"))
+	}()
+
+	cancel()
+	<-writeDone
+
+	// Write must return the context error, not block forever.
+	require.Error(t, writeErr)
+	require.ErrorIs(t, writeErr, context.Canceled)
+}

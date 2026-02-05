@@ -86,10 +86,8 @@ func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgen
 	return sum256[:], nil
 }
 
-// resolveEncryptionKey returns the encryption key for the given policy, creating a
-// secret agent client when config is set. Call this once at startup; pass the
-// result to the file writer/reader processor. Returns (nil, nil) when encryption
-// is disabled.
+// resolveEncryptionKey returns the encryption key for the given policy.
+// Returns (nil, nil) when encryption is disabled.
 func resolveEncryptionKey(
 	ctx context.Context,
 	encryptionPolicy *EncryptionPolicy,

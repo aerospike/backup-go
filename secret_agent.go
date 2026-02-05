@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -27,20 +28,18 @@ import (
 
 const secretPrefix = "secrets:"
 
-// getSecret gets the secret from the secret agent. It returns the secret value or an error if any.
-func getSecret(config *SecretAgentConfig, key string) (string, error) {
-	client, err := NewSecretAgentClient(config)
-	if err != nil {
-		return "", err
+// getSecret gets the secret from the secret agent using the given client.
+func getSecret(ctx context.Context, client *saClient.Client, key string) (string, error) {
+	if client == nil {
+		return "", fmt.Errorf("secret config not initialized")
 	}
 
-	// Getting resource and key.
 	resource, secretKey, err := getResourceKey(key)
 	if err != nil {
 		return "", err
 	}
 
-	result, err := client.GetSecret(resource, secretKey)
+	result, err := client.GetSecret(ctx, resource, secretKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret from secret agent: %w", err)
 	}
@@ -113,16 +112,21 @@ func isSecret(secret string) bool {
 //
 // If the input string does not contain a secret key it is returned as is,
 // without any modification.
-func ParseSecret(config *SecretAgentConfig, secret string) (string, error) {
+func ParseSecret(ctx context.Context, config *SecretAgentConfig, secret string) (string, error) {
 	// If value doesn't contain the secret, we return it as is.
 	if !isSecret(secret) {
 		return secret, nil
 	}
 
-	return getSecret(config, secret)
+	client, err := NewSecretAgentClient(config)
+	if err != nil {
+		return "", err
+	}
+
+	return getSecret(ctx, client, secret)
 }
 
-// NewSecretAgentClient initializes a new secret agent client.
+// NewSecretAgentClient initializes a new secret agent client from config.
 func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
 	if config == nil {
 		return nil, fmt.Errorf("secret config not initialized")

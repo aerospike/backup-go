@@ -35,6 +35,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *ConfigRestore
 
+	encryptionKey []byte
 	// kilobytes per second collector.
 	kbpsCollector *metrics.Collector
 
@@ -47,9 +48,11 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 }
 
 // newFileReaderProcessor returns a new file reader processor.
+// encryptionKey is the key for decryption; pass nil when encryption is disabled.
 func newFileReaderProcessor[T models.TokenConstraint](
 	reader StreamingReader,
 	config *ConfigRestore,
+	encryptionKey []byte,
 	kbpsCollector *metrics.Collector,
 	readersCh chan models.File,
 	errorsCh chan error,
@@ -60,6 +63,7 @@ func newFileReaderProcessor[T models.TokenConstraint](
 	return &fileReaderProcessor[T]{
 		reader:        reader,
 		config:        config,
+		encryptionKey: encryptionKey,
 		kbpsCollector: kbpsCollector,
 		readersCh:     readersCh,
 		errorsCh:      errorsCh,
@@ -152,7 +156,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 
 // wrapReader applies encryption and compression wrappers to the reader based on the configuration.
 func (fr *fileReaderProcessor[T]) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
-	r, err := newEncryptionReader(fr.config.EncryptionPolicy, fr.config.SecretAgentConfig, reader)
+	r, err := newEncryptionReader(fr.encryptionKey, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encryption reader: %w", err)
 	}
@@ -182,19 +186,13 @@ func newCompressionReader(
 }
 
 // newEncryptionReader returns an encryption reader for decrypting backup.
-func newEncryptionReader(
-	policy *EncryptionPolicy, saConfig *SecretAgentConfig, reader io.ReadCloser,
-) (io.ReadCloser, error) {
-	if policy == nil {
+// Pass nil encryptionKey when encryption is disabled.
+func newEncryptionReader(encryptionKey []byte, reader io.ReadCloser) (io.ReadCloser, error) {
+	if encryptionKey == nil {
 		return reader, nil
 	}
 
-	privateKey, err := readPrivateKey(policy, saConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	encryptedReader, err := encryption.NewEncryptedReader(reader, privateKey)
+	encryptedReader, err := encryption.NewEncryptedReader(reader, encryptionKey)
 	if err != nil {
 		return nil, err
 	}

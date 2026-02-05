@@ -114,9 +114,16 @@ func newRestoreHandler[T models.TokenConstraint](
 		config.MetricsEnabled,
 	)
 
+	encryptionKey, err := resolveEncryptionKey(base.ctx, config.EncryptionPolicy, config.SecretAgentConfig)
+	if err != nil {
+		base.cancel()
+		return nil, err
+	}
+
 	readProcessor := newFileReaderProcessor[T](
 		reader,
 		config,
+		encryptionKey,
 		kbpsCollector,
 		readersCh,
 		base.errors,

@@ -128,7 +128,9 @@ func (s *TCPServer) Start(ctx context.Context) (chan *models.ASBXToken, error) {
 			return nil, fmt.Errorf("failed to start tcp server with tls: %w", err)
 		}
 	} else {
-		s.listener, err = net.Listen("tcp", s.config.Address)
+		var lc net.ListenConfig
+
+		s.listener, err = lc.Listen(ctx, "tcp", s.config.Address)
 		if err != nil {
 			return nil, fmt.Errorf("failed to start tcp server without tls: %w", err)
 		}

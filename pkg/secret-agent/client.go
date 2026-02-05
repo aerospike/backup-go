@@ -16,6 +16,7 @@
 package secret_agent
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"time"
@@ -69,8 +70,8 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 // GetSecret performs a request to the Aerospike Secret Agent. If the key is found
 // in the external service, the corresponding value will be returned. Otherwise,
 // an empty value and an error will be returned.
-func (c *Client) GetSecret(resource, secretKey string) (string, error) {
-	conn, err := connection.Get(c.connectionType, c.address, c.timeout, c.tlsConfig)
+func (c *Client) GetSecret(ctx context.Context, resource, secretKey string) (string, error) {
+	conn, err := connection.Get(ctx, c.connectionType, c.address, c.timeout, c.tlsConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to secret agent: %w", err)
 	}

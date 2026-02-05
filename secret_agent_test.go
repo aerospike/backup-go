@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -72,7 +73,8 @@ ah87+EsQLgoao6VWDlepN54P`
 )
 
 func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error) {
-	listener, err := net.Listen(saClient.ConnectionTypeTCP, address)
+	var lc net.ListenConfig
+	listener, err := lc.Listen(context.Background(), saClient.ConnectionTypeTCP, address)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +208,13 @@ func TestSecretAgent_getSecret(t *testing.T) {
 	}
 
 	for i, tt := range testCases {
-		_, err = getSecret(tt.config, tt.key)
+		var client *saClient.Client
+		if tt.config != nil {
+			var errClient error
+			client, errClient = NewSecretAgentClient(tt.config)
+			require.NoError(t, errClient, "case %d", i)
+		}
+		_, err = getSecret(t.Context(), client, tt.key)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
@@ -219,7 +227,7 @@ func TestParseSecret_ReturnsPlainValueWhenNotSecret(t *testing.T) {
 	t.Parallel()
 
 	cfg := &SecretAgentConfig{}
-	value, err := ParseSecret(cfg, "plain-value")
+	value, err := ParseSecret(t.Context(), cfg, "plain-value")
 
 	require.NoError(t, err)
 	require.Equal(t, "plain-value", value)
@@ -249,7 +257,7 @@ func TestParseSecret_SecretValueIsResolved(t *testing.T) {
 		IsBase64:           &isBase64,
 	}
 
-	value, err := ParseSecret(cfg, testSASecretKey)
+	value, err := ParseSecret(t.Context(), cfg, testSASecretKey)
 	require.NoError(t, err)
 	require.Equal(t, testPKey, value)
 }
@@ -258,7 +266,7 @@ func TestParseSecret_SecretAgentError(t *testing.T) {
 	t.Parallel()
 
 	// nil config should propagate the NewSecretAgentClient error out of ParseSecret.
-	value, err := ParseSecret(nil, testSASecretKey)
+	value, err := ParseSecret(t.Context(), nil, testSASecretKey)
 	require.ErrorContains(t, err, "secret config not initialized")
 	require.Empty(t, value)
 }

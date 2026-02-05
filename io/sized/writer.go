@@ -64,7 +64,11 @@ func (f *Writer) Write(p []byte) (n int, err error) {
 		}
 
 		if f.saveCommandChan != nil {
-			f.saveCommandChan <- f.n
+			select {
+			case f.saveCommandChan <- f.n:
+			case <-f.ctx.Done():
+				return 0, f.ctx.Err()
+			}
 		}
 
 		f.writer = nil

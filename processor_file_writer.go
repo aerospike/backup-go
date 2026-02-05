@@ -45,7 +45,7 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 
 	writer            Writer
 	encoder           Encoder[T]
-	encryptionKey     []byte // nil = no encryption; resolved once at processor creation
+	encryptionKey     []byte
 	compressionPolicy *CompressionPolicy
 	state             *State
 	stats             *models.BackupStats

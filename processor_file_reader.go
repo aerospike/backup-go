@@ -35,7 +35,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 	reader StreamingReader
 	config *ConfigRestore
 
-	encryptionKey []byte // resolved once at processor creation; used for all readers
+	encryptionKey []byte
 	// kilobytes per second collector.
 	kbpsCollector *metrics.Collector
 

@@ -533,12 +533,12 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	if b == ' ' {
+	if b == ' ' { //nolint:nestif // optional context: two clear branches (expression vs CDT context)
 		if err := _expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
 		// Expression filter has a base64 encoded expression and no CDT context.
-		// If it is not expression, we assume it is CDT contex.
+		// If it is not expression, we assume it is CDT context.
 		if isExpression {
 			res.Expression, err = _readUntil(r.reader, asbNewLine, false)
 			if err != nil {

@@ -36,8 +36,8 @@ func (_m *Mockvalidator) EXPECT() *Mockvalidator_Expecter {
 }
 
 // Run provides a mock function for the type Mockvalidator
-func (_mock *Mockvalidator) Run(fileName string) error {
-	ret := _mock.Called(fileName)
+func (_mock *Mockvalidator) Run(file string) error {
+	ret := _mock.Called(file)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Run")
@@ -45,7 +45,7 @@ func (_mock *Mockvalidator) Run(fileName string) error {
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
-		r0 = returnFunc(fileName)
+		r0 = returnFunc(file)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -58,12 +58,12 @@ type Mockvalidator_Run_Call struct {
 }
 
 // Run is a helper method to define mock.On call
-//   - fileName
-func (_e *Mockvalidator_Expecter) Run(fileName interface{}) *Mockvalidator_Run_Call {
-	return &Mockvalidator_Run_Call{Call: _e.mock.On("Run", fileName)}
+//   - file
+func (_e *Mockvalidator_Expecter) Run(file interface{}) *Mockvalidator_Run_Call {
+	return &Mockvalidator_Run_Call{Call: _e.mock.On("Run", file)}
 }
 
-func (_c *Mockvalidator_Run_Call) Run(run func(fileName string)) *Mockvalidator_Run_Call {
+func (_c *Mockvalidator_Run_Call) Run(run func(file string)) *Mockvalidator_Run_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
@@ -75,7 +75,7 @@ func (_c *Mockvalidator_Run_Call) Return(err error) *Mockvalidator_Run_Call {
 	return _c
 }
 
-func (_c *Mockvalidator_Run_Call) RunAndReturn(run func(fileName string) error) *Mockvalidator_Run_Call {
+func (_c *Mockvalidator_Run_Call) RunAndReturn(run func(file string) error) *Mockvalidator_Run_Call {
 	_c.Call.Return(run)
 	return _c
 }

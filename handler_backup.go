@@ -199,13 +199,18 @@ func newBackupHandler(
 		kbpsCollector:          kbpsCollector,
 	}
 
+	encryptionKey, err := resolveEncryptionKey(base.ctx, config.EncryptionPolicy, config.SecretAgentConfig)
+	if err != nil {
+		base.cancel()
+		return nil, err
+	}
+
 	writerProcessor, err := newFileWriterProcessor[*models.Token](
 		config.OutputFilePrefix,
 		bh.stateSuffixGenerator,
 		writer,
 		encoder,
-		config.EncryptionPolicy,
-		config.SecretAgentConfig,
+		encryptionKey,
 		config.CompressionPolicy,
 		state,
 		stats,

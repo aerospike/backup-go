@@ -102,13 +102,18 @@ func newBackupXDRHandler(
 		logger,
 	)
 
+	encryptionKey, err := resolveEncryptionKey(base.ctx, config.EncryptionPolicy, config.SecretAgentConfig)
+	if err != nil {
+		base.cancel()
+		return nil, err
+	}
+
 	writerProcessor, err := newFileWriterProcessor[*models.ASBXToken](
 		"",
 		emptyPrefixSuffix,
 		writer,
 		encoder,
-		config.EncryptionPolicy,
-		config.SecretAgentConfig,
+		encryptionKey,
 		config.CompressionPolicy,
 		nil,
 		stats,

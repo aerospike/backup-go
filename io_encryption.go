@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -25,6 +26,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
 )
 
 var (
@@ -34,9 +37,8 @@ var (
 
 // readPrivateKey parses and loads a private key according to the EncryptionPolicy
 // configuration. It can load the private key from a file, env variable or Secret Agent.
-// A valid agent parameter is required to load the key from Aerospike Secret Agent.
-// Pass in nil for any other option.
-func readPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([]byte, error) {
+// secretAgent must be non-nil when using KeySecret; pass nil for file/env-only loading.
+func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgent *saClient.Client) ([]byte, error) {
 	var (
 		pemData []byte
 		err     error
@@ -54,7 +56,7 @@ func readPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([
 			return nil, fmt.Errorf("unable to read PEM from ENV: %w", err)
 		}
 	case encPolicy.KeySecret != nil:
-		pemData, err = readPemFromSecret(*encPolicy.KeySecret, saConfig)
+		pemData, err = readPemFromSecret(ctx, *encPolicy.KeySecret, secretAgent)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read PEM from secret agent: %w", err)
 		}
@@ -82,6 +84,36 @@ func readPrivateKey(encPolicy *EncryptionPolicy, saConfig *SecretAgentConfig) ([
 	}
 
 	return sum256[:], nil
+}
+
+// resolveEncryptionKey returns the encryption key for the given policy.
+// Returns (nil, nil) when encryption is disabled.
+func resolveEncryptionKey(
+	ctx context.Context,
+	encryptionPolicy *EncryptionPolicy,
+	secretAgentConfig *SecretAgentConfig,
+) ([]byte, error) {
+	if encryptionPolicy == nil || encryptionPolicy.Mode == EncryptNone {
+		return nil, nil
+	}
+
+	var secretAgentClient *saClient.Client
+
+	if secretAgentConfig != nil {
+		var err error
+
+		secretAgentClient, err = NewSecretAgentClient(secretAgentConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	key, err := readPrivateKey(ctx, encryptionPolicy, secretAgentClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve encryption key: %w", err)
+	}
+
+	return key, nil
 }
 
 // parsePK parses a private key from PKCS8 or PKCS1.
@@ -129,8 +161,8 @@ func readPemFromEnv(keyEnv string) ([]byte, error) {
 
 // readPemFromSecret reads the key from secret agent without a header
 // and footer, decrypts it adding the header and footer.
-func readPemFromSecret(secret string, config *SecretAgentConfig) ([]byte, error) {
-	key, err := getSecret(config, secret)
+func readPemFromSecret(ctx context.Context, secret string, client *saClient.Client) ([]byte, error) {
+	key, err := getSecret(ctx, client, secret)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read secret config key: %w", err)
 	}

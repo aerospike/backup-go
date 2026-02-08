@@ -16,6 +16,8 @@ package backup
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -101,6 +103,10 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 		KeyFile: &keyFile,
 		Mode:    EncryptAES128,
 	}
+	encPolicyKeyFileAES256 := &EncryptionPolicy{
+		KeyFile: &keyFile,
+		Mode:    EncryptAES256,
+	}
 	keyFileErr := ""
 	encPolicyKeyFileErr := &EncryptionPolicy{
 		KeyFile: &keyFileErr,
@@ -134,12 +140,23 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 		Mode:      EncryptAES128,
 	}
 
+	// Valid PEM structure but invalid key bytes so parsePK fails.
+	invalidKeyEnv := "testPKeyInvalidKeyContent"
+	invalidKeyPEM := "-----BEGIN PRIVATE KEY-----\n" + base64.StdEncoding.EncodeToString([]byte("not a valid key")) + "\n-----END PRIVATE KEY-----\n"
+	t.Setenv(invalidKeyEnv, invalidKeyPEM)
+	encPolicyInvalidKeyContent := &EncryptionPolicy{
+		KeyEnv: &invalidKeyEnv,
+		Mode:   EncryptAES128,
+	}
+
 	testCases := []struct {
 		encPolicy  *EncryptionPolicy
 		saConfig   *SecretAgentConfig
 		errContent string
 	}{
 		{encPolicyKeyFile, saCfg,
+			""},
+		{encPolicyKeyFileAES256, saCfg,
 			""},
 		{encPolicyKeyFileErr, saCfg,
 			"unable to read PEM from file"},
@@ -153,10 +170,15 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 			""},
 		{encPolicyKeySecretErr, saCfg,
 			"unable to read PEM from secret agent"},
+		{encPolicyInvalidKeyContent, saCfg,
+			"failed to parse private key"},
 	}
 
+	secretAgentClient, err := NewSecretAgentClient(saCfg)
+	require.NoError(t, err)
+
 	for i, tt := range testCases {
-		_, err = readPrivateKey(tt.encPolicy, tt.saConfig)
+		_, err = readPrivateKey(t.Context(), tt.encPolicy, secretAgentClient)
 		if tt.errContent != "" {
 			require.ErrorContains(t, err, tt.errContent, "case %d", i)
 		} else {
@@ -227,6 +249,17 @@ func Test_parsePK(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_parsePK_PKCS8NonRSA(t *testing.T) {
+	t.Parallel()
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(ecKey)
+	require.NoError(t, err)
+	got, err := parsePK(pkcs8Bytes)
+	require.ErrorContains(t, err, "expected RSA private key")
+	require.Nil(t, got)
 }
 
 func Test_parsePK_WithPEM(t *testing.T) {

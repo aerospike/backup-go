@@ -22,7 +22,7 @@ import (
 )
 
 type validator interface {
-	Run(file string) error
+	Run(fileName string) error
 }
 
 type Options struct {

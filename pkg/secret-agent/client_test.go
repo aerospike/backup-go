@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -85,7 +86,7 @@ func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error)
 }
 
 func mockHandler(conn net.Conn) {
-	defer conn.Close()
+	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
 	resp := models.Response{
@@ -105,7 +106,7 @@ func mockHandler(conn net.Conn) {
 }
 
 func mockBase64Handler(conn net.Conn) {
-	defer conn.Close()
+	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
 	resp := models.Response{
@@ -125,7 +126,7 @@ func mockBase64Handler(conn net.Conn) {
 }
 
 func mockErrorHandler(conn net.Conn) {
-	defer conn.Close()
+	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
 	resp := models.Response{
@@ -145,7 +146,7 @@ func mockErrorHandler(conn net.Conn) {
 }
 
 func mockInvalidBase64Handler(conn net.Conn) {
-	defer conn.Close()
+	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
 	resp := models.Response{
@@ -190,7 +191,7 @@ func TestClient_GetSecret(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		listener, err := mockTCPServer(testAddress, mockHandler)
 		require.NoError(t, err)
-		defer listener.Close()
+		defer sneakyClose(listener)
 
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
@@ -206,7 +207,7 @@ func TestClient_GetSecret(t *testing.T) {
 	t.Run("Success with Base64 Decoding", func(t *testing.T) {
 		listener, err := mockTCPServer(":1112", mockBase64Handler)
 		require.NoError(t, err)
-		defer listener.Close()
+		defer sneakyClose(listener)
 
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
@@ -222,7 +223,7 @@ func TestClient_GetSecret(t *testing.T) {
 	t.Run("Error from Server", func(t *testing.T) {
 		listener, err := mockTCPServer(":1113", mockErrorHandler)
 		require.NoError(t, err)
-		defer listener.Close()
+		defer sneakyClose(listener)
 
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
@@ -238,7 +239,7 @@ func TestClient_GetSecret(t *testing.T) {
 	t.Run("Invalid Base64", func(t *testing.T) {
 		listener, err := mockTCPServer(":1114", mockInvalidBase64Handler)
 		require.NoError(t, err)
-		defer listener.Close()
+		defer sneakyClose(listener)
 
 		// Wait for server start.
 		time.Sleep(1 * time.Second)
@@ -259,4 +260,8 @@ func TestClient_GetSecret(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to connect to secret agent")
 	})
+}
+
+func sneakyClose(c io.Closer) {
+	_ = c.Close()
 }

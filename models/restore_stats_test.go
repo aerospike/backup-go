@@ -58,7 +58,7 @@ func TestSumRestoreStats(t *testing.T) {
 		s.recordsInserted.Add(10)
 		s.errorsInDoubt.Add(1)
 		s.retryPolicyAttempts.Add(2)
-		s.commonStats.ReadRecords.Add(10)
+		s.ReadRecords.Add(10)
 		s.AddUDFs(1)
 
 		result := SumRestoreStats(s)
@@ -83,7 +83,7 @@ func TestSumRestoreStats(t *testing.T) {
 		s1.RecordsSkipped.Add(10)
 		s1.recordsInserted.Add(100)
 		s1.TotalBytesRead.Add(500)
-		s1.commonStats.ReadRecords.Add(100)
+		s1.ReadRecords.Add(100)
 
 		s2 := NewRestoreStats()
 		s2.RecordsExpired.Add(2)
@@ -92,7 +92,7 @@ func TestSumRestoreStats(t *testing.T) {
 		s2.recordsFresher.Add(3)
 		s2.errorsInDoubt.Add(1)
 		s2.TotalBytesRead.Add(300)
-		s2.commonStats.ReadRecords.Add(50)
+		s2.ReadRecords.Add(50)
 		s2.AddSIndexes(2)
 
 		result := SumRestoreStats(s1, s2)

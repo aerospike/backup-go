@@ -205,6 +205,11 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 		return nil, fmt.Errorf("failed to create storage writer: %w", err)
 	}
 
+	num, err := files.GetFileNumber(filename)
+	if err != nil {
+		return nil, err
+	}
+
 	// Apply encryption (if it is enabled).
 	encryptedWriter, err := newEncryptionWriter(
 		fw.encryptionKey,
@@ -212,11 +217,6 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set encryption: %w", err)
-	}
-
-	num, err := files.GetFileNumber(filename)
-	if err != nil {
-		return nil, err
 	}
 
 	// Apply compression (if it is enabled).

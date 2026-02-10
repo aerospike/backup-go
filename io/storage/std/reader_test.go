@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -109,7 +110,7 @@ func TestReader_StreamFiles(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		_, err := w.WriteString(testData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		_ = w.Close()
 	}()
 
@@ -157,7 +158,7 @@ func TestReader_StreamFile(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		_, err := w.WriteString(testData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		_ = w.Close()
 	}()
 

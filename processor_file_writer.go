@@ -214,15 +214,15 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 		return nil, fmt.Errorf("failed to set encryption: %w", err)
 	}
 
+	num, err := files.GetFileNumber(filename)
+	if err != nil {
+		return nil, err
+	}
+
 	// Apply compression (if it is enabled).
 	compressedWriter, err := newCompressionWriter(fw.compressionPolicy, encryptedWriter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set compression: %w", err)
-	}
-
-	num, err := files.GetFileNumber(filename)
-	if err != nil {
-		return nil, err
 	}
 
 	// Is it a metadata file?
@@ -231,6 +231,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	// Write file header.
 	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isRecords))
 	if err != nil {
+		_ = compressedWriter.Close()
 		return nil, fmt.Errorf("failed to write header: %w", err)
 	}
 

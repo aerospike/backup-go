@@ -329,7 +329,7 @@ func TestConcurrentWrites(t *testing.T) {
 			defer writeCloser.Close()
 
 			for j := range writesPerGoroutine {
-				data := []byte("goroutine-" + string(rune(id+'0')) + "-write-" + string(rune(j+'0')) + "\n")
+				data := []byte("goroutine-" + string(rune(id+'0')) + "-write-" + string(j+'0') + "\n")
 				_, err := writeCloser.Write(data)
 				if err != nil {
 					t.Errorf("Concurrent write failed: %v", err)

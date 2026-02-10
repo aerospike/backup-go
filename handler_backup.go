@@ -60,6 +60,7 @@ type Writer interface {
 }
 
 // BackupHandler handles a backup job.
+// noinspection GoNameStartsWithPackageName
 type BackupHandler struct {
 	*handlerBase
 

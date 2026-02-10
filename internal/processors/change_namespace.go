@@ -28,7 +28,7 @@ type changeNamespace[T models.TokenConstraint] struct {
 }
 
 // NewChangeNamespace creates new changeNamespace
-func NewChangeNamespace[T models.TokenConstraint](source, destination *string) processor[T] {
+func NewChangeNamespace[T models.TokenConstraint](source, destination *string) Processor[T] {
 	if source == nil || destination == nil {
 		return &noopProcessor[T]{}
 	}

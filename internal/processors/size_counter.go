@@ -26,7 +26,7 @@ type sizeCounter[T models.TokenConstraint] struct {
 }
 
 // NewSizeCounter creates a new sizeCounter processor.
-func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) processor[T] {
+func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) Processor[T] {
 	return &sizeCounter[T]{
 		counter: counter,
 	}

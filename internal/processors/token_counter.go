@@ -27,7 +27,7 @@ type TokenCounter[T models.TokenConstraint] struct {
 }
 
 // NewTokenCounter returns new token counter.
-func NewTokenCounter[T models.TokenConstraint](counter *atomic.Uint64) processor[T] {
+func NewTokenCounter[T models.TokenConstraint](counter *atomic.Uint64) Processor[T] {
 	return &TokenCounter[T]{
 		counter: counter,
 	}

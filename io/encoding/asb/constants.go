@@ -18,11 +18,8 @@ import "math"
 
 // section names
 const (
-	sectionUndefined = ""
-	sectionHeader    = "header"
-	sectionMetadata  = "meta-data"
-	sectionGlobal    = "global"
-	sectionRecord    = "records"
+	sectionGlobal = "global"
+	sectionRecord = "records"
 )
 
 // asb section markers
@@ -35,21 +32,12 @@ const (
 
 // line names
 const (
-	lineTypeUndefined    = ""
-	lineTypeVersion      = "metaVersion"
-	lineTypeNamespace    = "namespace"
-	lineTypeUDF          = "UDF"
-	lineTypeSindex       = "sindex"
-	lineTypeRecordHeader = "record header"
-	lineTypeRecordBins   = "record bins"
-	lineTypeBin          = "bin"
-	lineTypeKey          = "key"
-	lineTypeDigest       = "digest"
-	lineTypesSet         = "set"
-	lineTypeGen          = "generation"
-	lineTypeExpiration   = "expiration"
-	lineTypeBinCount     = "bin count"
-	lineTypeFirst        = "first"
+	lineTypeNamespace  = "namespace"
+	lineTypeUDF        = "UDF"
+	lineTypeSindex     = "sindex"
+	lineTypeRecordBins = "record bins"
+	lineTypeKey        = "key"
+	lineTypeFirst      = "first"
 )
 
 // global line types
@@ -126,10 +114,9 @@ const (
 
 // value bounds
 const (
-	maxNamespaceLength = 31
-	maxTokenSize       = 1000
-	maxGeneration      = math.MaxUint16
-	maxBinCount        = math.MaxUint16
+	maxTokenSize  = 1000
+	maxGeneration = math.MaxUint16
+	maxBinCount   = math.MaxUint16
 )
 
 // asb boolean encoding

@@ -105,11 +105,13 @@ func TestReader_StreamFiles(t *testing.T) {
 	defer func() { os.Stdin = oldStdin }()
 
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		_, err := w.WriteString(testData)
 		require.NoError(t, err)
 		_ = w.Close()
-	})
+	}()
 
 	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)
@@ -151,13 +153,13 @@ func TestReader_StreamFile(t *testing.T) {
 	defer func() { os.Stdin = oldStdin }()
 
 	var wg sync.WaitGroup
-
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
 		defer wg.Done()
 		_, err := w.WriteString(testData)
 		require.NoError(t, err)
 		_ = w.Close()
-	})
+	}()
 
 	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)

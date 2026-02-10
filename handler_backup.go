@@ -440,6 +440,7 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 	writer io.WriteCloser,
 ) error {
 	// The original writer is wrapped to disable closing after writing metadata.
+	//noinspection GoResourceLeak
 	ncWriter := newNoCloseWriter(writer)
 
 	if !bh.config.NoUDFs {

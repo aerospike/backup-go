@@ -327,7 +327,7 @@ func TestConcurrentWrites(t *testing.T) {
 		wg.Add(1)
 		go func(id int, writeCloser io.WriteCloser) {
 			defer wg.Done()
-			defer writeCloser.Close()
+			defer func() { _ = writeCloser.Close() }()
 
 			for j := range writesPerGoroutine {
 				data := fmt.Appendf(nil, "goroutine-%d-write-%d\n", id, j)

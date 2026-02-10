@@ -59,15 +59,13 @@ func (c *Chain[T]) Run(ctx context.Context) error {
 
 // NewReaderChain returns a new Chain with a Reader and a Processor,
 // and communication channel for backup operation.
-//
-//nolint:gocritic // No need to give names to the result here.
-func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (*Chain[T], chan T) {
-	output := make(chan T, readerBufferSize)
-	routine := newReaderRoutine(r, p, output)
+func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (chain *Chain[T], output chan T) {
+	output = make(chan T, readerBufferSize)
+	chain = &Chain[T]{
+		routine: newReaderRoutine(r, p, output),
+	}
 
-	return &Chain[T]{
-		routine: routine,
-	}, output
+	return chain, output
 }
 
 // newReaderRoutine returns a function that will be executed in goroutine to process a reader.
@@ -112,15 +110,13 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 
 // NewWriterChain returns a new Chain with a Writer,
 // and communication channel for backup operation.
-//
-//nolint:gocritic // No need to give names to the result here.
-func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *bandwidth.Limiter) (*Chain[T], chan T) {
-	input := make(chan T, writerBufferSize)
-	routine := newWriterRoutine(w, input, limiter)
+func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *bandwidth.Limiter) (chain *Chain[T], input chan T) {
+	input = make(chan T, writerBufferSize)
+	chain = &Chain[T]{
+		routine: newWriterRoutine(w, input, limiter),
+	}
 
-	return &Chain[T]{
-		routine: routine,
-	}, input
+	return chain, input
 }
 
 // newWriterRoutine returns a function that will be executed in goroutine to process a writer.

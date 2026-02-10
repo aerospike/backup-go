@@ -131,9 +131,9 @@ func TestWriter_NewWriter(t *testing.T) {
 
 			writeCloser, err := w.NewWriter(tt.ctx, tt.filename)
 
-			writer.Close()
+			_ = writer.Close()
 			os.Stdout = oldStdout
-			r.Close()
+			_ = r.Close()
 
 			switch tt.wantErr {
 			case true:
@@ -207,14 +207,14 @@ func TestStdoutWriteCloser_Write(t *testing.T) {
 			n, err := writeCloser.Write(tt.data)
 			require.NoError(t, err)
 
-			writeCloser.Close()
-			w.Close()
+			_ = writeCloser.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 
 			var buf bytes.Buffer
 			_, err = io.Copy(&buf, r)
 			require.NoError(t, err)
-			r.Close()
+			_ = r.Close()
 
 			switch tt.wantErr {
 			case true:
@@ -275,13 +275,13 @@ func TestStdoutWriteCloser_Close(t *testing.T) {
 
 			err := writeCloser.Close()
 			require.NoError(t, err)
-			w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 
 			var buf bytes.Buffer
 			_, err = io.Copy(&buf, r)
 			require.NoError(t, err)
-			r.Close()
+			_ = r.Close()
 
 			switch tt.wantErr {
 			case true:
@@ -340,13 +340,13 @@ func TestConcurrentWrites(t *testing.T) {
 	}
 
 	wg.Wait()
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
 	_, err := io.Copy(&buf, r)
 	require.NoError(t, err)
-	r.Close()
+	_ = r.Close()
 
 	if buf.Len() == 0 {
 		t.Error("No data written in concurrent test")

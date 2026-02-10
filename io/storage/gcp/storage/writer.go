@@ -242,7 +242,7 @@ func (c *crcWriter) Write(p []byte) (int, error) {
 	n, err := c.writer.Write(p)
 	if n > 0 {
 		// Write to the hash calculator only hash bytes actually written.
-		c.hash32.Write(p[:n])
+		_, _ = c.hash32.Write(p[:n])
 	}
 
 	return n, err

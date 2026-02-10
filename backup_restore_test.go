@@ -1404,7 +1404,9 @@ func TestBackupContinuation(t *testing.T) {
 	require.NoError(t, err)
 	stateFile := path.Join(testFolder, testStateFile)
 
-	ctx, _ := context.WithTimeout(t.Context(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
+	defer cancel()
+
 	t.Log("first backup")
 	first, err := runFirstBackup(ctx, asClient, setName, testFolder, stateFile)
 	require.NoError(t, err)

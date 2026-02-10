@@ -195,7 +195,7 @@ func TestReader_EmptyStdin(t *testing.T) {
 	os.Stdin = r
 	defer func() { os.Stdin = oldStdin }()
 
-	w.Close()
+	_ = w.Close()
 
 	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)

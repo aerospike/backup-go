@@ -114,8 +114,9 @@ func TestConnection_ReadOK(t *testing.T) {
 
 	binary.BigEndian.PutUint32(header[:4], magic)
 	binary.BigEndian.PutUint32(header[4:], uint32(len(bodyJSON)))
-	//nolint:gocritic // we don't need to append result to same slice. I need new slice for test.
-	response := append(header, bodyJSON...)
+	response := make([]byte, 0)
+	response = append(response, header...)
+	response = append(response, bodyJSON...)
 	readIndex := 0
 	mockConn.On("SetReadDeadline", mock.Anything).Return(nil)
 	mockConn.On("Read", mock.Anything).Return(func(b []byte) (int, error) {

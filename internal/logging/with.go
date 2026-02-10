@@ -36,11 +36,9 @@ func WithHandler(logger *slog.Logger, id string, handlerType HandlerType, storag
 type ReaderType string
 
 const (
-	ReaderTypeUnknown ReaderType = "unknown"
-	ReaderTypeToken   ReaderType = "token"
-	ReaderTypeRecord  ReaderType = "record"
-	ReaderTypeSIndex  ReaderType = "sindex"
-	ReaderTypeUDF     ReaderType = "udf"
+	ReaderTypeRecord ReaderType = "record"
+	ReaderTypeSIndex ReaderType = "sindex"
+	ReaderTypeUDF    ReaderType = "udf"
 )
 
 func WithReader(logger *slog.Logger, id string, readerType ReaderType) *slog.Logger {
@@ -51,7 +49,6 @@ func WithReader(logger *slog.Logger, id string, readerType ReaderType) *slog.Log
 type ProcessorType string
 
 const (
-	ProcessorTypeUnknown  ProcessorType = "unknown"
 	ProcessorTypeTTL      ProcessorType = "token"
 	ProcessorTypeVoidTime ProcessorType = "void_time"
 )
@@ -64,7 +61,6 @@ func WithProcessor(logger *slog.Logger, id string, processorType ProcessorType) 
 type WriterType string
 
 const (
-	WriterTypeUnknown    WriterType = "unknown"
 	WriterTypeTokenStats WriterType = "token_stats"
 	WriterTypeToken      WriterType = "token"
 	WriterTypeRestore    WriterType = "restore"

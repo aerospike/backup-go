@@ -17,6 +17,7 @@ package std
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -329,7 +330,7 @@ func TestConcurrentWrites(t *testing.T) {
 			defer writeCloser.Close()
 
 			for j := range writesPerGoroutine {
-				data := []byte("goroutine-" + string(rune(id+'0')) + "-write-" + string(rune(j+'0')) + "\n")
+				data := fmt.Appendf(nil, "goroutine-%d-write-%d\n", id, j)
 				_, err := writeCloser.Write(data)
 				if err != nil {
 					t.Errorf("Concurrent write failed: %v", err)

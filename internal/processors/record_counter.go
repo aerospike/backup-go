@@ -25,7 +25,8 @@ type recordCounter[T models.TokenConstraint] struct {
 	counter *atomic.Uint64
 }
 
-func NewRecordCounter[T models.TokenConstraint](counter *atomic.Uint64) processor[T] {
+// NewRecordCounter creates a new record counter processor.
+func NewRecordCounter[T models.TokenConstraint](counter *atomic.Uint64) Processor[T] {
 	return &recordCounter[T]{
 		counter: counter,
 	}

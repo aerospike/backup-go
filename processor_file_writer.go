@@ -205,6 +205,11 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 		return nil, fmt.Errorf("failed to create storage writer: %w", err)
 	}
 
+	num, err := files.GetFileNumber(filename)
+	if err != nil {
+		return nil, err
+	}
+
 	// Apply encryption (if it is enabled).
 	encryptedWriter, err := newEncryptionWriter(
 		fw.encryptionKey,
@@ -220,17 +225,13 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 		return nil, fmt.Errorf("failed to set compression: %w", err)
 	}
 
-	num, err := files.GetFileNumber(filename)
-	if err != nil {
-		return nil, err
-	}
-
 	// Is it a metadata file?
 	isRecords := n != metadataFileID
 
 	// Write file header.
 	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isRecords))
 	if err != nil {
+		_ = compressedWriter.Close()
 		return nil, fmt.Errorf("failed to write header: %w", err)
 	}
 

@@ -29,7 +29,7 @@ type filterBySet[T models.TokenConstraint] struct {
 }
 
 // NewFilterBySet creates new filterBySet processor with given setList.
-func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.Uint64) processor[T] {
+func NewFilterBySet[T models.TokenConstraint](setList []string, skipped *atomic.Uint64) Processor[T] {
 	return &filterBySet[T]{
 		setsToRestore: collections.ListToMap(setList),
 		skipped:       skipped,

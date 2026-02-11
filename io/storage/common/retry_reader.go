@@ -29,13 +29,6 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-// readerCloser interface for mocking tests.
-//
-//nolint:unused // Used only for tests.
-type readerCloser interface {
-	io.ReadCloser
-}
-
 // rangeReader interface for range reader. That reads a file from a specific offset.
 type rangeReader interface {
 	OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error)

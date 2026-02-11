@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -93,7 +94,7 @@ func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error)
 }
 
 func mockHandler(conn net.Conn) {
-	defer conn.Close()
+	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
 	resp := models.Response{
@@ -188,7 +189,7 @@ func TestSecretAgent_getSecret(t *testing.T) {
 
 	listener, err := mockTCPServer(fmt.Sprintf(":%d", testSAPort), mockHandler)
 	require.NoError(t, err)
-	defer listener.Close()
+	defer sneakyClose(listener)
 
 	// Wait for server start.
 	time.Sleep(1 * time.Second)
@@ -240,7 +241,7 @@ func TestParseSecret_SecretValueIsResolved(t *testing.T) {
 	// Use mockTCPServer with an ephemeral port.
 	listener, err := mockTCPServer("127.0.0.1:0", mockHandler)
 	require.NoError(t, err)
-	defer listener.Close()
+	defer sneakyClose(listener)
 
 	// Give the server a tiny bit of time to start accepting.
 	time.Sleep(20 * time.Millisecond)
@@ -338,7 +339,7 @@ func TestNewSecretAgentClient_Success(t *testing.T) {
 
 	listener, err := mockTCPServer("127.0.0.1:0", mockHandler)
 	require.NoError(t, err)
-	defer listener.Close()
+	defer sneakyClose(listener)
 
 	// Give the server a tiny bit of time to start accepting.
 	time.Sleep(20 * time.Millisecond)
@@ -399,7 +400,7 @@ func generateTempCertAndKey(t *testing.T) (certFile, keyFile string) {
 
 	certOut, err := os.Create(certPath)
 	require.NoError(t, err)
-	defer certOut.Close()
+	defer sneakyClose(certOut)
 
 	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	require.NoError(t, err)
@@ -407,11 +408,15 @@ func generateTempCertAndKey(t *testing.T) (certFile, keyFile string) {
 	// Write key to temp file
 	keyOut, err := os.Create(keyPath)
 	require.NoError(t, err)
-	defer keyOut.Close()
+	defer sneakyClose(keyOut)
 
 	keyBytes := x509.MarshalPKCS1PrivateKey(priv)
 	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
 	require.NoError(t, err)
 
 	return certPath, keyPath
+}
+
+func sneakyClose(c io.Closer) {
+	_ = c.Close()
 }

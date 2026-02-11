@@ -2151,7 +2151,7 @@ func BenchmarkIntToString(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			buf.Reset()
-			fmt.Fprintf(&buf, "%d", num)
+			_, _ = fmt.Fprintf(&buf, "%d", num)
 			_ = buf.String()
 		}
 	})
@@ -2164,7 +2164,7 @@ func BenchmarkIntToString(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			buf.Reset()
-			fmt.Fprintf(&buf, "%d", num)
+			_, _ = fmt.Fprintf(&buf, "%d", num)
 			_ = buf.String()
 		}
 	})

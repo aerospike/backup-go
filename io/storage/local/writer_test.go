@@ -555,6 +555,6 @@ func (m *mockCloser) Write(p []byte) (n int, err error) {
 }
 
 func (m *mockCloser) Close() error {
-	m.file.Close()
+	_ = m.file.Close()
 	return m.err
 }

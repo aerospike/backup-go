@@ -120,7 +120,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			logger,
 		)
 		require.NoError(t, err)
-		defer rr.Close()
+		defer sneakyClose(rr)
 
 		buf := make([]byte, 10)
 		n, err := rr.Read(buf)
@@ -181,7 +181,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			logger,
 		)
 		require.NoError(t, err)
-		defer rr.Close()
+		defer sneakyClose(rr)
 
 		rr.offset = rr.totalSize
 
@@ -219,7 +219,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			logger,
 		)
 		require.NoError(t, err)
-		defer rr.Close()
+		defer sneakyClose(rr)
 
 		rr.offset = 5
 
@@ -256,7 +256,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			logger,
 		)
 		require.NoError(t, err)
-		defer rr.Close()
+		defer sneakyClose(rr)
 
 		buf := make([]byte, 2048)
 		n, err := rr.Read(buf)
@@ -286,7 +286,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			logger,
 		)
 		require.NoError(t, err)
-		defer rr.Close()
+		defer sneakyClose(rr)
 
 		buf := make([]byte, 10)
 		n, err := rr.Read(buf)
@@ -321,7 +321,7 @@ func TestRetryableReader_Read(t *testing.T) {
 			logger,
 		)
 		require.NoError(t, err)
-		defer rr.Close()
+		defer sneakyClose(rr)
 
 		buf := make([]byte, 10)
 		n, err := rr.Read(buf)
@@ -370,4 +370,8 @@ func TestIsNetworkErrorInvalid(t *testing.T) {
 
 	result = isNetworkError(nil)
 	assert.False(t, result)
+}
+
+func sneakyClose(c io.Closer) {
+	_ = c.Close()
 }

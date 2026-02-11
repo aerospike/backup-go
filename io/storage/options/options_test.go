@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -164,6 +165,23 @@ func TestWithChunkSize(t *testing.T) {
 	WithChunkSize(1024)(opts)
 
 	assert.Equal(t, 1024, opts.ChunkSize)
+}
+
+func TestWithChecksum(t *testing.T) {
+	t.Parallel()
+	opts := &Options{}
+	WithChecksum()(opts)
+
+	assert.True(t, opts.WithChecksum)
+}
+
+func TestWithRetryPolicy(t *testing.T) {
+	t.Parallel()
+	opts := &Options{}
+	policy := models.NewRetryPolicy(100*time.Millisecond, 2.0, 3)
+	WithRetryPolicy(policy)(opts)
+
+	assert.Equal(t, policy, opts.RetryPolicy)
 }
 
 func TestCombinedOptions(t *testing.T) {

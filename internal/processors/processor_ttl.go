@@ -39,7 +39,7 @@ type expirationSetter[T models.TokenConstraint] struct {
 
 // NewExpirationSetter creates a new expirationSetter processor.
 func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extraTTL int64, logger *slog.Logger,
-) processor[T] {
+) Processor[T] {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
 	logger.Debug("created new TTL processor")

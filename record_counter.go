@@ -170,7 +170,7 @@ func randomPartition(partitionFilters []*a.PartitionFilter) *a.PartitionFilter {
 
 // randomElement returns a random element from the given slice.
 func randomElement[T any](s []T) T {
-	return s[rand.IntN(len(s))] //nolint:gosec // cryptographic randomness not needed
+	return s[randomInt(len(s))]
 }
 
 // randomInt returns a random int in [0, n).

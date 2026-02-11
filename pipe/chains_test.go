@@ -118,7 +118,7 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	})
 
 	for range output {
-		_ = 0 // Drain channel to avoid deadlock.
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()
@@ -199,7 +199,7 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	})
 
 	for range output {
-		_ = 0 // Drain channel to avoid deadlock.
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()
@@ -232,7 +232,7 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 	})
 
 	for range output {
-		_ = 0 // Drain channel to avoid deadlock.
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()
@@ -280,7 +280,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	})
 
 	for range output {
-		_ = 0 // Drain channel to avoid deadlock.
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()

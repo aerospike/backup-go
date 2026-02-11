@@ -21,18 +21,21 @@ import (
 
 // GetFullPath returns full path for file or directory, according to params.
 func GetFullPath(prefix, filename string, pathList []string, isDir bool) (string, error) {
-	if !isDir && len(pathList) == 0 {
+	if isDir {
+		return path.Join(prefix, filename), nil
+	}
+
+	// Validation: Files require at least one entry in the path list.
+	if len(pathList) == 0 {
 		return "", fmt.Errorf("path list can't be empty")
 	}
 
-	switch {
-	case isDir:
-		return path.Join(prefix, filename), nil
-	case !isDir && filename != "":
-		// If it is a metadata file and we backup to one file.
+	// Handle file path construction
+	if filename != "" {
+		// Use the directory of the first path entry as the base
 		return path.Join(path.Dir(pathList[0]), filename), nil
-	default:
-		// If we use backup to a single file, we overwrite the file name.
-		return path.Join(prefix, pathList[0]), nil
 	}
+
+	// Default: overwrite the filename using the first path entry
+	return path.Join(prefix, pathList[0]), nil
 }

@@ -60,7 +60,7 @@ func Test_writeCloserSized(t *testing.T) {
 	require.NotNil(t, wcs)
 	require.NoError(t, err)
 
-	defer wcs.Close()
+	defer sneakyClose(wcs)
 
 	n, err := wcs.Write([]byte("test"))
 	wcs.sizeCounter.Add(4)
@@ -116,7 +116,7 @@ func Test_writeCloserSized_WithSaveCommandChan(t *testing.T) {
 	require.NotNil(t, wcs)
 	require.NoError(t, err)
 
-	defer wcs.Close()
+	defer sneakyClose(wcs)
 
 	n, err := wcs.Write([]byte("test"))
 	require.NoError(t, err)
@@ -221,7 +221,7 @@ func Test_writeCloserSized_ContextCanceledDuringSaveSend(t *testing.T) {
 
 	writer, err := NewWriter(ctx, 1, saveCommandChan, 10, open)
 	require.NoError(t, err)
-	defer writer.Close()
+	defer sneakyClose(writer)
 
 	// One write so we have an active writer. Then pretend we've hit the size limit.
 	_, err = writer.Write([]byte("first"))
@@ -245,4 +245,8 @@ func Test_writeCloserSized_ContextCanceledDuringSaveSend(t *testing.T) {
 	// Write must return the context error, not block forever.
 	require.Error(t, writeErr)
 	require.ErrorIs(t, writeErr, context.Canceled)
+}
+
+func sneakyClose(c io.Closer) {
+	_ = c.Close()
 }

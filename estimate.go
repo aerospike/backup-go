@@ -116,6 +116,7 @@ func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, e
 	}
 
 	if _, err := encodedWriter.Write(samplesData); err != nil {
+		_ = encodedWriter.Close()
 		return 0, err
 	}
 

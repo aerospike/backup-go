@@ -45,7 +45,7 @@ func TestGet(t *testing.T) {
 		var lc net.ListenConfig
 		listener, err := lc.Listen(t.Context(), "tcp", "localhost:0")
 		require.NoError(t, err)
-		defer listener.Close()
+		defer func() { _ = listener.Close() }()
 
 		// Get the dynamically assigned port
 		addr := listener.Addr().String()
@@ -54,7 +54,7 @@ func TestGet(t *testing.T) {
 		conn, err := Get(t.Context(), "tcp", addr, testTimeout, nil)
 		require.NoError(t, err)
 		require.NotNil(t, conn)
-		conn.Close()
+		_ = conn.Close()
 	})
 
 	t.Run("Error with Invalid Address", func(t *testing.T) {

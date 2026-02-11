@@ -76,10 +76,9 @@ func (c *Client) GetSecret(ctx context.Context, resource, secretKey string) (str
 		return "", fmt.Errorf("failed to connect to secret agent: %w", err)
 	}
 
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
-	//nolint:gocritic // inline if
-	if err = connection.Write(conn, c.timeout, resource, secretKey); err != nil {
+	if err := connection.Write(conn, c.timeout, resource, secretKey); err != nil {
 		return "", err
 	}
 

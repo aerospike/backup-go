@@ -29,7 +29,7 @@ type filterByBin[T models.TokenConstraint] struct {
 }
 
 // NewFilterByBin creates new filterByBin processor with given binList.
-func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.Uint64) processor[T] {
+func NewFilterByBin[T models.TokenConstraint](binList []string, skipped *atomic.Uint64) Processor[T] {
 	return &filterByBin[T]{
 		binsToRemove: collections.ListToMap(binList),
 		skipped:      skipped,

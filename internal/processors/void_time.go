@@ -35,7 +35,7 @@ type voidTimeSetter[T models.TokenConstraint] struct {
 }
 
 // NewVoidTimeSetter creates a new VoidTimeProcessor
-func NewVoidTimeSetter[T models.TokenConstraint](logger *slog.Logger) processor[T] {
+func NewVoidTimeSetter[T models.TokenConstraint](logger *slog.Logger) Processor[T] {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeVoidTime)
 	logger.Debug("created new VoidTime processor")

@@ -107,12 +107,11 @@ func TestReader_StreamFiles(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-
 	go func() {
-		defer w.Close()
 		defer wg.Done()
 		_, err := w.WriteString(testData)
 		assert.NoError(t, err)
+		_ = w.Close()
 	}()
 
 	ctx := t.Context()
@@ -156,12 +155,11 @@ func TestReader_StreamFile(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-
 	go func() {
-		defer w.Close()
 		defer wg.Done()
 		_, err := w.WriteString(testData)
 		assert.NoError(t, err)
+		_ = w.Close()
 	}()
 
 	ctx := t.Context()
@@ -195,7 +193,7 @@ func TestReader_EmptyStdin(t *testing.T) {
 	os.Stdin = r
 	defer func() { os.Stdin = oldStdin }()
 
-	w.Close()
+	_ = w.Close()
 
 	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)

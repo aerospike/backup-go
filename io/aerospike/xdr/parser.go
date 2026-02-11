@@ -36,6 +36,7 @@ const (
 	info3Pos = 3
 )
 
+// noinspection GoUnusedConst
 const (
 	// MsgInfo1Read - Contains a read operation
 	MsgInfo1Read = 1 << iota // 1
@@ -55,6 +56,7 @@ const (
 	MsgInfo1CompressResponse // 128
 )
 
+// noinspection GoUnusedConst
 const (
 	// MsgInfo2Write - Contains a write operation
 	MsgInfo2Write = 1 << iota // 1
@@ -74,6 +76,7 @@ const (
 	MsgInfo2RespondAllOps // 128
 )
 
+// noinspection GoUnusedConst
 const (
 	// MsgInfo3Last - This is the last of a multi-part message
 	MsgInfo3Last = 1 << iota // 1

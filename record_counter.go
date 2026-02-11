@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/aerospike"
@@ -119,10 +119,8 @@ func (rc *recordCounter) countRecordsUsingScanByNode(
 	if err != nil {
 		return 0, fmt.Errorf("failed to get primary partitions: %w", err)
 	}
-	//nolint:gosec // G404. No need crypto random for approximate count.
-	randomPartID := partIDs[rand.Intn(len(partIDs))]
 
-	partitionFilter := NewPartitionFilterByID(randomPartID)
+	partitionFilter := NewPartitionFilterByID(randomElement(partIDs))
 	readerConfig := rc.readerProcessor.newRecordReaderConfig(partitionFilter, scanPolicy)
 
 	recordReader := aerospike.NewRecordReader(
@@ -157,19 +155,27 @@ func countRecords(ctx context.Context, recordReader aerospike.RecordReader) (uin
 }
 
 // randomPartition returns a random partition from the given list of partition filters.
-// #nosec G404
 func randomPartition(partitionFilters []*a.PartitionFilter) *a.PartitionFilter {
 	if len(partitionFilters) == 0 { // no filter => return any random partition.
-		return a.NewPartitionFilterById(rand.Intn(MaxPartitions))
+		return a.NewPartitionFilterById(randomInt(MaxPartitions))
 	}
 
-	index := rand.Intn(len(partitionFilters))
 	// get a random filter from the provided list of partition filters
-	randomFilter := partitionFilters[index]
+	randomFilter := randomElement(partitionFilters)
 	// get random partition offset for the filter
-	offset := rand.Intn(randomFilter.Count)
+	offset := randomInt(randomFilter.Count)
 
 	return a.NewPartitionFilterById(randomFilter.Begin + offset)
+}
+
+// randomElement returns a random element from the given slice.
+func randomElement[T any](s []T) T {
+	return s[randomInt(len(s))]
+}
+
+// randomInt returns a random int in [0, n).
+func randomInt(n int) int {
+	return rand.IntN(n) //nolint:gosec // cryptographic randomness not needed
 }
 
 // sumPartition returns total number of partitions in partition filters list.

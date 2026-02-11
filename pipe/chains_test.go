@@ -117,8 +117,8 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 		return readChain.Run(ctx)
 	})
 
-	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()
@@ -198,8 +198,8 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 		return readChain.Run(t.Context())
 	})
 
-	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()
@@ -231,8 +231,8 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 		return readChain.Run(t.Context())
 	})
 
-	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()
@@ -279,8 +279,8 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 		return readChain.Run(t.Context())
 	})
 
-	//nolint:revive // Read from output to avoid deadlock.
 	for range output {
+		_ = 0 // Read from output to avoid deadlock.
 	}
 
 	err := g.Wait()

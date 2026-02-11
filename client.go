@@ -18,13 +18,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand"
-	"strconv"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
+	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -201,8 +200,7 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	client := &Client{
 		aerospikeClient: ac,
 		logger:          slog.Default(),
-		// #nosec G404
-		id: strconv.Itoa(rand.Intn(1000)),
+		id:              uuid.NewString()[:6],
 	}
 
 	// Apply all options to the Client

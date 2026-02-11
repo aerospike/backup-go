@@ -23,9 +23,14 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 )
 
+const (
+	// Partition range regexp: begin (0–4095) and end (1–4096).
+	expPartitionRangeBegin = `^([0-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-5])`
+	expPartitionRangeEnd   = `([1-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-6])$`
+)
+
 var (
-	//nolint:lll // The regexp is long.
-	expPartitionRange  = regexp.MustCompile(`^([0-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-5])\-([1-9]|[1-9][0-9]{1,3}|40[0-8][0-9]|409[0-6])$`)
+	expPartitionRange  = regexp.MustCompile(expPartitionRangeBegin + `\-` + expPartitionRangeEnd)
 	expPartitionID     = regexp.MustCompile(`^(409[0-6]|40[0-8]\d|[123]?\d{1,3}|0)$`)
 	expPartitionDigest = regexp.MustCompile(`^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`)
 )

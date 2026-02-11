@@ -1273,7 +1273,8 @@ func _decodeBase64(src []byte) ([]byte, error) {
 	decodedLen := base64.StdEncoding.DecodedLen(len(src))
 
 	// Get a buffer from the pool
-	buf := base64BufferPool.Get().([]byte)
+	bp := base64BufferPool.Get().(*[]byte)
+	buf := *bp
 
 	// Ensure the buffer is large enough
 	if cap(buf) < decodedLen {

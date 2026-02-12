@@ -112,14 +112,20 @@ type MockWriter_Write_Call[T models.TokenConstraint] struct {
 }
 
 // Write is a helper method to define mock.On call
-//   - v
+//   - v T
 func (_e *MockWriter_Expecter[T]) Write(v interface{}) *MockWriter_Write_Call[T] {
 	return &MockWriter_Write_Call[T]{Call: _e.mock.On("Write", v)}
 }
 
 func (_c *MockWriter_Write_Call[T]) Run(run func(v T)) *MockWriter_Write_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(T))
+		var arg0 T
+		if args[0] != nil {
+			arg0 = args[0].(T)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

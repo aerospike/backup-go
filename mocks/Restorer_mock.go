@@ -153,14 +153,20 @@ type MockRestorer_Wait_Call struct {
 }
 
 // Wait is a helper method to define mock.On call
-//   - ctx
+//   - ctx context.Context
 func (_e *MockRestorer_Expecter) Wait(ctx interface{}) *MockRestorer_Wait_Call {
 	return &MockRestorer_Wait_Call{Call: _e.mock.On("Wait", ctx)}
 }
 
 func (_c *MockRestorer_Wait_Call) Run(run func(ctx context.Context)) *MockRestorer_Wait_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

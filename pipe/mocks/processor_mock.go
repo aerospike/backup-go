@@ -70,14 +70,20 @@ type MockProcessor_Process_Call[T models.TokenConstraint] struct {
 }
 
 // Process is a helper method to define mock.On call
-//   - v
+//   - v T
 func (_e *MockProcessor_Expecter[T]) Process(v interface{}) *MockProcessor_Process_Call[T] {
 	return &MockProcessor_Process_Call[T]{Call: _e.mock.On("Process", v)}
 }
 
 func (_c *MockProcessor_Process_Call[T]) Run(run func(v T)) *MockProcessor_Process_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(T))
+		var arg0 T
+		if args[0] != nil {
+			arg0 = args[0].(T)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

@@ -71,15 +71,26 @@ type Mockreader_ListObjects_Call struct {
 }
 
 // ListObjects is a helper method to define mock.On call
-//   - ctx
-//   - path
+//   - ctx context.Context
+//   - path string
 func (_e *Mockreader_Expecter) ListObjects(ctx interface{}, path interface{}) *Mockreader_ListObjects_Call {
 	return &Mockreader_ListObjects_Call{Call: _e.mock.On("ListObjects", ctx, path)}
 }
 
 func (_c *Mockreader_ListObjects_Call) Run(run func(ctx context.Context, path string)) *Mockreader_ListObjects_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -106,14 +117,20 @@ type Mockreader_SetObjectsToStream_Call struct {
 }
 
 // SetObjectsToStream is a helper method to define mock.On call
-//   - list
+//   - list []string
 func (_e *Mockreader_Expecter) SetObjectsToStream(list interface{}) *Mockreader_SetObjectsToStream_Call {
 	return &Mockreader_SetObjectsToStream_Call{Call: _e.mock.On("SetObjectsToStream", list)}
 }
 
 func (_c *Mockreader_SetObjectsToStream_Call) Run(run func(list []string)) *Mockreader_SetObjectsToStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]string))
+		var arg0 []string
+		if args[0] != nil {
+			arg0 = args[0].([]string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

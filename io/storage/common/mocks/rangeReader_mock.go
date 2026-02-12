@@ -160,16 +160,32 @@ type MockrangeReader_OpenRange_Call struct {
 }
 
 // OpenRange is a helper method to define mock.On call
-//   - ctx
-//   - offset
-//   - count
+//   - ctx context.Context
+//   - offset int64
+//   - count int64
 func (_e *MockrangeReader_Expecter) OpenRange(ctx interface{}, offset interface{}, count interface{}) *MockrangeReader_OpenRange_Call {
 	return &MockrangeReader_OpenRange_Call{Call: _e.mock.On("OpenRange", ctx, offset, count)}
 }
 
 func (_c *MockrangeReader_OpenRange_Call) Run(run func(ctx context.Context, offset int64, count int64)) *MockrangeReader_OpenRange_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }

@@ -72,14 +72,20 @@ type MockudfGetter_GetUDFs_Call struct {
 }
 
 // GetUDFs is a helper method to define mock.On call
-//   - ctx
+//   - ctx context.Context
 func (_e *MockudfGetter_Expecter) GetUDFs(ctx interface{}) *MockudfGetter_GetUDFs_Call {
 	return &MockudfGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs", ctx)}
 }
 
 func (_c *MockudfGetter_GetUDFs_Call) Run(run func(ctx context.Context)) *MockudfGetter_GetUDFs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

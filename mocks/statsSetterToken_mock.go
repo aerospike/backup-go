@@ -47,14 +47,20 @@ type MockstatsSetterToken_AddSIndexes_Call struct {
 }
 
 // AddSIndexes is a helper method to define mock.On call
-//   - v
+//   - v uint32
 func (_e *MockstatsSetterToken_Expecter) AddSIndexes(v interface{}) *MockstatsSetterToken_AddSIndexes_Call {
 	return &MockstatsSetterToken_AddSIndexes_Call{Call: _e.mock.On("AddSIndexes", v)}
 }
 
 func (_c *MockstatsSetterToken_AddSIndexes_Call) Run(run func(v uint32)) *MockstatsSetterToken_AddSIndexes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(uint32))
+		var arg0 uint32
+		if args[0] != nil {
+			arg0 = args[0].(uint32)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -81,14 +87,20 @@ type MockstatsSetterToken_AddUDFs_Call struct {
 }
 
 // AddUDFs is a helper method to define mock.On call
-//   - v
+//   - v uint32
 func (_e *MockstatsSetterToken_Expecter) AddUDFs(v interface{}) *MockstatsSetterToken_AddUDFs_Call {
 	return &MockstatsSetterToken_AddUDFs_Call{Call: _e.mock.On("AddUDFs", v)}
 }
 
 func (_c *MockstatsSetterToken_AddUDFs_Call) Run(run func(v uint32)) *MockstatsSetterToken_AddUDFs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(uint32))
+		var arg0 uint32
+		if args[0] != nil {
+			arg0 = args[0].(uint32)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

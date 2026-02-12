@@ -61,16 +61,32 @@ type MockinfoCommander_BlockMRTWrites_Call struct {
 }
 
 // BlockMRTWrites is a helper method to define mock.On call
-//   - ctx
-//   - nodeName
-//   - namespace
+//   - ctx context.Context
+//   - nodeName string
+//   - namespace string
 func (_e *MockinfoCommander_Expecter) BlockMRTWrites(ctx interface{}, nodeName interface{}, namespace interface{}) *MockinfoCommander_BlockMRTWrites_Call {
 	return &MockinfoCommander_BlockMRTWrites_Call{Call: _e.mock.On("BlockMRTWrites", ctx, nodeName, namespace)}
 }
 
 func (_c *MockinfoCommander_BlockMRTWrites_Call) Run(run func(ctx context.Context, nodeName string, namespace string)) *MockinfoCommander_BlockMRTWrites_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -163,17 +179,38 @@ type MockinfoCommander_GetStats_Call struct {
 }
 
 // GetStats is a helper method to define mock.On call
-//   - ctx
-//   - nodeName
-//   - dc
-//   - namespace
+//   - ctx context.Context
+//   - nodeName string
+//   - dc string
+//   - namespace string
 func (_e *MockinfoCommander_Expecter) GetStats(ctx interface{}, nodeName interface{}, dc interface{}, namespace interface{}) *MockinfoCommander_GetStats_Call {
 	return &MockinfoCommander_GetStats_Call{Call: _e.mock.On("GetStats", ctx, nodeName, dc, namespace)}
 }
 
 func (_c *MockinfoCommander_GetStats_Call) Run(run func(ctx context.Context, nodeName string, dc string, namespace string)) *MockinfoCommander_GetStats_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -211,21 +248,62 @@ type MockinfoCommander_StartXDR_Call struct {
 }
 
 // StartXDR is a helper method to define mock.On call
-//   - ctx
-//   - nodeName
-//   - dc
-//   - hostPort
-//   - namespace
-//   - rewind
-//   - throughput
-//   - forward
+//   - ctx context.Context
+//   - nodeName string
+//   - dc string
+//   - hostPort string
+//   - namespace string
+//   - rewind string
+//   - throughput int
+//   - forward bool
 func (_e *MockinfoCommander_Expecter) StartXDR(ctx interface{}, nodeName interface{}, dc interface{}, hostPort interface{}, namespace interface{}, rewind interface{}, throughput interface{}, forward interface{}) *MockinfoCommander_StartXDR_Call {
 	return &MockinfoCommander_StartXDR_Call{Call: _e.mock.On("StartXDR", ctx, nodeName, dc, hostPort, namespace, rewind, throughput, forward)}
 }
 
 func (_c *MockinfoCommander_StartXDR_Call) Run(run func(ctx context.Context, nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool)) *MockinfoCommander_StartXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(int), args[7].(bool))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		var arg6 int
+		if args[6] != nil {
+			arg6 = args[6].(int)
+		}
+		var arg7 bool
+		if args[7] != nil {
+			arg7 = args[7].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7,
+		)
 	})
 	return _c
 }
@@ -263,16 +341,32 @@ type MockinfoCommander_StopXDR_Call struct {
 }
 
 // StopXDR is a helper method to define mock.On call
-//   - ctx
-//   - nodeName
-//   - dc
+//   - ctx context.Context
+//   - nodeName string
+//   - dc string
 func (_e *MockinfoCommander_Expecter) StopXDR(ctx interface{}, nodeName interface{}, dc interface{}) *MockinfoCommander_StopXDR_Call {
 	return &MockinfoCommander_StopXDR_Call{Call: _e.mock.On("StopXDR", ctx, nodeName, dc)}
 }
 
 func (_c *MockinfoCommander_StopXDR_Call) Run(run func(ctx context.Context, nodeName string, dc string)) *MockinfoCommander_StopXDR_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -310,16 +404,32 @@ type MockinfoCommander_UnBlockMRTWrites_Call struct {
 }
 
 // UnBlockMRTWrites is a helper method to define mock.On call
-//   - ctx
-//   - nodeName
-//   - namespace
+//   - ctx context.Context
+//   - nodeName string
+//   - namespace string
 func (_e *MockinfoCommander_Expecter) UnBlockMRTWrites(ctx interface{}, nodeName interface{}, namespace interface{}) *MockinfoCommander_UnBlockMRTWrites_Call {
 	return &MockinfoCommander_UnBlockMRTWrites_Call{Call: _e.mock.On("UnBlockMRTWrites", ctx, nodeName, namespace)}
 }
 
 func (_c *MockinfoCommander_UnBlockMRTWrites_Call) Run(run func(ctx context.Context, nodeName string, namespace string)) *MockinfoCommander_UnBlockMRTWrites_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }

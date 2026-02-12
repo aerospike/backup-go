@@ -99,7 +99,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Wait for completion. 
+	// Wait for completion.
 	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
 	// You can use different context here, and if it is canceled
 	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
@@ -121,7 +121,7 @@ func main() {
     // Configure restore
     restoreCfg := backup.NewDefaultRestoreConfig()
     restoreCfg.Parallel = 5
-    
+
     // Optional: configure namespace mapping
     source := "source-ns"
     dest := "dest-ns"

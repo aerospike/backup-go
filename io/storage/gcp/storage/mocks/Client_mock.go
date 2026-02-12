@@ -61,14 +61,20 @@ type MockClient_Bucket_Call struct {
 }
 
 // Bucket is a helper method to define mock.On call
-//   - name
+//   - name string
 func (_e *MockClient_Expecter) Bucket(name interface{}) *MockClient_Bucket_Call {
 	return &MockClient_Bucket_Call{Call: _e.mock.On("Bucket", name)}
 }
 
 func (_c *MockClient_Bucket_Call) Run(run func(name string)) *MockClient_Bucket_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

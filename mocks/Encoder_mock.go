@@ -70,14 +70,20 @@ type MockEncoder_EncodeToken_Call[T models.TokenConstraint] struct {
 }
 
 // EncodeToken is a helper method to define mock.On call
-//   - v
+//   - v T
 func (_e *MockEncoder_Expecter[T]) EncodeToken(v interface{}) *MockEncoder_EncodeToken_Call[T] {
 	return &MockEncoder_EncodeToken_Call[T]{Call: _e.mock.On("EncodeToken", v)}
 }
 
 func (_c *MockEncoder_EncodeToken_Call[T]) Run(run func(v T)) *MockEncoder_EncodeToken_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(T))
+		var arg0 T
+		if args[0] != nil {
+			arg0 = args[0].(T)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -115,15 +121,26 @@ type MockEncoder_GenerateFilename_Call[T models.TokenConstraint] struct {
 }
 
 // GenerateFilename is a helper method to define mock.On call
-//   - prefix
-//   - suffix
+//   - prefix string
+//   - suffix string
 func (_e *MockEncoder_Expecter[T]) GenerateFilename(prefix interface{}, suffix interface{}) *MockEncoder_GenerateFilename_Call[T] {
 	return &MockEncoder_GenerateFilename_Call[T]{Call: _e.mock.On("GenerateFilename", prefix, suffix)}
 }
 
 func (_c *MockEncoder_GenerateFilename_Call[T]) Run(run func(prefix string, suffix string)) *MockEncoder_GenerateFilename_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -163,15 +180,26 @@ type MockEncoder_GetHeader_Call[T models.TokenConstraint] struct {
 }
 
 // GetHeader is a helper method to define mock.On call
-//   - v
-//   - b
+//   - v uint64
+//   - b bool
 func (_e *MockEncoder_Expecter[T]) GetHeader(v interface{}, b interface{}) *MockEncoder_GetHeader_Call[T] {
 	return &MockEncoder_GetHeader_Call[T]{Call: _e.mock.On("GetHeader", v, b)}
 }
 
 func (_c *MockEncoder_GetHeader_Call[T]) Run(run func(v uint64, b bool)) *MockEncoder_GetHeader_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(uint64), args[1].(bool))
+		var arg0 uint64
+		if args[0] != nil {
+			arg0 = args[0].(uint64)
+		}
+		var arg1 bool
+		if args[1] != nil {
+			arg1 = args[1].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }

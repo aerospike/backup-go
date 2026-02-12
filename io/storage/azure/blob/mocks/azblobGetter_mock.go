@@ -71,17 +71,38 @@ type MockazblobGetter_DownloadStream_Call struct {
 }
 
 // DownloadStream is a helper method to define mock.On call
-//   - ctx
-//   - container
-//   - path
-//   - options
+//   - ctx context.Context
+//   - container string
+//   - path string
+//   - options *blob.DownloadStreamOptions
 func (_e *MockazblobGetter_Expecter) DownloadStream(ctx interface{}, container interface{}, path interface{}, options interface{}) *MockazblobGetter_DownloadStream_Call {
 	return &MockazblobGetter_DownloadStream_Call{Call: _e.mock.On("DownloadStream", ctx, container, path, options)}
 }
 
 func (_c *MockazblobGetter_DownloadStream_Call) Run(run func(ctx context.Context, container string, path string, options *blob.DownloadStreamOptions)) *MockazblobGetter_DownloadStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(*blob.DownloadStreamOptions))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *blob.DownloadStreamOptions
+		if args[3] != nil {
+			arg3 = args[3].(*blob.DownloadStreamOptions)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -128,15 +149,26 @@ type MockazblobGetter_GetBlobProperties_Call struct {
 }
 
 // GetBlobProperties is a helper method to define mock.On call
-//   - ctx
-//   - path
+//   - ctx context.Context
+//   - path string
 func (_e *MockazblobGetter_Expecter) GetBlobProperties(ctx interface{}, path interface{}) *MockazblobGetter_GetBlobProperties_Call {
 	return &MockazblobGetter_GetBlobProperties_Call{Call: _e.mock.On("GetBlobProperties", ctx, path)}
 }
 
 func (_c *MockazblobGetter_GetBlobProperties_Call) Run(run func(ctx context.Context, path string)) *MockazblobGetter_GetBlobProperties_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }

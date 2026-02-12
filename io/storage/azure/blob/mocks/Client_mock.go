@@ -72,17 +72,38 @@ type MockClient_DeleteBlob_Call struct {
 }
 
 // DeleteBlob is a helper method to define mock.On call
-//   - ctx
-//   - containerName
-//   - blobName
-//   - o
+//   - ctx context.Context
+//   - containerName string
+//   - blobName string
+//   - o *azblob.DeleteBlobOptions
 func (_e *MockClient_Expecter) DeleteBlob(ctx interface{}, containerName interface{}, blobName interface{}, o interface{}) *MockClient_DeleteBlob_Call {
 	return &MockClient_DeleteBlob_Call{Call: _e.mock.On("DeleteBlob", ctx, containerName, blobName, o)}
 }
 
 func (_c *MockClient_DeleteBlob_Call) Run(run func(ctx context.Context, containerName string, blobName string, o *azblob.DeleteBlobOptions)) *MockClient_DeleteBlob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(*azblob.DeleteBlobOptions))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *azblob.DeleteBlobOptions
+		if args[3] != nil {
+			arg3 = args[3].(*azblob.DeleteBlobOptions)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -129,17 +150,38 @@ type MockClient_DownloadStream_Call struct {
 }
 
 // DownloadStream is a helper method to define mock.On call
-//   - ctx
-//   - containerName
-//   - blobName
-//   - o
+//   - ctx context.Context
+//   - containerName string
+//   - blobName string
+//   - o *azblob.DownloadStreamOptions
 func (_e *MockClient_Expecter) DownloadStream(ctx interface{}, containerName interface{}, blobName interface{}, o interface{}) *MockClient_DownloadStream_Call {
 	return &MockClient_DownloadStream_Call{Call: _e.mock.On("DownloadStream", ctx, containerName, blobName, o)}
 }
 
 func (_c *MockClient_DownloadStream_Call) Run(run func(ctx context.Context, containerName string, blobName string, o *azblob.DownloadStreamOptions)) *MockClient_DownloadStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(*azblob.DownloadStreamOptions))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *azblob.DownloadStreamOptions
+		if args[3] != nil {
+			arg3 = args[3].(*azblob.DownloadStreamOptions)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -179,15 +221,26 @@ type MockClient_NewListBlobsFlatPager_Call struct {
 }
 
 // NewListBlobsFlatPager is a helper method to define mock.On call
-//   - containerName
-//   - o
+//   - containerName string
+//   - o *azblob.ListBlobsFlatOptions
 func (_e *MockClient_Expecter) NewListBlobsFlatPager(containerName interface{}, o interface{}) *MockClient_NewListBlobsFlatPager_Call {
 	return &MockClient_NewListBlobsFlatPager_Call{Call: _e.mock.On("NewListBlobsFlatPager", containerName, o)}
 }
 
 func (_c *MockClient_NewListBlobsFlatPager_Call) Run(run func(containerName string, o *azblob.ListBlobsFlatOptions)) *MockClient_NewListBlobsFlatPager_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(*azblob.ListBlobsFlatOptions))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 *azblob.ListBlobsFlatOptions
+		if args[1] != nil {
+			arg1 = args[1].(*azblob.ListBlobsFlatOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }

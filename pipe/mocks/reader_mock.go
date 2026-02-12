@@ -105,14 +105,20 @@ type MockReader_Read_Call[T models.TokenConstraint] struct {
 }
 
 // Read is a helper method to define mock.On call
-//   - ctx
+//   - ctx context.Context
 func (_e *MockReader_Expecter[T]) Read(ctx interface{}) *MockReader_Read_Call[T] {
 	return &MockReader_Read_Call[T]{Call: _e.mock.On("Read", ctx)}
 }
 
 func (_c *MockReader_Read_Call[T]) Run(run func(ctx context.Context)) *MockReader_Read_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

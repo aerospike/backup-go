@@ -61,14 +61,20 @@ type MockRecordsetCloser_Close_Call struct {
 }
 
 // Close is a helper method to define mock.On call
-//   - recordset
+//   - recordset *aerospike.Recordset
 func (_e *MockRecordsetCloser_Expecter) Close(recordset interface{}) *MockRecordsetCloser_Close_Call {
 	return &MockRecordsetCloser_Close_Call{Call: _e.mock.On("Close", recordset)}
 }
 
 func (_c *MockRecordsetCloser_Close_Call) Run(run func(recordset *aerospike.Recordset)) *MockRecordsetCloser_Close_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*aerospike.Recordset))
+		var arg0 *aerospike.Recordset
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.Recordset)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

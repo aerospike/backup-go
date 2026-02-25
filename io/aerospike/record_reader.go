@@ -246,7 +246,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		// we loop back to the top to restart the producer.
 		if connectionErrorOccurred {
 			// Simple logic first, we just sleep for 1 minute and try again.
-			time.Sleep(1 * time.Minute)
+			time.Sleep(10 * time.Second)
 
 			continue
 		}

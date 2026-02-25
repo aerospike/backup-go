@@ -36,6 +36,8 @@ type RecordReaderConfig struct {
 	setList     []string
 	binList     []string
 	noTTLOnly   bool
+	// throttle indicates that we should throttle the scan on NO_AVAILABLE_CONNECTIONS_TO_NODE error.
+	throttle bool
 
 	// pageSize used for paginated scan for saving reading state.
 	// If pageSize = 0, we think that we use normal scan.
@@ -126,5 +128,6 @@ func NewRecordReaderConfig(namespace string,
 		noTTLOnly:       noTTLOnly,
 		pageSize:        pageSize,
 		rpsCollector:    rpsCollector,
+		throttle:        true,
 	}
 }

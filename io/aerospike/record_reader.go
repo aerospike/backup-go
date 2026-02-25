@@ -207,6 +207,10 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		// and returns a channel for its results.
 		recordset, err := producer()
 		if err != nil {
+			if r.config.scanLimiter != nil {
+				r.config.scanLimiter.Release(1)
+			}
+
 			return fmt.Errorf("scan producer failed: %w", err)
 		}
 
@@ -214,22 +218,31 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		var (
 			firstResult             = true
 			connectionErrorOccurred = false
+			claimedActiveSlot       = false
 		)
 
 		// Drain all results from this specific scan.
 		// No context checking here because it slows down the scan.
 		for res := range recordset.Results() {
 			// Check only the FIRST result for the specific connection error
-			if firstResult && res.Err != nil && ShouldThrottle(res.Err) && r.config.throttle {
+			if firstResult && res.Err != nil && ShouldThrottle(res.Err) && r.config.throttler != nil {
 				r.logger.Warn("connection pool empty on first record, restarting scan...",
 					slog.Any("error", res.Err))
+
 				connectionErrorOccurred = true
 
 				// Exit the results loop to trigger a restart
 				break
 			}
 
-			firstResult = false
+			// Claim 1 sync from throttler
+			if firstResult {
+				if r.config.throttler != nil {
+					r.config.throttler.Started()
+					claimedActiveSlot = true
+				}
+				firstResult = false
+			}
 
 			r.resultChan <- res
 		}
@@ -242,11 +255,16 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 			r.config.scanLimiter.Release(1)
 		}
 
+		if claimedActiveSlot {
+			r.config.throttler.Finished()
+		}
+
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
 		if connectionErrorOccurred {
+			r.logger.Warn("connection pool full, waiting for a signal...")
 			// Simple logic first, we just sleep for 1 minute and try again.
-			time.Sleep(10 * time.Second)
+			r.config.throttler.Wait(ctx, 1*time.Minute)
 
 			continue
 		}

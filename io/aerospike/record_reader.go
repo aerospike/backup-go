@@ -221,7 +221,8 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		for res := range recordset.Results() {
 			// Check only the FIRST result for the specific connection error
 			if firstResult && res.Err != nil && ShouldThrottle(res.Err) && r.config.throttle {
-				r.logger.Warn("connection pool empty on first record, restarting scan...")
+				r.logger.Warn("connection pool empty on first record, restarting scan...",
+					slog.Any("error", res.Err))
 				connectionErrorOccurred = true
 
 				// Exit the results loop to trigger a restart

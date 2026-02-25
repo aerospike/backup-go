@@ -29,7 +29,7 @@ func ShouldThrottle(err error) bool {
 
 	var ae a.Error
 	if errors.As(err, &ae) {
-		return ae.Matches(types.NO_AVAILABLE_CONNECTIONS_TO_NODE)
+		return ae.Matches(types.NO_AVAILABLE_CONNECTIONS_TO_NODE) || ae.Matches(types.FAIL_FORBIDDEN)
 	}
 
 	// Addititonal errors that should be throttled.

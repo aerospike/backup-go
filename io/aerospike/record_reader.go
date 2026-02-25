@@ -216,6 +216,8 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		r.resultChan <- res
 	}
 
+	r.logger.Debug("scan finished",
+		slog.Uint64("jobId", recordset.TaskId()))
 	return r.recordsetCloser.Close(recordset)
 }
 
@@ -227,21 +229,22 @@ func (r *singleRecordReader) generateProducers() []scanProducer {
 	producers := make([]scanProducer, len(r.config.setList))
 
 	for i, set := range r.config.setList {
-		capturedSet := set
 		producer := func() (*a.Recordset, error) {
 			// Each scan requires a fresh copy of the partition filter.
 			pf := *r.config.partitionFilter
-			r.logger.Debug("starting partition scan",
-				slog.String("set", capturedSet),
-				slog.Int("begin", pf.Begin),
-				slog.Int("count", pf.Count))
 
 			recordset, err := r.client.ScanPartitions(
-				&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
+				&scanPolicy, &pf, r.config.namespace, set, r.config.binList...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
-					capturedSet, r.config.namespace, pf.Begin, pf.Count, err)
+					set, r.config.namespace, pf.Begin, pf.Count, err)
 			}
+
+			r.logger.Debug("started partition scan",
+				slog.Uint64("jobId", recordset.TaskId()),
+				slog.String("set", set),
+				slog.String("filter", fmt.Sprintf("%d-%d", pf.Begin, pf.Count)),
+			)
 
 			return recordset, nil
 		}

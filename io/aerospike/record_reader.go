@@ -20,7 +20,6 @@ import (
 	"io"
 	"log/slog"
 	"sync"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -263,8 +262,8 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		// we loop back to the top to restart the producer.
 		if connectionErrorOccurred {
 			r.logger.Warn("connection pool full, waiting for a signal...")
-			// Simple logic first, we just sleep for 1 minute and try again.
-			r.config.throttler.Wait(ctx, 1*time.Minute)
+			// Simple logic first, we just sleep for 10 sec and try again.
+			r.config.throttler.Wait(ctx, jitterDuration())
 
 			continue
 		}

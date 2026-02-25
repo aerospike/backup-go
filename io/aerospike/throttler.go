@@ -16,7 +16,9 @@ package aerospike
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"math/big"
 	"sync"
 	"time"
 
@@ -102,4 +104,20 @@ func (t *ThrottleLimiter) Wait(ctx context.Context, timeout time.Duration) {
 		// No scan finished, but let's try again anyway
 		// in case external Scan finished.
 	}
+}
+
+func jitterDuration() time.Duration {
+	const (
+		minMs = 5000
+		maxMs = 8000
+	)
+
+	// Range size (inclusive)
+	rangeSize := maxMs - minMs + 1
+
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(rangeSize)))
+
+	ms := minMs + int(n.Int64())
+
+	return time.Duration(ms) * time.Millisecond
 }

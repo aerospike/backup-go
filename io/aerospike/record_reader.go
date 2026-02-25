@@ -218,6 +218,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 
 	r.logger.Debug("scan finished",
 		slog.Uint64("jobId", recordset.TaskId()))
+
 	return r.recordsetCloser.Close(recordset)
 }
 

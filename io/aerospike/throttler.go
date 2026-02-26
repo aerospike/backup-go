@@ -48,12 +48,14 @@ func (t *ThrottleLimiter) Notify(ctx context.Context) {
 	select {
 	case t.slots <- struct{}{}:
 	case <-ctx.Done():
+	default:
+		// Unblocking notify for tests
 	}
 }
 
 // Wait blocks until someone calls Notify OR the timeout hits.
 func (t *ThrottleLimiter) Wait(ctx context.Context) {
-	// timer := time.NewTimer(t.timeout)
+	// timer := time.NewTimer(t.timeout + jitterDuration())
 	// defer timer.Stop()
 
 	// Blocking everything until smth happens.

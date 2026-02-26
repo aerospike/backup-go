@@ -45,7 +45,7 @@ func TestIOEncryption_readPemFromFile(t *testing.T) {
 		errContent string
 	}{
 		{testPKeyFile, ""},
-		{"", "unable to read PEM file"},
+		{"", "failed to read PEM"},
 	}
 
 	for i, tt := range testCases {

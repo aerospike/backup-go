@@ -95,11 +95,11 @@ func TestTokenWriter(t *testing.T) {
 
 	_, err = writer.Write(UDFToken)
 	require.NoError(t, err)
-	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
+	require.Equal(t, "encoded rec encoded sindex encoded UDF ", b.String())
 
 	_, err = writer.Write(&models.Token{Type: models.TokenTypeInvalid})
 	require.Error(t, err)
-	require.Equal(t, "encoded rec encoded sindex encoded udf ", b.String())
+	require.Equal(t, "encoded rec encoded sindex encoded UDF ", b.String())
 
 	failRec := &models.Record{
 		Record: &a.Record{},

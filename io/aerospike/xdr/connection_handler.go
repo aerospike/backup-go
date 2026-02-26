@@ -278,7 +278,7 @@ func (h *ConnectionHandler) sendAck(ack []byte) error {
 
 	// Write an ack message to connection.
 	if _, err := h.conn.Write(ack); err != nil {
-		return fmt.Errorf("error writing ack to connection: %w", err)
+		return fmt.Errorf("failed to write ack to connection: %w", err)
 	}
 
 	return nil

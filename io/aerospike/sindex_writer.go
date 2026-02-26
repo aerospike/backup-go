@@ -70,14 +70,14 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	if si.Path.B64Context != "" {
 		ctx, err = a.Base64ToCDTContext(si.Path.B64Context)
 		if err != nil {
-			return fmt.Errorf("error decoding sindex context %s: %w", si.Path.B64Context, err)
+			return fmt.Errorf("failed to decode sindex context %s: %w", si.Path.B64Context, err)
 		}
 	}
 
 	if si.Expression != "" {
 		exp, err = a.ExpFromBase64(si.Expression)
 		if err != nil {
-			return fmt.Errorf("error decoding sindex expression %s: %w", si.Expression, err)
+			return fmt.Errorf("failed to decode sindex expression %s: %w", si.Expression, err)
 		}
 	}
 
@@ -91,14 +91,14 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	)
 	if aErr != nil {
 		if !aErr.Matches(atypes.INDEX_FOUND) {
-			return fmt.Errorf("error creating sindex %s: %w", si.Name, aErr)
+			return fmt.Errorf("failed to create sindex %s: %w", si.Name, aErr)
 		}
 
 		rw.logger.Debug("secondary index already exists, replacing it", slog.String("name", si.Name))
 
 		err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
 		if err != nil {
-			return fmt.Errorf("error dropping sindex %s: %w", si.Name, err)
+			return fmt.Errorf("failed to drop sindex %s: %w", si.Name, err)
 		}
 
 		job, err = rw.createIndex(
@@ -110,22 +110,22 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 			ctx...,
 		)
 		if err != nil {
-			return fmt.Errorf("error creating replacement sindex %s: %w", si.Name, err)
+			return fmt.Errorf("failed to create replacement sindex %s: %w", si.Name, err)
 		}
 	}
 
 	if job == nil {
-		return fmt.Errorf("error creating sindex: job is nil")
+		return fmt.Errorf("failed to create sindex: job is nil")
 	}
 
 	errs := job.OnComplete()
 	if errs == nil {
-		return fmt.Errorf("error creating sindex: OnComplete returned nil channel")
+		return fmt.Errorf("failed to create sindex: onComplete returned nil channel")
 	}
 
 	err = <-errs
 	if err != nil {
-		return fmt.Errorf("error creating sindex %s: %w", si.Name, err)
+		return fmt.Errorf("failed to create sindex %s: %w", si.Name, err)
 	}
 
 	rw.logger.Debug("created secondary index", slog.String("name", si.Name))

@@ -529,11 +529,11 @@ func (ic *Client) createXDRNamespace(nodeName, dc, namespace, rewind string) err
 
 	resp, err := ic.requestByNode(nodeName, cmd)
 	if err != nil {
-		return fmt.Errorf("failed to create xdr namesapce: %w", err)
+		return fmt.Errorf("failed to create xdr namespace: %w", err)
 	}
 
 	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse create xdr namesapce response: %w", err)
+		return fmt.Errorf("failed to parse create xdr namespace response: %w", err)
 	}
 
 	return nil
@@ -655,7 +655,7 @@ func (ic *Client) GetSetsList(ctx context.Context, namespace string) ([]string, 
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed get sets: %w", err)
+		return nil, fmt.Errorf("failed to get sets: %w", err)
 	}
 
 	result, err := parseResultResponse(cmd, resp)
@@ -692,7 +692,7 @@ func (ic *Client) GetRackNodes(ctx context.Context, rackID int) ([]string, error
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed get racks info: %w", err)
+		return nil, fmt.Errorf("failed to get racks info: %w", err)
 	}
 
 	result, err := parseResultResponse(cmd, resp)
@@ -764,7 +764,7 @@ func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
 
 	resultMap, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
-		return Stats{}, fmt.Errorf("failed to parse to map get stats response: %w", err)
+		return Stats{}, fmt.Errorf("failed to parse get stats response map: %w", err)
 	}
 
 	var stats Stats
@@ -828,7 +828,7 @@ func (ic *Client) GetService(ctx context.Context, node string) (string, error) {
 func (ic *Client) getByNode(node, cmd string) (string, error) {
 	resp, err := ic.requestByNode(node, cmd)
 	if err != nil {
-		return "", fmt.Errorf("failed get %s info for node %s: %w", cmd, node, err)
+		return "", fmt.Errorf("failed to get %s info for node %s: %w", cmd, node, err)
 	}
 
 	result, err := parseResultResponse(cmd, resp)
@@ -845,7 +845,7 @@ func (ic *Client) GetNamespacesList(ctx context.Context) ([]string, error) {
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed get namespaces list: %w", err)
+		return nil, fmt.Errorf("failed to get namespaces list: %w", err)
 	}
 
 	result, err := parseResultResponse(cmd, resp)
@@ -862,7 +862,7 @@ func (ic *Client) GetStatus(ctx context.Context) (string, error) {
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
-		return "", fmt.Errorf("failed get status info: %w", err)
+		return "", fmt.Errorf("failed to get status info: %w", err)
 	}
 
 	result, err := parseResultResponse(cmd, resp)
@@ -879,7 +879,7 @@ func (ic *Client) GetDCsList(ctx context.Context) ([]string, error) {
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed get DCs list: %w", err)
+		return nil, fmt.Errorf("failed to get DCs list: %w", err)
 	}
 
 	result, err := parseResultResponse(cmd, resp)
@@ -952,7 +952,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 
 	bitMap, err := base64StringToBitArray(base64Res)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse primary partiotion bitmap: %w", err)
+		return nil, fmt.Errorf("failed to parse primary partition bitmap: %w", err)
 	}
 
 	return bitMapToIntSlice(bitMap), nil
@@ -1227,7 +1227,7 @@ func (ic *Client) getUDF(node infoGetter, name string, policy *a.InfoPolicy) (*m
 
 	cmdResp, err := parseResultResponse(cmd, response)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse udf response: %w", err)
+		return nil, fmt.Errorf("failed to parse UDF response: %w", err)
 	}
 
 	udf, err := parseUDFResponse(cmdResp)
@@ -1243,12 +1243,12 @@ func (ic *Client) getUDF(node infoGetter, name string, policy *a.InfoPolicy) (*m
 func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 	udfInfo, err := parseUDFGetResponse(udfGetInfoResp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse udf response: %w", err)
+		return nil, fmt.Errorf("failed to parse UDF response: %w", err)
 	}
 
 	udf, err := parseUDF(udfInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse udf: %w", err)
+		return nil, fmt.Errorf("failed to parse UDF: %w", err)
 	}
 
 	return udf, nil
@@ -1360,25 +1360,25 @@ func parseUDF(udfMap infoMap) (*models.UDF, error) {
 	if val, ok := udfMap["type"]; ok {
 		udfLang = val
 	} else {
-		return nil, fmt.Errorf("udf info response missing language type")
+		return nil, fmt.Errorf("UDF info response missing language type")
 	}
 
 	if strings.EqualFold(udfLang, "lua") {
 		udf.UDFType = models.UDFTypeLUA
 	} else {
-		return nil, fmt.Errorf("invalid udf language type: %s", udfLang)
+		return nil, fmt.Errorf("invalid UDF language type: %s", udfLang)
 	}
 
 	if val, ok := udfMap["content"]; ok {
 		// the udf content field is base64 encoded in info responses
 		content, err := base64.StdEncoding.DecodeString(val)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode udf content: %w", err)
+			return nil, fmt.Errorf("failed to decode UDF content: %w", err)
 		}
 
 		udf.Content = content
 	} else {
-		return nil, fmt.Errorf("udf info response missing content")
+		return nil, fmt.Errorf("UDF info response missing content")
 	}
 
 	return &udf, nil

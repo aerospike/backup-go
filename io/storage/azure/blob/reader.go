@@ -99,7 +99,7 @@ func NewReader(
 	// Check if a container exists.
 	r.containerClient = client.ServiceClient().NewContainerClient(containerName)
 	if _, err := r.containerClient.GetProperties(ctx, nil); err != nil {
-		return nil, fmt.Errorf("unable to get container properties: %w", err)
+		return nil, fmt.Errorf("failed to get container properties: %w", err)
 	}
 
 	r.containerName = containerName
@@ -129,7 +129,7 @@ func NewReader(
 		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
-			return nil, fmt.Errorf("failed to heat the storage: %w", err)
+			return nil, fmt.Errorf("failed to warm storage: %w", err)
 		}
 
 		r.Logger.Debug("finish warming storage")
@@ -446,7 +446,7 @@ func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 
 	// Start polling objects.
 	if err := r.checkWarm(ctx); err != nil {
-		return fmt.Errorf("failed to server directory warming: %w", err)
+		return fmt.Errorf("failed to check directory warming status: %w", err)
 	}
 
 	r.Logger.Info("storage warm up finished")

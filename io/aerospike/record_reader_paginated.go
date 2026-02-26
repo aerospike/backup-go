@@ -165,9 +165,15 @@ func (r *paginatedRecordReader) scanPage(
 		return 0, err
 	}
 
+	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 	if r.config.scanLimiter != nil {
-		if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
-			return 0, err
+		// Attempt to acquire immediately; if not, log and wait.
+		if !r.config.scanLimiter.TryAcquire(1) {
+			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
+
+			if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
+				return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+			}
 		}
 
 		defer r.config.scanLimiter.Release(1)
@@ -188,6 +194,12 @@ func (r *paginatedRecordReader) scanPage(
 	if aErr != nil {
 		return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 	}
+
+	r.logger.Debug("partition scan started",
+		slog.Uint64("transactionId", recSet.TaskId()),
+		slog.String("set", set),
+		slog.String("filter", printPartitionFilter(pf)),
+	)
 
 	defer func() { // close record set
 		if cerr := r.recodsetCloser.Close(recSet); cerr != nil {
@@ -210,6 +222,8 @@ func (r *paginatedRecordReader) scanPage(
 
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}
+
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recSet.TaskId()))
 
 	return count, err
 }

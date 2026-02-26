@@ -111,7 +111,7 @@ func newSingleRecordReader(
 	recordsetCloser RecordsetCloser,
 	cancel context.CancelFunc,
 ) *singleRecordReader {
-	logger.Debug("created new aerospike record reader", cfg.logAttrs()...)
+	logger.Debug("created new Aerospike record reader", cfg.logAttrs()...)
 
 	return &singleRecordReader{
 		ctx:             ctx,
@@ -196,11 +196,18 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		return ctx.Err()
 	}
 
+	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 	if r.config.scanLimiter != nil {
-		if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("failed to acquire scan limiter: %w", err)
+		// Attempt to acquire immediately; if not, log and wait.
+		if !r.config.scanLimiter.TryAcquire(1) {
+			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
+
+			if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
+				return fmt.Errorf("failed to acquire scan limiter: %w", err)
+			}
 		}
-		defer r.config.scanLimiter.Release(1) // Semaphore is released in the same function
+
+		defer r.config.scanLimiter.Release(1)
 	}
 
 	// Call the producer function. This starts the actual Aerospike scan
@@ -216,6 +223,8 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		r.resultChan <- res
 	}
 
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
+
 	return r.recordsetCloser.Close(recordset)
 }
 
@@ -227,21 +236,22 @@ func (r *singleRecordReader) generateProducers() []scanProducer {
 	producers := make([]scanProducer, len(r.config.setList))
 
 	for i, set := range r.config.setList {
-		capturedSet := set
 		producer := func() (*a.Recordset, error) {
 			// Each scan requires a fresh copy of the partition filter.
 			pf := *r.config.partitionFilter
-			r.logger.Debug("starting partition scan",
-				slog.String("set", capturedSet),
-				slog.Int("begin", pf.Begin),
-				slog.Int("count", pf.Count))
 
 			recordset, err := r.client.ScanPartitions(
-				&scanPolicy, &pf, r.config.namespace, capturedSet, r.config.binList...)
+				&scanPolicy, &pf, r.config.namespace, set, r.config.binList...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
-					capturedSet, r.config.namespace, pf.Begin, pf.Count, err)
+					set, r.config.namespace, pf.Begin, pf.Count, err)
 			}
+
+			r.logger.Debug("partition scan started",
+				slog.Uint64("transactionId", recordset.TaskId()),
+				slog.String("set", set),
+				slog.String("filter", printPartitionFilter(&pf)),
+			)
 
 			return recordset, nil
 		}

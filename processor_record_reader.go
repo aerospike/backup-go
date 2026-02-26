@@ -194,7 +194,7 @@ func (rr *recordReaderProcessor[T]) getNodes(ctx context.Context) ([]*a.Node, er
 
 	nodes := rr.aerospikeClient.GetNodes()
 
-	rr.logger.Info("got nodes from cluster", slog.Any("nodes", nodes))
+	rr.logger.Debug("got nodes from cluster", slog.Any("nodes", nodes))
 
 	// If bh.config.NodeList is not empty we filter nodes.
 	nodes, err := rr.filterNodes(ctx, nodesToFilter, nodes)
@@ -230,7 +230,7 @@ func (rr *recordReaderProcessor[T]) filterNodes(ctx context.Context, nodesList [
 			return nil, fmt.Errorf("failed to get node %s service: %w", node.GetName(), err)
 		}
 
-		rr.logger.Info("got service for node",
+		rr.logger.Debug("got service for node",
 			slog.String("node", node.GetName()),
 			slog.String("host", node.GetHost().String()),
 			slog.String("service", nodeServiceAddress),

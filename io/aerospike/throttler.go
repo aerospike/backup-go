@@ -26,90 +26,62 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8/types"
 )
 
-// ShouldThrottle determines if we should throttler connection.
-func ShouldThrottle(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	var ae a.Error
-	if errors.As(err, &ae) {
-		return ae.Matches(types.NO_AVAILABLE_CONNECTIONS_TO_NODE) || ae.Matches(types.FAIL_FORBIDDEN)
-	}
-
-	// Addititonal errors that should be throttled.
-	return errors.Is(err, a.ErrConnectionPoolEmpty) ||
-		errors.Is(err, a.ErrConnectionPoolExhausted) ||
-		errors.Is(err, a.ErrTooManyConnectionsForNode)
-}
-
+// ThrottleLimiter notification mechanism that manages active connections.
+// On success, you should call Notify, on error, you should call Wait and restart the operation.
+// So throttler will wait for the next available slot.
 type ThrottleLimiter struct {
-	mu   sync.Mutex
 	cond *sync.Cond
-	// activeCount is the number of scans that are currently active.
-	// We not use atomic because we need to lock this value during Wait().
-	activeCount int
+	// Timeout when Wait will return. Not to block forever.
+	timeout time.Duration
 }
 
-func NewThrottleLimiter() *ThrottleLimiter {
-	t := &ThrottleLimiter{}
-	t.cond = sync.NewCond(&t.mu)
+// NewThrottleLimiter creates a new ThrottleLimiter.
+func NewThrottleLimiter(timeout time.Duration) *ThrottleLimiter {
+	t := &ThrottleLimiter{
+		timeout: timeout,
+	}
+	t.cond = sync.NewCond(&sync.Mutex{})
 
 	return t
 }
 
-// Started is called when a scan successfully receives its first record.
-func (t *ThrottleLimiter) Started() {
-	t.mu.Lock()
-
-	t.activeCount++
-
-	t.mu.Unlock()
-}
-
-// Finished is called when a scan is done, success or error.
+// Notify is called when a scan is done, success or error.
 // It notifies one or all waiting readers to try and take the freed slot.
-func (t *ThrottleLimiter) Finished() {
-	t.mu.Lock()
-
-	if t.activeCount > 0 {
-		t.activeCount--
-	}
-
-	t.mu.Unlock()
-
-	// Wake up everyone to race for the new free slot
-	t.cond.Broadcast()
+func (t *ThrottleLimiter) Notify() {
+	t.cond.Signal()
 }
 
-// Wait blocks until someone calls Finished OR the timeout hits.
-func (t *ThrottleLimiter) Wait(ctx context.Context, timeout time.Duration) {
+// Wait blocks until someone calls Notify OR the timeout hits.
+func (t *ThrottleLimiter) Wait(ctx context.Context) {
 	waitDone := make(chan struct{})
 
 	go func() {
-		t.mu.Lock()
+		t.cond.L.Lock()
+		defer t.cond.L.Unlock()
+
 		t.cond.Wait()
-		t.mu.Unlock()
 		close(waitDone)
 	}()
 
+	timer := time.NewTimer(t.timeout + jitterDuration())
+	defer timer.Stop()
+
+	// Blocking everything until smth happens.
 	select {
 	case <-ctx.Done():
 		// Context done
 	case <-waitDone:
-		// A slot just opened up!
-	case <-time.After(timeout):
-		// TODO: may be use time.NewTimer(timeout) here?
-
-		// No scan finished, but let's try again anyway
-		// in case external Scan finished.
+		// A slot just opened.
+	case <-timer.C:
+		// Timer for the situation, when the slot is opened by itself.
 	}
 }
 
+// jitterDuration adds a random duration to the timeout, not to restart everything at the same moment.
 func jitterDuration() time.Duration {
 	const (
-		minMs = 5000
-		maxMs = 8000
+		minMs = 1000
+		maxMs = 2000
 	)
 
 	// Range size (inclusive)
@@ -120,4 +92,21 @@ func jitterDuration() time.Duration {
 	ms := minMs + int(n.Int64())
 
 	return time.Duration(ms) * time.Millisecond
+}
+
+// shouldThrottle determines if we should throttle connections.
+func shouldThrottle(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var ae a.Error
+	if errors.As(err, &ae) {
+		return ae.Matches(types.NO_AVAILABLE_CONNECTIONS_TO_NODE) || ae.Matches(types.FAIL_FORBIDDEN)
+	}
+
+	// Additional errors that should be throttled.
+	return errors.Is(err, a.ErrConnectionPoolEmpty) ||
+		errors.Is(err, a.ErrConnectionPoolExhausted) ||
+		errors.Is(err, a.ErrTooManyConnectionsForNode)
 }

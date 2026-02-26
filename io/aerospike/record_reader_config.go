@@ -17,6 +17,7 @@ package aerospike
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/metrics"
@@ -129,6 +130,6 @@ func NewRecordReaderConfig(namespace string,
 		noTTLOnly:       noTTLOnly,
 		pageSize:        pageSize,
 		rpsCollector:    rpsCollector,
-		throttler:       NewThrottleLimiter(),
+		throttler:       NewThrottleLimiter(5 * time.Second),
 	}
 }

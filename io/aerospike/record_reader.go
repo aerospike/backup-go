@@ -224,7 +224,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		// No context checking here because it slows down the scan.
 		for res := range recordset.Results() {
 			// Check only the FIRST result for the specific connection error
-			if firstResult && res.Err != nil && ShouldThrottle(res.Err) && r.config.throttler != nil {
+			if firstResult && res.Err != nil && shouldThrottle(res.Err) && r.config.throttler != nil {
 				r.logger.Warn("connection pool empty on first record, restarting scan...",
 					slog.Any("error", res.Err))
 
@@ -237,7 +237,6 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 			// Claim 1 sync from throttler
 			if firstResult {
 				if r.config.throttler != nil {
-					r.config.throttler.Started()
 					claimedActiveSlot = true
 				}
 				firstResult = false
@@ -255,7 +254,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		}
 
 		if claimedActiveSlot {
-			r.config.throttler.Finished()
+			r.config.throttler.Notify()
 		}
 
 		// If we broke out because of a connection error on the first record,
@@ -263,7 +262,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		if connectionErrorOccurred {
 			r.logger.Warn("connection pool full, waiting for a signal...")
 			// Simple logic first, we just sleep for 10 sec and try again.
-			r.config.throttler.Wait(ctx, jitterDuration())
+			r.config.throttler.Wait(ctx)
 
 			continue
 		}

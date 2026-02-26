@@ -254,6 +254,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		}
 
 		if claimedActiveSlot {
+			r.logger.Warn("releasing slot")
 			r.config.throttler.Notify(ctx)
 		}
 

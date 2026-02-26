@@ -223,8 +223,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		r.resultChan <- res
 	}
 
-	r.logger.Debug("partition scan finished",
-		slog.Uint64("jobId", recordset.TaskId()))
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
 	return r.recordsetCloser.Close(recordset)
 }
@@ -249,7 +248,7 @@ func (r *singleRecordReader) generateProducers() []scanProducer {
 			}
 
 			r.logger.Debug("partition scan started",
-				slog.Uint64("jobId", recordset.TaskId()),
+				slog.Uint64("transactionId", recordset.TaskId()),
 				slog.String("set", set),
 				slog.String("filter", fmt.Sprintf("%d-%d", pf.Begin, pf.Count)),
 			)

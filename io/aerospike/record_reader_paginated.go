@@ -194,6 +194,11 @@ func (r *paginatedRecordReader) scanPage(
 	if aErr != nil {
 		return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 	}
+	r.logger.Debug("partition scan started",
+		slog.Uint64("transactionId", recSet.TaskId()),
+		slog.String("set", set),
+		slog.String("filter", fmt.Sprintf("%d-%d", pf.Begin, pf.Count)),
+	)
 
 	defer func() { // close record set
 		if cerr := r.recodsetCloser.Close(recSet); cerr != nil {
@@ -216,6 +221,8 @@ func (r *paginatedRecordReader) scanPage(
 
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}
+
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recSet.TaskId()))
 
 	return count, err
 }

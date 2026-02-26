@@ -198,7 +198,7 @@ func (r *paginatedRecordReader) scanPage(
 	r.logger.Debug("partition scan started",
 		slog.Uint64("transactionId", recSet.TaskId()),
 		slog.String("set", set),
-		slog.String("filter", fmt.Sprintf("%d-%d", pf.Begin, pf.Count)),
+		slog.String("filter", printPartitionFilter(pf)),
 	)
 
 	defer func() { // close record set

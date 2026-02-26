@@ -15,7 +15,6 @@
 package aerospike
 
 import (
-	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -57,7 +56,7 @@ func (c *RecordReaderConfig) logAttrs() []any {
 
 	if c.partitionFilter != nil {
 		attrs = append(attrs,
-			slog.String("partitionFilter", fmt.Sprintf("%d-%d", c.partitionFilter.Begin, c.partitionFilter.Count)))
+			slog.String("partitionFilter", printPartitionFilter(c.partitionFilter)))
 	}
 
 	if len(c.nodes) > 0 {

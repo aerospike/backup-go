@@ -250,7 +250,7 @@ func (r *singleRecordReader) generateProducers() []scanProducer {
 			r.logger.Debug("partition scan started",
 				slog.Uint64("transactionId", recordset.TaskId()),
 				slog.String("set", set),
-				slog.String("filter", fmt.Sprintf("%d-%d", pf.Begin, pf.Count)),
+				slog.String("filter", printPartitionFilter(&pf)),
 			)
 
 			return recordset, nil

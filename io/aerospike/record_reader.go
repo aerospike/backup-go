@@ -254,7 +254,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		}
 
 		if claimedActiveSlot {
-			r.config.throttler.Notify()
+			r.config.throttler.Notify(ctx)
 		}
 
 		// If we broke out because of a connection error on the first record,

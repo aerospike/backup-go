@@ -19,7 +19,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"math/big"
-	"sync"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -30,49 +29,40 @@ import (
 // On success, you should call Notify, on error, you should call Wait and restart the operation.
 // So throttler will wait for the next available slot.
 type ThrottleLimiter struct {
-	cond *sync.Cond
+	slots chan struct{}
 	// Timeout when Wait will return. Not to block forever.
 	timeout time.Duration
 }
 
 // NewThrottleLimiter creates a new ThrottleLimiter.
 func NewThrottleLimiter(timeout time.Duration) *ThrottleLimiter {
-	t := &ThrottleLimiter{
+	return &ThrottleLimiter{
+		slots:   make(chan struct{}),
 		timeout: timeout,
 	}
-	t.cond = sync.NewCond(&sync.Mutex{})
-
-	return t
 }
 
 // Notify is called when a scan is done, success or error.
 // It notifies one or all waiting readers to try and take the freed slot.
-func (t *ThrottleLimiter) Notify() {
-	t.cond.Signal()
+func (t *ThrottleLimiter) Notify(ctx context.Context) {
+	select {
+	case t.slots <- struct{}{}:
+	case <-ctx.Done():
+	}
 }
 
 // Wait blocks until someone calls Notify OR the timeout hits.
 func (t *ThrottleLimiter) Wait(ctx context.Context) {
-	waitDone := make(chan struct{})
-
-	go func() {
-		t.cond.L.Lock()
-		defer t.cond.L.Unlock()
-
-		t.cond.Wait()
-		close(waitDone)
-	}()
-
-	timer := time.NewTimer(t.timeout + jitterDuration())
-	defer timer.Stop()
+	// timer := time.NewTimer(t.timeout + jitterDuration())
+	// defer timer.Stop()
 
 	// Blocking everything until smth happens.
 	select {
 	case <-ctx.Done():
 		// Context done
-	case <-waitDone:
+	case <-t.slots:
 		// A slot just opened.
-	case <-timer.C:
+		// case <-timer.C:
 		// Timer for the situation, when the slot is opened by itself.
 	}
 }

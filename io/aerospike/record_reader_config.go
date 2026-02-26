@@ -104,7 +104,8 @@ func (c *RecordReaderConfig) logAttrs() []any {
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
-func NewRecordReaderConfig(namespace string,
+func NewRecordReaderConfig(
+	namespace string,
 	setList []string,
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,

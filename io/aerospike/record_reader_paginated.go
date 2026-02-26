@@ -194,6 +194,7 @@ func (r *paginatedRecordReader) scanPage(
 	if aErr != nil {
 		return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 	}
+
 	r.logger.Debug("partition scan started",
 		slog.Uint64("transactionId", recSet.TaskId()),
 		slog.String("set", set),

@@ -131,6 +131,6 @@ func NewRecordReaderConfig(
 		noTTLOnly:       noTTLOnly,
 		pageSize:        pageSize,
 		rpsCollector:    rpsCollector,
-		throttler:       NewThrottleLimiter(5 * time.Second),
+		throttler:       NewThrottleLimiter(8, 5*time.Second),
 	}
 }

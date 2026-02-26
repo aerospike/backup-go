@@ -35,9 +35,9 @@ type ThrottleLimiter struct {
 }
 
 // NewThrottleLimiter creates a new ThrottleLimiter.
-func NewThrottleLimiter(timeout time.Duration) *ThrottleLimiter {
+func NewThrottleLimiter(parallel int, timeout time.Duration) *ThrottleLimiter {
 	return &ThrottleLimiter{
-		slots:   make(chan struct{}),
+		slots:   make(chan struct{}, parallel),
 		timeout: timeout,
 	}
 }

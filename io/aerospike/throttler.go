@@ -53,7 +53,7 @@ func (t *ThrottleLimiter) Notify(ctx context.Context) {
 
 // Wait blocks until someone calls Notify OR the timeout hits.
 func (t *ThrottleLimiter) Wait(ctx context.Context) {
-	timer := time.NewTimer(t.timeout + jitterDuration())
+	timer := time.NewTimer(t.timeout)
 	defer timer.Stop()
 
 	// Blocking everything until smth happens.

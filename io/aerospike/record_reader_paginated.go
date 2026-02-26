@@ -169,7 +169,7 @@ func (r *paginatedRecordReader) scanPage(
 	if r.config.scanLimiter != nil {
 		// Attempt to acquire immediately; if not, log and wait.
 		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Debug("Max concurrent scan limit reached; waiting for available slot")
+			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
 
 			if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
 				return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)

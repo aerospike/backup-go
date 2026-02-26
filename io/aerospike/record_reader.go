@@ -111,7 +111,7 @@ func newSingleRecordReader(
 	recordsetCloser RecordsetCloser,
 	cancel context.CancelFunc,
 ) *singleRecordReader {
-	logger.Debug("created new aerospike record reader", cfg.logAttrs()...)
+	logger.Debug("created new Aerospike record reader", cfg.logAttrs()...)
 
 	return &singleRecordReader{
 		ctx:             ctx,
@@ -200,7 +200,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 	if r.config.scanLimiter != nil {
 		// Attempt to acquire immediately; if not, log and wait.
 		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Debug("Max concurrent scan limit reached; waiting for available slot")
+			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
 
 			if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
 				return fmt.Errorf("failed to acquire scan limiter: %w", err)

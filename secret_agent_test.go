@@ -170,7 +170,7 @@ func TestSecretAgent_getTlSConfig(t *testing.T) {
 	}{
 		{&SecretAgentConfig{CaFile: nil}, ""},
 		{&SecretAgentConfig{CaFile: &filePem}, ""},
-		{&SecretAgentConfig{CaFile: &filePemNotExist}, "unable to read ca file"},
+		{&SecretAgentConfig{CaFile: &filePemNotExist}, "failed to read ca file"},
 		{&SecretAgentConfig{CaFile: &filePemWrong}, "nothing to append to ca cert pool"},
 	}
 
@@ -331,7 +331,7 @@ func TestNewSecretAgentClient_TLSConfigError(t *testing.T) {
 	}
 
 	_, err := NewSecretAgentClient(cfg)
-	require.ErrorContains(t, err, "unable to read ca file")
+	require.ErrorContains(t, err, "failed to read ca file")
 }
 
 func TestNewSecretAgentClient_Success(t *testing.T) {

@@ -78,11 +78,11 @@ type Mockscanner_ScanPartitions_Call struct {
 }
 
 // ScanPartitions is a helper method to define mock.On call
-//   - scanPolicy
-//   - partitionFilter
-//   - namespace
-//   - setName
-//   - binNames
+//   - scanPolicy *aerospike.ScanPolicy
+//   - partitionFilter *aerospike.PartitionFilter
+//   - namespace string
+//   - setName string
+//   - binNames ...string
 func (_e *Mockscanner_Expecter) ScanPartitions(scanPolicy interface{}, partitionFilter interface{}, namespace interface{}, setName interface{}, binNames ...interface{}) *Mockscanner_ScanPartitions_Call {
 	return &Mockscanner_ScanPartitions_Call{Call: _e.mock.On("ScanPartitions",
 		append([]interface{}{scanPolicy, partitionFilter, namespace, setName}, binNames...)...)}
@@ -90,8 +90,35 @@ func (_e *Mockscanner_Expecter) ScanPartitions(scanPolicy interface{}, partition
 
 func (_c *Mockscanner_ScanPartitions_Call) Run(run func(scanPolicy *aerospike.ScanPolicy, partitionFilter *aerospike.PartitionFilter, namespace string, setName string, binNames ...string)) *Mockscanner_ScanPartitions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[4].([]string)
-		run(args[0].(*aerospike.ScanPolicy), args[1].(*aerospike.PartitionFilter), args[2].(string), args[3].(string), variadicArgs...)
+		var arg0 *aerospike.ScanPolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.ScanPolicy)
+		}
+		var arg1 *aerospike.PartitionFilter
+		if args[1] != nil {
+			arg1 = args[1].(*aerospike.PartitionFilter)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 []string
+		var variadicArgs []string
+		if len(args) > 4 {
+			variadicArgs = args[4].([]string)
+		}
+		arg4 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4...,
+		)
 	})
 	return _c
 }

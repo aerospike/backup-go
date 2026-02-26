@@ -161,15 +161,26 @@ type MockWriter_NewWriter_Call struct {
 }
 
 // NewWriter is a helper method to define mock.On call
-//   - ctx
-//   - filename
+//   - ctx context.Context
+//   - filename string
 func (_e *MockWriter_Expecter) NewWriter(ctx interface{}, filename interface{}) *MockWriter_NewWriter_Call {
 	return &MockWriter_NewWriter_Call{Call: _e.mock.On("NewWriter", ctx, filename)}
 }
 
 func (_c *MockWriter_NewWriter_Call) Run(run func(ctx context.Context, filename string)) *MockWriter_NewWriter_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -207,15 +218,26 @@ type MockWriter_Remove_Call struct {
 }
 
 // Remove is a helper method to define mock.On call
-//   - ctx
-//   - path
+//   - ctx context.Context
+//   - path string
 func (_e *MockWriter_Expecter) Remove(ctx interface{}, path interface{}) *MockWriter_Remove_Call {
 	return &MockWriter_Remove_Call{Call: _e.mock.On("Remove", ctx, path)}
 }
 
 func (_c *MockWriter_Remove_Call) Run(run func(ctx context.Context, path string)) *MockWriter_Remove_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -253,14 +275,20 @@ type MockWriter_RemoveFiles_Call struct {
 }
 
 // RemoveFiles is a helper method to define mock.On call
-//   - ctx
+//   - ctx context.Context
 func (_e *MockWriter_Expecter) RemoveFiles(ctx interface{}) *MockWriter_RemoveFiles_Call {
 	return &MockWriter_RemoveFiles_Call{Call: _e.mock.On("RemoveFiles", ctx)}
 }
 
 func (_c *MockWriter_RemoveFiles_Call) Run(run func(ctx context.Context)) *MockWriter_RemoveFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

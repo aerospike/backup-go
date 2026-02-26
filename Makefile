@@ -17,7 +17,7 @@ coverage:
 # Install mockery for generating test mocks.
 .PHONY: mockery-install
 mockery-install:
-	$(GO) install github.com/vektra/mockery/v3@v3.2.5
+	$(GO) install github.com/vektra/mockery/v3@v3.5.5
 
 # Iterate over project directory and generate mocks in packages where they must be.
 # FYI: --recursively not working, because then mockery creates mock in root dirs, not putting them to /mocks folder.

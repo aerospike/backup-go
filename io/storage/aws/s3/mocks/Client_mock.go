@@ -78,9 +78,9 @@ type MockClient_AbortMultipartUpload_Call struct {
 }
 
 // AbortMultipartUpload is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.AbortMultipartUploadInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) AbortMultipartUpload(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_AbortMultipartUpload_Call {
 	return &MockClient_AbortMultipartUpload_Call{Call: _e.mock.On("AbortMultipartUpload",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -88,8 +88,25 @@ func (_e *MockClient_Expecter) AbortMultipartUpload(ctx interface{}, params inte
 
 func (_c *MockClient_AbortMultipartUpload_Call) Run(run func(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options))) *MockClient_AbortMultipartUpload_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.AbortMultipartUploadInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.AbortMultipartUploadInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.AbortMultipartUploadInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -144,9 +161,9 @@ type MockClient_CompleteMultipartUpload_Call struct {
 }
 
 // CompleteMultipartUpload is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.CompleteMultipartUploadInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) CompleteMultipartUpload(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_CompleteMultipartUpload_Call {
 	return &MockClient_CompleteMultipartUpload_Call{Call: _e.mock.On("CompleteMultipartUpload",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -154,8 +171,25 @@ func (_e *MockClient_Expecter) CompleteMultipartUpload(ctx interface{}, params i
 
 func (_c *MockClient_CompleteMultipartUpload_Call) Run(run func(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options))) *MockClient_CompleteMultipartUpload_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.CompleteMultipartUploadInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.CompleteMultipartUploadInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.CompleteMultipartUploadInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -210,9 +244,9 @@ type MockClient_CreateMultipartUpload_Call struct {
 }
 
 // CreateMultipartUpload is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.CreateMultipartUploadInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) CreateMultipartUpload(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_CreateMultipartUpload_Call {
 	return &MockClient_CreateMultipartUpload_Call{Call: _e.mock.On("CreateMultipartUpload",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -220,8 +254,25 @@ func (_e *MockClient_Expecter) CreateMultipartUpload(ctx interface{}, params int
 
 func (_c *MockClient_CreateMultipartUpload_Call) Run(run func(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options))) *MockClient_CreateMultipartUpload_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.CreateMultipartUploadInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.CreateMultipartUploadInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.CreateMultipartUploadInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -276,9 +327,9 @@ type MockClient_DeleteObject_Call struct {
 }
 
 // DeleteObject is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.DeleteObjectInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) DeleteObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_DeleteObject_Call {
 	return &MockClient_DeleteObject_Call{Call: _e.mock.On("DeleteObject",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -286,8 +337,25 @@ func (_e *MockClient_Expecter) DeleteObject(ctx interface{}, params interface{},
 
 func (_c *MockClient_DeleteObject_Call) Run(run func(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options))) *MockClient_DeleteObject_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.DeleteObjectInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.DeleteObjectInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.DeleteObjectInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -342,9 +410,9 @@ type MockClient_GetObject_Call struct {
 }
 
 // GetObject is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.GetObjectInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) GetObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_GetObject_Call {
 	return &MockClient_GetObject_Call{Call: _e.mock.On("GetObject",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -352,8 +420,25 @@ func (_e *MockClient_Expecter) GetObject(ctx interface{}, params interface{}, op
 
 func (_c *MockClient_GetObject_Call) Run(run func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options))) *MockClient_GetObject_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.GetObjectInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.GetObjectInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.GetObjectInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -408,9 +493,9 @@ type MockClient_HeadBucket_Call struct {
 }
 
 // HeadBucket is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.HeadBucketInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) HeadBucket(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_HeadBucket_Call {
 	return &MockClient_HeadBucket_Call{Call: _e.mock.On("HeadBucket",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -418,8 +503,25 @@ func (_e *MockClient_Expecter) HeadBucket(ctx interface{}, params interface{}, o
 
 func (_c *MockClient_HeadBucket_Call) Run(run func(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options))) *MockClient_HeadBucket_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.HeadBucketInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.HeadBucketInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.HeadBucketInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -474,9 +576,9 @@ type MockClient_HeadObject_Call struct {
 }
 
 // HeadObject is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.HeadObjectInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) HeadObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_HeadObject_Call {
 	return &MockClient_HeadObject_Call{Call: _e.mock.On("HeadObject",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -484,8 +586,25 @@ func (_e *MockClient_Expecter) HeadObject(ctx interface{}, params interface{}, o
 
 func (_c *MockClient_HeadObject_Call) Run(run func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options))) *MockClient_HeadObject_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.HeadObjectInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.HeadObjectInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.HeadObjectInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -540,9 +659,9 @@ type MockClient_ListObjectsV2_Call struct {
 }
 
 // ListObjectsV2 is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.ListObjectsV2Input
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) ListObjectsV2(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_ListObjectsV2_Call {
 	return &MockClient_ListObjectsV2_Call{Call: _e.mock.On("ListObjectsV2",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -550,8 +669,25 @@ func (_e *MockClient_Expecter) ListObjectsV2(ctx interface{}, params interface{}
 
 func (_c *MockClient_ListObjectsV2_Call) Run(run func(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options))) *MockClient_ListObjectsV2_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.ListObjectsV2Input), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.ListObjectsV2Input
+		if args[1] != nil {
+			arg1 = args[1].(*s3.ListObjectsV2Input)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -606,9 +742,9 @@ type MockClient_RestoreObject_Call struct {
 }
 
 // RestoreObject is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.RestoreObjectInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) RestoreObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_RestoreObject_Call {
 	return &MockClient_RestoreObject_Call{Call: _e.mock.On("RestoreObject",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -616,8 +752,25 @@ func (_e *MockClient_Expecter) RestoreObject(ctx interface{}, params interface{}
 
 func (_c *MockClient_RestoreObject_Call) Run(run func(ctx context.Context, params *s3.RestoreObjectInput, optFns ...func(*s3.Options))) *MockClient_RestoreObject_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.RestoreObjectInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.RestoreObjectInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.RestoreObjectInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -672,9 +825,9 @@ type MockClient_UploadPart_Call struct {
 }
 
 // UploadPart is a helper method to define mock.On call
-//   - ctx
-//   - params
-//   - optFns
+//   - ctx context.Context
+//   - params *s3.UploadPartInput
+//   - optFns ...func(*s3.Options)
 func (_e *MockClient_Expecter) UploadPart(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_UploadPart_Call {
 	return &MockClient_UploadPart_Call{Call: _e.mock.On("UploadPart",
 		append([]interface{}{ctx, params}, optFns...)...)}
@@ -682,8 +835,25 @@ func (_e *MockClient_Expecter) UploadPart(ctx interface{}, params interface{}, o
 
 func (_c *MockClient_UploadPart_Call) Run(run func(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options))) *MockClient_UploadPart_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]func(*s3.Options))
-		run(args[0].(context.Context), args[1].(*s3.UploadPartInput), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *s3.UploadPartInput
+		if args[1] != nil {
+			arg1 = args[1].(*s3.UploadPartInput)
+		}
+		var arg2 []func(*s3.Options)
+		var variadicArgs []func(*s3.Options)
+		if len(args) > 2 {
+			variadicArgs = args[2].([]func(*s3.Options))
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }

@@ -61,15 +61,26 @@ type MockAerospikeClient_BatchOperate_Call struct {
 }
 
 // BatchOperate is a helper method to define mock.On call
-//   - policy
-//   - records
+//   - policy *aerospike.BatchPolicy
+//   - records []aerospike.BatchRecordIfc
 func (_e *MockAerospikeClient_Expecter) BatchOperate(policy interface{}, records interface{}) *MockAerospikeClient_BatchOperate_Call {
 	return &MockAerospikeClient_BatchOperate_Call{Call: _e.mock.On("BatchOperate", policy, records)}
 }
 
 func (_c *MockAerospikeClient_BatchOperate_Call) Run(run func(policy *aerospike.BatchPolicy, records []aerospike.BatchRecordIfc)) *MockAerospikeClient_BatchOperate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*aerospike.BatchPolicy), args[1].([]aerospike.BatchRecordIfc))
+		var arg0 *aerospike.BatchPolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.BatchPolicy)
+		}
+		var arg1 []aerospike.BatchRecordIfc
+		if args[1] != nil {
+			arg1 = args[1].([]aerospike.BatchRecordIfc)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -205,14 +216,14 @@ type MockAerospikeClient_CreateComplexIndex_Call struct {
 }
 
 // CreateComplexIndex is a helper method to define mock.On call
-//   - policy
-//   - namespace
-//   - set
-//   - indexName
-//   - binName
-//   - indexType
-//   - indexCollectionType
-//   - ctx
+//   - policy *aerospike.WritePolicy
+//   - namespace string
+//   - set string
+//   - indexName string
+//   - binName string
+//   - indexType aerospike.IndexType
+//   - indexCollectionType aerospike.IndexCollectionType
+//   - ctx ...*aerospike.CDTContext
 func (_e *MockAerospikeClient_Expecter) CreateComplexIndex(policy interface{}, namespace interface{}, set interface{}, indexName interface{}, binName interface{}, indexType interface{}, indexCollectionType interface{}, ctx ...interface{}) *MockAerospikeClient_CreateComplexIndex_Call {
 	return &MockAerospikeClient_CreateComplexIndex_Call{Call: _e.mock.On("CreateComplexIndex",
 		append([]interface{}{policy, namespace, set, indexName, binName, indexType, indexCollectionType}, ctx...)...)}
@@ -220,8 +231,50 @@ func (_e *MockAerospikeClient_Expecter) CreateComplexIndex(policy interface{}, n
 
 func (_c *MockAerospikeClient_CreateComplexIndex_Call) Run(run func(policy *aerospike.WritePolicy, namespace string, set string, indexName string, binName string, indexType aerospike.IndexType, indexCollectionType aerospike.IndexCollectionType, ctx ...*aerospike.CDTContext)) *MockAerospikeClient_CreateComplexIndex_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[7].([]*aerospike.CDTContext)
-		run(args[0].(*aerospike.WritePolicy), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(aerospike.IndexType), args[6].(aerospike.IndexCollectionType), variadicArgs...)
+		var arg0 *aerospike.WritePolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.WritePolicy)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 aerospike.IndexType
+		if args[5] != nil {
+			arg5 = args[5].(aerospike.IndexType)
+		}
+		var arg6 aerospike.IndexCollectionType
+		if args[6] != nil {
+			arg6 = args[6].(aerospike.IndexCollectionType)
+		}
+		var arg7 []*aerospike.CDTContext
+		var variadicArgs []*aerospike.CDTContext
+		if len(args) > 7 {
+			variadicArgs = args[7].([]*aerospike.CDTContext)
+		}
+		arg7 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7...,
+		)
 	})
 	return _c
 }
@@ -272,20 +325,56 @@ type MockAerospikeClient_CreateIndexWithExpression_Call struct {
 }
 
 // CreateIndexWithExpression is a helper method to define mock.On call
-//   - policy
-//   - namespace
-//   - set
-//   - indexName
-//   - indexType
-//   - indexCollectionType
-//   - expression
+//   - policy *aerospike.WritePolicy
+//   - namespace string
+//   - set string
+//   - indexName string
+//   - indexType aerospike.IndexType
+//   - indexCollectionType aerospike.IndexCollectionType
+//   - expression *aerospike.Expression
 func (_e *MockAerospikeClient_Expecter) CreateIndexWithExpression(policy interface{}, namespace interface{}, set interface{}, indexName interface{}, indexType interface{}, indexCollectionType interface{}, expression interface{}) *MockAerospikeClient_CreateIndexWithExpression_Call {
 	return &MockAerospikeClient_CreateIndexWithExpression_Call{Call: _e.mock.On("CreateIndexWithExpression", policy, namespace, set, indexName, indexType, indexCollectionType, expression)}
 }
 
 func (_c *MockAerospikeClient_CreateIndexWithExpression_Call) Run(run func(policy *aerospike.WritePolicy, namespace string, set string, indexName string, indexType aerospike.IndexType, indexCollectionType aerospike.IndexCollectionType, expression *aerospike.Expression)) *MockAerospikeClient_CreateIndexWithExpression_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*aerospike.WritePolicy), args[1].(string), args[2].(string), args[3].(string), args[4].(aerospike.IndexType), args[5].(aerospike.IndexCollectionType), args[6].(*aerospike.Expression))
+		var arg0 *aerospike.WritePolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.WritePolicy)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 aerospike.IndexType
+		if args[4] != nil {
+			arg4 = args[4].(aerospike.IndexType)
+		}
+		var arg5 aerospike.IndexCollectionType
+		if args[5] != nil {
+			arg5 = args[5].(aerospike.IndexCollectionType)
+		}
+		var arg6 *aerospike.Expression
+		if args[6] != nil {
+			arg6 = args[6].(*aerospike.Expression)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+		)
 	})
 	return _c
 }
@@ -325,17 +414,38 @@ type MockAerospikeClient_DropIndex_Call struct {
 }
 
 // DropIndex is a helper method to define mock.On call
-//   - policy
-//   - namespace
-//   - set
-//   - indexName
+//   - policy *aerospike.WritePolicy
+//   - namespace string
+//   - set string
+//   - indexName string
 func (_e *MockAerospikeClient_Expecter) DropIndex(policy interface{}, namespace interface{}, set interface{}, indexName interface{}) *MockAerospikeClient_DropIndex_Call {
 	return &MockAerospikeClient_DropIndex_Call{Call: _e.mock.On("DropIndex", policy, namespace, set, indexName)}
 }
 
 func (_c *MockAerospikeClient_DropIndex_Call) Run(run func(policy *aerospike.WritePolicy, namespace string, set string, indexName string)) *MockAerospikeClient_DropIndex_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*aerospike.WritePolicy), args[1].(string), args[2].(string), args[3].(string))
+		var arg0 *aerospike.WritePolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.WritePolicy)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -559,16 +669,32 @@ type MockAerospikeClient_Put_Call struct {
 }
 
 // Put is a helper method to define mock.On call
-//   - policy
-//   - key
-//   - bins
+//   - policy *aerospike.WritePolicy
+//   - key *aerospike.Key
+//   - bins aerospike.BinMap
 func (_e *MockAerospikeClient_Expecter) Put(policy interface{}, key interface{}, bins interface{}) *MockAerospikeClient_Put_Call {
 	return &MockAerospikeClient_Put_Call{Call: _e.mock.On("Put", policy, key, bins)}
 }
 
 func (_c *MockAerospikeClient_Put_Call) Run(run func(policy *aerospike.WritePolicy, key *aerospike.Key, bins aerospike.BinMap)) *MockAerospikeClient_Put_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*aerospike.WritePolicy), args[1].(*aerospike.Key), args[2].(aerospike.BinMap))
+		var arg0 *aerospike.WritePolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.WritePolicy)
+		}
+		var arg1 *aerospike.Key
+		if args[1] != nil {
+			arg1 = args[1].(*aerospike.Key)
+		}
+		var arg2 aerospike.BinMap
+		if args[2] != nil {
+			arg2 = args[2].(aerospike.BinMap)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -608,16 +734,32 @@ type MockAerospikeClient_PutPayload_Call struct {
 }
 
 // PutPayload is a helper method to define mock.On call
-//   - policy
-//   - key
-//   - payload
+//   - policy *aerospike.WritePolicy
+//   - key *aerospike.Key
+//   - payload []byte
 func (_e *MockAerospikeClient_Expecter) PutPayload(policy interface{}, key interface{}, payload interface{}) *MockAerospikeClient_PutPayload_Call {
 	return &MockAerospikeClient_PutPayload_Call{Call: _e.mock.On("PutPayload", policy, key, payload)}
 }
 
 func (_c *MockAerospikeClient_PutPayload_Call) Run(run func(policy *aerospike.WritePolicy, key *aerospike.Key, payload []byte)) *MockAerospikeClient_PutPayload_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*aerospike.WritePolicy), args[1].(*aerospike.Key), args[2].([]byte))
+		var arg0 *aerospike.WritePolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.WritePolicy)
+		}
+		var arg1 *aerospike.Key
+		if args[1] != nil {
+			arg1 = args[1].(*aerospike.Key)
+		}
+		var arg2 []byte
+		if args[2] != nil {
+			arg2 = args[2].([]byte)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -668,17 +810,38 @@ type MockAerospikeClient_RegisterUDF_Call struct {
 }
 
 // RegisterUDF is a helper method to define mock.On call
-//   - policy
-//   - udfBody
-//   - serverPath
-//   - language
+//   - policy *aerospike.WritePolicy
+//   - udfBody []byte
+//   - serverPath string
+//   - language aerospike.Language
 func (_e *MockAerospikeClient_Expecter) RegisterUDF(policy interface{}, udfBody interface{}, serverPath interface{}, language interface{}) *MockAerospikeClient_RegisterUDF_Call {
 	return &MockAerospikeClient_RegisterUDF_Call{Call: _e.mock.On("RegisterUDF", policy, udfBody, serverPath, language)}
 }
 
 func (_c *MockAerospikeClient_RegisterUDF_Call) Run(run func(policy *aerospike.WritePolicy, udfBody []byte, serverPath string, language aerospike.Language)) *MockAerospikeClient_RegisterUDF_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*aerospike.WritePolicy), args[1].([]byte), args[2].(string), args[3].(aerospike.Language))
+		var arg0 *aerospike.WritePolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.WritePolicy)
+		}
+		var arg1 []byte
+		if args[1] != nil {
+			arg1 = args[1].([]byte)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 aerospike.Language
+		if args[3] != nil {
+			arg3 = args[3].(aerospike.Language)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -735,11 +898,11 @@ type MockAerospikeClient_ScanNode_Call struct {
 }
 
 // ScanNode is a helper method to define mock.On call
-//   - scanPolicy
-//   - node
-//   - namespace
-//   - setName
-//   - binNames
+//   - scanPolicy *aerospike.ScanPolicy
+//   - node *aerospike.Node
+//   - namespace string
+//   - setName string
+//   - binNames ...string
 func (_e *MockAerospikeClient_Expecter) ScanNode(scanPolicy interface{}, node interface{}, namespace interface{}, setName interface{}, binNames ...interface{}) *MockAerospikeClient_ScanNode_Call {
 	return &MockAerospikeClient_ScanNode_Call{Call: _e.mock.On("ScanNode",
 		append([]interface{}{scanPolicy, node, namespace, setName}, binNames...)...)}
@@ -747,8 +910,35 @@ func (_e *MockAerospikeClient_Expecter) ScanNode(scanPolicy interface{}, node in
 
 func (_c *MockAerospikeClient_ScanNode_Call) Run(run func(scanPolicy *aerospike.ScanPolicy, node *aerospike.Node, namespace string, setName string, binNames ...string)) *MockAerospikeClient_ScanNode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[4].([]string)
-		run(args[0].(*aerospike.ScanPolicy), args[1].(*aerospike.Node), args[2].(string), args[3].(string), variadicArgs...)
+		var arg0 *aerospike.ScanPolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.ScanPolicy)
+		}
+		var arg1 *aerospike.Node
+		if args[1] != nil {
+			arg1 = args[1].(*aerospike.Node)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 []string
+		var variadicArgs []string
+		if len(args) > 4 {
+			variadicArgs = args[4].([]string)
+		}
+		arg4 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4...,
+		)
 	})
 	return _c
 }
@@ -805,11 +995,11 @@ type MockAerospikeClient_ScanPartitions_Call struct {
 }
 
 // ScanPartitions is a helper method to define mock.On call
-//   - scanPolicy
-//   - partitionFilter
-//   - namespace
-//   - setName
-//   - binNames
+//   - scanPolicy *aerospike.ScanPolicy
+//   - partitionFilter *aerospike.PartitionFilter
+//   - namespace string
+//   - setName string
+//   - binNames ...string
 func (_e *MockAerospikeClient_Expecter) ScanPartitions(scanPolicy interface{}, partitionFilter interface{}, namespace interface{}, setName interface{}, binNames ...interface{}) *MockAerospikeClient_ScanPartitions_Call {
 	return &MockAerospikeClient_ScanPartitions_Call{Call: _e.mock.On("ScanPartitions",
 		append([]interface{}{scanPolicy, partitionFilter, namespace, setName}, binNames...)...)}
@@ -817,8 +1007,35 @@ func (_e *MockAerospikeClient_Expecter) ScanPartitions(scanPolicy interface{}, p
 
 func (_c *MockAerospikeClient_ScanPartitions_Call) Run(run func(scanPolicy *aerospike.ScanPolicy, partitionFilter *aerospike.PartitionFilter, namespace string, setName string, binNames ...string)) *MockAerospikeClient_ScanPartitions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[4].([]string)
-		run(args[0].(*aerospike.ScanPolicy), args[1].(*aerospike.PartitionFilter), args[2].(string), args[3].(string), variadicArgs...)
+		var arg0 *aerospike.ScanPolicy
+		if args[0] != nil {
+			arg0 = args[0].(*aerospike.ScanPolicy)
+		}
+		var arg1 *aerospike.PartitionFilter
+		if args[1] != nil {
+			arg1 = args[1].(*aerospike.PartitionFilter)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 []string
+		var variadicArgs []string
+		if len(args) > 4 {
+			variadicArgs = args[4].([]string)
+		}
+		arg4 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4...,
+		)
 	})
 	return _c
 }

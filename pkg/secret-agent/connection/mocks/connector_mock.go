@@ -69,14 +69,20 @@ type Mockconnector_Read_Call struct {
 }
 
 // Read is a helper method to define mock.On call
-//   - b
+//   - b []byte
 func (_e *Mockconnector_Expecter) Read(b interface{}) *Mockconnector_Read_Call {
 	return &Mockconnector_Read_Call{Call: _e.mock.On("Read", b)}
 }
 
 func (_c *Mockconnector_Read_Call) Run(run func(b []byte)) *Mockconnector_Read_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
+		var arg0 []byte
+		if args[0] != nil {
+			arg0 = args[0].([]byte)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -114,14 +120,20 @@ type Mockconnector_SetReadDeadline_Call struct {
 }
 
 // SetReadDeadline is a helper method to define mock.On call
-//   - t
+//   - t time.Time
 func (_e *Mockconnector_Expecter) SetReadDeadline(t interface{}) *Mockconnector_SetReadDeadline_Call {
 	return &Mockconnector_SetReadDeadline_Call{Call: _e.mock.On("SetReadDeadline", t)}
 }
 
 func (_c *Mockconnector_SetReadDeadline_Call) Run(run func(t time.Time)) *Mockconnector_SetReadDeadline_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(time.Time))
+		var arg0 time.Time
+		if args[0] != nil {
+			arg0 = args[0].(time.Time)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -159,14 +171,20 @@ type Mockconnector_SetWriteDeadline_Call struct {
 }
 
 // SetWriteDeadline is a helper method to define mock.On call
-//   - t
+//   - t time.Time
 func (_e *Mockconnector_Expecter) SetWriteDeadline(t interface{}) *Mockconnector_SetWriteDeadline_Call {
 	return &Mockconnector_SetWriteDeadline_Call{Call: _e.mock.On("SetWriteDeadline", t)}
 }
 
 func (_c *Mockconnector_SetWriteDeadline_Call) Run(run func(t time.Time)) *Mockconnector_SetWriteDeadline_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(time.Time))
+		var arg0 time.Time
+		if args[0] != nil {
+			arg0 = args[0].(time.Time)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -213,14 +231,20 @@ type Mockconnector_Write_Call struct {
 }
 
 // Write is a helper method to define mock.On call
-//   - b
+//   - b []byte
 func (_e *Mockconnector_Expecter) Write(b interface{}) *Mockconnector_Write_Call {
 	return &Mockconnector_Write_Call{Call: _e.mock.On("Write", b)}
 }
 
 func (_c *Mockconnector_Write_Call) Run(run func(b []byte)) *Mockconnector_Write_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
+		var arg0 []byte
+		if args[0] != nil {
+			arg0 = args[0].([]byte)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

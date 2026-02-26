@@ -73,15 +73,26 @@ type MockgcpGetter_GetAttrs_Call struct {
 }
 
 // GetAttrs is a helper method to define mock.On call
-//   - ctx
-//   - path
+//   - ctx context.Context
+//   - path string
 func (_e *MockgcpGetter_Expecter) GetAttrs(ctx interface{}, path interface{}) *MockgcpGetter_GetAttrs_Call {
 	return &MockgcpGetter_GetAttrs_Call{Call: _e.mock.On("GetAttrs", ctx, path)}
 }
 
 func (_c *MockgcpGetter_GetAttrs_Call) Run(run func(ctx context.Context, path string)) *MockgcpGetter_GetAttrs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -130,18 +141,44 @@ type MockgcpGetter_GetReader_Call struct {
 }
 
 // GetReader is a helper method to define mock.On call
-//   - ctx
-//   - path
-//   - generation
-//   - offset
-//   - length
+//   - ctx context.Context
+//   - path string
+//   - generation int64
+//   - offset int64
+//   - length int64
 func (_e *MockgcpGetter_Expecter) GetReader(ctx interface{}, path interface{}, generation interface{}, offset interface{}, length interface{}) *MockgcpGetter_GetReader_Call {
 	return &MockgcpGetter_GetReader_Call{Call: _e.mock.On("GetReader", ctx, path, generation, offset, length)}
 }
 
 func (_c *MockgcpGetter_GetReader_Call) Run(run func(ctx context.Context, path string, generation int64, offset int64, length int64)) *MockgcpGetter_GetReader_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(int64), args[4].(int64))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		var arg4 int64
+		if args[4] != nil {
+			arg4 = args[4].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
 	})
 	return _c
 }

@@ -250,15 +250,26 @@ type MockStreamingReader_ListObjects_Call struct {
 }
 
 // ListObjects is a helper method to define mock.On call
-//   - ctx
-//   - path
+//   - ctx context.Context
+//   - path string
 func (_e *MockStreamingReader_Expecter) ListObjects(ctx interface{}, path interface{}) *MockStreamingReader_ListObjects_Call {
 	return &MockStreamingReader_ListObjects_Call{Call: _e.mock.On("ListObjects", ctx, path)}
 }
 
 func (_c *MockStreamingReader_ListObjects_Call) Run(run func(ctx context.Context, path string)) *MockStreamingReader_ListObjects_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -285,17 +296,38 @@ type MockStreamingReader_StreamFile_Call struct {
 }
 
 // StreamFile is a helper method to define mock.On call
-//   - ctx
-//   - filename
-//   - readersCh
-//   - errorsCh
+//   - ctx context.Context
+//   - filename string
+//   - readersCh chan<- models.File
+//   - errorsCh chan<- error
 func (_e *MockStreamingReader_Expecter) StreamFile(ctx interface{}, filename interface{}, readersCh interface{}, errorsCh interface{}) *MockStreamingReader_StreamFile_Call {
 	return &MockStreamingReader_StreamFile_Call{Call: _e.mock.On("StreamFile", ctx, filename, readersCh, errorsCh)}
 }
 
 func (_c *MockStreamingReader_StreamFile_Call) Run(run func(ctx context.Context, filename string, readersCh chan<- models.File, errorsCh chan<- error)) *MockStreamingReader_StreamFile_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(chan<- models.File), args[3].(chan<- error))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 chan<- models.File
+		if args[2] != nil {
+			arg2 = args[2].(chan<- models.File)
+		}
+		var arg3 chan<- error
+		if args[3] != nil {
+			arg3 = args[3].(chan<- error)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -322,17 +354,38 @@ type MockStreamingReader_StreamFiles_Call struct {
 }
 
 // StreamFiles is a helper method to define mock.On call
-//   - context1
-//   - fileCh
-//   - errCh
-//   - strings
+//   - context1 context.Context
+//   - fileCh chan<- models.File
+//   - errCh chan<- error
+//   - strings []string
 func (_e *MockStreamingReader_Expecter) StreamFiles(context1 interface{}, fileCh interface{}, errCh interface{}, strings interface{}) *MockStreamingReader_StreamFiles_Call {
 	return &MockStreamingReader_StreamFiles_Call{Call: _e.mock.On("StreamFiles", context1, fileCh, errCh, strings)}
 }
 
 func (_c *MockStreamingReader_StreamFiles_Call) Run(run func(context1 context.Context, fileCh chan<- models.File, errCh chan<- error, strings []string)) *MockStreamingReader_StreamFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(chan<- models.File), args[2].(chan<- error), args[3].([]string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 chan<- models.File
+		if args[1] != nil {
+			arg1 = args[1].(chan<- models.File)
+		}
+		var arg2 chan<- error
+		if args[2] != nil {
+			arg2 = args[2].(chan<- error)
+		}
+		var arg3 []string
+		if args[3] != nil {
+			arg3 = args[3].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }

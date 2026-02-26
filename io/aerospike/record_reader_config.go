@@ -37,7 +37,7 @@ type RecordReaderConfig struct {
 	binList     []string
 	noTTLOnly   bool
 
-	// throttler indicates that we should throttler the scan on NO_AVAILABLE_CONNECTIONS_TO_NODE error.
+	// throttler indicates that we should throttler the scan on error.
 	throttler *ThrottleLimiter
 
 	// pageSize used for paginated scan for saving reading state.

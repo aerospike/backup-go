@@ -196,11 +196,18 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		return ctx.Err()
 	}
 
+	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 	if r.config.scanLimiter != nil {
-		if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("failed to acquire scan limiter: %w", err)
+		// Attempt to acquire immediately; if not, log and wait.
+		if !r.config.scanLimiter.TryAcquire(1) {
+			r.logger.Debug("Max concurrent scan limit reached; waiting for available slot")
+
+			if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
+				return fmt.Errorf("failed to acquire scan limiter: %w", err)
+			}
 		}
-		defer r.config.scanLimiter.Release(1) // Semaphore is released in the same function
+
+		defer r.config.scanLimiter.Release(1)
 	}
 
 	// Call the producer function. This starts the actual Aerospike scan
@@ -241,7 +248,7 @@ func (r *singleRecordReader) generateProducers() []scanProducer {
 					set, r.config.namespace, pf.Begin, pf.Count, err)
 			}
 
-			r.logger.Debug("partition scan started",
+			r.logger.Debug("partition scan started", // 2
 				slog.Uint64("jobId", recordset.TaskId()),
 				slog.String("set", set),
 				slog.String("filter", fmt.Sprintf("%d-%d", pf.Begin, pf.Count)),

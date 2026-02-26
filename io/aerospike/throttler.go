@@ -53,8 +53,8 @@ func (t *ThrottleLimiter) Notify(ctx context.Context) {
 
 // Wait blocks until someone calls Notify OR the timeout hits.
 func (t *ThrottleLimiter) Wait(ctx context.Context) {
-	// timer := time.NewTimer(t.timeout + jitterDuration())
-	// defer timer.Stop()
+	timer := time.NewTimer(t.timeout + jitterDuration())
+	defer timer.Stop()
 
 	// Blocking everything until smth happens.
 	select {
@@ -62,7 +62,7 @@ func (t *ThrottleLimiter) Wait(ctx context.Context) {
 		// Context done
 	case <-t.slots:
 		// A slot just opened.
-		// case <-timer.C:
+	case <-timer.C:
 		// Timer for the situation, when the slot is opened by itself.
 	}
 }

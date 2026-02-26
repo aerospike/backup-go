@@ -16,7 +16,6 @@ package aerospike
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -160,56 +159,88 @@ func (r *paginatedRecordReader) scanPage(
 	pf *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	set string,
-) (count uint64, err error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
-	}
-
-	if r.config.scanLimiter != nil {
-		if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
+) (uint64, error) {
+	for {
+		if err := r.ctx.Err(); err != nil {
 			return 0, err
 		}
 
-		defer r.config.scanLimiter.Release(1)
-	}
+		if r.config.scanLimiter != nil {
+			if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
+				return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+			}
+		}
 
+		recSet, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
+			scanPolicy,
+			pf,
+			r.config.namespace,
+			set,
+			r.config.binList...,
+		)
+		if aErr != nil {
+			return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
+		}
+
+		count, isThrottled, drainErr := r.drainPageResults(pf, recSet)
+
+		// Close the record set. Do not return an error immediately, because we need to perform some actions first.
+		closeErr := r.recodsetCloser.Close(recSet)
+
+		// Release the semaphore manually because of for loop.
+		if r.config.scanLimiter != nil {
+			r.config.scanLimiter.Release(1)
+		}
+
+		// If we broke out because of a connection error on the first record,
+		// we loop back to the top to restart the producer.
+		if isThrottled {
+			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
+				slog.Any("error", drainErr))
+			// Simple logic first, we just sleep for 10 sec and try again.
+			r.config.throttler.Wait(r.ctx)
+
+			continue
+		}
+
+		// Successfully drained all results, notify the throttler.
+		r.config.throttler.Notify(r.ctx)
+
+		return count, closeErr
+	}
+}
+
+// drainResults drains results, and if operatrion
+func (r *paginatedRecordReader) drainPageResults(pf *a.PartitionFilter, recordset *a.Recordset,
+) (count uint64, isThrottled bool, err error) {
 	curFilter, err := models.NewPartitionFilterSerialized(pf)
 	if err != nil {
-		return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
+		return 0, false, fmt.Errorf("failed to serialize partition filter: %w", err)
 	}
 
-	recSet, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
-		scanPolicy,
-		pf,
-		r.config.namespace,
-		set,
-		r.config.binList...,
-	)
-	if aErr != nil {
-		return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
-	}
-
-	defer func() { // close record set
-		if cerr := r.recodsetCloser.Close(recSet); cerr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", cerr.Unwrap()))
-		}
-	}()
+	// Used to check the first error.
+	var isFirst = true
 
 	// to count records on pageRecord.
-	for res := range recSet.Results() {
-		count++
+	for res := range recordset.Results() {
+		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
+			return 0, true, res.Err
+		}
 
-		if res.Err != nil {
+		if res.Err != nil && !res.Err.Matches(types.INVALID_NODE_ERROR) {
 			// When reading last page (containing 0 records), the scan might return an types.INVALID_NODE_ERROR error
 			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
-				return 0, fmt.Errorf("error reading paginated record: %w", res.Err)
+				return 0, false, fmt.Errorf("error reading paginated record: %w", res.Err)
 			}
 
 			continue
 		}
 
+		isFirst = false
+		count++
+
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}
 
-	return count, err
+	return count, false, nil
 }

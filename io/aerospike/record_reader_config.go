@@ -17,7 +17,6 @@ package aerospike
 import (
 	"fmt"
 	"log/slog"
-	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/metrics"
@@ -115,6 +114,7 @@ func NewRecordReaderConfig(
 	noTTLOnly bool,
 	pageSize int64,
 	rpsCollector *metrics.Collector,
+	throttler *ThrottleLimiter,
 ) *RecordReaderConfig {
 	if len(setList) == 0 {
 		setList = []string{""}
@@ -131,6 +131,6 @@ func NewRecordReaderConfig(
 		noTTLOnly:       noTTLOnly,
 		pageSize:        pageSize,
 		rpsCollector:    rpsCollector,
-		throttler:       NewThrottleLimiter(8, 5*time.Second),
+		throttler:       throttler,
 	}
 }

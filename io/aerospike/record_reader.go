@@ -228,7 +228,8 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
 		if drainErr != nil {
-			r.logger.Debug("connection pool full, waiting for a signal")
+			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
+				slog.Any("error", drainErr))
 			// Simple logic first, we just sleep for 10 sec and try again.
 			r.config.throttler.Wait(ctx)
 
@@ -242,7 +243,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 	}
 }
 
-// drainResults drains results, and if operatrion
+// drainResults drains results, and if operation failed return error
 func (r *singleRecordReader) drainResults(recordset *a.Recordset) error {
 	// Used to check the first error.
 	var isFirst = true
@@ -253,9 +254,6 @@ func (r *singleRecordReader) drainResults(recordset *a.Recordset) error {
 		// Check only the FIRST result for the specific connection error
 		// and only if throttler is initialized.
 		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
-			r.logger.Debug("database hasn't got enough resources, restarting scan",
-				slog.Any("error", res.Err))
-
 			return res.Err
 		}
 

@@ -45,18 +45,26 @@ func NewThrottleLimiter(parallel int, timeout time.Duration) *ThrottleLimiter {
 // Notify is called when a scan is done, success or error.
 // It notifies one or all waiting readers to try and take the freed slot.
 func (t *ThrottleLimiter) Notify(ctx context.Context) {
+	if t == nil {
+		return
+	}
+
 	select {
 	case t.slots <- struct{}{}:
 	case <-ctx.Done():
 	default:
-		// Unblocking notify for tests
+		// Channel is full, nobody is waiting, so we don't need to block.
 	}
 }
 
 // Wait blocks until someone calls Notify OR the timeout hits.
 func (t *ThrottleLimiter) Wait(ctx context.Context) {
-	// timer := time.NewTimer(t.timeout + jitterDuration())
-	// defer timer.Stop()
+	if t == nil {
+		return
+	}
+
+	timer := time.NewTimer(t.timeout + jitterDuration())
+	defer timer.Stop()
 
 	// Blocking everything until smth happens.
 	select {
@@ -64,8 +72,8 @@ func (t *ThrottleLimiter) Wait(ctx context.Context) {
 		// Context done
 	case <-t.slots:
 		// A slot just opened.
-		// case <-timer.C:
-		// 	// Timer for the situation, when the slot is opened by itself.
+	case <-timer.C:
+		// Timer for the situation, when the slot is opened by itself.
 	}
 }
 

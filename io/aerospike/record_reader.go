@@ -213,39 +213,11 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 			return fmt.Errorf("scan producer failed: %w", err)
 		}
 
-		// !!! TESTING THE IDEA !!!
-		var (
-			firstResult             = true
-			connectionErrorOccurred = false
-			claimedActiveSlot       = false
-		)
-
 		// Drain all results from this specific scan.
 		// No context checking here because it slows down the scan.
-		for res := range recordset.Results() {
-			// Check only the FIRST result for the specific connection error
-			if firstResult && res.Err != nil && shouldThrottle(res.Err) && r.config.throttler != nil {
-				r.logger.Warn("connection pool empty on first record, restarting scan...",
-					slog.Any("error", res.Err))
+		drainErr := r.drainResults(recordset)
 
-				connectionErrorOccurred = true
-
-				// Exit the results loop to trigger a restart
-				break
-			}
-
-			// Claim 1 sync from throttler
-			if firstResult {
-				if r.config.throttler != nil {
-					claimedActiveSlot = true
-				}
-				firstResult = false
-			}
-
-			r.resultChan <- res
-		}
-
-		// Do not return error immediately, because we should do some stuff before.
+		// Do not return an error immediately, because we need to perform some actions first.
 		closeErr := r.recordsetCloser.Close(recordset)
 
 		// Release the semaphore manually because of for loop.
@@ -253,23 +225,46 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 			r.config.scanLimiter.Release(1)
 		}
 
-		if claimedActiveSlot {
-			r.logger.Warn("releasing slot")
-			r.config.throttler.Notify(ctx)
-		}
-
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
-		if connectionErrorOccurred {
-			r.logger.Warn("connection pool full, waiting for a signal...")
+		if drainErr != nil {
+			r.logger.Debug("connection pool full, waiting for a signal")
 			// Simple logic first, we just sleep for 10 sec and try again.
 			r.config.throttler.Wait(ctx)
 
 			continue
 		}
 
+		// Successfully drained all results, notify the throttler.
+		r.config.throttler.Notify(ctx)
+
 		return closeErr
 	}
+}
+
+// drainResults drains results, and if operatrion
+func (r *singleRecordReader) drainResults(recordset *a.Recordset) error {
+	// Used to check the first error.
+	var isFirst = true
+
+	// Drain all results from this specific scan.
+	// No context checking here because it slows down the scan.
+	for res := range recordset.Results() {
+		// Check only the FIRST result for the specific connection error
+		// and only if throttler is initialized.
+		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
+			r.logger.Debug("database hasn't got enough resources, restarting scan",
+				slog.Any("error", res.Err))
+
+			return res.Err
+		}
+
+		isFirst = false
+
+		r.resultChan <- res
+	}
+
+	return nil
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.

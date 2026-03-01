@@ -36,6 +36,11 @@ type ThrottleLimiter struct {
 
 // NewThrottleLimiter creates a new ThrottleLimiter.
 func NewThrottleLimiter(parallel int, timeout time.Duration) *ThrottleLimiter {
+	// When parallel is 1, we don't need to throttle.
+	if parallel < 2 {
+		return nil
+	}
+
 	return &ThrottleLimiter{
 		slots:   make(chan struct{}, parallel),
 		timeout: timeout,

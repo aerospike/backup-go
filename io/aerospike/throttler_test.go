@@ -87,7 +87,7 @@ func TestThrottleLimiter_OneNotifyPerWait(t *testing.T) {
 func TestThrottleLimiter_TimeoutFallback(t *testing.T) {
 	// Use very short timeout for test
 	shortTimeout := 100 * time.Millisecond
-	tl := NewThrottleLimiter(1, shortTimeout)
+	tl := NewThrottleLimiter(2, shortTimeout)
 	ctx := t.Context()
 
 	start := time.Now()
@@ -101,7 +101,7 @@ func TestThrottleLimiter_TimeoutFallback(t *testing.T) {
 }
 
 func TestThrottleLimiter_ContextCancel(t *testing.T) {
-	tl := NewThrottleLimiter(1, 10*time.Second)
+	tl := NewThrottleLimiter(2, 10*time.Second)
 	ctx, cancel := context.WithCancel(t.Context())
 
 	start := time.Now()

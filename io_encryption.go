@@ -48,17 +48,17 @@ func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgen
 	case encPolicy.KeyFile != nil:
 		pemData, err = readPemFromFile(*encPolicy.KeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read PEM from file: %w", err)
+			return nil, fmt.Errorf("failed to read PEM from file: %w", err)
 		}
 	case encPolicy.KeyEnv != nil:
 		pemData, err = readPemFromEnv(*encPolicy.KeyEnv)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read PEM from ENV: %w", err)
+			return nil, fmt.Errorf("failed to read PEM from ENV: %w", err)
 		}
 	case encPolicy.KeySecret != nil:
 		pemData, err = readPemFromSecret(ctx, *encPolicy.KeySecret, secretAgent)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read PEM from secret agent: %w", err)
+			return nil, fmt.Errorf("failed to read PEM from secret agent: %w", err)
 		}
 	}
 
@@ -142,7 +142,7 @@ func parsePK(block []byte) (*rsa.PrivateKey, error) {
 func readPemFromFile(file string) ([]byte, error) {
 	pemData, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read PEM file: %w", err)
+		return nil, fmt.Errorf("failed to read PEM file: %w", err)
 	}
 
 	return pemData, nil
@@ -164,7 +164,7 @@ func readPemFromEnv(keyEnv string) ([]byte, error) {
 func readPemFromSecret(ctx context.Context, secret string, client *saClient.Client) ([]byte, error) {
 	key, err := getSecret(ctx, client, secret)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read secret config key: %w", err)
+		return nil, fmt.Errorf("failed to read secret config key: %w", err)
 	}
 
 	return decodeKeyContent(key)

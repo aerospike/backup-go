@@ -151,7 +151,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 				Type: models.TokenTypeUDF,
 			},
 			expectError:  true,
-			errorMessage: "udf is filtered with no-udf flag",
+			errorMessage: "UDF is filtered with no-udf flag",
 		},
 		{
 			name: "Allow UDF token with noUdf flag off",

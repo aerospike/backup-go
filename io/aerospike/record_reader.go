@@ -153,7 +153,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 
 		if res.Err != nil {
 			r.cancel()
-			return nil, fmt.Errorf("error reading record: %w", res.Err)
+			return nil, fmt.Errorf("failed to read record: %w", res.Err)
 		}
 
 		rec := models.Record{

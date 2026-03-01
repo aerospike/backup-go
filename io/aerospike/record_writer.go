@@ -77,7 +77,7 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 
 	err := rw.executeWrite(&writePolicy, record)
 	if err != nil {
-		return fmt.Errorf("error writing record %s: %w", record.Key.Digest(), err)
+		return fmt.Errorf("failed to write record %s: %w", record.Key.Digest(), err)
 	}
 
 	return nil
@@ -113,7 +113,7 @@ func (rw *singleRecordWriter) executeWrite(writePolicy *a.WritePolicy, record *m
 			return aerr
 		default:
 			// Retry on unknown errors.
-			rw.logger.Warn("Retrying unknown error", slog.Any("error", aerr))
+			rw.logger.Warn("retrying unknown error", slog.Any("error", aerr))
 			return aerr
 		}
 	})

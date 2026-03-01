@@ -117,18 +117,18 @@ func (rw *batchRecordWriter) close() error {
 
 func (rw *batchRecordWriter) flushBuffer() error {
 	if len(rw.operationBuffer) == 0 {
-		rw.logger.Debug("Flush empty buffer")
+		rw.logger.Debug("flush empty buffer")
 		return nil
 	}
 
-	rw.logger.Debug("Starting batch operation",
+	rw.logger.Debug("starting batch operation",
 		slog.Int("bufferSize", len(rw.operationBuffer)),
 		slog.Any("retryPolicy", rw.retryPolicy),
 	)
 
 	return rw.retryPolicy.Do(rw.ctx,
 		func() error {
-			rw.logger.Debug("Attempting batch operation",
+			rw.logger.Debug("attempting batch operation",
 				slog.Int("bufferSize", len(rw.operationBuffer)),
 			)
 
@@ -145,18 +145,18 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				rw.operationBuffer, opErr = rw.processAndFilterOperations(aerr)
 
 				if len(rw.operationBuffer) == 0 {
-					rw.logger.Debug("All operations succeeded")
+					rw.logger.Debug("all operations succeeded")
 					return nil
 				}
 
-				rw.logger.Debug("Not all operations succeeded",
+				rw.logger.Debug("not all operations succeeded",
 					slog.Int("remainingOperations", len(rw.operationBuffer)),
 					slog.Any("error", opErr),
 				)
 
 				return opErr
 			case shouldRetry(aerr):
-				rw.logger.Debug("Retryable error occurred",
+				rw.logger.Debug("retryable error occurred",
 					slog.Any("error", aerr),
 					slog.Int("remainingOperations", len(rw.operationBuffer)),
 				)
@@ -165,7 +165,7 @@ func (rw *batchRecordWriter) flushBuffer() error {
 				return aerr
 			default:
 				// Retry on unknown errors.
-				rw.logger.Warn("Retrying unknown error", slog.Any("error", aerr))
+				rw.logger.Warn("retrying unknown error", slog.Any("error", aerr))
 				return aerr
 			}
 		},

@@ -110,7 +110,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 
 		if res.result.Err != nil {
 			r.cancel()
-			return nil, fmt.Errorf("error reading record: %w", res.result.Err)
+			return nil, fmt.Errorf("failed to read record: %w", res.result.Err)
 		}
 
 		rec := models.Record{
@@ -214,7 +214,7 @@ func (r *paginatedRecordReader) scanPage(
 		if res.Err != nil {
 			// When reading last page (containing 0 records), the scan might return an types.INVALID_NODE_ERROR error
 			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
-				return 0, fmt.Errorf("error reading paginated record: %w", res.Err)
+				return 0, fmt.Errorf("failed to read paginated record: %w", res.Err)
 			}
 
 			continue

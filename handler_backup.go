@@ -556,7 +556,7 @@ func (bh *BackupHandler) backupUDFs(
 		pipe.Fixed,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create udf pipeline: %w", err)
+		return fmt.Errorf("failed to create UDF pipeline: %w", err)
 	}
 
 	return udfPipeline.Run(ctx)

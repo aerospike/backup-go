@@ -82,7 +82,7 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("error encoding token at byte %d: %w", n, err)
+		return nil, fmt.Errorf("failed to encode token at byte %d: %w", n, err)
 	}
 
 	// keep smoothed last value

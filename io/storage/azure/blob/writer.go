@@ -87,7 +87,7 @@ func NewWriter(
 	// Check if a container exists.
 	w.containerClient = client.ServiceClient().NewContainerClient(containerName)
 	if _, err := w.containerClient.GetProperties(ctx, nil); err != nil {
-		return nil, fmt.Errorf("unable to get container properties: %w", err)
+		return nil, fmt.Errorf("failed to get container properties: %w", err)
 	}
 
 	if w.IsDir && !w.SkipDirCheck {

@@ -22,7 +22,6 @@ import (
 	"log/slog"
 	"math"
 	"sync/atomic"
-	"time"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -164,7 +163,10 @@ func newBackupHandler(
 		config.MetricsEnabled,
 	)
 
-	throttler := aerospike.NewThrottleLimiter(config.ParallelRead, 5*time.Second)
+	var throttler *aerospike.ThrottleLimiter
+	if config.ScanThrottling > 0 {
+		throttler = aerospike.NewThrottleLimiter(config.ScanThrottling, config.ScanThrottlingTimeout)
+	}
 
 	readerProcessor := newRecordReaderProcessor[*models.Token](
 		config,

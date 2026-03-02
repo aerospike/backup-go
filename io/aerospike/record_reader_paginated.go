@@ -227,13 +227,13 @@ func (r *paginatedRecordReader) drainPageResults(pf *a.PartitionFilter, recordse
 			return 0, true, res.Err
 		}
 
-		if res.Err != nil && !res.Err.Matches(types.INVALID_NODE_ERROR) {
-			// When reading last page (containing 0 records), the scan might return an types.INVALID_NODE_ERROR error
-			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
-				return 0, false, fmt.Errorf("error reading paginated record: %w", res.Err)
+		if res.Err != nil {
+			// When reading last page (containing 0 records), the scan might return an INVALID_NODE_ERROR.
+			if res.Err.Matches(types.INVALID_NODE_ERROR) {
+				continue
 			}
 
-			continue
+			return 0, false, fmt.Errorf("error reading paginated record: %w", res.Err)
 		}
 
 		isFirst = false

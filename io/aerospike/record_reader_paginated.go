@@ -239,6 +239,8 @@ func (r *paginatedRecordReader) drainPageResults(curFilter models.PartitionFilte
 	var isFirst = true
 
 	for res := range recordset.Results() {
+		count++
+
 		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
 			return 0, true, res.Err
 		}
@@ -253,8 +255,6 @@ func (r *paginatedRecordReader) drainPageResults(curFilter models.PartitionFilte
 
 			return 0, false, fmt.Errorf("failed to read paginated record: %w", res.Err)
 		}
-
-		count++
 
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}

@@ -244,7 +244,6 @@ func (r *paginatedRecordReader) drainPageResults(curFilter models.PartitionFilte
 		}
 
 		isFirst = false
-		count++
 
 		if res.Err != nil {
 			// When reading last page (containing 0 records), the scan might return an INVALID_NODE_ERROR.
@@ -254,6 +253,8 @@ func (r *paginatedRecordReader) drainPageResults(curFilter models.PartitionFilte
 
 			return 0, false, fmt.Errorf("failed to read paginated record: %w", res.Err)
 		}
+
+		count++
 
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}

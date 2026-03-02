@@ -150,7 +150,6 @@ func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 		}
 
 		if count == 0 { // empty pageRecord
-			r.config.throttler.Notify(r.ctx)
 			return nil
 		}
 	}
@@ -178,6 +177,11 @@ func (r *paginatedRecordReader) scanPage(
 			}
 		}
 
+		curFilter, err := models.NewPartitionFilterSerialized(pf)
+		if err != nil {
+			return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
+		}
+
 		recSet, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
 			scanPolicy,
 			pf,
@@ -195,7 +199,7 @@ func (r *paginatedRecordReader) scanPage(
 			slog.String("filter", printPartitionFilter(pf)),
 		)
 
-		count, isThrottled, drainErr := r.drainPageResults(pf, recSet)
+		count, isThrottled, drainErr := r.drainPageResults(curFilter, recSet)
 
 		// Close the record set. Do not return an error immediately, because we need to perform some actions first.
 		closeErr := r.recodsetCloser.Close(recSet)
@@ -220,6 +224,9 @@ func (r *paginatedRecordReader) scanPage(
 			return 0, drainErr
 		}
 
+		// Successfully drained all results, notify the throttler.
+		r.config.throttler.Notify(r.ctx)
+
 		r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recSet.TaskId()))
 
 		return count, closeErr
@@ -227,13 +234,8 @@ func (r *paginatedRecordReader) scanPage(
 }
 
 // drainResults drains results, and if operatrion
-func (r *paginatedRecordReader) drainPageResults(pf *a.PartitionFilter, recordset *a.Recordset,
+func (r *paginatedRecordReader) drainPageResults(curFilter models.PartitionFilterSerialized, recordset *a.Recordset,
 ) (count uint64, isThrottled bool, err error) {
-	curFilter, err := models.NewPartitionFilterSerialized(pf)
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to serialize partition filter: %w", err)
-	}
-
 	// Used to check the first error.
 	var isFirst = true
 

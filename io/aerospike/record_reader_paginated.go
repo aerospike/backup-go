@@ -223,11 +223,13 @@ func (r *paginatedRecordReader) drainPageResults(pf *a.PartitionFilter, recordse
 	// Used to check the first error.
 	var isFirst = true
 
-	// to count records on pageRecord.
 	for res := range recordset.Results() {
 		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
 			return 0, true, res.Err
 		}
+
+		isFirst = false
+		count++
 
 		if res.Err != nil {
 			// When reading last page (containing 0 records), the scan might return an INVALID_NODE_ERROR.
@@ -237,9 +239,6 @@ func (r *paginatedRecordReader) drainPageResults(pf *a.PartitionFilter, recordse
 
 			return 0, false, fmt.Errorf("error reading paginated record: %w", res.Err)
 		}
-
-		isFirst = false
-		count++
 
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}

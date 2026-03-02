@@ -150,6 +150,7 @@ func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 		}
 
 		if count == 0 { // empty pageRecord
+			r.config.throttler.Notify(r.ctx)
 			return nil
 		}
 	}
@@ -206,9 +207,6 @@ func (r *paginatedRecordReader) scanPage(
 		if drainErr != nil {
 			return 0, drainErr
 		}
-
-		// Successfully drained all results, notify the throttler.
-		r.config.throttler.Notify(r.ctx)
 
 		return count, closeErr
 	}

@@ -203,6 +203,10 @@ func (r *paginatedRecordReader) scanPage(
 			continue
 		}
 
+		if drainErr != nil {
+			return 0, drainErr
+		}
+
 		// Successfully drained all results, notify the throttler.
 		r.config.throttler.Notify(r.ctx)
 

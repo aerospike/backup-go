@@ -70,7 +70,7 @@ func NewState(
 	writer Writer,
 	logger *slog.Logger,
 ) (*State, error) {
-	logger.Debug("Initializing state", slog.String("path", config.StateFile))
+	logger.Debug("initializing state", slog.String("path", config.StateFile))
 
 	switch {
 	case config.isStateFirstRun():

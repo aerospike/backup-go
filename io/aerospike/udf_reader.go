@@ -44,7 +44,7 @@ type UdfReader struct {
 func NewUDFReader(client udfGetter, logger *slog.Logger) *UdfReader {
 	id := uuid.NewString()
 	logger = logging.WithReader(logger, id, logging.ReaderTypeUDF)
-	logger.Debug("created new udf reader")
+	logger.Debug("created new UDF reader")
 
 	return &UdfReader{
 		client: client,

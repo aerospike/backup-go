@@ -145,7 +145,7 @@ func countRecords(ctx context.Context, recordReader aerospike.RecordReader) (uin
 				break
 			}
 
-			return 0, fmt.Errorf("error during records counting: %w", err)
+			return 0, fmt.Errorf("failed to count records: %w", err)
 		}
 
 		count++

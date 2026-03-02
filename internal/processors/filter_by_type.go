@@ -62,7 +62,7 @@ func (p filterByType[T]) Process(token T) (T, error) {
 	}
 
 	if p.noUdf && t.Type == models.TokenTypeUDF {
-		return nil, fmt.Errorf("%w: udf is filtered with no-udf flag", models.ErrFilteredOut)
+		return nil, fmt.Errorf("%w: UDF is filtered with no-udf flag", models.ErrFilteredOut)
 	}
 
 	return token, nil

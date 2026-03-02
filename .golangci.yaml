@@ -92,6 +92,10 @@ linters:
           - revive
         path: ^io/storage/common/
       - linters:
+          - revive
+        text: 'var-naming: avoid package names that conflict with Go standard library package names'
+        path: ^internal/metrics/
+      - linters:
           - dupl
           - goconst
           - govet

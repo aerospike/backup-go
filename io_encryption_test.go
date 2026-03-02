@@ -45,7 +45,7 @@ func TestIOEncryption_readPemFromFile(t *testing.T) {
 		errContent string
 	}{
 		{testPKeyFile, ""},
-		{"", "unable to read PEM file"},
+		{"", "failed to read PEM"},
 	}
 
 	for i, tt := range testCases {
@@ -159,17 +159,17 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 		{encPolicyKeyFileAES256, saCfg,
 			""},
 		{encPolicyKeyFileErr, saCfg,
-			"unable to read PEM from file"},
+			"failed to read PEM from file"},
 		{encPolicyKeyEnv, saCfg,
 			""},
 		{encPolicyKeyEnvErrContent, saCfg,
 			"failed to decode PEM block containing private key"},
 		{encPolicyKeyEnvErr, saCfg,
-			"unable to read PEM from ENV"},
+			"failed to read PEM from ENV"},
 		{encPolicyKeySecret, saCfg,
 			""},
 		{encPolicyKeySecretErr, saCfg,
-			"unable to read PEM from secret agent"},
+			"failed to read PEM from secret agent"},
 		{encPolicyInvalidKeyContent, saCfg,
 			"failed to parse private key"},
 	}

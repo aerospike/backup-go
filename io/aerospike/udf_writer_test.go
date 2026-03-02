@@ -81,8 +81,7 @@ func TestUDFWriterRegisterError(t *testing.T) {
 	}
 
 	err := writer.writeUDF(udf)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "error registering UDF")
+	require.ErrorContains(t, err, "failed to register UDF")
 
 	mockDBWriter.AssertExpectations(t)
 }

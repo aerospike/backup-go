@@ -70,7 +70,7 @@ func getTLSConfig(config *SecretAgentConfig) (*tls.Config, error) {
 
 	caCert, err := os.ReadFile(*config.CaFile)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read ca file: %w", err)
+		return nil, fmt.Errorf("failed to read ca file: %w", err)
 	}
 
 	caCertPool := x509.NewCertPool()

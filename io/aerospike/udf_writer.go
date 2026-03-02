@@ -36,26 +36,26 @@ func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	case models.UDFTypeLUA:
 		UDFLang = a.LUA
 	default:
-		return fmt.Errorf("error registering UDF %s: invalid UDF language %b", udf.Name, udf.UDFType)
+		return fmt.Errorf("failed to register UDF %s: invalid UDF language %b", udf.Name, udf.UDFType)
 	}
 
 	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, UDFLang)
 	if aerr != nil {
-		return fmt.Errorf("error registering UDF %s: %w", udf.Name, aerr)
+		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, aerr)
 	}
 
 	if job == nil {
-		return fmt.Errorf("error registering UDF %s: job is nil", udf.Name)
+		return fmt.Errorf("failed to register UDF %s: job is nil", udf.Name)
 	}
 
 	errs := job.OnComplete()
 	if errs == nil {
-		return fmt.Errorf("error registering UDF %s: OnComplete returned nil channel", udf.Name)
+		return fmt.Errorf("failed to register UDF %s: onComplete returned nil channel", udf.Name)
 	}
 
 	err := <-errs
 	if err != nil {
-		return fmt.Errorf("error registering UDF %s: %w", udf.Name, err)
+		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
 	}
 
 	rw.logger.Debug("registered UDF", slog.String("name", udf.Name))

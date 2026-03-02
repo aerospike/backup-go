@@ -97,7 +97,7 @@ func (p *payloadWriter) writePayload(t *models.ASBXToken) error {
 			return aerr
 		default:
 			// Retry on unknown errors.
-			p.logger.Warn("Retrying unknown error", slog.Any("error", aerr))
+			p.logger.Warn("retrying unknown error", slog.Any("error", aerr))
 			return aerr
 		}
 	})

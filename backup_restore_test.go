@@ -1692,7 +1692,7 @@ func writeUDFs(client *a.Client, udfs []*models.UDF) error {
 		case models.UDFTypeLUA:
 			UDFLang = a.LUA
 		default:
-			return errors.New("error registering UDF: invalid UDF language")
+			return errors.New("failed to register UDF: invalid UDF language")
 		}
 
 		job, err := client.RegisterUDF(nil, udf.Content, udf.Name, UDFLang)

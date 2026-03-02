@@ -131,7 +131,7 @@ func newTokenWriter[T models.TokenConstraint](
 func (w *tokenWriter[T]) Write(v T) (int, error) {
 	data, err := w.encoder.EncodeToken(v)
 	if err != nil {
-		return 0, fmt.Errorf("error encoding token: %w", err)
+		return 0, fmt.Errorf("failed to encode token: %w", err)
 	}
 
 	// We set state only for ASB Tokens at the moment.

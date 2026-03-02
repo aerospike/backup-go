@@ -109,7 +109,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 
 		if res.result.Err != nil {
 			r.cancel()
-			return nil, fmt.Errorf("error reading record: %w", res.result.Err)
+			return nil, fmt.Errorf("failed to read record: %w", res.result.Err)
 		}
 
 		rec := models.Record{
@@ -166,9 +166,15 @@ func (r *paginatedRecordReader) scanPage(
 			return 0, err
 		}
 
+		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 		if r.config.scanLimiter != nil {
-			if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
-				return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+			// Attempt to acquire immediately; if not, log and wait.
+			if !r.config.scanLimiter.TryAcquire(1) {
+				r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
+
+				if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
+					return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+				}
 			}
 		}
 
@@ -182,6 +188,12 @@ func (r *paginatedRecordReader) scanPage(
 		if aErr != nil {
 			return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 		}
+
+		r.logger.Debug("partition scan started",
+			slog.Uint64("transactionId", recSet.TaskId()),
+			slog.String("set", set),
+			slog.String("filter", printPartitionFilter(pf)),
+		)
 
 		count, isThrottled, drainErr := r.drainPageResults(pf, recSet)
 
@@ -207,6 +219,8 @@ func (r *paginatedRecordReader) scanPage(
 		if drainErr != nil {
 			return 0, drainErr
 		}
+
+		r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recSet.TaskId()))
 
 		return count, closeErr
 	}
@@ -237,7 +251,7 @@ func (r *paginatedRecordReader) drainPageResults(pf *a.PartitionFilter, recordse
 				continue
 			}
 
-			return 0, false, fmt.Errorf("error reading paginated record: %w", res.Err)
+			return 0, false, fmt.Errorf("failed to read paginated record: %w", res.Err)
 		}
 
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)

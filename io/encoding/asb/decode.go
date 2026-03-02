@@ -73,7 +73,7 @@ func newDecoderError(tracker *positionTracker, err error) error {
 	}
 
 	return fmt.Errorf(
-		"error while reading asb data: %s line %d col %d (total byte %d): %w",
+		"failed to read asb data: %s line %d col %d (total byte %d): %w",
 		tracker.fileName,
 		tracker.line,
 		tracker.column,
@@ -89,7 +89,7 @@ func newSectionError(section string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading section: %s: %w", section, err)
+	return fmt.Errorf("failed to read section %s: %w", section, err)
 }
 
 func newLineError(lineType string, err error) error {
@@ -99,7 +99,7 @@ func newLineError(lineType string, err error) error {
 		return nil
 	}
 
-	return fmt.Errorf("error while reading line type: %s: %w", lineType, err)
+	return fmt.Errorf("failed to read line type %s: %w", lineType, err)
 }
 
 // positionTracker is used for tracking error information when validating backup files.
@@ -208,16 +208,16 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignore
 	case err == nil: // ok
 	case errors.Is(err, errInvalidToken),
 		compression.IsCorruptedError(err):
-		return nil, fmt.Errorf("error while reading %s header: %w. "+
-			"This may happen if the file was compressed/encrypted and the restore config does not"+
+		return nil, fmt.Errorf("failed to read %s header: %w. "+
+			"this may happen if the file was compressed/encrypted and the restore config does not"+
 			" contain the proper compression/encryption policy, or the file is corrupted", fileName, err)
 	default:
-		return nil, fmt.Errorf("error while reading %s header: %w", fileName, err)
+		return nil, fmt.Errorf("failed to read %s header: %w", fileName, err)
 	}
 
 	fileVersion, err := parseVersion(asb.header.Version)
 	if err != nil {
-		return nil, fmt.Errorf("error while parsing %s header version: %w", fileName, err)
+		return nil, fmt.Errorf("failed to parse %s header version: %w", fileName, err)
 	}
 
 	if !versionCurrent.greaterOrEqual(fileVersion) {
@@ -226,7 +226,7 @@ func NewDecoder[T models.TokenConstraint](src io.Reader, fileName string, ignore
 
 	asb.metaData, err = asb.readMetadata()
 	if err != nil {
-		return nil, fmt.Errorf("error while reading metadata: %w", err)
+		return nil, fmt.Errorf("failed to read metadata: %w", err)
 	}
 
 	return &asb, nil

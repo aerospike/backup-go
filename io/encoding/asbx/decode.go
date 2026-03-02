@@ -42,7 +42,7 @@ func NewDecoder[T models.TokenConstraint](r io.Reader, fileNumber uint64, filena
 	}
 
 	if err := d.readHeader(); err != nil {
-		return nil, fmt.Errorf("error reading asbx header: %w", err)
+		return nil, fmt.Errorf("failed to read asbx header: %w", err)
 	}
 
 	if d.fileNumber != fileNumber {

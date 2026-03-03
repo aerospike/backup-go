@@ -142,8 +142,6 @@ func (r *paginatedRecordReader) startScan() {
 
 func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
 	pf := *r.config.partitionFilter
-	// Return the token to the throttler only when all pages finish.
-	defer r.config.throttler.Notify(r.ctx)
 
 	for {
 		count, err := r.scanPage(&pf, scanPolicy, set)
@@ -230,6 +228,9 @@ func (r *paginatedRecordReader) scanPage(
 		if drainErr != nil {
 			return 0, drainErr
 		}
+
+		// Return the token to the throttler only when all pages finish.
+		r.config.throttler.Notify(r.ctx)
 
 		r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recSet.TaskId()))
 

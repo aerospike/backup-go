@@ -142,19 +142,10 @@ func (r *paginatedRecordReader) startScan(ctx context.Context) {
 
 func (r *paginatedRecordReader) scanSet(ctx context.Context, set string, scanPolicy *a.ScanPolicy) error {
 	// Each scan requires a copy of the partition filter.
-	// Hard copy.
-	pfs, err := models.NewPartitionFilterSerialized(r.config.partitionFilter)
-	if err != nil {
-		return fmt.Errorf("failed to serialize partition filter: %w", err)
-	}
-
-	pf, err := pfs.Decode()
-	if err != nil {
-		return fmt.Errorf("failed to deserialize partition filter: %w", err)
-	}
+	pf := *r.config.partitionFilter
 
 	for {
-		count, err := r.scanPage(ctx, pf, scanPolicy, set)
+		count, err := r.scanPage(ctx, &pf, scanPolicy, set)
 		if err != nil {
 			return fmt.Errorf("failed to scan set %s namespace %s: %w", set, r.config.namespace, err)
 		}
@@ -229,21 +220,15 @@ func (r *paginatedRecordReader) scanPage(
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
 		if drainErr != nil {
-			r.logger.Info("original", slog.String("cursor", string(pfs.Cursor)))
+			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
+				slog.Any("error", drainErr))
+			// Simple logic first, we just sleep for 10 sec and try again.
+			r.config.throttler.Wait(ctx)
 
 			pf, err = pfs.Decode()
 			if err != nil {
 				return 0, fmt.Errorf("failed to deserialize partition filter: %w", err)
 			}
-
-			newCrs, _ := pf.EncodeCursor()
-
-			r.logger.Info("new", slog.String("cursor", string(newCrs)))
-
-			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
-				slog.Any("error", drainErr))
-			// Simple logic first, we just sleep for 10 sec and try again.
-			r.config.throttler.Wait(ctx)
 
 			continue
 		}

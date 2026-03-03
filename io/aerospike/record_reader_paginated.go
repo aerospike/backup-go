@@ -234,6 +234,11 @@ func (r *paginatedRecordReader) scanPage(
 			// Simple logic first, we just sleep for 10 sec and try again.
 			r.config.throttler.Wait(ctx)
 
+			pf, err = pfs.Decode()
+			if err != nil {
+				return 0, fmt.Errorf("failed to deserialize partition filter: %w", err)
+			}
+
 			continue
 		}
 

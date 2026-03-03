@@ -43,6 +43,8 @@ type paginatedRecordReader struct {
 	errChan         chan error
 	scanOnce        sync.Once
 	recodsetCloser  RecordsetCloser
+	// prevPf conatin previous partition filter
+	prevPf models.PartitionFilterSerialized
 }
 
 // Close no-op operation to satisfy pipe.Reader interface.
@@ -145,6 +147,8 @@ func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 	// Return the token to the throttler only when all pages finish.
 	defer r.config.throttler.Notify(r.ctx)
 
+	r.prevPf, _ = models.NewPartitionFilterSerialized(&pf)
+
 	for {
 		count, err := r.scanPage(&pf, scanPolicy, set)
 		if err != nil {
@@ -177,6 +181,11 @@ func (r *paginatedRecordReader) scanPage(
 					return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
 				}
 			}
+		}
+
+		pf, err := r.prevPf.Decode()
+		if err != nil {
+			return 0, fmt.Errorf("failed to decode partition filter: %w", err)
 		}
 
 		curFilter, err := models.NewPartitionFilterSerialized(pf)
@@ -218,6 +227,8 @@ func (r *paginatedRecordReader) scanPage(
 				slog.Any("error", drainErr))
 			// Simple logic first, we just sleep for 10 sec and try again.
 			r.config.throttler.Wait(r.ctx)
+
+			r.prevPf = curFilter
 
 			continue
 		}

@@ -193,8 +193,6 @@ func (r *paginatedRecordReader) scanPage(
 			return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
 		}
 
-		r.logger.Info("page scan start", slog.String("cursor", string(pfs.Cursor)))
-
 		recordset, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
 			scanPolicy,
 			pf,
@@ -220,8 +218,6 @@ func (r *paginatedRecordReader) scanPage(
 		// No context checking here because it slows down the scan.
 		count, drainErr := r.drainResults(pfs, recordset)
 
-		r.logger.Info("page scan end", slog.String("cursor", string(pfs.Cursor)))
-
 		// Do not return an error immediately, because we need to perform some actions first.
 		closeErr := r.recordsetCloser.Close(recordset)
 
@@ -233,15 +229,21 @@ func (r *paginatedRecordReader) scanPage(
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
 		if drainErr != nil {
-			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
-				slog.Any("error", drainErr))
-			// Simple logic first, we just sleep for 10 sec and try again.
-			r.config.throttler.Wait(ctx)
+			r.logger.Info("original", slog.String("cursor", string(pfs.Cursor)))
 
 			pf, err = pfs.Decode()
 			if err != nil {
 				return 0, fmt.Errorf("failed to deserialize partition filter: %w", err)
 			}
+
+			newCrs, _ := pf.EncodeCursor()
+
+			r.logger.Info("new", slog.String("cursor", string(newCrs)))
+
+			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
+				slog.Any("error", drainErr))
+			// Simple logic first, we just sleep for 10 sec and try again.
+			r.config.throttler.Wait(ctx)
 
 			continue
 		}

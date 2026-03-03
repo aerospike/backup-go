@@ -193,6 +193,8 @@ func (r *paginatedRecordReader) scanPage(
 			return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
 		}
 
+		r.logger.Info("page scan start", slog.String("cursor", string(pfs.Cursor)))
+
 		recordset, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
 			scanPolicy,
 			pf,
@@ -217,6 +219,8 @@ func (r *paginatedRecordReader) scanPage(
 		// Drain all results from this specific scan.
 		// No context checking here because it slows down the scan.
 		count, drainErr := r.drainResults(pfs, recordset)
+
+		r.logger.Info("page scan end", slog.String("cursor", string(pfs.Cursor)))
 
 		// Do not return an error immediately, because we need to perform some actions first.
 		closeErr := r.recordsetCloser.Close(recordset)

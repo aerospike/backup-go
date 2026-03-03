@@ -220,6 +220,8 @@ func (r *paginatedRecordReader) scanPage(
 			r.config.scanLimiter.Release(1)
 		}
 
+		r.prevPf = curFilter
+
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
 		if isThrottled {
@@ -227,8 +229,6 @@ func (r *paginatedRecordReader) scanPage(
 				slog.Any("error", drainErr))
 			// Simple logic first, we just sleep for 10 sec and try again.
 			r.config.throttler.Wait(r.ctx)
-
-			r.prevPf = curFilter
 
 			continue
 		}

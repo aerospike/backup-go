@@ -218,6 +218,11 @@ func (r *paginatedRecordReader) scanPage(
 				slog.Any("error", drainErr))
 			// Simple logic first, we just sleep for 10 sec and try again.
 			r.config.throttler.Wait(r.ctx)
+			// Reset the filter.
+			pf, err = curFilter.Decode()
+			if err != nil {
+				return 0, fmt.Errorf("failed to decode partition filter: %w", err)
+			}
 
 			continue
 		}
@@ -239,12 +244,11 @@ func (r *paginatedRecordReader) drainPageResults(curFilter models.PartitionFilte
 	var isFirst = true
 
 	for res := range recordset.Results() {
-		count++
-
 		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
 			return 0, true, res.Err
 		}
 
+		count++
 		isFirst = false
 
 		if res.Err != nil {

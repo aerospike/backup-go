@@ -244,11 +244,12 @@ func (r *paginatedRecordReader) drainPageResults(curFilter models.PartitionFilte
 	var isFirst = true
 
 	for res := range recordset.Results() {
+		count++
+
 		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
 			return 0, true, res.Err
 		}
 
-		count++
 		isFirst = false
 
 		if res.Err != nil {

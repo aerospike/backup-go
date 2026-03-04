@@ -135,16 +135,13 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 
 	select {
 	case <-ctx.Done():
-		r.logger.Info("ctx.Done")
 		// If the local context is canceled, we cancel the global context.
 		r.cancel()
 
 		return nil, ctx.Err()
 	case <-r.ctx.Done():
-		r.logger.Info("r.ctx.Done")
 		return nil, r.ctx.Err()
 	case err := <-r.errChan:
-		r.logger.Info("r.errChan")
 		// serve errors.
 		r.cancel()
 
@@ -156,7 +153,6 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 		}
 
 		if res.Err != nil {
-			r.logger.Info("res.Err")
 			r.cancel()
 
 			return nil, fmt.Errorf("failed to read record: %w", res.Err)
@@ -206,7 +202,7 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 	if r.config.scanLimiter != nil {
 		// Attempt to acquire immediately; if not, log and wait.
 		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Info("max concurrent scan limit reached; waiting for available slot")
+			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
 
 			if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
 				return fmt.Errorf("failed to acquire scan limiter: %w", err)
@@ -214,7 +210,6 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 		}
 
 		defer r.config.scanLimiter.Release(1)
-		defer r.logger.Info("releasing scan limit")
 	}
 
 	// Call the producer function. This starts the actual Aerospike scan
@@ -228,7 +223,7 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 	// No context checking here because it slows down the scan.
 	r.drainResults(recordset)
 
-	r.logger.Info("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
 	return r.recordsetCloser.Close(recordset)
 }
@@ -237,7 +232,6 @@ func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
 	for res := range recordset.Results() {
 		select {
 		case <-r.ctx.Done():
-			r.logger.Info("ctx.Done")
 			return
 		case r.resultChan <- res:
 		}
@@ -263,7 +257,7 @@ func (r *singleRecordReader) generateProducers() []scanProducer {
 					set, r.config.namespace, pf.Begin, pf.Count, err)
 			}
 
-			r.logger.Info("partition scan started",
+			r.logger.Debug("partition scan started",
 				slog.Uint64("transactionId", recordset.TaskId()),
 				slog.String("set", set),
 				slog.String("filter", printPartitionFilter(&pf)),

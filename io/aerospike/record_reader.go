@@ -245,6 +245,7 @@ func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
 	for res := range recordset.Results() {
 		select {
 		case <-r.exitChan:
+			r.logger.Info("stopping drain results")
 			return
 		case r.resultChan <- res:
 		}

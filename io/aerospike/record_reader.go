@@ -60,6 +60,7 @@ type singleRecordReader struct {
 	logger          *slog.Logger
 	config          *RecordReaderConfig
 	resultChan      chan *a.Result
+	exitChan        chan struct{}
 	errChan         chan error
 	scanOnce        sync.Once
 	recordsetCloser RecordsetCloser
@@ -123,6 +124,7 @@ func newSingleRecordReader(
 		resultChan:      make(chan *a.Result, resultChanSize),
 		errChan:         make(chan error, 1),
 		recordsetCloser: recordsetCloser,
+		exitChan:        make(chan struct{}),
 	}
 }
 
@@ -138,13 +140,17 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	case <-ctx.Done():
 		// If the local context is canceled, we cancel the global context.
 		r.cancel()
+		close(r.exitChan)
 
 		return nil, ctx.Err()
 	case <-r.ctx.Done():
+		close(r.exitChan)
 		return nil, r.ctx.Err()
 	case err := <-r.errChan:
+		close(r.exitChan)
 		// serve errors.
 		r.cancel()
+
 		return nil, err
 	case res, ok := <-r.resultChan:
 		if !ok {
@@ -227,11 +233,9 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-r.exitChan:
+			break
 		case r.resultChan <- res:
-		default:
-			r.logger.Info("skipping record")
 		}
 	}
 
@@ -239,6 +243,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 
 	r.logger.Info(fmt.Sprintf("close producer c = %d", c.Load()))
 	c.Add(-1)
+
 	return r.recordsetCloser.Close(recordset)
 }
 

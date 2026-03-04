@@ -36,6 +36,9 @@ type RecordReaderConfig struct {
 	binList     []string
 	noTTLOnly   bool
 
+	// throttler indicates that we should throttler the scan on error.
+	throttler *ThrottleLimiter
+
 	// pageSize used for paginated scan for saving reading state.
 	// If pageSize = 0, we think that we use normal scan.
 	pageSize int64
@@ -99,7 +102,8 @@ func (c *RecordReaderConfig) logAttrs() []any {
 }
 
 // NewRecordReaderConfig creates a new RecordReaderConfig.
-func NewRecordReaderConfig(namespace string,
+func NewRecordReaderConfig(
+	namespace string,
 	setList []string,
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
@@ -109,6 +113,7 @@ func NewRecordReaderConfig(namespace string,
 	noTTLOnly bool,
 	pageSize int64,
 	rpsCollector *metrics.Collector,
+	throttler *ThrottleLimiter,
 ) *RecordReaderConfig {
 	if len(setList) == 0 {
 		setList = []string{""}
@@ -125,5 +130,6 @@ func NewRecordReaderConfig(namespace string,
 		noTTLOnly:       noTTLOnly,
 		pageSize:        pageSize,
 		rpsCollector:    rpsCollector,
+		throttler:       throttler,
 	}
 }

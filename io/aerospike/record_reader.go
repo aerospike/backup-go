@@ -212,6 +212,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		}
 
 		defer r.config.scanLimiter.Release(1)
+		defer r.logger.Info("releasing scan limit")
 	}
 
 	r.logger.Info(fmt.Sprintf("starting producer c = %d", c.Load()))

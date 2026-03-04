@@ -138,15 +138,18 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 
 	select {
 	case <-ctx.Done():
+		r.logger.Info("ctx.Done")
 		// If the local context is canceled, we cancel the global context.
 		r.cancel()
 		close(r.exitChan)
 
 		return nil, ctx.Err()
 	case <-r.ctx.Done():
+		r.logger.Info("r.ctx.Done")
 		close(r.exitChan)
 		return nil, r.ctx.Err()
 	case err := <-r.errChan:
+		r.logger.Info("r.errChan")
 		close(r.exitChan)
 		// serve errors.
 		r.cancel()
@@ -159,6 +162,8 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 		}
 
 		if res.Err != nil {
+			r.logger.Info("res.Err")
+			close(r.exitChan)
 			r.cancel()
 			return nil, fmt.Errorf("failed to read record: %w", res.Err)
 		}

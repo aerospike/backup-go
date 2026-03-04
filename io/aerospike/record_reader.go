@@ -231,13 +231,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
-	for res := range recordset.Results() {
-		select {
-		case <-r.exitChan:
-			break
-		case r.resultChan <- res:
-		}
-	}
+	r.drainResults(recordset)
 
 	r.logger.Info("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
@@ -245,6 +239,16 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 	c.Add(-1)
 
 	return r.recordsetCloser.Close(recordset)
+}
+
+func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
+	for res := range recordset.Results() {
+		select {
+		case <-r.exitChan:
+			return
+		case r.resultChan <- res:
+		}
+	}
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.

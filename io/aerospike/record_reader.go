@@ -226,11 +226,13 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
-		if ctx.Err() != nil {
-			break
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case r.resultChan <- res:
+		default:
+			r.logger.Info("skipping record")
 		}
-
-		r.resultChan <- res
 	}
 
 	r.logger.Info("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))

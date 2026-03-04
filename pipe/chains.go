@@ -77,8 +77,8 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 
 		for {
 			select {
-			case <-ctx.Done():
-				return ctx.Err()
+			//case <-ctx.Done():
+			//	return ctx.Err()
 			default:
 				data, err := r.Read(ctx)
 				if err != nil {

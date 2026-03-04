@@ -249,6 +249,9 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
 	for res := range recordset.Results() {
 		select {
+		case <-r.ctx.Done():
+			r.logger.Info("ctx.Done")
+			return
 		case <-r.exitChan:
 			r.logger.Info("stopping drain results")
 			return

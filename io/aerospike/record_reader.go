@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -188,6 +189,8 @@ func (r *singleRecordReader) startScan(ctx context.Context) {
 	}
 }
 
+var c = atomic.Int32{}
+
 // executeProducer runs a single scan task. It acquires a semaphore,
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
@@ -196,11 +199,12 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		return ctx.Err()
 	}
 
+	c.Add(1)
 	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 	if r.config.scanLimiter != nil {
 		// Attempt to acquire immediately; if not, log and wait.
 		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
+			r.logger.Info("max concurrent scan limit reached; waiting for available slot")
 
 			if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
 				return fmt.Errorf("failed to acquire scan limiter: %w", err)
@@ -210,6 +214,7 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		defer r.config.scanLimiter.Release(1)
 	}
 
+	r.logger.Info(fmt.Sprintf("starting producer c = %d", c.Load()))
 	// Call the producer function. This starts the actual Aerospike scan
 	// and returns a channel for its results.
 	recordset, err := producer()
@@ -223,8 +228,10 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 		r.resultChan <- res
 	}
 
-	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
+	r.logger.Info("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
+	r.logger.Info(fmt.Sprintf("close producer c = %d", c.Load()))
+	c.Add(-1)
 	return r.recordsetCloser.Close(recordset)
 }
 
@@ -247,7 +254,7 @@ func (r *singleRecordReader) generateProducers() []scanProducer {
 					set, r.config.namespace, pf.Begin, pf.Count, err)
 			}
 
-			r.logger.Debug("partition scan started",
+			r.logger.Info("partition scan started",
 				slog.Uint64("transactionId", recordset.TaskId()),
 				slog.String("set", set),
 				slog.String("filter", printPartitionFilter(&pf)),

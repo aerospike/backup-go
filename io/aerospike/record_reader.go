@@ -226,6 +226,10 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
+		if ctx.Err() != nil {
+			break
+		}
+
 		r.resultChan <- res
 	}
 

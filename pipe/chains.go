@@ -76,31 +76,28 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 		defer close(output)
 
 		for {
+			data, err := r.Read(ctx)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
+
+				return fmt.Errorf("failed to read data: %w", err)
+			}
+
+			data, err = p.Process(data)
+			if err != nil {
+				if errors.Is(err, models.ErrFilteredOut) {
+					continue
+				}
+
+				return fmt.Errorf("failed to process data: %w", err)
+			}
+
 			select {
-			default:
-				data, err := r.Read(ctx)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						return nil
-					}
-
-					return fmt.Errorf("failed to read data: %w", err)
-				}
-
-				data, err = p.Process(data)
-				if err != nil {
-					if errors.Is(err, models.ErrFilteredOut) {
-						continue
-					}
-
-					return fmt.Errorf("failed to process data: %w", err)
-				}
-
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case output <- data:
-				}
+			case <-ctx.Done():
+				return ctx.Err()
+			case output <- data:
 			}
 		}
 	}

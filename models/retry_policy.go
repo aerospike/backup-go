@@ -80,8 +80,8 @@ func (p *RetryPolicy) totalAttempts() uint {
 	return p.MaxRetries
 }
 
-// sleep waits for the calculated delay or until context is cancelled.
-// Returns ctx.Err() if context was cancelled, nil if sleep completed.
+// sleep waits for the calculated delay or until context is canceled.
+// Returns ctx.Err() if context was canceled, nil if sleep completed.
 func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
 	if p == nil {
 		return nil

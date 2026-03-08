@@ -61,6 +61,8 @@ linters:
     nolintlint:
       require-explanation: true
       require-specific: true
+    misspell:
+      locale: US
     sloglint:
       attr-only: true
       key-naming-case: camel

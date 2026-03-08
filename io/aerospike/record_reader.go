@@ -199,18 +199,10 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 	}
 
 	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-	if r.config.scanLimiter != nil {
-		// Attempt to acquire immediately; if not, log and wait.
-		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
-
-			if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
-				return fmt.Errorf("failed to acquire scan limiter: %w", err)
-			}
-		}
-
-		defer r.config.scanLimiter.Release(1)
+	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+		return fmt.Errorf("failed to acquire scan limiter: %w", err)
 	}
+	defer r.config.scanLimiter.Release(1)
 
 	// Call the producer function. This starts the actual Aerospike scan
 	// and returns a channel for its results.

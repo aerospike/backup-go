@@ -20,10 +20,10 @@ import (
 	"log/slog"
 
 	"github.com/aerospike/backup-go/internal/metrics"
+	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/io/aerospike/xdr"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
-	"golang.org/x/sync/semaphore"
 )
 
 // recordReaderProcessorXDR configures and creates record readers pipelines for xdr.
@@ -33,7 +33,7 @@ type recordReaderProcessorXDR[T models.TokenConstraint] struct {
 	aerospikeClient AerospikeClient
 	infoClient      InfoGetter
 	state           *State
-	scanLimiter     *semaphore.Weighted
+	scanLimiter     scanlimiter.Limiter
 	rpsCollector    *metrics.Collector
 
 	logger *slog.Logger
@@ -45,7 +45,7 @@ func newRecordReaderProcessorXDR[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
 	infoClient InfoGetter,
 	state *State,
-	scanLimiter *semaphore.Weighted,
+	scanLimiter scanlimiter.Limiter,
 	rpsCollector *metrics.Collector,
 	logger *slog.Logger,
 ) *recordReaderProcessorXDR[T] {

@@ -230,6 +230,7 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 
 func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
 	done := r.ctx.Done() // cache once
+
 	for res := range recordset.Results() {
 		// fast path: channel has space, no select arbitration
 		select {

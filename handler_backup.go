@@ -163,6 +163,11 @@ func newBackupHandler(
 		config.MetricsEnabled,
 	)
 
+	var throttler *aerospike.ThrottleLimiter
+	if config.ScanThrottling > 0 {
+		throttler = aerospike.NewThrottleLimiter(config.ScanThrottling, config.ScanThrottlingTimeout)
+	}
+
 	readerProcessor := newRecordReaderProcessor[*models.Token](
 		config,
 		ac,
@@ -171,6 +176,7 @@ func newBackupHandler(
 		scanLimiter,
 		rpsCollector,
 		logger,
+		throttler,
 	)
 
 	recCounter := newRecordCounter(ac, infoClient, config, readerProcessor, logger)

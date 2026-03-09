@@ -36,6 +36,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 	state           *State
 	scanLimiter     *semaphore.Weighted
 	rpsCollector    *metrics.Collector
+	throttler       *aerospike.ThrottleLimiter
 
 	logger *slog.Logger
 }
@@ -49,6 +50,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	scanLimiter *semaphore.Weighted,
 	rpsCollector *metrics.Collector,
 	logger *slog.Logger,
+	throttler *aerospike.ThrottleLimiter,
 ) *recordReaderProcessor[T] {
 	logger.Debug("created new records reader processor")
 
@@ -60,6 +62,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 		state:           state,
 		rpsCollector:    rpsCollector,
 		logger:          logger,
+		throttler:       throttler,
 	}
 }
 
@@ -277,5 +280,6 @@ func (rr *recordReaderProcessor[T]) newRecordReaderConfig(
 		rr.config.NoTTLOnly,
 		rr.config.PageSize,
 		rr.rpsCollector,
+		rr.throttler,
 	)
 }

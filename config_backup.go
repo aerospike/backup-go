@@ -129,6 +129,9 @@ type ConfigBackup struct {
 	OutputFilePrefix string
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
+
+	ScanThrottling        int
+	ScanThrottlingTimeout time.Duration
 }
 
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.

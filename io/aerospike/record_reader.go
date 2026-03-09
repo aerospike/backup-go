@@ -137,7 +137,6 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	case <-ctx.Done():
 		// If the local context is canceled, we cancel the global context.
 		r.cancel()
-
 		return nil, ctx.Err()
 	case <-r.ctx.Done():
 		return nil, r.ctx.Err()
@@ -192,40 +191,86 @@ func (r *singleRecordReader) startScan(ctx context.Context) {
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
 func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 
-	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-	if r.config.scanLimiter != nil {
-		// Attempt to acquire immediately; if not, log and wait.
-		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
+		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
+		if r.config.scanLimiter != nil {
+			// Attempt to acquire immediately; if not, log and wait.
+			if !r.config.scanLimiter.TryAcquire(1) {
+				r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
 
-			if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
-				return fmt.Errorf("failed to acquire scan limiter: %w", err)
+				if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
+					return fmt.Errorf("failed to acquire scan limiter: %w", err)
+				}
 			}
 		}
 
-		defer r.config.scanLimiter.Release(1)
-	}
+		// Call the producer function. This starts the actual Aerospike scan
+		// and returns a channel for its results.
+		recordset, err := producer()
+		if err != nil {
+			if r.config.scanLimiter != nil {
+				r.config.scanLimiter.Release(1)
+			}
 
-	// Call the producer function. This starts the actual Aerospike scan
-	// and returns a channel for its results.
-	recordset, err := producer()
-	if err != nil {
-		return fmt.Errorf("scan producer failed: %w", err)
+			return fmt.Errorf("scan producer failed: %w", err)
+		}
+
+		// Drain all results from this specific scan.
+		// No context checking here because it slows down the scan.
+		drainErr := r.drainResults(recordset)
+
+		// Do not return an error immediately, because we need to perform some actions first.
+		closeErr := r.recordsetCloser.Close(recordset)
+
+		// Release the semaphore manually because of for loop.
+		if r.config.scanLimiter != nil {
+			r.config.scanLimiter.Release(1)
+		}
+
+		// If we broke out because of a connection error on the first record,
+		// we loop back to the top to restart the producer.
+		if drainErr != nil {
+			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
+				slog.Any("error", drainErr))
+			// Simple logic first, we just sleep for 10 sec and try again.
+			r.config.throttler.Wait(ctx)
+
+			continue
+		}
+
+		// Successfully drained all results, notify the throttler.
+		r.config.throttler.Notify(ctx)
+
+		r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
+
+		return closeErr
 	}
+}
+
+// drainResults drains results, and if operation failed return error
+func (r *singleRecordReader) drainResults(recordset *a.Recordset) error {
+	// Used to check the first error.
+	var isFirst = true
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
+		// Check only the FIRST result for the specific connection error
+		// and only if throttler is initialized.
+		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
+			return res.Err
+		}
+
+		isFirst = false
+
 		r.resultChan <- res
 	}
 
-	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
-
-	return r.recordsetCloser.Close(recordset)
+	return nil
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.

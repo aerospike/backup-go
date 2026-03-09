@@ -221,21 +221,32 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 }
 
 func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
-	done := r.ctx.Done() // cache once
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		select {
+		case <-r.ctx.Done():
+			// Close record set
+			r.recordsetCloser.Close(recordset)
+
+			// Darin records to nowhere
+			for {
+				select {
+				case <-r.resultChan:
+				case <-done:
+					// If we already done exit
+					return
+				}
+			}
+		case <-done:
+			// if everything was ok exit
+			return
+		}
+	}()
 
 	for res := range recordset.Results() {
-		// fast path: channel has space, no select arbitration
-		select {
-		case r.resultChan <- res:
-			continue
-		default:
-		}
-		// slow path: only when backpressured
-		select {
-		case <-done:
-			return
-		case r.resultChan <- res:
-		}
+		r.resultChan <- res
 	}
 }
 

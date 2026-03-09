@@ -364,7 +364,7 @@ func (w *s3Writer) Close() error {
 
 // abortUpload aborts the multipart upload and cleans up partial data
 func (w *s3Writer) abortUpload(originalErr error) error {
-	// Use a fresh context for cleanup (not the cancelled one).
+	// Use a fresh context for cleanup (not the canceled one).
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

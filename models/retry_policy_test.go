@@ -275,7 +275,7 @@ func TestRetryPolicy_Do(t *testing.T) {
 			wantCallCount: 1,
 		},
 		{
-			name:   "context cancelled during retry",
+			name:   "context canceled during retry",
 			policy: NewRetryPolicy(100*time.Millisecond, 2.0, 5),
 			operation: func() (callCount *int, operation func() error) {
 				count := 0

@@ -130,7 +130,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 		// Start scan with the global context.
 		r.logger.Debug("scan started")
 
-		go r.startScan(r.ctx)
+		go r.startScan()
 	})
 
 	select {
@@ -144,6 +144,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	case err := <-r.errChan:
 		// serve errors.
 		r.cancel()
+
 		return nil, err
 	case res, ok := <-r.resultChan:
 		if !ok {
@@ -153,6 +154,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 
 		if res.Err != nil {
 			r.cancel()
+
 			return nil, fmt.Errorf("failed to read record: %w", res.Err)
 		}
 
@@ -173,7 +175,7 @@ func (r *singleRecordReader) Close() {
 }
 
 // startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *singleRecordReader) startScan(ctx context.Context) {
+func (r *singleRecordReader) startScan() {
 	defer close(r.resultChan)
 
 	// Generate the list of all scan tasks.
@@ -181,7 +183,7 @@ func (r *singleRecordReader) startScan(ctx context.Context) {
 
 	// Execute the tasks sequentially.
 	for _, producer := range producers {
-		if err := r.executeProducer(ctx, producer); err != nil {
+		if err := r.executeProducer(producer); err != nil {
 			r.errChan <- err
 			return
 		}
@@ -191,24 +193,16 @@ func (r *singleRecordReader) startScan(ctx context.Context) {
 // executeProducer runs a single scan task. It acquires a semaphore,
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
-func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+func (r *singleRecordReader) executeProducer(producer scanProducer) error {
+	if r.ctx.Err() != nil {
+		return r.ctx.Err()
 	}
 
 	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-	if r.config.scanLimiter != nil {
-		// Attempt to acquire immediately; if not, log and wait.
-		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
-
-			if err := r.config.scanLimiter.Acquire(ctx, 1); err != nil {
-				return fmt.Errorf("failed to acquire scan limiter: %w", err)
-			}
-		}
-
-		defer r.config.scanLimiter.Release(1)
+	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+		return fmt.Errorf("failed to acquire scan limiter: %w", err)
 	}
+	defer r.config.scanLimiter.Release(1)
 
 	// Call the producer function. This starts the actual Aerospike scan
 	// and returns a channel for its results.
@@ -219,13 +213,41 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
-	for res := range recordset.Results() {
-		r.resultChan <- res
-	}
+	r.drainResults(recordset)
 
 	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
 	return r.recordsetCloser.Close(recordset)
+}
+
+func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		select {
+		case <-r.ctx.Done():
+			// Close record set
+			r.recordsetCloser.Close(recordset)
+
+			// Darin records to nowhere
+			for {
+				select {
+				case <-r.resultChan:
+				case <-done:
+					// If we already done exit
+					return
+				}
+			}
+		case <-done:
+			// if everything was ok exit
+			return
+		}
+	}()
+
+	for res := range recordset.Results() {
+		r.resultChan <- res
+	}
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.

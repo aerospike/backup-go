@@ -25,6 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/metrics"
+	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
@@ -99,6 +100,7 @@ func TestAerospikeRecordReaderPaginated(t *testing.T) {
 			partitionFilter: pf,
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -177,6 +179,7 @@ func TestAerospikeRecordReaderPaginatedRecordError(t *testing.T) {
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -220,6 +223,7 @@ func TestAerospikeRecordReaderPaginatedScanFailed(t *testing.T) {
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -325,6 +329,7 @@ func TestAerospikeRecordReaderPaginatedMultipleSets(t *testing.T) {
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -388,6 +393,7 @@ func TestAerospikeRecordReaderPaginatedContextCanceled(t *testing.T) {
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
 		},
 		slog.Default(),
@@ -528,6 +534,7 @@ func TestAerospikeRecordReaderPaginatedIgnoreInvalidNodeError(t *testing.T) {
 			partitionFilter: pf,
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
 		},
 		slog.Default(),
@@ -584,6 +591,7 @@ func TestAerospikeRecordReaderPaginatedRecordsetCloseError(t *testing.T) {
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
 		},
 		slog.Default(),
@@ -649,6 +657,7 @@ func TestAerospikeRecordReaderPaginatedLargePageSize(t *testing.T) {
 			partitionFilter: pf,
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
 		},
 		slog.Default(),
@@ -718,6 +727,7 @@ func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
 			partitionFilter: pf,
 			scanPolicy:      &a.ScanPolicy{},
 			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
 		},
 		slog.Default(),

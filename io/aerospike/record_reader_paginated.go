@@ -166,18 +166,10 @@ func (r *paginatedRecordReader) scanPage(
 	}
 
 	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-	if r.config.scanLimiter != nil {
-		// Attempt to acquire immediately; if not, log and wait.
-		if !r.config.scanLimiter.TryAcquire(1) {
-			r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
-
-			if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
-				return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
-			}
-		}
-
-		defer r.config.scanLimiter.Release(1)
+	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+		return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
 	}
+	defer r.config.scanLimiter.Release(1)
 
 	curFilter, err := models.NewPartitionFilterSerialized(pf)
 	if err != nil {

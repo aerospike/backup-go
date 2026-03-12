@@ -139,7 +139,7 @@ func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
 			return testToken(), nil
 		}
 
-		return nil, errTest
+		return nil, context.Canceled
 	})
 
 	readerMock.EXPECT().Close()

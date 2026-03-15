@@ -41,7 +41,7 @@ func TestNewWriter(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "cancelled context",
+			name:    "canceled context",
 			ctx:     func() context.Context { ctx, cancel := context.WithCancel(t.Context()); cancel(); return ctx }(),
 			buffer:  0,
 			wantErr: true,
@@ -104,7 +104,7 @@ func TestWriter_NewWriter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "error with cancelled context",
+			name:     "error with canceled context",
 			ctx:      func() context.Context { ctx, cancel := context.WithCancel(t.Context()); cancel(); return ctx }(),
 			filename: "test.dat",
 			wantErr:  true,

@@ -155,7 +155,7 @@ func (s *TCPServer) Stop() error {
 	if !s.isActive.CompareAndSwap(true, false) {
 		return fmt.Errorf("server is not active")
 	}
-	// Stop all routines by context cancelling.
+	// Stop all routines by context canceling.
 	s.cancel()
 
 	if s.listener != nil {

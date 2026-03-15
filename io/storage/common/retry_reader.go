@@ -188,7 +188,7 @@ func (r *RetryableReader) Read(p []byte) (int, error) {
 		return readErr
 	})
 
-	// If retry failed (context cancelled, etc), return retry error.
+	// If retry failed (context canceled, etc), return retry error.
 	if retryErr != nil {
 		return n, retryErr
 	}

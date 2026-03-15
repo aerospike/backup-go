@@ -211,26 +211,41 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 		return fmt.Errorf("scan producer failed: %w", err)
 	}
 
+	// Close recordset only once.
+	var closeOnce sync.Once
+	closeRecordset := func() a.Error {
+		var closeErr a.Error
+
+		closeOnce.Do(func() {
+			closeErr = r.recordsetCloser.Close(recordset)
+		})
+
+		return closeErr
+	}
+
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
-	r.drainResults(recordset)
+	r.drainResults(recordset, closeRecordset)
 
 	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
-	return r.recordsetCloser.Close(recordset)
+	return closeRecordset()
 }
 
-func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
+func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset func() a.Error) {
 	done := make(chan struct{})
 	defer close(done)
 
 	go func() {
 		select {
 		case <-r.ctx.Done():
-			// Close record set
-			r.recordsetCloser.Close(recordset)
+			// Close record set.
+			err := closeRecordset()
+			if err != nil {
+				r.logger.Error("failed to close recordset", slog.Any("error", err))
+			}
 
-			// Darin records to nowhere
+			// Drain records to nowhere.
 			for {
 				select {
 				case <-r.resultChan:
@@ -240,7 +255,7 @@ func (r *singleRecordReader) drainResults(recordset *a.Recordset) {
 				}
 			}
 		case <-done:
-			// if everything was ok exit
+			// if everything was ok, exit.
 			return
 		}
 	}()

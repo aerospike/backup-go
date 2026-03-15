@@ -43,7 +43,7 @@ type paginatedRecordReader struct {
 	pageRecordsChan chan *pageRecord
 	errChan         chan error
 	scanOnce        sync.Once
-	recodsetCloser  RecordsetCloser
+	recordsetCloser RecordsetCloser
 }
 
 // Close no-op operation to satisfy pipe.Reader interface.
@@ -70,7 +70,7 @@ func newPaginatedRecordReader(
 		pageRecordsChan: make(chan *pageRecord),
 		errChan:         make(chan error, 1),
 		scanOnce:        sync.Once{},
-		recodsetCloser:  closer,
+		recordsetCloser: closer,
 	}
 }
 
@@ -176,7 +176,7 @@ func (r *paginatedRecordReader) scanPage(
 		return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
 	}
 
-	recSet, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
+	recordset, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
 		scanPolicy,
 		pf,
 		r.config.namespace,
@@ -188,19 +188,74 @@ func (r *paginatedRecordReader) scanPage(
 	}
 
 	r.logger.Debug("partition scan started",
-		slog.Uint64("transactionId", recSet.TaskId()),
+		slog.Uint64("transactionId", recordset.TaskId()),
 		slog.String("set", set),
 		slog.String("filter", printPartitionFilter(pf)),
 	)
 
+	// Close recordset only once.
+	var closeOnce sync.Once
+	closeRecordset := func() a.Error {
+		var closeErr a.Error
+
+		closeOnce.Do(func() {
+			closeErr = r.recordsetCloser.Close(recordset)
+		})
+
+		return closeErr
+	}
+
 	defer func() { // close record set
-		if cerr := r.recodsetCloser.Close(recSet); cerr != nil {
+		if cerr := closeRecordset(); cerr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", cerr.Unwrap()))
 		}
 	}()
 
+	// Drain all results from this specific scan.
+	// No context checking here because it slows down the scan.
+	count, err = r.drainResults(recordset, closeRecordset, curFilter)
+
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
+
+	return count, err
+}
+
+func (r *paginatedRecordReader) drainResults(
+	recordset *a.Recordset,
+	closeRecordset func() a.Error,
+	curFilter models.PartitionFilterSerialized,
+) (uint64, error) {
+	done := make(chan struct{})
+	defer close(done)
+
+	var count uint64
+
+	go func() {
+		select {
+		case <-r.ctx.Done():
+			// Close record set.
+			err := closeRecordset()
+			if err != nil {
+				r.logger.Error("failed to close recordset", slog.Any("error", err))
+			}
+
+			// Drain records to nowhere.
+			for {
+				select {
+				case <-r.pageRecordsChan:
+				case <-done:
+					// If we already done exit
+					return
+				}
+			}
+		case <-done:
+			// if everything was ok, exit.
+			return
+		}
+	}()
+
 	// to count records on pageRecord.
-	for res := range recSet.Results() {
+	for res := range recordset.Results() {
 		count++
 
 		if res.Err != nil {
@@ -215,7 +270,5 @@ func (r *paginatedRecordReader) scanPage(
 		r.pageRecordsChan <- newPageRecord(res, &curFilter)
 	}
 
-	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recSet.TaskId()))
-
-	return count, err
+	return count, nil
 }

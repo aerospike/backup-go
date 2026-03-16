@@ -37,8 +37,8 @@ type recordWriter interface {
 // It writes the types from the models package to an Aerospike client
 // It is used to restore data from a backup.
 type RestoreWriter[T models.TokenConstraint] struct {
-	sindexWriter
-	udfWriter
+	*sindexWriter
+	*udfWriter
 	recordWriter
 	*payloadWriter
 	logger *slog.Logger
@@ -65,16 +65,8 @@ func NewRestoreWriter[T models.TokenConstraint](
 	)
 
 	return &RestoreWriter[T]{
-		sindexWriter: sindexWriter{
-			asc:         asc,
-			writePolicy: writePolicy,
-			logger:      logger,
-		},
-		udfWriter: udfWriter{
-			asc:         asc,
-			writePolicy: writePolicy,
-			logger:      logger,
-		},
+		sindexWriter: newSindexWriter(ctx, asc, writePolicy, retryPolicy, logger),
+		udfWriter:    newUdfWriter(ctx, asc, writePolicy, retryPolicy, logger),
 		recordWriter: newRecordWriter(
 			ctx,
 			asc,

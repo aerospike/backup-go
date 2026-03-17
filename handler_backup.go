@@ -27,12 +27,12 @@ import (
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/processors"
+	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/io/aerospike"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
-	"golang.org/x/sync/semaphore"
 )
 
 // Writer defines an interface for writing backup data to a storage provider.
@@ -75,7 +75,7 @@ type BackupHandler struct {
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *bandwidth.Limiter
 	infoClient             InfoGetter
-	scanLimiter            *semaphore.Weighted
+	scanLimiter            scanlimiter.Limiter
 	id                     string
 
 	stats *models.BackupStats
@@ -98,7 +98,7 @@ func newBackupHandler(
 	logger *slog.Logger,
 	writer Writer,
 	reader StreamingReader,
-	scanLimiter *semaphore.Weighted,
+	scanLimiter scanlimiter.Limiter,
 	infoClient InfoGetter,
 ) (*BackupHandler, error) {
 	id := uuid.NewString()

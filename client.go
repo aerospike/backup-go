@@ -21,10 +21,10 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/logging"
+	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/google/uuid"
-	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -144,7 +144,7 @@ type Client struct {
 	aerospikeClient AerospikeClient
 	infoClient      InfoGetter
 	logger          *slog.Logger
-	scanLimiter     *semaphore.Weighted
+	scanLimiter     scanlimiter.Limiter
 	// infoPolicy applies to Aerospike Info requests made during backup and
 	// restore. If nil, the Aerospike client's default policy will be used.
 	infoPolicy *a.InfoPolicy
@@ -172,7 +172,7 @@ func WithLogger(logger *slog.Logger) ClientOpt {
 }
 
 // WithScanLimiter sets the scan limiter for the [Client].
-func WithScanLimiter(sem *semaphore.Weighted) ClientOpt {
+func WithScanLimiter(sem scanlimiter.Limiter) ClientOpt {
 	return func(c *Client) {
 		c.scanLimiter = sem
 	}

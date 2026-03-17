@@ -168,16 +168,10 @@ func (r *paginatedRecordReader) scanPage(
 		}
 
 		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-		if r.config.scanLimiter != nil {
-			// Attempt to acquire immediately; if not, log and wait.
-			if !r.config.scanLimiter.TryAcquire(1) {
-				r.logger.Debug("max concurrent scan limit reached; waiting for available slot")
-
-				if err := r.config.scanLimiter.Acquire(r.ctx, 1); err != nil {
-					return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
-				}
-			}
+		if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+			return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
 		}
+		defer r.config.scanLimiter.Release(1)
 
 		pfs, err := models.NewPartitionFilterSerialized(pf)
 		if err != nil {
@@ -192,10 +186,6 @@ func (r *paginatedRecordReader) scanPage(
 			r.config.binList...,
 		)
 		if aErr != nil {
-			if r.config.scanLimiter != nil {
-				r.config.scanLimiter.Release(1)
-			}
-
 			return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 		}
 
@@ -205,12 +195,15 @@ func (r *paginatedRecordReader) scanPage(
 			slog.String("filter", printPartitionFilter(pf)),
 		)
 
+		// Set close recordset function.
+		closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
+
 		// Drain all results from this specific scan.
 		// No context checking here because it slows down the scan.
-		count, drainErr := r.drainResults(pfs, recordset)
+		count, drainErr := r.drainResults(recordset, closeRecordset, pfs)
 
 		// Do not return an error immediately, because we need to perform some actions first.
-		closeErr := r.recordsetCloser.Close(recordset)
+		closeErr := closeRecordset()
 
 		// Release the semaphore manually because of for loop.
 		if r.config.scanLimiter != nil {
@@ -248,8 +241,16 @@ func (r *paginatedRecordReader) scanPage(
 }
 
 // drainResults drains results, and if operation failed return error
-func (r *paginatedRecordReader) drainResults(pfs models.PartitionFilterSerialized, recordset *a.Recordset,
+func (r *paginatedRecordReader) drainResults(
+	pfs models.PartitionFilterSerialized,
+	recordset *a.Recordset,
+	closeRecordset func() error,
 ) (uint64, error) {
+	done := make(chan struct{})
+	defer close(done)
+
+	monitorContext[*pageRecord](r.ctx, r.logger, r.resultChan, done, closeRecordset)
+
 	// Used to check the first error.
 	var (
 		isFirst = true
@@ -262,7 +263,8 @@ func (r *paginatedRecordReader) drainResults(pfs models.PartitionFilterSerialize
 		count++
 
 		if res.Err != nil {
-			// Check if we should skip an error.
+			// When reading the last page (containing 0 records),
+			// the scan might return a types.INVALID_NODE_ERROR.
 			if res.Err.Matches(types.INVALID_NODE_ERROR) {
 				continue
 			}

@@ -162,16 +162,17 @@ func (r *paginatedRecordReader) scanPage(
 	scanPolicy *a.ScanPolicy,
 	set string,
 ) (uint64, error) {
+	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
+	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+		return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+	}
+
+	defer r.config.scanLimiter.Release(1)
+
 	for {
 		if err := r.ctx.Err(); err != nil {
 			return 0, err
 		}
-
-		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-		if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-			return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
-		}
-		defer r.config.scanLimiter.Release(1)
 
 		pfs, err := models.NewPartitionFilterSerialized(pf)
 		if err != nil {
@@ -200,7 +201,7 @@ func (r *paginatedRecordReader) scanPage(
 
 		// Drain all results from this specific scan.
 		// No context checking here because it slows down the scan.
-		count, drainErr := r.drainResults(recordset, closeRecordset, pfs)
+		count, drainErr := r.drainResults(pfs, recordset, closeRecordset)
 
 		// Do not return an error immediately, because we need to perform some actions first.
 		closeErr := closeRecordset()

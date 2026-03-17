@@ -192,17 +192,18 @@ func (r *singleRecordReader) startScan() {
 // executeProducer runs a single scan task. It acquires a semaphore,
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
-func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanProducer) error {
-	for {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
+func (r *singleRecordReader) executeProducer(producer scanProducer) error {
+	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
+	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+		return fmt.Errorf("failed to acquire scan limiter: %w", err)
+	}
 
-		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-		if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-			return fmt.Errorf("failed to acquire scan limiter: %w", err)
+	defer r.config.scanLimiter.Release(1)
+
+	for {
+		if r.ctx.Err() != nil {
+			return r.ctx.Err()
 		}
-		defer r.config.scanLimiter.Release(1)
 
 		// Call the producer function. This starts the actual Aerospike scan
 		// and returns a channel for its results.
@@ -232,13 +233,13 @@ func (r *singleRecordReader) executeProducer(ctx context.Context, producer scanP
 			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
 				slog.Any("error", drainErr))
 			// Simple logic first, we just sleep for 10 sec and try again.
-			r.config.throttler.Wait(ctx)
+			r.config.throttler.Wait(r.ctx)
 
 			continue
 		}
 
 		// Successfully drained all results, notify the throttler.
-		r.config.throttler.Notify(ctx)
+		r.config.throttler.Notify(r.ctx)
 
 		r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 

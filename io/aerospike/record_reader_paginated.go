@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -195,6 +196,12 @@ func (r *paginatedRecordReader) scanPage(
 	// Set close recordset function.
 	closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
 
+	defer func() { // close record set
+		if cerr := closeRecordset(); cerr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", err))
+		}
+	}()
+
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
 	count, err = r.drainResults(recordset, closeRecordset, curFilter)
@@ -204,7 +211,7 @@ func (r *paginatedRecordReader) scanPage(
 
 	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
-	return count, closeRecordset()
+	return count, err
 }
 
 func (r *paginatedRecordReader) drainResults(

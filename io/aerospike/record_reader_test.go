@@ -25,6 +25,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/metrics"
+	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
@@ -87,6 +88,7 @@ func TestAerospikeRecordReader(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -155,6 +157,7 @@ func TestAerospikeRecordReaderRecordResError(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -207,6 +210,7 @@ func TestAerospikeRecordReaderClosedChannel(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -251,6 +255,7 @@ func TestAerospikeRecordReaderReadFailed(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      &a.ScanPolicy{},
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},
@@ -325,6 +330,7 @@ func TestAerospikeRecordReaderWithPolicy(t *testing.T) {
 			setList:         []string{set},
 			partitionFilter: a.NewPartitionFilterAll(),
 			scanPolicy:      policy,
+			scanLimiter:     scanlimiter.Noop,
 			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
 				testMetricMessage, true),
 		},

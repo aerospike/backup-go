@@ -15,12 +15,13 @@
 package aerospike
 
 import (
+	"context"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/metrics"
+	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/models"
-	"golang.org/x/sync/semaphore"
 )
 
 // RecordReaderConfig represents the configuration for scanning Aerospike records.
@@ -30,7 +31,7 @@ type RecordReaderConfig struct {
 	// If nodes are set we ignore partitionFilter.
 	nodes       []*a.Node
 	scanPolicy  *a.ScanPolicy
-	scanLimiter *semaphore.Weighted
+	scanLimiter scanlimiter.Limiter
 	namespace   string
 	setList     []string
 	binList     []string
@@ -71,7 +72,7 @@ func (c *RecordReaderConfig) logAttrs() []any {
 		attrs = append(attrs, slog.Any("nodes", nodeStrs))
 	}
 
-	if c.scanLimiter != nil {
+	if c.scanLimiter != scanlimiter.Noop {
 		attrs = append(attrs, slog.Bool("scanLimiter", true))
 	}
 
@@ -98,6 +99,18 @@ func (c *RecordReaderConfig) logAttrs() []any {
 	return attrs
 }
 
+// acquireScanSlot acquires one unit from the limiter (try once, then block if needed).
+// Caller must call limiter.Release(1) when done.
+func acquireScanSlot(ctx context.Context, limiter scanlimiter.Limiter, logger *slog.Logger) error {
+	if limiter.TryAcquire(1) {
+		return nil
+	}
+
+	logger.Debug("max concurrent scan limit reached; waiting for available slot")
+
+	return limiter.Acquire(ctx, 1)
+}
+
 // NewRecordReaderConfig creates a new RecordReaderConfig.
 func NewRecordReaderConfig(namespace string,
 	setList []string,
@@ -105,13 +118,17 @@ func NewRecordReaderConfig(namespace string,
 	scanPolicy *a.ScanPolicy,
 	binList []string,
 	timeBounds models.TimeBounds,
-	scanLimiter *semaphore.Weighted,
+	scanLimiter scanlimiter.Limiter,
 	noTTLOnly bool,
 	pageSize int64,
 	rpsCollector *metrics.Collector,
 ) *RecordReaderConfig {
 	if len(setList) == 0 {
 		setList = []string{""}
+	}
+
+	if scanLimiter == nil {
+		scanLimiter = scanlimiter.Noop
 	}
 
 	return &RecordReaderConfig{

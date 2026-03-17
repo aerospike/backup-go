@@ -211,17 +211,8 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 		return fmt.Errorf("scan producer failed: %w", err)
 	}
 
-	// Close recordset only once.
-	var closeOnce sync.Once
-	closeRecordset := func() a.Error {
-		var closeErr a.Error
-
-		closeOnce.Do(func() {
-			closeErr = r.recordsetCloser.Close(recordset)
-		})
-
-		return closeErr
-	}
+	// Set close recordset function.
+	closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
@@ -232,33 +223,11 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 	return closeRecordset()
 }
 
-func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset func() a.Error) {
+func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset func() error) {
 	done := make(chan struct{})
 	defer close(done)
 
-	go func() {
-		select {
-		case <-r.ctx.Done():
-			// Close record set.
-			err := closeRecordset()
-			if err != nil {
-				r.logger.Error("failed to close recordset", slog.Any("error", err))
-			}
-
-			// Drain records to nowhere.
-			for {
-				select {
-				case <-r.resultChan:
-				case <-done:
-					// If we already done exit
-					return
-				}
-			}
-		case <-done:
-			// if everything was ok, exit.
-			return
-		}
-	}()
+	monitorContext[*a.Result](r.ctx, r.logger, r.resultChan, done, closeRecordset)
 
 	for res := range recordset.Results() {
 		r.resultChan <- res
@@ -354,4 +323,51 @@ func noTTLExpression(noTTLOnly bool) *a.Expression {
 func noMrtSetExpression() *a.Expression {
 	// where set != "<ERO~MRT"
 	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))
+}
+
+// monitorContext check context on a separate routine, not to slow down records reading.
+// When context is canceled, we drain all results from r.resultChan to avoid deadlock.
+func monitorContext[T any](
+	ctx context.Context,
+	logger *slog.Logger,
+	resultChan chan T,
+	done chan struct{},
+	closeRecordset func() error,
+) {
+	go func() {
+		select {
+		case <-ctx.Done():
+			// Close record set.
+			err := closeRecordset()
+			if err != nil {
+				logger.Error("failed to close recordset", slog.Any("error", err))
+			}
+
+			// Drain records to nowhere.
+			for {
+				select {
+				case <-resultChan:
+				case <-done:
+					// If we have already done, exit.
+					return
+				}
+			}
+		case <-done:
+			// if everything was ok, exit.
+			return
+		}
+	}()
+}
+
+// wrapCloser wraps RecordsetCloser.Close function with context check.
+func wrapCloser(ctx context.Context, closer RecordsetCloser, recordSet *a.Recordset) func() error {
+	return func() error {
+		// If context is already done, that means that the recordset is already closed in monitorContext.
+		// Just skip closing.
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		return closer.Close(recordSet)
+	}
 }

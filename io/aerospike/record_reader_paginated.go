@@ -16,7 +16,6 @@ package aerospike
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -193,73 +192,40 @@ func (r *paginatedRecordReader) scanPage(
 		slog.String("filter", printPartitionFilter(pf)),
 	)
 
-	// Close recordset only once.
-	var closeOnce sync.Once
-	closeRecordset := func() a.Error {
-		var closeErr a.Error
-
-		closeOnce.Do(func() {
-			closeErr = r.recordsetCloser.Close(recordset)
-		})
-
-		return closeErr
-	}
-
-	defer func() { // close record set
-		if cerr := closeRecordset(); cerr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", cerr.Unwrap()))
-		}
-	}()
+	// Set close recordset function.
+	closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
 	count, err = r.drainResults(recordset, closeRecordset, curFilter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to drain results: %w", err)
+	}
 
 	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
-	return count, err
+	return count, closeRecordset()
 }
 
 func (r *paginatedRecordReader) drainResults(
 	recordset *a.Recordset,
-	closeRecordset func() a.Error,
+	closeRecordset func() error,
 	curFilter models.PartitionFilterSerialized,
 ) (uint64, error) {
 	done := make(chan struct{})
 	defer close(done)
 
-	var count uint64
-
-	go func() {
-		select {
-		case <-r.ctx.Done():
-			// Close record set.
-			err := closeRecordset()
-			if err != nil {
-				r.logger.Error("failed to close recordset", slog.Any("error", err))
-			}
-
-			// Drain records to nowhere.
-			for {
-				select {
-				case <-r.pageRecordsChan:
-				case <-done:
-					// If we already done exit
-					return
-				}
-			}
-		case <-done:
-			// if everything was ok, exit.
-			return
-		}
-	}()
+	monitorContext[*pageRecord](r.ctx, r.logger, r.pageRecordsChan, done, closeRecordset)
 
 	// to count records on pageRecord.
+	var count uint64
+
 	for res := range recordset.Results() {
 		count++
 
 		if res.Err != nil {
-			// When reading last page (containing 0 records), the scan might return an types.INVALID_NODE_ERROR error
+			// When reading the last page (containing 0 records),
+			// the scan might return an types.INVALID_NODE_ERROR.
 			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
 				return 0, fmt.Errorf("failed to read paginated record: %w", res.Err)
 			}

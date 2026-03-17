@@ -198,7 +198,7 @@ func (r *paginatedRecordReader) scanPage(
 
 	defer func() { // close record set
 		if cerr := closeRecordset(); cerr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", err))
+			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", cerr))
 		}
 	}()
 
@@ -232,7 +232,7 @@ func (r *paginatedRecordReader) drainResults(
 
 		if res.Err != nil {
 			// When reading the last page (containing 0 records),
-			// the scan might return an types.INVALID_NODE_ERROR.
+			// the scan might return a types.INVALID_NODE_ERROR.
 			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
 				return 0, fmt.Errorf("failed to read paginated record: %w", res.Err)
 			}

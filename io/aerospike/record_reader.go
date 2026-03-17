@@ -65,7 +65,7 @@ type singleRecordReader struct {
 }
 
 // RecordsetCloser is an interface for closing Aerospike recordsets.
-// It is required because scanner interacted return concrete type Recordset that is impossible to mock.
+// It is required because scanner methods return concrete type Recordset that is impossible to mock.
 type RecordsetCloser interface {
 	Close(recordset *a.Recordset) a.Error
 }
@@ -142,7 +142,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	case <-r.ctx.Done():
 		return nil, r.ctx.Err()
 	case err := <-r.errChan:
-		// serve errors.
+		// Return scan errors.
 		r.cancel()
 
 		return nil, err
@@ -174,7 +174,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 func (r *singleRecordReader) Close() {
 }
 
-// startPartitionScan initiates a partition scan for each provided set using the given scan policy and partition filter.
+// startScan initiates a partition scan for each provided set using the given scan policy and partition filter.
 func (r *singleRecordReader) startScan() {
 	defer close(r.resultChan)
 
@@ -315,7 +315,7 @@ func noTTLExpression(noTTLOnly bool) *a.Expression {
 	if !noTTLOnly {
 		return nil
 	}
-	// Unexpired records has TTL = -1.
+	// Unexpired records have TTL = -1.
 	return a.ExpEq(a.ExpTTL(), a.ExpIntVal(-1))
 }
 
@@ -325,8 +325,8 @@ func noMrtSetExpression() *a.Expression {
 	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))
 }
 
-// monitorContext check context on a separate routine, not to slow down records reading.
-// When context is canceled, we drain all results from r.resultChan to avoid deadlock.
+// monitorContext checks context on a separate goroutine to avoid slowing down record reads.
+// When context is canceled, we drain all results from resultChan to avoid deadlock.
 func monitorContext[T any](
 	ctx context.Context,
 	logger *slog.Logger,
@@ -353,7 +353,7 @@ func monitorContext[T any](
 				}
 			}
 		case <-done:
-			// if everything was ok, exit.
+			// If everything was OK, exit.
 			return
 		}
 	}()

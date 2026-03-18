@@ -129,9 +129,6 @@ type ConfigBackup struct {
 	OutputFilePrefix string
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
-	// ScanThrottling limits the scan throughput (for example, records per second per node).
-	// A value of 0 disables scan throttling. Must be >= 0.
-	ScanThrottling int
 	// ScanThrottlingTimeout is the maximum backoff duration between throttled scan batches.
 	// This is a Go time.Duration (e.g. time.Second). It is only used when ScanThrottling > 0
 	// and should be > 0 to avoid immediate or effectively zero-length waits.
@@ -141,12 +138,13 @@ type ConfigBackup struct {
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.
 func NewDefaultBackupConfig() *ConfigBackup {
 	return &ConfigBackup{
-		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
-		ParallelRead:     1,
-		ParallelWrite:    1,
-		Namespace:        "test",
-		EncoderType:      EncoderTypeASB,
-		ScanPolicy:       a.NewScanPolicy(),
+		PartitionFilters:      []*a.PartitionFilter{NewPartitionFilterAll()},
+		ParallelRead:          1,
+		ParallelWrite:         1,
+		Namespace:             "test",
+		EncoderType:           EncoderTypeASB,
+		ScanPolicy:            a.NewScanPolicy(),
+		ScanThrottlingTimeout: time.Second * 10,
 	}
 }
 
@@ -276,6 +274,10 @@ func (c *ConfigBackup) validate() error {
 		if err := collections.CheckDuplicates(c.BinList); err != nil {
 			return fmt.Errorf("bin list contains duplicates: %w", err)
 		}
+	}
+
+	if c.ScanThrottlingTimeout <= 0 {
+		return fmt.Errorf("scan throttling timeout must be positive")
 	}
 
 	return nil

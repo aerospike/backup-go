@@ -138,13 +138,12 @@ type ConfigBackup struct {
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.
 func NewDefaultBackupConfig() *ConfigBackup {
 	return &ConfigBackup{
-		PartitionFilters:      []*a.PartitionFilter{NewPartitionFilterAll()},
-		ParallelRead:          1,
-		ParallelWrite:         1,
-		Namespace:             "test",
-		EncoderType:           EncoderTypeASB,
-		ScanPolicy:            a.NewScanPolicy(),
-		ScanThrottlingTimeout: time.Second * 10,
+		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
+		ParallelRead:     1,
+		ParallelWrite:    1,
+		Namespace:        "test",
+		EncoderType:      EncoderTypeASB,
+		ScanPolicy:       a.NewScanPolicy(),
 	}
 }
 
@@ -274,10 +273,6 @@ func (c *ConfigBackup) validate() error {
 		if err := collections.CheckDuplicates(c.BinList); err != nil {
 			return fmt.Errorf("bin list contains duplicates: %w", err)
 		}
-	}
-
-	if c.ScanThrottlingTimeout <= 0 {
-		return fmt.Errorf("scan throttling timeout must be positive")
 	}
 
 	return nil

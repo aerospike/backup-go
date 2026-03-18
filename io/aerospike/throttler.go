@@ -24,6 +24,8 @@ import (
 	"github.com/aerospike/aerospike-client-go/v8/types"
 )
 
+const defaultThrottleTimeout = 10 * time.Second
+
 // ThrottleLimiter notification mechanism that manages active connections.
 // On success, you should call Notify, on error, you should call Wait and restart the operation.
 // So throttler will wait for the next available slot.
@@ -38,6 +40,10 @@ func NewThrottleLimiter(parallel int, timeout time.Duration) *ThrottleLimiter {
 	// When parallel is 1, we don't need to throttle.
 	if parallel < 2 {
 		return nil
+	}
+
+	if timeout == 0 {
+		timeout = defaultThrottleTimeout
 	}
 
 	return &ThrottleLimiter{

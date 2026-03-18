@@ -162,20 +162,20 @@ func (r *paginatedRecordReader) scanPage(
 	scanPolicy *a.ScanPolicy,
 	set string,
 ) (uint64, error) {
-	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-		return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
-	}
-
-	defer r.config.scanLimiter.Release(1)
-
 	for {
 		if err := r.ctx.Err(); err != nil {
 			return 0, err
 		}
 
+		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
+		if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+			return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+		}
+
 		pfs, err := models.NewPartitionFilterSerialized(pf)
 		if err != nil {
+			r.config.scanLimiter.Release(1)
+
 			return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
 		}
 
@@ -187,6 +187,8 @@ func (r *paginatedRecordReader) scanPage(
 			r.config.binList...,
 		)
 		if aErr != nil {
+			r.config.scanLimiter.Release(1)
+
 			return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 		}
 
@@ -207,9 +209,7 @@ func (r *paginatedRecordReader) scanPage(
 		closeErr := closeRecordset()
 
 		// Release the semaphore manually because of for loop.
-		if r.config.scanLimiter != nil {
-			r.config.scanLimiter.Release(1)
-		}
+		r.config.scanLimiter.Release(1)
 
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
@@ -271,7 +271,7 @@ func (r *paginatedRecordReader) drainResults(
 			}
 			// check if we should throttle.
 			if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
-				r.logger.Info("throttling with count", slog.Uint64("count", count))
+				r.logger.Debug("throttling with count", slog.Uint64("count", count))
 
 				return 0, res.Err
 			}

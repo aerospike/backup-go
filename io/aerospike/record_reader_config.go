@@ -37,7 +37,7 @@ type RecordReaderConfig struct {
 	binList     []string
 	noTTLOnly   bool
 
-	// throttler indicates that we should throttler the scan on error.
+	// throttler indicates that we should throttle the scan on error.
 	throttler *ThrottleLimiter
 
 	// pageSize used for paginated scan for saving reading state.

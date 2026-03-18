@@ -16,9 +16,8 @@ package aerospike
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
-	"math/big"
+	"math/rand/v2"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -89,12 +88,9 @@ func jitterDuration() time.Duration {
 		maxMs = 2000
 	)
 
-	// Range size (inclusive)
-	rangeSize := maxMs - minMs + 1
-
-	n, _ := rand.Int(rand.Reader, big.NewInt(int64(rangeSize)))
-
-	ms := minMs + int(n.Int64())
+	// rand.IntN returns [0, n), so we add +1 for inclusive range
+	//nolint:gosec // Delay between restarts should not be cryptographically secure.
+	ms := minMs + rand.IntN(maxMs-minMs+1)
 
 	return time.Duration(ms) * time.Millisecond
 }

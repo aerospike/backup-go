@@ -193,22 +193,22 @@ func (r *singleRecordReader) startScan() {
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
 func (r *singleRecordReader) executeProducer(producer scanProducer) error {
-	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-		return fmt.Errorf("failed to acquire scan limiter: %w", err)
-	}
-
-	defer r.config.scanLimiter.Release(1)
-
 	for {
 		if r.ctx.Err() != nil {
 			return r.ctx.Err()
+		}
+
+		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
+		if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+			return fmt.Errorf("failed to acquire scan limiter: %w", err)
 		}
 
 		// Call the producer function. This starts the actual Aerospike scan
 		// and returns a channel for its results.
 		recordset, err := producer()
 		if err != nil {
+			r.config.scanLimiter.Release(1)
+
 			return fmt.Errorf("scan producer failed: %w", err)
 		}
 
@@ -223,16 +223,13 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 		closeErr := closeRecordset()
 
 		// Release the semaphore manually because of for loop.
-		if r.config.scanLimiter != nil {
-			r.config.scanLimiter.Release(1)
-		}
+		r.config.scanLimiter.Release(1)
 
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
 		if drainErr != nil {
 			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
 				slog.Any("error", drainErr))
-			// Simple logic first, we just sleep for 10 sec and try again.
 			r.config.throttler.Wait(r.ctx)
 
 			continue

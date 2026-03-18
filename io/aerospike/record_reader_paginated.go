@@ -85,7 +85,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 	r.scanOnce.Do(func() {
 		r.logger.Debug("scan started")
 
-		go r.startScan(r.ctx)
+		go r.startScan()
 	})
 
 	select {
@@ -125,7 +125,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 }
 
 // startScan starts the scan for the RecordReader only for state save!
-func (r *paginatedRecordReader) startScan(ctx context.Context) {
+func (r *paginatedRecordReader) startScan() {
 	defer close(r.resultChan)
 
 	scanPolicy := *r.config.scanPolicy
@@ -133,19 +133,19 @@ func (r *paginatedRecordReader) startScan(ctx context.Context) {
 	scanPolicy.MaxRecords = r.config.pageSize
 
 	for _, set := range r.config.setList {
-		if err := r.scanSet(ctx, set, &scanPolicy); err != nil {
+		if err := r.scanSet(set, &scanPolicy); err != nil {
 			r.errChan <- err
 			return
 		}
 	}
 }
 
-func (r *paginatedRecordReader) scanSet(ctx context.Context, set string, scanPolicy *a.ScanPolicy) error {
+func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
 	// Each scan requires a copy of the partition filter.
 	pf := *r.config.partitionFilter
 
 	for {
-		count, err := r.scanPage(ctx, &pf, scanPolicy, set)
+		count, err := r.scanPage(&pf, scanPolicy, set)
 		if err != nil {
 			return fmt.Errorf("failed to scan set %s namespace %s: %w", set, r.config.namespace, err)
 		}
@@ -157,7 +157,6 @@ func (r *paginatedRecordReader) scanSet(ctx context.Context, set string, scanPol
 }
 
 func (r *paginatedRecordReader) scanPage(
-	ctx context.Context,
 	pf *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	set string,
@@ -214,10 +213,13 @@ func (r *paginatedRecordReader) scanPage(
 		// If we broke out because of a connection error on the first record,
 		// we loop back to the top to restart the producer.
 		if drainErr != nil {
-			r.logger.Debug("database hasn't got enough resources, waiting for a signal",
-				slog.Any("error", drainErr))
+			r.logger.Debug(
+				"database hasn't got enough resources, waiting for a signal",
+				slog.Any("drainErr", drainErr),
+				slog.Any("closeErr", closeErr),
+			)
 			// Simple logic first, we just sleep for 10 sec and try again.
-			r.config.throttler.Wait(ctx)
+			r.config.throttler.Wait(r.ctx)
 
 			// Reset the partition filter to the state before the failed scan.
 			// We must copy into *pf rather than reassigning the pointer,
@@ -233,7 +235,7 @@ func (r *paginatedRecordReader) scanPage(
 		}
 
 		// Successfully drained all results, notify the throttler.
-		r.config.throttler.Notify(ctx)
+		r.config.throttler.Notify(r.ctx)
 
 		r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 

@@ -129,8 +129,12 @@ type ConfigBackup struct {
 	OutputFilePrefix string
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
-
-	ScanThrottling        int
+	// ScanThrottling limits the scan throughput (for example, records per second per node).
+	// A value of 0 disables scan throttling. Must be >= 0.
+	ScanThrottling int
+	// ScanThrottlingTimeout is the maximum backoff duration between throttled scan batches.
+	// This is a Go time.Duration (e.g. time.Second). It is only used when ScanThrottling > 0
+	// and should be > 0 to avoid immediate or effectively zero-length waits.
 	ScanThrottlingTimeout time.Duration
 }
 

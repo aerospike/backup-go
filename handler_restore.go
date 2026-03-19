@@ -86,7 +86,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	reader StreamingReader,
 	infoClient InfoGetter,
 ) (*RestoreHandler[T], error) {
-	id := uuid.NewString()
+	id := uuid.NewString()[:6]
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id)
 

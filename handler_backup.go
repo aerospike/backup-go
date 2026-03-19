@@ -101,7 +101,7 @@ func newBackupHandler(
 	scanLimiter scanlimiter.Limiter,
 	infoClient InfoGetter,
 ) (*BackupHandler, error) {
-	id := uuid.NewString()
+	id := uuid.NewString()[:6]
 	// For estimates calculations, a writer will be nil.
 	storageType := ""
 	if writer != nil {

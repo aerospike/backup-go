@@ -156,91 +156,109 @@ func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 	}
 }
 
+// scanPage performs a paginated scan on a specific set using the provided partition filter and scan policy.
 func (r *paginatedRecordReader) scanPage(
 	pf *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	set string,
 ) (uint64, error) {
 	for {
-		if err := r.ctx.Err(); err != nil {
+		retry, count, err := r.scanPageOnce(pf, scanPolicy, set)
+		if err != nil {
 			return 0, err
 		}
 
-		// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-		if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-			return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+		if !retry {
+			return count, nil
 		}
+	}
+}
 
-		pfs, err := models.NewPartitionFilterSerialized(pf)
-		if err != nil {
-			r.config.scanLimiter.Release(1)
+// scanPageOnce performs a single scan over a filtered partition of a given set and returns retry status,
+// count, and errors.
+func (r *paginatedRecordReader) scanPageOnce(
+	pf *a.PartitionFilter,
+	scanPolicy *a.ScanPolicy,
+	set string,
+) (retry bool, count uint64, err error) {
+	if err := r.ctx.Err(); err != nil {
+		return false, 0, err
+	}
 
-			return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
-		}
+	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
+	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+		return false, 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+	}
 
-		recordset, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
-			scanPolicy,
-			pf,
-			r.config.namespace,
-			set,
-			r.config.binList...,
-		)
-		if aErr != nil {
-			r.config.scanLimiter.Release(1)
-
-			return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
-		}
-
-		r.logger.Debug("partition scan started",
-			slog.Uint64("transactionId", recordset.TaskId()),
-			slog.String("set", set),
-			slog.String("filter", printPartitionFilter(pf)),
-		)
-
-		// Set close recordset function.
-		closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
-
-		// Drain all results from this specific scan.
-		// No context checking here because it slows down the scan.
-		count, drainErr := r.drainResults(pfs, recordset, closeRecordset)
-
-		// Do not return an error immediately, because we need to perform some actions first.
-		closeErr := closeRecordset()
-
-		// Release the semaphore manually because of for loop.
+	pfs, err := models.NewPartitionFilterSerialized(pf)
+	if err != nil {
 		r.config.scanLimiter.Release(1)
 
-		// If we broke out because of a connection error on the first record,
-		// we loop back to the top to restart the producer.
-		if drainErr != nil {
-			r.logger.Debug(
-				"database hasn't got enough resources, waiting for a signal",
-				slog.Any("drainErr", drainErr),
-				slog.Any("closeErr", closeErr),
-			)
-			// Simple logic first, we just sleep for 10 sec and try again.
-			r.config.throttler.Wait(r.ctx)
+		return false, 0, fmt.Errorf("failed to serialize partition filter: %w", err)
+	}
 
-			// Reset the partition filter to the state before the failed scan.
-			// We must copy into *pf rather than reassigning the pointer,
-			// because scanSet holds the struct that pf points to.
-			decoded, err := pfs.Decode()
-			if err != nil {
-				return 0, fmt.Errorf("failed to deserialize partition filter: %w", err)
-			}
+	recordset, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
+		scanPolicy,
+		pf,
+		r.config.namespace,
+		set,
+		r.config.binList...,
+	)
+	if aErr != nil {
+		r.config.scanLimiter.Release(1)
 
-			*pf = *decoded
+		return false, 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
+	}
 
-			continue
+	r.logger.Debug("partition scan started",
+		slog.Uint64("transactionId", recordset.TaskId()),
+		slog.String("set", set),
+		slog.String("filter", printPartitionFilter(pf)),
+	)
+
+	// Set close recordset function.
+	closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
+
+	// Drain all results from this specific scan.
+	// No context checking here because it slows down the scan.
+	count, drainErr := r.drainResults(pfs, recordset, closeRecordset)
+
+	// Do not return an error immediately, because we need to perform some actions first.
+	closeErr := closeRecordset()
+
+	// Release the semaphore manually because of for loop.
+	r.config.scanLimiter.Release(1)
+
+	// If we broke out because of a connection error on the first record,
+	// we loop back to the top to restart the producer.
+	if drainErr != nil {
+		r.logger.Debug(
+			"database hasn't got enough resources, waiting for a signal",
+			slog.Any("drainErr", drainErr),
+			slog.Any("closeErr", closeErr),
+		)
+		// Simple logic first, we just sleep for 10 sec and try again.
+		r.config.throttler.Wait(r.ctx)
+
+		// Reset the partition filter to the state before the failed scan.
+		// We must copy into *pf rather than reassigning the pointer,
+		// because scanSet holds the struct that pf points to.
+		decoded, err := pfs.Decode()
+		if err != nil {
+			return false, 0, fmt.Errorf("failed to deserialize partition filter: %w", err)
 		}
 
-		// Successfully drained all results, notify the throttler.
-		r.config.throttler.Notify(r.ctx)
+		*pf = *decoded
 
-		r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
-
-		return count, closeErr
+		return true, 0, nil
 	}
+
+	// Successfully drained all results, notify the throttler.
+	r.config.throttler.Notify(r.ctx)
+
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
+
+	return false, count, closeErr
 }
 
 // drainResults drains results, and if operation failed return error

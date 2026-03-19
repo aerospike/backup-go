@@ -93,7 +93,7 @@ func runBackupRestoreLocal(
 		return nil, nil, fmt.Errorf("failed to create directory %s: %w", directory, err)
 	}
 
-	backupClient, err := NewClient(client, WithID("test_client"))
+	backupClient, err := NewClient(client)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create backup client: %w", err)
 	}
@@ -1238,7 +1238,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 	require.NoError(t, aerr)
 	defer testAeroClient.Close()
 
-	backupClient, err := NewClient(testAeroClient, WithID("test_client"))
+	backupClient, err := NewClient(testAeroClient)
 	require.NoError(t, err)
 
 	rh, err := backupClient.Restore(
@@ -1268,7 +1268,7 @@ func TestBackupContextCancel(t *testing.T) {
 	require.NoError(t, err)
 	defer asClient.Close()
 
-	backupClient, err := NewClient(asClient, WithID("test_client"))
+	backupClient, err := NewClient(asClient)
 	require.NoError(t, err)
 
 	directory := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
@@ -1305,7 +1305,7 @@ func TestRestoreContextCancel(t *testing.T) {
 	require.NoError(t, err)
 	defer asClient.Close()
 
-	backupClient, err := NewClient(asClient, WithID("test_client"))
+	backupClient, err := NewClient(asClient)
 	require.NoError(t, err)
 
 	directory := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
@@ -1346,7 +1346,7 @@ func TestBackupEstimate(t *testing.T) {
 	err = writeRecords(asClient, records)
 	require.NoError(t, err)
 
-	backupClient, err := NewClient(asClient, WithID("test_client"))
+	backupClient, err := NewClient(asClient)
 	require.NoError(t, err)
 
 	configFileLimit := NewDefaultBackupConfig()
@@ -1455,7 +1455,7 @@ func runFirstBackup(ctx context.Context, asClient *a.Client, setName, testFolder
 	backupCfg.FileLimit = 10
 	backupCfg.PageSize = 1
 
-	backupClient, err := NewClient(asClient, WithID("test_client"))
+	backupClient, err := NewClient(asClient)
 	if err != nil {
 		return 0, err
 	}
@@ -1505,7 +1505,7 @@ func runContinueBackup(ctx context.Context, asClient *a.Client, setName, testFol
 	backupCfg.FileLimit = 100000
 	backupCfg.PageSize = 100
 
-	backupClient, err := NewClient(asClient, WithID("test_client"))
+	backupClient, err := NewClient(asClient)
 	if err != nil {
 		return 0, err
 	}

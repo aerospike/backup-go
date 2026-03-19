@@ -33,21 +33,18 @@ func TestClientOptions(t *testing.T) {
 	var logBuffer strings.Builder
 	logger := slog.New(slog.NewTextHandler(&logBuffer, nil))
 	sem := semaphore.NewWeighted(10)
-	id := "ID"
 
 	testAeroClient, aerr := testAerospikeClient()
 	require.NoError(t, aerr)
 
 	client, err := NewClient(
 		testAeroClient,
-		WithID(id),
 		WithLogger(logger),
 		WithScanLimiter(sem),
 		WithInfoPolicies(&a.InfoPolicy{}, models.NewDefaultRetryPolicy()),
 	)
 
 	require.NoError(t, err)
-	assert.Equal(t, id, client.id)
 	assert.Equal(t, sem, client.scanLimiter)
 
 	client.logger.Info("test")

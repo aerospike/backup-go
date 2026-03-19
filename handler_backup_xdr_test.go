@@ -245,7 +245,6 @@ func newBackupClient(aerospikeClient *a.Client) (*Client, error) {
 
 	backupClient, err := NewClient(
 		aerospikeClient,
-		WithID("xdr_test_id"),
 		WithLogger(logger),
 	)
 	if err != nil {

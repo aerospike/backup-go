@@ -20,11 +20,9 @@ import (
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
-	"github.com/google/uuid"
 )
 
 const (
@@ -111,7 +109,7 @@ type InfoGetter interface {
 //		// handle error
 //	}
 //
-//	backupClient, err := backup.NewClient(asc, backup.WithID("id"))	// create a backup client
+//	backupClient, err := backup.NewClient(asc)	// create a backup client
 //	if err != nil {
 //		// handle error
 //	}
@@ -150,19 +148,10 @@ type Client struct {
 	infoPolicy *a.InfoPolicy
 	// Retry policy for info commands.
 	infoRetryPolicy *models.RetryPolicy
-	id              string
 }
 
 // ClientOpt is a functional option that allows configuring the [Client].
 type ClientOpt func(*Client)
-
-// WithID sets the ID for the [Client].
-// This ID is used for logging purposes.
-func WithID(id string) ClientOpt {
-	return func(c *Client) {
-		c.id = id
-	}
-}
 
 // WithLogger sets the logger for the [Client].
 func WithLogger(logger *slog.Logger) ClientOpt {
@@ -191,7 +180,6 @@ func WithInfoPolicies(ip *a.InfoPolicy, rp *models.RetryPolicy) ClientOpt {
 //   - ac is the aerospike client to use for backup and restore operations.
 //
 // options:
-//   - [WithID] to set an identifier for the client.
 //   - [WithLogger] to set a logger that this client will log to.
 //   - [WithScanLimiter] to set a semaphore that is used to limit number of concurrent scans.
 //   - [WithInfoPolicies] to set InfoPolicy and RetryPolicy for info commands.
@@ -200,7 +188,6 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 	client := &Client{
 		aerospikeClient: ac,
 		logger:          slog.Default(),
-		id:              uuid.NewString()[:6],
 	}
 
 	// Apply all options to the Client
@@ -210,7 +197,6 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 
 	// Further customization after applying options
 	client.logger = client.logger.WithGroup("backup")
-	client.logger = logging.WithClient(client.logger, client.id)
 
 	// Initialize the info client only if the Aerospike client is available.
 	if ac != nil {

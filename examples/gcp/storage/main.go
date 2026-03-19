@@ -60,7 +60,7 @@ func initBackupClient() *backup.Client {
 		panic(aerr)
 	}
 
-	backupClient, err := backup.NewClient(aerospikeClient, backup.WithID("client_id"))
+	backupClient, err := backup.NewClient(aerospikeClient)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -16,11 +16,6 @@ package logging
 
 import "log/slog"
 
-func WithClient(logger *slog.Logger, id string) *slog.Logger {
-	group := slog.Group("client", "id", id)
-	return logger.With(group)
-}
-
 type HandlerType string
 
 const (

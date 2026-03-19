@@ -59,7 +59,7 @@ func newBackupXDRHandler(
 	logger *slog.Logger,
 	infoClient InfoGetter,
 ) (*HandlerBackupXDR, error) {
-	id := uuid.NewString()
+	id := uuid.NewString()[:6]
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 

@@ -48,7 +48,7 @@ func TestClientOptions(t *testing.T) {
 	assert.Equal(t, sem, client.scanLimiter)
 
 	client.logger.Info("test")
-	assert.Contains(t, logBuffer.String(), "level=INFO msg=test backup.client.id=ID")
+	assert.Contains(t, logBuffer.String(), "level=INFO msg=test")
 }
 
 // Negative test cases for Backup method

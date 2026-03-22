@@ -112,8 +112,5 @@ func shouldThrottle(err error) bool {
 		return ae.Matches(types.NO_AVAILABLE_CONNECTIONS_TO_NODE) || ae.Matches(types.FAIL_FORBIDDEN)
 	}
 
-	// Additional errors that should be throttled.
-	return errors.Is(err, a.ErrConnectionPoolEmpty) ||
-		errors.Is(err, a.ErrConnectionPoolExhausted) ||
-		errors.Is(err, a.ErrTooManyConnectionsForNode)
+	return false
 }

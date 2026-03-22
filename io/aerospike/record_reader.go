@@ -271,7 +271,7 @@ func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset
 	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
 		// Check only the FIRST result for the specific connection error
-		// and only if throttler is initialized.
+		// and only if the throttler is initialized.
 		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
 			return res.Err
 		}

@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -23,23 +24,57 @@ import (
 )
 
 type udfWriter struct {
+	ctx         context.Context
 	asc         dbWriter
 	writePolicy *a.WritePolicy
+	retryPolicy *models.RetryPolicy
 	logger      *slog.Logger
 }
 
+func newUdfWriter(
+	ctx context.Context,
+	asc dbWriter,
+	writePolicy *a.WritePolicy,
+	retryPolicy *models.RetryPolicy,
+	logger *slog.Logger,
+) *udfWriter {
+	return &udfWriter{
+		ctx:         ctx,
+		asc:         asc,
+		writePolicy: writePolicy,
+		retryPolicy: retryPolicy,
+		logger:      logger,
+	}
+}
+
 // writeUDF writes a UDF to the Aerospike database.
-func (rw udfWriter) writeUDF(udf *models.UDF) error {
-	var UDFLang a.Language
+func (rw *udfWriter) writeUDF(udf *models.UDF) error {
+	var udfLang a.Language
 
 	switch udf.UDFType {
 	case models.UDFTypeLUA:
-		UDFLang = a.LUA
+		udfLang = a.LUA
 	default:
 		return fmt.Errorf("failed to register UDF %s: invalid UDF language %b", udf.Name, udf.UDFType)
 	}
 
-	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, UDFLang)
+	if err := rw.executeWrite(udf, udfLang); err != nil {
+		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
+	}
+
+	rw.logger.Debug("registered UDF", slog.String("name", udf.Name))
+
+	return nil
+}
+
+func (rw *udfWriter) executeWrite(udf *models.UDF, udfLang a.Language) error {
+	return rw.retryPolicy.Do(rw.ctx, func() error {
+		return rw.executeWriteOnce(udf, udfLang)
+	})
+}
+
+func (rw *udfWriter) executeWriteOnce(udf *models.UDF, udfLang a.Language) error {
+	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, udfLang)
 	if aerr != nil {
 		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, aerr)
 	}
@@ -49,16 +84,11 @@ func (rw udfWriter) writeUDF(udf *models.UDF) error {
 	}
 
 	errs := job.OnComplete()
-	if errs == nil {
-		return fmt.Errorf("failed to register UDF %s: onComplete returned nil channel", udf.Name)
-	}
 
 	err := <-errs
 	if err != nil {
 		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
 	}
-
-	rw.logger.Debug("registered UDF", slog.String("name", udf.Name))
 
 	return nil
 }

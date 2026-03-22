@@ -15,6 +15,7 @@
 package aerospike
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -24,13 +25,31 @@ import (
 )
 
 type sindexWriter struct {
+	ctx         context.Context
 	asc         dbWriter
 	writePolicy *a.WritePolicy
+	retryPolicy *models.RetryPolicy
 	logger      *slog.Logger
 }
 
+func newSindexWriter(
+	ctx context.Context,
+	asc dbWriter,
+	writePolicy *a.WritePolicy,
+	retryPolicy *models.RetryPolicy,
+	logger *slog.Logger,
+) *sindexWriter {
+	return &sindexWriter{
+		ctx:         ctx,
+		asc:         asc,
+		writePolicy: writePolicy,
+		retryPolicy: retryPolicy,
+		logger:      logger,
+	}
+}
+
 // writeSecondaryIndex writes a secondary index to Aerospike.
-func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
+func (rw *sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	var sIndexType a.IndexType
 
 	switch si.Path.BinType {
@@ -62,13 +81,13 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	}
 
 	var (
-		ctx []*a.CDTContext
-		exp *a.Expression
-		err error
+		cdtCtx []*a.CDTContext
+		exp    *a.Expression
+		err    error
 	)
 
 	if si.Path.B64Context != "" {
-		ctx, err = a.Base64ToCDTContext(si.Path.B64Context)
+		cdtCtx, err = a.Base64ToCDTContext(si.Path.B64Context)
 		if err != nil {
 			return fmt.Errorf("failed to decode sindex context %s: %w", si.Path.B64Context, err)
 		}
@@ -81,51 +100,8 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		}
 	}
 
-	job, aErr := rw.createIndex(
-		rw.writePolicy,
-		si,
-		sIndexType,
-		sIndexCollectionType,
-		exp,
-		ctx...,
-	)
-	if aErr != nil {
-		if !aErr.Matches(atypes.INDEX_FOUND) {
-			return fmt.Errorf("failed to create sindex %s: %w", si.Name, aErr)
-		}
-
-		rw.logger.Debug("secondary index already exists, replacing it", slog.String("name", si.Name))
-
-		err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
-		if err != nil {
-			return fmt.Errorf("failed to drop sindex %s: %w", si.Name, err)
-		}
-
-		job, err = rw.createIndex(
-			rw.writePolicy,
-			si,
-			sIndexType,
-			sIndexCollectionType,
-			exp,
-			ctx...,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create replacement sindex %s: %w", si.Name, err)
-		}
-	}
-
-	if job == nil {
-		return fmt.Errorf("failed to create sindex: job is nil")
-	}
-
-	errs := job.OnComplete()
-	if errs == nil {
-		return fmt.Errorf("failed to create sindex: onComplete returned nil channel")
-	}
-
-	err = <-errs
-	if err != nil {
-		return fmt.Errorf("failed to create sindex %s: %w", si.Name, err)
+	if err := rw.executeWrite(si, sIndexType, sIndexCollectionType, exp, cdtCtx...); err != nil {
+		return err
 	}
 
 	rw.logger.Debug("created secondary index", slog.String("name", si.Name))
@@ -133,13 +109,114 @@ func (rw sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	return nil
 }
 
-func (rw sindexWriter) createIndex(
+func (rw *sindexWriter) executeWrite(
+	si *models.SIndex,
+	sIndexType a.IndexType,
+	sIndexCollectionType a.IndexCollectionType,
+	exp *a.Expression,
+	cdtCtx ...*a.CDTContext,
+) error {
+	return rw.retryPolicy.Do(rw.ctx, func() error {
+		return rw.executeWriteOnce(
+			si,
+			sIndexType,
+			sIndexCollectionType,
+			exp,
+			cdtCtx...,
+		)
+	})
+}
+
+func (rw *sindexWriter) executeWriteOnce(
+	si *models.SIndex,
+	sIndexType a.IndexType,
+	sIndexCollectionType a.IndexCollectionType,
+	exp *a.Expression,
+	cdtCtx ...*a.CDTContext,
+) error {
+	job, aerr := rw.createIndex(
+		rw.writePolicy,
+		si,
+		sIndexType,
+		sIndexCollectionType,
+		exp,
+		cdtCtx...,
+	)
+	if aerr != nil {
+		var err error
+
+		job, err = rw.recreateIndexIfExists(
+			aerr,
+			si,
+			sIndexType,
+			sIndexCollectionType,
+			exp,
+			cdtCtx...,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return rw.waitCreateIndexJob(si, job)
+}
+
+func (rw *sindexWriter) recreateIndexIfExists(
+	createErr a.Error,
+	si *models.SIndex,
+	sIndexType a.IndexType,
+	sIndexCollectionType a.IndexCollectionType,
+	exp *a.Expression,
+	cdtCtx ...*a.CDTContext,
+) (*a.IndexTask, error) {
+	if !createErr.Matches(atypes.INDEX_FOUND) {
+		return nil, fmt.Errorf("failed to create sindex %s: %w", si.Name, createErr)
+	}
+
+	rw.logger.Debug("secondary index already exists, replacing it", slog.String("name", si.Name))
+
+	err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to drop sindex %s: %w", si.Name, err)
+	}
+
+	job, err := rw.createIndex(
+		rw.writePolicy,
+		si,
+		sIndexType,
+		sIndexCollectionType,
+		exp,
+		cdtCtx...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replacement sindex %s: %w", si.Name, err)
+	}
+
+	return job, nil
+}
+
+func (rw *sindexWriter) waitCreateIndexJob(si *models.SIndex, job *a.IndexTask) error {
+	if job == nil {
+		return fmt.Errorf("failed to create sindex: job is nil")
+	}
+
+	errs := job.OnComplete()
+
+	err := <-errs
+	if err != nil {
+		return fmt.Errorf("failed to create sindex %s: %w", si.Name, err)
+	}
+
+	return nil
+}
+
+func (rw *sindexWriter) createIndex(
 	wp *a.WritePolicy,
 	si *models.SIndex,
 	sIndexType a.IndexType,
 	sIndexCollectionType a.IndexCollectionType,
 	exp *a.Expression,
-	ctx ...*a.CDTContext,
+	cdtCtx ...*a.CDTContext,
 ) (*a.IndexTask, a.Error) {
 	if si.Expression != "" {
 		return rw.asc.CreateIndexWithExpression(
@@ -161,6 +238,6 @@ func (rw sindexWriter) createIndex(
 		si.Path.BinName,
 		sIndexType,
 		sIndexCollectionType,
-		ctx...,
+		cdtCtx...,
 	)
 }

@@ -69,25 +69,26 @@ func (rw *udfWriter) writeUDF(udf *models.UDF) error {
 
 func (rw *udfWriter) executeWrite(udf *models.UDF, udfLang a.Language) error {
 	return rw.retryPolicy.Do(rw.ctx, func() error {
-		job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, udfLang)
-		if aerr != nil {
-			return fmt.Errorf("failed to register UDF %s: %w", udf.Name, aerr)
-		}
-
-		if job == nil {
-			return fmt.Errorf("failed to register UDF %s: job is nil", udf.Name)
-		}
-
-		errs := job.OnComplete()
-		if errs == nil {
-			return fmt.Errorf("failed to register UDF %s: onComplete returned nil channel", udf.Name)
-		}
-
-		err := <-errs
-		if err != nil {
-			return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
-		}
-
-		return nil
+		return rw.executeWriteOnce(udf, udfLang)
 	})
+}
+
+func (rw *udfWriter) executeWriteOnce(udf *models.UDF, udfLang a.Language) error {
+	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, udfLang)
+	if aerr != nil {
+		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, aerr)
+	}
+
+	if job == nil {
+		return fmt.Errorf("failed to register UDF %s: job is nil", udf.Name)
+	}
+
+	errs := job.OnComplete()
+
+	err := <-errs
+	if err != nil {
+		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
+	}
+
+	return nil
 }

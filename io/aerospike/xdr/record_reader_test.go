@@ -15,6 +15,7 @@
 package xdr
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -43,14 +44,14 @@ const (
 	testStartTimeout      = 10 * time.Second
 )
 
-func testTCPConfig(host string) *TCPConfig {
-	cfg := newDefaultTCPConfig()
+func testTCPConfig(ctx context.Context, host string) *TCPConfig {
+	cfg := newDefaultTCPConfig(ctx)
 	// Remap address to the specified host
 	cfg.Address = host
 	return cfg
 }
 
-func testRecordReaderConfig(host ...string) *RecordReaderConfig {
+func testRecordReaderConfig(ctx context.Context, host ...string) *RecordReaderConfig {
 	hostToUse := testCurrentHost
 	if len(host) > 0 {
 		hostToUse = host[0]
@@ -60,7 +61,7 @@ func testRecordReaderConfig(host ...string) *RecordReaderConfig {
 		testNamespace,
 		testRewind,
 		hostToUse,
-		testTCPConfig(hostToUse),
+		testTCPConfig(ctx, hostToUse),
 		testInfoPollingPeriod,
 		testStartTimeout,
 		0,
@@ -94,7 +95,7 @@ func TestRecordReader(t *testing.T) {
 	}))
 	ic := newInfoMock(t)
 
-	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(testCurrentHost2), logger)
+	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(t.Context(), testCurrentHost2), logger)
 	require.NoError(t, err)
 
 	var counter atomic.Uint64
@@ -142,7 +143,7 @@ func TestRecordReaderCloseNotRunning(t *testing.T) {
 
 	ic := mocks.NewMockinfoCommander(t)
 
-	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(testCurrentHost3), logger)
+	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(t.Context(), testCurrentHost3), logger)
 	require.NoError(t, err)
 
 	r.Close()
@@ -156,7 +157,7 @@ func TestRecordReaderServeNoNodes(t *testing.T) {
 	ic := mocks.NewMockinfoCommander(t)
 	ic.On("GetNodesNames").Return([]string{})
 
-	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(testCurrentHost4), logger)
+	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(t.Context(), testCurrentHost4), logger)
 	require.NoError(t, err)
 
 	r.serve()
@@ -174,11 +175,11 @@ func TestRecordReaderWatchNodes(t *testing.T) {
 	ic.On("BlockMRTWrites", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	hostPort := testCurrentHost5
-	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(hostPort), logger)
+	r, err := NewRecordReader(ctx, ic, testRecordReaderConfig(t.Context(), hostPort), logger)
 	require.NoError(t, err)
 
-	node1 := NewNodeReader(ctx, "node1", ic, testRecordReaderConfig(hostPort), r.nodesRecovered, logger)
-	node2 := NewNodeReader(ctx, "node2", ic, testRecordReaderConfig(hostPort), r.nodesRecovered, logger)
+	node1 := NewNodeReader(ctx, "node1", ic, testRecordReaderConfig(t.Context(), hostPort), r.nodesRecovered, logger)
+	node2 := NewNodeReader(ctx, "node2", ic, testRecordReaderConfig(t.Context(), hostPort), r.nodesRecovered, logger)
 
 	r.anMu.Lock()
 	r.activeNodes = []*NodeReader{node1, node2}

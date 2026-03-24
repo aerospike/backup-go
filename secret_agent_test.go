@@ -73,9 +73,9 @@ rqDyLDkROLjIJE1InlzrtH9rHGInExFVWbzL1jpCV7GtQsYVdiSxHzNaRB47UGZI
 ah87+EsQLgoao6VWDlepN54P`
 )
 
-func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error) {
+func mockTCPServer(ctx context.Context, address string, handler func(net.Conn)) (net.Listener, error) {
 	var lc net.ListenConfig
-	listener, err := lc.Listen(context.Background(), saClient.ConnectionTypeTCP, address)
+	listener, err := lc.Listen(ctx, saClient.ConnectionTypeTCP, address)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func TestSecretAgent_getTlSConfig(t *testing.T) {
 func TestSecretAgent_getSecret(t *testing.T) {
 	t.Parallel()
 
-	listener, err := mockTCPServer(fmt.Sprintf(":%d", testSAPort), mockHandler)
+	listener, err := mockTCPServer(t.Context(), fmt.Sprintf(":%d", testSAPort), mockHandler)
 	require.NoError(t, err)
 	defer sneakyClose(listener)
 
@@ -239,7 +239,7 @@ func TestParseSecret_SecretValueIsResolved(t *testing.T) {
 	// and want to avoid any flakiness around timing / port reuse.
 
 	// Use mockTCPServer with an ephemeral port.
-	listener, err := mockTCPServer("127.0.0.1:0", mockHandler)
+	listener, err := mockTCPServer(t.Context(), "127.0.0.1:0", mockHandler)
 	require.NoError(t, err)
 	defer sneakyClose(listener)
 
@@ -337,7 +337,7 @@ func TestNewSecretAgentClient_TLSConfigError(t *testing.T) {
 func TestNewSecretAgentClient_Success(t *testing.T) {
 	// As with the ParseSecret success test, avoid t.Parallel since we spin up a real listener.
 
-	listener, err := mockTCPServer("127.0.0.1:0", mockHandler)
+	listener, err := mockTCPServer(t.Context(), "127.0.0.1:0", mockHandler)
 	require.NoError(t, err)
 	defer sneakyClose(listener)
 

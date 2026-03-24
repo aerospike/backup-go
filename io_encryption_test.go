@@ -87,7 +87,7 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 	t.Setenv(testPKeyEnv, string(pemData))
 	t.Setenv(testPKeyEnvErrContent, testPKeyEnvErrContent)
 
-	listener, err := mockTCPServer(testEncSAAddress, mockHandler)
+	listener, err := mockTCPServer(t.Context(), testEncSAAddress, mockHandler)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 	// Wait for server start.

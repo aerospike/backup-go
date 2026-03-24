@@ -16,13 +16,14 @@ package s3
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -304,8 +305,8 @@ func (w *s3Writer) Close() error {
 
 	// Sort completed parts by part number (required by S3).
 	w.cpMu.Lock()
-	sort.Slice(w.completedParts, func(i, j int) bool {
-		return *w.completedParts[i].PartNumber < *w.completedParts[j].PartNumber
+	slices.SortFunc(w.completedParts, func(a, b types.CompletedPart) int {
+		return cmp.Compare(*a.PartNumber, *b.PartNumber)
 	})
 
 	// Verify no gaps in part numbers.

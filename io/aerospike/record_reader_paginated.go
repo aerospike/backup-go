@@ -274,10 +274,11 @@ func (r *paginatedRecordReader) drainResults(
 	// Check only the FIRST result for the specific connection error
 	// and only if the throttler is initialized.
 	first, ok := <-recordset.Results()
-	if !ok {
+	if !ok || shouldSkipPaginatedDrainError(first.Err) {
 		return 0, nil
 	}
 
+	// Check if we should throttle.
 	if r.config.throttler != nil && shouldThrottle(first.Err) {
 		return 0, first.Err
 	}
@@ -292,16 +293,25 @@ func (r *paginatedRecordReader) drainResults(
 	for res := range recordset.Results() {
 		count++
 
-		if res.Err != nil {
-			// When reading the last page (containing 0 records),
-			// the scan might return a types.INVALID_NODE_ERROR.
-			if res.Err.Matches(types.INVALID_NODE_ERROR) {
-				continue
-			}
+		if shouldSkipPaginatedDrainError(res.Err) {
+			continue
 		}
 
 		r.resultChan <- newPageRecord(res, &pfs)
 	}
 
 	return count, nil
+}
+
+// shouldSkipPaginatedDrainError used only for paginated drainer.
+// When reading the last page (containing 0 records),
+// the scan might return a types.INVALID_NODE_ERROR.
+func shouldSkipPaginatedDrainError(err a.Error) bool {
+	if err != nil {
+		if err.Matches(types.INVALID_NODE_ERROR) {
+			return true
+		}
+	}
+
+	return false
 }

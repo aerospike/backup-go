@@ -80,7 +80,7 @@ type GCPSuite struct {
 
 func (s *GCPSuite) SetupSuite() {
 	defer s.suiteWg.Done() // Signal that setup is complete
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(ctx, option.WithEndpoint(testServiceAddress), option.WithoutAuthentication())
 	s.Require().NoError(err)
 
@@ -286,7 +286,7 @@ func (mock validatorMock) Run(fileName string) error {
 func (s *GCPSuite) TestReader_StreamFilesOk() {
 	s.suiteWg.Wait()
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -328,7 +328,7 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 func (s *GCPSuite) TestReader_WithSorting() {
 	s.suiteWg.Wait()
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -375,7 +375,7 @@ func (s *GCPSuite) TestReader_WithSorting() {
 
 func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -396,7 +396,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 
 func (s *GCPSuite) TestReader_StreamFilesMixed() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -436,7 +436,7 @@ func (s *GCPSuite) TestReader_StreamFilesMixed() {
 
 func (s *GCPSuite) TestReader_GetType() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -459,7 +459,7 @@ func (s *GCPSuite) TestReader_GetType() {
 
 func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -491,7 +491,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -511,7 +511,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDirError() {
 
 func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -543,7 +543,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 
 func (s *GCPSuite) TestWriter_WriteMixedDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -575,7 +575,7 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 
 func (s *GCPSuite) TestWriter_GetType() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -598,7 +598,7 @@ func (s *GCPSuite) TestWriter_GetType() {
 
 func (s *GCPSuite) TestReader_OpenFileOk() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -637,7 +637,7 @@ func (s *GCPSuite) TestReader_OpenFileOk() {
 
 func (s *GCPSuite) TestReader_OpenFileErr() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -666,7 +666,7 @@ func (s *GCPSuite) TestReader_OpenFileErr() {
 
 func (s *GCPSuite) TestWriter_WriteSingleFile() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -693,7 +693,7 @@ func (s *GCPSuite) TestWriter_WriteSingleFile() {
 
 func (s *GCPSuite) TestReader_WithStartOffset() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -737,7 +737,7 @@ func (s *GCPSuite) TestReader_WithStartOffset() {
 
 func (s *GCPSuite) TestReader_StreamPathList() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -783,7 +783,7 @@ func (s *GCPSuite) TestReader_StreamPathList() {
 
 func (s *GCPSuite) TestReader_StreamFilesList() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -828,7 +828,7 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 
 func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),
@@ -902,7 +902,7 @@ func readAll(r io.ReadCloser) (string, error) {
 func (s *GCPSuite) TestReader_StreamFiles_Skipped() {
 	s.suiteWg.Wait()
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := storage.NewClient(
 		ctx,
 		option.WithEndpoint(testServiceAddress),

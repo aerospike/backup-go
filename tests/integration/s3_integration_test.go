@@ -74,7 +74,7 @@ func (s *writeReadTestSuite) TearDownSuite() {}
 
 func (s *writeReadTestSuite) TestWriteRead() {
 	s3Client, err := getS3Client(
-		context.Background(),
+		s.T().Context(),
 		"minio",
 		"eu",
 		"http://localhost:9000",
@@ -92,7 +92,7 @@ func (s *writeReadTestSuite) TestWriteRead() {
 
 func (s *writeReadTestSuite) TestWriteReadSingleFile() {
 	s3Client, err := getS3Client(
-		context.Background(),
+		s.T().Context(),
 		"minio",
 		"eu",
 		"http://localhost:9000",
@@ -120,7 +120,7 @@ func randomBytes(n int) []byte {
 }
 
 func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3.Client) []byte {
-	ctx := context.Background()
+	ctx := s.T().Context()
 	writers, err := s3Storasge.NewWriter(
 		ctx,
 		client,
@@ -168,7 +168,7 @@ func (s *writeReadTestSuite) write(filename string, bytes, times int, client *s3
 
 func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 	reader, err := s3Storasge.NewReader(
-		context.Background(),
+		s.T().Context(),
 		client,
 		"backup",
 		options.WithDir(testBackupDir),
@@ -178,7 +178,7 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go reader.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go reader.StreamFiles(s.T().Context(), readerChan, errorChan, nil)
 
 	select {
 	case r := <-readerChan:
@@ -195,7 +195,7 @@ func (s *writeReadTestSuite) read(client *s3.Client) []byte {
 }
 
 func (s *writeReadTestSuite) writeSingleFile(bytes, times int, client *s3.Client) []byte {
-	ctx := context.Background()
+	ctx := s.T().Context()
 	writers, err := s3Storasge.NewWriter(
 		ctx,
 		client,
@@ -233,7 +233,7 @@ func (s *writeReadTestSuite) writeSingleFile(bytes, times int, client *s3.Client
 
 func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 	reader, err := s3Storasge.NewReader(
-		context.Background(),
+		s.T().Context(),
 		client,
 		"backup",
 		options.WithFile(testBackupFile),
@@ -243,7 +243,7 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 
 	readerChan := make(chan models.File)
 	errorChan := make(chan error)
-	go reader.StreamFiles(context.Background(), readerChan, errorChan, nil)
+	go reader.StreamFiles(s.T().Context(), readerChan, errorChan, nil)
 
 	select {
 	case r := <-readerChan:

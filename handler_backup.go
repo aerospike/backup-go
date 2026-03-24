@@ -236,13 +236,12 @@ func newBackupHandler(
 // run runs the backup job.
 // currently this should only be run once.
 func (bh *BackupHandler) run() {
-	bh.wg.Add(1)
 	bh.stats.Start()
 
-	go doWork(bh.errors, bh.done, bh.logger, func() error {
-		defer bh.wg.Done()
-
-		return bh.backup(bh.ctx)
+	bh.wg.Go(func() {
+		doWork(bh.errors, bh.done, bh.logger, func() error {
+			return bh.backup(bh.ctx)
+		})
 	})
 }
 

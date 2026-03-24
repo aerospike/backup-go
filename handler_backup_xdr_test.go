@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -141,7 +140,7 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 	backupDir := filepath.Join(s.T().TempDir(), testBackupDir)
 	s.T().Log("backup directory: ", backupDir)
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 
 	writers, err := local.NewWriter(
 		ctx,
@@ -192,7 +191,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 	backupDir := filepath.Join(s.T().TempDir(), testBackupDirLimit)
 	s.T().Log("backup directory: ", backupDir)
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 
 	writers, err := local.NewWriter(
 		ctx,

@@ -216,16 +216,14 @@ func TestFanout_RunSplit(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	// Count only first output.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// For testASBXToken() index will be 2.
 		for range outputs[2] {
 			counterMutex.Lock()
 			counter++
 			counterMutex.Unlock()
 		}
-	}()
+	})
 
 	fan.Run(t.Context())
 
@@ -386,15 +384,13 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	// Count only first output.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range outputs[testIndex] {
 			counterMutex.Lock()
 			counter++
 			counterMutex.Unlock()
 		}
-	}()
+	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	go func() {

@@ -50,7 +50,7 @@ type Fanout[T models.TokenConstraint] struct {
 
 	strategy FanoutStrategy
 	// for RoundRobin
-	currentIndex uint64
+	currentIndex atomic.Uint64
 }
 
 // NewFanout returns a new Fanout.
@@ -147,7 +147,7 @@ func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 
 // roundRobin returns the next output chain index, distributing tokens in a fair, rotating manner.
 func (f *Fanout[T]) roundRobin(_ T) int {
-	index := atomic.AddUint64(&f.currentIndex, 1) % uint64(len(f.Outputs))
+	index := f.currentIndex.Add(1) % uint64(len(f.Outputs))
 
 	return int(index)
 }

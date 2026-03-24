@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	mRand "math/rand"
+	mRand "math/rand/v2"
 	"reflect"
 	"sort"
 	"strconv"
@@ -1728,7 +1728,7 @@ func genKey() *a.Key {
 	var key *a.Key
 	var err error
 
-	i := mRand.Intn(3)
+	i := mRand.IntN(3)
 
 	userKeys := []any{1, "string", []byte("bytes")}
 	userKey := userKeys[i%len(userKeys)]

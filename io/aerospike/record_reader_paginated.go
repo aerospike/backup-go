@@ -237,7 +237,6 @@ func (r *paginatedRecordReader) scanPageOnce(
 			slog.Any("drainErr", drainErr),
 			slog.Any("closeErr", closeErr),
 		)
-		// Simple logic first, we just sleep for 10 sec and try again.
 		r.config.throttler.Wait(r.ctx)
 
 		// Reset the partition filter to the state before the failed scan.
@@ -272,11 +271,21 @@ func (r *paginatedRecordReader) drainResults(
 
 	monitorContext[*pageRecord](r.ctx, r.logger, r.resultChan, done, closeRecordset)
 
-	// Used to check the first error.
-	var (
-		isFirst = true
-		count   uint64
-	)
+	// Check only the FIRST result for the specific connection error
+	// and only if the throttler is initialized.
+	first, ok := <-recordset.Results()
+	if !ok {
+		return 0, nil
+	}
+
+	if r.config.throttler != nil && shouldThrottle(first.Err) {
+		return 0, first.Err
+	}
+
+	r.resultChan <- newPageRecord(first, &pfs)
+
+	// Starting count from 1 as we processed first element
+	count := uint64(1)
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
@@ -289,15 +298,7 @@ func (r *paginatedRecordReader) drainResults(
 			if res.Err.Matches(types.INVALID_NODE_ERROR) {
 				continue
 			}
-			// check if we should throttle.
-			if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
-				r.logger.Debug("throttling with count", slog.Uint64("count", count))
-
-				return 0, res.Err
-			}
 		}
-
-		isFirst = false
 
 		r.resultChan <- newPageRecord(res, &pfs)
 	}

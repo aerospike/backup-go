@@ -265,19 +265,22 @@ func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset
 
 	monitorContext[*a.Result](r.ctx, r.logger, r.resultChan, done, closeRecordset)
 
-	// Used to check the first error.
-	var isFirst = true
+	// Check only the FIRST result for the specific connection error
+	// and only if the throttler is initialized.
+	first, ok := <-recordset.Results()
+	if !ok {
+		return nil
+	}
+
+	if r.config.throttler != nil && shouldThrottle(first.Err) {
+		return first.Err
+	}
+
+	r.resultChan <- first
+
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
-		// Check only the FIRST result for the specific connection error
-		// and only if the throttler is initialized.
-		if isFirst && shouldThrottle(res.Err) && r.config.throttler != nil {
-			return res.Err
-		}
-
-		isFirst = false
-
 		r.resultChan <- res
 	}
 

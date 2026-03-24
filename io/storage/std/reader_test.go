@@ -105,9 +105,7 @@ func TestReader_StreamFiles(t *testing.T) {
 	defer func() { os.Stdin = oldStdin }()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 	wg.Go(func() {
-		defer wg.Done()
 		_, err := w.WriteString(testData)
 		require.NoError(t, err)
 		_ = w.Close()
@@ -153,9 +151,7 @@ func TestReader_StreamFile(t *testing.T) {
 	defer func() { os.Stdin = oldStdin }()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 	wg.Go(func() {
-		defer wg.Done()
 		_, err := w.WriteString(testData)
 		require.NoError(t, err)
 		_ = w.Close()

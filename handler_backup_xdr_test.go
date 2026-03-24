@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -124,10 +124,9 @@ func generateList() *a.Bin {
 
 func generateRandomString(n int) string {
 	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	rand.New(rand.NewSource(time.Now().UnixNano()))
 	result := make([]rune, n)
 	for i := range result {
-		result[i] = letters[rand.Intn(len(letters))]
+		result[i] = letters[rand.IntN(len(letters))]
 	}
 	return string(result)
 }

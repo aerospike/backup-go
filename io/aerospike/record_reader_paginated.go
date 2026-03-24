@@ -16,7 +16,6 @@ package aerospike
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -40,7 +39,7 @@ type paginatedRecordReader struct {
 	client          scanner
 	logger          *slog.Logger
 	config          *RecordReaderConfig
-	pageRecordsChan chan *pageRecord
+	resultChan      chan *pageRecord
 	errChan         chan error
 	scanOnce        sync.Once
 	recordsetCloser RecordsetCloser
@@ -67,7 +66,7 @@ func newPaginatedRecordReader(
 		client:          scanner,
 		logger:          logger,
 		config:          cfg,
-		pageRecordsChan: make(chan *pageRecord),
+		resultChan:      make(chan *pageRecord, resultChanSize),
 		errChan:         make(chan error, 1),
 		scanOnce:        sync.Once{},
 		recordsetCloser: closer,
@@ -98,7 +97,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 	case err := <-r.errChan:
 		r.cancel()
 		return nil, err
-	case res, ok := <-r.pageRecordsChan:
+	case res, ok := <-r.resultChan:
 		if !ok {
 			r.logger.Debug("scan finished")
 			return nil, io.EOF
@@ -127,7 +126,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 
 // startScan starts the scan for the RecordReader only for state save!
 func (r *paginatedRecordReader) startScan() {
-	defer close(r.pageRecordsChan)
+	defer close(r.resultChan)
 
 	scanPolicy := *r.config.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
@@ -142,7 +141,8 @@ func (r *paginatedRecordReader) startScan() {
 }
 
 func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
-	pf := *r.config.partitionFilter // Each scan requires a copy of the partition filter.
+	// Each scan requires a copy of the partition filter.
+	pf := *r.config.partitionFilter
 
 	for {
 		count, err := r.scanPage(&pf, scanPolicy, set)
@@ -156,24 +156,45 @@ func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) er
 	}
 }
 
+// scanPage performs a paginated scan on a specific set using the provided partition filter and scan policy.
 func (r *paginatedRecordReader) scanPage(
 	pf *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 	set string,
-) (count uint64, err error) {
+) (uint64, error) {
+	for {
+		retry, count, err := r.scanPageOnce(pf, scanPolicy, set)
+		if err != nil {
+			return 0, err
+		}
+
+		if !retry {
+			return count, nil
+		}
+	}
+}
+
+// scanPageOnce performs a single scan over a filtered partition of a given set and returns retry status,
+// count, and errors.
+func (r *paginatedRecordReader) scanPageOnce(
+	pf *a.PartitionFilter,
+	scanPolicy *a.ScanPolicy,
+	set string,
+) (retry bool, count uint64, err error) {
 	if err := r.ctx.Err(); err != nil {
-		return 0, err
+		return false, 0, err
 	}
 
 	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-		return 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+		return false, 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
 	}
-	defer r.config.scanLimiter.Release(1)
 
-	curFilter, err := models.NewPartitionFilterSerialized(pf)
+	pfs, err := models.NewPartitionFilterSerialized(pf)
 	if err != nil {
-		return 0, fmt.Errorf("failed to serialize partition filter: %w", err)
+		r.config.scanLimiter.Release(1)
+
+		return false, 0, fmt.Errorf("failed to serialize partition filter: %w", err)
 	}
 
 	recordset, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
@@ -184,7 +205,9 @@ func (r *paginatedRecordReader) scanPage(
 		r.config.binList...,
 	)
 	if aErr != nil {
-		return 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
+		r.config.scanLimiter.Release(1)
+
+		return false, 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 	}
 
 	r.logger.Debug("partition scan started",
@@ -196,52 +219,99 @@ func (r *paginatedRecordReader) scanPage(
 	// Set close recordset function.
 	closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
 
-	defer func() { // close record set
-		if cerr := closeRecordset(); cerr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to close record set: %w", cerr))
-		}
-	}()
-
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
-	count, err = r.drainResults(recordset, closeRecordset, curFilter)
-	if err != nil {
-		return 0, fmt.Errorf("failed to drain results: %w", err)
+	count, drainErr := r.drainResults(pfs, recordset, closeRecordset)
+
+	// Do not return an error immediately, because we need to perform some actions first.
+	closeErr := closeRecordset()
+
+	// Release the semaphore manually because of for loop.
+	r.config.scanLimiter.Release(1)
+
+	// If we broke out because of a connection error on the first record,
+	// we loop back to the top to restart the producer.
+	if drainErr != nil {
+		r.logger.Debug(
+			"database hasn't got enough resources, waiting for a signal",
+			slog.Any("drainErr", drainErr),
+			slog.Any("closeErr", closeErr),
+		)
+		r.config.throttler.Wait(r.ctx)
+
+		// Reset the partition filter to the state before the failed scan.
+		// We must copy into *pf rather than reassigning the pointer,
+		// because scanSet holds the struct that pf points to.
+		decoded, err := pfs.Decode()
+		if err != nil {
+			return false, 0, fmt.Errorf("failed to deserialize partition filter: %w", err)
+		}
+
+		*pf = *decoded
+
+		return true, 0, nil
 	}
+
+	// Successfully drained all results, notify the throttler.
+	r.config.throttler.Notify(r.ctx)
 
 	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
-	return count, err
+	return false, count, closeErr
 }
 
+// drainResults drains results, and if operation failed return error
 func (r *paginatedRecordReader) drainResults(
+	pfs models.PartitionFilterSerialized,
 	recordset *a.Recordset,
 	closeRecordset func() error,
-	curFilter models.PartitionFilterSerialized,
 ) (uint64, error) {
 	done := make(chan struct{})
 	defer close(done)
 
-	monitorContext[*pageRecord](r.ctx, r.logger, r.pageRecordsChan, done, closeRecordset)
+	monitorContext[*pageRecord](r.ctx, r.logger, r.resultChan, done, closeRecordset)
 
-	// to count records on pageRecord.
-	var count uint64
+	// Check only the FIRST result for the specific connection error
+	// and only if the throttler is initialized.
+	first, ok := <-recordset.Results()
+	if !ok || shouldSkipPaginatedDrainError(first.Err) {
+		return 0, nil
+	}
 
+	// Check if we should throttle.
+	if r.config.throttler != nil && shouldThrottle(first.Err) {
+		return 0, first.Err
+	}
+
+	r.resultChan <- newPageRecord(first, &pfs)
+
+	// Starting count from 1 as we processed first element
+	count := uint64(1)
+
+	// Drain all results from this specific scan.
+	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
 		count++
 
-		if res.Err != nil {
-			// When reading the last page (containing 0 records),
-			// the scan might return a types.INVALID_NODE_ERROR.
-			if !res.Err.Matches(types.INVALID_NODE_ERROR) {
-				return 0, fmt.Errorf("failed to read paginated record: %w", res.Err)
-			}
-
+		if shouldSkipPaginatedDrainError(res.Err) {
 			continue
 		}
 
-		r.pageRecordsChan <- newPageRecord(res, &curFilter)
+		r.resultChan <- newPageRecord(res, &pfs)
 	}
 
 	return count, nil
+}
+
+// shouldSkipPaginatedDrainError used only for paginated drainer.
+// When reading the last page (containing 0 records),
+// the scan might return a types.INVALID_NODE_ERROR.
+func shouldSkipPaginatedDrainError(err a.Error) bool {
+	if err != nil {
+		if err.Matches(types.INVALID_NODE_ERROR) {
+			return true
+		}
+	}
+
+	return false
 }

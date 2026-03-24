@@ -129,6 +129,9 @@ type ConfigBackup struct {
 	OutputFilePrefix string
 	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
 	MetricsEnabled bool
+	// ScanThrottlingTimeout is the maximum backoff duration between throttled scan batches.
+	// This is a Go time.Duration (e.g. time.Second).
+	ScanThrottlingTimeout time.Duration
 }
 
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.

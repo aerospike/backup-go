@@ -137,7 +137,6 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	case <-ctx.Done():
 		// If the local context is canceled, we cancel the global context.
 		r.cancel()
-
 		return nil, ctx.Err()
 	case <-r.ctx.Done():
 		return nil, r.ctx.Err()
@@ -194,21 +193,36 @@ func (r *singleRecordReader) startScan() {
 // calls the producer function to start the scan, and drains all results
 // from the returned channel before releasing the semaphore.
 func (r *singleRecordReader) executeProducer(producer scanProducer) error {
+	for {
+		retry, err := r.executeProducerOnce(producer)
+		if err != nil {
+			return err
+		}
+
+		if !retry {
+			return nil
+		}
+	}
+}
+
+// executeProducerOnce performs a single scan attempt.
+func (r *singleRecordReader) executeProducerOnce(producer scanProducer) (bool, error) {
 	if r.ctx.Err() != nil {
-		return r.ctx.Err()
+		return false, r.ctx.Err()
 	}
 
 	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-		return fmt.Errorf("failed to acquire scan limiter: %w", err)
+		return false, fmt.Errorf("failed to acquire scan limiter: %w", err)
 	}
-	defer r.config.scanLimiter.Release(1)
 
 	// Call the producer function. This starts the actual Aerospike scan
 	// and returns a channel for its results.
 	recordset, err := producer()
 	if err != nil {
-		return fmt.Errorf("scan producer failed: %w", err)
+		r.config.scanLimiter.Release(1)
+
+		return false, fmt.Errorf("scan producer failed: %w", err)
 	}
 
 	// Set close recordset function.
@@ -216,22 +230,61 @@ func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.
-	r.drainResults(recordset, closeRecordset)
+	drainErr := r.drainResults(recordset, closeRecordset)
+
+	// Do not return an error immediately, because we need to perform some actions first.
+	closeErr := closeRecordset()
+
+	// Release the semaphore manually because of for loop.
+	r.config.scanLimiter.Release(1)
+
+	// If we broke out because of a connection error on the first record,
+	// we loop back to the top to restart the producer.
+	if drainErr != nil {
+		r.logger.Debug("database hasn't got enough resources, waiting for a signal",
+			slog.Any("drainErr", drainErr),
+			slog.Any("closeErr", closeErr),
+		)
+		r.config.throttler.Wait(r.ctx)
+
+		return true, nil
+	}
+
+	// Successfully drained all results, notify the throttler.
+	r.config.throttler.Notify(r.ctx)
 
 	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
 
-	return closeRecordset()
+	return false, closeErr
 }
 
-func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset func() error) {
+// drainResults drains results, and if operation failed return error
+func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset func() error) error {
 	done := make(chan struct{})
 	defer close(done)
 
 	monitorContext[*a.Result](r.ctx, r.logger, r.resultChan, done, closeRecordset)
 
+	// Check only the FIRST result for the specific connection error
+	// and only if the throttler is initialized.
+	first, ok := <-recordset.Results()
+	if !ok {
+		return nil
+	}
+
+	if r.config.throttler != nil && shouldThrottle(first.Err) {
+		return first.Err
+	}
+
+	r.resultChan <- first
+
+	// Drain all results from this specific scan.
+	// No context checking here because it slows down the scan.
 	for res := range recordset.Results() {
 		r.resultChan <- res
 	}
+
+	return nil
 }
 
 // generateProducers creates a list of scan-producing functions based on the reader's configuration.

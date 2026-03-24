@@ -601,7 +601,8 @@ func TestAerospikeRecordReaderPaginatedRecordsetCloseError(t *testing.T) {
 
 	token, err := reader.Read(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to close record set")
+	// Error is not wrapped any more.
+	require.Contains(t, err.Error(), "failed to scan set")
 	require.Nil(t, token)
 
 	mockScanner.AssertExpectations(t)

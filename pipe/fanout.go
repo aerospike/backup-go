@@ -91,13 +91,9 @@ func (f *Fanout[T]) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for i, input := range f.Inputs {
-		wg.Add(1)
-
-		go func(index int, in <-chan T) {
-			defer wg.Done()
-
-			f.processInput(ctx, index, in)
-		}(i, input)
+		wg.Go(func() {
+			f.processInput(ctx, i, input)
+		})
 	}
 
 	wg.Wait()

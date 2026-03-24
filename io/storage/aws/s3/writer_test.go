@@ -75,7 +75,7 @@ func (s *WriterSuite) SetupSuite() {
 	err := createAwsCredentials()
 	s.Require().NoError(err)
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -194,7 +194,7 @@ func fillWriterTestData(ctx context.Context, client *s3.Client) error {
 
 func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -232,7 +232,7 @@ func (s *WriterSuite) TestWriter_WriteEmptyDir() {
 
 func (s *WriterSuite) TestWriter_WriteNotEmptyDirError() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -248,7 +248,7 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDirError() {
 
 func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -286,7 +286,7 @@ func (s *WriterSuite) TestWriter_WriteNotEmptyDir() {
 
 func (s *WriterSuite) TestWriter_WriteSingleFile() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -318,7 +318,7 @@ func (s *WriterSuite) TestWriter_WriteSingleFile() {
 
 func (s *WriterSuite) TestWriter_GetType() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 

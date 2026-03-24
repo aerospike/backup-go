@@ -28,16 +28,16 @@ func TestThrottleLimiter_NotifyUnblocksWait(t *testing.T) {
 	tl := NewThrottleLimiter(2, timeout)
 	ctx := t.Context()
 
-	var wokenUp int32
+	var wokenUp atomic.Int32
 	go func() {
 		tl.Wait(ctx)
-		atomic.StoreInt32(&wokenUp, 1)
+		wokenUp.Add(1)
 	}()
 
 	// Give the goroutine a moment to enter Wait
 	time.Sleep(100 * time.Millisecond)
 
-	if atomic.LoadInt32(&wokenUp) != 0 {
+	if wokenUp.Load() != 0 {
 		t.Error("Wait should have blocked")
 	}
 
@@ -45,7 +45,7 @@ func TestThrottleLimiter_NotifyUnblocksWait(t *testing.T) {
 
 	// Check if it woke up (using a small retry loop or timeout)
 	time.Sleep(100 * time.Millisecond)
-	if atomic.LoadInt32(&wokenUp) != 1 {
+	if wokenUp.Load() != 1 {
 		t.Error("Wait should have been unblocked by Notify")
 	}
 }
@@ -54,17 +54,15 @@ func TestThrottleLimiter_OneNotifyPerWait(t *testing.T) {
 	tl := NewThrottleLimiter(5, 10*time.Second)
 	ctx := t.Context()
 
-	var wokenCount int32
+	var wokenCount atomic.Int32
 	wg := sync.WaitGroup{}
 
 	// Start 3 waiters
 	for range 3 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			tl.Wait(ctx)
-			atomic.AddInt32(&wokenCount, 1)
-		}()
+			wokenCount.Add(1)
+		})
 	}
 
 	time.Sleep(100 * time.Millisecond)
@@ -72,15 +70,15 @@ func TestThrottleLimiter_OneNotifyPerWait(t *testing.T) {
 	// First Notify
 	tl.Notify(ctx)
 	time.Sleep(100 * time.Millisecond)
-	if atomic.LoadInt32(&wokenCount) != 1 {
-		t.Errorf("Expected 1 woken waiter, got %d", atomic.LoadInt32(&wokenCount))
+	if wokenCount.Load() != 1 {
+		t.Errorf("Expected 1 woken waiter, got %d", wokenCount.Load())
 	}
 
 	// Second Notify
 	tl.Notify(ctx)
 	time.Sleep(100 * time.Millisecond)
-	if atomic.LoadInt32(&wokenCount) != 2 {
-		t.Errorf("Expected 2 woken waiters, got %d", atomic.LoadInt32(&wokenCount))
+	if wokenCount.Load() != 2 {
+		t.Errorf("Expected 2 woken waiters, got %d", wokenCount.Load())
 	}
 }
 

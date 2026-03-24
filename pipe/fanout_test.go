@@ -113,15 +113,14 @@ func TestFanout_RunDefault(t *testing.T) {
 	)
 
 	for i := range outputs {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	fan.Run(t.Context())
@@ -163,16 +162,14 @@ func TestFanout_RunStraight(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	for i := range outputs {
-		wg.Add(1)
-
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	fan.Run(t.Context())
@@ -216,16 +213,14 @@ func TestFanout_RunSplit(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	// Count only first output.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// For testASBXToken() index will be 2.
 		for range outputs[2] {
 			counterMutex.Lock()
 			counter++
 			counterMutex.Unlock()
 		}
-	}()
+	})
 
 	fan.Run(t.Context())
 
@@ -269,15 +264,14 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	for i := range outputs {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -326,16 +320,14 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	for i := range outputs {
-		wg.Add(1)
-
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -386,15 +378,13 @@ func TestFanout_RunSplitContextCancel(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	// Count only first output.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range outputs[testIndex] {
 			counterMutex.Lock()
 			counter++
 			counterMutex.Unlock()
 		}
-	}()
+	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	go func() {

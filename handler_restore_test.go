@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -66,7 +65,7 @@ func (s *handlerRestoreTestSuite) Test_RestoreXDR() {
 	backupDir := filepath.Join(s.T().TempDir(), testBackupDirRestore)
 	s.T().Log("backup directory: ", backupDir)
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 
 	writers, err := local.NewWriter(
 		ctx,

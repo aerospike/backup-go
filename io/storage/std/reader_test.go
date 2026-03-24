@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -106,13 +105,11 @@ func TestReader_StreamFiles(t *testing.T) {
 	defer func() { os.Stdin = oldStdin }()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := w.WriteString(testData)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_ = w.Close()
-	}()
+	})
 
 	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)
@@ -154,13 +151,11 @@ func TestReader_StreamFile(t *testing.T) {
 	defer func() { os.Stdin = oldStdin }()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := w.WriteString(testData)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_ = w.Close()
-	}()
+	})
 
 	ctx := t.Context()
 	reader, err := NewReader(ctx, defaultBufferSize)

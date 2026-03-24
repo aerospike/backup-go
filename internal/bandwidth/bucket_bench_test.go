@@ -113,13 +113,11 @@ func BenchmarkHighConcurrency(b *testing.B) {
 			opsPerGoroutine := b.N / tt.goroutines
 
 			for i := 0; i < tt.goroutines; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for range opsPerGoroutine {
 						bucket.Wait(1)
 					}
-				}()
+				})
 			}
 			wg.Wait()
 		})
@@ -133,13 +131,11 @@ func BenchmarkHighConcurrency(b *testing.B) {
 			opsPerGoroutine := b.N / tt.goroutines
 
 			for i := 0; i < tt.goroutines; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for range opsPerGoroutine {
 						_ = limiter.Wait(ctx)
 					}
-				}()
+				})
 			}
 			wg.Wait()
 		})

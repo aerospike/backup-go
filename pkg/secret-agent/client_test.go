@@ -65,9 +65,9 @@ ah87+EsQLgoao6VWDlepN54P`
 	testBase64Value = "dGVzdFZhbHVl" // base64 encoded "testValue"
 )
 
-func mockTCPServer(address string, handler func(net.Conn)) (net.Listener, error) {
+func mockTCPServer(ctx context.Context, address string, handler func(net.Conn)) (net.Listener, error) {
 	var lc net.ListenConfig
-	listener, err := lc.Listen(context.Background(), ConnectionTypeTCP, address)
+	listener, err := lc.Listen(ctx, ConnectionTypeTCP, address)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func TestNewClient(t *testing.T) {
 
 func TestClient_GetSecret(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		listener, err := mockTCPServer(testAddress, mockHandler)
+		listener, err := mockTCPServer(t.Context(), testAddress, mockHandler)
 		require.NoError(t, err)
 		defer sneakyClose(listener)
 
@@ -205,7 +205,7 @@ func TestClient_GetSecret(t *testing.T) {
 	})
 
 	t.Run("Success with Base64 Decoding", func(t *testing.T) {
-		listener, err := mockTCPServer(":1112", mockBase64Handler)
+		listener, err := mockTCPServer(t.Context(), ":1112", mockBase64Handler)
 		require.NoError(t, err)
 		defer sneakyClose(listener)
 
@@ -221,7 +221,7 @@ func TestClient_GetSecret(t *testing.T) {
 	})
 
 	t.Run("Error from Server", func(t *testing.T) {
-		listener, err := mockTCPServer(":1113", mockErrorHandler)
+		listener, err := mockTCPServer(t.Context(), ":1113", mockErrorHandler)
 		require.NoError(t, err)
 		defer sneakyClose(listener)
 
@@ -237,7 +237,7 @@ func TestClient_GetSecret(t *testing.T) {
 	})
 
 	t.Run("Invalid Base64", func(t *testing.T) {
-		listener, err := mockTCPServer(":1114", mockInvalidBase64Handler)
+		listener, err := mockTCPServer(t.Context(), ":1114", mockInvalidBase64Handler)
 		require.NoError(t, err)
 		defer sneakyClose(listener)
 

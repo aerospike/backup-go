@@ -215,9 +215,8 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 			if s.activeConnections.Load() < int32(s.config.MaxConnections) {
 				// Increment connections counter.
 				s.activeConnections.Add(1)
-				s.handlersWg.Add(1)
 
-				go func() {
+				s.handlersWg.Go(func() {
 					// Create and run handler.
 					handler := NewConnectionHandler(
 						conn,
@@ -233,8 +232,7 @@ func (s *TCPServer) acceptConnections(ctx context.Context) {
 					s.logger.Debug("connection finished",
 						slog.String("address", conn.RemoteAddr().String()))
 					s.activeConnections.Add(-1)
-					s.handlersWg.Done()
-				}()
+				})
 
 				s.logger.Debug("accepted new connection",
 					slog.String("address", conn.RemoteAddr().String()))

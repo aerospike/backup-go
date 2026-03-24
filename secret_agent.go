@@ -80,7 +80,7 @@ func getTLSConfig(config *SecretAgentConfig) (*tls.Config, error) {
 		return nil, fmt.Errorf("nothing to append to ca cert pool")
 	}
 
-	//nolint:gosec // we must support any tls configuration for legacy.
+	// we must support any tls configuration for legacy.
 	tlsConfig := &tls.Config{
 		RootCAs: caCertPool,
 	}

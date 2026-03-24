@@ -15,10 +15,9 @@
 package backup
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -124,10 +123,9 @@ func generateList() *a.Bin {
 
 func generateRandomString(n int) string {
 	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	rand.New(rand.NewSource(time.Now().UnixNano()))
 	result := make([]rune, n)
 	for i := range result {
-		result[i] = letters[rand.Intn(len(letters))]
+		result[i] = letters[rand.IntN(len(letters))]
 	}
 	return string(result)
 }
@@ -142,7 +140,7 @@ func (s *handlerBackupXDRTestSuite) Test_Backup() {
 	backupDir := filepath.Join(s.T().TempDir(), testBackupDir)
 	s.T().Log("backup directory: ", backupDir)
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 
 	writers, err := local.NewWriter(
 		ctx,
@@ -193,7 +191,7 @@ func (s *handlerBackupXDRTestSuite) Test_BackupFileLimit() {
 	backupDir := filepath.Join(s.T().TempDir(), testBackupDirLimit)
 	s.T().Log("backup directory: ", backupDir)
 
-	ctx := context.Background()
+	ctx := s.T().Context()
 
 	writers, err := local.NewWriter(
 		ctx,

@@ -15,9 +15,10 @@
 package files
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -84,8 +85,8 @@ func SortBackupFiles(files []string) ([]string, error) {
 
 	// sort each group.
 	for o := range presort {
-		sort.Slice(presort[o], func(i, j int) bool {
-			return presort[o][i].suffix < presort[o][j].suffix
+		slices.SortFunc(presort[o], func(a, b backupFile) int {
+			return cmp.Compare(a.suffix, b.suffix)
 		})
 	}
 

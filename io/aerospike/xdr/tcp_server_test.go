@@ -38,7 +38,7 @@ const (
 )
 
 // newDefaultTCPConfig returns default TCP Server config.
-func newDefaultTCPConfig() *TCPConfig {
+func newDefaultTCPConfig(ctx context.Context) *TCPConfig {
 	return NewTCPConfig(
 		defaultAddress,
 		nil,
@@ -47,7 +47,7 @@ func newDefaultTCPConfig() *TCPConfig {
 		defaultQueueSize,
 		defaultQueueSize,
 		defaultMaxConnections,
-		metrics.NewCollector(context.Background(), slog.Default(), metrics.RecordsPerSecond, "", true),
+		metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, "", true),
 	)
 }
 
@@ -55,7 +55,7 @@ func TestTCPServer(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	cfg := newDefaultTCPConfig()
+	cfg := newDefaultTCPConfig(t.Context())
 
 	srv := NewTCPServer(
 		cfg,
@@ -133,7 +133,7 @@ func TestTCPServer_DoubleStart(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	cfg := newDefaultTCPConfig()
+	cfg := newDefaultTCPConfig(t.Context())
 	cfg.Address = ":8087"
 
 	srv := NewTCPServer(
@@ -154,7 +154,7 @@ func TestTCPServer_DoubleStop(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	cfg := newDefaultTCPConfig()
+	cfg := newDefaultTCPConfig(t.Context())
 	cfg.Address = ":8086"
 
 	srv := NewTCPServer(

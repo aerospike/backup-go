@@ -16,13 +16,14 @@ package s3
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -157,6 +158,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
+	//nolint:gosec // context is canceled when the writer is closed.
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &s3Writer{
@@ -303,8 +305,8 @@ func (w *s3Writer) Close() error {
 
 	// Sort completed parts by part number (required by S3).
 	w.cpMu.Lock()
-	sort.Slice(w.completedParts, func(i, j int) bool {
-		return *w.completedParts[i].PartNumber < *w.completedParts[j].PartNumber
+	slices.SortFunc(w.completedParts, func(a, b types.CompletedPart) int {
+		return cmp.Compare(*a.PartNumber, *b.PartNumber)
 	})
 
 	// Verify no gaps in part numbers.

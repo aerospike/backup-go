@@ -42,7 +42,7 @@ func TestNodeReader_Run(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -67,7 +67,7 @@ func TestNodeReader_BlockMrt(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -90,7 +90,7 @@ func TestNodeReader_BlockMrt(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -121,7 +121,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -146,7 +146,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -181,7 +181,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -207,7 +207,7 @@ func TestNodeReader_GetStats(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -233,7 +233,7 @@ func TestNodeReader_Close(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -260,7 +260,7 @@ func TestNodeReader_Close(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)
@@ -291,7 +291,7 @@ func TestNodeReader_Close(t *testing.T) {
 			ctx,
 			"node1",
 			ic,
-			testRecordReaderConfig(),
+			testRecordReaderConfig(t.Context()),
 			nodesRecovered,
 			logger,
 		)

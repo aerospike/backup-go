@@ -324,19 +324,18 @@ func TestConcurrentWrites(t *testing.T) {
 	}
 
 	for i := range numGoroutines {
-		wg.Add(1)
-		go func(id int, writeCloser io.WriteCloser) {
-			defer wg.Done()
-			defer func() { _ = writeCloser.Close() }()
+		wc := writers[i]
+		wg.Go(func() {
+			defer func() { _ = wc.Close() }()
 
 			for j := range writesPerGoroutine {
-				data := fmt.Appendf(nil, "goroutine-%d-write-%d\n", id, j)
-				_, err := writeCloser.Write(data)
+				data := fmt.Appendf(nil, "goroutine-%d-write-%d\n", i, j)
+				_, err := wc.Write(data)
 				if err != nil {
 					t.Errorf("Concurrent write failed: %v", err)
 				}
 			}
-		}(i, writers[i])
+		})
 	}
 
 	wg.Wait()

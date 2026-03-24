@@ -51,17 +51,13 @@ func (p *Pool) Submit(f func()) {
 
 	// Adding empty field to chanel to take one worker place.
 	p.workChan <- struct{}{}
-	// Adding one to a waiting group.
-	p.wg.Add(1)
 
-	go func() {
+	p.wg.Go(func() {
 		// Remove message from channel to release space for new worker.
 		defer func() { <-p.workChan }()
-		// When function will finish it's work we release a waiting group.
-		defer p.wg.Done()
-		// Run our goroutine.
+
 		f()
-	}()
+	})
 }
 
 // Wait waits until all submitted funcs complete.

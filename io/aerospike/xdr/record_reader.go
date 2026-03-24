@@ -247,8 +247,6 @@ func (r *RecordReader) serve() {
 // createNodeReaders creates node readers for nodes list.
 func (r *RecordReader) createNodeReaders(nodes []string, wg *sync.WaitGroup) {
 	for _, node := range nodes {
-		wg.Add(1)
-
 		n := node
 		nr := NewNodeReader(
 			r.ctx,
@@ -263,18 +261,16 @@ func (r *RecordReader) createNodeReaders(nodes []string, wg *sync.WaitGroup) {
 		r.activeNodes = append(r.activeNodes, nr)
 		r.anMu.Unlock()
 
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			if err := nr.Run(); err != nil {
-				r.errorsCh <- fmt.Errorf("failed to start node reader for node %s: %w", node, err)
+				r.errorsCh <- fmt.Errorf("failed to start node reader for node %s: %w", n, err)
 
 				// If one of the routine failed, we shut other.
 				r.cancel()
 
 				return
 			}
-		}()
+		})
 	}
 }
 

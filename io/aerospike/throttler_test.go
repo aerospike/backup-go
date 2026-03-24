@@ -59,9 +59,7 @@ func TestThrottleLimiter_OneNotifyPerWait(t *testing.T) {
 
 	// Start 3 waiters
 	for range 3 {
-		wg.Add(1)
 		wg.Go(func() {
-			defer wg.Done()
 			tl.Wait(ctx)
 			wokenCount.Add(1)
 		})

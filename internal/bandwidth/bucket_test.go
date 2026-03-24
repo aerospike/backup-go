@@ -74,15 +74,12 @@ func TestBucket_WaitAsync(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	wg.Add(5)
-
 	for range 5 {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 5 {
 				l.Wait(limit * rate)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

@@ -1443,23 +1443,20 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 
 	numWriters := 5
 	var wg sync.WaitGroup
-	wg.Add(numWriters)
 
 	for i := range numWriters {
-		go func(id int) {
-			defer wg.Done()
-
-			fileName := fmt.Sprintf("file-%d.txt", id)
+		wg.Go(func() {
+			fileName := fmt.Sprintf("file-%d.txt", i)
 			w, err := writer.NewWriter(ctx, fileName)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
-			data := fmt.Appendf(nil, "test data %d", id)
+			data := fmt.Appendf(nil, "test data %d", i)
 			_, err = w.Write(data)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			err = w.Close()
 			assert.NoError(t, err)
-		}(i)
+		})
 	}
 
 	wg.Wait()

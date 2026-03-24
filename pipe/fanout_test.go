@@ -113,15 +113,14 @@ func TestFanout_RunDefault(t *testing.T) {
 	)
 
 	for i := range outputs {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	fan.Run(t.Context())
@@ -163,16 +162,14 @@ func TestFanout_RunStraight(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	for i := range outputs {
-		wg.Add(1)
-
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	fan.Run(t.Context())
@@ -267,15 +264,14 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	for i := range outputs {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -324,16 +320,14 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		wg           sync.WaitGroup
 	)
 	for i := range outputs {
-		wg.Add(1)
-
-		go func(n int) {
-			defer wg.Done()
+		n := i
+		wg.Go(func() {
 			for range outputs[n] {
 				counterMutex.Lock()
 				counter++
 				counterMutex.Unlock()
 			}
-		}(i)
+		})
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())

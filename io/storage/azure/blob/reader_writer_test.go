@@ -84,7 +84,7 @@ type AzureSuite struct {
 
 func (s *AzureSuite) SetupSuite() {
 	defer s.suiteWg.Done() // Signal that setup is complete
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -230,7 +230,7 @@ func (mock validatorMock) Run(fileName string) error {
 
 func (s *AzureSuite) TestReader_StreamFilesOk() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -272,7 +272,7 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 
 func (s *AzureSuite) TestReader_WithSorting() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -317,7 +317,7 @@ func (s *AzureSuite) TestReader_WithSorting() {
 
 func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -335,7 +335,7 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 
 func (s *AzureSuite) TestReader_StreamFilesMixed() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -374,7 +374,7 @@ func (s *AzureSuite) TestReader_StreamFilesMixed() {
 
 func (s *AzureSuite) TestReader_GetType() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -395,7 +395,7 @@ func (s *AzureSuite) TestReader_GetType() {
 
 func (s *AzureSuite) TestReader_OpenFileOk() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -432,7 +432,7 @@ func (s *AzureSuite) TestReader_OpenFileOk() {
 
 func (s *AzureSuite) TestReader_OpenFileErr() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -459,7 +459,7 @@ func (s *AzureSuite) TestReader_OpenFileErr() {
 
 func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -489,7 +489,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 
 func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -508,7 +508,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDirError() {
 
 func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -538,7 +538,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 
 func (s *AzureSuite) TestWriter_WriteMixedDir() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -568,7 +568,7 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 
 func (s *AzureSuite) TestWriter_WriteSingleFile() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -594,7 +594,7 @@ func (s *AzureSuite) TestWriter_WriteSingleFile() {
 
 func (s *AzureSuite) TestWriter_GetType() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -615,7 +615,7 @@ func (s *AzureSuite) TestWriter_GetType() {
 
 func (s *AzureSuite) TestReader_WithMarker() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -658,7 +658,7 @@ func (s *AzureSuite) TestReader_WithMarker() {
 
 func (s *AzureSuite) TestReader_StreamPathList() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -702,7 +702,7 @@ func (s *AzureSuite) TestReader_StreamPathList() {
 
 func (s *AzureSuite) TestReader_StreamFilesList() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -745,7 +745,7 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 
 func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
@@ -907,7 +907,7 @@ func readAll(r io.ReadCloser) (string, error) {
 
 func (s *AzureSuite) TestReader_StreamFiles_Skipped() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
 	s.Require().NoError(err)
 	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)

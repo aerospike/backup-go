@@ -160,13 +160,12 @@ func newRestoreHandler[T models.TokenConstraint](
 }
 
 func (rh *RestoreHandler[T]) run() {
-	rh.wg.Add(1)
 	rh.stats.Start()
 
-	go doWork(rh.errors, rh.done, rh.logger, func() error {
-		defer rh.wg.Done()
-
-		return rh.restore(rh.ctx)
+	rh.wg.Go(func() {
+		doWork(rh.errors, rh.done, rh.logger, func() error {
+			return rh.restore(rh.ctx)
+		})
 	})
 }
 

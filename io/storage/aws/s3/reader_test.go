@@ -98,7 +98,7 @@ func testClient(ctx context.Context) (*s3.Client, error) {
 
 func (s *AwsSuite) SetupSuite() {
 	defer s.suiteWg.Done() // Signal that setup is complete
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 	err = fillTestData(ctx, client)
@@ -260,7 +260,7 @@ func fillTestData(ctx context.Context, client *s3.Client) error {
 
 func (s *AwsSuite) TestReader_WithStartAfter() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -300,7 +300,7 @@ func (s *AwsSuite) TestReader_WithStartAfter() {
 
 func (s *AwsSuite) TestReader_StreamPathList() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -351,7 +351,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 
 func (s *AwsSuite) TestReader_StreamFilesList() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -400,7 +400,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 
 func (s *AwsSuite) TestReader_WithSorting() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -451,7 +451,7 @@ func (s *AwsSuite) TestReader_WithSorting() {
 
 func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -521,7 +521,7 @@ func readAll(r io.ReadCloser) (string, error) {
 
 func (s *AwsSuite) TestReader_StreamFilesOk() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -565,7 +565,7 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 
 func (s *AwsSuite) TestReader_StreamFilesEmpty() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -589,7 +589,7 @@ func (s *AwsSuite) TestReader_StreamFilesEmpty() {
 
 func (s *AwsSuite) TestReader_StreamFilesMixed() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -633,7 +633,7 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 
 func (s *AwsSuite) TestReader_GetType() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -651,7 +651,7 @@ func (s *AwsSuite) TestReader_GetType() {
 
 func (s *AwsSuite) TestReader_OpenFileOk() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -686,7 +686,7 @@ func (s *AwsSuite) TestReader_OpenFileOk() {
 
 func (s *AwsSuite) TestReader_OpenFileErr() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -881,7 +881,7 @@ func TestParseAccessTier(t *testing.T) {
 
 func (s *AwsSuite) TestReader_ListObjects() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -978,7 +978,7 @@ func TestReader_ShouldSkip(t *testing.T) {
 
 func (s *AwsSuite) TestReader_SetObjectsToStream() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 
@@ -1028,7 +1028,7 @@ func (s *AwsSuite) TestReader_SetObjectsToStream() {
 
 func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 	s.suiteWg.Wait()
-	ctx := context.Background()
+	ctx := s.T().Context()
 	client, err := testClient(ctx)
 	s.Require().NoError(err)
 

@@ -85,14 +85,11 @@ func (h *ConnectionHandler) Start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	h.cancel = cancel
 
-	wg := sync.WaitGroup{}
-	wg.Add(4)
+	var wg sync.WaitGroup
 
 	// This function serve h.timeNow field, to save each 100 milliseconds, current time.
 	// This time is used to update deadlines on write and read operations, to improve speed.
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		ticker := time.NewTicker(100 * time.Millisecond) // Update every 100ms
 		defer ticker.Stop()
 
@@ -104,31 +101,25 @@ func (h *ConnectionHandler) Start(ctx context.Context) {
 				atomic.StoreInt64(&h.timeNow, t.UnixNano())
 			}
 		}
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		h.handleMessages(ctx)
 		h.logger.Debug("message handler closed")
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		h.processMessage(ctx)
 		h.logger.Debug("message processor closed")
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		h.handleAcknowledgments(ctx)
 		h.logger.Debug("ack handler closed")
 		// After we gracefully closed all channels and stopped goroutines,
 		// we can cancel context to stop h.timeNow serving goroutine.
 		h.cancel()
-	}()
+	})
 
 	wg.Wait()
 	// When all routines finished we close the connection.

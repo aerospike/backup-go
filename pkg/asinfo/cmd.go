@@ -43,7 +43,7 @@ const (
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 23
+const commandsNumber = 25
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (

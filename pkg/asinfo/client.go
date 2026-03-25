@@ -958,6 +958,40 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	return bitMapToIntSlice(bitMap), nil
 }
 
+// StartBackup starts a backup job.
+func (ic *Client) StartBackup(ctx context.Context, namespace, bucket, region, profile string, jobID int) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup], namespace, bucket, region, profile, jobID)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed start backup: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return fmt.Errorf("failed to parse start backup response: %w", err)
+	}
+
+	return nil
+}
+
+// StartRestore starts a backup job.
+func (ic *Client) StartRestore(ctx context.Context, namespace, bucket, region, profile string, jobID int) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup], namespace, bucket, region, profile, jobID)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed start restore: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return fmt.Errorf("failed to parse start restore response: %w", err)
+	}
+
+	return nil
+}
+
 // ***** Utility functions *****
 
 func parseResultResponse(cmd string, result map[string]string) (string, error) {

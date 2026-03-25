@@ -38,6 +38,8 @@ const (
 	cmdIDSetXDRForward
 	cmdIDGetConfigXDR
 	cmdIDReplicas
+	cmdIDServerSideBackup
+	cmdIDServerSideRestore
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
@@ -68,6 +70,9 @@ const (
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 	cmdGetConfigXDR        = "get-config:context=xdr"
 	cmdReplicas            = "replicas:max=1"
+
+	cmdServerSideBackup  = "backup:namespace=%s;s3-bucket=%s;s3-region=%s;s3-profile=%s;job-id=%d"
+	cmdServerSideRestore = "restore:namespace=%s;s3-bucket=%s;s3-region=%s;s3-profile=%s;job-id=%d"
 
 	// Deprecated commands:
 
@@ -108,6 +113,9 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 
 	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList
+
+		cmds[cmdIDServerSideBackup] = cmdServerSideBackup
+		cmds[cmdIDServerSideRestore] = cmdServerSideRestore
 	}
 
 	return cmds

@@ -168,7 +168,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		key:          fullPath,
 		client:       w.client,
 		bucket:       w.bucketName,
-		buffer:       new(bytes.Buffer),
+		buffer:       bytes.NewBuffer(make([]byte, 0, w.ChunkSize)),
 		chunkSize:    w.ChunkSize,
 		logger:       w.Logger,
 		retryPolicy:  w.RetryPolicy,
@@ -219,19 +219,36 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, err.(error)
 	}
 
-	if w.buffer.Len() >= w.chunkSize {
-		partNumber := w.partNumber.Add(1)
+	written := 0
 
-		buf := w.buffer.Bytes()
-		// Submit the part for upload.
-		w.workersPool.Submit(func() {
-			w.uploadPart(buf, partNumber)
-		})
-		// Reset buffer for the next chunk.
-		w.buffer = new(bytes.Buffer)
+	for len(p) > 0 {
+		// Fill the current multipart chunk first; upload exactly when it is full.
+		remaining := w.chunkSize - w.buffer.Len()
+		if remaining <= 0 {
+			partNumber := w.partNumber.Add(1)
+			buf := w.buffer.Bytes()
+			// Hand off immutable part bytes to worker pool for async UploadPart.
+			w.workersPool.Submit(func() {
+				w.uploadPart(buf, partNumber)
+			})
+			// Reset buffer for the next chunk with preallocated capacity.
+			w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
+			remaining = w.chunkSize
+		}
+
+		// Copy only what fits in this chunk; the loop handles any remainder.
+		toWrite := min(len(p), remaining)
+		n, err := w.buffer.Write(p[:toWrite])
+
+		written += n
+		if err != nil {
+			return written, err
+		}
+
+		p = p[n:]
 	}
 
-	return w.buffer.Write(p)
+	return written, nil
 }
 
 // uploadPart uploads a part of the file to S3.

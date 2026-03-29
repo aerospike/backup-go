@@ -211,36 +211,17 @@ type s3Writer struct {
 var _ io.WriteCloser = (*s3Writer)(nil)
 
 func (w *s3Writer) Write(p []byte) (int, error) {
-	if w.closed.Load() {
-		return 0, os.ErrClosed
-	}
-
-	if err := w.uploadErr.Load(); err != nil {
-		return 0, err.(error)
+	if err := w.validateWriteState(); err != nil {
+		return 0, err
 	}
 
 	written := 0
 
 	for len(p) > 0 {
-		// Fill the current multipart chunk first; upload exactly when it is full.
-		remaining := w.chunkSize - w.buffer.Len()
-		if remaining <= 0 {
-			partNumber := w.partNumber.Add(1)
-			buf := w.buffer.Bytes()
-			// Hand off immutable part bytes to worker pool for async UploadPart.
-			w.workersPool.Submit(func() {
-				w.uploadPart(buf, partNumber)
-			})
-			// Reset buffer for the next chunk with preallocated capacity.
-			w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
-			remaining = w.chunkSize
-		}
-
-		// Copy only what fits in this chunk; the loop handles any remainder.
-		toWrite := min(len(p), remaining)
-		n, err := w.buffer.Write(p[:toWrite])
-
+		w.flushFullBuffer()
+		n, err := w.writeToCurrentChunk(p)
 		written += n
+
 		if err != nil {
 			return written, err
 		}
@@ -249,6 +230,39 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	return written, nil
+}
+
+func (w *s3Writer) validateWriteState() error {
+	if w.closed.Load() {
+		return os.ErrClosed
+	}
+
+	if err := w.uploadErr.Load(); err != nil {
+		return err.(error)
+	}
+
+	return nil
+}
+
+func (w *s3Writer) flushFullBuffer() {
+	// Upload exactly one full chunk and reset the buffer for the next writes.
+	if w.buffer.Len() < w.chunkSize {
+		return
+	}
+
+	partNumber := w.partNumber.Add(1)
+	w.workersPool.Submit(func() {
+		w.uploadPart(w.buffer.Bytes(), partNumber)
+	})
+
+	w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
+}
+
+func (w *s3Writer) writeToCurrentChunk(p []byte) (int, error) {
+	remaining := w.chunkSize - w.buffer.Len()
+	toWrite := min(len(p), remaining)
+
+	return w.buffer.Write(p[:toWrite])
 }
 
 // uploadPart uploads a part of the file to S3.

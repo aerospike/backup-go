@@ -98,6 +98,8 @@ type InfoGetter interface {
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetNodesNames() []string
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
+	StartBackup(ctx context.Context, namespace, bucket, region, profile string, jobID int64) error
+	StartRestore(ctx context.Context, namespace, bucket, region, profile string, jobID int64) error
 }
 
 // Client is the main entry point for the backup package.

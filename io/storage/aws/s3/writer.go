@@ -168,7 +168,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		key:          fullPath,
 		client:       w.client,
 		bucket:       w.bucketName,
-		buffer:       new(bytes.Buffer),
+		buffer:       nil, // lazy init on the first write.
 		chunkSize:    w.ChunkSize,
 		logger:       w.Logger,
 		retryPolicy:  w.RetryPolicy,
@@ -219,6 +219,13 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, err.(error)
 	}
 
+	if w.buffer == nil {
+		w.buffer = bytes.NewBuffer(make([]byte, 0, len(p)))
+	} else if w.buffer.Cap() < w.chunkSize {
+		// We're still smaller than one S3 part — grow once.
+		w.buffer.Grow(w.chunkSize)
+	}
+
 	if w.buffer.Len() >= w.chunkSize {
 		partNumber := w.partNumber.Add(1)
 
@@ -228,7 +235,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 			w.uploadPart(buf, partNumber)
 		})
 		// Reset buffer for the next chunk.
-		w.buffer = new(bytes.Buffer)
+		w.buffer.Reset()
 	}
 
 	return w.buffer.Write(p)
@@ -289,7 +296,7 @@ func (w *s3Writer) Close() error {
 		return os.ErrClosed
 	}
 
-	if w.buffer.Len() > 0 {
+	if w.buffer != nil && w.buffer.Len() > 0 {
 		partNumber := w.partNumber.Add(1)
 
 		lastPart := w.buffer.Bytes()

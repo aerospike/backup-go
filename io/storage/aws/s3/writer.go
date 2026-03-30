@@ -220,9 +220,11 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer == nil {
+		// Initial write: allocate only enough for the current request.
+		// This prevents over-allocation if the object is small and written in one go.
 		w.buffer = bytes.NewBuffer(make([]byte, 0, len(p)))
 	} else if w.buffer.Cap() < w.chunkSize {
-		// We're still smaller than one S3 part — grow once.
+		// Subsequent writes: expand buffer to the full chunk size.
 		w.buffer.Grow(w.chunkSize)
 	}
 
@@ -230,12 +232,12 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		partNumber := w.partNumber.Add(1)
 
 		buf := w.buffer.Bytes()
-		// Submit the part for upload.
+		// Submit the current chunk for asynchronous upload.
 		w.workersPool.Submit(func() {
 			w.uploadPart(buf, partNumber)
 		})
-		// Reset buffer for the next chunk.
-		w.buffer.Reset()
+		// Reset the buffer for the next part.
+		w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
 	}
 
 	return w.buffer.Write(p)
@@ -368,6 +370,7 @@ func (w *s3Writer) Close() error {
 
 	w.cpMu.Unlock()
 
+	w.buffer.Reset()
 	return nil
 }
 

@@ -302,6 +302,7 @@ func (w *s3Writer) Close() error {
 		partNumber := w.partNumber.Add(1)
 
 		lastPart := w.buffer.Bytes()
+		w.buffer = nil // explicitly free buffer.
 
 		w.uploadPart(lastPart, partNumber)
 	}
@@ -370,7 +371,6 @@ func (w *s3Writer) Close() error {
 
 	w.cpMu.Unlock()
 
-	w.buffer.Reset()
 	return nil
 }
 

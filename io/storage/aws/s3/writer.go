@@ -162,18 +162,19 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &s3Writer{
-		ctx:          ctx,
-		cancel:       cancel,
-		uploadID:     upload.UploadId,
-		key:          fullPath,
-		client:       w.client,
-		bucket:       w.bucketName,
-		buffer:       new(bytes.Buffer),
-		chunkSize:    w.ChunkSize,
-		logger:       w.Logger,
-		retryPolicy:  w.RetryPolicy,
-		workersPool:  pool.NewPool(w.UploadConcurrency),
-		withChecksum: w.WithChecksum,
+		ctx:               ctx,
+		cancel:            cancel,
+		uploadID:          upload.UploadId,
+		key:               fullPath,
+		client:            w.client,
+		bucket:            w.bucketName,
+		buffer:            nil, // lazy init on first Write
+		chunkSize:         w.ChunkSize,
+		uploadConcurrency: w.UploadConcurrency,
+		logger:            w.Logger,
+		retryPolicy:       w.RetryPolicy,
+		workersPool:       pool.NewPool(w.UploadConcurrency),
+		withChecksum:      w.WithChecksum,
 	}, nil
 }
 
@@ -188,6 +189,8 @@ type s3Writer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	writeMu sync.Mutex
+
 	uploadID *string
 	client   Client
 	buffer   *bytes.Buffer
@@ -197,13 +200,16 @@ type s3Writer struct {
 	cpMu           sync.Mutex
 	completedParts []types.CompletedPart
 
-	chunkSize   int
-	partNumber  atomic.Int32
-	closed      atomic.Bool
-	logger      *slog.Logger
-	retryPolicy *models.RetryPolicy
-	workersPool *pool.Pool
-	uploadErr   atomic.Value
+	chunkSize         int
+	uploadConcurrency int
+	writeCount        int
+	bufferPool        *chunkBufferPool
+	partNumber        atomic.Int32
+	closed            atomic.Bool
+	logger            *slog.Logger
+	retryPolicy       *models.RetryPolicy
+	workersPool       *pool.Pool
+	uploadErr         atomic.Value
 
 	withChecksum bool
 }
@@ -211,6 +217,9 @@ type s3Writer struct {
 var _ io.WriteCloser = (*s3Writer)(nil)
 
 func (w *s3Writer) Write(p []byte) (int, error) {
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
+
 	if w.closed.Load() {
 		return 0, os.ErrClosed
 	}
@@ -219,19 +228,120 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, err.(error)
 	}
 
-	if w.buffer.Len() >= w.chunkSize {
-		partNumber := w.partNumber.Add(1)
+	if len(p) == 0 {
+		return 0, nil
+	}
 
-		buf := w.buffer.Bytes()
-		// Submit the part for upload.
-		w.workersPool.Submit(func() {
-			w.uploadPart(buf, partNumber)
-		})
-		// Reset buffer for the next chunk.
-		w.buffer = new(bytes.Buffer)
+	w.writeCount++
+
+	if w.buffer == nil {
+		// First write stays lightweight and allocates only for current payload.
+		w.buffer = bytes.NewBuffer(make([]byte, 0, len(p)))
+	} else if w.writeCount == 2 && w.bufferPool == nil {
+		w.enableBufferPool()
+	}
+
+	// Flush before append if this payload would push the buffer over chunkSize.
+	if w.buffer.Len() > 0 && len(p) > w.chunkSize-w.buffer.Len() {
+		w.flushCurrentBuffer()
 	}
 
 	return w.buffer.Write(p)
+}
+
+func (w *s3Writer) enableBufferPool() {
+	w.bufferPool = newChunkBufferPool(w.chunkSize, w.uploadConcurrency+1)
+	if w.buffer.Cap() == w.chunkSize {
+		return
+	}
+
+	// If current contents fit, move them into a chunk-sized buffer to avoid repeated growth.
+	if w.buffer.Len() > w.chunkSize {
+		return
+	}
+
+	next := w.acquireBuffer()
+	_, _ = next.Write(w.buffer.Bytes())
+	w.buffer = next
+}
+
+func (w *s3Writer) acquireBuffer() *bytes.Buffer {
+	if w.bufferPool == nil {
+		return new(bytes.Buffer)
+	}
+
+	return w.bufferPool.get()
+}
+
+func (w *s3Writer) releaseBuffer(buf *bytes.Buffer) {
+	if w.bufferPool == nil {
+		return
+	}
+
+	w.bufferPool.put(buf)
+}
+
+func (w *s3Writer) flushCurrentBuffer() {
+	partNumber := w.partNumber.Add(1)
+	partBuf := w.buffer
+
+	// Submit one immutable part buffer and continue writing into another buffer.
+	w.workersPool.Submit(func() {
+		w.uploadPart(partBuf.Bytes(), partNumber)
+		w.releaseBuffer(partBuf)
+	})
+
+	w.buffer = w.acquireBuffer()
+}
+
+type chunkBufferPool struct {
+	chunkSize int
+	buffers   chan *bytes.Buffer
+}
+
+func newChunkBufferPool(chunkSize, size int) *chunkBufferPool {
+	if size < 1 {
+		size = 1
+	}
+
+	return &chunkBufferPool{
+		chunkSize: chunkSize,
+		buffers:   make(chan *bytes.Buffer, size),
+	}
+}
+
+func (p *chunkBufferPool) get() *bytes.Buffer {
+	select {
+	case buf := <-p.buffers:
+		buf.Reset()
+
+		return buf
+	default:
+		return bytes.NewBuffer(make([]byte, 0, p.chunkSize))
+	}
+}
+
+func (p *chunkBufferPool) put(buf *bytes.Buffer) {
+	if buf == nil || buf.Cap() != p.chunkSize {
+		return
+	}
+
+	buf.Reset()
+
+	select {
+	case p.buffers <- buf:
+	default:
+	}
+}
+
+func (p *chunkBufferPool) drain() {
+	for {
+		select {
+		case <-p.buffers:
+		default:
+			return
+		}
+	}
 }
 
 // uploadPart uploads a part of the file to S3.
@@ -288,16 +398,27 @@ func (w *s3Writer) Close() error {
 	if !w.closed.CompareAndSwap(false, true) {
 		return os.ErrClosed
 	}
+	defer w.cancel()
 
-	if w.buffer.Len() > 0 {
+	w.writeMu.Lock()
+
+	if w.buffer != nil && w.buffer.Len() > 0 {
 		partNumber := w.partNumber.Add(1)
 
 		lastPart := w.buffer.Bytes()
 
 		w.uploadPart(lastPart, partNumber)
 	}
+	w.releaseBuffer(w.buffer)
+	w.buffer = nil
+	w.writeMu.Unlock()
 	// Wait for all workers to finish.
 	w.workersPool.Wait()
+
+	if w.bufferPool != nil {
+		w.bufferPool.drain()
+		w.bufferPool = nil
+	}
 
 	if err := w.uploadErr.Load(); err != nil {
 		return err.(error)
@@ -305,6 +426,7 @@ func (w *s3Writer) Close() error {
 
 	// Sort completed parts by part number (required by S3).
 	w.cpMu.Lock()
+	defer w.cpMu.Unlock()
 	slices.SortFunc(w.completedParts, func(a, b types.CompletedPart) int {
 		return cmp.Compare(*a.PartNumber, *b.PartNumber)
 	})
@@ -359,7 +481,7 @@ func (w *s3Writer) Close() error {
 		)
 	}
 
-	w.cpMu.Unlock()
+	w.completedParts = nil
 
 	return nil
 }

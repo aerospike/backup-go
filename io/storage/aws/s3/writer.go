@@ -91,7 +91,7 @@ func NewWriter(
 
 	w.bufferPool = &sync.Pool{
 		New: func() any {
-			return bytes.NewBuffer(make([]byte, 0, w.ChunkSize))
+			return bytes.NewBuffer(make([]byte, 0, s3DefaultChunkSize))
 		},
 	}
 
@@ -236,18 +236,14 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	// 1. Initial Buffer Allocation (Lazy & Small)
-	// Stay outside the pool for small one-off files.
 	if w.buffer == nil {
-		w.buffer = bytes.NewBuffer(make([]byte, 0, len(p)))
-		return w.buffer.Write(p)
+		w.buffer = w.acquireBuffer()
 	}
 
 	// 2. Buffer Promotion (Small -> Pooled)
 	// If we have a small buffer, promote to a full-sized pooled buffer.
-	if w.buffer.Cap() < w.chunkSize {
-		newBuf := w.acquireBuffer()
-		newBuf.Write(w.buffer.Bytes())
-		w.buffer = newBuf
+	if w.buffer.Len() > 0 && w.buffer.Cap() < w.chunkSize {
+		w.buffer.Grow(w.chunkSize - w.buffer.Cap())
 	}
 
 	// 3. The Write Loop
@@ -256,6 +252,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	for len(p) > 0 {
 		if w.buffer.Len() >= w.chunkSize {
 			w.flushCurrentBuffer()
+			w.buffer = w.acquireBuffer()
 		}
 
 		remaining := w.chunkSize - w.buffer.Len()
@@ -271,13 +268,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 
 func (w *s3Writer) acquireBuffer() *bytes.Buffer {
 	buf := w.bufferPool.Get().(*bytes.Buffer)
-	// If the pool gave us a small buffer ensure it has the capacity we need for this specific writer.
-	if buf.Cap() < w.chunkSize {
-		buf.Grow(w.chunkSize)
-	}
-
 	buf.Reset()
-
 	return buf
 }
 
@@ -295,8 +286,6 @@ func (w *s3Writer) flushCurrentBuffer() {
 		w.uploadPart(partBuf.Bytes(), partNumber)
 		w.releaseBuffer(partBuf)
 	})
-
-	w.buffer = w.acquireBuffer()
 }
 
 // uploadPart uploads a part of the file to S3.
@@ -356,18 +345,13 @@ func (w *s3Writer) Close() error {
 	defer w.cancel()
 
 	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
 
 	if w.buffer != nil && w.buffer.Len() > 0 {
-		partNumber := w.partNumber.Add(1)
-
-		lastPart := w.buffer.Bytes()
-
-		w.uploadPart(lastPart, partNumber)
-		w.releaseBuffer(w.buffer)
+		w.flushCurrentBuffer()
 		w.buffer = nil
 	}
 
-	w.writeMu.Unlock()
 	// Wait for all workers to finish.
 	w.workersPool.Wait()
 

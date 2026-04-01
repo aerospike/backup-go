@@ -269,6 +269,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 func (w *s3Writer) acquireBuffer() *bytes.Buffer {
 	buf := w.bufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
+
 	return buf
 }
 

@@ -56,6 +56,7 @@ type Writer struct {
 	prefix string
 
 	storageClass types.StorageClass
+	bufferPool   *sync.Pool
 }
 
 // NewWriter creates a new writer for S3 storage directory/file writes.
@@ -86,6 +87,12 @@ func NewWriter(
 
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
+	}
+
+	w.bufferPool = &sync.Pool{
+		New: func() any {
+			return bytes.NewBuffer(make([]byte, 0, s3DefaultChunkSize))
+		},
 	}
 
 	if w.IsDir {
@@ -158,7 +165,6 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
-	//nolint:gosec // context is canceled when the writer is closed.
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &s3Writer{
@@ -168,7 +174,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		key:          fullPath,
 		client:       w.client,
 		bucket:       w.bucketName,
-		buffer:       new(bytes.Buffer),
+		bufferPool:   w.bufferPool,
 		chunkSize:    w.ChunkSize,
 		logger:       w.Logger,
 		retryPolicy:  w.RetryPolicy,
@@ -188,6 +194,8 @@ type s3Writer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	writeMu sync.Mutex
+
 	uploadID *string
 	client   Client
 	buffer   *bytes.Buffer
@@ -198,6 +206,7 @@ type s3Writer struct {
 	completedParts []types.CompletedPart
 
 	chunkSize   int
+	bufferPool  *sync.Pool
 	partNumber  atomic.Int32
 	closed      atomic.Bool
 	logger      *slog.Logger
@@ -211,6 +220,9 @@ type s3Writer struct {
 var _ io.WriteCloser = (*s3Writer)(nil)
 
 func (w *s3Writer) Write(p []byte) (int, error) {
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
+
 	if w.closed.Load() {
 		return 0, os.ErrClosed
 	}
@@ -219,19 +231,62 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, err.(error)
 	}
 
-	if w.buffer.Len() >= w.chunkSize {
-		partNumber := w.partNumber.Add(1)
-
-		buf := w.buffer.Bytes()
-		// Submit the part for upload.
-		w.workersPool.Submit(func() {
-			w.uploadPart(buf, partNumber)
-		})
-		// Reset buffer for the next chunk.
-		w.buffer = new(bytes.Buffer)
+	if len(p) == 0 {
+		return 0, nil
 	}
 
-	return w.buffer.Write(p)
+	// 1. Initial Buffer Allocation (Lazy & Small)
+	if w.buffer == nil {
+		w.buffer = w.acquireBuffer()
+	}
+
+	// 2. Buffer Promotion (Small -> Pooled)
+	// If we have a small buffer, promote to a full-sized pooled buffer.
+	if w.buffer.Len() > 0 && w.buffer.Cap() < w.chunkSize {
+		w.buffer.Grow(w.chunkSize - w.buffer.Cap())
+	}
+
+	// 3. The Write Loop
+	written := 0
+
+	for len(p) > 0 {
+		if w.buffer.Len() >= w.chunkSize {
+			w.flushCurrentBuffer()
+			w.buffer = w.acquireBuffer()
+		}
+
+		remaining := w.chunkSize - w.buffer.Len()
+		n := min(len(p), remaining)
+
+		_, _ = w.buffer.Write(p[:n])
+		written += n
+		p = p[n:]
+	}
+
+	return written, nil
+}
+
+func (w *s3Writer) acquireBuffer() *bytes.Buffer {
+	buf := w.bufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+
+	return buf
+}
+
+func (w *s3Writer) releaseBuffer(buf *bytes.Buffer) {
+	buf.Reset()
+	w.bufferPool.Put(buf)
+}
+
+func (w *s3Writer) flushCurrentBuffer() {
+	partNumber := w.partNumber.Add(1)
+	partBuf := w.buffer
+
+	// Submit one immutable part buffer and continue writing into another buffer.
+	w.workersPool.Submit(func() {
+		w.uploadPart(partBuf.Bytes(), partNumber)
+		w.releaseBuffer(partBuf)
+	})
 }
 
 // uploadPart uploads a part of the file to S3.
@@ -288,23 +343,38 @@ func (w *s3Writer) Close() error {
 	if !w.closed.CompareAndSwap(false, true) {
 		return os.ErrClosed
 	}
+	defer w.cancel()
 
-	if w.buffer.Len() > 0 {
-		partNumber := w.partNumber.Add(1)
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
 
-		lastPart := w.buffer.Bytes()
-
-		w.uploadPart(lastPart, partNumber)
+	if w.buffer != nil && w.buffer.Len() > 0 {
+		w.flushCurrentBuffer()
+		w.buffer = nil
 	}
+
 	// Wait for all workers to finish.
 	w.workersPool.Wait()
 
 	if err := w.uploadErr.Load(); err != nil {
+		if abErr := w.abortUpload(err.(error)); abErr != nil {
+			if w.logger != nil {
+				w.logger.Error("failed to abort multipart upload",
+					slog.String("key", w.key),
+					slog.String("uploadID", ptr.ToString(w.uploadID)),
+					slog.Any("error", abErr))
+			}
+
+			return abErr
+		}
+
 		return err.(error)
 	}
 
 	// Sort completed parts by part number (required by S3).
 	w.cpMu.Lock()
+	defer w.cpMu.Unlock()
+
 	slices.SortFunc(w.completedParts, func(a, b types.CompletedPart) int {
 		return cmp.Compare(*a.PartNumber, *b.PartNumber)
 	})
@@ -359,7 +429,7 @@ func (w *s3Writer) Close() error {
 		)
 	}
 
-	w.cpMu.Unlock()
+	w.completedParts = nil
 
 	return nil
 }

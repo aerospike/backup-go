@@ -430,7 +430,7 @@ func (bh *BackupHandler) backupMetadata(ctx context.Context, writer io.WriteClos
 func (bh *BackupHandler) countRecords(ctx context.Context) {
 	records, err := bh.recordCounter.countRecords(ctx, bh.infoClient)
 	if err != nil {
-		bh.logger.Error("failed to count records", slog.Any("error", err))
+		bh.logger.Warn("failed to count records", slog.Any("error", err))
 		return
 	}
 

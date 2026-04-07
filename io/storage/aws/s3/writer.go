@@ -158,7 +158,6 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
-	//nolint:gosec // context is canceled when the writer is closed.
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &s3Writer{

@@ -959,8 +959,11 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 }
 
 // StartBackup starts a backup job.
-func (ic *Client) StartBackup(ctx context.Context, namespace, bucket, region, profile string, jobID int64) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup], namespace, bucket, region, profile, jobID)
+func (ic *Client) StartBackup(ctx context.Context, jobID int64,
+	namespace, storage, bucket, region, profile, accessKey, secretKey string,
+) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup],
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
@@ -976,8 +979,11 @@ func (ic *Client) StartBackup(ctx context.Context, namespace, bucket, region, pr
 }
 
 // StartRestore starts a backup job.
-func (ic *Client) StartRestore(ctx context.Context, namespace, bucket, region, profile string, jobID int64) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup], namespace, bucket, region, profile, jobID)
+func (ic *Client) StartRestore(ctx context.Context, jobID int64,
+	namespace, storage, bucket, region, profile, accessKey, secretKey string,
+) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideRestore],
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {

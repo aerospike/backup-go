@@ -39,14 +39,15 @@ func NewByteBufferPool(size int) *ByteBufferPool {
 // Get retrieves a buffer from the pool or allocates one.
 // The buffer is always reset to an empty state.
 func (p *ByteBufferPool) Get() *bytes.Buffer {
-	slog.Warn("Getting byte buffer pool")
 	b := p.pool.Get().(*bytes.Buffer)
 	b.Reset()
 
+	slog.Warn("Getting byte buffer pool", slog.Int("size", b.Cap()))
 	return b
 }
 
 // Put returns a buffer to the pool.
 func (p *ByteBufferPool) Put(b *bytes.Buffer) {
+	slog.Warn("Putting byte buffer pool", slog.Int("size", b.Cap()))
 	p.pool.Put(b)
 }

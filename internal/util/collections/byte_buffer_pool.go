@@ -16,6 +16,7 @@ package collections
 
 import (
 	"bytes"
+	"log/slog"
 	"sync"
 )
 
@@ -28,6 +29,7 @@ type ByteBufferPool struct {
 func NewByteBufferPool(size int) *ByteBufferPool {
 	p := &ByteBufferPool{}
 	p.pool.New = func() any {
+		slog.Warn("Creating new byte buffer pool")
 		return bytes.NewBuffer(make([]byte, 0, size))
 	}
 
@@ -37,6 +39,7 @@ func NewByteBufferPool(size int) *ByteBufferPool {
 // Get retrieves a buffer from the pool or allocates one.
 // The buffer is always reset to an empty state.
 func (p *ByteBufferPool) Get() *bytes.Buffer {
+	slog.Warn("Getting byte buffer pool")
 	b := p.pool.Get().(*bytes.Buffer)
 	b.Reset()
 

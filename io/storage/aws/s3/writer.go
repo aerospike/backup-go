@@ -352,11 +352,16 @@ func (w *s3Writer) Close() error {
 	w.writeMu.Lock()
 	defer w.writeMu.Unlock()
 
-	if w.buffer != nil && w.buffer.Len() > 0 {
-		w.flushCurrentBuffer()
+	if w.buffer != nil {
+		if w.buffer.Len() > 0 {
+			w.flushCurrentBuffer() // async path releases this buffer
+		} else {
+			w.releaseBuffer(w.buffer)
+		}
 		w.buffer = nil
 	}
 
+	w.bufferPool = nil
 	// Wait for all workers to finish.
 	w.workersPool.Wait()
 

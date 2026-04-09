@@ -29,7 +29,7 @@ type ByteBufferPool struct {
 func NewByteBufferPool(size int) *ByteBufferPool {
 	p := &ByteBufferPool{}
 	p.pool.New = func() any {
-		slog.Warn("Creating new byte buffer pool")
+		slog.Warn("Creating new byte buffer pool", slog.Int("size", size))
 		return bytes.NewBuffer(make([]byte, 0, size))
 	}
 

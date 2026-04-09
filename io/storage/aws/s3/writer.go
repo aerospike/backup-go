@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -167,6 +166,11 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	logger := w.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+
 	return &s3Writer{
 		ctx:          ctx,
 		cancel:       cancel,
@@ -176,7 +180,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		bucket:       w.bucketName,
 		bufferPool:   w.bufferPool,
 		chunkSize:    w.ChunkSize,
-		logger:       w.Logger,
+		logger:       logger,
 		retryPolicy:  w.RetryPolicy,
 		workersPool:  pool.NewPool(w.UploadConcurrency),
 		withChecksum: w.WithChecksum,
@@ -209,7 +213,7 @@ type s3Writer struct {
 	bufferPool  *sync.Pool
 	partNumber  atomic.Int32
 	closed      atomic.Bool
-	logger      *slog.Logger
+	logger      *slog.Logger // logger is required
 	retryPolicy *models.RetryPolicy
 	workersPool *pool.Pool
 	uploadErr   atomic.Value
@@ -357,16 +361,7 @@ func (w *s3Writer) Close() error {
 	w.workersPool.Wait()
 
 	if err := w.uploadErr.Load(); err != nil {
-		if abErr := w.abortUpload(err.(error)); abErr != nil {
-			if w.logger != nil {
-				w.logger.Error("failed to abort multipart upload",
-					slog.String("key", w.key),
-					slog.String("uploadID", ptr.ToString(w.uploadID)),
-					slog.Any("error", abErr))
-			}
-
-			return abErr
-		}
+		w.abortUpload()
 
 		return err.(error)
 	}
@@ -379,21 +374,9 @@ func (w *s3Writer) Close() error {
 		return cmp.Compare(*a.PartNumber, *b.PartNumber)
 	})
 
-	// Verify no gaps in part numbers.
-	for i, part := range w.completedParts {
-		expectedPartNum := int32(i + 1)
-		if *part.PartNumber != expectedPartNum {
-			if err := w.abortUpload(fmt.Errorf("missing part %d in upload sequence", expectedPartNum)); err != nil {
-				if w.logger != nil {
-					w.logger.Error("failed to abort multipart upload",
-						slog.String("key", w.key),
-						slog.String("uploadID", ptr.ToString(w.uploadID)),
-						slog.Any("error", err))
-				}
-
-				return err
-			}
-		}
+	if err := verifyNoGapsInPartNumbers(w.completedParts); err != nil {
+		w.abortUpload()
+		return err
 	}
 
 	r, err := w.client.CompleteMultipartUpload(w.ctx,
@@ -406,36 +389,36 @@ func (w *s3Writer) Close() error {
 			},
 		})
 	if err != nil {
-		// Try to abort even if complete upload failed.
-		if abErr := w.abortUpload(err); abErr != nil {
-			if w.logger != nil {
-				w.logger.Error("failed to abort multipart upload",
-					slog.String("key", w.key),
-					slog.String("uploadID", ptr.ToString(w.uploadID)),
-					slog.Any("error", err))
-			}
-		}
-
+		w.abortUpload()
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	if w.logger != nil {
-		w.logger.Debug("completed multipart upload",
-			slog.String("key", w.key),
-			slog.String("uploadID", ptr.ToString(w.uploadID)),
-			slog.Int("parts", len(w.completedParts)),
-			slog.String("etag", ptr.ToString(r.ETag)),
-			slog.String("checksum", ptr.ToString(r.ChecksumCRC32)),
-		)
-	}
+	w.logger.Debug("completed multipart upload",
+		slog.String("key", w.key),
+		slog.String("uploadID", ptr.ToString(w.uploadID)),
+		slog.Int("parts", len(w.completedParts)),
+		slog.String("etag", ptr.ToString(r.ETag)),
+		slog.String("checksum", ptr.ToString(r.ChecksumCRC32)),
+	)
 
 	w.completedParts = nil
 
 	return nil
 }
 
+func verifyNoGapsInPartNumbers(parts []types.CompletedPart) error {
+	for i, part := range parts {
+		expectedPartNum := int32(i + 1)
+		if *part.PartNumber != expectedPartNum {
+			return fmt.Errorf("missing part %d in upload sequence", expectedPartNum)
+		}
+	}
+
+	return nil
+}
+
 // abortUpload aborts the multipart upload and cleans up partial data
-func (w *s3Writer) abortUpload(originalErr error) error {
+func (w *s3Writer) abortUpload() {
 	// Use a fresh context for cleanup (not the canceled one).
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -445,8 +428,12 @@ func (w *s3Writer) abortUpload(originalErr error) error {
 		Key:      &w.key,
 		UploadId: w.uploadID,
 	})
-
-	return errors.Join(originalErr, err)
+	if err != nil {
+		w.logger.Error("failed to abort multipart upload",
+			slog.String("key", w.key),
+			slog.String("uploadID", ptr.ToString(w.uploadID)),
+			slog.Any("error", err))
+	}
 }
 
 func isEmptyDirectory(ctx context.Context, client Client, bucketName, prefix string) (bool, error) {

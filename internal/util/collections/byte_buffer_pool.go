@@ -39,6 +39,7 @@ func NewByteBufferPool(size int) *ByteBufferPool {
 func (p *ByteBufferPool) Get() *bytes.Buffer {
 	b := p.pool.Get().(*bytes.Buffer)
 	b.Reset()
+
 	return b
 }
 

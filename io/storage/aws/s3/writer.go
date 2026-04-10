@@ -241,10 +241,6 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	if w.buffer.Cap() < w.chunkSize {
 		// This ensures that after this call, Cap >= chunkSize
 		w.buffer.Grow(w.chunkSize - w.buffer.Len())
-
-		slog.Warn("Buffer size grown",
-			slog.Int("new_cap_mb", w.buffer.Cap()/1024/1024),
-		)
 	}
 
 	// 3. The Write Loop

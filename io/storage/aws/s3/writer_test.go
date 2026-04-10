@@ -127,8 +127,22 @@ aws_secret_access_key = minioadminpassword`)
 }
 
 func fillWriterTestData(ctx context.Context, client *s3.Client) error {
+	// Create bucket if absent
+	_, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
+		Bucket: aws.String(testBucket),
+	})
+
+	if err != nil {
+		_, err = client.CreateBucket(ctx, &s3.CreateBucketInput{
+			Bucket: aws.String(testBucket),
+		})
+		if err != nil {
+			return fmt.Errorf("error creating bucket: %w", err)
+		}
+	}
+
 	// Create empty folder
-	_, err := client.PutObject(ctx, &s3.PutObjectInput{
+	_, err = client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(testBucket),
 		Key:    aws.String(testWriteFolderEmpty),
 		Body:   nil,
@@ -952,6 +966,11 @@ func TestS3Writer_Write_WithUploadError(t *testing.T) {
 		Return(nil, errors.New("upload failed")).
 		Maybe()
 
+	mockClient.EXPECT().
+		AbortMultipartUpload(mock.Anything, mock.Anything).
+		Return(&s3.AbortMultipartUploadOutput{}, nil).
+		Maybe()
+
 	writer, err := NewWriter(
 		ctx,
 		mockClient,
@@ -1365,6 +1384,11 @@ func TestS3Writer_ContextCancellation(t *testing.T) {
 			cancel()
 			return nil, context.Canceled
 		}).
+		Maybe()
+
+	mockClient.EXPECT().
+		AbortMultipartUpload(mock.Anything, mock.Anything).
+		Return(&s3.AbortMultipartUploadOutput{}, nil).
 		Maybe()
 
 	writer, err := NewWriter(

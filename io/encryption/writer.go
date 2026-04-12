@@ -26,6 +26,7 @@ import (
 type writer struct {
 	writer io.WriteCloser
 	stream cipher.Stream
+	buf    []byte
 }
 
 // NewWriter returns a new encryption Writer
@@ -63,7 +64,10 @@ func NewWriter(w io.WriteCloser, key []byte) (io.WriteCloser, error) {
 
 // Write writes the data to the writer and encrypts it.
 func (ew *writer) Write(p []byte) (int, error) {
-	encrypted := make([]byte, len(p))
+	if cap(ew.buf) < len(p) {
+		ew.buf = make([]byte, len(p))
+	}
+	encrypted := ew.buf[:len(p)]
 	ew.stream.XORKeyStream(encrypted, p)
 
 	return ew.writer.Write(encrypted)

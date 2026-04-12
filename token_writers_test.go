@@ -25,6 +25,7 @@ import (
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/aerospike/backup-go/models"
 	pipemocks "github.com/aerospike/backup-go/pipe/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,10 +76,19 @@ func TestTokenWriter(t *testing.T) {
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
 	mockEncoder := mocks.NewMockEncoder[*models.Token](t)
-	mockEncoder.EXPECT().EncodeToken(recToken).Return([]byte("encoded rec "), nil)
-	mockEncoder.EXPECT().EncodeToken(SIndexToken).Return([]byte("encoded sindex "), nil)
-	mockEncoder.EXPECT().EncodeToken(UDFToken).Return([]byte("encoded UDF "), nil)
-	mockEncoder.EXPECT().EncodeToken(invalidToken).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(recToken, mock.Anything).RunAndReturn(func(_ *models.Token, w io.Writer) error {
+		_, _ = w.Write([]byte("encoded rec "))
+		return nil
+	})
+	mockEncoder.EXPECT().EncodeToken(SIndexToken, mock.Anything).RunAndReturn(func(_ *models.Token, w io.Writer) error {
+		_, _ = w.Write([]byte("encoded sindex "))
+		return nil
+	})
+	mockEncoder.EXPECT().EncodeToken(UDFToken, mock.Anything).RunAndReturn(func(_ *models.Token, w io.Writer) error {
+		_, _ = w.Write([]byte("encoded UDF "))
+		return nil
+	})
+	mockEncoder.EXPECT().EncodeToken(invalidToken, mock.Anything).Return(errors.New("error"))
 
 	b := bytes.Buffer{}
 	dst := newBufferWriteCloser(&b)
@@ -105,7 +115,7 @@ func TestTokenWriter(t *testing.T) {
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
-	mockEncoder.EXPECT().EncodeToken(failRecToken).Return(nil, errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(failRecToken, mock.Anything).Return(errors.New("error"))
 	_, err = writer.Write(failRecToken)
 	require.Error(t, err)
 

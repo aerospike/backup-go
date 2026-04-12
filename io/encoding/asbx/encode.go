@@ -16,6 +16,7 @@ package asbx
 
 import (
 	"fmt"
+	"io"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
@@ -51,13 +52,11 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 	return fmt.Sprintf("%s%s_%d%s.asbx", prefix, e.namespace, e.fileNumber.Add(1), suffix)
 }
 
-// EncodeToken encodes a token to the ASBX format.
-// It returns a byte slice of the encoded token and an error if the encoding
-// fails.
-func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
+// EncodeToken encodes a token to the ASBX format, writing to the provided writer.
+func (e *Encoder[T]) EncodeToken(token T, w io.Writer) error {
 	t, ok := any(token).(*models.ASBXToken)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for ASBX encoder", token)
+		return fmt.Errorf("unsupported token type %T for ASBX encoder", token)
 	}
 	// Message contains:
 	// Digest - 20 bytes.
@@ -65,22 +64,31 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	// Payload - contains a raw message from tcp protocol.
 	pLen := len(t.Payload)
 
-	msg := make([]byte, 26+pLen)
+	// Write digest (20 bytes).
+	if _, err := w.Write(t.Key.Digest()); err != nil {
+		return err
+	}
 
-	copy(msg[:20], t.Key.Digest())
+	// Write payload length (6 bytes, big-endian).
+	lenBuf := [6]byte{
+		byte(pLen >> 40),
+		byte(pLen >> 32),
+		byte(pLen >> 24),
+		byte(pLen >> 16),
+		byte(pLen >> 8),
+		byte(pLen),
+	}
 
-	// Fill payload len.
-	msg[20] = byte(pLen >> 40)
-	msg[21] = byte(pLen >> 32)
-	msg[22] = byte(pLen >> 24)
-	msg[23] = byte(pLen >> 16)
-	msg[24] = byte(pLen >> 8)
-	msg[25] = byte(pLen)
+	if _, err := w.Write(lenBuf[:]); err != nil {
+		return err
+	}
 
-	// Fill token.
-	copy(msg[26:], t.Payload)
+	// Write payload.
+	if _, err := w.Write(t.Payload); err != nil {
+		return err
+	}
 
-	return msg, nil
+	return nil
 }
 
 // GetHeader returns prepared file header as []byte.

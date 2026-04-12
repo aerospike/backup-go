@@ -36,8 +36,6 @@ type Encoder[T models.TokenConstraint] struct {
 
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
-
-	estimatedRecordSize atomic.Uint32
 }
 
 // NewEncoder creates a new Encoder.
@@ -52,12 +50,11 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 	return prefix + e.config.Namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
-// EncodeToken encodes a token to the ASB format.
-// It returns a byte slice of the encoded token and an error if the encoding fails.
-func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
+// EncodeToken encodes a token to the ASB format, writing to the provided writer.
+func (e *Encoder[T]) EncodeToken(token T, w io.Writer) error {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for ASB encoder", token)
+		return fmt.Errorf("unsupported token type %T for ASB encoder", token)
 	}
 
 	var (
@@ -65,16 +62,13 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 		err error
 	)
 
-	allocationSize := int(e.estimatedRecordSize.Load() * 11 / 10) // add 10% to be safe
-	buff := bytes.NewBuffer(make([]byte, 0, allocationSize))
-
 	switch t.Type {
 	case models.TokenTypeRecord:
-		n, err = e.encodeRecord(t.Record, buff)
+		n, err = recordToASB(e.config.Compact, t.Record, w)
 	case models.TokenTypeUDF:
-		n, err = e.encodeUDF(t.UDF, buff)
+		n, err = udfToASB(t.UDF, w)
 	case models.TokenTypeSIndex:
-		n, err = e.encodeSIndex(t.SIndex, buff)
+		n, err = sindexToASB(t.SIndex, w)
 	case models.TokenTypeInvalid:
 		n, err = 0, errors.New("invalid token")
 	default:
@@ -82,25 +76,10 @@ func (e *Encoder[T]) EncodeToken(token T) ([]byte, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode token at byte %d: %w", n, err)
+		return fmt.Errorf("failed to encode token at byte %d: %w", n, err)
 	}
 
-	// keep smoothed last value
-	e.estimatedRecordSize.Store((e.estimatedRecordSize.Load() + uint32(n)) / 2)
-
-	return buff.Bytes(), nil
-}
-
-func (e *Encoder[T]) encodeRecord(rec *models.Record, buff *bytes.Buffer) (int, error) {
-	return recordToASB(e.config.Compact, rec, buff)
-}
-
-func (e *Encoder[T]) encodeUDF(udf *models.UDF, buff *bytes.Buffer) (int, error) {
-	return udfToASB(udf, buff)
-}
-
-func (e *Encoder[T]) encodeSIndex(sIndex *models.SIndex, buff *bytes.Buffer) (int, error) {
-	return sindexToASB(sIndex, buff)
+	return nil
 }
 
 // GetHeader returns the header of the ASB file as a byte slice.

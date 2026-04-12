@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"io"
 	mRand "math/rand/v2"
 	"reflect"
 	"sort"
@@ -56,13 +57,15 @@ func TestEncodeTokenRecord(t *testing.T) {
 	}
 
 	buff := &bytes.Buffer{}
-	_, err := encoder.encodeRecord(token.Record, buff)
+	var w io.Writer = buff
+	_, err := recordToASB(encoder.config.Compact, token.Record, w)
 	require.NoError(t, err)
 	expected := bytes.Clone(buff.Bytes())
 
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err = encoder.EncodeToken(token, actual)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, actual.Bytes())
 }
 
 func TestEncodeTokenUDF(t *testing.T) {
@@ -79,13 +82,15 @@ func TestEncodeTokenUDF(t *testing.T) {
 		},
 	}
 	buff := &bytes.Buffer{}
-	_, err := encoder.encodeUDF(token.UDF, buff)
+	var w io.Writer = buff
+	_, err := udfToASB(token.UDF, w)
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err = encoder.EncodeToken(token, actual)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, actual.Bytes())
 }
 
 func TestEncodeTokenSIndex(t *testing.T) {
@@ -107,13 +112,15 @@ func TestEncodeTokenSIndex(t *testing.T) {
 	}
 
 	buff := &bytes.Buffer{}
-	_, err := encoder.encodeSIndex(token.SIndex, buff)
+	var w io.Writer = buff
+	_, err := sindexToASB(token.SIndex, w)
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err = encoder.EncodeToken(token, actual)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, actual.Bytes())
 }
 
 func TestEncodeTokenInvalid(t *testing.T) {
@@ -126,9 +133,9 @@ func TestEncodeTokenInvalid(t *testing.T) {
 	}
 
 	token.Type = models.TokenTypeInvalid
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err := encoder.EncodeToken(token, actual)
 	require.Error(t, err)
-	require.Nil(t, actual)
 }
 
 func TestEncodeRecord(t *testing.T) {
@@ -154,7 +161,8 @@ func TestEncodeRecord(t *testing.T) {
 	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
 	buff := &bytes.Buffer{}
-	n, err := encoder.encodeRecord(rec, buff)
+	var w io.Writer = buff
+	n, err := recordToASB(encoder.config.Compact, rec, w)
 	require.NoError(t, err)
 	actual := buff.Bytes()
 	require.Equal(t, len(actual), n)
@@ -163,8 +171,6 @@ func TestEncodeRecord(t *testing.T) {
 
 func TestEncodeSIndex(t *testing.T) {
 	t.Parallel()
-
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -178,7 +184,8 @@ func TestEncodeSIndex(t *testing.T) {
 
 	expected := []byte("* i ns  name N 1 bin S\n")
 	buff := &bytes.Buffer{}
-	n, err := encoder.encodeSIndex(sindex, buff)
+	var w io.Writer = buff
+	n, err := sindexToASB(sindex, w)
 	require.Len(t, expected, n)
 	require.NoError(t, err)
 	require.Equal(t, expected, buff.Bytes())
@@ -1648,7 +1655,8 @@ func BenchmarkEncodeRecord(b *testing.B) {
 
 	for b.Loop() {
 		buff := &bytes.Buffer{}
-		_, _ = encoder.encodeRecord(rec, buff)
+		var w io.Writer = buff
+		_, _ = recordToASB(encoder.config.Compact, rec, w)
 		output.Write(buff.Bytes())
 	}
 }

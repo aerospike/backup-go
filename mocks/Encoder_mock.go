@@ -5,6 +5,8 @@
 package mocks
 
 import (
+	"io"
+
 	"github.com/aerospike/backup-go/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -37,31 +39,20 @@ func (_m *MockEncoder[T]) EXPECT() *MockEncoder_Expecter[T] {
 }
 
 // EncodeToken provides a mock function for the type MockEncoder
-func (_mock *MockEncoder[T]) EncodeToken(v T) ([]byte, error) {
-	ret := _mock.Called(v)
+func (_mock *MockEncoder[T]) EncodeToken(v T, writer io.Writer) error {
+	ret := _mock.Called(v, writer)
 
 	if len(ret) == 0 {
 		panic("no return value specified for EncodeToken")
 	}
 
-	var r0 []byte
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(T) ([]byte, error)); ok {
-		return returnFunc(v)
-	}
-	if returnFunc, ok := ret.Get(0).(func(T) []byte); ok {
-		r0 = returnFunc(v)
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(T, io.Writer) error); ok {
+		r0 = returnFunc(v, writer)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
+		r0 = ret.Error(0)
 	}
-	if returnFunc, ok := ret.Get(1).(func(T) error); ok {
-		r1 = returnFunc(v)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
 // MockEncoder_EncodeToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EncodeToken'
@@ -71,29 +62,35 @@ type MockEncoder_EncodeToken_Call[T models.TokenConstraint] struct {
 
 // EncodeToken is a helper method to define mock.On call
 //   - v T
-func (_e *MockEncoder_Expecter[T]) EncodeToken(v interface{}) *MockEncoder_EncodeToken_Call[T] {
-	return &MockEncoder_EncodeToken_Call[T]{Call: _e.mock.On("EncodeToken", v)}
+//   - writer io.Writer
+func (_e *MockEncoder_Expecter[T]) EncodeToken(v interface{}, writer interface{}) *MockEncoder_EncodeToken_Call[T] {
+	return &MockEncoder_EncodeToken_Call[T]{Call: _e.mock.On("EncodeToken", v, writer)}
 }
 
-func (_c *MockEncoder_EncodeToken_Call[T]) Run(run func(v T)) *MockEncoder_EncodeToken_Call[T] {
+func (_c *MockEncoder_EncodeToken_Call[T]) Run(run func(v T, writer io.Writer)) *MockEncoder_EncodeToken_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 T
 		if args[0] != nil {
 			arg0 = args[0].(T)
 		}
+		var arg1 io.Writer
+		if args[1] != nil {
+			arg1 = args[1].(io.Writer)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockEncoder_EncodeToken_Call[T]) Return(bytes []byte, err error) *MockEncoder_EncodeToken_Call[T] {
-	_c.Call.Return(bytes, err)
+func (_c *MockEncoder_EncodeToken_Call[T]) Return(err error) *MockEncoder_EncodeToken_Call[T] {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockEncoder_EncodeToken_Call[T]) RunAndReturn(run func(v T) ([]byte, error)) *MockEncoder_EncodeToken_Call[T] {
+func (_c *MockEncoder_EncodeToken_Call[T]) RunAndReturn(run func(v T, writer io.Writer) error) *MockEncoder_EncodeToken_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }

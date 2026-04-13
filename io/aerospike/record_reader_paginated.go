@@ -217,7 +217,7 @@ func (r *paginatedRecordReader) scanPageOnce(
 	)
 
 	// Set close recordset function.
-	closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
+	closeRecordset := wrapCloser(r.recordsetCloser, recordset)
 
 	// Drain all results from this specific scan.
 	// No context checking here because it slows down the scan.

@@ -40,11 +40,11 @@ type Token struct {
 	SIndex *SIndex
 	UDF    *UDF
 	Record *Record
-	Type   TokenType
-	Size   uint64
 	// Filter represents serialized partition filter for page, that record belongs to.
 	// Is used only on pagination read, to save reading states.
 	Filter *PartitionFilterSerialized
+	Size   uint64
+	Type   TokenType
 }
 
 func (t *Token) GetSize() uint64 {

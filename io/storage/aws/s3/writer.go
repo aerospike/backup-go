@@ -56,6 +56,7 @@ type Writer struct {
 	prefix string
 
 	storageClass types.StorageClass
+	bufferPool   *collections.ByteBufferPool
 }
 
 // NewWriter creates a new writer for S3 storage directory/file writes.
@@ -87,6 +88,7 @@ func NewWriter(
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
 	}
+	w.bufferPool = collections.NewByteBufferPool(w.ChunkSize)
 
 	if w.IsDir {
 		w.prefix = common.CleanPath(w.PathList[0], true)
@@ -176,6 +178,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		logger:       logger,
 		retryPolicy:  w.RetryPolicy,
 		workersPool:  pool.NewPool(w.UploadConcurrency),
+		bufferPool:   w.bufferPool,
 		withChecksum: w.WithChecksum,
 	}, nil
 }
@@ -208,14 +211,13 @@ type s3Writer struct {
 	logger      *slog.Logger // logger is required
 	retryPolicy *models.RetryPolicy
 	workersPool *pool.Pool
+	bufferPool  *collections.ByteBufferPool
 	uploadErr   atomic.Value
 
 	withChecksum bool
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
-
-var bufferPool = collections.NewByteBufferPool(s3DefaultChunkSize)
 
 func (w *s3Writer) Write(p []byte) (int, error) {
 	w.writeMu.Lock()
@@ -234,7 +236,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer == nil {
-		w.buffer = bufferPool.Get()
+		w.buffer = w.bufferPool.Get()
 	}
 
 	// Buffer Promotion. If we have a small buffer, grow it.
@@ -249,7 +251,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	for len(p) > 0 {
 		if w.buffer.Len() >= w.chunkSize {
 			w.flushCurrentBuffer()
-			w.buffer = bufferPool.Get()
+			w.buffer = w.bufferPool.Get()
 		}
 
 		remaining := w.chunkSize - w.buffer.Len()
@@ -270,7 +272,7 @@ func (w *s3Writer) flushCurrentBuffer() {
 	// Submit one immutable part buffer and continue writing into another buffer.
 	w.workersPool.Submit(func() {
 		w.uploadPart(partBuf.Bytes(), partNumber)
-		bufferPool.Put(partBuf)
+		w.bufferPool.Put(partBuf)
 	})
 }
 
@@ -337,7 +339,7 @@ func (w *s3Writer) Close() error {
 		if w.buffer.Len() > 0 {
 			w.flushCurrentBuffer() // async path releases this buffer
 		} else {
-			bufferPool.Put(w.buffer)
+			w.bufferPool.Put(w.buffer)
 		}
 		w.buffer = nil
 	}

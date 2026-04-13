@@ -30,9 +30,9 @@ const (
 
 // backupFile is used for sorting files.
 type backupFile struct {
+	name   string // original filename.
 	prefix int    // stores the number before _source.
 	suffix int    // stores the number after _ns1_.
-	name   string // original filename.
 }
 
 // parseFileName parse file name to backupFile struct.

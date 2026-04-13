@@ -88,7 +88,9 @@ func NewWriter(
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
 	}
-	w.bufferPool = collections.NewByteBufferPool(w.ChunkSize)
+	if w.UploadConcurrency > 0 {
+		w.bufferPool = collections.NewByteBufferPool(w.ChunkSize)
+	}
 
 	if w.IsDir {
 		w.prefix = common.CleanPath(w.PathList[0], true)
@@ -219,6 +221,10 @@ type s3Writer struct {
 
 var _ io.WriteCloser = (*s3Writer)(nil)
 
+func (w *s3Writer) isAsyncUpload() bool {
+	return w.workersPool != nil && w.bufferPool != nil
+}
+
 func (w *s3Writer) Write(p []byte) (int, error) {
 	w.writeMu.Lock()
 	defer w.writeMu.Unlock()
@@ -236,7 +242,11 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer == nil {
-		w.buffer = w.bufferPool.Get()
+		if w.bufferPool != nil {
+			w.buffer = w.bufferPool.Get()
+		} else {
+			w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
+		}
 	}
 
 	// Buffer Promotion. If we have a small buffer, grow it.
@@ -251,7 +261,9 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	for len(p) > 0 {
 		if w.buffer.Len() >= w.chunkSize {
 			w.flushCurrentBuffer()
-			w.buffer = w.bufferPool.Get()
+			if w.bufferPool != nil {
+				w.buffer = w.bufferPool.Get()
+			}
 		}
 
 		remaining := w.chunkSize - w.buffer.Len()
@@ -267,6 +279,13 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 
 func (w *s3Writer) flushCurrentBuffer() {
 	partNumber := w.partNumber.Add(1)
+
+	if !w.isAsyncUpload() {
+		w.uploadPart(w.buffer.Bytes(), partNumber)
+		w.buffer.Reset()
+		return
+	}
+
 	partBuf := w.buffer
 
 	// Submit one immutable part buffer and continue writing into another buffer.
@@ -337,8 +356,8 @@ func (w *s3Writer) Close() error {
 
 	if w.buffer != nil {
 		if w.buffer.Len() > 0 {
-			w.flushCurrentBuffer() // async path releases this buffer
-		} else {
+			w.flushCurrentBuffer()
+		} else if w.bufferPool != nil {
 			w.bufferPool.Put(w.buffer)
 		}
 		w.buffer = nil

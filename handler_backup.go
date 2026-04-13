@@ -309,6 +309,8 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	// Timestamp processor.
 	tsProcessor := processors.NewVoidTimeSetter[*models.Token](bh.logger)
 
+	var buf bytes.Buffer
+
 	for {
 		t, err := recordReader.Read(ctx)
 		if err != nil {
@@ -324,7 +326,8 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 			return nil, nil, fmt.Errorf("failed to process token: %w", err)
 		}
 
-		var buf bytes.Buffer
+		buf.Reset()
+
 		if err := bh.encoder.EncodeToken(t, &buf); err != nil {
 			return nil, nil, fmt.Errorf("failed to encode token: %w", err)
 		}

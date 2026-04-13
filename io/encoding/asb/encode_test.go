@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	"io"
 	mRand "math/rand/v2"
 	"reflect"
 	"sort"
@@ -57,8 +56,7 @@ func TestEncodeTokenRecord(t *testing.T) {
 	}
 
 	buff := &bytes.Buffer{}
-	var w io.Writer = buff
-	_, err := recordToASB(encoder.config.Compact, token.Record, w)
+	_, err := recordToASB(encoder.config.Compact, token.Record, buff)
 	require.NoError(t, err)
 	expected := bytes.Clone(buff.Bytes())
 
@@ -82,8 +80,7 @@ func TestEncodeTokenUDF(t *testing.T) {
 		},
 	}
 	buff := &bytes.Buffer{}
-	var w io.Writer = buff
-	_, err := udfToASB(token.UDF, w)
+	_, err := udfToASB(token.UDF, buff)
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
@@ -112,8 +109,7 @@ func TestEncodeTokenSIndex(t *testing.T) {
 	}
 
 	buff := &bytes.Buffer{}
-	var w io.Writer = buff
-	_, err := sindexToASB(token.SIndex, w)
+	_, err := sindexToASB(token.SIndex, buff)
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
@@ -161,8 +157,7 @@ func TestEncodeRecord(t *testing.T) {
 	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
 	buff := &bytes.Buffer{}
-	var w io.Writer = buff
-	n, err := recordToASB(encoder.config.Compact, rec, w)
+	n, err := recordToASB(encoder.config.Compact, rec, buff)
 	require.NoError(t, err)
 	actual := buff.Bytes()
 	require.Equal(t, len(actual), n)
@@ -184,8 +179,7 @@ func TestEncodeSIndex(t *testing.T) {
 
 	expected := []byte("* i ns  name N 1 bin S\n")
 	buff := &bytes.Buffer{}
-	var w io.Writer = buff
-	n, err := sindexToASB(sindex, w)
+	n, err := sindexToASB(sindex, buff)
 	require.Len(t, expected, n)
 	require.NoError(t, err)
 	require.Equal(t, expected, buff.Bytes())
@@ -1655,8 +1649,7 @@ func BenchmarkEncodeRecord(b *testing.B) {
 
 	for b.Loop() {
 		buff := &bytes.Buffer{}
-		var w io.Writer = buff
-		_, _ = recordToASB(encoder.config.Compact, rec, w)
+		_, _ = recordToASB(encoder.config.Compact, rec, buff)
 		output.Write(buff.Bytes())
 	}
 }

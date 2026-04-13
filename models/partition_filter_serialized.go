@@ -23,10 +23,10 @@ import (
 // PartitionFilterSerialized represent serialized a.PartitionFilter.
 // To save cursor state.
 type PartitionFilterSerialized struct {
-	Begin  int
-	Count  int
 	Digest []byte
 	Cursor []byte
+	Begin  int
+	Count  int
 	// Worker number.
 	N int
 }

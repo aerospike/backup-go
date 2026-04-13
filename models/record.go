@@ -66,9 +66,9 @@ type SIndex struct {
 	Namespace  string
 	Set        string
 	Name       string
+	Expression string
 	Path       SIndexPath
 	IndexType  SIndexType
-	Expression string
 }
 
 type UDFType byte

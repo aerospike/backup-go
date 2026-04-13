@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -50,8 +49,8 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 	return prefix + e.config.Namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
-// EncodeToken encodes a token to the ASB format, writing to the provided writer.
-func (e *Encoder[T]) EncodeToken(token T, w io.Writer) error {
+// EncodeToken encodes a token to the ASB format, writing to the provided buffer.
+func (e *Encoder[T]) EncodeToken(token T, w *bytes.Buffer) error {
 	t, ok := any(token).(*models.Token)
 	if !ok {
 		return fmt.Errorf("unsupported token type %T for ASB encoder", token)
@@ -109,21 +108,21 @@ func (e *Encoder[T]) headerVersion(isRecords bool) string {
 
 // **** META DATA ****
 
-func writeVersionText(asbVersion string, w io.Writer) {
+func writeVersionText(asbVersion string, w *bytes.Buffer) {
 	_, _ = writeBytes(w, tokenVersion, space, []byte(asbVersion))
 }
 
-func writeNamespaceMetaText(namespace string, w io.Writer) {
+func writeNamespaceMetaText(namespace string, w *bytes.Buffer) {
 	_, _ = writeBytes(w, metadataSection, space, namespaceToken, space, escapeASB(namespace))
 }
 
-func writeFirstMetaText(w io.Writer) {
+func writeFirstMetaText(w *bytes.Buffer) {
 	_, _ = writeBytes(w, metadataSection, space, tokenFirst)
 }
 
 // **** RECORD ****
 
-func recordToASB(c bool, r *models.Record, w io.Writer) (int, error) {
+func recordToASB(c bool, r *models.Record, w *bytes.Buffer) (int, error) {
 	var bytesWritten int
 
 	n, err := keyToASB(r.Key, w)
@@ -164,20 +163,28 @@ func recordToASB(c bool, r *models.Record, w io.Writer) (int, error) {
 	return bytesWritten, nil
 }
 
-func writeRecordHeaderGeneration(generation uint32, w io.Writer) (int, error) {
-	value := []byte(strconv.FormatUint(uint64(generation), 10))
+func writeRecordHeaderGeneration(generation uint32, w *bytes.Buffer) (int, error) {
+	var numBuf [20]byte
+	value := strconv.AppendUint(numBuf[:0], uint64(generation), 10)
+
 	return writeBytes(w, headerGeneration, value)
 }
 
-func writeRecordHeaderExpiration(expiration int64, w io.Writer) (int, error) {
-	return writeBytes(w, headerExpiration, []byte(strconv.FormatInt(expiration, 10)))
+func writeRecordHeaderExpiration(expiration int64, w *bytes.Buffer) (int, error) {
+	var numBuf [20]byte
+	value := strconv.AppendInt(numBuf[:0], expiration, 10)
+
+	return writeBytes(w, headerExpiration, value)
 }
 
-func writeRecordHeaderBinCount(binCount int, w io.Writer) (int, error) {
-	return writeBytes(w, headerBinCount, []byte(strconv.Itoa(binCount)))
+func writeRecordHeaderBinCount(binCount int, w *bytes.Buffer) (int, error) {
+	var numBuf [20]byte
+	value := strconv.AppendInt(numBuf[:0], int64(binCount), 10)
+
+	return writeBytes(w, headerBinCount, value)
 }
 
-func binsToASB(compact bool, bins a.BinMap, w io.Writer) (int, error) {
+func binsToASB(compact bool, bins a.BinMap, w *bytes.Buffer) (int, error) {
 	var bytesWritten int
 
 	// NOTE golang's random order map iteration
@@ -196,7 +203,7 @@ func binsToASB(compact bool, bins a.BinMap, w io.Writer) (int, error) {
 	return bytesWritten, nil
 }
 
-func binToASB(k string, c bool, v any, w io.Writer) (int, error) {
+func binToASB(k string, c bool, v any, w *bytes.Buffer) (int, error) {
 	var (
 		bytesWritten int
 		err          error
@@ -236,28 +243,36 @@ func binToASB(k string, c bool, v any, w io.Writer) (int, error) {
 	return bytesWritten, err
 }
 
-func writeBinBool(name string, v bool, w io.Writer) (int, error) {
-	return writeBytes(w, binBoolTypePrefix, escapeASB(name), space, boolToASB(v))
+func writeBinBool(name string, v bool, w *bytes.Buffer) (int, error) {
+	return writeEscapedNameValueLine(w, binBoolTypePrefix, name, boolToASB(v))
 }
 
 type binTypesInt interface {
 	int64 | int32 | int16 | int8 | int
 }
 
-func writeBinInt[T binTypesInt](name string, v T, w io.Writer) (int, error) {
-	value := []byte(strconv.FormatInt(int64(v), 10))
-	return writeBytes(w, binIntTypePrefix, escapeASB(name), space, value)
+func writeBinInt[T binTypesInt](name string, v T, w *bytes.Buffer) (int, error) {
+	var numBuf [20]byte
+	value := strconv.AppendInt(numBuf[:0], int64(v), 10)
+
+	return writeEscapedNameValueLine(w, binIntTypePrefix, name, value)
 }
 
-func writeBinFloat(name string, v float64, w io.Writer) (int, error) {
-	return writeBytes(w, binFloatTypePrefix, escapeASB(name), space, []byte(strconv.FormatFloat(v, 'g', -1, 64)))
+func writeBinFloat(name string, v float64, w *bytes.Buffer) (int, error) {
+	var numBuf [32]byte
+	value := strconv.AppendFloat(numBuf[:0], v, 'g', -1, 64)
+
+	return writeEscapedNameValueLine(w, binFloatTypePrefix, name, value)
 }
 
-func writeBinString(name, v string, w io.Writer) (int, error) {
-	return writeBytes(w, binStringTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, []byte(v))
+func writeBinString(name, v string, w *bytes.Buffer) (int, error) {
+	var numBuf [20]byte
+	valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
+
+	return writeEscapedNameLenStringLine(w, binStringTypePrefix, name, valueLen, v)
 }
 
-func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error) {
+func writeBinBytes(name string, compact bool, v []byte, w *bytes.Buffer) (int, error) {
 	var (
 		prefix  []byte
 		encoded []byte
@@ -268,18 +283,24 @@ func writeBinBytes(name string, compact bool, v []byte, w io.Writer) (int, error
 	switch compact {
 	case true:
 		prefix = binBytesTypeCompactPrefix
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
 	case false:
 		prefix = binBytesTypePrefix
 		encoded = base64Encode(v)
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
 		returnBase64Buffer(encoded)
 	}
 
 	return result, err
 }
 
-func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, error) {
+func writeBinHLL(name string, compact bool, v a.HLLValue, w *bytes.Buffer) (int, error) {
 	var (
 		prefix  []byte
 		encoded []byte
@@ -290,26 +311,35 @@ func writeBinHLL(name string, compact bool, v a.HLLValue, w io.Writer) (int, err
 	switch compact {
 	case true:
 		prefix = binHLLTypeCompactPrefix
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
 	case false:
 		prefix = binHLLTypePrefix
 		encoded = base64Encode(v)
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
 		returnBase64Buffer(encoded)
 	}
 
 	return result, err
 }
 
-func writeBinGeoJSON(name string, v a.GeoJSONValue, w io.Writer) (int, error) {
-	return writeBytes(w, binGeoJSONTypePrefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, []byte(v))
+func writeBinGeoJSON(name string, v a.GeoJSONValue, w *bytes.Buffer) (int, error) {
+	var numBuf [20]byte
+	valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
+
+	return writeEscapedNameLenStringLine(w, binGeoJSONTypePrefix, name, valueLen, string(v))
 }
 
-func writeBinNil(name string, w io.Writer) (int, error) {
-	return writeBytes(w, binNilTypePrefix, escapeASB(name))
+func writeBinNil(name string, w *bytes.Buffer) (int, error) {
+	return writeEscapedNameOnlyLine(w, binNilTypePrefix, name)
 }
 
-func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
+func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
 	switch cdt.ParticleType {
 	case particleType.MAP:
 		return writeRawMapBin(cdt, name, compact, w)
@@ -320,7 +350,7 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 	}
 }
 
-func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
+func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
 	var (
 		prefix  []byte
 		v       []byte
@@ -333,18 +363,24 @@ func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer)
 	case true:
 		prefix = binMapTypeCompactPrefix
 		v = cdt.Data
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
 	case false:
 		prefix = binMapTypePrefix
 		encoded = base64Encode(cdt.Data)
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
 		returnBase64Buffer(encoded)
 	}
 
 	return result, err
 }
 
-func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer) (int, error) {
+func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
 	var (
 		prefix  []byte
 		v       []byte
@@ -357,11 +393,17 @@ func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w io.Writer
 	case true:
 		prefix = binListTypeCompactPrefix
 		v = cdt.Data
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(v))), space, v)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
 	case false:
 		prefix = binListTypePrefix
 		encoded = base64Encode(cdt.Data)
-		result, err = writeBytes(w, prefix, escapeASB(name), space, []byte(strconv.Itoa(len(encoded))), space, encoded)
+
+		var numBuf [20]byte
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
+		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
 		returnBase64Buffer(encoded)
 	}
 
@@ -396,12 +438,12 @@ func boolToASB(b bool) []byte {
 	return falseBytes
 }
 
-func keyToASB(k *a.Key, w io.Writer) (int, error) {
+func keyToASB(k *a.Key, w *bytes.Buffer) (int, error) {
 	var bytesWritten int
 
 	userKey := k.Value()
 	if userKey != nil {
-		n, err := userKeyToASB(k.Value(), w)
+		n, err := userKeyToASB(userKey, w)
 		bytesWritten += n
 
 		if err != nil {
@@ -476,7 +518,21 @@ func returnBase64Buffer(buf []byte) {
 	base64BufferPool.Put(buf[:0])
 }
 
-func writeBytes(w io.Writer, data ...[]byte) (int, error) {
+func writeBytes(w *bytes.Buffer, data ...[]byte) (int, error) {
+	totalBytesWritten, err := writeRawBytes(w, data...)
+	if err != nil {
+		return totalBytesWritten, err
+	}
+
+	n, err := w.Write(newLine)
+	if err != nil {
+		return totalBytesWritten, err
+	}
+
+	return totalBytesWritten + n, nil
+}
+
+func writeRawBytes(w *bytes.Buffer, data ...[]byte) (int, error) {
 	totalBytesWritten := 0
 
 	for _, d := range data {
@@ -488,21 +544,14 @@ func writeBytes(w io.Writer, data ...[]byte) (int, error) {
 		totalBytesWritten += n
 	}
 
-	n, err := w.Write(newLine)
-	if err != nil {
-		return totalBytesWritten, err
-	}
-
-	totalBytesWritten += n
-
 	return totalBytesWritten, nil
 }
 
-func writeRecordNamespace(namespace string, w io.Writer) (int, error) {
-	return writeBytes(w, namespacePrefix, escapeASB(namespace))
+func writeRecordNamespace(namespace string, w *bytes.Buffer) (int, error) {
+	return writeEscapedValueLine(w, namespacePrefix, namespace)
 }
 
-func writeRecordDigest(digest []byte, w io.Writer) (int, error) {
+func writeRecordDigest(digest []byte, w *bytes.Buffer) (int, error) {
 	encoded := base64Encode(digest)
 	n, err := writeBytes(w, digestPrefix, encoded)
 	returnBase64Buffer(encoded)
@@ -510,11 +559,11 @@ func writeRecordDigest(digest []byte, w io.Writer) (int, error) {
 	return n, err
 }
 
-func writeRecordSet(setName string, w io.Writer) (int, error) {
-	return writeBytes(w, setPrefix, escapeASB(setName))
+func writeRecordSet(setName string, w *bytes.Buffer) (int, error) {
+	return writeEscapedValueLine(w, setPrefix, setName)
 }
 
-func userKeyToASB(userKey a.Value, w io.Writer) (int, error) {
+func userKeyToASB(userKey a.Value, w *bytes.Buffer) (int, error) {
 	switch v := userKey.GetObject().(type) {
 	// need the repeated int cases to satisfy the generic type checker
 	case int64:
@@ -544,7 +593,10 @@ type UserKeyTypesInt interface {
 	int64 | int32 | int16 | int8 | int
 }
 
-func writeUserKeyInt[T UserKeyTypesInt](v T, w io.Writer) (int, error) {
+func writeUserKeyInt[T UserKeyTypesInt](v T, w *bytes.Buffer) (int, error) {
+	var numBuf [20]byte
+	value := strconv.AppendInt(numBuf[:0], int64(v), 10)
+
 	return writeBytes(
 		w,
 		recordHeader,
@@ -553,11 +605,14 @@ func writeUserKeyInt[T UserKeyTypesInt](v T, w io.Writer) (int, error) {
 		space,
 		headerTypeInt,
 		space,
-		[]byte(strconv.FormatInt(int64(v), 10)),
+		value,
 	)
 }
 
-func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
+func writeUserKeyFloat(v float64, w *bytes.Buffer) (int, error) {
+	var numBuf [32]byte
+	value := strconv.AppendFloat(numBuf[:0], v, 'f', -1, 64)
+
 	return writeBytes(
 		w,
 		recordHeader,
@@ -566,12 +621,15 @@ func writeUserKeyFloat(v float64, w io.Writer) (int, error) {
 		space,
 		headerTypeFloat,
 		space,
-		[]byte(strconv.FormatFloat(v, 'f', -1, 64)),
+		value,
 	)
 }
 
-func writeUserKeyString(v string, w io.Writer) (int, error) {
-	return writeBytes(
+func writeUserKeyString(v string, w *bytes.Buffer) (int, error) {
+	var lenBuf [20]byte
+	valueLen := strconv.AppendInt(lenBuf[:0], int64(len(v)), 10)
+
+	n, err := writeRawBytes(
 		w,
 		recordHeader,
 		space,
@@ -579,14 +637,31 @@ func writeUserKeyString(v string, w io.Writer) (int, error) {
 		space,
 		headerTypeString,
 		space,
-		[]byte(strconv.Itoa(len(v))),
+		valueLen,
 		space,
-		[]byte(v),
 	)
+	if err != nil {
+		return n, err
+	}
+
+	valueN, err := w.WriteString(v)
+
+	n += valueN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
+
+	return n, err
 }
 
-func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
+func writeUserKeyBytes(v []byte, w *bytes.Buffer) (int, error) {
 	encoded := base64Encode(v)
+
+	var lenBuf [20]byte
+	valueLen := strconv.AppendInt(lenBuf[:0], int64(len(encoded)), 10)
 	n, err := writeBytes(w,
 		recordHeader,
 		space,
@@ -594,7 +669,7 @@ func writeUserKeyBytes(v []byte, w io.Writer) (int, error) {
 		space,
 		headerTypeBytes,
 		space,
-		[]byte(strconv.Itoa(len(encoded))),
+		valueLen,
 		space,
 		encoded,
 	)
@@ -642,11 +717,176 @@ func escapeASB(s string) []byte {
 	return out
 }
 
-// **** SINDEX ****
-func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
-	// sindexes only ever use 1 path for now
-	numPaths := 1
+func writeEscapedValueLine(w *bytes.Buffer, prefix []byte, value string) (int, error) {
+	n, err := writeRawBytes(w, prefix)
+	if err != nil {
+		return n, err
+	}
 
+	valueN, err := writeEscapedASBToWriter(w, value)
+
+	n += valueN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
+
+	return n, err
+}
+
+func writeEscapedNameOnlyLine(w *bytes.Buffer, prefix []byte, name string) (int, error) {
+	n, err := writeRawBytes(w, prefix)
+	if err != nil {
+		return n, err
+	}
+
+	nameN, err := writeEscapedASBToWriter(w, name)
+
+	n += nameN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
+
+	return n, err
+}
+
+func writeEscapedNameValueLine(w *bytes.Buffer, prefix []byte, name string, value []byte) (int, error) {
+	n, err := writeRawBytes(w, prefix)
+	if err != nil {
+		return n, err
+	}
+
+	nameN, err := writeEscapedASBToWriter(w, name)
+
+	n += nameN
+	if err != nil {
+		return n, err
+	}
+
+	valueN, err := writeRawBytes(w, space, value)
+
+	n += valueN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
+
+	return n, err
+}
+
+func writeEscapedNameLenValueLine(w *bytes.Buffer, prefix []byte, name string, valueLen, value []byte) (int, error) {
+	n, err := writeRawBytes(w, prefix)
+	if err != nil {
+		return n, err
+	}
+
+	nameN, err := writeEscapedASBToWriter(w, name)
+
+	n += nameN
+	if err != nil {
+		return n, err
+	}
+
+	valueN, err := writeRawBytes(w, space, valueLen, space, value)
+
+	n += valueN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
+
+	return n, err
+}
+
+func writeEscapedNameLenStringLine(
+	w *bytes.Buffer,
+	prefix []byte,
+	name string,
+	valueLen []byte,
+	value string,
+) (int, error) {
+	n, err := writeRawBytes(w, prefix)
+	if err != nil {
+		return n, err
+	}
+
+	nameN, err := writeEscapedASBToWriter(w, name)
+
+	n += nameN
+	if err != nil {
+		return n, err
+	}
+
+	valueN, err := writeRawBytes(w, space, valueLen, space)
+
+	n += valueN
+	if err != nil {
+		return n, err
+	}
+
+	valueN, err = w.WriteString(value)
+
+	n += valueN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
+
+	return n, err
+}
+
+func writeEscapedASBToWriter(w *bytes.Buffer, s string) (int, error) {
+	total := 0
+	start := 0
+
+	for i := 0; i < len(s); i++ {
+		if !needsEscape[s[i]] {
+			continue
+		}
+
+		n, err := w.WriteString(s[start:i])
+
+		total += n
+		if err != nil {
+			return total, err
+		}
+
+		n, err = 1, w.WriteByte('\\')
+
+		total += n
+		if err != nil {
+			return total, err
+		}
+
+		n, err = 1, w.WriteByte(s[i])
+
+		total += n
+		if err != nil {
+			return total, err
+		}
+
+		start = i + 1
+	}
+
+	n, err := w.WriteString(s[start:])
+	total += n
+
+	return total, err
+}
+
+// **** SINDEX ****
+func sindexToASB(sindex *models.SIndex, w *bytes.Buffer) (int, error) {
 	sindexSection := globalSIndex
 	// If we have sindex with expression, we need to use the globalSIndexExpression section.
 	if sindex.Expression != "" {
@@ -667,7 +907,7 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 		space,
 		{byte(sindex.IndexType)},
 		space,
-		[]byte(strconv.Itoa(numPaths)),
+		[]byte("1"),
 		space,
 		escapeASB(sindex.Path.BinName),
 		space,
@@ -690,7 +930,10 @@ func sindexToASB(sindex *models.SIndex, w io.Writer) (int, error) {
 
 // **** UDFs ****
 
-func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
+func udfToASB(udf *models.UDF, w *bytes.Buffer) (int, error) {
+	var lenBuf [20]byte
+	contentLen := strconv.AppendInt(lenBuf[:0], int64(len(udf.Content)), 10)
+
 	return writeBytes(
 		w,
 		globalSection,
@@ -701,7 +944,7 @@ func udfToASB(udf *models.UDF, w io.Writer) (int, error) {
 		space,
 		escapeASB(udf.Name),
 		space,
-		[]byte(strconv.Itoa(len(udf.Content))),
+		contentLen,
 		space,
 		udf.Content,
 	)

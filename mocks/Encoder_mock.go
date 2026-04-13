@@ -5,7 +5,7 @@
 package mocks
 
 import (
-	"io"
+	"bytes"
 
 	"github.com/aerospike/backup-go/models"
 	mock "github.com/stretchr/testify/mock"
@@ -39,7 +39,7 @@ func (_m *MockEncoder[T]) EXPECT() *MockEncoder_Expecter[T] {
 }
 
 // EncodeToken provides a mock function for the type MockEncoder
-func (_mock *MockEncoder[T]) EncodeToken(v T, writer io.Writer) error {
+func (_mock *MockEncoder[T]) EncodeToken(v T, writer *bytes.Buffer) error {
 	ret := _mock.Called(v, writer)
 
 	if len(ret) == 0 {
@@ -47,7 +47,7 @@ func (_mock *MockEncoder[T]) EncodeToken(v T, writer io.Writer) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(T, io.Writer) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(T, *bytes.Buffer) error); ok {
 		r0 = returnFunc(v, writer)
 	} else {
 		r0 = ret.Error(0)
@@ -62,20 +62,20 @@ type MockEncoder_EncodeToken_Call[T models.TokenConstraint] struct {
 
 // EncodeToken is a helper method to define mock.On call
 //   - v T
-//   - writer io.Writer
+//   - writer *bytes.Buffer
 func (_e *MockEncoder_Expecter[T]) EncodeToken(v interface{}, writer interface{}) *MockEncoder_EncodeToken_Call[T] {
 	return &MockEncoder_EncodeToken_Call[T]{Call: _e.mock.On("EncodeToken", v, writer)}
 }
 
-func (_c *MockEncoder_EncodeToken_Call[T]) Run(run func(v T, writer io.Writer)) *MockEncoder_EncodeToken_Call[T] {
+func (_c *MockEncoder_EncodeToken_Call[T]) Run(run func(v T, writer *bytes.Buffer)) *MockEncoder_EncodeToken_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 T
 		if args[0] != nil {
 			arg0 = args[0].(T)
 		}
-		var arg1 io.Writer
+		var arg1 *bytes.Buffer
 		if args[1] != nil {
-			arg1 = args[1].(io.Writer)
+			arg1 = args[1].(*bytes.Buffer)
 		}
 		run(
 			arg0,
@@ -90,7 +90,7 @@ func (_c *MockEncoder_EncodeToken_Call[T]) Return(err error) *MockEncoder_Encode
 	return _c
 }
 
-func (_c *MockEncoder_EncodeToken_Call[T]) RunAndReturn(run func(v T, writer io.Writer) error) *MockEncoder_EncodeToken_Call[T] {
+func (_c *MockEncoder_EncodeToken_Call[T]) RunAndReturn(run func(v T, writer *bytes.Buffer) error) *MockEncoder_EncodeToken_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }

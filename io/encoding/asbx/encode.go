@@ -15,8 +15,8 @@
 package asbx
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/models"
@@ -53,7 +53,7 @@ func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
 }
 
 // EncodeToken encodes a token to the ASBX format, writing to the provided writer.
-func (e *Encoder[T]) EncodeToken(token T, w io.Writer) error {
+func (e *Encoder[T]) EncodeToken(token T, w *bytes.Buffer) error {
 	t, ok := any(token).(*models.ASBXToken)
 	if !ok {
 		return fmt.Errorf("unsupported token type %T for ASBX encoder", token)

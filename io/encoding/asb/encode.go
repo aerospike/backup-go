@@ -549,6 +549,22 @@ func writeRecordSet(setName string, w *bytes.Buffer) (int, error) {
 }
 
 func userKeyToASB(userKey a.Value, w *bytes.Buffer) (int, error) {
+	switch v := userKey.(type) {
+	case a.IntegerValue:
+		return writeUserKeyInt(int(v), w)
+	case a.LongValue:
+		return writeUserKeyInt(int64(v), w)
+	case a.FloatValue:
+		return writeUserKeyFloat(float64(v), w)
+	case a.StringValue:
+		return writeUserKeyString(string(v), w)
+	case a.BytesValue:
+		return writeUserKeyBytes([]byte(v), w)
+	case a.NullValue:
+		return 0, nil
+	}
+
+	// Fallback for custom Value implementations and compatibility with non-standard key values.
 	switch v := userKey.GetObject().(type) {
 	// need the repeated int cases to satisfy the generic type checker
 	case int64:

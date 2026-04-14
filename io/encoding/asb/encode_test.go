@@ -297,6 +297,25 @@ func Test__SIndexToASB(t *testing.T) {
 			want:  len("* i ns set name N 1 bin S context\n"),
 			wantW: "* i ns set name N 1 bin S context\n",
 		},
+		{
+			name: "positive sindex with expression",
+			args: args{
+				sindex: &models.SIndex{
+					Namespace: "ns",
+					Name:      "name",
+					Set:       "set",
+					IndexType: models.BinSIndex,
+					Path: models.SIndexPath{
+						BinName:    "bin",
+						BinType:    models.StringSIDataType,
+						B64Context: "context",
+					},
+					Expression: "expr",
+				},
+			},
+			want:  len("* e ns set name N 1 bin S context expr\n"),
+			wantW: "* e ns set name N 1 bin S context expr\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -367,6 +386,22 @@ func Test_binToASB(t *testing.T) {
 			args: args{
 				k: "binName",
 				v: int64(-123),
+			},
+			want: []byte("- I binName -123\n"),
+		},
+		{
+			name: "positive int32 bin",
+			args: args{
+				k: "binName",
+				v: int32(123),
+			},
+			want: []byte("- I binName 123\n"),
+		},
+		{
+			name: "positive int16 bin",
+			args: args{
+				k: "binName",
+				v: int16(-123),
 			},
 			want: []byte("- I binName -123\n"),
 		},
@@ -1116,8 +1151,9 @@ func Test_writeBinString(t *testing.T) {
 func Test_writeBinBytes(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		name string
-		v    []byte
+		compact bool
+		name    string
+		v       []byte
 	}
 	tests := []struct {
 		name    string
@@ -1129,8 +1165,9 @@ func Test_writeBinBytes(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				name: "binName",
-				v:    []byte("hello"),
+				compact: false,
+				name:    "binName",
+				v:       []byte("hello"),
 			},
 			want: len(fmt.Sprintf("- B binName %d %s\n",
 				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello")))),
@@ -1140,20 +1177,31 @@ func Test_writeBinBytes(t *testing.T) {
 		{
 			name: "positive escaped",
 			args: args{
-				name: "b\nin\\Nam e",
-				v:    []byte("hello"),
+				compact: false,
+				name:    "b\nin\\Nam e",
+				v:       []byte("hello"),
 			},
 			want: len(fmt.Sprintf("- B b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello")))),
 			wantW: fmt.Sprintf("- B b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello"))),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				name:    "binName",
+				v:       []byte("hello"),
+			},
+			want:  len("- B! binName 5 hello\n"),
+			wantW: "- B! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinBytes(tt.args.name, false, tt.args.v, w)
+			got, err := writeBinBytes(tt.args.name, tt.args.compact, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeBinBytes() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1171,8 +1219,9 @@ func Test_writeBinBytes(t *testing.T) {
 func Test_writeBinHLL(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		name string
-		v    a.HLLValue
+		compact bool
+		name    string
+		v       a.HLLValue
 	}
 	tests := []struct {
 		name    string
@@ -1184,8 +1233,9 @@ func Test_writeBinHLL(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				name: "binName",
-				v:    a.HLLValue("hello"),
+				compact: false,
+				name:    "binName",
+				v:       a.HLLValue("hello"),
 			},
 			want: len(fmt.Sprintf("- Y binName %d %s\n",
 				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello")))),
@@ -1195,20 +1245,31 @@ func Test_writeBinHLL(t *testing.T) {
 		{
 			name: "positive escaped",
 			args: args{
-				name: "b\nin\\Nam e",
-				v:    a.HLLValue("hello"),
+				compact: false,
+				name:    "b\nin\\Nam e",
+				v:       a.HLLValue("hello"),
 			},
 			want: len(fmt.Sprintf("- Y b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello")))),
 			wantW: fmt.Sprintf("- Y b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello"))),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				name:    "binName",
+				v:       a.HLLValue("hello"),
+			},
+			want:  len("- Y! binName 5 hello\n"),
+			wantW: "- Y! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinHLL(tt.args.name, false, tt.args.v, w)
+			got, err := writeBinHLL(tt.args.name, tt.args.compact, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeBinHLL() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1947,8 +2008,9 @@ func Test_writeRawListBin(t *testing.T) {
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
-		cdt  *a.RawBlobValue
-		name string
+		compact bool
+		cdt     *a.RawBlobValue
+		name    string
 	}
 	tests := []struct {
 		args    args
@@ -1960,6 +2022,7 @@ func Test_writeRawListBin(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -1971,6 +2034,7 @@ func Test_writeRawListBin(t *testing.T) {
 		{
 			name: "positive escaped bin name",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -1979,12 +2043,24 @@ func Test_writeRawListBin(t *testing.T) {
 			want:  len(fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
 			wantW: fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len("- L! binName 5 hello\n"),
+			wantW: "- L! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRawListBin(tt.args.cdt, tt.args.name, false, w)
+			got, err := writeRawListBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeRawListBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2004,8 +2080,9 @@ func Test_writeRawMapBin(t *testing.T) {
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
-		cdt  *a.RawBlobValue
-		name string
+		compact bool
+		cdt     *a.RawBlobValue
+		name    string
 	}
 	tests := []struct {
 		args    args
@@ -2017,6 +2094,7 @@ func Test_writeRawMapBin(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -2028,6 +2106,7 @@ func Test_writeRawMapBin(t *testing.T) {
 		{
 			name: "positive escaped bin name",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -2036,12 +2115,24 @@ func Test_writeRawMapBin(t *testing.T) {
 			want:  len(fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
 			wantW: fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len("- M! binName 5 hello\n"),
+			wantW: "- M! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, false, w)
+			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeRawMapBin() error = %v, wantErr %v", err, tt.wantErr)
 				return

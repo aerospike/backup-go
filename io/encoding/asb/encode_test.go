@@ -1654,6 +1654,65 @@ func BenchmarkEncodeRecord(b *testing.B) {
 	}
 }
 
+func BenchmarkEncodeTokenRecordAllDataTypes(b *testing.B) {
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
+
+	key, err := a.NewKey("test", "all_types_set", "benchmark-user-key")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	token := &models.Token{
+		Type: models.TokenTypeRecord,
+		Record: &models.Record{
+			Record: &a.Record{
+				Key: key,
+				Bins: a.BinMap{
+					"bool_true":   true,
+					"bool_false":  false,
+					"int64_bin":   int64(922337203685477580),
+					"int32_bin":   int32(214748364),
+					"int16_bin":   int16(32000),
+					"int8_bin":    int8(120),
+					"int_bin":     123456789,
+					"float64_bin": 123456.789123,
+					"string_bin":  "text with spaces and symbols !@#$%^&*()",
+					"bytes_bin":   []byte("raw-byte-payload-123"),
+					"hll_bin":     a.HLLValue("hll-bytes"),
+					"geojson_bin": a.GeoJSONValue(`{"type":"Point","coordinates":[12.34,56.78]}`),
+					"nil_bin":     nil,
+					"raw_map_bin": &a.RawBlobValue{
+						ParticleType: particleType.MAP,
+						Data:         []byte("raw-map-bytes"),
+					},
+					"raw_list_bin": &a.RawBlobValue{
+						ParticleType: particleType.LIST,
+						Data:         []byte("raw-list-bytes"),
+					},
+				},
+				Generation: 42,
+			},
+			VoidTime: 1712345678,
+		},
+	}
+
+	out := bytes.NewBuffer(make([]byte, 0, 4096))
+	if err := encoder.EncodeToken(token, out); err != nil {
+		b.Fatal(err)
+	}
+
+	b.SetBytes(int64(out.Len()))
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		out.Reset()
+		if err := encoder.EncodeToken(token, out); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // base64EncodeNative old encoding mechanism, using a default library.
 // Left here for benchmarking purposes.
 func base64EncodeNative(v []byte) []byte {

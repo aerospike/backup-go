@@ -273,39 +273,22 @@ func writeBinString(name, v string, w *bytes.Buffer) (int, error) {
 }
 
 func writeBinBytes(name string, compact bool, v []byte, w *bytes.Buffer) (int, error) {
-	var (
-		prefix  []byte
-		encoded []byte
-		result  int
-		err     error
-	)
 
-	switch compact {
-	case true:
-		prefix = binBytesTypeCompactPrefix
-
-		var numBuf [20]byte
+	var numBuf [20]byte
+	if compact {
 		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
-	case false:
-		prefix = binBytesTypePrefix
-		encoded = base64Encode(v)
-
-		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
-		returnBase64Buffer(encoded)
+		return writeEscapedNameLenValueLine(w, binBytesTypeCompactPrefix, name, valueLen, v)
 	}
 
-	return result, err
+	valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(v))), 10)
+	return writeEscapedNameLenBase64Line(w, binBytesTypePrefix, name, valueLen, v)
 }
 
 func writeBinHLL(name string, compact bool, v a.HLLValue, w *bytes.Buffer) (int, error) {
 	var (
-		prefix  []byte
-		encoded []byte
-		result  int
-		err     error
+		prefix []byte
+		result int
+		err    error
 	)
 
 	switch compact {
@@ -317,12 +300,10 @@ func writeBinHLL(name string, compact bool, v a.HLLValue, w *bytes.Buffer) (int,
 		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
 	case false:
 		prefix = binHLLTypePrefix
-		encoded = base64Encode(v)
 
 		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
-		returnBase64Buffer(encoded)
+		valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(v))), 10)
+		result, err = writeEscapedNameLenBase64Line(w, prefix, name, valueLen, v)
 	}
 
 	return result, err
@@ -352,11 +333,10 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Bu
 
 func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
 	var (
-		prefix  []byte
-		v       []byte
-		encoded []byte
-		result  int
-		err     error
+		prefix []byte
+		v      []byte
+		result int
+		err    error
 	)
 
 	switch compact {
@@ -369,12 +349,10 @@ func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buf
 		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
 	case false:
 		prefix = binMapTypePrefix
-		encoded = base64Encode(cdt.Data)
 
 		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
-		returnBase64Buffer(encoded)
+		valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(cdt.Data))), 10)
+		result, err = writeEscapedNameLenBase64Line(w, prefix, name, valueLen, cdt.Data)
 	}
 
 	return result, err
@@ -382,11 +360,10 @@ func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buf
 
 func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
 	var (
-		prefix  []byte
-		v       []byte
-		encoded []byte
-		result  int
-		err     error
+		prefix []byte
+		v      []byte
+		result int
+		err    error
 	)
 
 	switch compact {
@@ -399,12 +376,10 @@ func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Bu
 		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
 	case false:
 		prefix = binListTypePrefix
-		encoded = base64Encode(cdt.Data)
 
 		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(len(encoded)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, encoded)
-		returnBase64Buffer(encoded)
+		valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(cdt.Data))), 10)
+		result, err = writeEscapedNameLenBase64Line(w, prefix, name, valueLen, cdt.Data)
 	}
 
 	return result, err
@@ -552,9 +527,19 @@ func writeRecordNamespace(namespace string, w *bytes.Buffer) (int, error) {
 }
 
 func writeRecordDigest(digest []byte, w *bytes.Buffer) (int, error) {
-	encoded := base64Encode(digest)
-	n, err := writeBytes(w, digestPrefix, encoded)
-	returnBase64Buffer(encoded)
+	n, err := writeRawBytes(w, digestPrefix)
+	if err != nil {
+		return n, err
+	}
+
+	encodedN, err := writeBase64ToBuffer(w, digest)
+	n += encodedN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
 
 	return n, err
 }
@@ -658,11 +643,9 @@ func writeUserKeyString(v string, w *bytes.Buffer) (int, error) {
 }
 
 func writeUserKeyBytes(v []byte, w *bytes.Buffer) (int, error) {
-	encoded := base64Encode(v)
-
 	var lenBuf [20]byte
-	valueLen := strconv.AppendInt(lenBuf[:0], int64(len(encoded)), 10)
-	n, err := writeBytes(w,
+	valueLen := strconv.AppendInt(lenBuf[:0], int64(base64.StdEncoding.EncodedLen(len(v))), 10)
+	n, err := writeRawBytes(w,
 		recordHeader,
 		space,
 		recordHeaderType,
@@ -671,10 +654,19 @@ func writeUserKeyBytes(v []byte, w *bytes.Buffer) (int, error) {
 		space,
 		valueLen,
 		space,
-		encoded,
 	)
+	if err != nil {
+		return n, err
+	}
 
-	returnBase64Buffer(encoded)
+	encodedN, err := writeBase64ToBuffer(w, v)
+	n += encodedN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
 
 	return n, err
 }
@@ -805,6 +797,54 @@ func writeEscapedNameLenValueLine(w *bytes.Buffer, prefix []byte, name string, v
 	n += newLineN
 
 	return n, err
+}
+
+func writeEscapedNameLenBase64Line(
+	w *bytes.Buffer,
+	prefix []byte,
+	name string,
+	valueLen []byte,
+	value []byte,
+) (int, error) {
+	n, err := writeRawBytes(w, prefix)
+	if err != nil {
+		return n, err
+	}
+
+	nameN, err := writeEscapedASBToWriter(w, name)
+
+	n += nameN
+	if err != nil {
+		return n, err
+	}
+
+	valueN, err := writeRawBytes(w, space, valueLen, space)
+
+	n += valueN
+	if err != nil {
+		return n, err
+	}
+
+	encodedN, err := writeBase64ToBuffer(w, value)
+	n += encodedN
+	if err != nil {
+		return n, err
+	}
+
+	newLineN, err := w.Write(newLine)
+	n += newLineN
+
+	return n, err
+}
+
+func writeBase64ToBuffer(w *bytes.Buffer, data []byte) (int, error) {
+	encodedLen := base64.StdEncoding.EncodedLen(len(data))
+	w.Grow(encodedLen)
+	dst := w.AvailableBuffer()
+	dst = dst[:encodedLen]
+	base64.StdEncoding.Encode(dst, data)
+
+	return w.Write(dst)
 }
 
 func writeEscapedNameLenStringLine(

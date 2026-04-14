@@ -88,7 +88,6 @@ func NewWriter(
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
 	}
-
 	if w.UploadConcurrency > 0 {
 		w.bufferPool = collections.NewByteBufferPool(w.ChunkSize)
 	}
@@ -243,10 +242,9 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.buffer == nil {
-		if w.isAsyncUpload() {
+		if w.bufferPool != nil {
 			w.buffer = w.bufferPool.Get()
 		} else {
-			slog.Info("Creating new byte buffer", slog.Int("size", w.chunkSize))
 			w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
 		}
 	}
@@ -254,7 +252,6 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	// Buffer Promotion. If we have a small buffer, grow it.
 	if w.buffer.Cap() < w.chunkSize {
 		// This ensures that after this call, Cap >= chunkSize
-		slog.Info("Grow buffer", slog.Int("to", w.chunkSize-w.buffer.Len()))
 		w.buffer.Grow(w.chunkSize - w.buffer.Len())
 	}
 
@@ -264,8 +261,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	for len(p) > 0 {
 		if w.buffer.Len() >= w.chunkSize {
 			w.flushCurrentBuffer()
-
-			if w.isAsyncUpload() {
+			if w.bufferPool != nil {
 				w.buffer = w.bufferPool.Get()
 			}
 		}
@@ -285,9 +281,8 @@ func (w *s3Writer) flushCurrentBuffer() {
 	partNumber := w.partNumber.Add(1)
 
 	if !w.isAsyncUpload() {
-		w.uploadPart(w.buffer, partNumber)
+		w.uploadPart(w.buffer.Bytes(), partNumber)
 		w.buffer.Reset()
-
 		return
 	}
 
@@ -295,13 +290,13 @@ func (w *s3Writer) flushCurrentBuffer() {
 
 	// Submit one immutable part buffer and continue writing into another buffer.
 	w.workersPool.Submit(func() {
-		w.uploadPart(partBuf, partNumber)
+		w.uploadPart(partBuf.Bytes(), partNumber)
 		w.bufferPool.Put(partBuf)
 	})
 }
 
 // uploadPart uploads a part of the file to S3.
-func (w *s3Writer) uploadPart(p *bytes.Buffer, partNumber int32) {
+func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 	if w.ctx.Err() != nil || w.uploadErr.Load() != nil {
 		return
 	}
@@ -312,7 +307,7 @@ func (w *s3Writer) uploadPart(p *bytes.Buffer, partNumber int32) {
 		var uploadErr error
 
 		ipInput := &s3.UploadPartInput{
-			Body:       p,
+			Body:       bytes.NewReader(p),
 			Bucket:     &w.bucket,
 			Key:        &w.key,
 			PartNumber: &partNumber,

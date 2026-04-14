@@ -203,44 +203,37 @@ func binsToASB(compact bool, bins a.BinMap, w *bytes.Buffer) (int, error) {
 	return bytesWritten, nil
 }
 
-func binToASB(k string, c bool, v any, w *bytes.Buffer) (int, error) {
-	var (
-		bytesWritten int
-		err          error
-	)
-
+func binToASB(k string, compact bool, v any, w *bytes.Buffer) (int, error) {
 	switch v := v.(type) {
 	case bool:
-		bytesWritten, err = writeBinBool(k, v, w)
+		return writeBinBool(k, v, w)
 	case int64:
-		bytesWritten, err = writeBinInt(k, v, w)
+		return writeBinInt(k, v, w)
 	case int32:
-		bytesWritten, err = writeBinInt(k, v, w)
+		return writeBinInt(k, v, w)
 	case int16:
-		bytesWritten, err = writeBinInt(k, v, w)
+		return writeBinInt(k, v, w)
 	case int8:
-		bytesWritten, err = writeBinInt(k, v, w)
+		return writeBinInt(k, v, w)
 	case int:
-		bytesWritten, err = writeBinInt(k, v, w)
+		return writeBinInt(k, v, w)
 	case float64:
-		bytesWritten, err = writeBinFloat(k, v, w)
+		return writeBinFloat(k, v, w)
 	case string:
-		bytesWritten, err = writeBinString(k, v, w)
+		return writeBinString(k, v, w)
 	case []byte:
-		bytesWritten, err = writeBinBytes(k, c, v, w)
+		return writeBinBytes(k, compact, v, w)
 	case *a.RawBlobValue:
-		bytesWritten, err = writeRawBlobBin(v, k, c, w)
+		return writeRawBlobBin(v, k, compact, w)
 	case a.HLLValue:
-		bytesWritten, err = writeBinHLL(k, c, v, w)
+		return writeBinHLL(k, compact, v, w)
 	case a.GeoJSONValue:
-		bytesWritten, err = writeBinGeoJSON(k, v, w)
+		return writeBinGeoJSON(k, v, w)
 	case nil:
-		bytesWritten, err = writeBinNil(k, w)
-	default:
-		return bytesWritten, fmt.Errorf("unknown bin type: %T, key: %s", v, k)
+		return writeBinNil(k, w)
 	}
 
-	return bytesWritten, err
+	return 0, fmt.Errorf("unknown bin type: %T, key: %s", v, k)
 }
 
 func writeBinBool(name string, v bool, w *bytes.Buffer) (int, error) {
@@ -285,28 +278,15 @@ func writeBinBytes(name string, compact bool, v []byte, w *bytes.Buffer) (int, e
 }
 
 func writeBinHLL(name string, compact bool, v a.HLLValue, w *bytes.Buffer) (int, error) {
-	var (
-		prefix []byte
-		result int
-		err    error
-	)
-
-	switch compact {
-	case true:
-		prefix = binHLLTypeCompactPrefix
-
+	if compact {
 		var numBuf [20]byte
 		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
-	case false:
-		prefix = binHLLTypePrefix
-
-		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(v))), 10)
-		result, err = writeEscapedNameLenBase64Line(w, prefix, name, valueLen, v)
+		return writeEscapedNameLenValueLine(w, binHLLTypeCompactPrefix, name, valueLen, v)
 	}
 
-	return result, err
+	var numBuf [20]byte
+	valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(v))), 10)
+	return writeEscapedNameLenBase64Line(w, binHLLTypePrefix, name, valueLen, v)
 }
 
 func writeBinGeoJSON(name string, v a.GeoJSONValue, w *bytes.Buffer) (int, error) {
@@ -332,57 +312,27 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Bu
 }
 
 func writeRawMapBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
-	var (
-		prefix []byte
-		v      []byte
-		result int
-		err    error
-	)
-
-	switch compact {
-	case true:
-		prefix = binMapTypeCompactPrefix
-		v = cdt.Data
-
+	if compact {
 		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
-	case false:
-		prefix = binMapTypePrefix
-
-		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(cdt.Data))), 10)
-		result, err = writeEscapedNameLenBase64Line(w, prefix, name, valueLen, cdt.Data)
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(cdt.Data)), 10)
+		return writeEscapedNameLenValueLine(w, binMapTypeCompactPrefix, name, valueLen, cdt.Data)
 	}
 
-	return result, err
+	var numBuf [20]byte
+	valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(cdt.Data))), 10)
+	return writeEscapedNameLenBase64Line(w, binMapTypePrefix, name, valueLen, cdt.Data)
 }
 
 func writeRawListBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
-	var (
-		prefix []byte
-		v      []byte
-		result int
-		err    error
-	)
-
-	switch compact {
-	case true:
-		prefix = binListTypeCompactPrefix
-		v = cdt.Data
-
+	if compact {
 		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(len(v)), 10)
-		result, err = writeEscapedNameLenValueLine(w, prefix, name, valueLen, v)
-	case false:
-		prefix = binListTypePrefix
-
-		var numBuf [20]byte
-		valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(cdt.Data))), 10)
-		result, err = writeEscapedNameLenBase64Line(w, prefix, name, valueLen, cdt.Data)
+		valueLen := strconv.AppendInt(numBuf[:0], int64(len(cdt.Data)), 10)
+		return writeEscapedNameLenValueLine(w, binListTypeCompactPrefix, name, valueLen, cdt.Data)
 	}
 
-	return result, err
+	var numBuf [20]byte
+	valueLen := strconv.AppendInt(numBuf[:0], int64(base64.StdEncoding.EncodedLen(len(cdt.Data))), 10)
+	return writeEscapedNameLenBase64Line(w, binListTypePrefix, name, valueLen, cdt.Data)
 }
 
 func blobBinToASB(val []byte, bytesType byte, name string) []byte {

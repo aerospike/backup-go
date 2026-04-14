@@ -1688,30 +1688,52 @@ func Test_writeUserKeyBytes(t *testing.T) {
 }
 
 func BenchmarkEncodeRecord(b *testing.B) {
-	output := &bytes.Buffer{}
 	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	key := genKey()
+
 	rec := &models.Record{
 		Record: &a.Record{
 			Key: key,
 			Bins: a.BinMap{
-				"IntBin":     1,
-				"FloatBin":   1.1,
-				"StringBin":  "string",
-				"BoolBin":    true,
-				"BlobBin":    []byte("bytes"),
-				"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+				// Scalar Types
+				"IntBin":    123456789,
+				"FloatBin":  98.6,
+				"StringBin": "This is a longer string to test buffer allocation",
+				"BoolBin":   true,
+				"NilBin":    nil,
+
+				// Bytes/Blobs
+				"SmallBlob": []byte("small"),
+				"LargeBlob": bytes.Repeat([]byte("A"), 1024), // 1KB blob
+
+				// Geospatial
+				"GeoJSONBin": a.GeoJSONValue(`{"type": "Point", "coordinates": [12.49, 41.89]}`),
+
+				// Raw CDT payloads accepted by ASB encoder.
+				"MapBin": &a.RawBlobValue{
+					ParticleType: particleType.MAP,
+					Data:         []byte{0x81, 0xA2, 'i', 'd', 0x2A}, // msgpack-ish payload
+				},
+				"ListBin": &a.RawBlobValue{
+					ParticleType: particleType.LIST,
+					Data:         []byte{0x93, 0x01, 0x02, 0x03}, // msgpack-ish payload
+				},
 			},
-			Generation: 1234,
+			Generation: 5,
 		},
-		VoidTime: 10,
+		VoidTime: 3600, // 1 hour TTL
 	}
 
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	buff := &bytes.Buffer{}
 	for b.Loop() {
-		buff := &bytes.Buffer{}
-		_, _ = recordToASB(encoder.config.Compact, rec, buff)
-		output.Write(buff.Bytes())
+		buff.Reset()
+		if _, err := recordToASB(encoder.config.Compact, rec, buff); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

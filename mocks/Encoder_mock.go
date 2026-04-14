@@ -39,8 +39,8 @@ func (_m *MockEncoder[T]) EXPECT() *MockEncoder_Expecter[T] {
 }
 
 // EncodeToken provides a mock function for the type MockEncoder
-func (_mock *MockEncoder[T]) EncodeToken(v T, writer *bytes.Buffer) error {
-	ret := _mock.Called(v, writer)
+func (_mock *MockEncoder[T]) EncodeToken(v T, buffer *bytes.Buffer) error {
+	ret := _mock.Called(v, buffer)
 
 	if len(ret) == 0 {
 		panic("no return value specified for EncodeToken")
@@ -48,7 +48,7 @@ func (_mock *MockEncoder[T]) EncodeToken(v T, writer *bytes.Buffer) error {
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(T, *bytes.Buffer) error); ok {
-		r0 = returnFunc(v, writer)
+		r0 = returnFunc(v, buffer)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -62,12 +62,12 @@ type MockEncoder_EncodeToken_Call[T models.TokenConstraint] struct {
 
 // EncodeToken is a helper method to define mock.On call
 //   - v T
-//   - writer *bytes.Buffer
-func (_e *MockEncoder_Expecter[T]) EncodeToken(v interface{}, writer interface{}) *MockEncoder_EncodeToken_Call[T] {
-	return &MockEncoder_EncodeToken_Call[T]{Call: _e.mock.On("EncodeToken", v, writer)}
+//   - buffer *bytes.Buffer
+func (_e *MockEncoder_Expecter[T]) EncodeToken(v interface{}, buffer interface{}) *MockEncoder_EncodeToken_Call[T] {
+	return &MockEncoder_EncodeToken_Call[T]{Call: _e.mock.On("EncodeToken", v, buffer)}
 }
 
-func (_c *MockEncoder_EncodeToken_Call[T]) Run(run func(v T, writer *bytes.Buffer)) *MockEncoder_EncodeToken_Call[T] {
+func (_c *MockEncoder_EncodeToken_Call[T]) Run(run func(v T, buffer *bytes.Buffer)) *MockEncoder_EncodeToken_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 T
 		if args[0] != nil {
@@ -90,7 +90,7 @@ func (_c *MockEncoder_EncodeToken_Call[T]) Return(err error) *MockEncoder_Encode
 	return _c
 }
 
-func (_c *MockEncoder_EncodeToken_Call[T]) RunAndReturn(run func(v T, writer *bytes.Buffer) error) *MockEncoder_EncodeToken_Call[T] {
+func (_c *MockEncoder_EncodeToken_Call[T]) RunAndReturn(run func(v T, buffer *bytes.Buffer) error) *MockEncoder_EncodeToken_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }
@@ -201,8 +201,8 @@ func (_c *MockEncoder_GetHeader_Call[T]) Run(run func(v uint64, b bool)) *MockEn
 	return _c
 }
 
-func (_c *MockEncoder_GetHeader_Call[T]) Return(bytes []byte) *MockEncoder_GetHeader_Call[T] {
-	_c.Call.Return(bytes)
+func (_c *MockEncoder_GetHeader_Call[T]) Return(bytes1 []byte) *MockEncoder_GetHeader_Call[T] {
+	_c.Call.Return(bytes1)
 	return _c
 }
 

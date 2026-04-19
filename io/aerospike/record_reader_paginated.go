@@ -26,6 +26,9 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+// resultChanSize is the size of the channel used to send scan results.
+const resultChanSize = 1024
+
 // pageRecord contains records and serialized filter.
 type pageRecord struct {
 	result *a.Result
@@ -314,4 +317,42 @@ func shouldSkipPaginatedDrainError(err a.Error) bool {
 	}
 
 	return false
+}
+
+// monitorContext checks context on a separate goroutine to avoid slowing down record reads.
+// When context is canceled, we drain all results from resultChan to avoid deadlock.
+func monitorContext[T any](
+	ctx context.Context,
+	logger *slog.Logger,
+	resultChan chan T,
+	done chan struct{},
+	closeRecordset func() error,
+) {
+	go func() {
+		select {
+		case <-ctx.Done():
+			// Close record set.
+			err := closeRecordset()
+			if err != nil {
+				logger.Error("failed to close recordset", slog.Any("error", err))
+			}
+
+			// Drain records to nowhere.
+			for {
+				select {
+				case _, ok := <-resultChan:
+					if !ok {
+						// Channel closed, safe to exit
+						return
+					}
+				case <-done:
+					// If we have already done, exit.
+					return
+				}
+			}
+		case <-done:
+			// If everything was OK, exit.
+			return
+		}
+	}()
 }

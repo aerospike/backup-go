@@ -27,9 +27,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// resultChanSize is the size of the channel used to send scan results.
-const resultChanSize = 1024
-
 // scanner is an interface for scanning Aerospike records.
 type scanner interface {
 	ScanPartitions(
@@ -48,7 +45,8 @@ type RecordReader interface {
 	Close()
 }
 
-// singleRecordReader is a RecordReader that reads records from Aerospike one by one in single thread.
+// singleRecordReader reads records from Aerospike namespace one set at a time,
+// iterating over setList sequentially. Each set triggers one ScanPartitions call.
 type singleRecordReader struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -59,13 +57,16 @@ type singleRecordReader struct {
 	setIndex        int
 	active          *singleScan
 	recordsetCloser RecordsetCloser
+	closeOnce       sync.Once
+	mu              sync.Mutex // active + closeActiveScan (Close vs Read)
 }
 
+// singleScan holds state for one active ScanPartitions call.
 type singleScan struct {
-	taskID      uint64
-	results     <-chan *a.Result
-	close       func() error
-	firstResult bool
+	taskID             uint64
+	results            <-chan *a.Result
+	close              func() error
+	needsThrottleCheck bool // true until we've inspected the first result for throttle errors
 }
 
 // RecordsetCloser is an interface for closing Aerospike recordsets.
@@ -128,6 +129,8 @@ func newSingleRecordReader(
 	}
 }
 
+// Read returns the next record token, blocking until one is available.
+// It advances through setList automatically, returning io.EOF when all sets are exhausted.
 func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	for {
 		if err := r.ensureActiveScan(ctx); err != nil {
@@ -139,6 +142,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 			return nil, err
 		}
 
+		// Channel closed — this set is done; advance to the next one.
 		if !ok {
 			if err := r.finishActiveScan(); err != nil {
 				return nil, err
@@ -147,12 +151,13 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 			continue
 		}
 
-		token, retry, err := r.handleResult(res)
+		token, err := r.handleResult(res)
 		if err != nil {
 			return nil, err
 		}
 
-		if retry {
+		// nil token means we were throttled and retried the same set — loop again.
+		if token == nil {
 			continue
 		}
 
@@ -160,35 +165,44 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 	}
 }
 
-func (r *singleRecordReader) checkContext(ctx context.Context) error {
+// ensureActiveScan starts a new scan if none is active, respecting context cancellation.
+func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
+	r.mu.Lock()
+	hasActive := r.active != nil
+	r.mu.Unlock()
+
+	if hasActive {
+		return nil
+	}
+
+	// Check both the caller's context and our own internal context.
 	select {
 	case <-ctx.Done():
-		// If the local context is canceled, we cancel the global context.
 		r.cancel()
-		_ = r.closeActiveScan()
-
 		return ctx.Err()
 	case <-r.ctx.Done():
-		_ = r.closeActiveScan()
 		return r.ctx.Err()
 	default:
-		return nil
-	}
-}
-
-func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
-	if r.active != nil {
-		return nil
-	}
-
-	if err := r.checkContext(ctx); err != nil {
-		return err
 	}
 
 	return r.startNextScan()
 }
 
+// readResult blocks on the active scan's result channel, respecting context cancellation.
 func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
+	r.mu.Lock()
+	active := r.active
+
+	var results <-chan *a.Result
+	if active != nil {
+		results = active.results
+	}
+	r.mu.Unlock()
+
+	if results == nil {
+		return nil, false, fmt.Errorf("active scan has no results channel")
+	}
+
 	select {
 	case <-ctx.Done():
 		r.cancel()
@@ -198,22 +212,46 @@ func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, e
 	case <-r.ctx.Done():
 		_ = r.closeActiveScan()
 		return nil, false, r.ctx.Err()
-	case res, ok := <-r.active.results:
+	case res, ok := <-results:
 		return res, ok, nil
 	}
 }
 
-func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, bool, error) {
-	if r.active.firstResult {
-		r.active.firstResult = false
+// handleResult processes one scan result. Returns nil token (no error) when the
+// scan was throttled and needs to be retried from the same set.
+func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) {
+	r.mu.Lock()
+	scan := r.active
 
-		// Check only the first result for throttling and retry the same set if needed.
+	var doThrottleCheck bool
+	if scan != nil && scan.needsThrottleCheck {
+		doThrottleCheck = true
+		scan.needsThrottleCheck = false
+	}
+	r.mu.Unlock()
+
+	if scan == nil {
+		if err := r.ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		return nil, fmt.Errorf("no active scan while handling record result")
+	}
+
+	if res == nil {
+		return nil, fmt.Errorf("nil scan result")
+	}
+
+	// On the first result only, check whether the DB signaled throttling.
+	// If so, close the scan, wait for capacity, and signal the caller to retry.
+	if doThrottleCheck {
 		if r.config.throttler != nil && shouldThrottle(res.Err) {
-			r.logger.Debug("database hasn't got enough resources, waiting for a signal", slog.Any("drainErr", res.Err))
+			r.logger.Debug("DB under pressure, throttling scan",
+				slog.Any("drainErr", res.Err))
 			_ = r.closeActiveScan()
 			r.config.throttler.Wait(r.ctx)
 
-			return nil, true, nil
+			return nil, nil // caller will loop and retry the same set
 		}
 	}
 
@@ -221,48 +259,72 @@ func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, bool, e
 		r.cancel()
 		_ = r.closeActiveScan()
 
-		return nil, false, fmt.Errorf("failed to read record: %w", res.Err)
+		return nil, fmt.Errorf("failed to read record: %w", res.Err)
 	}
 
-	rec := models.Record{
-		Record: res.Record,
+	if r.config.rpsCollector != nil {
+		r.config.rpsCollector.Increment()
 	}
 
-	recToken := models.NewRecordToken(&rec, 0, nil)
-
-	r.config.rpsCollector.Increment()
-
-	return recToken, false, nil
+	return models.NewRecordToken(&models.Record{Record: res.Record}, 0, nil), nil
 }
 
-// Close no-op operation to satisfy pipe.Reader interface.
+// finishActiveScan closes the current scan, notifies the throttler, and advances setIndex.
+func (r *singleRecordReader) finishActiveScan() error {
+	r.mu.Lock()
+
+	var taskID uint64
+	if r.active != nil {
+		taskID = r.active.taskID
+	}
+	r.mu.Unlock()
+
+	err := r.closeActiveScan()
+	if r.config.throttler != nil {
+		r.config.throttler.Notify(r.ctx)
+	}
+
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", taskID))
+	r.setIndex++
+
+	return err
+}
+
+// Close cancels the reader context and releases any active scan (recordset + scan slot).
+// It is safe to call more than once.
 func (r *singleRecordReader) Close() {
+	r.closeOnce.Do(func() {
+		r.cancel()
+		_ = r.closeActiveScan()
+	})
 }
 
 func (r *singleRecordReader) startNextScan() error {
 	if r.setIndex >= len(r.config.setList) {
-		r.logger.Debug("scan finished")
+		r.logger.Debug("all sets scanned, done")
 		return io.EOF
+	}
+
+	if r.config.partitionFilter == nil {
+		return fmt.Errorf("partition filter is required for scan")
 	}
 
 	if err := r.ctx.Err(); err != nil {
 		return err
 	}
 
-	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
 	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-		return fmt.Errorf("failed to acquire scan limiter: %w", err)
+		return fmt.Errorf("failed to acquire scan slot: %w", err)
 	}
 
-	// Each scan requires a fresh copy of the partition filter.
-	pf := *r.config.partitionFilter
+	pf := *r.config.partitionFilter // fresh copy required per scan
 	set := r.config.setList[r.setIndex]
 
 	recordset, err := r.client.ScanPartitions(r.scanPolicy, &pf, r.config.namespace, set, r.config.binList...)
 	if err != nil {
 		r.config.scanLimiter.Release(1)
 
-		return fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
+		return fmt.Errorf("failed to start scan for set %q namespace %q partitions %d-%d: %w",
 			set, r.config.namespace, pf.Begin, pf.Count, err)
 	}
 
@@ -272,53 +334,45 @@ func (r *singleRecordReader) startNextScan() error {
 		slog.String("filter", printPartitionFilter(&pf)),
 	)
 
-	// Set close recordset function. Using thread-safe wrapper.
 	closeRecordset := wrapCloser(r.recordsetCloser, recordset)
-	releaseSlot := sync.OnceFunc(func() {
-		r.config.scanLimiter.Release(1)
-	})
+	releaseSlot := sync.OnceFunc(func() { r.config.scanLimiter.Release(1) })
 
+	r.mu.Lock()
 	r.active = &singleScan{
-		taskID:      recordset.TaskId(),
-		results:     recordset.Results(),
-		firstResult: true,
+		taskID:             recordset.TaskId(),
+		results:            recordset.Results(),
+		needsThrottleCheck: true,
 		close: func() error {
 			defer releaseSlot()
-
 			return closeRecordset()
 		},
 	}
+	r.mu.Unlock()
 
 	return nil
 }
 
-func (r *singleRecordReader) finishActiveScan() error {
-	taskID := uint64(0)
-	if r.active != nil {
-		taskID = r.active.taskID
-	}
-
-	closeErr := r.closeActiveScan()
-	r.config.throttler.Notify(r.ctx)
-	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", taskID))
-	r.setIndex++
-
-	return closeErr
-}
-
+// closeActiveScan closes the active scan's recordset.
+// r.active is set to nil *before* calling close to prevent any re-entrant close attempt.
 func (r *singleRecordReader) closeActiveScan() error {
+	r.mu.Lock()
 	if r.active == nil {
+		r.mu.Unlock()
 		return nil
 	}
 
 	closeFn := r.active.close
-	r.active = nil
+	r.active = nil // clear first — close may call back indirectly
+	r.mu.Unlock()
 
 	return closeFn()
 }
 
 func newScanPolicy(cfg *RecordReaderConfig) *a.ScanPolicy {
-	scanPolicy := *cfg.scanPolicy
+	var scanPolicy a.ScanPolicy
+	if cfg.scanPolicy != nil {
+		scanPolicy = *cfg.scanPolicy
+	}
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, cfg.timeBounds, cfg.noTTLOnly)
 
 	return &scanPolicy
@@ -380,44 +434,6 @@ func noTTLExpression(noTTLOnly bool) *a.Expression {
 func noMrtSetExpression() *a.Expression {
 	// where set != "<ERO~MRT"
 	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))
-}
-
-// monitorContext checks context on a separate goroutine to avoid slowing down record reads.
-// When context is canceled, we drain all results from resultChan to avoid deadlock.
-func monitorContext[T any](
-	ctx context.Context,
-	logger *slog.Logger,
-	resultChan chan T,
-	done chan struct{},
-	closeRecordset func() error,
-) {
-	go func() {
-		select {
-		case <-ctx.Done():
-			// Close record set.
-			err := closeRecordset()
-			if err != nil {
-				logger.Error("failed to close recordset", slog.Any("error", err))
-			}
-
-			// Drain records to nowhere.
-			for {
-				select {
-				case _, ok := <-resultChan:
-					if !ok {
-						// Channel closed, safe to exit
-						return
-					}
-				case <-done:
-					// If we have already done, exit.
-					return
-				}
-			}
-		case <-done:
-			// If everything was OK, exit.
-			return
-		}
-	}()
 }
 
 // wrapCloser wraps RecordsetCloser.Close function to guarantee it is only executed once.

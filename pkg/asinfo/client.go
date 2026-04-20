@@ -959,7 +959,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 }
 
 // StartBackup starts a backup job.
-func (ic *Client) StartBackup(ctx context.Context, jobID int64,
+func (ic *Client) StartBackup(ctx context.Context, jobID string,
 	namespace, storage, bucket, region, profile, accessKey, secretKey string,
 ) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup],
@@ -979,7 +979,7 @@ func (ic *Client) StartBackup(ctx context.Context, jobID int64,
 }
 
 // StartRestore starts a backup job.
-func (ic *Client) StartRestore(ctx context.Context, jobID int64,
+func (ic *Client) StartRestore(ctx context.Context, jobID string,
 	namespace, storage, bucket, region, profile, accessKey, secretKey string,
 ) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideRestore],

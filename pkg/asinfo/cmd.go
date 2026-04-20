@@ -71,9 +71,9 @@ const (
 	cmdGetConfigXDR        = "get-config:context=xdr"
 	cmdReplicas            = "replicas:max=1"
 
-	cmdServerSideBackup = "backup:namespace=%s;job-id=%d;object_storage_type=%s;s3-bucket=%s;" +
+	cmdServerSideBackup = "backup:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s"
-	cmdServerSideRestore = "restore:namespace=%s;job-id=%d;object_storage_type=%s;s3-bucket=%s;" +
+	cmdServerSideRestore = "restore:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s"
 
 	// Deprecated commands:

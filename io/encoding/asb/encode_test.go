@@ -56,13 +56,14 @@ func TestEncodeTokenRecord(t *testing.T) {
 	}
 
 	buff := &bytes.Buffer{}
-	_, err := encoder.encodeRecord(token.Record, buff)
+	_, err := recordToASB(encoder.config.Compact, token.Record, buff)
 	require.NoError(t, err)
 	expected := bytes.Clone(buff.Bytes())
 
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err = encoder.EncodeToken(token, actual)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, actual.Bytes())
 }
 
 func TestEncodeTokenUDF(t *testing.T) {
@@ -79,13 +80,14 @@ func TestEncodeTokenUDF(t *testing.T) {
 		},
 	}
 	buff := &bytes.Buffer{}
-	_, err := encoder.encodeUDF(token.UDF, buff)
+	_, err := udfToASB(token.UDF, buff)
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err = encoder.EncodeToken(token, actual)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, actual.Bytes())
 }
 
 func TestEncodeTokenSIndex(t *testing.T) {
@@ -107,13 +109,14 @@ func TestEncodeTokenSIndex(t *testing.T) {
 	}
 
 	buff := &bytes.Buffer{}
-	_, err := encoder.encodeSIndex(token.SIndex, buff)
+	_, err := sindexToASB(token.SIndex, buff)
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err = encoder.EncodeToken(token, actual)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, actual.Bytes())
 }
 
 func TestEncodeTokenInvalid(t *testing.T) {
@@ -126,9 +129,9 @@ func TestEncodeTokenInvalid(t *testing.T) {
 	}
 
 	token.Type = models.TokenTypeInvalid
-	actual, err := encoder.EncodeToken(token)
+	actual := &bytes.Buffer{}
+	err := encoder.EncodeToken(token, actual)
 	require.Error(t, err)
-	require.Nil(t, actual)
 }
 
 func TestEncodeRecord(t *testing.T) {
@@ -154,7 +157,7 @@ func TestEncodeRecord(t *testing.T) {
 	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
 	buff := &bytes.Buffer{}
-	n, err := encoder.encodeRecord(rec, buff)
+	n, err := recordToASB(encoder.config.Compact, rec, buff)
 	require.NoError(t, err)
 	actual := buff.Bytes()
 	require.Equal(t, len(actual), n)
@@ -163,8 +166,6 @@ func TestEncodeRecord(t *testing.T) {
 
 func TestEncodeSIndex(t *testing.T) {
 	t.Parallel()
-
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	sindex := &models.SIndex{
 		Namespace: "ns",
@@ -178,7 +179,7 @@ func TestEncodeSIndex(t *testing.T) {
 
 	expected := []byte("* i ns  name N 1 bin S\n")
 	buff := &bytes.Buffer{}
-	n, err := encoder.encodeSIndex(sindex, buff)
+	n, err := sindexToASB(sindex, buff)
 	require.Len(t, expected, n)
 	require.NoError(t, err)
 	require.Equal(t, expected, buff.Bytes())
@@ -296,6 +297,25 @@ func Test__SIndexToASB(t *testing.T) {
 			want:  len("* i ns set name N 1 bin S context\n"),
 			wantW: "* i ns set name N 1 bin S context\n",
 		},
+		{
+			name: "positive sindex with expression",
+			args: args{
+				sindex: &models.SIndex{
+					Namespace: "ns",
+					Name:      "name",
+					Set:       "set",
+					IndexType: models.BinSIndex,
+					Path: models.SIndexPath{
+						BinName:    "bin",
+						BinType:    models.StringSIDataType,
+						B64Context: "context",
+					},
+					Expression: "expr",
+				},
+			},
+			want:  len("* e ns set name N 1 bin S context expr\n"),
+			wantW: "* e ns set name N 1 bin S context expr\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -366,6 +386,22 @@ func Test_binToASB(t *testing.T) {
 			args: args{
 				k: "binName",
 				v: int64(-123),
+			},
+			want: []byte("- I binName -123\n"),
+		},
+		{
+			name: "positive int32 bin",
+			args: args{
+				k: "binName",
+				v: int32(123),
+			},
+			want: []byte("- I binName 123\n"),
+		},
+		{
+			name: "positive int16 bin",
+			args: args{
+				k: "binName",
+				v: int16(-123),
 			},
 			want: []byte("- I binName -123\n"),
 		},
@@ -1115,8 +1151,9 @@ func Test_writeBinString(t *testing.T) {
 func Test_writeBinBytes(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		name string
-		v    []byte
+		compact bool
+		name    string
+		v       []byte
 	}
 	tests := []struct {
 		name    string
@@ -1128,8 +1165,9 @@ func Test_writeBinBytes(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				name: "binName",
-				v:    []byte("hello"),
+				compact: false,
+				name:    "binName",
+				v:       []byte("hello"),
 			},
 			want: len(fmt.Sprintf("- B binName %d %s\n",
 				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello")))),
@@ -1139,20 +1177,31 @@ func Test_writeBinBytes(t *testing.T) {
 		{
 			name: "positive escaped",
 			args: args{
-				name: "b\nin\\Nam e",
-				v:    []byte("hello"),
+				compact: false,
+				name:    "b\nin\\Nam e",
+				v:       []byte("hello"),
 			},
 			want: len(fmt.Sprintf("- B b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello")))),
 			wantW: fmt.Sprintf("- B b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode([]byte("hello"))), base64Encode([]byte("hello"))),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				name:    "binName",
+				v:       []byte("hello"),
+			},
+			want:  len("- B! binName 5 hello\n"),
+			wantW: "- B! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinBytes(tt.args.name, false, tt.args.v, w)
+			got, err := writeBinBytes(tt.args.name, tt.args.compact, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeBinBytes() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1170,8 +1219,9 @@ func Test_writeBinBytes(t *testing.T) {
 func Test_writeBinHLL(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		name string
-		v    a.HLLValue
+		compact bool
+		name    string
+		v       a.HLLValue
 	}
 	tests := []struct {
 		name    string
@@ -1183,8 +1233,9 @@ func Test_writeBinHLL(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				name: "binName",
-				v:    a.HLLValue("hello"),
+				compact: false,
+				name:    "binName",
+				v:       a.HLLValue("hello"),
 			},
 			want: len(fmt.Sprintf("- Y binName %d %s\n",
 				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello")))),
@@ -1194,20 +1245,31 @@ func Test_writeBinHLL(t *testing.T) {
 		{
 			name: "positive escaped",
 			args: args{
-				name: "b\nin\\Nam e",
-				v:    a.HLLValue("hello"),
+				compact: false,
+				name:    "b\nin\\Nam e",
+				v:       a.HLLValue("hello"),
 			},
 			want: len(fmt.Sprintf("- Y b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello")))),
 			wantW: fmt.Sprintf("- Y b\\\nin\\\\Nam\\ e %d %s\n",
 				len(base64Encode(a.HLLValue("hello"))), base64Encode(a.HLLValue("hello"))),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				name:    "binName",
+				v:       a.HLLValue("hello"),
+			},
+			want:  len("- Y! binName 5 hello\n"),
+			wantW: "- Y! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinHLL(tt.args.name, false, tt.args.v, w)
+			got, err := writeBinHLL(tt.args.name, tt.args.compact, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeBinHLL() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1626,30 +1688,111 @@ func Test_writeUserKeyBytes(t *testing.T) {
 }
 
 func BenchmarkEncodeRecord(b *testing.B) {
-	output := &bytes.Buffer{}
 	encoder := NewEncoder[*models.Token](testEncoderConfig)
 
 	key := genKey()
+
 	rec := &models.Record{
 		Record: &a.Record{
 			Key: key,
 			Bins: a.BinMap{
-				"IntBin":     1,
-				"FloatBin":   1.1,
-				"StringBin":  "string",
-				"BoolBin":    true,
-				"BlobBin":    []byte("bytes"),
-				"GeoJSONBin": a.GeoJSONValue(`{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [10, 0], [0,0]]]}`),
+				// Scalar Types
+				"IntBin":    123456789,
+				"FloatBin":  98.6,
+				"StringBin": "This is a longer string to test buffer allocation",
+				"BoolBin":   true,
+				"NilBin":    nil,
+
+				// Bytes/Blobs
+				"SmallBlob": []byte("small"),
+				"LargeBlob": bytes.Repeat([]byte("A"), 1024), // 1KB blob
+
+				// Geospatial
+				"GeoJSONBin": a.GeoJSONValue(`{"type": "Point", "coordinates": [12.49, 41.89]}`),
+
+				// Raw CDT payloads accepted by ASB encoder.
+				"MapBin": &a.RawBlobValue{
+					ParticleType: particleType.MAP,
+					Data:         []byte{0x81, 0xA2, 'i', 'd', 0x2A}, // msgpack-ish payload
+				},
+				"ListBin": &a.RawBlobValue{
+					ParticleType: particleType.LIST,
+					Data:         []byte{0x93, 0x01, 0x02, 0x03}, // msgpack-ish payload
+				},
 			},
-			Generation: 1234,
+			Generation: 5,
 		},
-		VoidTime: 10,
+		VoidTime: 3600, // 1 hour TTL
 	}
 
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	buff := &bytes.Buffer{}
 	for b.Loop() {
-		buff := &bytes.Buffer{}
-		_, _ = encoder.encodeRecord(rec, buff)
-		output.Write(buff.Bytes())
+		buff.Reset()
+		if _, err := recordToASB(encoder.config.Compact, rec, buff); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkEncodeTokenRecordAllDataTypes(b *testing.B) {
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
+
+	key, err := a.NewKey("test", "all_types_set", "benchmark-user-key")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	token := &models.Token{
+		Type: models.TokenTypeRecord,
+		Record: &models.Record{
+			Record: &a.Record{
+				Key: key,
+				Bins: a.BinMap{
+					"bool_true":   true,
+					"bool_false":  false,
+					"int64_bin":   int64(922337203685477580),
+					"int32_bin":   int32(214748364),
+					"int16_bin":   int16(32000),
+					"int8_bin":    int8(120),
+					"int_bin":     123456789,
+					"float64_bin": 123456.789123,
+					"string_bin":  "text with spaces and symbols !@#$%^&*()",
+					"bytes_bin":   []byte("raw-byte-payload-123"),
+					"hll_bin":     a.HLLValue("hll-bytes"),
+					"geojson_bin": a.GeoJSONValue(`{"type":"Point","coordinates":[12.34,56.78]}`),
+					"nil_bin":     nil,
+					"raw_map_bin": &a.RawBlobValue{
+						ParticleType: particleType.MAP,
+						Data:         []byte("raw-map-bytes"),
+					},
+					"raw_list_bin": &a.RawBlobValue{
+						ParticleType: particleType.LIST,
+						Data:         []byte("raw-list-bytes"),
+					},
+				},
+				Generation: 42,
+			},
+			VoidTime: 1712345678,
+		},
+	}
+
+	out := bytes.NewBuffer(make([]byte, 0, 4096))
+	if err := encoder.EncodeToken(token, out); err != nil {
+		b.Fatal(err)
+	}
+
+	b.SetBytes(int64(out.Len()))
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		out.Reset()
+		if err := encoder.EncodeToken(token, out); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -1887,8 +2030,9 @@ func Test_writeRawListBin(t *testing.T) {
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
-		cdt  *a.RawBlobValue
-		name string
+		compact bool
+		cdt     *a.RawBlobValue
+		name    string
 	}
 	tests := []struct {
 		args    args
@@ -1900,6 +2044,7 @@ func Test_writeRawListBin(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -1911,6 +2056,7 @@ func Test_writeRawListBin(t *testing.T) {
 		{
 			name: "positive escaped bin name",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -1919,12 +2065,24 @@ func Test_writeRawListBin(t *testing.T) {
 			want:  len(fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
 			wantW: fmt.Sprintf("- L %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len("- L! binName 5 hello\n"),
+			wantW: "- L! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRawListBin(tt.args.cdt, tt.args.name, false, w)
+			got, err := writeRawListBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeRawListBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1944,8 +2102,9 @@ func Test_writeRawMapBin(t *testing.T) {
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	type args struct {
-		cdt  *a.RawBlobValue
-		name string
+		compact bool
+		cdt     *a.RawBlobValue
+		name    string
 	}
 	tests := []struct {
 		args    args
@@ -1957,6 +2116,7 @@ func Test_writeRawMapBin(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -1968,6 +2128,7 @@ func Test_writeRawMapBin(t *testing.T) {
 		{
 			name: "positive escaped bin name",
 			args: args{
+				compact: false,
 				cdt: &a.RawBlobValue{
 					Data: data,
 				},
@@ -1976,12 +2137,24 @@ func Test_writeRawMapBin(t *testing.T) {
 			want:  len(fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data)),
 			wantW: fmt.Sprintf("- M %s %d %s\n", "b\\ in\\\\Name\\\n", len(b64Data), b64Data),
 		},
+		{
+			name: "positive compact simple",
+			args: args{
+				compact: true,
+				cdt: &a.RawBlobValue{
+					Data: data,
+				},
+				name: "binName",
+			},
+			want:  len("- M! binName 5 hello\n"),
+			wantW: "- M! binName 5 hello\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, false, w)
+			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeRawMapBin() error = %v, wantErr %v", err, tt.wantErr)
 				return

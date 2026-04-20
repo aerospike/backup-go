@@ -59,6 +59,11 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		w.ChunkSize = defaultBufferSize
 	}
 
+	// Special case for null target: writes are intentionally no-op.
+	if filepath.Clean(w.PathList[0]) == filepath.Clean(os.DevNull) {
+		return w, nil
+	}
+
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return w, nil
 	}
@@ -208,6 +213,11 @@ func (bf *bufferedFile) Close() error {
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
+	}
+
+	// Special case for null target: writes are intentionally discarded.
+	if filepath.Clean(w.PathList[0]) == filepath.Clean(os.DevNull) {
+		return noopWriter{}, nil
 	}
 
 	// Create directory only if we have something to back up to this directory.

@@ -245,7 +245,6 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		if w.bufferPool != nil {
 			w.buffer = w.bufferPool.Get()
 		} else {
-			slog.Info("New buffer", slog.Int("size", w.chunkSize))
 			w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
 		}
 	}
@@ -253,7 +252,6 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	// Buffer Promotion. If we have a small buffer, grow it.
 	if w.buffer.Cap() < w.chunkSize {
 		// This ensures that after this call, Cap >= chunkSize
-		slog.Info("Grow buffer", slog.Int("to", w.chunkSize-w.buffer.Len()))
 		w.buffer.Grow(w.chunkSize - w.buffer.Len())
 	}
 

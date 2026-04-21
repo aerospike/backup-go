@@ -30,6 +30,8 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -55,6 +57,9 @@ type Reader struct {
 	options.Options
 
 	client Client
+
+	// downloader performs parallel ranged downloads for full-object reads.
+	downloader *transfermanager.Client
 
 	// bucketName contains the name of the bucket to read from.
 	bucketName string
@@ -112,6 +117,19 @@ func NewReader(
 
 	r.client = client
 	r.bucketName = bucketName
+
+	partSize := max(int64(r.ChunkSize), s3DefaultChunkSize)
+
+	downloadConcurrency := r.UploadConcurrency
+	if downloadConcurrency <= 0 {
+		downloadConcurrency = 1
+	}
+	r.downloader = transfermanager.New(client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = partSize
+		o.Concurrency = downloadConcurrency
+		o.GetObjectType = tmtypes.GetObjectRanges
+		o.DisableChecksumValidation = true
+	})
 
 	if r.IsDir && !r.SkipDirCheck {
 		if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
@@ -259,9 +277,9 @@ func (r *Reader) openObject(
 		return
 	}
 
-	rReader, err := newRangeReader(ctx, r.client, &r.bucketName, &path)
+	rReader, err := newDownloadReader(ctx, r.client, r.downloader, &r.bucketName, &path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare download reader %s: %w", path, err))
 		return
 	}
 

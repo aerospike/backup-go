@@ -8,7 +8,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -22,6 +22,8 @@ import (
 	"github.com/aerospike/backup-go/io/storage/aws/s3/mocks"
 	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +40,16 @@ var (
 	errS3Test = errors.New("test error")
 )
 
-func TestNewRangeReader(t *testing.T) {
+func newTestTransferManager(client Client) *transfermanager.Client {
+	return transfermanager.New(client, func(o *transfermanager.Options) {
+		o.GetObjectType = tmtypes.GetObjectRanges
+		o.PartSizeBytes = s3DefaultChunkSize
+		o.Concurrency = 1
+		o.DisableChecksumValidation = true
+	})
+}
+
+func TestNewDownloadReader(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -58,7 +69,8 @@ func TestNewRangeReader(t *testing.T) {
 			ETag:          etag,
 		}, nil)
 
-		reader, err := newRangeReader(ctx, clientMock, bucket, key)
+		tm := newTestTransferManager(clientMock)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -67,6 +79,7 @@ func TestNewRangeReader(t *testing.T) {
 		require.Equal(t, key, reader.key)
 		require.Equal(t, etag, reader.etag)
 		require.Equal(t, clientMock, reader.client)
+		require.NotNil(t, reader.tm)
 	})
 
 	t.Run("Success with nil ContentLength", func(t *testing.T) {
@@ -81,7 +94,8 @@ func TestNewRangeReader(t *testing.T) {
 			ETag:          etag,
 		}, nil)
 
-		reader, err := newRangeReader(ctx, clientMock, bucket, key)
+		tm := newTestTransferManager(clientMock)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -101,7 +115,8 @@ func TestNewRangeReader(t *testing.T) {
 			ETag:          etag,
 		}, nil)
 
-		reader, err := newRangeReader(ctx, clientMock, bucket, key)
+		tm := newTestTransferManager(clientMock)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -120,7 +135,8 @@ func TestNewRangeReader(t *testing.T) {
 			ETag:          nil,
 		}, nil)
 
-		reader, err := newRangeReader(ctx, clientMock, bucket, key)
+		tm := newTestTransferManager(clientMock)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -136,7 +152,8 @@ func TestNewRangeReader(t *testing.T) {
 			Key:    key,
 		}).Return(nil, errS3Test)
 
-		reader, err := newRangeReader(ctx, clientMock, bucket, key)
+		tm := newTestTransferManager(clientMock)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
 
 		require.ErrorIs(t, err, errS3Test)
 		require.Contains(t, err.Error(), "failed to get head")
@@ -145,7 +162,7 @@ func TestNewRangeReader(t *testing.T) {
 	})
 }
 
-func TestRangeReader_OpenRange(t *testing.T) {
+func TestDownloadReader_OpenRange(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -153,8 +170,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 	key := aws.String(testKey)
 	etag := aws.String(testETag)
 	rangeHeader := aws.String(fmt.Sprintf("bytes=%d-", testOffset))
-
-	t.Run("Success", func(t *testing.T) {
+	t.Run("Success offset resume uses raw GetObject", func(t *testing.T) {
 		t.Parallel()
 
 		bodyMock := closerMock.NewMockreaderCloser(t)
@@ -169,8 +185,9 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			Body: bodyMock,
 		}, nil)
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			client: clientMock,
+			tm:     newTestTransferManager(clientMock),
 			bucket: bucket,
 			key:    key,
 			etag:   etag,
@@ -182,35 +199,6 @@ func TestRangeReader_OpenRange(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, body)
 		require.Equal(t, bodyMock, body)
-	})
-
-	t.Run("Success with nil range header", func(t *testing.T) {
-		t.Parallel()
-
-		bodyMock := closerMock.NewMockreaderCloser(t)
-
-		clientMock := mocks.NewMockClient(t)
-		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
-			Bucket:  bucket,
-			Key:     key,
-			Range:   nil,
-			IfMatch: etag,
-		}).Return(&s3.GetObjectOutput{
-			Body: bodyMock,
-		}, nil)
-
-		reader := &rangeReader{
-			client: clientMock,
-			bucket: bucket,
-			key:    key,
-			etag:   etag,
-			size:   testSize,
-		}
-
-		body, err := reader.OpenRange(ctx, 0, 0)
-
-		require.NoError(t, err)
-		require.NotNil(t, body)
 	})
 
 	t.Run("Success with different range", func(t *testing.T) {
@@ -229,8 +217,9 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			Body: bodyMock,
 		}, nil)
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			client: clientMock,
+			tm:     newTestTransferManager(clientMock),
 			bucket: bucket,
 			key:    key,
 			etag:   etag,
@@ -254,8 +243,9 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			IfMatch: etag,
 		}).Return(nil, errS3Test)
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			client: clientMock,
+			tm:     newTestTransferManager(clientMock),
 			bucket: bucket,
 			key:    key,
 			etag:   etag,
@@ -271,13 +261,13 @@ func TestRangeReader_OpenRange(t *testing.T) {
 	})
 }
 
-func TestRangeReader_GetSize(t *testing.T) {
+func TestDownloadReader_GetSize(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Returns correct size", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			size: testSize,
 		}
 
@@ -289,7 +279,7 @@ func TestRangeReader_GetSize(t *testing.T) {
 	t.Run("Returns zero size", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			size: 0,
 		}
 
@@ -303,7 +293,7 @@ func TestRangeReader_GetSize(t *testing.T) {
 
 		largeSize := int64(9223372036854775807) // max int64
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			size: largeSize,
 		}
 
@@ -313,7 +303,7 @@ func TestRangeReader_GetSize(t *testing.T) {
 	})
 }
 
-func TestRangeReader_GetInfo(t *testing.T) {
+func TestDownloadReader_GetInfo(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Returns correct info", func(t *testing.T) {
@@ -322,7 +312,7 @@ func TestRangeReader_GetInfo(t *testing.T) {
 		bucket := aws.String(testBucket)
 		key := aws.String(testKey)
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			bucket: bucket,
 			key:    key,
 		}
@@ -338,7 +328,7 @@ func TestRangeReader_GetInfo(t *testing.T) {
 		bucket := aws.String("my-backup-bucket")
 		key := aws.String("backups/2024/file.txt")
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			bucket: bucket,
 			key:    key,
 		}
@@ -354,7 +344,7 @@ func TestRangeReader_GetInfo(t *testing.T) {
 		bucket := aws.String("")
 		key := aws.String("")
 
-		reader := &rangeReader{
+		reader := &downloadReader{
 			bucket: bucket,
 			key:    key,
 		}

@@ -8,7 +8,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -20,23 +20,41 @@ import (
 	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// rangeReader encapsulates getting a file by range and file size logic. To use with retry reader.
-type rangeReader struct {
+// downloadReader streams S3 objects for use with [common.RetryableReader].
+//
+// Reads that start at offset zero use [transfermanager.Client.GetObject] with
+// GetObjectRanges so large objects are fetched via parallel ranged GETs. When
+// [common.RetryableReader] reopens the stream after a partial read (non-zero
+// offset), this type uses a single ranged [Client.GetObject] so the client does
+// not re-download from the beginning of the object.
+type downloadReader struct {
 	client Client
+	tm     *transfermanager.Client
 	bucket *string
 	key    *string
 	etag   *string
-
-	size int64
+	size   int64
 }
 
-// newRangeReader creates a new file reader.
-func newRangeReader(ctx context.Context, client Client, bucket, key *string) (*rangeReader, error) {
+// newDownloadReader performs a HeadObject to capture size and ETag, then serves
+// reads through the transfer manager or direct GetObject as described for
+// [downloadReader].
+func newDownloadReader(
+	ctx context.Context,
+	client Client,
+	tm *transfermanager.Client,
+	bucket, key *string,
+) (*downloadReader, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key is nil")
+	}
+
+	if tm == nil {
+		return nil, fmt.Errorf("transfer manager client is nil")
 	}
 
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
@@ -52,8 +70,9 @@ func newRangeReader(ctx context.Context, client Client, bucket, key *string) (*r
 		size = *head.ContentLength
 	}
 
-	return &rangeReader{
+	return &downloadReader{
 		client: client,
+		tm:     tm,
 		bucket: bucket,
 		key:    key,
 		etag:   head.ETag,
@@ -61,11 +80,24 @@ func newRangeReader(ctx context.Context, client Client, bucket, key *string) (*r
 	}, nil
 }
 
-// OpenRange opens a file by range.
-func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
-	// We can't validate checksum for range requests, so we don't set ChecksumMode param in GetObjectInput.
-	// Checksums are generated on upload by S3 for chunk, so when we request data by range, we can't validate its checksum.
-	// Link to issue: https://github.com/aws/aws-sdk-java-v2/issues/5421
+// OpenRange opens the object. offset 0 and count 0 mean the remainder of the
+// object (full object when starting at the beginning).
+func (r *downloadReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
+	if offset == 0 && count == 0 {
+		out, err := r.tm.GetObject(ctx, &transfermanager.GetObjectInput{
+			Bucket:  r.bucket,
+			Key:     r.key,
+			IfMatch: r.etag,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get object %s: %w", *r.key, err)
+		}
+
+		return readerToReadCloser(out.Body), nil
+	}
+
+	// Ranged read without transfer manager: checksum mode is not set on range GETs
+	// (see https://github.com/aws/aws-sdk-java-v2/issues/5421).
 	resp, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:  r.bucket,
 		Key:     r.key,
@@ -80,12 +112,12 @@ func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.Re
 }
 
 // GetSize returns file size.
-func (r *rangeReader) GetSize() int64 {
+func (r *downloadReader) GetSize() int64 {
 	return r.size
 }
 
 // GetInfo returns file info for logging.
-func (r *rangeReader) GetInfo() string {
+func (r *downloadReader) GetInfo() string {
 	return fmt.Sprintf("%s:%s", *r.bucket, *r.key)
 }
 
@@ -102,4 +134,16 @@ func getRangeHeader(offset, count int64) *string {
 	default:
 		return nil
 	}
+}
+
+func readerToReadCloser(body io.Reader) io.ReadCloser {
+	if body == nil {
+		return nil
+	}
+
+	if rc, ok := body.(io.ReadCloser); ok {
+		return rc
+	}
+
+	return io.NopCloser(body)
 }

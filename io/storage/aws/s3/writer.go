@@ -35,10 +35,15 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	awstypes "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go/ptr"
 )
 
-const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part (S3 multipart minimum)
+const (
+	s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part (S3 multipart minimum)
+	// maxDeleteObjectsPerRequest is the S3 DeleteObjects limit per API call.
+	maxDeleteObjectsPerRequest = 1000
+)
 
 // Writer represents a s3 storage writer.
 type Writer struct {
@@ -411,10 +416,24 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 
 		return nil
 	}
-	// Remove files from dir.
+	// Remove files from dir using batch DeleteObjects (up to maxDeleteObjectsPerRequest per call).
 	var continuationToken *string
 
 	prefix := common.CleanPath(targetPath, true)
+	batch := make([]string, 0, maxDeleteObjectsPerRequest)
+
+	flushBatch := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+
+		if err := w.deleteObjectsBatch(ctx, batch); err != nil {
+			return err
+		}
+		batch = batch[:0]
+
+		return nil
+	}
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -431,19 +450,18 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 				continue
 			}
 
-			// If validator is set, remove only valid files.
+			key := ptr.ToString(p.Key)
 			if w.Validator != nil {
-				if err = w.Validator.Run(ptr.ToString(p.Key)); err != nil {
+				if err = w.Validator.Run(key); err != nil {
 					continue
 				}
 			}
 
-			_, err = w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-				Bucket: &w.bucketName,
-				Key:    p.Key,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to delete object %s: %w", ptr.ToString(p.Key), err)
+			batch = append(batch, key)
+			if len(batch) >= maxDeleteObjectsPerRequest {
+				if err := flushBatch(); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -453,7 +471,50 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 	}
 
+	return flushBatch()
+}
+
+func (w *Writer) deleteObjectsBatch(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	objs := make([]awstypes.ObjectIdentifier, len(keys))
+	for i := range keys {
+		objs[i] = awstypes.ObjectIdentifier{Key: aws.String(keys[i])}
+	}
+
+	out, err := w.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		Bucket: aws.String(w.bucketName),
+		Delete: &awstypes.Delete{
+			Objects: objs,
+			Quiet:   aws.Bool(true),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete objects: %w", err)
+	}
+
+	if len(out.Errors) > 0 {
+		return fmt.Errorf("failed to delete some objects: %s", formatDeleteObjectsErrors(out.Errors))
+	}
+
 	return nil
+}
+
+func formatDeleteObjectsErrors(errs []awstypes.Error) string {
+	parts := make([]string, 0, len(errs))
+	for _, e := range errs {
+		key := aws.ToString(e.Key)
+
+		msg := aws.ToString(e.Message)
+		if msg == "" {
+			msg = aws.ToString(e.Code)
+		}
+		parts = append(parts, fmt.Sprintf("%s: %s", key, msg))
+	}
+
+	return strings.Join(parts, "; ")
 }
 
 // knownStorageClasses is the set accepted for uploads; it matches transfer manager / S3 PutObject enums.

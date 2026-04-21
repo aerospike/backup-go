@@ -524,8 +524,8 @@ func TestNewWriter_DirectoryNotEmptyWithRemoveFiles(t *testing.T) {
 		Times(2) // Once for check, once for removal
 
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.Anything).
-		Return(&s3.DeleteObjectOutput{}, nil).
+		DeleteObjects(mock.Anything, mock.Anything, mock.Anything).
+		Return(&s3.DeleteObjectsOutput{}, nil).
 		Once()
 
 	writer, err := NewWriter(
@@ -1376,9 +1376,11 @@ func TestWriter_RemoveFiles_Success(t *testing.T) {
 		Times(2) // Once for check, once for removal
 
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.Anything).
-		Return(&s3.DeleteObjectOutput{}, nil).
-		Times(2)
+		DeleteObjects(mock.Anything, mock.MatchedBy(func(in *s3.DeleteObjectsInput) bool {
+			return in.Delete != nil && len(in.Delete.Objects) == 2
+		}), mock.Anything).
+		Return(&s3.DeleteObjectsOutput{}, nil).
+		Once()
 
 	writer, err := NewWriter(
 		ctx,
@@ -1441,9 +1443,11 @@ func TestWriter_RemoveFiles_WithPagination(t *testing.T) {
 		Once()
 
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.Anything).
-		Return(&s3.DeleteObjectOutput{}, nil).
-		Times(2)
+		DeleteObjects(mock.Anything, mock.MatchedBy(func(in *s3.DeleteObjectsInput) bool {
+			return in.Delete != nil && len(in.Delete.Objects) == 2
+		}), mock.Anything).
+		Return(&s3.DeleteObjectsOutput{}, nil).
+		Once()
 
 	_, err := NewWriter(
 		ctx,
@@ -1518,8 +1522,11 @@ func TestWriter_Remove_Directory(t *testing.T) {
 		Once()
 
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.Anything).
-		Return(&s3.DeleteObjectOutput{}, nil).
+		DeleteObjects(mock.Anything, mock.MatchedBy(func(in *s3.DeleteObjectsInput) bool {
+			return in.Delete != nil && len(in.Delete.Objects) == 1 &&
+				in.Delete.Objects[0].Key != nil && *in.Delete.Objects[0].Key == "test-dir/file1.txt"
+		}), mock.Anything).
+		Return(&s3.DeleteObjectsOutput{}, nil).
 		Once()
 
 	err = writer.Remove(ctx, testDir)
@@ -1568,9 +1575,11 @@ func TestWriter_Remove_DirectoryWithNestedDir(t *testing.T) {
 		Once()
 
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.Anything).
-		Return(&s3.DeleteObjectOutput{}, nil).
-		Times(2)
+		DeleteObjects(mock.Anything, mock.MatchedBy(func(in *s3.DeleteObjectsInput) bool {
+			return in.Delete != nil && len(in.Delete.Objects) == 2
+		}), mock.Anything).
+		Return(&s3.DeleteObjectsOutput{}, nil).
+		Once()
 
 	err = writer.Remove(ctx, testDir)
 	require.NoError(t, err)
@@ -1613,10 +1622,11 @@ func TestWriter_Remove_SkipDirectory(t *testing.T) {
 
 	// Only file should be deleted, directory should be skipped
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.MatchedBy(func(input *s3.DeleteObjectInput) bool {
-			return *input.Key == "test-dir/file1.txt"
-		})).
-		Return(&s3.DeleteObjectOutput{}, nil).
+		DeleteObjects(mock.Anything, mock.MatchedBy(func(in *s3.DeleteObjectsInput) bool {
+			return in.Delete != nil && len(in.Delete.Objects) == 1 &&
+				in.Delete.Objects[0].Key != nil && *in.Delete.Objects[0].Key == "test-dir/file1.txt"
+		}), mock.Anything).
+		Return(&s3.DeleteObjectsOutput{}, nil).
 		Once()
 
 	err = writer.Remove(ctx, testDir)
@@ -1659,8 +1669,8 @@ func TestWriter_Remove_NullKey(t *testing.T) {
 		Once()
 
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.Anything).
-		Return(&s3.DeleteObjectOutput{}, nil).
+		DeleteObjects(mock.Anything, mock.Anything, mock.Anything).
+		Return(&s3.DeleteObjectsOutput{}, nil).
 		Once()
 
 	err = writer.Remove(ctx, testDir)
@@ -1702,8 +1712,8 @@ func TestWriter_Remove_ListObjectsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to list objects")
 }
 
-// TestWriter_Remove_DeleteObjectError tests error handling when DeleteObject fails
-func TestWriter_Remove_DeleteObjectError(t *testing.T) {
+// TestWriter_Remove_DeleteObjectsError tests error handling when DeleteObjects fails
+func TestWriter_Remove_DeleteObjectsError(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
 	ctx := t.Context()
 
@@ -1737,13 +1747,13 @@ func TestWriter_Remove_DeleteObjectError(t *testing.T) {
 		Once()
 
 	mockClient.EXPECT().
-		DeleteObject(ctx, mock.Anything).
+		DeleteObjects(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("delete failed")).
 		Once()
 
 	err = writer.Remove(ctx, testDir)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to delete object")
+	assert.Contains(t, err.Error(), "failed to delete")
 }
 
 // TestIsEmptyDirectory tests isEmptyDirectory function

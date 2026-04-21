@@ -65,7 +65,7 @@ func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgen
 	// Decode the PEM file
 	block, _ := pem.Decode(pemData)
 	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block containing private key," +
+		return nil, fmt.Errorf("failed to decode PEM block containing private key, please" +
 			"check key file format, it must be valid PEM with header and footer")
 	}
 

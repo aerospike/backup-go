@@ -24,6 +24,9 @@ const s3type = "s3"
 
 // Client is an interface for *s3.Client. Used for testing purposes.
 type Client interface {
+	// PutObject stores an object in a bucket.
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options),
+	) (*s3.PutObjectOutput, error)
 	// CreateMultipartUpload initiates a multipart upload and returns an upload ID.
 	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options),
 	) (*s3.CreateMultipartUploadOutput, error)

@@ -15,25 +15,20 @@
 package s3
 
 import (
-	"bytes"
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/aerospike/backup-go/io/storage/common"
-	"github.com/aerospike/backup-go/io/storage/common/pool"
 	"github.com/aerospike/backup-go/io/storage/options"
-	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go/ptr"
@@ -45,7 +40,14 @@ const (
 	maxDeleteObjectsPerRequest = 1000
 )
 
-// Writer represents a s3 storage writer.
+// Writer configures backup uploads to S3. It validates the bucket and optional prefix,
+// then builds a [transfermanager.Client] used for each opened object.
+//
+// Uploads are streaming: each call to (*Writer).NewWriter runs an S3 upload in a
+// background goroutine while the caller writes to an in-memory pipe. The transfer
+// manager chooses PutObject vs multipart upload from the stream shape and options
+// (see NewWriter), so unlike a hand-rolled multipart flow it does not call
+// CreateMultipartUpload until the first full part is read from the body.
 type Writer struct {
 	// Optional parameters.
 	options.Options
@@ -56,7 +58,9 @@ type Writer struct {
 	// prefix contains folder name if we have folders inside the bucket.
 	prefix string
 
-	storageClass types.StorageClass
+	// storageClass is set when options.StorageClass is non-empty; validated in NewWriter.
+	storageClass tmtypes.StorageClass
+	uploader     *transfermanager.Client
 }
 
 // NewWriter creates a new writer for S3 storage directory/file writes.
@@ -124,7 +128,6 @@ func NewWriter(
 	}
 
 	if w.StorageClass != "" {
-		// validation.
 		class, err := parseStorageClass(w.StorageClass)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse storage class: %w", err)
@@ -133,49 +136,71 @@ func NewWriter(
 		w.storageClass = class
 	}
 
+	// Part size is floored at 5MB so we never ask S3 for multipart parts below its minimum.
+	// MultipartUploadThreshold matches part size so objects that exceed one part use multipart
+	// rather than buffering to a higher threshold first.
+	partSize := int64(max(w.ChunkSize, s3DefaultChunkSize))
+
+	uploadConcurrency := w.UploadConcurrency
+	if uploadConcurrency <= 0 {
+		uploadConcurrency = 1
+	}
+
+	w.uploader = transfermanager.New(client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = partSize
+		o.MultipartUploadThreshold = partSize
+		o.Concurrency = uploadConcurrency
+	})
+
 	return w, nil
 }
 
-// NewWriter returns a new S3 writer to the specified path.
-// isRecords indicates whether the file contains record data.
+// NewWriter opens an object key for write. The returned [io.WriteCloser] writes to a pipe;
+// a goroutine reads the other end and runs [transfermanager.Client.UploadObject], which may
+// use PutObject (small/unknown-length streams that finish under one part) or multipart upload.
+// Errors from that upload are delivered asynchronously: first non-blocking delivery on a
+// successful Write after the upload finishes (tryCollectUploadResult), or on Close (waitForUploadResult).
 func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser, error) {
 	fullPath, err := common.GetFullPath(w.prefix, filename, w.PathList, w.IsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
 
-	muInput := &s3.CreateMultipartUploadInput{
-		Bucket:       &w.bucketName,
-		Key:          &fullPath,
-		StorageClass: w.storageClass,
+	ctx, cancel := context.WithCancel(ctx)
+	pr, pw := io.Pipe()
+
+	s3w := &s3Writer{
+		ctx:        ctx,
+		cancel:     cancel,
+		pipeWriter: pw,
+		uploadDone: make(chan error, 1),
+	}
+
+	uploadInput := &transfermanager.UploadObjectInput{
+		Bucket: &w.bucketName,
+		Key:    &fullPath,
+		Body:   pr,
+	}
+	if w.storageClass != "" {
+		uploadInput.StorageClass = w.storageClass
 	}
 
 	if w.WithChecksum {
-		muInput.ChecksumAlgorithm = s3DefaultChecksumAlgorithm
+		uploadInput.ChecksumAlgorithm = tmtypes.ChecksumAlgorithmCrc32
 	}
 
-	upload, err := w.client.CreateMultipartUpload(ctx, muInput)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
-	}
+	go func() {
+		defer pr.Close()
 
-	//nolint:gosec // context is canceled when the writer is closed.
-	ctx, cancel := context.WithCancel(ctx)
+		_, uploadErr := w.uploader.UploadObject(ctx, uploadInput)
+		if uploadErr != nil {
+			pw.CloseWithError(uploadErr) // Unblocks Write() immediately
+		}
 
-	return &s3Writer{
-		ctx:          ctx,
-		cancel:       cancel,
-		uploadID:     upload.UploadId,
-		key:          fullPath,
-		client:       w.client,
-		bucket:       w.bucketName,
-		buffer:       new(bytes.Buffer),
-		chunkSize:    w.ChunkSize,
-		logger:       w.Logger,
-		retryPolicy:  w.RetryPolicy,
-		workersPool:  pool.NewPool(w.UploadConcurrency),
-		withChecksum: w.WithChecksum,
-	}, nil
+		s3w.uploadDone <- uploadErr
+	}()
+
+	return s3w, nil
 }
 
 // GetType returns the type of the writer.
@@ -183,35 +208,28 @@ func (w *Writer) GetType() string {
 	return s3type
 }
 
-// s3Writer wrapper for writing files, as S3 in not supporting creation of io.Writer.
+// s3Writer implements [io.WriteCloser] over an [io.PipeWriter]. The read side of the pipe is
+// consumed by the transfer manager upload goroutine; writeMu serializes Write/Close with the
+// pipe’s close semantics. uploadDone carries the final error from UploadObject exactly once;
+// tryCollectUploadResult drains it without blocking when a Write runs after the upload completed.
 type s3Writer struct {
-	// ctx is stored internally so that it can be used in io.WriteCloser methods
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	uploadID *string
-	client   Client
-	buffer   *bytes.Buffer
-	key      string
-	bucket   string
+	writeMu sync.Mutex
 
-	cpMu           sync.Mutex
-	completedParts []types.CompletedPart
-
-	chunkSize   int
-	partNumber  atomic.Int32
-	closed      atomic.Bool
-	logger      *slog.Logger
-	retryPolicy *models.RetryPolicy
-	workersPool *pool.Pool
-	uploadErr   atomic.Value
-
-	withChecksum bool
+	pipeWriter *io.PipeWriter
+	uploadDone chan error
+	uploadErr  atomic.Value // stores error; only non-nil after upload finishes
+	closed     atomic.Bool
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
 
 func (w *s3Writer) Write(p []byte) (int, error) {
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
+
 	if w.closed.Load() {
 		return 0, os.ErrClosed
 	}
@@ -220,164 +238,90 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, err.(error)
 	}
 
-	if w.buffer.Len() >= w.chunkSize {
-		partNumber := w.partNumber.Add(1)
-
-		buf := w.buffer.Bytes()
-		// Submit the part for upload.
-		w.workersPool.Submit(func() {
-			w.uploadPart(buf, partNumber)
-		})
-		// Reset buffer for the next chunk.
-		w.buffer = new(bytes.Buffer)
+	if len(p) == 0 {
+		return 0, nil
 	}
 
-	return w.buffer.Write(p)
-}
-
-// uploadPart uploads a part of the file to S3.
-func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
-	if w.ctx.Err() != nil || w.uploadErr.Load() != nil {
-		return
-	}
-
-	var response *s3.UploadPartOutput
-
-	err := w.retryPolicy.Do(w.ctx, func() error {
-		var uploadErr error
-
-		ipInput := &s3.UploadPartInput{
-			Body:       bytes.NewReader(p),
-			Bucket:     &w.bucket,
-			Key:        &w.key,
-			PartNumber: &partNumber,
-			UploadId:   w.uploadID,
-		}
-
-		if w.withChecksum {
-			ipInput.ChecksumAlgorithm = s3DefaultChecksumAlgorithm
-		}
-
-		response, uploadErr = w.client.UploadPart(w.ctx, ipInput)
-
-		return uploadErr
-	})
+	n, err := w.pipeWriter.Write(p)
 	if err != nil {
-		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", partNumber, err)) {
-			w.cancel()
+		if uploadErr := w.loadUploadErr(); uploadErr != nil {
+			return n, uploadErr
 		}
 
-		return
+		return n, err
 	}
 
-	w.cpMu.Lock()
-
-	part := types.CompletedPart{
-		PartNumber: &partNumber,
-		ETag:       response.ETag,
+	// If the upload goroutine already finished, surface its error without blocking this Write.
+	if err := w.tryCollectUploadResult(); err != nil {
+		return n, err
 	}
 
-	if w.withChecksum {
-		part.ChecksumCRC32 = response.ChecksumCRC32
-	}
-
-	w.completedParts = append(w.completedParts, part)
-	w.cpMu.Unlock()
+	return n, nil
 }
 
 func (w *s3Writer) Close() error {
 	if !w.closed.CompareAndSwap(false, true) {
 		return os.ErrClosed
 	}
+	defer w.cancel()
 
-	if w.buffer.Len() > 0 {
-		partNumber := w.partNumber.Add(1)
+	w.writeMu.Lock()
+	closeErr := w.pipeWriter.Close() // unblocks the reader; remaining body is EOF
+	w.writeMu.Unlock()
 
-		lastPart := w.buffer.Bytes()
-
-		w.uploadPart(lastPart, partNumber)
-	}
-	// Wait for all workers to finish.
-	w.workersPool.Wait()
-
-	if err := w.uploadErr.Load(); err != nil {
-		return err.(error)
+	uploadErr := w.waitForUploadResult()
+	if uploadErr != nil {
+		return uploadErr
 	}
 
-	// Sort completed parts by part number (required by S3).
-	w.cpMu.Lock()
-	slices.SortFunc(w.completedParts, func(a, b types.CompletedPart) int {
-		return cmp.Compare(*a.PartNumber, *b.PartNumber)
-	})
-
-	// Verify no gaps in part numbers.
-	for i, part := range w.completedParts {
-		expectedPartNum := int32(i + 1)
-		if *part.PartNumber != expectedPartNum {
-			if err := w.abortUpload(fmt.Errorf("missing part %d in upload sequence", expectedPartNum)); err != nil {
-				if w.logger != nil {
-					w.logger.Error("failed to abort multipart upload",
-						slog.String("key", w.key),
-						slog.String("uploadID", ptr.ToString(w.uploadID)),
-						slog.Any("error", err))
-				}
-
-				return err
-			}
-		}
+	if closeErr != nil && !errors.Is(closeErr, io.ErrClosedPipe) {
+		return closeErr
 	}
-
-	r, err := w.client.CompleteMultipartUpload(w.ctx,
-		&s3.CompleteMultipartUploadInput{
-			Bucket:   &w.bucket,
-			UploadId: w.uploadID,
-			Key:      &w.key,
-			MultipartUpload: &types.CompletedMultipartUpload{
-				Parts: w.completedParts,
-			},
-		})
-	if err != nil {
-		// Try to abort even if complete upload failed.
-		if abErr := w.abortUpload(err); abErr != nil {
-			if w.logger != nil {
-				w.logger.Error("failed to abort multipart upload",
-					slog.String("key", w.key),
-					slog.String("uploadID", ptr.ToString(w.uploadID)),
-					slog.Any("error", err))
-			}
-		}
-
-		return fmt.Errorf("failed to complete multipart upload: %w", err)
-	}
-
-	if w.logger != nil {
-		w.logger.Debug("completed multipart upload",
-			slog.String("key", w.key),
-			slog.String("uploadID", ptr.ToString(w.uploadID)),
-			slog.Int("parts", len(w.completedParts)),
-			slog.String("etag", ptr.ToString(r.ETag)),
-			slog.String("checksum", ptr.ToString(r.ChecksumCRC32)),
-		)
-	}
-
-	w.cpMu.Unlock()
 
 	return nil
 }
 
-// abortUpload aborts the multipart upload and cleans up partial data
-func (w *s3Writer) abortUpload(originalErr error) error {
-	// Use a fresh context for cleanup (not the canceled one).
-	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func (w *s3Writer) loadUploadErr() error {
+	if err := w.uploadErr.Load(); err != nil {
+		return err.(error)
+	}
 
-	_, err := w.client.AbortMultipartUpload(cleanupCtx, &s3.AbortMultipartUploadInput{
-		Bucket:   &w.bucket,
-		Key:      &w.key,
-		UploadId: w.uploadID,
-	})
+	return nil
+}
 
-	return errors.Join(originalErr, err)
+func (w *s3Writer) setUploadErr(err error) {
+	if err == nil {
+		return
+	}
+
+	w.uploadErr.CompareAndSwap(nil, err)
+}
+
+// tryCollectUploadResult receives the upload outcome if it is already available; otherwise it is a no-op.
+func (w *s3Writer) tryCollectUploadResult() error {
+	if w.uploadDone == nil {
+		return w.loadUploadErr()
+	}
+
+	select {
+	case err := <-w.uploadDone:
+		w.uploadDone = nil
+		w.setUploadErr(err)
+	default:
+	}
+
+	return w.loadUploadErr()
+}
+
+// waitForUploadResult blocks until the upload goroutine sends its result (normally on Close).
+func (w *s3Writer) waitForUploadResult() error {
+	if w.uploadDone != nil {
+		err := <-w.uploadDone
+		w.uploadDone = nil
+		w.setUploadErr(err)
+	}
+
+	return w.loadUploadErr()
 }
 
 func isEmptyDirectory(ctx context.Context, client Client, bucketName, prefix string) (bool, error) {

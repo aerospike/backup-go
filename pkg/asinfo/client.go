@@ -962,23 +962,24 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 // StartBackup starts a backup job.
 func (ic *Client) StartBackup(ctx context.Context,
 	namespace, storage, bucket, region, profile, accessKey, secretKey string,
-) error {
-	jobID := cltime.Now()
+) (string, error) {
+	cNow := cltime.Now()
+	jobID := cNow.String()
 
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup],
 		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
-		return fmt.Errorf("failed start backup: %w", err)
+		return "", fmt.Errorf("failed start backup: %w", err)
 	}
 
 	_, err = parseResultResponse(cmd, resp)
 	if err != nil {
-		return fmt.Errorf("failed to parse start backup response: %w", err)
+		return "", fmt.Errorf("failed to parse start backup response: %w", err)
 	}
 
-	return nil
+	return jobID, nil
 }
 
 // StartRestore starts a backup job.

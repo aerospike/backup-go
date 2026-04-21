@@ -1081,20 +1081,29 @@ func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(ctx con
 }
 
 // StartBackup provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StartBackup(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error {
+func (_mock *MockInfoGetter) StartBackup(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) (string, error) {
 	ret := _mock.Called(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartBackup")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) error); ok {
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) (string, error)); ok {
+		return returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) string); ok {
 		r0 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(string)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, string, string) error); ok {
+		r1 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // MockInfoGetter_StartBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartBackup'
@@ -1163,12 +1172,12 @@ func (_c *MockInfoGetter_StartBackup_Call) Run(run func(ctx context.Context, nam
 	return _c
 }
 
-func (_c *MockInfoGetter_StartBackup_Call) Return(err error) *MockInfoGetter_StartBackup_Call {
-	_c.Call.Return(err)
+func (_c *MockInfoGetter_StartBackup_Call) Return(s string, err error) *MockInfoGetter_StartBackup_Call {
+	_c.Call.Return(s, err)
 	return _c
 }
 
-func (_c *MockInfoGetter_StartBackup_Call) RunAndReturn(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error) *MockInfoGetter_StartBackup_Call {
+func (_c *MockInfoGetter_StartBackup_Call) RunAndReturn(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) (string, error)) *MockInfoGetter_StartBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }

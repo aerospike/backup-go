@@ -99,7 +99,7 @@ type InfoGetter interface {
 	GetNodesNames() []string
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
 	StartBackup(ctx context.Context,
-		namespace, storage, bucket, region, profile, accessKey, secretKey string) error
+		namespace, storage, bucket, region, profile, accessKey, secretKey string) (string, error)
 	StartRestore(ctx context.Context, jobID,
 		namespace, storage, bucket, region, profile, accessKey, secretKey string) error
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
@@ -713,73 +714,73 @@ func TestParseStorageClass(t *testing.T) {
 	tests := []struct {
 		name          string
 		class         string
-		expected      types.StorageClass
+		expected      tmtypes.StorageClass
 		expectedError error
 	}{
 		{
 			name:          "standard storage class",
 			class:         "STANDARD",
-			expected:      types.StorageClassStandard,
+			expected:      tmtypes.StorageClassStandard,
 			expectedError: nil,
 		},
 		{
 			name:          "reduced redundancy storage class",
 			class:         "REDUCED_REDUNDANCY",
-			expected:      types.StorageClassReducedRedundancy,
+			expected:      tmtypes.StorageClassReducedRedundancy,
 			expectedError: nil,
 		},
 		{
 			name:          "glacier storage class",
 			class:         "GLACIER",
-			expected:      types.StorageClassGlacier,
+			expected:      tmtypes.StorageClassGlacier,
 			expectedError: nil,
 		},
 		{
 			name:          "standard ia storage class",
 			class:         "STANDARD_IA",
-			expected:      types.StorageClassStandardIa,
+			expected:      tmtypes.StorageClassStandardIa,
 			expectedError: nil,
 		},
 		{
 			name:          "onezone ia storage class",
 			class:         "ONEZONE_IA",
-			expected:      types.StorageClassOnezoneIa,
+			expected:      tmtypes.StorageClassOnezoneIa,
 			expectedError: nil,
 		},
 		{
 			name:          "intelligent tiering storage class",
 			class:         "INTELLIGENT_TIERING",
-			expected:      types.StorageClassIntelligentTiering,
+			expected:      tmtypes.StorageClassIntelligentTiering,
 			expectedError: nil,
 		},
 		{
 			name:          "deep archive storage class",
 			class:         "DEEP_ARCHIVE",
-			expected:      types.StorageClassDeepArchive,
+			expected:      tmtypes.StorageClassDeepArchive,
 			expectedError: nil,
 		},
 		{
 			name:          "outposts storage class",
 			class:         "OUTPOSTS",
-			expected:      types.StorageClassOutposts,
+			expected:      tmtypes.StorageClassOutposts,
 			expectedError: nil,
 		},
 		{
 			name:          "glacier ir storage class",
 			class:         "GLACIER_IR",
-			expected:      types.StorageClassGlacierIr,
+			expected:      tmtypes.StorageClassGlacierIr,
 			expectedError: nil,
 		},
 		{
 			name:          "lower case input",
 			class:         "standard",
-			expected:      types.StorageClassStandard,
+			expected:      tmtypes.StorageClassStandard,
 			expectedError: nil,
 		},
 		{
 			name:          "mixed case input",
 			class:         "StAnDaRd",
-			expected:      types.StorageClassStandard,
+			expected:      tmtypes.StorageClassStandard,
 			expectedError: nil,
 		},
 		{

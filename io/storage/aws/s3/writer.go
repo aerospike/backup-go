@@ -35,14 +35,10 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go/ptr"
 )
 
-const (
-	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
-	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
-)
+const s3DefaultChunkSize = 5 * 1024 * 1024 // 5MB, minimum size of a part (S3 multipart minimum)
 
 // Writer represents a s3 storage writer.
 type Writer struct {
@@ -460,26 +456,36 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	return nil
 }
 
-// parseStorageClass parses the storage class from a string.
-func parseStorageClass(class string) (types.StorageClass, error) {
-	// To correct case: CLASS
-	class = strings.ToUpper(class)
+// knownStorageClasses is the set accepted for uploads; it matches transfer manager / S3 PutObject enums.
+var knownStorageClasses = []tmtypes.StorageClass{
+	tmtypes.StorageClassStandard,
+	tmtypes.StorageClassReducedRedundancy,
+	tmtypes.StorageClassStandardIa,
+	tmtypes.StorageClassOnezoneIa,
+	tmtypes.StorageClassIntelligentTiering,
+	tmtypes.StorageClassGlacier,
+	tmtypes.StorageClassDeepArchive,
+	tmtypes.StorageClassOutposts,
+	tmtypes.StorageClassGlacierIr,
+	tmtypes.StorageClassSnow,
+	tmtypes.StorageClassExpressOnezone,
+}
 
-	var result types.StorageClass
-	possible := result.Values()
+// parseStorageClass normalizes user input and returns a transfer-manager storage class value.
+func parseStorageClass(class string) (tmtypes.StorageClass, error) {
+	class = strings.ToUpper(strings.TrimSpace(class))
 
-	for _, possibleClass := range possible {
-		if class == string(possibleClass) {
-			result = possibleClass
-			break
+	for _, v := range knownStorageClasses {
+		if class == string(v) {
+			return v, nil
 		}
 	}
 
-	if result == "" {
+	if class == "" {
 		return "", fmt.Errorf("invalid storage class %s", class)
 	}
 
-	return result, nil
+	return "", fmt.Errorf("invalid storage class %s", class)
 }
 
 // GetOptions returns initialized options for the writer.

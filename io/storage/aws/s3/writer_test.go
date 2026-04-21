@@ -24,12 +24,11 @@ import (
 	"path"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/aerospike/backup-go/io/storage/aws/s3/mocks"
 	"github.com/aerospike/backup-go/io/storage/options"
-	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
@@ -62,6 +61,24 @@ const (
 )
 
 var testData = []byte("test data")
+
+func putObjectSuccessOutput() *s3.PutObjectOutput {
+	etag := testEtag
+	checksum := testChecksum
+	return &s3.PutObjectOutput{
+		ETag:          &etag,
+		ChecksumCRC32: &checksum,
+	}
+}
+
+func expectPutObject(mockClient *mocks.MockClient, times int) {
+	// Transfer manager passes API option funcs as a third argument; the mock forwards
+	// either (ctx, params) or (ctx, params, optFns) to Called depending on len(optFns).
+	mockClient.EXPECT().
+		PutObject(mock.Anything, mock.Anything, mock.Anything).
+		Return(putObjectSuccessOutput(), nil).
+		Times(times)
+}
 
 type WriterSuite struct {
 	suite.Suite
@@ -557,22 +574,22 @@ func TestNewWriter_ValidStorageClass(t *testing.T) {
 	testCases := []struct {
 		name         string
 		storageClass string
-		expected     types.StorageClass
+		expected     tmtypes.StorageClass
 	}{
 		{
 			name:         "STANDARD lowercase",
 			storageClass: "standard",
-			expected:     types.StorageClassStandard,
+			expected:     tmtypes.StorageClassStandard,
 		},
 		{
 			name:         "STANDARD_IA uppercase",
 			storageClass: "STANDARD_IA",
-			expected:     types.StorageClassStandardIa,
+			expected:     tmtypes.StorageClassStandardIa,
 		},
 		{
 			name:         "GLACIER mixed case",
 			storageClass: "GlAcIeR",
-			expected:     types.StorageClassGlacier,
+			expected:     tmtypes.StorageClassGlacier,
 		},
 	}
 
@@ -696,13 +713,7 @@ func TestWriter_NewWriter_Success(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -716,6 +727,7 @@ func TestWriter_NewWriter_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, w)
+	require.NoError(t, w.Close())
 }
 
 // TestWriter_NewWriter_CreateMultipartUploadError tests error in CreateMultipartUpload
@@ -736,7 +748,7 @@ func TestWriter_NewWriter_CreateMultipartUploadError(t *testing.T) {
 		Once()
 
 	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
+		CreateMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("upload creation failed")).
 		Once()
 
@@ -748,10 +760,16 @@ func TestWriter_NewWriter_CreateMultipartUploadError(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = writer.NewWriter(ctx, testFile)
+	w, err := writer.NewWriter(ctx, testFile)
+	require.NoError(t, err)
 
+	data := make([]byte, testChunkSize)
+	_, err = w.Write(data)
+	require.NoError(t, err)
+
+	err = w.Close()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create multipart upload")
+	assert.Contains(t, err.Error(), "upload creation failed")
 }
 
 // TestS3Writer_Write_Success tests successful Write operation
@@ -771,13 +789,7 @@ func TestS3Writer_Write_Success(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -795,9 +807,10 @@ func TestS3Writer_Write_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, len(testData), n)
+	require.NoError(t, w.Close())
 }
 
-// TestS3Writer_Write_TriggerMultipart tests that Write triggers multipart upload when buffer exceeds chunk size
+// TestS3Writer_Write_TriggerMultipart tests multipart upload when the first part fills the minimum part size.
 func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
 	ctx := t.Context()
@@ -816,7 +829,7 @@ func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 
 	uploadID := testUploadID
 	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
+		CreateMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.CreateMultipartUploadOutput{
 			UploadId: &uploadID,
 		}, nil).
@@ -825,15 +838,15 @@ func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 	etag := testEtag
 	checksum := testChecksum
 	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
+		UploadPart(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.UploadPartOutput{
 			ETag:          &etag,
 			ChecksumCRC32: &checksum,
 		}, nil).
-		Maybe()
+		Times(2)
 
 	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
+		CompleteMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.CompleteMultipartUploadOutput{
 			ETag:          &etag,
 			ChecksumCRC32: &checksum,
@@ -845,15 +858,14 @@ func TestS3Writer_Write_TriggerMultipart(t *testing.T) {
 		mockClient,
 		testBucket,
 		options.WithDir(testDir),
-		options.WithChunkSize(10), // Very small chunk for testing
+		options.WithChunkSize(10), // ignored for part size floor (5MB)
 	)
 	require.NoError(t, err)
 
 	w, err := writer.NewWriter(ctx, testFile)
 	require.NoError(t, err)
 
-	// Write data larger than chunk size to trigger multipart upload
-	data := make([]byte, 50)
+	data := make([]byte, testChunkSize+100)
 	for i := range data {
 		data[i] = byte(i)
 	}
@@ -883,23 +895,7 @@ func TestS3Writer_Write_AfterClose(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -939,18 +935,10 @@ func TestS3Writer_Write_WithUploadError(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
 	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
+		PutObject(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("upload failed")).
-		Maybe()
+		Once()
 
 	writer, err := NewWriter(
 		ctx,
@@ -964,15 +952,11 @@ func TestS3Writer_Write_WithUploadError(t *testing.T) {
 	w, err := writer.NewWriter(ctx, testFile)
 	require.NoError(t, err)
 
-	// Write data to trigger upload
 	data := make([]byte, 50)
 	n, err := w.Write(data)
 	require.NoError(t, err)
 	assert.Equal(t, len(data), n)
 
-	time.Sleep(100 * time.Millisecond)
-
-	_, _ = w.Write(data)
 	err = w.Close()
 	assert.Error(t, err)
 }
@@ -994,31 +978,7 @@ func TestS3Writer_Close_Success(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
-		Return(&s3.UploadPartOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Maybe()
-
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -1056,31 +1016,7 @@ func TestS3Writer_Close_AfterClose(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
-		Return(&s3.UploadPartOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Maybe()
-
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -1125,7 +1061,7 @@ func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
 
 	uploadID := testUploadID
 	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
+		CreateMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.CreateMultipartUploadOutput{
 			UploadId: &uploadID,
 		}, nil).
@@ -1134,20 +1070,20 @@ func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
 	etag := testEtag
 	checksum := testChecksum
 	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
+		UploadPart(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.UploadPartOutput{
 			ETag:          &etag,
 			ChecksumCRC32: &checksum,
 		}, nil).
-		Maybe()
+		Times(2)
 
 	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
+		CompleteMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("complete failed")).
 		Once()
 
 	mockClient.EXPECT().
-		AbortMultipartUpload(mock.Anything, mock.Anything).
+		AbortMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.AbortMultipartUploadOutput{}, nil).
 		Once()
 
@@ -1162,13 +1098,13 @@ func TestS3Writer_Close_CompleteMultipartUploadError(t *testing.T) {
 	w, err := writer.NewWriter(ctx, testFile)
 	require.NoError(t, err)
 
-	// Write some data
-	_, err = w.Write(testData)
+	payload := make([]byte, testChunkSize+1)
+	_, err = w.Write(payload)
 	require.NoError(t, err)
 
 	err = w.Close()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to complete multipart upload")
+	assert.Contains(t, err.Error(), "complete failed")
 }
 
 // TestS3Writer_Close_AbortMultipartUploadError tests error handling when both Complete and Abort fail
@@ -1193,7 +1129,7 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 
 	uploadID := testUploadID
 	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
+		CreateMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.CreateMultipartUploadOutput{
 			UploadId: &uploadID,
 		}, nil).
@@ -1202,20 +1138,20 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 	etag := testEtag
 	checksum := testChecksum
 	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
+		UploadPart(mock.Anything, mock.Anything, mock.Anything).
 		Return(&s3.UploadPartOutput{
 			ETag:          &etag,
 			ChecksumCRC32: &checksum,
 		}, nil).
-		Maybe()
+		Times(2)
 
 	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
+		CompleteMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("complete failed")).
 		Once()
 
 	mockClient.EXPECT().
-		AbortMultipartUpload(mock.Anything, mock.Anything).
+		AbortMultipartUpload(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("abort failed")).
 		Once()
 
@@ -1236,7 +1172,8 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 	w, err := writer.NewWriter(ctx, testFile)
 	require.NoError(t, err)
 
-	_, err = w.Write(testData)
+	payload := make([]byte, testChunkSize+1)
+	_, err = w.Write(payload)
 	require.NoError(t, err)
 
 	err = w.Close()
@@ -1245,8 +1182,8 @@ func TestS3Writer_Close_AbortMultipartUploadError(t *testing.T) {
 	assert.Contains(t, err.Error(), "complete failed")
 }
 
-// TestS3Writer_UploadPart_WithRetryPolicy tests uploadPart with retry policy
-func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
+// TestS3Writer_Upload_SinglePutObject checks that a small payload uses a single PutObject (retries are handled by the SDK transfer manager).
+func TestS3Writer_Upload_SinglePutObject(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
 	ctx := t.Context()
 
@@ -1262,52 +1199,12 @@ func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-
-	// Fail first 2 times, succeed on 3rd attempt
-	callCount := 0
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, _ *s3.UploadPartInput, _ ...func(*s3.Options)) (*s3.UploadPartOutput, error) {
-			callCount++
-			if callCount < 3 {
-				return nil, errors.New("temporary upload error")
-			}
-			return &s3.UploadPartOutput{
-				ETag:          &etag,
-				ChecksumCRC32: &checksum,
-			}, nil
-		}).
-		Maybe()
-
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
-
-	retryPolicy := &models.RetryPolicy{
-		BaseTimeout: 1 * time.Millisecond,
-		Multiplier:  2,
-		MaxRetries:  3,
-	}
+	expectPutObject(mockClient, 1)
 
 	opts := func(o *options.Options) {
 		o.PathList = []string{testDir}
 		o.IsDir = true
 		o.ChunkSize = 10
-		o.RetryPolicy = retryPolicy
 	}
 
 	writer, err := NewWriter(
@@ -1321,16 +1218,12 @@ func TestS3Writer_UploadPart_WithRetryPolicy(t *testing.T) {
 	w, err := writer.NewWriter(ctx, testFile)
 	require.NoError(t, err)
 
-	// Write data to trigger upload
 	data := make([]byte, 50)
 	_, err = w.Write(data)
 	require.NoError(t, err)
 
 	err = w.Close()
 	require.NoError(t, err)
-
-	// Verify UploadPart was called 3 times (2 retries + 1 success)
-	assert.GreaterOrEqual(t, callCount, 3)
 }
 
 // TestS3Writer_ContextCancellation tests that context cancellation stops uploads
@@ -1350,22 +1243,13 @@ func TestS3Writer_ContextCancellation(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
 	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	// Cancel context before upload completes
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, _ *s3.UploadPartInput, _ ...func(*s3.Options)) (*s3.UploadPartOutput, error) {
+		PutObject(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 			cancel()
 			return nil, context.Canceled
 		}).
-		Maybe()
+		Once()
 
 	writer, err := NewWriter(
 		ctx,
@@ -1384,7 +1268,6 @@ func TestS3Writer_ContextCancellation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, len(data), n)
 
-	_, _ = w.Write(data)
 	err = w.Close()
 	assert.Error(t, err)
 }
@@ -1406,31 +1289,7 @@ func TestS3Writer_ConcurrentWrites(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Times(5)
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
-		Return(&s3.UploadPartOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Maybe()
-
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Times(5)
+	expectPutObject(mockClient, 5)
 
 	writer, err := NewWriter(
 		ctx,
@@ -1479,23 +1338,7 @@ func TestS3Writer_EmptyBuffer(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -2037,23 +1880,7 @@ func TestS3Writer_WriteZeroBytes(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -2075,7 +1902,7 @@ func TestS3Writer_WriteZeroBytes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestWriter_NewWriter_WithStorageClass tests that storage class is passed to CreateMultipartUpload
+// TestWriter_NewWriter_WithStorageClass tests that storage class is passed on upload
 func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
 	mockClient := mocks.NewMockClient(t)
 	ctx := t.Context()
@@ -2092,16 +1919,11 @@ func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-
-	// Verify storage class is passed correctly
 	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.MatchedBy(func(input *s3.CreateMultipartUploadInput) bool {
+		PutObject(mock.Anything, mock.MatchedBy(func(input *s3.PutObjectInput) bool {
 			return input.StorageClass == types.StorageClassGlacier
-		})).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
+		}), mock.Anything).
+		Return(putObjectSuccessOutput(), nil).
 		Once()
 
 	opts := func(o *options.Options) {
@@ -2118,8 +1940,9 @@ func TestWriter_NewWriter_WithStorageClass(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = writer.NewWriter(ctx, testFile)
+	w, err := writer.NewWriter(ctx, testFile)
 	require.NoError(t, err)
+	require.NoError(t, w.Close())
 }
 
 // TestS3Writer_WriteIncrementally tests writing data incrementally
@@ -2139,31 +1962,7 @@ func TestS3Writer_WriteIncrementally(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
-		Return(&s3.UploadPartOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Maybe()
-
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,
@@ -2209,31 +2008,7 @@ func TestS3Writer_LargeWrite(t *testing.T) {
 		}, nil).
 		Once()
 
-	uploadID := testUploadID
-	mockClient.EXPECT().
-		CreateMultipartUpload(ctx, mock.Anything).
-		Return(&s3.CreateMultipartUploadOutput{
-			UploadId: &uploadID,
-		}, nil).
-		Once()
-
-	etag := testEtag
-	checksum := testChecksum
-	mockClient.EXPECT().
-		UploadPart(mock.Anything, mock.Anything).
-		Return(&s3.UploadPartOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Maybe()
-
-	mockClient.EXPECT().
-		CompleteMultipartUpload(mock.Anything, mock.Anything).
-		Return(&s3.CompleteMultipartUploadOutput{
-			ETag:          &etag,
-			ChecksumCRC32: &checksum,
-		}, nil).
-		Once()
+	expectPutObject(mockClient, 1)
 
 	writer, err := NewWriter(
 		ctx,

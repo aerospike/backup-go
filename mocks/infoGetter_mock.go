@@ -1081,16 +1081,16 @@ func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(ctx con
 }
 
 // StartBackup provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StartBackup(ctx context.Context, jobID int64, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error {
-	ret := _mock.Called(ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)
+func (_mock *MockInfoGetter) StartBackup(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error {
+	ret := _mock.Called(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartBackup")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string, string, string, string, string, string, string) error); ok {
-		r0 = returnFunc(ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) error); ok {
+		r0 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1104,7 +1104,6 @@ type MockInfoGetter_StartBackup_Call struct {
 
 // StartBackup is a helper method to define mock.On call
 //   - ctx context.Context
-//   - jobID int64
 //   - namespace string
 //   - storage string
 //   - bucket string
@@ -1112,19 +1111,19 @@ type MockInfoGetter_StartBackup_Call struct {
 //   - profile string
 //   - accessKey string
 //   - secretKey string
-func (_e *MockInfoGetter_Expecter) StartBackup(ctx interface{}, jobID interface{}, namespace interface{}, storage interface{}, bucket interface{}, region interface{}, profile interface{}, accessKey interface{}, secretKey interface{}) *MockInfoGetter_StartBackup_Call {
-	return &MockInfoGetter_StartBackup_Call{Call: _e.mock.On("StartBackup", ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)}
+func (_e *MockInfoGetter_Expecter) StartBackup(ctx interface{}, namespace interface{}, storage interface{}, bucket interface{}, region interface{}, profile interface{}, accessKey interface{}, secretKey interface{}) *MockInfoGetter_StartBackup_Call {
+	return &MockInfoGetter_StartBackup_Call{Call: _e.mock.On("StartBackup", ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)}
 }
 
-func (_c *MockInfoGetter_StartBackup_Call) Run(run func(ctx context.Context, jobID int64, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string)) *MockInfoGetter_StartBackup_Call {
+func (_c *MockInfoGetter_StartBackup_Call) Run(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string)) *MockInfoGetter_StartBackup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 string
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(string)
 		}
 		var arg2 string
 		if args[2] != nil {
@@ -1150,10 +1149,6 @@ func (_c *MockInfoGetter_StartBackup_Call) Run(run func(ctx context.Context, job
 		if args[7] != nil {
 			arg7 = args[7].(string)
 		}
-		var arg8 string
-		if args[8] != nil {
-			arg8 = args[8].(string)
-		}
 		run(
 			arg0,
 			arg1,
@@ -1163,7 +1158,6 @@ func (_c *MockInfoGetter_StartBackup_Call) Run(run func(ctx context.Context, job
 			arg5,
 			arg6,
 			arg7,
-			arg8,
 		)
 	})
 	return _c
@@ -1174,13 +1168,13 @@ func (_c *MockInfoGetter_StartBackup_Call) Return(err error) *MockInfoGetter_Sta
 	return _c
 }
 
-func (_c *MockInfoGetter_StartBackup_Call) RunAndReturn(run func(ctx context.Context, jobID int64, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error) *MockInfoGetter_StartBackup_Call {
+func (_c *MockInfoGetter_StartBackup_Call) RunAndReturn(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error) *MockInfoGetter_StartBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StartRestore provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StartRestore(ctx context.Context, jobID int64, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error {
+func (_mock *MockInfoGetter) StartRestore(ctx context.Context, jobID string, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error {
 	ret := _mock.Called(ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)
 
 	if len(ret) == 0 {
@@ -1188,7 +1182,7 @@ func (_mock *MockInfoGetter) StartRestore(ctx context.Context, jobID int64, name
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string, string, string, string, string, string, string) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string, string) error); ok {
 		r0 = returnFunc(ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)
 	} else {
 		r0 = ret.Error(0)
@@ -1203,7 +1197,7 @@ type MockInfoGetter_StartRestore_Call struct {
 
 // StartRestore is a helper method to define mock.On call
 //   - ctx context.Context
-//   - jobID int64
+//   - jobID string
 //   - namespace string
 //   - storage string
 //   - bucket string
@@ -1215,15 +1209,15 @@ func (_e *MockInfoGetter_Expecter) StartRestore(ctx interface{}, jobID interface
 	return &MockInfoGetter_StartRestore_Call{Call: _e.mock.On("StartRestore", ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)}
 }
 
-func (_c *MockInfoGetter_StartRestore_Call) Run(run func(ctx context.Context, jobID int64, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string)) *MockInfoGetter_StartRestore_Call {
+func (_c *MockInfoGetter_StartRestore_Call) Run(run func(ctx context.Context, jobID string, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string)) *MockInfoGetter_StartRestore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 string
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(string)
 		}
 		var arg2 string
 		if args[2] != nil {
@@ -1273,7 +1267,7 @@ func (_c *MockInfoGetter_StartRestore_Call) Return(err error) *MockInfoGetter_St
 	return _c
 }
 
-func (_c *MockInfoGetter_StartRestore_Call) RunAndReturn(run func(ctx context.Context, jobID int64, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error) *MockInfoGetter_StartRestore_Call {
+func (_c *MockInfoGetter_StartRestore_Call) RunAndReturn(run func(ctx context.Context, jobID string, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error) *MockInfoGetter_StartRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }

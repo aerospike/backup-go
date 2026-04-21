@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 )
@@ -959,9 +960,11 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 }
 
 // StartBackup starts a backup job.
-func (ic *Client) StartBackup(ctx context.Context, jobID string,
+func (ic *Client) StartBackup(ctx context.Context,
 	namespace, storage, bucket, region, profile, accessKey, secretKey string,
 ) error {
+	jobID := cltime.Now()
+
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup],
 		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
 

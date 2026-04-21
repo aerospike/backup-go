@@ -98,7 +98,7 @@ type InfoGetter interface {
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetNodesNames() []string
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
-	StartBackup(ctx context.Context, jobID,
+	StartBackup(ctx context.Context,
 		namespace, storage, bucket, region, profile, accessKey, secretKey string) error
 	StartRestore(ctx context.Context, jobID,
 		namespace, storage, bucket, region, profile, accessKey, secretKey string) error

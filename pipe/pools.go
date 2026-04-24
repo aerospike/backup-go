@@ -16,6 +16,8 @@ package pipe
 
 import (
 	"context"
+	"fmt"
+	"sync"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
@@ -26,6 +28,9 @@ import (
 // All chains in a pool are running in parallel.
 // Pools are communicating via fanout.
 type Pool[T models.TokenConstraint] struct {
+	mu sync.RWMutex
+	eg *errgroup.Group
+
 	Chains []*Chain[T]
 	// Outputs and Inputs are mutually exclusive.
 	Inputs  []chan T
@@ -34,17 +39,21 @@ type Pool[T models.TokenConstraint] struct {
 
 // Run runs all chains in the pool.
 func (p *Pool[T]) Run(ctx context.Context) error {
-	errGroup, ctx := errgroup.WithContext(ctx)
+	p.eg, ctx = errgroup.WithContext(ctx)
+
+	p.mu.RLock()
 
 	for i := range p.Chains {
 		chain := p.Chains[i]
 
-		errGroup.Go(func() error {
+		p.eg.Go(func() error {
 			return chain.Run(ctx)
 		})
 	}
 
-	return errGroup.Wait()
+	p.mu.RUnlock()
+
+	return p.eg.Wait()
 }
 
 // ProcessorCreator is a function type that defines a creator for a Processor.
@@ -82,8 +91,53 @@ func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *bandw
 	}
 }
 
+// AddReader adds a new reader chain to the pool and starts it.
+func (p *Pool[T]) AddReader(ctx context.Context, reader Reader[T], pc ProcessorCreator[T]) (chan T, error) {
+	chain, output := NewReaderChain[T](reader, pc())
+
+	p.mu.Lock()
+	if p.eg == nil {
+		p.mu.Unlock()
+		return nil, fmt.Errorf("pool is not running")
+	}
+
+	p.Chains = append(p.Chains, chain)
+	p.Outputs = append(p.Outputs, output)
+	p.mu.Unlock()
+
+	p.eg.Go(func() error {
+		return chain.Run(ctx)
+	})
+
+	return output, nil
+}
+
+// AddWriter adds a new writer chain to the pool and starts it.
+func (p *Pool[T]) AddWriter(ctx context.Context, writer Writer[T], limiter *bandwidth.Limiter) (chan T, error) {
+	chain, input := NewWriterChain[T](writer, limiter)
+
+	p.mu.Lock()
+	if p.eg == nil {
+		p.mu.Unlock()
+		return nil, fmt.Errorf("pool is not running")
+	}
+
+	p.Chains = append(p.Chains, chain)
+	p.Inputs = append(p.Inputs, input)
+	p.mu.Unlock()
+
+	p.eg.Go(func() error {
+		return chain.Run(ctx)
+	})
+
+	return input, nil
+}
+
 // Close closing channels and cleaning links.
 func (p *Pool[T]) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	// Nullify objects, so GC can free this memory.
 	p.Chains = nil
 	p.Inputs = nil

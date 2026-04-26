@@ -678,11 +678,13 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			}
 
 			if r.Validator != nil {
-				if err = r.Validator.Run(*p.Key); err == nil {
-					totalNum++
-					totalSize += *p.Size
+				if err = r.Validator.Run(*p.Key); err != nil {
+					continue
 				}
 			}
+
+			totalNum++
+			totalSize += *p.Size
 		}
 
 		continuationToken = listResponse.NextContinuationToken

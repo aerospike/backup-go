@@ -710,6 +710,150 @@ func (s *AwsSuite) TestReader_OpenFileErr() {
 	}
 }
 
+func TestReader_CalculateTotalSizeForPath_NoValidator(t *testing.T) {
+	mockClient := mocks.NewMockClient(t)
+	ctx := t.Context()
+
+	mockClient.EXPECT().
+		HeadBucket(ctx, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).
+		Once()
+
+	reader, err := NewReader(
+		ctx,
+		mockClient,
+		testBucket,
+		options.WithDir(testDir),
+		options.WithSkipDirCheck(),
+	)
+	require.NoError(t, err)
+
+	mockClient.EXPECT().
+		ListObjectsV2(ctx, mock.Anything).
+		Return(&s3.ListObjectsV2Output{
+			Contents: []types.Object{
+				{Key: aws.String("test-dir/file1.asb"), Size: aws.Int64(100)},
+				{Key: aws.String("test-dir/file2.asb"), Size: aws.Int64(200)},
+				{Key: aws.String("test-dir/"), Size: aws.Int64(0)},
+			},
+		}, nil).
+		Once()
+
+	totalSize, totalNum, err := reader.calculateTotalSizeForPath(ctx, testDir)
+	require.NoError(t, err)
+	assert.Equal(t, int64(300), totalSize)
+	assert.Equal(t, int64(2), totalNum)
+}
+
+func (s *AwsSuite) TestReaderWriter_RoundTripLargeFilesParallel() {
+	s.suiteWg.Wait()
+	ctx := s.T().Context()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	uploadPrefix := fmt.Sprintf("transfermanager_roundtrip_%d", time.Now().UnixNano())
+
+	writer, err := NewWriter(
+		ctx,
+		client,
+		testBucket,
+		options.WithDir(uploadPrefix),
+		options.WithChunkSize(s3DefaultChunkSize),
+		options.WithUploadConcurrency(4),
+	)
+	s.Require().NoError(err)
+
+	makePayload := func(size int, seed byte) []byte {
+		payload := make([]byte, size)
+		for i := range payload {
+			payload[i] = seed + byte(i%251)
+		}
+		return payload
+	}
+
+	filesToUpload := []struct {
+		name    string
+		payload []byte
+	}{
+		{name: "parallel_large_1.asb", payload: makePayload(int(s3DefaultChunkSize)+12345, 11)},
+		{name: "parallel_large_2.asb", payload: makePayload(int(s3DefaultChunkSize*2)+54321, 27)},
+		{name: "parallel_large_3.asb", payload: makePayload(int(s3DefaultChunkSize*3)+11111, 39)},
+	}
+
+	expected := make(map[string][]byte, len(filesToUpload))
+	for _, file := range filesToUpload {
+		expected[file.name] = file.payload
+	}
+
+	var uploadWG sync.WaitGroup
+	uploadErrCh := make(chan error, len(filesToUpload))
+
+	for _, file := range filesToUpload {
+		uploadWG.Go(func() {
+			w, err := writer.NewWriter(ctx, file.name)
+			if err != nil {
+				uploadErrCh <- err
+				return
+			}
+
+			if _, err = io.Copy(w, bytes.NewReader(file.payload)); err != nil {
+				uploadErrCh <- err
+				_ = w.Close()
+				return
+			}
+
+			if err = w.Close(); err != nil {
+				uploadErrCh <- err
+			}
+		})
+	}
+
+	uploadWG.Wait()
+	close(uploadErrCh)
+
+	for err := range uploadErrCh {
+		s.Require().NoError(err)
+	}
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		options.WithDir(uploadPrefix),
+		options.WithChunkSize(s3DefaultChunkSize),
+		options.WithUploadConcurrency(4),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
+
+	received := make(map[string][]byte, len(filesToUpload))
+
+	for {
+		select {
+		case err = <-eCH:
+			s.Require().NoError(err)
+		case file, ok := <-rCH:
+			if !ok {
+				s.Require().Equal(len(filesToUpload), len(received))
+				for fileName, expectedData := range expected {
+					actualData, ok := received[fileName]
+					s.Require().True(ok, "downloaded file %s was not found", fileName)
+					s.Require().Equal(expectedData, actualData)
+				}
+				return
+			}
+
+			data, readErr := io.ReadAll(file.Reader)
+			s.Require().NoError(readErr)
+			s.Require().NoError(file.Reader.Close())
+			received[file.Name] = data
+		}
+	}
+}
+
 func TestParseStorageClass(t *testing.T) {
 	tests := []struct {
 		name          string

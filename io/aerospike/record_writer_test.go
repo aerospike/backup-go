@@ -16,6 +16,7 @@ package aerospike
 
 import (
 	"log/slog"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -56,8 +57,8 @@ func TestRestoreWriterRecord(t *testing.T) {
 	stats := models.NewRestoreStats()
 	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		testMetricMessage, true)
-	writer := newRecordWriter(
-		t.Context(), mockDBWriter, policy, stats, slog.Default(), false, 1, nil, rpsCollector, false)
+	writer := newSingleRecordWriter(
+		t.Context(), mockDBWriter, policy, stats, nil, rpsCollector, false, slog.Default())
 	require.NotNil(t, writer)
 
 	err := writer.writeRecord(&expRecord)
@@ -78,8 +79,8 @@ func TestRestoreWriterRecordFail(t *testing.T) {
 	stats := models.NewRestoreStats()
 	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		testMetricMessage, true)
-	writer := newRecordWriter(
-		t.Context(), mockDBWriter, policy, stats, slog.Default(), false, 1, nil, rpsCollector, false)
+	writer := newSingleRecordWriter(
+		t.Context(), mockDBWriter, policy, stats, nil, rpsCollector, false, slog.Default())
 	rec := models.Record{
 		Record: &a.Record{
 			Key: key,
@@ -126,8 +127,8 @@ func TestRestoreWriterWithPolicy(t *testing.T) {
 	stats := models.NewRestoreStats()
 	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		testMetricMessage, true)
-	writer := newRecordWriter(
-		t.Context(), mockDBWriter, policy, stats, slog.Default(), false, 1, nil, rpsCollector, false)
+	writer := newSingleRecordWriter(
+		t.Context(), mockDBWriter, policy, stats, nil, rpsCollector, false, slog.Default())
 	require.NotNil(t, writer)
 
 	err := writer.writeRecord(&expRecord)
@@ -152,8 +153,8 @@ func TestSingleRecordWriterRetry(t *testing.T) {
 	}
 	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		testMetricMessage, true)
-	writer := newRecordWriter(
-		t.Context(), mockDBWriter, policy, stats, slog.Default(), false, 1, retryPolicy, rpsCollector, false)
+	writer := newSingleRecordWriter(
+		t.Context(), mockDBWriter, policy, stats, retryPolicy, rpsCollector, false, slog.Default())
 	rec := models.Record{
 		Record: &a.Record{
 			Key: key,
@@ -197,8 +198,10 @@ func TestBatchRecordWriterRetry(t *testing.T) {
 	}
 	rpsCollector := metrics.NewCollector(t.Context(), slog.Default(), metrics.RecordsPerSecond,
 		testMetricMessage, true)
-	writer := newRecordWriter(
-		t.Context(), mockDBWriter, policy, stats, slog.Default(), true, 1, retryPolicy, rpsCollector, false)
+	batchSize := &atomic.Int32{}
+	batchSize.Store(1)
+	writer := newBatchRecordWriter(
+		t.Context(), mockDBWriter, policy, stats, retryPolicy, rpsCollector, batchSize, false, slog.Default())
 	rec := models.Record{
 		Record: &a.Record{
 			Key: key,

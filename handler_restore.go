@@ -74,6 +74,14 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	rpsCollector  *metrics.Collector
 	kbpsCollector *metrics.Collector
 
+	rpsMA        *models.MovingAverage
+	kbpsMA       *models.MovingAverage
+	queueDepthMA *models.MovingAverage
+
+	dynamicBatchSize atomic.Int32
+
+	useBatchWrites bool
+
 	id string
 }
 
@@ -130,33 +138,40 @@ func newRestoreHandler[T models.TokenConstraint](
 		logger,
 	)
 
+	rh := &RestoreHandler[T]{
+		handlerBase:   base,
+		readProcessor: readProcessor,
+		config:        config,
+		stats:         stats,
+		id:            id,
+		logger:        logger,
+		rpsCollector:  rpsCollector,
+		kbpsCollector: kbpsCollector,
+		rpsMA:         models.NewMovingAverage(30), // 30s window
+		kbpsMA:        models.NewMovingAverage(30),
+		queueDepthMA:  models.NewMovingAverage(30),
+	}
+
+	rh.dynamicBatchSize.Store(int32(config.BatchSize))
 	writeProcessor := newRecordWriterProcessor[T](
 		aerospikeClient,
 		config,
+		&rh.dynamicBatchSize,
 		stats,
 		rpsCollector,
 		infoClient,
 		logger,
 	)
+	rh.writeProcessor = writeProcessor
 
 	limiter, err := bandwidth.NewLimiter(config.Bandwidth)
 	if err != nil {
 		base.cancel()
 		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
 	}
+	rh.limiter = limiter
 
-	return &RestoreHandler[T]{
-		handlerBase:    base,
-		readProcessor:  readProcessor,
-		writeProcessor: writeProcessor,
-		config:         config,
-		stats:          stats,
-		id:             id,
-		logger:         logger,
-		limiter:        limiter,
-		rpsCollector:   rpsCollector,
-		kbpsCollector:  kbpsCollector,
-	}, nil
+	return rh, nil
 }
 
 func (rh *RestoreHandler[T]) run() {
@@ -205,6 +220,13 @@ func (rh *RestoreHandler[T]) restoreMetadata(ctx context.Context) error {
 }
 
 func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe.Reader[T]) error {
+	useBatchWrites, err := rh.writeProcessor.useBatchWrites(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check batch writes: %w", err)
+	}
+
+	rh.useBatchWrites = useBatchWrites
+
 	dataWriters, err := rh.writeProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create writer workers: %w", err)
@@ -230,6 +252,13 @@ func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe
 
 	// Assign, so we can get pl stats.
 	rh.pl.Store(pl)
+
+	if rh.config.DynamicScaling && rh.config.EncoderType == EncoderTypeASB {
+		controller := newRestoreScalingController[T](rh, &rh.dynamicBatchSize)
+		rh.wg.Go(func() {
+			controller.run(ctx, pl)
+		})
+	}
 
 	return pl.Run(ctx)
 }
@@ -308,11 +337,25 @@ func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 		pr, pw = pl.GetMetrics()
 	}
 
-	return models.NewMetrics(
+	rps := rh.rpsCollector.GetLastResult()
+	kbps := rh.kbpsCollector.GetLastResult()
+	queueDepth := uint64(pr + pw)
+
+	rh.rpsMA.Add(rps)
+	rh.kbpsMA.Add(kbps)
+	rh.queueDepthMA.Add(queueDepth)
+
+	m := models.NewMetrics(
 		pr, pw,
-		rh.rpsCollector.GetLastResult(),
-		rh.kbpsCollector.GetLastResult(),
+		rps,
+		kbps,
 	)
+
+	m.AverageRecordsPerSecond = rh.rpsMA.Average()
+	m.AverageKilobytesPerSecond = rh.kbpsMA.Average()
+	m.AverageQueueDepth = rh.queueDepthMA.Average()
+
+	return m
 }
 
 // cleanup stops the collection of stats and metrics for the restore job,

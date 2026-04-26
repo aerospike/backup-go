@@ -50,11 +50,17 @@ type Processor[T models.TokenConstraint] interface {
 // Each routine is built from a Reader and/or Processor and/or Writer.
 type Chain[T models.TokenConstraint] struct {
 	routine func(context.Context) error
+	writer  Writer[T]
 }
 
 // Run execute the chain.
 func (c *Chain[T]) Run(ctx context.Context) error {
 	return c.routine(ctx)
+}
+
+// Writer returns the writer associated with the chain, if any.
+func (c *Chain[T]) Writer() Writer[T] {
+	return c.writer
 }
 
 // NewReaderChain returns a new Chain with a Reader and a Processor,
@@ -109,6 +115,7 @@ func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *bandwidth.Li
 	input = make(chan T, writerBufferSize)
 	chain = &Chain[T]{
 		routine: newWriterRoutine(w, input, limiter),
+		writer:  w,
 	}
 
 	return chain, input

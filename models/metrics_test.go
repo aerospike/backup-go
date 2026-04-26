@@ -15,9 +15,11 @@
 package models
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMetrics_SumMetrics(t *testing.T) {
@@ -146,4 +148,85 @@ func TestMetrics_SumMetrics(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMovingAverage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty average returns zero", func(t *testing.T) {
+		t.Parallel()
+		ma := NewMovingAverage(5)
+		require.Equal(t, uint64(0), ma.Average())
+		require.Equal(t, 0, ma.HistorySize())
+	})
+
+	t.Run("single value", func(t *testing.T) {
+		t.Parallel()
+		ma := NewMovingAverage(5)
+		ma.Add(100)
+		require.Equal(t, uint64(100), ma.Average())
+		require.Equal(t, 1, ma.HistorySize())
+	})
+
+	t.Run("multiple values within window", func(t *testing.T) {
+		t.Parallel()
+		ma := NewMovingAverage(5)
+		ma.Add(10)
+		ma.Add(20)
+		ma.Add(30)
+		require.Equal(t, uint64(20), ma.Average()) // (10+20+30)/3 = 20
+		require.Equal(t, 3, ma.HistorySize())
+	})
+
+	t.Run("window overflow drops oldest values", func(t *testing.T) {
+		t.Parallel()
+		ma := NewMovingAverage(3)
+		ma.Add(10)
+		ma.Add(20)
+		ma.Add(30)
+		require.Equal(t, uint64(20), ma.Average()) // (10+20+30)/3 = 20
+		require.Equal(t, 3, ma.HistorySize())
+
+		ma.Add(40)
+		require.Equal(t, uint64(30), ma.Average()) // (20+30+40)/3 = 30
+		require.Equal(t, 3, ma.HistorySize())
+
+		ma.Add(50)
+		require.Equal(t, uint64(40), ma.Average()) // (30+40+50)/3 = 40
+		require.Equal(t, 3, ma.HistorySize())
+	})
+
+	t.Run("window size of 1", func(t *testing.T) {
+		t.Parallel()
+		ma := NewMovingAverage(1)
+		ma.Add(100)
+		require.Equal(t, uint64(100), ma.Average())
+		ma.Add(200)
+		require.Equal(t, uint64(200), ma.Average())
+		require.Equal(t, 1, ma.HistorySize())
+	})
+}
+
+func TestMovingAverage_Concurrent(t *testing.T) {
+	t.Parallel()
+
+	ma := NewMovingAverage(100)
+	var wg sync.WaitGroup
+	numGoroutines := 10
+	numOps := 1000
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < numOps; j++ {
+				ma.Add(uint64(j))
+				_ = ma.Average()
+				_ = ma.HistorySize()
+			}
+		}()
+	}
+
+	wg.Wait()
+	require.LessOrEqual(t, ma.HistorySize(), 100)
 }

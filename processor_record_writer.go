@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/aerospike"
@@ -29,6 +30,7 @@ import (
 type recordWriterProcessor[T models.TokenConstraint] struct {
 	aerospikeClient  AerospikeClient
 	config           *ConfigRestore
+	dynamicBatchSize *atomic.Int32
 	stats            *models.RestoreStats
 	metricsCollector *metrics.Collector
 	infoClient       InfoGetter
@@ -40,6 +42,7 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 func newRecordWriterProcessor[T models.TokenConstraint](
 	aerospikeClient AerospikeClient,
 	config *ConfigRestore,
+	dynamicBatchSize *atomic.Int32,
 	stats *models.RestoreStats,
 	metricsCollector *metrics.Collector,
 	infoClient InfoGetter,
@@ -50,6 +53,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	return &recordWriterProcessor[T]{
 		aerospikeClient:  aerospikeClient,
 		config:           config,
+		dynamicBatchSize: dynamicBatchSize,
 		stats:            stats,
 		metricsCollector: metricsCollector,
 		infoClient:       infoClient,
@@ -69,11 +73,6 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 		parallelism = rw.config.MaxAsyncBatches
 	}
 
-	// If we need only validation, we create discard writers.
-	if rw.config.ValidateOnly {
-		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
-	}
-
 	// Check if batch writes are supported.
 	useBatchWrites, err := rw.useBatchWrites(ctx)
 	if err != nil {
@@ -83,23 +82,38 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 	dataWriters := make([]pipe.Writer[T], parallelism)
 
 	for i := 0; i < parallelism; i++ {
-		writer := aerospike.NewRestoreWriter[T](
-			ctx,
-			rw.aerospikeClient,
-			rw.config.WritePolicy,
-			rw.stats,
-			rw.logger,
-			useBatchWrites,
-			rw.config.BatchSize,
-			rw.config.RetryPolicy,
-			rw.metricsCollector,
-			rw.config.IgnoreRecordError,
-		)
+		writer, err := rw.newDataWriter(ctx, useBatchWrites)
+		if err != nil {
+			return nil, err
+		}
 
-		dataWriters[i] = newWriterWithTokenStats[T](writer, rw.stats, rw.logger)
+		dataWriters[i] = writer
 	}
 
 	return dataWriters, nil
+}
+
+// newDataWriter creates a single data writer.
+func (rw *recordWriterProcessor[T]) newDataWriter(ctx context.Context, useBatchWrites bool) (pipe.Writer[T], error) {
+	// If we need only validation, we create discard writers.
+	if rw.config.ValidateOnly {
+		return newWriterWithTokenStats[T](&discardWriter[T]{}, rw.stats, rw.logger), nil
+	}
+
+	writer := aerospike.NewRestoreWriter[T](
+		ctx,
+		rw.aerospikeClient,
+		rw.config.WritePolicy,
+		rw.stats,
+		rw.logger,
+		useBatchWrites,
+		rw.dynamicBatchSize,
+		rw.config.RetryPolicy,
+		rw.metricsCollector,
+		rw.config.IgnoreRecordError,
+	)
+
+	return newWriterWithTokenStats[T](writer, rw.stats, rw.logger), nil
 }
 
 // useBatchWrites checks if batch writes are supported.

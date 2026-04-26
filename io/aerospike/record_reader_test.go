@@ -555,6 +555,57 @@ func TestAerospikeRecordReaderCancelledContextClosesActiveScan(t *testing.T) {
 	require.Nil(t, v)
 }
 
+// TestAerospikeRecordReaderCloseReleasesActiveScan matches pipe: Read and RecordReader.Close
+// run on the same goroutine (deferred Close after the read loop). After one record is
+// read the scan is still open; pipe.Close must still release the recordset / scan slot.
+func TestAerospikeRecordReaderCloseReleasesActiveScan(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test"
+	set := ""
+	key, aerr := a.NewKey(namespace, set, "k")
+	require.NoError(t, aerr)
+	rec := &a.Record{Bins: a.BinMap{"x": 1}, Key: key}
+
+	recordset := &a.Recordset{}
+	results := make(chan *a.Result, 1)
+	results <- &a.Result{Record: rec}
+	// more results and drain left for a real close-from-recordset; Close() uses closer on active scan
+	setFieldValue(recordset, "records", results)
+
+	mockScanner := mocks.NewMockscanner(t)
+	mockScanner.EXPECT().ScanPartitions(newExpectedPolicy(), a.NewPartitionFilterByRange(0, 4096), namespace, set).
+		Return(recordset, nil).Once()
+
+	ctx := t.Context()
+	closer := mocks.NewMockRecordsetCloser(t)
+	closer.EXPECT().Close(recordset).Return(nil).Once()
+
+	reader := NewRecordReader(
+		ctx,
+		mockScanner,
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
+			scanLimiter:     scanlimiter.Noop,
+			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
+				testMetricMessage, true),
+		},
+		slog.Default(),
+		closer,
+	)
+	require.NotNil(t, reader)
+
+	_, rerr := reader.Read(ctx)
+	require.NoError(t, rerr)
+	reader.Close()
+
+	closer.AssertExpectations(t)
+	mockScanner.AssertExpectations(t)
+}
+
 func TestAerospikeRecordReaderReturnsCloseErrorOnScanFinish(t *testing.T) {
 	t.Parallel()
 

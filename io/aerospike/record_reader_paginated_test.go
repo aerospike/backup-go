@@ -406,6 +406,58 @@ func TestAerospikeRecordReaderPaginatedContextCanceled(t *testing.T) {
 	require.Nil(t, token)
 }
 
+// TestAerospikeRecordReaderPaginatedCloseReleasesActiveScan ensures paginatedRecordReader.Close
+// releases the recordset when a page scan is still open (same goroutine as Read, like pipe's defer Close).
+func TestAerospikeRecordReaderPaginatedCloseReleasesActiveScan(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test"
+	set := ""
+	pageSize := int64(2)
+	key, aerr := a.NewKey(namespace, set, "k")
+	require.NoError(t, aerr)
+	rec := &a.Record{Bins: a.BinMap{"x": 1}, Key: key}
+
+	mockRecordSet := &a.Recordset{}
+	mockResults := make(chan *a.Result, 1)
+	mockResults <- &a.Result{Record: rec}
+	setFieldValue(mockRecordSet, "records", mockResults)
+
+	expectedPolicy := newExpectedPaginatedPolicy(pageSize)
+
+	mockScanner := mocks.NewMockscanner(t)
+	mockScanner.EXPECT().ScanPartitions(expectedPolicy, a.NewPartitionFilterAll(), namespace, set).
+		Return(mockRecordSet, nil).Once()
+
+	ctx := t.Context()
+	closer := mocks.NewMockRecordsetCloser(t)
+	closer.EXPECT().Close(mockRecordSet).Return(nil).Once()
+
+	reader := NewRecordReader(
+		ctx,
+		mockScanner,
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
+			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
+			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
+		},
+		slog.Default(),
+		closer,
+	)
+	require.NotNil(t, reader)
+
+	_, rerr := reader.Read(ctx)
+	require.NoError(t, rerr)
+	reader.Close()
+
+	closer.AssertExpectations(t)
+	mockScanner.AssertExpectations(t)
+}
+
 // Test pagination with scan limiter (semaphore)
 func TestAerospikeRecordReaderPaginatedWithScanLimiter(t *testing.T) {
 	namespace := "test"

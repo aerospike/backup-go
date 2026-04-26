@@ -3610,7 +3610,7 @@ func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
 			Bins: a.BinMap{
 				"bool_bin":   true,
 				"int_bin":    int64(42),
-				"float_bin":  float64(3.14),
+				"float_bin":  3.14,
 				"string_bin": "hello",
 				"bytes_bin":  []byte("bytes"),
 				"hll_bin":    a.HLLValue("hll-value"),

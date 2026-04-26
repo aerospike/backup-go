@@ -183,21 +183,30 @@ func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
 }
 
 // readResult blocks on the active scan's result channel, respecting context cancellation.
-func (r *singleRecordReader) readResult(_ context.Context) (*a.Result, bool, error) {
+func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
 	active := r.active
 	if active == nil {
 		return nil, false, fmt.Errorf("active scan has no results channel")
 	}
 
+	// Fast path: if a result is immediately available, return it without
+	// checking context. This avoids expensive select setup on the hot path.
 	select {
-	//case <-ctx.Done():
-	//	r.cancel()
-	//	_ = r.closeActiveScan()
-	//
-	//	return nil, false, ctx.Err()
-	//case <-r.ctx.Done():
-	//	_ = r.closeActiveScan()
-	//	return nil, false, r.ctx.Err()
+	case res, ok := <-active.results:
+		return res, ok, nil
+	default:
+	}
+
+	// Slow path: block on either result or context cancellation.
+	select {
+	case <-ctx.Done():
+		r.cancel()
+		_ = r.closeActiveScan()
+
+		return nil, false, ctx.Err()
+	case <-r.ctx.Done():
+		_ = r.closeActiveScan()
+		return nil, false, r.ctx.Err()
 	case res, ok := <-active.results:
 		return res, ok, nil
 	}
@@ -206,13 +215,7 @@ func (r *singleRecordReader) readResult(_ context.Context) (*a.Result, bool, err
 // handleResult processes one scan result. Returns nil token (no error) when the
 // scan was throttled and needs to be retried from the same set.
 func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) {
-	var doThrottleCheck bool
-
 	active := r.active
-	if active != nil && active.needsThrottleCheck {
-		doThrottleCheck = true
-		active.needsThrottleCheck = false
-	}
 	if active == nil {
 		if err := r.ctx.Err(); err != nil {
 			return nil, err
@@ -227,7 +230,9 @@ func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) 
 
 	// On the first result only, check whether the DB signaled throttling.
 	// If so, close the scan, wait for capacity, and signal the caller to retry.
-	if doThrottleCheck {
+	if active.needsThrottleCheck {
+		active.needsThrottleCheck = false
+
 		if r.config.throttler != nil && shouldThrottle(res.Err) {
 			r.logger.Debug("DB under pressure, throttling scan",
 				slog.Any("drainErr", res.Err))
@@ -270,8 +275,10 @@ func (r *singleRecordReader) finishActiveScan() error {
 	return err
 }
 
-// Close is a no-op.
+// Close cancels the reader context and releases any active scan (recordset + scan slot).
 func (r *singleRecordReader) Close() {
+	r.cancel()
+	_ = r.closeActiveScan()
 }
 
 func (r *singleRecordReader) startNextScan() error {
@@ -330,10 +337,10 @@ func (r *singleRecordReader) closeActiveScan() error {
 	if active == nil {
 		return nil
 	}
-	r.active = nil
-	closeFn := active.close
 
-	return closeFn()
+	r.active = nil
+
+	return active.close()
 }
 
 func newScanPolicy(cfg *RecordReaderConfig) *a.ScanPolicy {

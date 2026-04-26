@@ -80,6 +80,10 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 		defer close(output)
 
 		for {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			data, err := r.Read(ctx)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
@@ -98,6 +102,14 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 				return fmt.Errorf("failed to process data: %w", err)
 			}
 
+			// Fast path: try to send without checking context to save overhead
+			select {
+			case output <- data:
+				continue
+			default:
+			}
+
+			// Slow path: block on send or context cancellation
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -139,24 +151,40 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 			}
 		}()
 
+		var (
+			data T
+			ok   bool
+		)
+
 		for {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
+			// Fast path: try to receive without checking context
 			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case data, ok := <-input:
-				if !ok {
-					return nil
+			case data, ok = <-input:
+			default:
+				// Slow path: block on receive or context cancellation
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case data, ok = <-input:
 				}
+			}
 
-				n, err := w.Write(data)
-				if err != nil {
-					return fmt.Errorf("failed to write data: %w", err)
-				}
+			if !ok {
+				return nil
+			}
 
-				// Wait for the bandwidth limiter if it is set.
-				if limiter != nil {
-					limiter.Wait(n)
-				}
+			n, err := w.Write(data)
+			if err != nil {
+				return fmt.Errorf("failed to write data: %w", err)
+			}
+
+			// Wait for the bandwidth limiter if it is set.
+			if limiter != nil {
+				limiter.Wait(n)
 			}
 		}
 	}

@@ -38,7 +38,6 @@ type paginatedRecordReader struct {
 	pf              *a.PartitionFilter // current active filter for the set
 	active          *pageScan
 	recordsetCloser RecordsetCloser
-	mu              sync.Mutex
 }
 
 type pageScan struct {
@@ -50,9 +49,11 @@ type pageScan struct {
 	count              uint64
 }
 
-// Close is a no-op. Recordset lifetime is managed during Read/scan. See
-// [github.com/aerospike/backup-go/pipe.Reader] (Close).
-func (r *paginatedRecordReader) Close() {}
+// Close cancels the reader context and releases any active scan (recordset + scan slot).
+func (r *paginatedRecordReader) Close() {
+	r.cancel()
+	_ = r.closeActiveScan()
+}
 
 func newPaginatedRecordReader(
 	ctx context.Context,
@@ -77,13 +78,6 @@ func newPaginatedRecordReader(
 		scanPolicy:      &scanPolicy,
 		recordsetCloser: closer,
 	}
-}
-
-func (r *paginatedRecordReader) getActive() *pageScan {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.active
 }
 
 func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
@@ -124,7 +118,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 }
 
 func (r *paginatedRecordReader) ensureActiveScan(ctx context.Context) error {
-	if r.getActive() != nil {
+	if r.active != nil {
 		return nil
 	}
 
@@ -188,7 +182,6 @@ func (r *paginatedRecordReader) startNextScan() error {
 	closeRecordset := wrapCloser(r.recordsetCloser, recordset)
 	releaseSlot := sync.OnceFunc(func() { r.config.scanLimiter.Release(1) })
 
-	r.mu.Lock()
 	r.active = &pageScan{
 		taskID:             recordset.TaskId(),
 		results:            recordset.Results(),
@@ -200,15 +193,21 @@ func (r *paginatedRecordReader) startNextScan() error {
 			return closeRecordset()
 		},
 	}
-	r.mu.Unlock()
 
 	return nil
 }
 
 func (r *paginatedRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
-	active := r.getActive()
+	active := r.active
 	if active == nil {
 		return nil, false, fmt.Errorf("active scan has no results channel")
+	}
+
+	// Fast path
+	select {
+	case res, ok := <-active.results:
+		return res, ok, nil
+	default:
 	}
 
 	select {
@@ -226,17 +225,7 @@ func (r *paginatedRecordReader) readResult(ctx context.Context) (*a.Result, bool
 }
 
 func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, error) {
-	var doThrottleCheck bool
-
-	r.mu.Lock()
-
 	active := r.active
-	if active != nil && active.needsThrottleCheck {
-		doThrottleCheck = true
-		active.needsThrottleCheck = false
-	}
-	r.mu.Unlock()
-
 	if active == nil {
 		if err := r.ctx.Err(); err != nil {
 			return nil, err
@@ -249,7 +238,9 @@ func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, erro
 		return nil, fmt.Errorf("nil scan result")
 	}
 
-	if doThrottleCheck {
+	if active.needsThrottleCheck {
+		active.needsThrottleCheck = false
+
 		if r.config.throttler != nil && shouldThrottle(res.Err) {
 			r.logger.Debug("DB under pressure, throttling scan", slog.Any("drainErr", res.Err))
 
@@ -273,11 +264,7 @@ func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, erro
 		return nil, fmt.Errorf("failed to read record: %w", res.Err)
 	}
 
-	r.mu.Lock()
-	if r.active != nil {
-		r.active.count++
-	}
-	r.mu.Unlock()
+	r.active.count++
 
 	if r.config.rpsCollector != nil {
 		r.config.rpsCollector.Increment()
@@ -291,7 +278,7 @@ func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, erro
 func (r *paginatedRecordReader) finishActiveScan() error {
 	var taskID, count uint64
 
-	if active := r.getActive(); active != nil {
+	if active := r.active; active != nil {
 		taskID = active.taskID
 		count = active.count
 	}
@@ -312,19 +299,14 @@ func (r *paginatedRecordReader) finishActiveScan() error {
 }
 
 func (r *paginatedRecordReader) closeActiveScan() error {
-	r.mu.Lock()
-
 	active := r.active
 	if active == nil {
-		r.mu.Unlock()
 		return nil
 	}
 
 	r.active = nil
-	closeFn := active.close
-	r.mu.Unlock()
 
-	return closeFn()
+	return active.close()
 }
 
 func shouldSkipPaginatedDrainError(err a.Error) bool {

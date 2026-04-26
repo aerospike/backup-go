@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -42,6 +43,8 @@ import (
 const (
 	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
 	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
+	// s3DeleteObjectsMaxKeys is the maximum number of keys per DeleteObjects request (S3 limit).
+	s3DeleteObjectsMaxKeys = 1000
 )
 
 // Writer represents a s3 storage writer.
@@ -215,12 +218,20 @@ type s3Writer struct {
 	retryPolicy *models.RetryPolicy
 	workersPool *pool.Pool
 	bufferPool  *collections.ByteBufferPool
-	uploadErr   atomic.Value
+	uploadErr   atomic.Pointer[error]
 
 	withChecksum bool
 }
 
 var _ io.WriteCloser = (*s3Writer)(nil)
+
+func (w *s3Writer) firstUploadErr() error {
+	if p := w.uploadErr.Load(); p != nil {
+		return *p
+	}
+
+	return nil
+}
 
 func (w *s3Writer) isAsyncUpload() bool {
 	return w.workersPool != nil && w.bufferPool != nil
@@ -234,8 +245,8 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, os.ErrClosed
 	}
 
-	if err := w.uploadErr.Load(); err != nil {
-		return 0, err.(error)
+	if err := w.firstUploadErr(); err != nil {
+		return 0, err
 	}
 
 	if len(p) == 0 {
@@ -326,7 +337,8 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 		return uploadErr
 	})
 	if err != nil {
-		if w.uploadErr.CompareAndSwap(nil, fmt.Errorf("failed to upload part %d: %w", partNumber, err)) {
+		uploadFailure := fmt.Errorf("failed to upload part %d: %w", partNumber, err)
+		if w.uploadErr.CompareAndSwap(nil, &uploadFailure) {
 			w.cancel()
 		}
 
@@ -369,10 +381,10 @@ func (w *s3Writer) Close() error {
 	// Wait for all workers to finish.
 	w.workersPool.Wait()
 
-	if err := w.uploadErr.Load(); err != nil {
+	if err := w.firstUploadErr(); err != nil {
 		w.abortUpload()
 
-		return err.(error)
+		return err
 	}
 
 	// Sort completed parts by part number (required by S3).
@@ -485,6 +497,21 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	var continuationToken *string
 
 	prefix := common.CleanPath(targetPath, true)
+	batch := make([]types.ObjectIdentifier, 0, s3DeleteObjectsMaxKeys)
+
+	flushBatch := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+
+		if err := w.deleteObjectsBatch(ctx, batch); err != nil {
+			return err
+		}
+
+		batch = batch[:0]
+
+		return nil
+	}
 
 	for {
 		listResponse, err := w.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -508,12 +535,11 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 				}
 			}
 
-			_, err = w.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-				Bucket: &w.bucketName,
-				Key:    p.Key,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to delete object %s: %w", ptr.ToString(p.Key), err)
+			batch = append(batch, types.ObjectIdentifier{Key: p.Key})
+			if len(batch) >= s3DeleteObjectsMaxKeys {
+				if err := flushBatch(); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -521,6 +547,31 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		if continuationToken == nil {
 			break
 		}
+	}
+
+	return flushBatch()
+}
+
+func (w *Writer) deleteObjectsBatch(ctx context.Context, objects []types.ObjectIdentifier) error {
+	out, err := w.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		Bucket: &w.bucketName,
+		Delete: &types.Delete{
+			Objects: objects,
+			Quiet:   aws.Bool(true),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete objects batch: %w", err)
+	}
+
+	if len(out.Errors) > 0 {
+		errs := make([]error, 0, len(out.Errors))
+		for _, fr := range out.Errors {
+			errs = append(errs, fmt.Errorf("%s (code=%s): %s",
+				aws.ToString(fr.Key), aws.ToString(fr.Code), aws.ToString(fr.Message)))
+		}
+
+		return fmt.Errorf("failed to delete objects batch: %w", errors.Join(errs...))
 	}
 
 	return nil

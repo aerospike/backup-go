@@ -26,15 +26,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-// resultChanSize is the size of the channel used to send scan results.
-const resultChanSize = 1024
-
-// pageRecord contains records and serialized filter.
-type pageRecord struct {
-	result *a.Result
-	filter *models.PartitionFilterSerialized
-}
-
 // paginatedRecordReader reads records from Aerospike in pages and saves current filter.
 type paginatedRecordReader struct {
 	ctx             context.Context
@@ -42,17 +33,27 @@ type paginatedRecordReader struct {
 	client          scanner
 	logger          *slog.Logger
 	config          *RecordReaderConfig
-	resultChan      chan *pageRecord
-	errChan         chan error
-	scanOnce        sync.Once
+	scanPolicy      *a.ScanPolicy
+	setIndex        int
+	pf              *a.PartitionFilter // current active filter for the set
+	active          *pageScan
 	recordsetCloser RecordsetCloser
+	mu              sync.Mutex
 }
 
-// Close no-op operation to satisfy pipe.Reader interface.
-func (r *paginatedRecordReader) Close() {
+type pageScan struct {
+	taskID             uint64
+	results            <-chan *a.Result
+	close              func() error
+	needsThrottleCheck bool
+	pfs                models.PartitionFilterSerialized
+	count              uint64
 }
 
-// newPaginatedRecordReader creates a new paginatedRecordReader.
+// Close is a no-op. Recordset lifetime is managed during Read/scan. See
+// [github.com/aerospike/backup-go/pipe.Reader] (Close).
+func (r *paginatedRecordReader) Close() {}
+
 func newPaginatedRecordReader(
 	ctx context.Context,
 	scanner scanner,
@@ -63,252 +64,269 @@ func newPaginatedRecordReader(
 ) *paginatedRecordReader {
 	logger.Debug("created new paginated aerospike record reader", cfg.logAttrs()...)
 
+	scanPolicy := *cfg.scanPolicy
+	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, cfg.timeBounds, cfg.noTTLOnly)
+	scanPolicy.MaxRecords = cfg.pageSize
+
 	return &paginatedRecordReader{
 		ctx:             ctx,
 		cancel:          cancel,
 		client:          scanner,
 		logger:          logger,
 		config:          cfg,
-		resultChan:      make(chan *pageRecord, resultChanSize),
-		errChan:         make(chan error, 1),
-		scanOnce:        sync.Once{},
+		scanPolicy:      &scanPolicy,
 		recordsetCloser: closer,
 	}
 }
 
-func newPageRecord(result *a.Result, filter *models.PartitionFilterSerialized) *pageRecord {
-	return &pageRecord{
-		result: result,
-		filter: filter,
-	}
+func (r *paginatedRecordReader) getActive() *pageScan {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.active
 }
 
-// readPage reads the next record from pageRecord from the Aerospike database.
 func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error) {
-	r.scanOnce.Do(func() {
-		r.logger.Debug("scan started")
+	for {
+		if err := r.ensureActiveScan(ctx); err != nil {
+			return nil, err
+		}
 
-		go r.startScan()
-	})
+		res, ok, err := r.readResult(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-	select {
-	case <-ctx.Done():
-		r.cancel()
-		return nil, ctx.Err()
-	case <-r.ctx.Done():
-		return nil, r.ctx.Err()
-	case err := <-r.errChan:
-		r.cancel()
-		return nil, err
-	case res, ok := <-r.resultChan:
+		// Channel closed — this page is done
 		if !ok {
-			r.logger.Debug("scan finished")
-			return nil, io.EOF
+			if err := r.finishActiveScan(); err != nil {
+				return nil, err
+			}
+
+			continue
 		}
 
-		if res.result == nil {
-			return nil, io.EOF
+		if shouldSkipPaginatedDrainError(res.Err) {
+			continue
 		}
 
-		if res.result.Err != nil {
-			r.cancel()
-			return nil, fmt.Errorf("failed to read record: %w", res.result.Err)
-		}
-
-		rec := models.Record{
-			Record: res.result.Record,
-		}
-
-		recToken := models.NewRecordToken(&rec, 0, res.filter)
-
-		r.config.rpsCollector.Increment()
-
-		return recToken, nil
-	}
-}
-
-// startScan starts the scan for the RecordReader only for state save!
-func (r *paginatedRecordReader) startScan() {
-	defer close(r.resultChan)
-
-	scanPolicy := *r.config.scanPolicy
-	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
-	scanPolicy.MaxRecords = r.config.pageSize
-
-	for _, set := range r.config.setList {
-		if err := r.scanSet(set, &scanPolicy); err != nil {
-			r.errChan <- err
-			return
-		}
-	}
-}
-
-func (r *paginatedRecordReader) scanSet(set string, scanPolicy *a.ScanPolicy) error {
-	// Each scan requires a copy of the partition filter.
-	pf := *r.config.partitionFilter
-
-	for {
-		count, err := r.scanPage(&pf, scanPolicy, set)
+		token, err := r.handleResult(res)
 		if err != nil {
-			return fmt.Errorf("failed to scan set %s namespace %s: %w", set, r.config.namespace, err)
+			return nil, err
 		}
 
-		if count == 0 { // empty pageRecord
-			return nil
+		if token == nil {
+			continue
 		}
+
+		return token, nil
 	}
 }
 
-// scanPage performs a paginated scan on a specific set using the provided partition filter and scan policy.
-func (r *paginatedRecordReader) scanPage(
-	pf *a.PartitionFilter,
-	scanPolicy *a.ScanPolicy,
-	set string,
-) (uint64, error) {
-	for {
-		retry, count, err := r.scanPageOnce(pf, scanPolicy, set)
-		if err != nil {
-			return 0, err
-		}
-
-		if !retry {
-			return count, nil
-		}
+func (r *paginatedRecordReader) ensureActiveScan(ctx context.Context) error {
+	if r.getActive() != nil {
+		return nil
 	}
-}
 
-// scanPageOnce performs a single scan over a filtered partition of a given set and returns retry status,
-// count, and errors.
-func (r *paginatedRecordReader) scanPageOnce(
-	pf *a.PartitionFilter,
-	scanPolicy *a.ScanPolicy,
-	set string,
-) (retry bool, count uint64, err error) {
+	if err := ctx.Err(); err != nil {
+		r.cancel()
+		return err
+	}
+
 	if err := r.ctx.Err(); err != nil {
-		return false, 0, err
+		return err
 	}
 
-	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
+	return r.startNextScan()
+}
+
+func (r *paginatedRecordReader) startNextScan() error {
+	if r.setIndex >= len(r.config.setList) {
+		r.logger.Debug("all sets scanned, done")
+		return io.EOF
+	}
+
+	if r.pf == nil {
+		pf := *r.config.partitionFilter
+		r.pf = &pf
+	}
+
+	if err := r.ctx.Err(); err != nil {
+		return err
+	}
+
 	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-		return false, 0, fmt.Errorf("failed to acquire scan limiter: %w", err)
+		return fmt.Errorf("failed to acquire scan slot: %w", err)
 	}
 
-	pfs, err := models.NewPartitionFilterSerialized(pf)
+	pfs, err := models.NewPartitionFilterSerialized(r.pf)
 	if err != nil {
 		r.config.scanLimiter.Release(1)
-
-		return false, 0, fmt.Errorf("failed to serialize partition filter: %w", err)
+		return fmt.Errorf("failed to serialize partition filter: %w", err)
 	}
 
-	recordset, aErr := r.client.ScanPartitions( // this scan will read r.config.pageSize records.
-		scanPolicy,
-		pf,
+	set := r.config.setList[r.setIndex]
+
+	recordset, aErr := r.client.ScanPartitions(
+		r.scanPolicy,
+		r.pf,
 		r.config.namespace,
 		set,
 		r.config.binList...,
 	)
 	if aErr != nil {
 		r.config.scanLimiter.Release(1)
-
-		return false, 0, fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
+		return fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
 	}
 
 	r.logger.Debug("partition scan started",
 		slog.Uint64("transactionId", recordset.TaskId()),
 		slog.String("set", set),
-		slog.String("filter", printPartitionFilter(pf)),
+		slog.String("filter", printPartitionFilter(r.pf)),
 	)
 
-	// Set close recordset function.
 	closeRecordset := wrapCloser(r.recordsetCloser, recordset)
+	releaseSlot := sync.OnceFunc(func() { r.config.scanLimiter.Release(1) })
 
-	// Drain all results from this specific scan.
-	// No context checking here because it slows down the scan.
-	count, drainErr := r.drainResults(pfs, recordset, closeRecordset)
-
-	// Do not return an error immediately, because we need to perform some actions first.
-	closeErr := closeRecordset()
-
-	// Release the semaphore manually because of for loop.
-	r.config.scanLimiter.Release(1)
-
-	// If we broke out because of a connection error on the first record,
-	// we loop back to the top to restart the producer.
-	if drainErr != nil {
-		r.logger.Debug(
-			"database hasn't got enough resources, waiting for a signal",
-			slog.Any("drainErr", drainErr),
-			slog.Any("closeErr", closeErr),
-		)
-		r.config.throttler.Wait(r.ctx)
-
-		// Reset the partition filter to the state before the failed scan.
-		// We must copy into *pf rather than reassigning the pointer,
-		// because scanSet holds the struct that pf points to.
-		decoded, err := pfs.Decode()
-		if err != nil {
-			return false, 0, fmt.Errorf("failed to deserialize partition filter: %w", err)
-		}
-
-		*pf = *decoded
-
-		return true, 0, nil
+	r.mu.Lock()
+	r.active = &pageScan{
+		taskID:             recordset.TaskId(),
+		results:            recordset.Results(),
+		needsThrottleCheck: true,
+		pfs:                pfs,
+		count:              0,
+		close: func() error {
+			defer releaseSlot()
+			return closeRecordset()
+		},
 	}
+	r.mu.Unlock()
 
-	// Successfully drained all results, notify the throttler.
-	r.config.throttler.Notify(r.ctx)
-
-	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
-
-	return false, count, closeErr
+	return nil
 }
 
-// drainResults drains results, and if operation failed return error
-func (r *paginatedRecordReader) drainResults(
-	pfs models.PartitionFilterSerialized,
-	recordset *a.Recordset,
-	closeRecordset func() error,
-) (uint64, error) {
-	done := make(chan struct{})
-	defer close(done)
-
-	monitorContext[*pageRecord](r.ctx, r.logger, r.resultChan, done, closeRecordset)
-
-	// Check only the FIRST result for the specific connection error
-	// and only if the throttler is initialized.
-	first, ok := <-recordset.Results()
-	if !ok || shouldSkipPaginatedDrainError(first.Err) {
-		return 0, nil
+func (r *paginatedRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
+	active := r.getActive()
+	if active == nil {
+		return nil, false, fmt.Errorf("active scan has no results channel")
 	}
 
-	// Check if we should throttle.
-	if r.config.throttler != nil && shouldThrottle(first.Err) {
-		return 0, first.Err
+	select {
+	case <-ctx.Done():
+		r.cancel()
+		_ = r.closeActiveScan()
+
+		return nil, false, ctx.Err()
+	case <-r.ctx.Done():
+		_ = r.closeActiveScan()
+		return nil, false, r.ctx.Err()
+	case res, ok := <-active.results:
+		return res, ok, nil
 	}
-
-	r.resultChan <- newPageRecord(first, &pfs)
-
-	// Starting count from 1 as we processed first element
-	count := uint64(1)
-
-	// Drain all results from this specific scan.
-	// No context checking here because it slows down the scan.
-	for res := range recordset.Results() {
-		count++
-
-		if shouldSkipPaginatedDrainError(res.Err) {
-			continue
-		}
-
-		r.resultChan <- newPageRecord(res, &pfs)
-	}
-
-	return count, nil
 }
 
-// shouldSkipPaginatedDrainError used only for paginated drainer.
-// When reading the last page (containing 0 records),
-// the scan might return a types.INVALID_NODE_ERROR.
+func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, error) {
+	var doThrottleCheck bool
+
+	r.mu.Lock()
+
+	active := r.active
+	if active != nil && active.needsThrottleCheck {
+		doThrottleCheck = true
+		active.needsThrottleCheck = false
+	}
+	r.mu.Unlock()
+
+	if active == nil {
+		if err := r.ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		return nil, fmt.Errorf("no active scan while handling record result")
+	}
+
+	if res == nil {
+		return nil, fmt.Errorf("nil scan result")
+	}
+
+	if doThrottleCheck {
+		if r.config.throttler != nil && shouldThrottle(res.Err) {
+			r.logger.Debug("DB under pressure, throttling scan", slog.Any("drainErr", res.Err))
+
+			decoded, err := active.pfs.Decode()
+			if err != nil {
+				return nil, fmt.Errorf("failed to deserialize partition filter: %w", err)
+			}
+			r.pf = decoded
+
+			_ = r.closeActiveScan()
+			r.config.throttler.Wait(r.ctx)
+
+			return nil, nil
+		}
+	}
+
+	if res.Err != nil {
+		r.cancel()
+		_ = r.closeActiveScan()
+
+		return nil, fmt.Errorf("failed to read record: %w", res.Err)
+	}
+
+	r.mu.Lock()
+	if r.active != nil {
+		r.active.count++
+	}
+	r.mu.Unlock()
+
+	if r.config.rpsCollector != nil {
+		r.config.rpsCollector.Increment()
+	}
+
+	rec := models.Record{Record: res.Record}
+
+	return models.NewRecordToken(&rec, 0, &active.pfs), nil
+}
+
+func (r *paginatedRecordReader) finishActiveScan() error {
+	var taskID, count uint64
+
+	if active := r.getActive(); active != nil {
+		taskID = active.taskID
+		count = active.count
+	}
+
+	err := r.closeActiveScan()
+	if r.config.throttler != nil {
+		r.config.throttler.Notify(r.ctx)
+	}
+
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", taskID))
+
+	if count == 0 {
+		r.setIndex++
+		r.pf = nil
+	}
+
+	return err
+}
+
+func (r *paginatedRecordReader) closeActiveScan() error {
+	r.mu.Lock()
+
+	active := r.active
+	if active == nil {
+		r.mu.Unlock()
+		return nil
+	}
+
+	r.active = nil
+	closeFn := active.close
+	r.mu.Unlock()
+
+	return closeFn()
+}
+
 func shouldSkipPaginatedDrainError(err a.Error) bool {
 	if err != nil {
 		if err.Matches(types.INVALID_NODE_ERROR) {
@@ -317,42 +335,4 @@ func shouldSkipPaginatedDrainError(err a.Error) bool {
 	}
 
 	return false
-}
-
-// monitorContext checks context on a separate goroutine to avoid slowing down record reads.
-// When context is canceled, we drain all results from resultChan to avoid deadlock.
-func monitorContext[T any](
-	ctx context.Context,
-	logger *slog.Logger,
-	resultChan chan T,
-	done chan struct{},
-	closeRecordset func() error,
-) {
-	go func() {
-		select {
-		case <-ctx.Done():
-			// Close record set.
-			err := closeRecordset()
-			if err != nil {
-				logger.Error("failed to close recordset", slog.Any("error", err))
-			}
-
-			// Drain records to nowhere.
-			for {
-				select {
-				case _, ok := <-resultChan:
-					if !ok {
-						// Channel closed, safe to exit
-						return
-					}
-				case <-done:
-					// If we have already done, exit.
-					return
-				}
-			}
-		case <-done:
-			// If everything was OK, exit.
-			return
-		}
-	}()
 }

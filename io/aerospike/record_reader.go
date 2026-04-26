@@ -38,8 +38,8 @@ type scanner interface {
 	) (*a.Recordset, a.Error)
 }
 
-// RecordReader is an interface for reading Aerospike records.
-// implements pipe.Reader for a token.
+// RecordReader is an interface for reading Aerospike records. It is used as
+// [github.com/aerospike/backup-go/pipe.Reader] (with *models.Token as T).
 type RecordReader interface {
 	Read(ctx context.Context) (*models.Token, error)
 	Close()
@@ -57,8 +57,8 @@ type singleRecordReader struct {
 	setIndex        int
 	active          *singleScan
 	recordsetCloser RecordsetCloser
-	closeOnce       sync.Once
-	mu              sync.Mutex // active + closeActiveScan (Close vs Read)
+
+	mu sync.Mutex
 }
 
 // singleScan holds state for one active ScanPartitions call.
@@ -129,6 +129,13 @@ func newSingleRecordReader(
 	}
 }
 
+func (r *singleRecordReader) getActive() *singleScan {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.active
+}
+
 // Read returns the next record token, blocking until one is available.
 // It advances through setList automatically, returning io.EOF when all sets are exhausted.
 func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
@@ -167,22 +174,18 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 
 // ensureActiveScan starts a new scan if none is active, respecting context cancellation.
 func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
-	r.mu.Lock()
-	hasActive := r.active != nil
-	r.mu.Unlock()
-
-	if hasActive {
+	if r.getActive() != nil { // there is a healthy running scan
 		return nil
 	}
 
-	// Check both the caller's context and our own internal context.
-	select {
-	case <-ctx.Done():
+	// Fast path only: do not start scan if already canceled.
+	if err := ctx.Err(); err != nil {
 		r.cancel()
-		return ctx.Err()
-	case <-r.ctx.Done():
-		return r.ctx.Err()
-	default:
+		return err
+	}
+
+	if err := r.ctx.Err(); err != nil {
+		return err
 	}
 
 	return r.startNextScan()
@@ -190,16 +193,8 @@ func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
 
 // readResult blocks on the active scan's result channel, respecting context cancellation.
 func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
-	r.mu.Lock()
-	active := r.active
-
-	var results <-chan *a.Result
-	if active != nil {
-		results = active.results
-	}
-	r.mu.Unlock()
-
-	if results == nil {
+	active := r.getActive()
+	if active == nil {
 		return nil, false, fmt.Errorf("active scan has no results channel")
 	}
 
@@ -212,7 +207,7 @@ func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, e
 	case <-r.ctx.Done():
 		_ = r.closeActiveScan()
 		return nil, false, r.ctx.Err()
-	case res, ok := <-results:
+	case res, ok := <-active.results:
 		return res, ok, nil
 	}
 }
@@ -220,17 +215,18 @@ func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, e
 // handleResult processes one scan result. Returns nil token (no error) when the
 // scan was throttled and needs to be retried from the same set.
 func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) {
-	r.mu.Lock()
-	scan := r.active
-
 	var doThrottleCheck bool
-	if scan != nil && scan.needsThrottleCheck {
+
+	r.mu.Lock()
+
+	active := r.active
+	if active != nil && active.needsThrottleCheck {
 		doThrottleCheck = true
-		scan.needsThrottleCheck = false
+		active.needsThrottleCheck = false
 	}
 	r.mu.Unlock()
 
-	if scan == nil {
+	if active == nil {
 		if err := r.ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -271,13 +267,10 @@ func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) 
 
 // finishActiveScan closes the current scan, notifies the throttler, and advances setIndex.
 func (r *singleRecordReader) finishActiveScan() error {
-	r.mu.Lock()
-
 	var taskID uint64
-	if r.active != nil {
-		taskID = r.active.taskID
+	if active := r.getActive(); active != nil {
+		taskID = active.taskID
 	}
-	r.mu.Unlock()
 
 	err := r.closeActiveScan()
 	if r.config.throttler != nil {
@@ -290,18 +283,12 @@ func (r *singleRecordReader) finishActiveScan() error {
 	return err
 }
 
-// Close cancels the reader context and releases any active scan (recordset + scan slot).
-// It is safe to call more than once.
+// Close is a no-op.
 func (r *singleRecordReader) Close() {
-	r.closeOnce.Do(func() {
-		r.cancel()
-		_ = r.closeActiveScan()
-	})
 }
 
 func (r *singleRecordReader) startNextScan() error {
-	if r.setIndex >= len(r.config.setList) {
-		r.logger.Debug("all sets scanned, done")
+	if r.setIndex >= len(r.config.setList) { // all sets scanned, done.
 		return io.EOF
 	}
 
@@ -353,16 +340,16 @@ func (r *singleRecordReader) startNextScan() error {
 }
 
 // closeActiveScan closes the active scan's recordset.
-// r.active is set to nil *before* calling close to prevent any re-entrant close attempt.
 func (r *singleRecordReader) closeActiveScan() error {
 	r.mu.Lock()
-	if r.active == nil {
+
+	active := r.active
+	if active == nil {
 		r.mu.Unlock()
 		return nil
 	}
-
-	closeFn := r.active.close
-	r.active = nil // clear first — close may call back indirectly
+	r.active = nil
+	closeFn := active.close
 	r.mu.Unlock()
 
 	return closeFn()

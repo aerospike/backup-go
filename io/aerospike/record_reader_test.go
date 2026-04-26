@@ -555,55 +555,6 @@ func TestAerospikeRecordReaderCancelledContextClosesActiveScan(t *testing.T) {
 	require.Nil(t, v)
 }
 
-func TestAerospikeRecordReaderCloseStopsBlockedRead(t *testing.T) {
-	t.Parallel()
-
-	namespace := "test"
-	set := ""
-
-	recordset := &a.Recordset{}
-	results := make(chan *a.Result)
-	setFieldValue(recordset, "records", results)
-
-	mockScanner := mocks.NewMockscanner(t)
-	scanStarted := make(chan struct{})
-	mockScanner.EXPECT().ScanPartitions(newExpectedPolicy(), a.NewPartitionFilterByRange(0, 4096), namespace, set).
-		Run(func(*a.ScanPolicy, *a.PartitionFilter, string, string, ...string) {
-			close(scanStarted)
-		}).
-		Return(recordset, nil).Once()
-
-	ctx := t.Context()
-	closer := mocks.NewMockRecordsetCloser(t)
-	closer.EXPECT().Close(recordset).Return(nil).Once()
-	defer closer.AssertExpectations(t)
-
-	reader := NewRecordReader(
-		ctx,
-		mockScanner,
-		&RecordReaderConfig{
-			namespace:       namespace,
-			setList:         []string{set},
-			partitionFilter: a.NewPartitionFilterAll(),
-			scanPolicy:      &a.ScanPolicy{},
-			scanLimiter:     scanlimiter.Noop,
-			rpsCollector: metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond,
-				testMetricMessage, true),
-		},
-		slog.Default(),
-		closer,
-	)
-
-	go func() {
-		<-scanStarted
-		reader.Close()
-	}()
-
-	v, err := reader.Read(ctx)
-	require.ErrorIs(t, err, context.Canceled)
-	require.Nil(t, v)
-}
-
 func TestAerospikeRecordReaderReturnsCloseErrorOnScanFinish(t *testing.T) {
 	t.Parallel()
 

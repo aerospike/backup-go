@@ -223,7 +223,7 @@ type s3Writer struct {
 
 	pipeWriter *io.PipeWriter
 	uploadDone chan error
-	uploadErr  atomic.Value // stores error; only non-nil after upload finishes
+	uploadErr  atomic.Pointer[error] // terminal upload error; set after uploadDone is drained
 	closed     atomic.Bool
 }
 
@@ -237,8 +237,8 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, os.ErrClosed
 	}
 
-	if err := w.uploadErr.Load(); err != nil {
-		return 0, err.(error)
+	if err := w.loadUploadErr(); err != nil {
+		return 0, err
 	}
 
 	if len(p) == 0 {
@@ -285,8 +285,8 @@ func (w *s3Writer) Close() error {
 }
 
 func (w *s3Writer) loadUploadErr() error {
-	if err := w.uploadErr.Load(); err != nil {
-		return err.(error)
+	if p := w.uploadErr.Load(); p != nil {
+		return *p
 	}
 
 	return nil
@@ -297,7 +297,15 @@ func (w *s3Writer) setUploadErr(err error) {
 		return
 	}
 
-	w.uploadErr.CompareAndSwap(nil, err)
+	for {
+		if w.uploadErr.Load() != nil {
+			return
+		}
+		e := err
+		if w.uploadErr.CompareAndSwap(nil, &e) {
+			return
+		}
+	}
 }
 
 // tryCollectUploadResult receives the upload outcome if it is already available; otherwise it is a no-op.

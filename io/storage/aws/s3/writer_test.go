@@ -1669,7 +1669,7 @@ func TestWriter_Remove_NullKey(t *testing.T) {
 		Once()
 
 	mockClient.EXPECT().
-		DeleteObjects(mock.Anything, mock.Anything, mock.Anything).
+		DeleteObjects(mock.Anything, mock.Anything).
 		Return(&s3.DeleteObjectsOutput{}, nil).
 		Once()
 

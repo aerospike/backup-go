@@ -70,7 +70,7 @@ func TestNewDownloadReader(t *testing.T) {
 		}, nil)
 
 		tm := newTestTransferManager(clientMock)
-		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key, 0)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -95,7 +95,7 @@ func TestNewDownloadReader(t *testing.T) {
 		}, nil)
 
 		tm := newTestTransferManager(clientMock)
-		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key, 0)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -116,7 +116,7 @@ func TestNewDownloadReader(t *testing.T) {
 		}, nil)
 
 		tm := newTestTransferManager(clientMock)
-		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key, 0)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -136,7 +136,7 @@ func TestNewDownloadReader(t *testing.T) {
 		}, nil)
 
 		tm := newTestTransferManager(clientMock)
-		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key, 0)
 
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -153,7 +153,7 @@ func TestNewDownloadReader(t *testing.T) {
 		}).Return(nil, errS3Test)
 
 		tm := newTestTransferManager(clientMock)
-		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key)
+		reader, err := newDownloadReader(ctx, clientMock, tm, bucket, key, 0)
 
 		require.ErrorIs(t, err, errS3Test)
 		require.Contains(t, err.Error(), "failed to get head")

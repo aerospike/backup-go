@@ -190,11 +190,14 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}
 
 	go func() {
-		defer pr.Close()
+		defer func() {
+			_ = pr.Close()
+		}()
 
 		_, uploadErr := w.uploader.UploadObject(ctx, uploadInput)
 		if uploadErr != nil {
-			pw.CloseWithError(uploadErr) // Unblocks Write() immediately
+			// Unblocks Write() immediately if upload fails while caller is still writing.
+			_ = pw.CloseWithError(uploadErr)
 		}
 
 		s3w.uploadDone <- uploadErr

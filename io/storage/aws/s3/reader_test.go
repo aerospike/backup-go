@@ -837,7 +837,7 @@ func (s *AwsSuite) TestReaderWriter_RoundTripLargeFilesParallel() {
 			s.Require().NoError(err)
 		case file, ok := <-rCH:
 			if !ok {
-				s.Require().Equal(len(filesToUpload), len(received))
+				s.Require().Len(received, len(filesToUpload))
 				for fileName, expectedData := range expected {
 					actualData, ok := received[fileName]
 					s.Require().True(ok, "downloaded file %s was not found", fileName)

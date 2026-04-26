@@ -60,6 +60,8 @@ type Reader struct {
 
 	// downloader performs parallel ranged downloads for full-object reads.
 	downloader *transfermanager.Client
+	// downloadPartBodyMaxRetries controls retries for failed part body reads in transfer manager.
+	downloadPartBodyMaxRetries int
 
 	// bucketName contains the name of the bucket to read from.
 	bucketName string
@@ -124,11 +126,16 @@ func NewReader(
 	if downloadConcurrency <= 0 {
 		downloadConcurrency = 1
 	}
+
+	if r.RetryPolicy != nil {
+		r.downloadPartBodyMaxRetries = int(r.RetryPolicy.MaxRetries)
+	}
 	r.downloader = transfermanager.New(client, func(o *transfermanager.Options) {
 		o.PartSizeBytes = partSize
 		o.Concurrency = downloadConcurrency
 		o.GetObjectType = tmtypes.GetObjectRanges
 		o.DisableChecksumValidation = true
+		o.PartBodyMaxRetries = r.downloadPartBodyMaxRetries
 	})
 
 	if r.IsDir && !r.SkipDirCheck {
@@ -277,7 +284,9 @@ func (r *Reader) openObject(
 		return
 	}
 
-	rReader, err := newDownloadReader(ctx, r.client, r.downloader, &r.bucketName, &path)
+	rReader, err := newDownloadReader(
+		ctx, r.client, r.downloader, &r.bucketName, &path, r.downloadPartBodyMaxRetries,
+	)
 	if err != nil {
 		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare download reader %s: %w", path, err))
 		return

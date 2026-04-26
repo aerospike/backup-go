@@ -38,6 +38,8 @@ type downloadReader struct {
 	key    *string
 	etag   *string
 	size   int64
+	// partBodyMaxRetries controls transfer-manager retries for failed part body reads.
+	partBodyMaxRetries int
 }
 
 // newDownloadReader performs a HeadObject to capture size and ETag, then serves
@@ -48,6 +50,7 @@ func newDownloadReader(
 	client Client,
 	tm *transfermanager.Client,
 	bucket, key *string,
+	partBodyMaxRetries int,
 ) (*downloadReader, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key is nil")
@@ -71,12 +74,13 @@ func newDownloadReader(
 	}
 
 	return &downloadReader{
-		client: client,
-		tm:     tm,
-		bucket: bucket,
-		key:    key,
-		etag:   head.ETag,
-		size:   size,
+		client:             client,
+		tm:                 tm,
+		bucket:             bucket,
+		key:                key,
+		etag:               head.ETag,
+		size:               size,
+		partBodyMaxRetries: partBodyMaxRetries,
 	}, nil
 }
 
@@ -88,6 +92,8 @@ func (r *downloadReader) OpenRange(ctx context.Context, offset, count int64) (io
 			Bucket:  r.bucket,
 			Key:     r.key,
 			IfMatch: r.etag,
+		}, func(o *transfermanager.Options) {
+			o.PartBodyMaxRetries = r.partBodyMaxRetries
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get object %s: %w", *r.key, err)

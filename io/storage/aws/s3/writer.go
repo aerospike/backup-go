@@ -88,6 +88,7 @@ func NewWriter(
 	if w.ChunkSize == 0 {
 		w.ChunkSize = s3DefaultChunkSize
 	}
+
 	if w.UploadConcurrency > 0 {
 		w.bufferPool = collections.NewByteBufferPool(w.ChunkSize)
 	}
@@ -261,6 +262,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 	for len(p) > 0 {
 		if w.buffer.Len() >= w.chunkSize {
 			w.flushCurrentBuffer()
+
 			if w.bufferPool != nil {
 				w.buffer = w.bufferPool.Get()
 			}
@@ -283,6 +285,7 @@ func (w *s3Writer) flushCurrentBuffer() {
 	if !w.isAsyncUpload() {
 		w.uploadPart(w.buffer.Bytes(), partNumber)
 		w.buffer.Reset()
+
 		return
 	}
 

@@ -57,8 +57,6 @@ type singleRecordReader struct {
 	setIndex        int
 	active          *singleScan
 	recordsetCloser RecordsetCloser
-
-	mu sync.Mutex
 }
 
 // singleScan holds state for one active ScanPartitions call.
@@ -129,13 +127,6 @@ func newSingleRecordReader(
 	}
 }
 
-func (r *singleRecordReader) getActive() *singleScan {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.active
-}
-
 // Read returns the next record token, blocking until one is available.
 // It advances through setList automatically, returning io.EOF when all sets are exhausted.
 func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
@@ -174,7 +165,7 @@ func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
 
 // ensureActiveScan starts a new scan if none is active, respecting context cancellation.
 func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
-	if r.getActive() != nil { // there is a healthy running scan
+	if r.active != nil { // there is a healthy running scan
 		return nil
 	}
 
@@ -192,21 +183,21 @@ func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
 }
 
 // readResult blocks on the active scan's result channel, respecting context cancellation.
-func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
-	active := r.getActive()
+func (r *singleRecordReader) readResult(_ context.Context) (*a.Result, bool, error) {
+	active := r.active
 	if active == nil {
 		return nil, false, fmt.Errorf("active scan has no results channel")
 	}
 
 	select {
-	case <-ctx.Done():
-		r.cancel()
-		_ = r.closeActiveScan()
-
-		return nil, false, ctx.Err()
-	case <-r.ctx.Done():
-		_ = r.closeActiveScan()
-		return nil, false, r.ctx.Err()
+	//case <-ctx.Done():
+	//	r.cancel()
+	//	_ = r.closeActiveScan()
+	//
+	//	return nil, false, ctx.Err()
+	//case <-r.ctx.Done():
+	//	_ = r.closeActiveScan()
+	//	return nil, false, r.ctx.Err()
 	case res, ok := <-active.results:
 		return res, ok, nil
 	}
@@ -217,15 +208,11 @@ func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, e
 func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) {
 	var doThrottleCheck bool
 
-	r.mu.Lock()
-
 	active := r.active
 	if active != nil && active.needsThrottleCheck {
 		doThrottleCheck = true
 		active.needsThrottleCheck = false
 	}
-	r.mu.Unlock()
-
 	if active == nil {
 		if err := r.ctx.Err(); err != nil {
 			return nil, err
@@ -268,7 +255,7 @@ func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) 
 // finishActiveScan closes the current scan, notifies the throttler, and advances setIndex.
 func (r *singleRecordReader) finishActiveScan() error {
 	var taskID uint64
-	if active := r.getActive(); active != nil {
+	if active := r.active; active != nil {
 		taskID = active.taskID
 	}
 
@@ -324,7 +311,6 @@ func (r *singleRecordReader) startNextScan() error {
 	closeRecordset := wrapCloser(r.recordsetCloser, recordset)
 	releaseSlot := sync.OnceFunc(func() { r.config.scanLimiter.Release(1) })
 
-	r.mu.Lock()
 	r.active = &singleScan{
 		taskID:             recordset.TaskId(),
 		results:            recordset.Results(),
@@ -334,23 +320,18 @@ func (r *singleRecordReader) startNextScan() error {
 			return closeRecordset()
 		},
 	}
-	r.mu.Unlock()
 
 	return nil
 }
 
 // closeActiveScan closes the active scan's recordset.
 func (r *singleRecordReader) closeActiveScan() error {
-	r.mu.Lock()
-
 	active := r.active
 	if active == nil {
-		r.mu.Unlock()
 		return nil
 	}
 	r.active = nil
 	closeFn := active.close
-	r.mu.Unlock()
 
 	return closeFn()
 }

@@ -225,7 +225,7 @@ type s3Writer struct {
 
 var _ io.WriteCloser = (*s3Writer)(nil)
 
-func (w *s3Writer) firstUploadErr() error {
+func (w *s3Writer) getUploadErr() error {
 	if p := w.uploadErr.Load(); p != nil {
 		return *p
 	}
@@ -245,7 +245,7 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, os.ErrClosed
 	}
 
-	if err := w.firstUploadErr(); err != nil {
+	if err := w.getUploadErr(); err != nil {
 		return 0, err
 	}
 
@@ -253,21 +253,12 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		return 0, nil
 	}
 
-	if w.buffer == nil {
-		if w.bufferPool != nil {
-			w.buffer = w.bufferPool.Get()
-		} else {
-			w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
-		}
-	}
+	w.prepareBuffer()
 
-	// Buffer Promotion. If we have a small buffer, grow it.
-	if w.buffer.Cap() < w.chunkSize {
-		// This ensures that after this call, Cap >= chunkSize
-		w.buffer.Grow(w.chunkSize - w.buffer.Len())
-	}
+	return w.writeToBuf(p), nil
+}
 
-	// 3. The Write Loop
+func (w *s3Writer) writeToBuf(p []byte) int {
 	written := 0
 
 	for len(p) > 0 {
@@ -287,7 +278,24 @@ func (w *s3Writer) Write(p []byte) (int, error) {
 		p = p[n:]
 	}
 
-	return written, nil
+	return written
+}
+
+// prepareBuffer allocates new buffer or gets one from pool.
+func (w *s3Writer) prepareBuffer() {
+	if w.buffer == nil {
+		if w.bufferPool != nil {
+			w.buffer = w.bufferPool.Get()
+		} else {
+			w.buffer = bytes.NewBuffer(make([]byte, 0, w.chunkSize))
+		}
+	}
+
+	// Buffer Promotion. If we have a small buffer, grow it.
+	if w.buffer.Cap() < w.chunkSize {
+		// This ensures that after this call, Cap >= chunkSize
+		w.buffer.Grow(w.chunkSize - w.buffer.Len())
+	}
 }
 
 func (w *s3Writer) flushCurrentBuffer() {
@@ -381,7 +389,7 @@ func (w *s3Writer) Close() error {
 	// Wait for all workers to finish.
 	w.workersPool.Wait()
 
-	if err := w.firstUploadErr(); err != nil {
+	if err := w.getUploadErr(); err != nil {
 		w.abortUpload()
 
 		return err

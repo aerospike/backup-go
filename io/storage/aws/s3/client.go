@@ -42,6 +42,9 @@ type Client interface {
 	// DeleteObject removes an object from a bucket.
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options),
 	) (*s3.DeleteObjectOutput, error)
+	// DeleteObjects batch delete objects from a bucket.
+	DeleteObjects(ctx context.Context, params *s3.DeleteObjectsInput, optFns ...func(*s3.Options),
+	) (*s3.DeleteObjectsOutput, error)
 	// HeadBucket checks if a bucket exists and you have permission to access it.
 	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options),
 	) (*s3.HeadBucketOutput, error)

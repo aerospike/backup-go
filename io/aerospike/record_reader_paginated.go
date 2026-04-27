@@ -33,7 +33,7 @@ type paginatedRecordReader struct {
 	client          scanner
 	logger          *slog.Logger
 	config          *RecordReaderConfig
-	scanPolicy      *a.ScanPolicy
+	scanPolicy      *a.ScanPolicy // required; must not be nil
 	setIndex        int
 	pf              *a.PartitionFilter // current active filter for the set
 	active          *pageScan

@@ -53,7 +53,7 @@ type singleRecordReader struct {
 	client          scanner
 	logger          *slog.Logger
 	config          *RecordReaderConfig
-	scanPolicy      *a.ScanPolicy
+	scanPolicy      *a.ScanPolicy // required; must not be nil
 	setIndex        int
 	active          *singleScan
 	recordsetCloser RecordsetCloser
@@ -305,8 +305,8 @@ func (r *singleRecordReader) startNextScan() error {
 	if err != nil {
 		r.config.scanLimiter.Release(1)
 
-		return fmt.Errorf("failed to start scan for set %q namespace %q partitions %d-%d: %w",
-			set, r.config.namespace, pf.Begin, pf.Count, err)
+		return fmt.Errorf("failed to start scan for set %q namespace %q filter %s: %w",
+			set, r.config.namespace, printPartitionFilter(&pf), err)
 	}
 
 	r.logger.Debug("partition scan started",

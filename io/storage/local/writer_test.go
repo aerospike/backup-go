@@ -115,6 +115,48 @@ func TestNewWriter_WithDir_NonExistent(t *testing.T) {
 	require.True(t, w.IsDir)
 }
 
+func TestWriter_NewWriter_WithDir_DevNull(t *testing.T) {
+	t.Parallel()
+
+	w := &Writer{
+		Options: options.Options{
+			PathList: []string{os.DevNull},
+			IsDir:    true,
+		},
+	}
+
+	writer, err := w.NewWriter(t.Context(), testFileName)
+	require.NoError(t, err)
+
+	n, err := writer.Write([]byte("test data"))
+	require.NoError(t, err)
+	require.Equal(t, len("test data"), n)
+
+	err = writer.Close()
+	require.NoError(t, err)
+}
+
+func TestWriter_NewWriter_WithFile_DevNull(t *testing.T) {
+	t.Parallel()
+
+	w := &Writer{
+		Options: options.Options{
+			PathList: []string{os.DevNull},
+			IsDir:    false,
+		},
+	}
+
+	writer, err := w.NewWriter(t.Context(), "")
+	require.NoError(t, err)
+
+	n, err := writer.Write([]byte("test data"))
+	require.NoError(t, err)
+	require.Equal(t, len("test data"), n)
+
+	err = writer.Close()
+	require.NoError(t, err)
+}
+
 func TestNewWriter_WithDir_Empty(t *testing.T) {
 	t.Parallel()
 	tmpDir := path.Join(t.TempDir(), "TestNewWriter_WithDir_Empty")

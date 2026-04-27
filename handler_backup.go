@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -308,6 +309,8 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 	// Timestamp processor.
 	tsProcessor := processors.NewVoidTimeSetter[*models.Token](bh.logger)
 
+	var buf bytes.Buffer
+
 	for {
 		t, err := recordReader.Read(ctx)
 		if err != nil {
@@ -323,13 +326,14 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 			return nil, nil, fmt.Errorf("failed to process token: %w", err)
 		}
 
-		data, err := bh.encoder.EncodeToken(t)
-		if err != nil {
+		buf.Reset()
+
+		if err := bh.encoder.EncodeToken(t, &buf); err != nil {
 			return nil, nil, fmt.Errorf("failed to encode token: %w", err)
 		}
 
-		samples = append(samples, float64(len(data)))
-		samplesData = append(samplesData, data...)
+		samples = append(samples, float64(buf.Len()))
+		samplesData = append(samplesData, buf.Bytes()...)
 	}
 
 	return samples, samplesData, nil

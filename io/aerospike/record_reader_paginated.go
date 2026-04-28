@@ -63,7 +63,7 @@ func newPaginatedRecordReader(
 	closer RecordsetCloser,
 	cancel context.CancelFunc,
 ) *paginatedRecordReader {
-	logger.Debug("created new paginated aerospike record reader", cfg.logAttrs()...)
+	logger.Debug("created new paginated Aerospike record reader", cfg.logAttrs()...)
 
 	scanPolicy := *cfg.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, cfg.timeBounds, cfg.noTTLOnly)

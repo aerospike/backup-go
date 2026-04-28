@@ -184,15 +184,14 @@ func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
 
 // readResult blocks on the active scan's result channel, respecting context cancellation.
 func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
-	active := r.active
-	if active == nil {
+	if r.active == nil {
 		return nil, false, fmt.Errorf("active scan has no results channel")
 	}
 
 	// Fast path: if a result is immediately available, return it without
 	// checking context. This avoids expensive select setup on the hot path.
 	select {
-	case res, ok := <-active.results:
+	case res, ok := <-r.active.results:
 		return res, ok, nil
 	default:
 	}
@@ -207,7 +206,7 @@ func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, e
 	case <-r.ctx.Done():
 		_ = r.closeActiveScan()
 		return nil, false, r.ctx.Err()
-	case res, ok := <-active.results:
+	case res, ok := <-r.active.results:
 		return res, ok, nil
 	}
 }
@@ -344,10 +343,7 @@ func (r *singleRecordReader) closeActiveScan() error {
 }
 
 func newScanPolicy(cfg *RecordReaderConfig) *a.ScanPolicy {
-	var scanPolicy a.ScanPolicy
-	if cfg.scanPolicy != nil {
-		scanPolicy = *cfg.scanPolicy
-	}
+	scanPolicy := *cfg.scanPolicy
 	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, cfg.timeBounds, cfg.noTTLOnly)
 
 	return &scanPolicy

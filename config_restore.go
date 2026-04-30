@@ -93,8 +93,6 @@ type ConfigRestore struct {
 	// ApplyMetadataLast defines when to restore metadata (secondary indexes and UDFs).
 	// If set to true, metadata will be restored after all records have been processed.
 	ApplyMetadataLast bool
-	// DynamicScaling indicates whether restore should use dynamic scaling for parallelism.
-	DynamicScaling bool
 	// IgnoreUnknownFields indicates whether restore should ignore unknown to decoder fields.
 	// Will be used for backward compatibility, to ignore unknown fields in the future.
 	IgnoreUnknownFields bool

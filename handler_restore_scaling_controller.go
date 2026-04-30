@@ -72,8 +72,8 @@ func newRestoreScalingController[T models.TokenConstraint](
 }
 
 func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T]) {
-	c.logger.Debug("starting scaling controller")
-	defer c.logger.Debug("stopping scaling controller")
+	c.logger.Info("starting scaling controller")
+	defer c.logger.Info("stopping scaling controller")
 
 	ticker := time.NewTicker(scalingInterval)
 	defer ticker.Stop()

@@ -253,7 +253,7 @@ func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe
 	// Assign, so we can get pl stats.
 	rh.pl.Store(pl)
 
-	if rh.config.DynamicScaling && rh.config.EncoderType == EncoderTypeASB {
+	if rh.config.EncoderType == EncoderTypeASB {
 		controller := newRestoreScalingController[T](rh, &rh.dynamicBatchSize)
 		rh.wg.Go(func() {
 			controller.run(ctx, pl)

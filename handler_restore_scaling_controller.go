@@ -57,7 +57,10 @@ type restoreScalingController[T models.TokenConstraint] struct {
 	batchStep     int32
 	direction     int32 // 1 for increasing, -1 for decreasing
 
-	cooldownTicks int
+	cooldownTicks      int
+	batchSizeOptimized bool
+	stopAddingWorkers  bool
+	lastActionKBPS     float64
 }
 
 func newRestoreScalingController[T models.TokenConstraint](
@@ -66,13 +69,16 @@ func newRestoreScalingController[T models.TokenConstraint](
 ) *restoreScalingController[T] {
 	initialBatchSize := dynamicBatchSize.Load()
 	return &restoreScalingController[T]{
-		rh:               rh,
-		logger:           rh.logger,
-		dynamicBatchSize: dynamicBatchSize,
-		bestBatchSize:    initialBatchSize,
-		bestKBPS:         0,
-		batchStep:        32, // Start with a reasonable step size
-		direction:        1,  // Start by increasing
+		rh:                 rh,
+		logger:             rh.logger,
+		dynamicBatchSize:   dynamicBatchSize,
+		bestBatchSize:      initialBatchSize,
+		bestKBPS:           0,
+		batchStep:          32, // Start with a reasonable step size
+		direction:          1,  // Start by increasing
+		batchSizeOptimized: false,
+		stopAddingWorkers:  false,
+		lastActionKBPS:     0,
 	}
 }
 
@@ -120,7 +126,11 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 				if err := pl.AddReader(ctx, reader); err != nil {
 					c.logger.Error("failed to add reader", slog.Any("error", err))
 				}
-				c.cooldownTicks = 1 // Wait 1 tick for the new worker to ramp up
+				c.cooldownTicks = 2 // Wait 2 ticks for the new worker to ramp up
+				c.batchSizeOptimized = false
+				c.lastActionKBPS = c.emaKBPS
+				c.bestKBPS = c.emaKBPS
+				c.batchStep = 32
 
 			case actionAddWriter:
 				c.logger.Info("dynamic scaling: adding writer",
@@ -132,7 +142,11 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 				} else if err := pl.AddWriter(ctx, writer); err != nil {
 					c.logger.Error("failed to add writer", slog.Any("error", err))
 				}
-				c.cooldownTicks = 1
+				c.cooldownTicks = 2
+				c.batchSizeOptimized = false
+				c.lastActionKBPS = c.emaKBPS
+				c.bestKBPS = c.emaKBPS
+				c.batchStep = 32
 
 			case actionAdjustBatchSize:
 				currentBatchSize := c.dynamicBatchSize.Load()
@@ -146,8 +160,11 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 				} else {
 					// Performance dropped. Reverse direction and reduce step size to fine-tune.
 					c.direction *= -1
-					if c.batchStep > 1 {
+					if c.batchStep > 2 {
 						c.batchStep /= 2
+					} else {
+						// Step size is minimal, we found the local peak.
+						c.batchSizeOptimized = true
 					}
 				}
 
@@ -192,34 +209,49 @@ func (c *restoreScalingController[T]) decideScaling(
 	emaKBPS float64,
 	lastAction scalingAction,
 ) scalingAction {
+	// 1. Check if previous worker addition was successful
+	if lastAction == actionAddReader || lastAction == actionAddWriter {
+		// We expect at least a 2% increase in EMA after adding a worker.
+		if emaKBPS <= c.lastActionKBPS*1.02 {
+			c.logger.Info("dynamic scaling: worker addition did not improve throughput significantly, pausing worker scaling")
+			c.stopAddingWorkers = true
+		}
+	}
+
 	avgQueueDepth := m.AverageQueueDepth
 
-	// 1. Identify bottleneck based on average queue depth
+	// 2. Identify bottleneck based on average queue depth
 	// Low queue depth -> pipeline is starved, need more readers
 	if avgQueueDepth < lowQueueThreshold {
-		return actionAddReader
+		if !c.stopAddingWorkers && c.batchSizeOptimized {
+			return actionAddReader
+		}
+		return actionAdjustBatchSize
 	}
 
 	// High queue depth -> pipeline is backed up, need more consumers
 	if avgQueueDepth > highQueueThreshold {
-		// Try adjusting batch size first as it's cheaper than adding a new writer.
-		if lastAction != actionAdjustBatchSize {
-			return actionAdjustBatchSize
+		if !c.stopAddingWorkers && c.batchSizeOptimized {
+			return actionAddWriter
 		}
-		return actionAddWriter
+		return actionAdjustBatchSize
 	}
 
-	// 2. Queue depth is in acceptable range - use individual queue balance to identify the bottleneck.
+	// 3. Queue depth is in acceptable range - use individual queue balance to identify the bottleneck.
 	// If read queue is significantly smaller, readers are the bottleneck.
 	if m.PipelineReadQueueSize < m.PipelineWriteQueueSize/2 {
-		return actionAddReader
+		if !c.stopAddingWorkers && c.batchSizeOptimized {
+			return actionAddReader
+		}
 	}
 	// If write queue is significantly smaller, writers are the bottleneck.
 	if m.PipelineWriteQueueSize < m.PipelineReadQueueSize/2 {
-		return actionAddWriter
+		if !c.stopAddingWorkers && c.batchSizeOptimized {
+			return actionAddWriter
+		}
 	}
 
-	// 3. Queues are balanced - prioritize batch size optimization (hill climbing).
+	// 4. Queues are balanced or workers are maxed - prioritize batch size optimization (hill climbing).
 	// Batch size can always be tweaked for potential performance gains without adding new workers.
 	return actionAdjustBatchSize
 }

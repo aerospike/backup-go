@@ -25,10 +25,10 @@ import (
 )
 
 const (
-	scalingInterval = 10 * time.Second
+	scalingInterval = 5 * time.Second
 	// Thresholds for average queue depth (read + write queue lengths)
 	lowQueueThreshold  = 10
-	highQueueThreshold = 200
+	highQueueThreshold = 1000
 
 	maxBatchSizeThreshold = 1024
 	minBatchSizeThreshold = 1

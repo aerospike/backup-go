@@ -127,6 +127,7 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 			// Decide what to do based on the stable windowKBPS
 			action := c.decideScaling(m, windowKBPS, lastAction)
 
+		executeAction:
 			switch action {
 			case actionAddReader:
 				c.logger.Info("dynamic scaling: adding reader",
@@ -180,7 +181,10 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 							slog.Int("best_batch_size", int(c.bestBatchSize)),
 							slog.Float64("best_kbps", c.bestKBPS))
 
-						continue // Go immediately to next interval without recording this as an action
+						// Force immediate evaluation of worker scaling on this exact tick
+						action = c.decideScaling(m, windowKBPS, lastAction)
+						// Ensure we process the new action immediately instead of skipping
+						goto executeAction
 					}
 				}
 
@@ -207,7 +211,6 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 				} else {
 					action = actionNone
 				}
-
 			case actionNone:
 				// do nothing
 			}

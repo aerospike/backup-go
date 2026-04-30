@@ -27,10 +27,9 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 )
 
-// recordReaderProcessorXDR configures and creates record readers pipelines.
+// recordReaderProcessor configures and creates record readers pipelines.
 type recordReaderProcessor[T models.TokenConstraint] struct {
-	config *ConfigBackup
-	// add scanConfig in the future.
+	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 	infoClient      InfoGetter
 	state           *State
@@ -41,7 +40,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 	logger *slog.Logger
 }
 
-// newRecordReaderProcessorXDR returns a new record reader processor.
+// newRecordReaderProcessor returns a new record reader processor.
 func newRecordReaderProcessor[T models.TokenConstraint](
 	config *ConfigBackup,
 	aerospikeClient AerospikeClient,

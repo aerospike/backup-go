@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	scalingInterval = 5 * time.Second
+	scalingInterval = 1 * time.Second
 	// Thresholds for average queue depth (read + write queue lengths)
 	lowQueueThreshold  = 10
 	highQueueThreshold = 1000
@@ -72,10 +72,10 @@ func newRestoreScalingController[T models.TokenConstraint](
 		dynamicBatchSize:   dynamicBatchSize,
 		bestBatchSize:      initialBatchSize,
 		bestKBPS:           0,
-		batchStep:          32,                    // Start with a reasonable step size
+		batchStep:          64,                    // Start with a larger step size to find peak faster
 		direction:          1,                     // Start by increasing
-		kbpsWindow:         make([]float64, 0, 3), // 3 ticks = 15 seconds
-		windowSize:         3,
+		kbpsWindow:         make([]float64, 0, 5), // 5 ticks = 5 seconds
+		windowSize:         5,
 		batchSizeOptimized: false,
 		stopAddingWorkers:  false,
 		lastActionKBPS:     0,
@@ -99,6 +99,11 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 			m := c.rh.GetMetrics()
 			if m == nil {
 				continue
+			}
+
+			// Initialize kbpsWindow array here if it's the first time
+			if len(c.kbpsWindow) == 0 {
+				c.kbpsWindow = make([]float64, 0, c.windowSize)
 			}
 
 			currentKBPS := float64(m.AverageKilobytesPerSecond)
@@ -152,12 +157,13 @@ func (c *restoreScalingController[T]) run(ctx context.Context, pl *pipe.Pipe[T])
 					// First evaluation
 					c.bestKBPS = windowKBPS
 					c.bestBatchSize = currentBatchSize
-				} else if windowKBPS > c.bestKBPS {
-					// Improved! Keep going in the same direction.
+				} else if windowKBPS > c.bestKBPS*1.01 {
+					// Improved by at least 1%! Keep going in the same direction.
 					c.bestKBPS = windowKBPS
 					c.bestBatchSize = currentBatchSize
 				} else {
-					// Performance dropped. Reverse direction and reduce step size to fine-tune.
+					// Performance dropped or didn't improve by 1%.
+					// Reverse direction and reduce step size to fine-tune.
 					c.direction *= -1
 					if c.batchStep > 2 {
 						c.batchStep /= 2

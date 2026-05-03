@@ -1802,17 +1802,7 @@ func base64EncodeNative(v []byte) []byte {
 	encodedLen := base64.StdEncoding.EncodedLen(len(v))
 
 	// Get a buffer from the pool
-	bufInterface := base64BufferPool.Get()
-	buf := bufInterface.([]byte)
-
-	// Ensure the buffer is large enough
-	if cap(buf) < encodedLen {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, encodedLen)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:encodedLen]
-	}
+	buf := getBuffer(encodedLen)
 
 	// Encode the data
 	base64.StdEncoding.Encode(buf, v)
@@ -1841,7 +1831,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 				if len(encoded) == 0 {
 					b.Fatal("encoded data is empty")
 				}
-				returnBase64Buffer(encoded)
+				putBuffer(encoded)
 			}
 		})
 
@@ -1861,7 +1851,7 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 				if len(encoded) == 0 {
 					b.Fatal("encoded data is empty")
 				}
-				returnBase64Buffer(encoded)
+				putBuffer(encoded)
 			}
 		})
 	}

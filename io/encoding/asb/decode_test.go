@@ -2208,7 +2208,7 @@ func Test_readBase64BytesDelimited(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("_readBase64BytesDelimited() = %v, want %v", got, tt.want)
 			}
-			returnBase64Buffer(got)
+			putBuffer(got)
 		})
 	}
 }
@@ -2278,7 +2278,7 @@ func Test_readBase64BytesSized(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("_readBase64BytesSized() = %v, want %v", got, tt.want)
 			}
-			returnBase64Buffer(got)
+			putBuffer(got)
 		})
 	}
 }
@@ -2874,7 +2874,7 @@ func Test_readNBytes(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("_readNBytes() = %v, want %v", got, tt.want)
 			}
-			returnBigBuffer(got)
+			putBuffer(got)
 		})
 	}
 }
@@ -3610,7 +3610,7 @@ func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
 			Bins: a.BinMap{
 				"bool_bin":   true,
 				"int_bin":    int64(42),
-				"float_bin":  float64(3.14),
+				"float_bin":  3.14,
 				"string_bin": "hello",
 				"bytes_bin":  []byte("bytes"),
 				"hll_bin":    a.HLLValue("hll-value"),

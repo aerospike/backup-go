@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"slices"
 	"strconv"
 	"sync"
 
@@ -37,72 +36,48 @@ var errInvalidToken = errors.New("invalid token")
 // The following sync.Pool instances provide optimized memory reuse
 // for byte slices of varying capacities.
 var (
-	// bigBufPool is a pool of big byte slices used for decoding.
-	bigBufPool = sync.Pool{
+	// bufPool is a unified pool for byte slices.
+	bufPool = sync.Pool{
 		New: func() any {
-			return make([]byte, 0, 512)
-		},
-	}
-	// smallBufPool is a pool of small byte slices used for decoding.
-	smallBufPool = sync.Pool{
-		New: func() any {
-			return make([]byte, 0, 64)
-		},
-	}
-	// base64BufferPool is a pool of byte slices used for base64 encoding
-	base64BufferPool = sync.Pool{
-		New: func() any {
-			// The buffer size is arbitrary and will be grown if needed
-			return make([]byte, 0, 1024)
+			b := make([]byte, 0, 512)
+			return &b
 		},
 	}
 )
 
+func getBuffer(size int) []byte {
+	bufPtr := bufPool.Get().(*[]byte)
+
+	buf := *bufPtr
+	if cap(buf) < size {
+		buf = make([]byte, size)
+	} else {
+		buf = buf[:size]
+	}
+
+	return buf
+}
+
+func putBuffer(buf []byte) {
+
+	buf = buf[:0]
+	bufPool.Put(&buf)
+}
+
 // base64Encode encodes the input bytes using base64 encoding.
 // It returns a slice that references a pooled buffer, which must be returned to the pool
-// after use by calling returnBase64Buffer.
+// after use by calling putBuffer.
 func base64Encode(v []byte) []byte {
 	encodedLen := base64.StdEncoding.EncodedLen(len(v))
 
 	// Get a buffer from the pool
-	buf := base64BufferPool.Get().([]byte)
-
-	// Ensure the buffer is large enough
-	if cap(buf) < encodedLen {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, encodedLen)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:encodedLen]
-	}
+	buf := getBuffer(encodedLen)
 
 	// Encode the data
 	base64.StdEncoding.Encode(buf, v)
 
 	// Return a slice that references the pooled buffer
 	return buf
-}
-
-// returnBase64Buffer returns the buffer to the pool.
-// This must be called after the buffer returned by base64Encode is no longer needed.
-func returnBase64Buffer(buf []byte) {
-	// Reset length but keep capacity
-	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	base64BufferPool.Put(buf[:0])
-}
-
-// returnBigBuffer return buffer to pool.
-func returnBigBuffer(buf []byte) {
-	// Reset length but keep capacity
-	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	bigBufPool.Put(buf[:0])
-}
-
-// returnSmallBuffer return buffer to pool.
-func returnSmallBuffer(buf []byte) {
-	// Reset length but keep capacity
-	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	smallBufPool.Put(buf[:0])
 }
 
 func newDecoderError(tracker *positionTracker, err error) error {
@@ -161,7 +136,7 @@ type countingReader struct {
 
 func newCountingReader(src io.Reader, fileName string) *countingReader {
 	return &countingReader{
-		Reader: bufio.NewReader(src),
+		Reader: bufio.NewReaderSize(src, 1024*1024),
 		tracker: &positionTracker{
 			fileName: fileName,
 			// For printing lines starting from 1.
@@ -341,7 +316,7 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 
 	res.Version = string(ver)
 
-	returnBigBuffer(ver)
+	putBuffer(ver)
 
 	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
@@ -383,7 +358,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 		}
 
 		mToken := string(metaToken)
-		returnSmallBuffer(metaToken)
+		putBuffer(metaToken)
 
 		switch mToken {
 		case tokenNamespace:
@@ -695,7 +670,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 
 	res.Content = make([]byte, len(content))
 	copy(res.Content, content)
-	returnBigBuffer(content)
+	putBuffer(content)
 
 	if err := _expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
@@ -927,7 +902,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 	}
 
 	name := string(nameBytes)
-	returnSmallBuffer(nameBytes)
+	putBuffer(nameBytes)
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
@@ -998,7 +973,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 		}
 
 		result := string(val)
-		returnBase64Buffer(val)
+		putBuffer(val)
 
 		return result, nil
 	case binTypeGeoJSON:
@@ -1016,10 +991,10 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 
 	if base64Encoded {
 		val, err = _readBase64BytesSized(r.reader, ' ')
-		defer returnBase64Buffer(val)
+		defer putBuffer(val)
 	} else {
 		val, err = _readBytesSized(r.reader, ' ')
-		defer returnBigBuffer(val)
+		defer putBuffer(val)
 	}
 
 	if err != nil {
@@ -1127,7 +1102,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 
 		res = string(keyVal)
 
-		returnBase64Buffer(keyVal)
+		putBuffer(keyVal)
 
 	case keyTypeBytes:
 		var keyVal, cVal []byte
@@ -1135,12 +1110,12 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 			keyVal, err = _readBase64BytesSized(r.reader, ' ')
 			cVal = make([]byte, len(keyVal))
 			copy(cVal, keyVal)
-			returnBase64Buffer(keyVal)
+			putBuffer(keyVal)
 		} else {
 			keyVal, err = _readBytesSized(r.reader, ' ')
 			cVal = make([]byte, len(keyVal))
 			copy(cVal, keyVal)
-			returnBigBuffer(keyVal)
+			putBuffer(keyVal)
 		}
 
 		if err != nil {
@@ -1249,7 +1224,7 @@ func (r *Decoder[T]) skipToNextLine() error {
 	}
 
 	// Return buffer to pool immediately since we don't need the data.
-	returnSmallBuffer(buf)
+	putBuffer(buf)
 
 	// Consume the newline.
 	_, err = r.reader.ReadByte()
@@ -1270,12 +1245,12 @@ func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) 
 		return nil, err
 	}
 
-	returnSmallBuffer(encoded)
+	putBuffer(encoded)
 
 	decoded := make([]byte, len(result))
 	copy(decoded, result)
 
-	returnBase64Buffer(result)
+	putBuffer(result)
 
 	return decoded, nil
 }
@@ -1304,7 +1279,7 @@ func _readBlockDecodeBase64(src *countingReader, n int64) ([]byte, error) {
 		return nil, err
 	}
 
-	returnSmallBuffer(data)
+	putBuffer(data)
 
 	return result, nil
 }
@@ -1313,16 +1288,7 @@ func _decodeBase64(src []byte) ([]byte, error) {
 	decodedLen := base64.StdEncoding.DecodedLen(len(src))
 
 	// Get a buffer from the pool
-	buf := base64BufferPool.Get().([]byte)
-
-	// Ensure the buffer is large enough
-	if cap(buf) < decodedLen {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, decodedLen)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:decodedLen]
-	}
+	buf := getBuffer(decodedLen)
 
 	bw, err := base64.StdEncoding.Decode(buf, src)
 	if err != nil {
@@ -1340,7 +1306,7 @@ func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 
 	result := string(val)
 
-	returnBigBuffer(val)
+	putBuffer(val)
 
 	return result, nil
 }
@@ -1400,7 +1366,7 @@ func _readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 
 	result := a.NewHLLValue(data)
 
-	returnBigBuffer(data)
+	putBuffer(data)
 
 	return result, nil
 }
@@ -1413,14 +1379,13 @@ func _readUntil(src *countingReader, delim byte, escaped bool) (string, error) {
 
 	resultStr := string(result)
 
-	returnSmallBuffer(result)
+	putBuffer(result)
 
 	return resultStr, nil
 }
 
 func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, error) {
-	bufInterface := smallBufPool.Get()
-	buf := bufInterface.([]byte)
+	buf := getBuffer(0)
 
 	var esc bool
 
@@ -1436,7 +1401,11 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 		}
 
 		if !esc {
-			if slices.Contains(delims, b) {
+			if len(delims) == 1 {
+				if b == delims[0] {
+					return buf, src.UnreadByte()
+				}
+			} else if bytes.IndexByte(delims, b) != -1 {
 				return buf, src.UnreadByte()
 			}
 		}
@@ -1450,16 +1419,7 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 }
 
 func _readNBytes(src *countingReader, n int64) ([]byte, error) {
-	buf := bigBufPool.Get().([]byte)
-
-	// Ensure the buffer is large enough
-	if int64(cap(buf)) < n {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, n)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:n]
-	}
+	buf := getBuffer(int(n))
 
 	_, err := io.ReadFull(src, buf)
 	if err != nil {
@@ -1513,7 +1473,7 @@ func _expectToken(src *countingReader, token string) error {
 	}
 
 	result := string(data)
-	returnBigBuffer(data)
+	putBuffer(data)
 
 	if result != token {
 		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, result, token)

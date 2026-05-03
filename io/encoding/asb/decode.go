@@ -133,7 +133,7 @@ type countingReader struct {
 
 func newCountingReader(src io.Reader, fileName string) *countingReader {
 	return &countingReader{
-		Reader: bufio.NewReader(src),
+		Reader: bufio.NewReaderSize(src, 1024*1024), // 1mb buffer
 		tracker: &positionTracker{
 			fileName: fileName,
 			// For printing lines starting from 1.

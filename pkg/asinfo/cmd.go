@@ -115,7 +115,9 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 
 	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList
+	}
 
+	if version.IsGreaterOrEqual(AerospikeVersionSupportsIntegratedBackup) {
 		cmds[cmdIDServerSideBackup] = cmdServerSideBackup
 		cmds[cmdIDServerSideRestore] = cmdServerSideRestore
 	}

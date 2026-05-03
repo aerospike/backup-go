@@ -48,6 +48,9 @@ var (
 	// AerospikeVersionRecentInfoCommands after this version, all commands should use
 	// `namespace` parameter instead of `ns` or `id`.
 	AerospikeVersionRecentInfoCommands = AerospikeVersion{8, 1, 0}
+
+	// AerospikeVersionSupportsIntegratedBackup TODO: change this, after server release.
+	AerospikeVersionSupportsIntegratedBackup = AerospikeVersion{8, 1, 0}
 )
 
 var (

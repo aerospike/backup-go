@@ -333,7 +333,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 			return nil, err
 		}
 
-		metaToken, err := readUntilAny(r.reader, []byte{' ', asbNewLine}, false)
+		metaToken, err := readUntilAny(r.reader, delimsSpaceOrNewline, false)
 		if err != nil {
 			return nil, err
 		}
@@ -877,7 +877,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return err
 	}
 
-	nameBytes, err := readUntilAny(r.reader, []byte{' ', asbNewLine}, true)
+	nameBytes, err := readUntilAny(r.reader, delimsSpaceOrNewline, true)
 	if err != nil {
 		return err
 	}

@@ -134,6 +134,7 @@ const (
 var (
 	space                     = []byte(" ")
 	newLine                   = []byte("\n")
+	delimsSpaceOrNewline      = []byte{' ', asbNewLine}
 	binBoolTypePrefix         = []byte("- Z ")
 	binIntTypePrefix          = []byte("- I ")
 	binFloatTypePrefix        = []byte("- D ")

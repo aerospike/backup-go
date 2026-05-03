@@ -39,16 +39,14 @@ var (
 	// bufPool is a unified pool for byte slices.
 	bufPool = sync.Pool{
 		New: func() any {
-			b := make([]byte, 0, 512)
-			return &b
+			return make([]byte, 0, 512)
 		},
 	}
 )
 
 func getBuffer(size int) []byte {
-	bufPtr := bufPool.Get().(*[]byte)
+	buf := bufPool.Get().([]byte)
 
-	buf := *bufPtr
 	if cap(buf) < size {
 		buf = make([]byte, size)
 	} else {
@@ -59,9 +57,7 @@ func getBuffer(size int) []byte {
 }
 
 func putBuffer(buf []byte) {
-
-	buf = buf[:0]
-	bufPool.Put(&buf)
+	bufPool.Put(buf[:0])
 }
 
 // base64Encode encodes the input bytes using base64 encoding.
@@ -136,7 +132,7 @@ type countingReader struct {
 
 func newCountingReader(src io.Reader, fileName string) *countingReader {
 	return &countingReader{
-		Reader: bufio.NewReaderSize(src, 1024*1024),
+		Reader: bufio.NewReader(src),
 		tracker: &positionTracker{
 			fileName: fileName,
 			// For printing lines starting from 1.
@@ -1218,7 +1214,7 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 
 func (r *Decoder[T]) skipToNextLine() error {
 	// Read until newline, no escaping needed for skip.
-	buf, err := _readUntilAny(r.reader, []byte{asbNewLine}, false)
+	buf, err := _readUntilByte(r.reader, asbNewLine, false)
 	if err != nil {
 		return err
 	}
@@ -1235,7 +1231,7 @@ func (r *Decoder[T]) skipToNextLine() error {
 // ***** Helper Functions
 
 func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) {
-	encoded, err := _readUntilAny(src, []byte{delim}, false)
+	encoded, err := _readUntilByte(src, delim, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1372,7 +1368,7 @@ func _readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 }
 
 func _readUntil(src *countingReader, delim byte, escaped bool) (string, error) {
-	result, err := _readUntilAny(src, []byte{delim}, escaped)
+	result, err := _readUntilByte(src, delim, escaped)
 	if err != nil {
 		return "", err
 	}
@@ -1382,6 +1378,34 @@ func _readUntil(src *countingReader, delim byte, escaped bool) (string, error) {
 	putBuffer(result)
 
 	return resultStr, nil
+}
+
+func _readUntilByte(src *countingReader, delim byte, escaped bool) ([]byte, error) {
+	buf := getBuffer(0)
+
+	var esc bool
+
+	for range maxTokenSize {
+		b, err := src.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+
+		if escaped && b == asbEscape && !esc {
+			esc = true
+			continue
+		}
+
+		if !esc && b == delim {
+			return buf, src.UnreadByte()
+		}
+
+		esc = false
+
+		buf = append(buf, b)
+	}
+
+	return nil, errors.New("token larger than max size")
 }
 
 func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, error) {
@@ -1400,14 +1424,8 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 			continue
 		}
 
-		if !esc {
-			if len(delims) == 1 {
-				if b == delims[0] {
-					return buf, src.UnreadByte()
-				}
-			} else if bytes.IndexByte(delims, b) != -1 {
-				return buf, src.UnreadByte()
-			}
+		if !esc && bytes.IndexByte(delims, b) != -1 {
+			return buf, src.UnreadByte()
 		}
 
 		esc = false

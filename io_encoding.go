@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 	"log/slog"
@@ -74,13 +75,16 @@ type Decoder[T models.TokenConstraint] interface {
 func NewDecoder[T models.TokenConstraint](
 	eType EncoderType, src io.Reader, fileNumber uint64, fileName string, ignoreUnknownFields bool, logger *slog.Logger,
 ) (Decoder[T], error) {
+	// Wrap in a large buffer to minimize read() syscalls during decoding.
+	bufferedSrc := bufio.NewReaderSize(src, 1024*1024)
+
 	switch eType {
 	// As at the moment only one `ASB` Decoder supported, we use such construction.
 	case EncoderTypeASB:
-		return asb.NewDecoder[T](src, fileName, ignoreUnknownFields, logger)
+		return asb.NewDecoder[T](bufferedSrc, fileName, ignoreUnknownFields, logger)
 	case EncoderTypeASBX:
-		return asbx.NewDecoder[T](src, fileNumber, fileName)
+		return asbx.NewDecoder[T](bufferedSrc, fileNumber, fileName)
 	default:
-		return asb.NewDecoder[T](src, fileName, ignoreUnknownFields, logger)
+		return asb.NewDecoder[T](bufferedSrc, fileName, ignoreUnknownFields, logger)
 	}
 }

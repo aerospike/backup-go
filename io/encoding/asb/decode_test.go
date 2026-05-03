@@ -2151,7 +2151,7 @@ func TestASBReader_readDigest(t *testing.T) {
 	}
 }
 
-func Test_readBase64BytesDelimited(t *testing.T) {
+func TestReadBase64BytesDelimited(t *testing.T) {
 	t.Parallel()
 	str := "string"
 	encodedStr := base64.StdEncoding.EncodeToString([]byte(str))
@@ -2200,20 +2200,20 @@ func Test_readBase64BytesDelimited(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readBase64BytesDelimited(tt.args.src, tt.args.delim)
+			got, err := readBase64BytesDelimited(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readBase64BytesDelimited() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readBase64BytesDelimited() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readBase64BytesDelimited() = %v, want %v", got, tt.want)
+				t.Errorf("readBase64BytesDelimited() = %v, want %v", got, tt.want)
 			}
 			putBuffer(got)
 		})
 	}
 }
 
-func Test_readBase64BytesSized(t *testing.T) {
+func TestReadBase64BytesSized(t *testing.T) {
 	t.Parallel()
 	str := "string"
 	encodedStr := base64.StdEncoding.EncodeToString([]byte(str))
@@ -2270,20 +2270,20 @@ func Test_readBase64BytesSized(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readBase64BytesSized(tt.args.src, tt.args.sizeDelim)
+			got, err := readBase64BytesSized(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readBase64BytesSized() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readBase64BytesSized() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readBase64BytesSized() = %v, want %v", got, tt.want)
+				t.Errorf("readBase64BytesSized() = %v, want %v", got, tt.want)
 			}
 			putBuffer(got)
 		})
 	}
 }
 
-func Test_decodeBase64(t *testing.T) {
+func TestDecodeBase64(t *testing.T) {
 	t.Parallel()
 	str := "string"
 	encodedStr := base64.StdEncoding.EncodeToString([]byte(str))
@@ -2317,19 +2317,19 @@ func Test_decodeBase64(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _decodeBase64(tt.args.src)
+			got, err := decodeBase64(tt.args.src)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_decodeBase64() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("decodeBase64() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_decodeBase64() = %v, want %v", got, tt.want)
+				t.Errorf("decodeBase64() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readStringSized(t *testing.T) {
+func TestReadStringSized(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src       *countingReader
@@ -2395,7 +2395,7 @@ func Test_readStringSized(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readStringSized(tt.args.src, tt.args.sizeDelim)
+			got, err := readStringSized(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("_readString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2407,7 +2407,7 @@ func Test_readStringSized(t *testing.T) {
 	}
 }
 
-func Test_readBytesSized(t *testing.T) {
+func TestReadBytesSized(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src       *countingReader
@@ -2473,19 +2473,19 @@ func Test_readBytesSized(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readBytesSized(tt.args.src, tt.args.sizeDelim)
+			got, err := readBytesSized(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readBytesSized() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readBytesSized() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readBytesSized() = %v, want %v", got, tt.want)
+				t.Errorf("readBytesSized() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readBool(t *testing.T) {
+func TestReadBool(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src *countingReader
@@ -2532,19 +2532,19 @@ func Test_readBool(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readBool(tt.args.src)
+			got, err := readBool(tt.args.src)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readBool() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readBool() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("_readBool() = %v, want %v", got, tt.want)
+				t.Errorf("readBool() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readFloat(t *testing.T) {
+func TestReadFloat(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src   *countingReader
@@ -2590,19 +2590,19 @@ func Test_readFloat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readFloat(tt.args.src, tt.args.delim)
+			got, err := readFloat(tt.args.src, tt.args.delim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readFloat() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readFloat() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("_readFloat() = %v, want %v", got, tt.want)
+				t.Errorf("readFloat() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readUntil(t *testing.T) {
+func TestReadUntil(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src     *countingReader
@@ -2663,19 +2663,19 @@ func Test_readUntil(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readUntil(tt.args.src, tt.args.delim, tt.args.escaped)
+			got, err := readUntil(tt.args.src, tt.args.delim, tt.args.escaped)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readUntil() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readUntil() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readUntil() = %v, want %v", got, tt.want)
+				t.Errorf("readUntil() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readUntilAny(t *testing.T) {
+func TestReadUntilAny(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src     *countingReader
@@ -2813,19 +2813,19 @@ func Test_readUntilAny(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readUntilAny(tt.args.src, tt.args.delims, tt.args.escaped)
+			got, err := readUntilAny(tt.args.src, tt.args.delims, tt.args.escaped)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readUntilAny() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readUntilAny() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readUntilAny() = %v, want %v", got, tt.want)
+				t.Errorf("readUntilAny() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readNBytes(t *testing.T) {
+func TestReadNBytes(t *testing.T) {
 	type args struct {
 		src *countingReader
 		n   int64
@@ -2866,20 +2866,20 @@ func Test_readNBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := _readNBytes(tt.args.src, tt.args.n)
+			got, err := readNBytes(tt.args.src, tt.args.n)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readNBytes() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readNBytes() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readNBytes() = %v, want %v", got, tt.want)
+				t.Errorf("readNBytes() = %v, want %v", got, tt.want)
 			}
 			putBuffer(got)
 		})
 	}
 }
 
-func Test_expectChar(t *testing.T) {
+func TestExpectChar(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src *countingReader
@@ -2918,14 +2918,14 @@ func Test_expectChar(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if err := _expectChar(tt.args.src, tt.args.c); (err != nil) != tt.wantErr {
-				t.Errorf("_expectChar() error = %v, wantErr %v", err, tt.wantErr)
+			if err := expectChar(tt.args.src, tt.args.c); (err != nil) != tt.wantErr {
+				t.Errorf("expectChar() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_expectToken(t *testing.T) {
+func TestExpectToken(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src   *countingReader
@@ -2967,14 +2967,14 @@ func Test_expectToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if err := _expectToken(tt.args.src, tt.args.token); (err != nil) != tt.wantErr {
-				t.Errorf("_expectToken() error = %v, wantErr %v", err, tt.wantErr)
+			if err := expectToken(tt.args.src, tt.args.token); (err != nil) != tt.wantErr {
+				t.Errorf("expectToken() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_peek(t *testing.T) {
+func TestPeek(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src *countingReader
@@ -3005,13 +3005,13 @@ func Test_peek(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _peek(tt.args.src)
+			got, err := peek(tt.args.src)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_peek() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("peek() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("_peek() = %v, want %v", got, tt.want)
+				t.Errorf("peek() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3126,7 +3126,7 @@ func TestASBReader_readBins(t *testing.T) {
 	}
 }
 
-func Test_readGeoJSON(t *testing.T) {
+func TestReadGeoJSON(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src       *countingReader
@@ -3162,19 +3162,19 @@ func Test_readGeoJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readGeoJSON(tt.args.src, tt.args.sizeDelim)
+			got, err := readGeoJSON(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readGeoJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readGeoJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readGeoJSON() = %v, want %v", got, tt.want)
+				t.Errorf("readGeoJSON() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_readHLL(t *testing.T) {
+func TestReadHLL(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		src       *countingReader
@@ -3210,13 +3210,13 @@ func Test_readHLL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := _readHLL(tt.args.src, tt.args.sizeDelim)
+			got, err := readHLL(tt.args.src, tt.args.sizeDelim)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("_readHLL() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readHLL() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("_readHLL() = %v, want %v", got, tt.want)
+				t.Errorf("readHLL() = %v, want %v", got, tt.want)
 			}
 		})
 	}

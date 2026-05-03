@@ -29,8 +29,8 @@ import (
 // Original functions (kept for benchmark comparison)
 // ============================================================================
 
-func _readIntegerOriginal(src *countingReader, delim byte) (int64, error) {
-	data, err := _readUntil(src, delim, false)
+func readIntegerOriginal(src *countingReader, delim byte) (int64, error) {
+	data, err := readUntil(src, delim, false)
 	if err != nil {
 		return 0, err
 	}
@@ -38,8 +38,8 @@ func _readIntegerOriginal(src *countingReader, delim byte) (int64, error) {
 	return strconv.ParseInt(data, 10, 64)
 }
 
-func _readSizeOriginal(src *countingReader, delim byte) (uint32, error) {
-	data, err := _readUntil(src, delim, false)
+func readSizeOriginal(src *countingReader, delim byte) (uint32, error) {
+	data, err := readUntil(src, delim, false)
 	if err != nil {
 		return 0, err
 	}
@@ -329,7 +329,7 @@ func TestIntegerParsingEquivalence(t *testing.T) {
 
 			// Test original
 			reader1 := newCountingReader(strings.NewReader(input), "test")
-			orig, origErr := _readIntegerOriginal(reader1, '\n')
+			orig, origErr := readIntegerOriginal(reader1, '\n')
 
 			// Test optimized
 			reader2 := newCountingReader(strings.NewReader(input), "test")
@@ -358,7 +358,7 @@ func TestSizeParsingEquivalence(t *testing.T) {
 
 			// Test original
 			reader1 := newCountingReader(strings.NewReader(input), "test")
-			orig, origErr := _readSizeOriginal(reader1, '\n')
+			orig, origErr := readSizeOriginal(reader1, '\n')
 
 			// Test optimized
 			reader2 := newCountingReader(strings.NewReader(input), "test")
@@ -392,7 +392,7 @@ func BenchmarkIntegerParsing_Original(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				reader := newCountingReader(strings.NewReader(input.value), "test")
-				_, err := _readIntegerOriginal(reader, '\n')
+				_, err := readIntegerOriginal(reader, '\n')
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -445,7 +445,7 @@ func BenchmarkSizeParsing_Original(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				reader := newCountingReader(strings.NewReader(input.value), "test")
-				_, err := _readSizeOriginal(reader, '\n')
+				_, err := readSizeOriginal(reader, '\n')
 				if err != nil {
 					b.Fatal(err)
 				}

@@ -2341,3 +2341,17 @@ func BenchmarkIntToString(b *testing.B) {
 		}
 	})
 }
+
+// base64Encode encodes the input bytes using base64 encoding.
+func base64Encode(v []byte) []byte {
+	encodedLen := base64.StdEncoding.EncodedLen(len(v))
+
+	// Get a buffer from the pool
+	buf := make([]byte, encodedLen)
+
+	// Encode the data
+	base64.StdEncoding.Encode(buf, v)
+
+	// Return a slice that references the pooled buffer
+	return buf
+}

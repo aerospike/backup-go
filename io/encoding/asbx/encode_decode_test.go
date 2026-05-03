@@ -72,9 +72,10 @@ func TestEncoder_Decoder(t *testing.T) {
 	h := enc.GetHeader(num, false)
 	content = append(content, h...)
 
-	et, err := enc.EncodeToken(token)
+	tokenBuf := &bytes.Buffer{}
+	err = enc.EncodeToken(token, tokenBuf)
 	require.NoError(t, err)
-	content = append(content, et...)
+	content = append(content, tokenBuf.Bytes()...)
 
 	// Decode.
 	reader := bytes.NewReader(content)

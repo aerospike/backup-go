@@ -27,15 +27,13 @@ import (
 // RecordReaderConfig represents the configuration for scanning Aerospike records.
 type RecordReaderConfig struct {
 	timeBounds      models.TimeBounds
-	partitionFilter *a.PartitionFilter
-	// If nodes are set we ignore partitionFilter.
-	nodes       []*a.Node
-	scanPolicy  *a.ScanPolicy
-	scanLimiter scanlimiter.Limiter
-	namespace   string
-	setList     []string
-	binList     []string
-	noTTLOnly   bool
+	partitionFilter *a.PartitionFilter // required; must not be nil
+	scanPolicy      *a.ScanPolicy      // required; must not be nil
+	scanLimiter     scanlimiter.Limiter
+	namespace       string
+	setList         []string
+	binList         []string
+	noTTLOnly       bool
 
 	// throttler indicates that we should throttle the scan on error.
 	throttler *ThrottleLimiter
@@ -58,22 +56,8 @@ func (c *RecordReaderConfig) logAttrs() []any {
 		attrs = append(attrs, slog.Time("toTime", *c.timeBounds.ToTime))
 	}
 
-	if c.partitionFilter != nil {
-		attrs = append(attrs,
-			slog.String("partitionFilter", printPartitionFilter(c.partitionFilter)))
-	}
-
-	if len(c.nodes) > 0 {
-		nodeStrs := make([]string, 0, len(c.nodes))
-
-		for _, n := range c.nodes {
-			if n != nil {
-				nodeStrs = append(nodeStrs, n.String())
-			}
-		}
-
-		attrs = append(attrs, slog.Any("nodes", nodeStrs))
-	}
+	attrs = append(attrs,
+		slog.String("partitionFilter", printPartitionFilter(c.partitionFilter)))
 
 	if c.scanLimiter != scanlimiter.Noop {
 		attrs = append(attrs, slog.Bool("scanLimiter", true))

@@ -49,7 +49,47 @@ var (
 			return make([]byte, 0, 64)
 		},
 	}
+	// base64BufferPool is a pool of byte slices used for base64 encoding
+	base64BufferPool = sync.Pool{
+		New: func() any {
+			// The buffer size is arbitrary and will be grown if needed
+			return make([]byte, 0, 1024)
+		},
+	}
 )
+
+// base64Encode encodes the input bytes using base64 encoding.
+// It returns a slice that references a pooled buffer, which must be returned to the pool
+// after use by calling returnBase64Buffer.
+func base64Encode(v []byte) []byte {
+	encodedLen := base64.StdEncoding.EncodedLen(len(v))
+
+	// Get a buffer from the pool
+	buf := base64BufferPool.Get().([]byte)
+
+	// Ensure the buffer is large enough
+	if cap(buf) < encodedLen {
+		// If the buffer is too small, create a new one with sufficient capacity
+		buf = make([]byte, encodedLen)
+	} else {
+		// Otherwise, resize the existing buffer
+		buf = buf[:encodedLen]
+	}
+
+	// Encode the data
+	base64.StdEncoding.Encode(buf, v)
+
+	// Return a slice that references the pooled buffer
+	return buf
+}
+
+// returnBase64Buffer returns the buffer to the pool.
+// This must be called after the buffer returned by base64Encode is no longer needed.
+func returnBase64Buffer(buf []byte) {
+	// Reset length but keep capacity
+	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
+	base64BufferPool.Put(buf[:0])
+}
 
 // returnBigBuffer return buffer to pool.
 func returnBigBuffer(buf []byte) {

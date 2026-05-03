@@ -27,9 +27,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// resultChanSize is the size of the channel used to send scan results.
-const resultChanSize = 1024
-
 // scanner is an interface for scanning Aerospike records.
 type scanner interface {
 	ScanPartitions(
@@ -41,27 +38,33 @@ type scanner interface {
 	) (*a.Recordset, a.Error)
 }
 
-// RecordReader is an interface for reading Aerospike records.
-// implements pipe.Reader for a token.
+// RecordReader is an interface for reading Aerospike records. It is used as
+// [github.com/aerospike/backup-go/pipe.Reader] (with *models.Token as T).
 type RecordReader interface {
 	Read(ctx context.Context) (*models.Token, error)
 	Close()
 }
 
-// scanProducer is a function that initiates a scan and returns a channel from which the scan results can be read.
-type scanProducer func() (*a.Recordset, error)
-
-// singleRecordReader is a RecordReader that reads records from Aerospike one by one in single thread.
+// singleRecordReader reads records from Aerospike namespace one set at a time,
+// iterating over setList sequentially. Each set triggers one ScanPartitions call.
 type singleRecordReader struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	client          scanner
 	logger          *slog.Logger
 	config          *RecordReaderConfig
-	resultChan      chan *a.Result
-	errChan         chan error
-	scanOnce        sync.Once
+	scanPolicy      *a.ScanPolicy // required; must not be nil
+	setIndex        int
+	active          *singleScan
 	recordsetCloser RecordsetCloser
+}
+
+// singleScan holds state for one active ScanPartitions call.
+type singleScan struct {
+	taskID             uint64
+	results            <-chan *a.Result
+	close              func() error
+	needsThrottleCheck bool // true until we've inspected the first result for throttle errors
 }
 
 // RecordsetCloser is an interface for closing Aerospike recordsets.
@@ -119,205 +122,231 @@ func newSingleRecordReader(
 		config:          cfg,
 		client:          client,
 		logger:          logger,
-		resultChan:      make(chan *a.Result, resultChanSize),
-		errChan:         make(chan error, 1),
+		scanPolicy:      newScanPolicy(cfg),
 		recordsetCloser: recordsetCloser,
 	}
 }
 
+// Read returns the next record token, blocking until one is available.
+// It advances through setList automatically, returning io.EOF when all sets are exhausted.
 func (r *singleRecordReader) Read(ctx context.Context) (*models.Token, error) {
-	r.scanOnce.Do(func() {
-		// Start scan with the global context.
-		r.logger.Debug("scan started")
-
-		go r.startScan()
-	})
-
-	select {
-	case <-ctx.Done():
-		// If the local context is canceled, we cancel the global context.
-		r.cancel()
-		return nil, ctx.Err()
-	case <-r.ctx.Done():
-		return nil, r.ctx.Err()
-	case err := <-r.errChan:
-		// Return scan errors.
-		r.cancel()
-
-		return nil, err
-	case res, ok := <-r.resultChan:
-		if !ok {
-			r.logger.Debug("scan finished")
-			return nil, io.EOF
-		}
-
-		if res.Err != nil {
-			r.cancel()
-
-			return nil, fmt.Errorf("failed to read record: %w", res.Err)
-		}
-
-		rec := models.Record{
-			Record: res.Record,
-		}
-
-		recToken := models.NewRecordToken(&rec, 0, nil)
-
-		r.config.rpsCollector.Increment()
-
-		return recToken, nil
-	}
-}
-
-// Close no-op operation to satisfy pipe.Reader interface.
-func (r *singleRecordReader) Close() {
-}
-
-// startScan initiates a partition scan for each provided set using the given scan policy and partition filter.
-func (r *singleRecordReader) startScan() {
-	defer close(r.resultChan)
-
-	// Generate the list of all scan tasks.
-	producers := r.generateProducers()
-
-	// Execute the tasks sequentially.
-	for _, producer := range producers {
-		if err := r.executeProducer(producer); err != nil {
-			r.errChan <- err
-			return
-		}
-	}
-}
-
-// executeProducer runs a single scan task. It acquires a semaphore,
-// calls the producer function to start the scan, and drains all results
-// from the returned channel before releasing the semaphore.
-func (r *singleRecordReader) executeProducer(producer scanProducer) error {
 	for {
-		retry, err := r.executeProducerOnce(producer)
+		if err := r.ensureActiveScan(ctx); err != nil {
+			return nil, err
+		}
+
+		res, ok, err := r.readResult(ctx)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if !retry {
-			return nil
+		// Channel closed — this set is done; advance to the next one.
+		if !ok {
+			if err := r.finishActiveScan(); err != nil {
+				return nil, err
+			}
+
+			continue
 		}
+
+		token, err := r.handleResult(res)
+		if err != nil {
+			return nil, err
+		}
+
+		// nil token means we were throttled and retried the same set — loop again.
+		if token == nil {
+			continue
+		}
+
+		return token, nil
 	}
 }
 
-// executeProducerOnce performs a single scan attempt.
-func (r *singleRecordReader) executeProducerOnce(producer scanProducer) (bool, error) {
-	if r.ctx.Err() != nil {
-		return false, r.ctx.Err()
-	}
-
-	// Check scan limiter. It is required to avoid overloading the DB with too many parallel scans.
-	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
-		return false, fmt.Errorf("failed to acquire scan limiter: %w", err)
-	}
-
-	// Call the producer function. This starts the actual Aerospike scan
-	// and returns a channel for its results.
-	recordset, err := producer()
-	if err != nil {
-		r.config.scanLimiter.Release(1)
-
-		return false, fmt.Errorf("scan producer failed: %w", err)
-	}
-
-	// Set close recordset function.
-	closeRecordset := wrapCloser(r.ctx, r.recordsetCloser, recordset)
-
-	// Drain all results from this specific scan.
-	// No context checking here because it slows down the scan.
-	drainErr := r.drainResults(recordset, closeRecordset)
-
-	// Do not return an error immediately, because we need to perform some actions first.
-	closeErr := closeRecordset()
-
-	// Release the semaphore manually because of for loop.
-	r.config.scanLimiter.Release(1)
-
-	// If we broke out because of a connection error on the first record,
-	// we loop back to the top to restart the producer.
-	if drainErr != nil {
-		r.logger.Debug("database hasn't got enough resources, waiting for a signal",
-			slog.Any("drainErr", drainErr),
-			slog.Any("closeErr", closeErr),
-		)
-		r.config.throttler.Wait(r.ctx)
-
-		return true, nil
-	}
-
-	// Successfully drained all results, notify the throttler.
-	r.config.throttler.Notify(r.ctx)
-
-	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", recordset.TaskId()))
-
-	return false, closeErr
-}
-
-// drainResults drains results, and if operation failed return error
-func (r *singleRecordReader) drainResults(recordset *a.Recordset, closeRecordset func() error) error {
-	done := make(chan struct{})
-	defer close(done)
-
-	monitorContext[*a.Result](r.ctx, r.logger, r.resultChan, done, closeRecordset)
-
-	// Check only the FIRST result for the specific connection error
-	// and only if the throttler is initialized.
-	first, ok := <-recordset.Results()
-	if !ok {
+// ensureActiveScan starts a new scan if none is active, respecting context cancellation.
+func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
+	if r.active != nil { // there is a healthy running scan
 		return nil
 	}
 
-	if r.config.throttler != nil && shouldThrottle(first.Err) {
-		return first.Err
+	// Fast path only: do not start scan if already canceled.
+	if err := ctx.Err(); err != nil {
+		r.cancel()
+		return err
 	}
 
-	r.resultChan <- first
+	if err := r.ctx.Err(); err != nil {
+		return err
+	}
 
-	// Drain all results from this specific scan.
-	// No context checking here because it slows down the scan.
-	for res := range recordset.Results() {
-		r.resultChan <- res
+	return r.startNextScan()
+}
+
+// readResult blocks on the active scan's result channel, respecting context cancellation.
+func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
+	if r.active == nil {
+		return nil, false, fmt.Errorf("active scan has no results channel")
+	}
+
+	// Fast path: if a result is immediately available, return it without
+	// checking context. This avoids expensive select setup on the hot path.
+	select {
+	case res, ok := <-r.active.results:
+		return res, ok, nil
+	default:
+	}
+
+	// Slow path: block on either result or context cancellation.
+	select {
+	case <-ctx.Done():
+		r.cancel()
+		_ = r.closeActiveScan()
+
+		return nil, false, ctx.Err()
+	case <-r.ctx.Done():
+		_ = r.closeActiveScan()
+		return nil, false, r.ctx.Err()
+	case res, ok := <-r.active.results:
+		return res, ok, nil
+	}
+}
+
+// handleResult processes one scan result. Returns nil token (no error) when the
+// scan was throttled and needs to be retried from the same set.
+func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) {
+	active := r.active
+	if active == nil {
+		if err := r.ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		return nil, fmt.Errorf("no active scan while handling record result")
+	}
+
+	if res == nil {
+		return nil, fmt.Errorf("nil scan result")
+	}
+
+	// On the first result only, check whether the DB signaled throttling.
+	// If so, close the scan, wait for capacity, and signal the caller to retry.
+	if active.needsThrottleCheck {
+		active.needsThrottleCheck = false
+
+		if r.config.throttler != nil && shouldThrottle(res.Err) {
+			r.logger.Debug("DB under pressure, throttling scan",
+				slog.Any("drainErr", res.Err))
+			_ = r.closeActiveScan()
+			r.config.throttler.Wait(r.ctx)
+
+			return nil, nil // caller will loop and retry the same set
+		}
+	}
+
+	if res.Err != nil {
+		r.cancel()
+		_ = r.closeActiveScan()
+
+		return nil, fmt.Errorf("failed to read record: %w", res.Err)
+	}
+
+	if r.config.rpsCollector != nil {
+		r.config.rpsCollector.Increment()
+	}
+
+	return models.NewRecordToken(&models.Record{Record: res.Record}, 0, nil), nil
+}
+
+// finishActiveScan closes the current scan, notifies the throttler, and advances setIndex.
+func (r *singleRecordReader) finishActiveScan() error {
+	var taskID uint64
+	if active := r.active; active != nil {
+		taskID = active.taskID
+	}
+
+	err := r.closeActiveScan()
+	if r.config.throttler != nil {
+		r.config.throttler.Notify(r.ctx)
+	}
+
+	r.logger.Debug("partition scan finished", slog.Uint64("transactionId", taskID))
+	r.setIndex++
+
+	return err
+}
+
+// Close cancels the reader context and releases any active scan (recordset + scan slot).
+func (r *singleRecordReader) Close() {
+	r.cancel()
+	_ = r.closeActiveScan()
+}
+
+func (r *singleRecordReader) startNextScan() error {
+	if r.setIndex >= len(r.config.setList) { // all sets scanned, done.
+		return io.EOF
+	}
+
+	if r.config.partitionFilter == nil {
+		return fmt.Errorf("partition filter is required for scan")
+	}
+
+	if err := r.ctx.Err(); err != nil {
+		return err
+	}
+
+	if err := acquireScanSlot(r.ctx, r.config.scanLimiter, r.logger); err != nil {
+		return fmt.Errorf("failed to acquire scan slot: %w", err)
+	}
+
+	pf := *r.config.partitionFilter // fresh copy required per scan
+	set := r.config.setList[r.setIndex]
+
+	recordset, err := r.client.ScanPartitions(r.scanPolicy, &pf, r.config.namespace, set, r.config.binList...)
+	if err != nil {
+		r.config.scanLimiter.Release(1)
+
+		return fmt.Errorf("failed to start scan for set %q namespace %q filter %s: %w",
+			set, r.config.namespace, printPartitionFilter(&pf), err)
+	}
+
+	r.logger.Debug("partition scan started",
+		slog.Uint64("transactionId", recordset.TaskId()),
+		slog.String("set", set),
+		slog.String("filter", printPartitionFilter(&pf)),
+	)
+
+	closeRecordset := wrapCloser(r.recordsetCloser, recordset)
+	releaseSlot := sync.OnceFunc(func() { r.config.scanLimiter.Release(1) })
+
+	r.active = &singleScan{
+		taskID:             recordset.TaskId(),
+		results:            recordset.Results(),
+		needsThrottleCheck: true,
+		close: func() error {
+			defer releaseSlot()
+			return closeRecordset()
+		},
 	}
 
 	return nil
 }
 
-// generateProducers creates a list of scan-producing functions based on the reader's configuration.
-func (r *singleRecordReader) generateProducers() []scanProducer {
-	scanPolicy := *r.config.scanPolicy
-	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, r.config.timeBounds, r.config.noTTLOnly)
-
-	producers := make([]scanProducer, len(r.config.setList))
-
-	for i, set := range r.config.setList {
-		producer := func() (*a.Recordset, error) {
-			// Each scan requires a fresh copy of the partition filter.
-			pf := *r.config.partitionFilter
-
-			recordset, err := r.client.ScanPartitions(
-				&scanPolicy, &pf, r.config.namespace, set, r.config.binList...)
-			if err != nil {
-				return nil, fmt.Errorf("failed to start scan for set %s, namespace %s, filter %d-%d: %w",
-					set, r.config.namespace, pf.Begin, pf.Count, err)
-			}
-
-			r.logger.Debug("partition scan started",
-				slog.Uint64("transactionId", recordset.TaskId()),
-				slog.String("set", set),
-				slog.String("filter", printPartitionFilter(&pf)),
-			)
-
-			return recordset, nil
-		}
-		producers[i] = producer
+// closeActiveScan closes the active scan's recordset.
+func (r *singleRecordReader) closeActiveScan() error {
+	active := r.active
+	if active == nil {
+		return nil
 	}
 
-	return producers
+	r.active = nil
+
+	return active.close()
+}
+
+func newScanPolicy(cfg *RecordReaderConfig) *a.ScanPolicy {
+	scanPolicy := *cfg.scanPolicy
+	scanPolicy.FilterExpression = getScanExpression(scanPolicy.FilterExpression, cfg.timeBounds, cfg.noTTLOnly)
+
+	return &scanPolicy
 }
 
 func getScanExpression(currentExpression *a.Expression, bounds models.TimeBounds, noTTLOnly bool) *a.Expression {
@@ -378,49 +407,18 @@ func noMrtSetExpression() *a.Expression {
 	return a.ExpNotEq(a.ExpSetName(), a.ExpStringVal(models.MonitorRecordsSetName))
 }
 
-// monitorContext checks context on a separate goroutine to avoid slowing down record reads.
-// When context is canceled, we drain all results from resultChan to avoid deadlock.
-func monitorContext[T any](
-	ctx context.Context,
-	logger *slog.Logger,
-	resultChan chan T,
-	done chan struct{},
-	closeRecordset func() error,
-) {
-	go func() {
-		select {
-		case <-ctx.Done():
-			// Close record set.
-			err := closeRecordset()
-			if err != nil {
-				logger.Error("failed to close recordset", slog.Any("error", err))
-			}
+// wrapCloser wraps RecordsetCloser.Close function to guarantee it is only executed once.
+func wrapCloser(closer RecordsetCloser, recordSet *a.Recordset) func() error {
+	var (
+		once sync.Once // required to avoid race condition on close
+		err  error
+	)
 
-			// Drain records to nowhere.
-			for {
-				select {
-				case <-resultChan:
-				case <-done:
-					// If we have already done, exit.
-					return
-				}
-			}
-		case <-done:
-			// If everything was OK, exit.
-			return
-		}
-	}()
-}
-
-// wrapCloser wraps RecordsetCloser.Close function with context check.
-func wrapCloser(ctx context.Context, closer RecordsetCloser, recordSet *a.Recordset) func() error {
 	return func() error {
-		// If context is already done, that means that the recordset is already closed in monitorContext.
-		// Just skip closing.
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
+		once.Do(func() {
+			err = closer.Close(recordSet)
+		})
 
-		return closer.Close(recordSet)
+		return err
 	}
 }

@@ -185,7 +185,9 @@ func (r *RecordReader) Read(ctx context.Context) (*models.ASBXToken, error) {
 	}
 }
 
-// Close cancels the Aerospike scan used to read records.
+// Close stops the XDR TCP server and cancels the reader. Unlike most
+// [github.com/aerospike/backup-go/pipe.Reader] implementations, Close is required for
+// cleanup here, not a placeholder.
 func (r *RecordReader) Close() {
 	r.cancel()
 	// If not running, do nothing.

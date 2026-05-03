@@ -57,6 +57,7 @@ func getBuffer(size int) []byte {
 }
 
 func putBuffer(buf []byte) {
+	//nolint:staticcheck // It's ok to put byte array into buffer.
 	bufPool.Put(buf[:0])
 }
 

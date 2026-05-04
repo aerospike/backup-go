@@ -944,20 +944,12 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	}
 
 	if _, ok := isMsgPackBytes[binType]; !ok {
-		// We should copy a result, as buffer will be returned.
-		mspVal := make([]byte, len(val))
-		copy(mspVal, val)
-
-		return mspVal, nil
+		return val, nil
 	}
 
 	switch binType {
 	case binTypeBytesHLL:
-		// Only HLL val is not copied inside the lib, so we should copy it ourselves.
-		hllVal := make([]byte, len(val))
-		copy(hllVal, val)
-
-		return a.NewHLLValue(hllVal), nil
+		return a.NewHLLValue(val), nil
 	case binTypeBytesMap:
 		return a.NewRawBlobValue(particleType.MAP, val), nil
 	case binTypeBytesList:
@@ -1293,7 +1285,7 @@ func readUntil(src *countingReader, delim byte) (string, error) {
 }
 
 func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
-	slice, err := src.ReadSlice(delim)
+	slice, err := src.Reader.ReadSlice(delim)
 	if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
 		return nil, err
 	}
@@ -1304,16 +1296,15 @@ func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
 		n--
 	}
 
-	// Update tracker offset only (line/column computed lazily on error)
+	// Update tracker offset only
 	src.tracker.offset += uint64(n)
 
-	// Unread the delimiter - use underlying reader directly
+	// Unread the delimiter
 	if err := src.Reader.UnreadByte(); err != nil {
 		return nil, err
 	}
 
 	// Copy slice data - ReadSlice returns internal buffer that becomes invalid on next read
-	// No pool needed: callers either discard immediately or copy to final destination
 	buf := make([]byte, n)
 	copy(buf, slice[:n])
 
@@ -1358,17 +1349,17 @@ func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
 			return nil, errors.New("token larger than max size")
 		}
 
-		buffered := src.Buffered()
+		buffered := src.Reader.Buffered()
 		if buffered == 0 {
 			// Need to fill buffer
-			if _, err := src.Peek(1); err != nil {
+			if _, err := src.Reader.Peek(1); err != nil {
 				return nil, err
 			}
 
-			buffered = src.Buffered()
+			buffered = src.Reader.Buffered()
 		}
 
-		data, err := src.Peek(buffered)
+		data, err := src.Reader.Peek(buffered)
 		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
@@ -1384,7 +1375,7 @@ func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
 		if idx >= 0 {
 			// Found delimiter, read up to it
 			buf = append(buf, data[:idx]...)
-			if _, err := src.Discard(idx); err != nil {
+			if _, err := src.Reader.Discard(idx); err != nil {
 				return nil, err
 			}
 
@@ -1400,7 +1391,7 @@ func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
 
 		// No delimiter in buffer, consume all and continue
 		buf = append(buf, data[:searchLen]...)
-		if _, err := src.Discard(searchLen); err != nil {
+		if _, err := src.Reader.Discard(searchLen); err != nil {
 			return nil, err
 		}
 

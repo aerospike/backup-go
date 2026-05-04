@@ -1285,7 +1285,7 @@ func readUntil(src *countingReader, delim byte) (string, error) {
 }
 
 func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
-	slice, err := src.Reader.ReadSlice(delim)
+	slice, err := src.ReadSlice(delim)
 	if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
 		return nil, err
 	}
@@ -1349,17 +1349,17 @@ func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
 			return nil, errors.New("token larger than max size")
 		}
 
-		buffered := src.Reader.Buffered()
+		buffered := src.Buffered()
 		if buffered == 0 {
 			// Need to fill buffer
-			if _, err := src.Reader.Peek(1); err != nil {
+			if _, err := src.Peek(1); err != nil {
 				return nil, err
 			}
 
-			buffered = src.Reader.Buffered()
+			buffered = src.Buffered()
 		}
 
-		data, err := src.Reader.Peek(buffered)
+		data, err := src.Peek(buffered)
 		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
@@ -1375,7 +1375,7 @@ func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
 		if idx >= 0 {
 			// Found delimiter, read up to it
 			buf = append(buf, data[:idx]...)
-			if _, err := src.Reader.Discard(idx); err != nil {
+			if _, err := src.Discard(idx); err != nil {
 				return nil, err
 			}
 
@@ -1391,7 +1391,7 @@ func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
 
 		// No delimiter in buffer, consume all and continue
 		buf = append(buf, data[:searchLen]...)
-		if _, err := src.Reader.Discard(searchLen); err != nil {
+		if _, err := src.Discard(searchLen); err != nil {
 			return nil, err
 		}
 

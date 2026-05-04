@@ -1796,27 +1796,11 @@ func BenchmarkEncodeTokenRecordAllDataTypes(b *testing.B) {
 	}
 }
 
-// base64EncodeNative old encoding mechanism, using a default library.
-// Left here for benchmarking purposes.
-func base64EncodeNative(v []byte) []byte {
-	encodedLen := base64.StdEncoding.EncodedLen(len(v))
-
-	// Get a buffer from the pool
-	buf := getBuffer(encodedLen)
-
-	// Encode the data
-	base64.StdEncoding.Encode(buf, v)
-
-	// Return a slice that references the pooled buffer
-	return buf
-}
-
-func BenchmarkBase64EncodeComparison(b *testing.B) {
+func BenchmarkBase64Encode(b *testing.B) {
 	benchmarkSizes := []int{64, 256, 1024, 4096, 16384}
 
 	for _, size := range benchmarkSizes {
-		// Test the optimized version
-		b.Run(fmt.Sprintf("optimized-size-%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("size-%d", size), func(b *testing.B) {
 			data := make([]byte, size)
 			_, err := rand.Read(data)
 			if err != nil {
@@ -1831,27 +1815,6 @@ func BenchmarkBase64EncodeComparison(b *testing.B) {
 				if len(encoded) == 0 {
 					b.Fatal("encoded data is empty")
 				}
-				putBuffer(encoded)
-			}
-		})
-
-		// Test the unoptimized version
-		b.Run(fmt.Sprintf("native-size-%d", size), func(b *testing.B) {
-			data := make([]byte, size)
-			_, err := rand.Read(data)
-			if err != nil {
-				b.Fatal(err)
-			}
-
-			b.ResetTimer()
-			b.ReportAllocs()
-
-			for i := 0; i < b.N; i++ {
-				encoded := base64EncodeNative(data)
-				if len(encoded) == 0 {
-					b.Fatal("encoded data is empty")
-				}
-				putBuffer(encoded)
 			}
 		})
 	}

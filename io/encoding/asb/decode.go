@@ -22,7 +22,6 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
-	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
@@ -32,34 +31,6 @@ import (
 )
 
 var errInvalidToken = errors.New("invalid token")
-
-// The following sync.Pool instances provide optimized memory reuse
-// for byte slices of varying capacities.
-var (
-	// bufPool is a unified pool for byte slices.
-	bufPool = sync.Pool{
-		New: func() any {
-			return make([]byte, 0, 512)
-		},
-	}
-)
-
-func getBuffer(size int) []byte {
-	buf := bufPool.Get().([]byte)
-
-	if cap(buf) < size {
-		buf = make([]byte, size)
-	} else {
-		buf = buf[:size]
-	}
-
-	return buf
-}
-
-func putBuffer(buf []byte) {
-	//nolint:staticcheck // It's ok to put byte array into buffer.
-	bufPool.Put(buf[:0])
-}
 
 func newDecoderError(tracker *positionTracker, err error) error {
 	if errors.Is(err, io.EOF) {
@@ -296,8 +267,6 @@ func (r *Decoder[T]) readHeader() (*header, error) {
 	}
 
 	res.Version = string(ver)
-
-	putBuffer(ver)
 
 	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
@@ -648,9 +617,8 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	res.Content = make([]byte, len(content))
-	copy(res.Content, content)
-	putBuffer(content)
+	// content is already a fresh allocation from readNBytes, use directly
+	res.Content = content
 
 	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
@@ -951,10 +919,7 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 			return nil, err
 		}
 
-		result := string(val)
-		putBuffer(val)
-
-		return result, nil
+		return string(val), nil
 	case binTypeGeoJSON:
 		return readGeoJSON(r.reader, ' ')
 	}
@@ -970,10 +935,8 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 
 	if base64Encoded {
 		val, err = readBase64BytesSized(r.reader, ' ')
-		defer putBuffer(val)
 	} else {
 		val, err = readBytesSized(r.reader, ' ')
-		defer putBuffer(val)
 	}
 
 	if err != nil {
@@ -1081,20 +1044,12 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 
 		res = string(keyVal)
 
-		putBuffer(keyVal)
-
 	case keyTypeBytes:
-		var keyVal, cVal []byte
+		var cVal []byte
 		if base64Encoded {
-			keyVal, err = readBase64BytesSized(r.reader, ' ')
-			cVal = make([]byte, len(keyVal))
-			copy(cVal, keyVal)
-			putBuffer(keyVal)
+			cVal, err = readBase64BytesSized(r.reader, ' ')
 		} else {
-			keyVal, err = readBytesSized(r.reader, ' ')
-			cVal = make([]byte, len(keyVal))
-			copy(cVal, keyVal)
-			putBuffer(keyVal)
+			cVal, err = readBytesSized(r.reader, ' ')
 		}
 
 		if err != nil {
@@ -1217,17 +1172,7 @@ func readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// decodeBase64 returns a pooled buffer, copy and return it
-	result, err := decodeBase64(encoded)
-	if err != nil {
-		return nil, err
-	}
-
-	decoded := make([]byte, len(result))
-	copy(decoded, result)
-	putBuffer(result)
-
-	return decoded, nil
+	return decodeBase64(encoded)
 }
 
 func readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
@@ -1248,21 +1193,13 @@ func readBlockDecodeBase64(src *countingReader, n int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer putBuffer(data)
 
-	result, err := decodeBase64(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return decodeBase64(data)
 }
 
 func decodeBase64(src []byte) ([]byte, error) {
 	decodedLen := base64.StdEncoding.DecodedLen(len(src))
-
-	// Get a buffer from the pool
-	buf := getBuffer(decodedLen)
+	buf := make([]byte, decodedLen)
 
 	bw, err := base64.StdEncoding.Decode(buf, src)
 	if err != nil {
@@ -1278,11 +1215,7 @@ func readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 		return "", err
 	}
 
-	result := string(val)
-
-	putBuffer(val)
-
-	return result, nil
+	return string(val), nil
 }
 
 func readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
@@ -1338,11 +1271,7 @@ func readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 		return nil, err
 	}
 
-	result := a.NewHLLValue(data)
-
-	putBuffer(data)
-
-	return result, nil
+	return a.NewHLLValue(data), nil
 }
 
 func readUntilEscaped(src *countingReader, delim byte) (string, error) {
@@ -1365,7 +1294,7 @@ func readUntil(src *countingReader, delim byte) (string, error) {
 
 func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
 	slice, err := src.Reader.ReadSlice(delim)
-	if err != nil && err != bufio.ErrBufferFull {
+	if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
 		return nil, err
 	}
 
@@ -1500,7 +1429,7 @@ func readUntilAnyEscaped(src *countingReader, delims []byte) ([]byte, error) {
 }
 
 func readNBytes(src *countingReader, n int64) ([]byte, error) {
-	buf := getBuffer(int(n))
+	buf := make([]byte, n)
 
 	_, err := io.ReadFull(src, buf)
 	if err != nil {
@@ -1512,9 +1441,7 @@ func readNBytes(src *countingReader, n int64) ([]byte, error) {
 
 	// Update position tracker by counting newlines in the read data, only if we found at least one newline.
 	if bytes.IndexByte(buf, asbNewLine) != -1 {
-		// Us bytes.Count for fast counting of newlines.
 		newlineCount := bytes.Count(buf, []byte{asbNewLine})
-		// Increase counter.
 		src.tracker.line += int64(newlineCount)
 
 		if newlineCount > 0 {
@@ -1553,11 +1480,8 @@ func expectToken(src *countingReader, token string) error {
 		return err
 	}
 
-	result := string(data)
-	putBuffer(data)
-
-	if result != token {
-		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, result, token)
+	if string(data) != token {
+		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, string(data), token)
 	}
 
 	return nil

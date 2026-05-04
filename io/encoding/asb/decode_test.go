@@ -2208,7 +2208,6 @@ func TestReadBase64BytesDelimited(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readBase64BytesDelimited() = %v, want %v", got, tt.want)
 			}
-			putBuffer(got)
 		})
 	}
 }
@@ -2278,7 +2277,6 @@ func TestReadBase64BytesSized(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readBase64BytesSized() = %v, want %v", got, tt.want)
 			}
-			putBuffer(got)
 		})
 	}
 }
@@ -2830,7 +2828,6 @@ func TestReadNBytes(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readNBytes() = %v, want %v", got, tt.want)
 			}
-			putBuffer(got)
 		})
 	}
 }

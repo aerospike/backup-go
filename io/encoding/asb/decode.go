@@ -333,13 +333,12 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 			return nil, err
 		}
 
-		metaToken, err := readUntilAny(r.reader, delimsSpaceOrNewline, false)
+		metaToken, err := readUntilAny(r.reader, delimsSpaceOrNewline)
 		if err != nil {
 			return nil, err
 		}
 
 		mToken := string(metaToken)
-		putBuffer(metaToken)
 
 		switch mToken {
 		case tokenNamespace:
@@ -367,7 +366,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 }
 
 func (r *Decoder[T]) readNamespace() (string, error) {
-	data, err := readUntil(r.reader, asbNewLine, true)
+	data, err := readUntilEscaped(r.reader, asbNewLine)
 	if err != nil {
 		return "", err
 	}
@@ -456,7 +455,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	res.Namespace, err = readUntil(r.reader, ' ', true)
+	res.Namespace, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -465,7 +464,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	res.Set, err = readUntil(r.reader, ' ', true)
+	res.Set, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +473,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	res.Name, err = readUntil(r.reader, ' ', true)
+	res.Name, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +508,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	path.BinName, err = readUntil(r.reader, ' ', true)
+	path.BinName, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -536,14 +535,14 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		// Expression filter has a base64 encoded expression and no CDT context.
 		// If it is not expression, we assume it is CDT context.
 		if isExpression {
-			res.Expression, err = readUntil(r.reader, asbNewLine, false)
+			res.Expression, err = readUntil(r.reader, asbNewLine)
 			if err != nil {
 				return nil, err
 			}
 		} else {
 			// NOTE: the context should always be base64 encoded,
 			// so escaping is not needed
-			path.B64Context, err = readUntil(r.reader, asbNewLine, false)
+			path.B64Context, err = readUntil(r.reader, asbNewLine)
 			if err != nil {
 				return nil, err
 			}
@@ -626,7 +625,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	res.Name, err = readUntil(r.reader, ' ', true)
+	res.Name, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
@@ -877,13 +876,12 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return err
 	}
 
-	nameBytes, err := readUntilAny(r.reader, delimsSpaceOrNewline, true)
+	nameBytes, err := readUntilAnyEscaped(r.reader, delimsSpaceOrNewline)
 	if err != nil {
 		return err
 	}
 
 	name := string(nameBytes)
-	putBuffer(nameBytes)
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
@@ -1172,7 +1170,7 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 }
 
 func (r *Decoder[T]) readSet() (string, error) {
-	set, err := readUntil(r.reader, asbNewLine, true)
+	set, err := readUntilEscaped(r.reader, asbNewLine)
 	if err != nil {
 		return "", err
 	}
@@ -1199,13 +1197,11 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 
 func (r *Decoder[T]) skipToNextLine() error {
 	// Read until newline, no escaping needed for skip.
-	buf, err := readUntilByte(r.reader, asbNewLine, false)
+	// Result is discarded - we just need to advance the reader
+	_, err := readUntilByte(r.reader, asbNewLine)
 	if err != nil {
 		return err
 	}
-
-	// Return buffer to pool immediately since we don't need the data.
-	putBuffer(buf)
 
 	// Consume the newline.
 	_, err = r.reader.ReadByte()
@@ -1216,12 +1212,12 @@ func (r *Decoder[T]) skipToNextLine() error {
 // ***** Helper Functions
 
 func readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) {
-	encoded, err := readUntilByte(src, delim, false)
+	encoded, err := readUntilByte(src, delim)
 	if err != nil {
 		return nil, err
 	}
-	defer putBuffer(encoded)
 
+	// decodeBase64 returns a pooled buffer, copy and return it
 	result, err := decodeBase64(encoded)
 	if err != nil {
 		return nil, err
@@ -1229,7 +1225,6 @@ func readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) {
 
 	decoded := make([]byte, len(result))
 	copy(decoded, result)
-
 	putBuffer(result)
 
 	return decoded, nil
@@ -1320,7 +1315,7 @@ func readBool(src *countingReader) (bool, error) {
 }
 
 func readFloat(src *countingReader, delim byte) (float64, error) {
-	data, err := readUntil(src, delim, false)
+	data, err := readUntil(src, delim)
 	if err != nil {
 		return 0, err
 	}
@@ -1350,22 +1345,54 @@ func readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
 	return result, nil
 }
 
-func readUntil(src *countingReader, delim byte, escaped bool) (string, error) {
-	result, err := readUntilByte(src, delim, escaped)
+func readUntilEscaped(src *countingReader, delim byte) (string, error) {
+	result, err := readUntilByteEscaped(src, delim)
 	if err != nil {
 		return "", err
 	}
 
-	resultStr := string(result)
-
-	putBuffer(result)
-
-	return resultStr, nil
+	return string(result), nil
 }
 
-func readUntilByte(src *countingReader, delim byte, escaped bool) ([]byte, error) {
-	buf := getBuffer(0)
+func readUntil(src *countingReader, delim byte) (string, error) {
+	result, err := readUntilByte(src, delim)
+	if err != nil {
+		return "", err
+	}
 
+	return string(result), nil
+}
+
+func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
+	slice, err := src.Reader.ReadSlice(delim)
+	if err != nil && err != bufio.ErrBufferFull {
+		return nil, err
+	}
+
+	n := len(slice)
+	// ReadSlice includes the delimiter, we need to exclude it
+	if n > 0 && slice[n-1] == delim {
+		n--
+	}
+
+	// Update tracker offset only (line/column computed lazily on error)
+	src.tracker.offset += uint64(n)
+
+	// Unread the delimiter - use underlying reader directly
+	if err := src.Reader.UnreadByte(); err != nil {
+		return nil, err
+	}
+
+	// Copy slice data - ReadSlice returns internal buffer that becomes invalid on next read
+	// No pool needed: callers either discard immediately or copy to final destination
+	buf := make([]byte, n)
+	copy(buf, slice[:n])
+
+	return buf, nil
+}
+
+func readUntilByteEscaped(src *countingReader, delim byte) ([]byte, error) {
+	var buf []byte
 	var esc bool
 
 	for range maxTokenSize {
@@ -1374,7 +1401,7 @@ func readUntilByte(src *countingReader, delim byte, escaped bool) ([]byte, error
 			return nil, err
 		}
 
-		if escaped && b == asbEscape && !esc {
+		if b == asbEscape && !esc {
 			esc = true
 			continue
 		}
@@ -1391,9 +1418,62 @@ func readUntilByte(src *countingReader, delim byte, escaped bool) ([]byte, error
 	return nil, errors.New("token larger than max size")
 }
 
-func readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, error) {
-	buf := getBuffer(0)
+func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
+	var buf []byte
+	totalRead := 0
 
+	for {
+		if totalRead >= maxTokenSize {
+			return nil, errors.New("token larger than max size")
+		}
+
+		buffered := src.Reader.Buffered()
+		if buffered == 0 {
+			// Need to fill buffer
+			if _, err := src.Reader.Peek(1); err != nil {
+				return nil, err
+			}
+
+			buffered = src.Reader.Buffered()
+		}
+
+		data, err := src.Reader.Peek(buffered)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		// Limit search to maxTokenSize
+		searchLen := len(data)
+		if totalRead+searchLen > maxTokenSize {
+			searchLen = maxTokenSize - totalRead
+		}
+
+		// Find first delimiter in buffered data
+		idx := bytes.IndexAny(data[:searchLen], string(delims))
+		if idx >= 0 {
+			// Found delimiter, read up to it
+			buf = append(buf, data[:idx]...)
+			src.Reader.Discard(idx)
+			src.tracker.offset += uint64(idx)
+
+			return buf, nil
+		}
+
+		// No delimiter found in search range
+		if totalRead+searchLen >= maxTokenSize {
+			return nil, errors.New("token larger than max size")
+		}
+
+		// No delimiter in buffer, consume all and continue
+		buf = append(buf, data[:searchLen]...)
+		src.Reader.Discard(searchLen)
+		src.tracker.offset += uint64(searchLen)
+		totalRead += searchLen
+	}
+}
+
+func readUntilAnyEscaped(src *countingReader, delims []byte) ([]byte, error) {
+	var buf []byte
 	var esc bool
 
 	for range maxTokenSize {
@@ -1402,7 +1482,7 @@ func readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, err
 			return nil, err
 		}
 
-		if escaped && b == asbEscape && !esc {
+		if b == asbEscape && !esc {
 			esc = true
 			continue
 		}

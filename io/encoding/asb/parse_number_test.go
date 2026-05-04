@@ -30,7 +30,7 @@ import (
 // ============================================================================
 
 func readIntegerOriginal(src *countingReader, delim byte) (int64, error) {
-	data, err := readUntil(src, delim, false)
+	data, err := readUntil(src, delim)
 	if err != nil {
 		return 0, err
 	}
@@ -39,7 +39,7 @@ func readIntegerOriginal(src *countingReader, delim byte) (int64, error) {
 }
 
 func readSizeOriginal(src *countingReader, delim byte) (uint32, error) {
-	data, err := readUntil(src, delim, false)
+	data, err := readUntil(src, delim)
 	if err != nil {
 		return 0, err
 	}

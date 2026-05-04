@@ -2604,225 +2604,181 @@ func TestReadFloat(t *testing.T) {
 
 func TestReadUntil(t *testing.T) {
 	t.Parallel()
-	type args struct {
-		src     *countingReader
-		delim   byte
-		escaped bool
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
-	}{
-		{
-			name: "positive read until",
-			args: args{
-				src: newTestCountingReader("string\n"),
 
-				delim:   '\n',
-				escaped: false,
-			},
-			want:    "string",
-			wantErr: false,
-		},
-		{
-			name: "positive read until escaped",
-			args: args{
-				src: newTestCountingReader("str\\\ning\n"),
+	t.Run("positive read until", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("string\n")
+		got, err := readUntil(src, '\n')
+		if err != nil {
+			t.Errorf("readUntil() error = %v", err)
+			return
+		}
+		if got != "string" {
+			t.Errorf("readUntil() = %v, want %v", got, "string")
+		}
+	})
 
-				delim:   '\n',
-				escaped: true,
-			},
-			want:    "str\ning",
-			wantErr: false,
-		},
-		{
-			name: "positive read until unescaped control chars",
-			args: args{
-				src: newTestCountingReader("str\\\ning\n"),
+	t.Run("positive read until escaped", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("str\\\ning\n")
+		got, err := readUntilEscaped(src, '\n')
+		if err != nil {
+			t.Errorf("readUntilEscaped() error = %v", err)
+			return
+		}
+		if got != "str\ning" {
+			t.Errorf("readUntilEscaped() = %v, want %v", got, "str\ning")
+		}
+	})
 
-				delim:   '\n',
-				escaped: false,
-			},
-			want:    "str\\",
-			wantErr: false,
-		},
-		{
-			name: "negative no delimiter",
-			args: args{
-				src: newTestCountingReader("string"),
+	t.Run("positive read until unescaped control chars", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("str\\\ning\n")
+		got, err := readUntil(src, '\n')
+		if err != nil {
+			t.Errorf("readUntil() error = %v", err)
+			return
+		}
+		if got != "str\\" {
+			t.Errorf("readUntil() = %v, want %v", got, "str\\")
+		}
+	})
 
-				delim:   '\n',
-				escaped: false,
-			},
-			want:    "",
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := readUntil(tt.args.src, tt.args.delim, tt.args.escaped)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readUntil() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readUntil() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	t.Run("negative no delimiter", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("string")
+		_, err := readUntil(src, '\n')
+		if err == nil {
+			t.Errorf("readUntil() expected error, got nil")
+		}
+	})
 }
 
 func TestReadUntilAny(t *testing.T) {
 	t.Parallel()
-	type args struct {
-		src     *countingReader
-		delims  []byte
-		escaped bool
-	}
-	tests := []struct {
-		name    string
-		want    []byte
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "positive simple",
-			args: args{
-				src: newTestCountingReader("string\n"),
 
-				delims:  []byte{'\n'},
-				escaped: false,
-			},
-			want:    []byte("string"),
-			wantErr: false,
-		},
-		{
-			name: "positive escaped",
-			args: args{
-				src: newTestCountingReader("str\\ing\n"),
+	t.Run("positive simple", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("string\n")
+		got, err := readUntilAny(src, []byte{'\n'})
+		if err != nil {
+			t.Errorf("readUntilAny() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("string")) {
+			t.Errorf("readUntilAny() = %v, want %v", got, []byte("string"))
+		}
+	})
 
-				delims:  []byte{'\n'},
-				escaped: true,
-			},
-			want:    []byte("string"),
-			wantErr: false,
-		},
-		{
-			name: "positive escaped delimiter",
-			args: args{
-				src: newTestCountingReader("str\\\ning\n"),
+	t.Run("positive escaped", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("str\\ing\n")
+		got, err := readUntilAnyEscaped(src, []byte{'\n'})
+		if err != nil {
+			t.Errorf("readUntilAnyEscaped() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("string")) {
+			t.Errorf("readUntilAnyEscaped() = %v, want %v", got, []byte("string"))
+		}
+	})
 
-				delims:  []byte{'\n'},
-				escaped: true,
-			},
-			want:    []byte("str\ning"),
-			wantErr: false,
-		},
-		{
-			name: "positive multiple delimiters",
-			args: args{
-				src: newTestCountingReader("strHing\n"),
+	t.Run("positive escaped delimiter", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("str\\\ning\n")
+		got, err := readUntilAnyEscaped(src, []byte{'\n'})
+		if err != nil {
+			t.Errorf("readUntilAnyEscaped() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("str\ning")) {
+			t.Errorf("readUntilAnyEscaped() = %v, want %v", got, []byte("str\ning"))
+		}
+	})
 
-				delims:  []byte{'\n', 'H'},
-				escaped: false,
-			},
-			want:    []byte("str"),
-			wantErr: false,
-		},
-		{
-			name: "positive multiple escaped delimiters",
-			args: args{
-				src: newTestCountingReader("str\\Hing\n"),
+	t.Run("positive multiple delimiters", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("strHing\n")
+		got, err := readUntilAny(src, []byte{'\n', 'H'})
+		if err != nil {
+			t.Errorf("readUntilAny() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("str")) {
+			t.Errorf("readUntilAny() = %v, want %v", got, []byte("str"))
+		}
+	})
 
-				delims:  []byte{'\n', 'H'},
-				escaped: true,
-			},
-			want:    []byte("strHing"),
-			wantErr: false,
-		},
-		{
-			name: "positive unescaped delimiter mid input",
-			args: args{
-				src: newTestCountingReader("strHing\n"),
+	t.Run("positive multiple escaped delimiters", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("str\\Hing\n")
+		got, err := readUntilAnyEscaped(src, []byte{'\n', 'H'})
+		if err != nil {
+			t.Errorf("readUntilAnyEscaped() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("strHing")) {
+			t.Errorf("readUntilAnyEscaped() = %v, want %v", got, []byte("strHing"))
+		}
+	})
 
-				delims:  []byte{'H'},
-				escaped: false,
-			},
-			want:    []byte("str"),
-			wantErr: false,
-		},
-		{
-			name: "negative empty delimiter list",
-			args: args{
-				src: newTestCountingReader("string\n"),
+	t.Run("positive unescaped delimiter mid input", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("strHing\n")
+		got, err := readUntilAny(src, []byte{'H'})
+		if err != nil {
+			t.Errorf("readUntilAny() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("str")) {
+			t.Errorf("readUntilAny() = %v, want %v", got, []byte("str"))
+		}
+	})
 
-				delims:  []byte{},
-				escaped: false,
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "negative no delimiter",
-			args: args{
-				src: newTestCountingReader("string"),
+	t.Run("negative empty delimiter list", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("string\n")
+		_, err := readUntilAny(src, []byte{})
+		if err == nil {
+			t.Errorf("readUntilAny() expected error, got nil")
+		}
+	})
 
-				delims:  []byte{'\n'},
-				escaped: false,
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "negative no delimiter escaped",
-			args: args{
-				src: newTestCountingReader("string\\\n"),
+	t.Run("negative no delimiter", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("string")
+		_, err := readUntilAny(src, []byte{'\n'})
+		if err == nil {
+			t.Errorf("readUntilAny() expected error, got nil")
+		}
+	})
 
-				delims:  []byte{'\n'},
-				escaped: true,
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "negative token too long",
-			args: args{
-				src: newTestCountingReader(strings.Repeat("a", maxTokenSize+1) + "\n"),
+	t.Run("negative no delimiter escaped", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("string\\\n")
+		_, err := readUntilAnyEscaped(src, []byte{'\n'})
+		if err == nil {
+			t.Errorf("readUntilAnyEscaped() expected error, got nil")
+		}
+	})
 
-				delims:  []byte{'\n'},
-				escaped: false,
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "negative input empty",
-			args: args{
-				src: newTestCountingReader(""),
+	t.Run("negative token too long", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader(strings.Repeat("a", maxTokenSize+1) + "\n")
+		_, err := readUntilAny(src, []byte{'\n'})
+		if err == nil {
+			t.Errorf("readUntilAny() expected error, got nil")
+		}
+	})
 
-				delims:  []byte{'\n'},
-				escaped: false,
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := readUntilAny(tt.args.src, tt.args.delims, tt.args.escaped)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readUntilAny() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readUntilAny() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	t.Run("negative input empty", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("")
+		_, err := readUntilAny(src, []byte{'\n'})
+		if err == nil {
+			t.Errorf("readUntilAny() expected error, got nil")
+		}
+	})
 }
 
 func TestReadNBytes(t *testing.T) {

@@ -111,14 +111,20 @@ type MockreaderCloser_Read_Call struct {
 }
 
 // Read is a helper method to define mock.On call
-//   - p
+//   - p []byte
 func (_e *MockreaderCloser_Expecter) Read(p interface{}) *MockreaderCloser_Read_Call {
 	return &MockreaderCloser_Read_Call{Call: _e.mock.On("Read", p)}
 }
 
 func (_c *MockreaderCloser_Read_Call) Run(run func(p []byte)) *MockreaderCloser_Read_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
+		var arg0 []byte
+		if args[0] != nil {
+			arg0 = args[0].([]byte)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

@@ -1080,6 +1080,207 @@ func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(ctx con
 	return _c
 }
 
+// StartBackup provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) StartBackup(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) (string, error) {
+	ret := _mock.Called(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StartBackup")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) (string, error)); ok {
+		return returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) string); ok {
+		r0 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, string, string) error); ok {
+		r1 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockInfoGetter_StartBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartBackup'
+type MockInfoGetter_StartBackup_Call struct {
+	*mock.Call
+}
+
+// StartBackup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - storage string
+//   - bucket string
+//   - region string
+//   - profile string
+//   - accessKey string
+//   - secretKey string
+func (_e *MockInfoGetter_Expecter) StartBackup(ctx interface{}, namespace interface{}, storage interface{}, bucket interface{}, region interface{}, profile interface{}, accessKey interface{}, secretKey interface{}) *MockInfoGetter_StartBackup_Call {
+	return &MockInfoGetter_StartBackup_Call{Call: _e.mock.On("StartBackup", ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)}
+}
+
+func (_c *MockInfoGetter_StartBackup_Call) Run(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string)) *MockInfoGetter_StartBackup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		var arg6 string
+		if args[6] != nil {
+			arg6 = args[6].(string)
+		}
+		var arg7 string
+		if args[7] != nil {
+			arg7 = args[7].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_StartBackup_Call) Return(s string, err error) *MockInfoGetter_StartBackup_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockInfoGetter_StartBackup_Call) RunAndReturn(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) (string, error)) *MockInfoGetter_StartBackup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StartRestore provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) StartRestore(ctx context.Context, jobID string, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error {
+	ret := _mock.Called(ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StartRestore")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string, string) error); ok {
+		r0 = returnFunc(ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockInfoGetter_StartRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartRestore'
+type MockInfoGetter_StartRestore_Call struct {
+	*mock.Call
+}
+
+// StartRestore is a helper method to define mock.On call
+//   - ctx context.Context
+//   - jobID string
+//   - namespace string
+//   - storage string
+//   - bucket string
+//   - region string
+//   - profile string
+//   - accessKey string
+//   - secretKey string
+func (_e *MockInfoGetter_Expecter) StartRestore(ctx interface{}, jobID interface{}, namespace interface{}, storage interface{}, bucket interface{}, region interface{}, profile interface{}, accessKey interface{}, secretKey interface{}) *MockInfoGetter_StartRestore_Call {
+	return &MockInfoGetter_StartRestore_Call{Call: _e.mock.On("StartRestore", ctx, jobID, namespace, storage, bucket, region, profile, accessKey, secretKey)}
+}
+
+func (_c *MockInfoGetter_StartRestore_Call) Run(run func(ctx context.Context, jobID string, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string)) *MockInfoGetter_StartRestore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		var arg6 string
+		if args[6] != nil {
+			arg6 = args[6].(string)
+		}
+		var arg7 string
+		if args[7] != nil {
+			arg7 = args[7].(string)
+		}
+		var arg8 string
+		if args[8] != nil {
+			arg8 = args[8].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7,
+			arg8,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_StartRestore_Call) Return(err error) *MockInfoGetter_StartRestore_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockInfoGetter_StartRestore_Call) RunAndReturn(run func(ctx context.Context, jobID string, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) error) *MockInfoGetter_StartRestore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StartXDR provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) StartXDR(ctx context.Context, nodeName string, dc string, hostPort string, namespace string, rewind string, throughput int, forward bool) error {
 	ret := _mock.Called(ctx, nodeName, dc, hostPort, namespace, rewind, throughput, forward)

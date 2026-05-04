@@ -14,7 +14,10 @@
 
 package cltime
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
 
 // getNow is a variable that holds the time.Now function. It is used for testing
 var getNow = time.Now
@@ -41,4 +44,9 @@ func (c *CLTime) Unix() int64 {
 // Now returns the current time in seconds since the citrusleaf epoch.
 func Now() CLTime {
 	return CLTime{Seconds: getNow().Unix() - CitrusleafEpoch}
+}
+
+// String returns the string representation of the CLTime instance in seconds.
+func (c *CLTime) String() string {
+	return strconv.FormatInt(c.Seconds, 10)
 }

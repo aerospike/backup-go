@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 )
@@ -47,6 +48,9 @@ var (
 	// AerospikeVersionRecentInfoCommands after this version, all commands should use
 	// `namespace` parameter instead of `ns` or `id`.
 	AerospikeVersionRecentInfoCommands = AerospikeVersion{8, 1, 0}
+
+	// AerospikeVersionSupportsIntegratedBackup TODO: change this, after server release.
+	AerospikeVersionSupportsIntegratedBackup = AerospikeVersion{8, 1, 0}
 )
 
 var (
@@ -956,6 +960,49 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	}
 
 	return bitMapToIntSlice(bitMap), nil
+}
+
+// StartBackup starts a backup job.
+func (ic *Client) StartBackup(ctx context.Context,
+	namespace, storage, bucket, region, profile, accessKey, secretKey string,
+) (string, error) {
+	cNow := cltime.Now()
+	jobID := cNow.String()
+
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup],
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed start backup: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse start backup response: %w", err)
+	}
+
+	return jobID, nil
+}
+
+// StartRestore starts a backup job.
+func (ic *Client) StartRestore(ctx context.Context, jobID string,
+	namespace, storage, bucket, region, profile, accessKey, secretKey string,
+) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideRestore],
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed start restore: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return fmt.Errorf("failed to parse start restore response: %w", err)
+	}
+
+	return nil
 }
 
 // ***** Utility functions *****

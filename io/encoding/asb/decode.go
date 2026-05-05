@@ -21,9 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"slices"
 	"strconv"
-	"sync"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
@@ -33,77 +31,6 @@ import (
 )
 
 var errInvalidToken = errors.New("invalid token")
-
-// The following sync.Pool instances provide optimized memory reuse
-// for byte slices of varying capacities.
-var (
-	// bigBufPool is a pool of big byte slices used for decoding.
-	bigBufPool = sync.Pool{
-		New: func() any {
-			return make([]byte, 0, 512)
-		},
-	}
-	// smallBufPool is a pool of small byte slices used for decoding.
-	smallBufPool = sync.Pool{
-		New: func() any {
-			return make([]byte, 0, 64)
-		},
-	}
-	// base64BufferPool is a pool of byte slices used for base64 encoding
-	base64BufferPool = sync.Pool{
-		New: func() any {
-			// The buffer size is arbitrary and will be grown if needed
-			return make([]byte, 0, 1024)
-		},
-	}
-)
-
-// base64Encode encodes the input bytes using base64 encoding.
-// It returns a slice that references a pooled buffer, which must be returned to the pool
-// after use by calling returnBase64Buffer.
-func base64Encode(v []byte) []byte {
-	encodedLen := base64.StdEncoding.EncodedLen(len(v))
-
-	// Get a buffer from the pool
-	buf := base64BufferPool.Get().([]byte)
-
-	// Ensure the buffer is large enough
-	if cap(buf) < encodedLen {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, encodedLen)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:encodedLen]
-	}
-
-	// Encode the data
-	base64.StdEncoding.Encode(buf, v)
-
-	// Return a slice that references the pooled buffer
-	return buf
-}
-
-// returnBase64Buffer returns the buffer to the pool.
-// This must be called after the buffer returned by base64Encode is no longer needed.
-func returnBase64Buffer(buf []byte) {
-	// Reset length but keep capacity
-	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	base64BufferPool.Put(buf[:0])
-}
-
-// returnBigBuffer return buffer to pool.
-func returnBigBuffer(buf []byte) {
-	// Reset length but keep capacity
-	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	bigBufPool.Put(buf[:0])
-}
-
-// returnSmallBuffer return buffer to pool.
-func returnSmallBuffer(buf []byte) {
-	// Reset length but keep capacity
-	//nolint:staticcheck // We try to decrease allocation, not to make them zero.
-	smallBufPool.Put(buf[:0])
-}
 
 func newDecoderError(tracker *positionTracker, err error) error {
 	if errors.Is(err, io.EOF) {
@@ -161,7 +88,7 @@ type countingReader struct {
 
 func newCountingReader(src io.Reader, fileName string) *countingReader {
 	return &countingReader{
-		Reader: bufio.NewReader(src),
+		Reader: bufio.NewReaderSize(src, 1024*1024), // 1mb buffer
 		tracker: &positionTracker{
 			fileName: fileName,
 			// For printing lines starting from 1.
@@ -276,7 +203,7 @@ func (r *Decoder[T]) NextToken() (T, error) {
 	countBefore := r.reader.tracker.offset
 
 	v, err := func() (any, error) {
-		b, err := _peek(r.reader)
+		b, err := peek(r.reader)
 		if err != nil {
 			return nil, err
 		}
@@ -325,25 +252,23 @@ type header struct {
 func (r *Decoder[T]) readHeader() (*header, error) {
 	var res header
 
-	if err := _expectToken(r.reader, tokenASBVersion); err != nil {
+	if err := expectToken(r.reader, tokenASBVersion); err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
 	// version number format is "x.y"
-	ver, err := _readNBytes(r.reader, 3)
+	ver, err := readNBytes(r.reader, 3)
 	if err != nil {
 		return nil, err
 	}
 
 	res.Version = string(ver)
 
-	returnBigBuffer(ver)
-
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -355,7 +280,7 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 	var res metaData
 
 	for {
-		startC, err := _peek(r.reader)
+		startC, err := peek(r.reader)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
@@ -369,25 +294,24 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 			break
 		}
 
-		if err := _expectChar(r.reader, markerMetadataSection); err != nil {
+		if err := expectChar(r.reader, markerMetadataSection); err != nil {
 			return nil, err
 		}
 
-		if err := _expectChar(r.reader, ' '); err != nil {
+		if err := expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
 
-		metaToken, err := _readUntilAny(r.reader, []byte{' ', asbNewLine}, false)
+		metaToken, err := readUntilAny(r.reader, delimsSpaceOrNewline)
 		if err != nil {
 			return nil, err
 		}
 
 		mToken := string(metaToken)
-		returnSmallBuffer(metaToken)
 
 		switch mToken {
 		case tokenNamespace:
-			if err := _expectChar(r.reader, ' '); err != nil {
+			if err := expectChar(r.reader, ' '); err != nil {
 				return nil, err
 			}
 
@@ -411,12 +335,12 @@ func (r *Decoder[T]) readMetadata() (*metaData, error) {
 }
 
 func (r *Decoder[T]) readNamespace() (string, error) {
-	data, err := _readUntil(r.reader, asbNewLine, true)
+	data, err := readUntilEscaped(r.reader, asbNewLine)
 	if err != nil {
 		return "", err
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return "", err
 	}
 
@@ -424,7 +348,7 @@ func (r *Decoder[T]) readNamespace() (string, error) {
 }
 
 func (r *Decoder[T]) readFirst() (bool, error) {
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return false, err
 	}
 
@@ -434,11 +358,11 @@ func (r *Decoder[T]) readFirst() (bool, error) {
 func (r *Decoder[T]) readGlobals() (any, error) {
 	var res any
 
-	if err := _expectChar(r.reader, markerGlobalSection); err != nil {
+	if err := expectChar(r.reader, markerGlobalSection); err != nil {
 		return r.skipAndRetryGlobals(fmt.Errorf("failed to read global section: %w", err))
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
@@ -496,34 +420,34 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		err error
 	)
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	res.Namespace, err = _readUntil(r.reader, ' ', true)
+	res.Namespace, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	res.Set, err = _readUntil(r.reader, ' ', true)
+	res.Set, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	res.Name, err = _readUntil(r.reader, ' ', true)
+	res.Name, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
@@ -532,7 +456,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
@@ -549,16 +473,16 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 
 	var path models.SIndexPath
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	path.BinName, err = _readUntil(r.reader, ' ', true)
+	path.BinName, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
@@ -568,26 +492,26 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 	}
 
 	// check for optional context
-	b, err := _peek(r.reader)
+	b, err := peek(r.reader)
 	if err != nil {
 		return nil, err
 	}
 
 	if b == ' ' { //nolint:nestif // optional context: two clear branches (expression vs CDT context)
-		if err := _expectChar(r.reader, ' '); err != nil {
+		if err := expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
 		// Expression filter has a base64 encoded expression and no CDT context.
 		// If it is not expression, we assume it is CDT context.
 		if isExpression {
-			res.Expression, err = _readUntil(r.reader, asbNewLine, false)
+			res.Expression, err = readUntil(r.reader, asbNewLine)
 			if err != nil {
 				return nil, err
 			}
 		} else {
 			// NOTE: the context should always be base64 encoded,
 			// so escaping is not needed
-			path.B64Context, err = _readUntil(r.reader, asbNewLine, false)
+			path.B64Context, err = readUntil(r.reader, asbNewLine)
 			if err != nil {
 				return nil, err
 			}
@@ -596,7 +520,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 
 	res.Path = path
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -650,7 +574,7 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		res models.UDF
 	)
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
@@ -666,16 +590,16 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, fmt.Errorf("invalid UDF type %c in global section UDF line", b)
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	res.Name, err = _readUntil(r.reader, ' ', true)
+	res.Name, err = readUntilEscaped(r.reader, ' ')
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
@@ -684,20 +608,19 @@ func (r *Decoder[T]) readUDF() (*models.UDF, error) {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return nil, err
 	}
 
-	content, err := _readNBytes(r.reader, int64(length))
+	content, err := readNBytes(r.reader, int64(length))
 	if err != nil {
 		return nil, err
 	}
 
-	res.Content = make([]byte, len(content))
-	copy(res.Content, content)
-	returnBigBuffer(content)
+	// content is already a fresh allocation from readNBytes, use directly
+	res.Content = content
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -728,11 +651,11 @@ func (r *Decoder[T]) readRecord() (*models.Record, error) {
 	var recData recordData
 
 	for i := 0; i < len(expectedRecordHeaderTypes); i++ {
-		if err := _expectChar(r.reader, markerRecordHeader); err != nil {
+		if err := expectChar(r.reader, markerRecordHeader); err != nil {
 			return nil, err
 		}
 
-		if err := _expectChar(r.reader, ' '); err != nil {
+		if err := expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
 
@@ -767,7 +690,7 @@ func (r *Decoder[T]) readRecord() (*models.Record, error) {
 			return nil, fmt.Errorf("invalid record header line type %c expected %c", b, expectedRecordHeaderTypes[i])
 		}
 
-		if err := _expectChar(r.reader, ' '); err != nil {
+		if err := expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
 
@@ -844,11 +767,11 @@ func (r *Decoder[T]) readBins(count uint16) (a.BinMap, error) {
 	bins := make(a.BinMap, count)
 
 	for range count {
-		if err := _expectChar(r.reader, markerRecordBins); err != nil {
+		if err := expectChar(r.reader, markerRecordBins); err != nil {
 			return nil, err
 		}
 
-		if err := _expectChar(r.reader, ' '); err != nil {
+		if err := expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
 
@@ -921,17 +844,16 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return err
 	}
 
-	nameBytes, err := _readUntilAny(r.reader, []byte{' ', asbNewLine}, true)
+	nameBytes, err := readUntilAnyEscaped(r.reader, delimsSpaceOrNewline)
 	if err != nil {
 		return err
 	}
 
 	name := string(nameBytes)
-	returnSmallBuffer(nameBytes)
 
 	// binTypeNil is a special case where the line ends after the bin name
 	if binType == binTypeNil {
-		if err := _expectChar(r.reader, asbNewLine); err != nil {
+		if err := expectChar(r.reader, asbNewLine); err != nil {
 			return err
 		}
 
@@ -940,7 +862,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return nil
 	}
 
-	if err := _expectChar(r.reader, ' '); err != nil {
+	if err := expectChar(r.reader, ' '); err != nil {
 		return err
 	}
 
@@ -949,7 +871,7 @@ func (r *Decoder[T]) readBin(bins a.BinMap) error {
 		return binErr
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return err
 	}
 
@@ -969,7 +891,7 @@ func (r *Decoder[T]) checkEncoded() (bool, error) {
 	}
 
 	if b == '!' {
-		if err := _expectChar(r.reader, ' '); err != nil {
+		if err := expectChar(r.reader, ' '); err != nil {
 			return false, err
 		}
 
@@ -982,27 +904,24 @@ func (r *Decoder[T]) checkEncoded() (bool, error) {
 func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64Encoded bool) (any, error) {
 	switch binType {
 	case binTypeBool:
-		return _readBool(r.reader)
+		return readBool(r.reader)
 	case binTypeInt:
 		return readSignedInt(r.reader, asbNewLine)
 	case binTypeFloat:
-		return _readFloat(r.reader, asbNewLine)
+		return readFloat(r.reader, asbNewLine)
 	case binTypeString:
-		return _readStringSized(r.reader, ' ')
+		return readStringSized(r.reader, ' ')
 	case binTypeLDT:
 		return nil, errors.New("this backup contains LDTs, please restore it using an older restore tool that supports LDTs")
 	case binTypeStringBase64:
-		val, err := _readBase64BytesSized(r.reader, ' ')
+		val, err := readBase64BytesSized(r.reader, ' ')
 		if err != nil {
 			return nil, err
 		}
 
-		result := string(val)
-		returnBase64Buffer(val)
-
-		return result, nil
+		return string(val), nil
 	case binTypeGeoJSON:
-		return _readGeoJSON(r.reader, ' ')
+		return readGeoJSON(r.reader, ' ')
 	}
 
 	if _, ok := bytesBinTypes[binType]; !ok {
@@ -1015,11 +934,9 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	)
 
 	if base64Encoded {
-		val, err = _readBase64BytesSized(r.reader, ' ')
-		defer returnBase64Buffer(val)
+		val, err = readBase64BytesSized(r.reader, ' ')
 	} else {
-		val, err = _readBytesSized(r.reader, ' ')
-		defer returnBigBuffer(val)
+		val, err = readBytesSized(r.reader, ' ')
 	}
 
 	if err != nil {
@@ -1027,20 +944,12 @@ func fetchBinValue[T models.TokenConstraint](r *Decoder[T], binType byte, base64
 	}
 
 	if _, ok := isMsgPackBytes[binType]; !ok {
-		// We should copy a result, as buffer will be returned.
-		mspVal := make([]byte, len(val))
-		copy(mspVal, val)
-
-		return mspVal, nil
+		return val, nil
 	}
 
 	switch binType {
 	case binTypeBytesHLL:
-		// Only HLL val is not copied inside the lib, so we should copy it ourselves.
-		hllVal := make([]byte, len(val))
-		copy(hllVal, val)
-
-		return a.NewHLLValue(hllVal), nil
+		return a.NewHLLValue(val), nil
 	case binTypeBytesMap:
 		return a.NewRawBlobValue(particleType.MAP, val), nil
 	case binTypeBytesList:
@@ -1089,7 +998,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 	}
 
 	if !base64Encoded {
-		if err := _expectChar(r.reader, ' '); err != nil {
+		if err := expectChar(r.reader, ' '); err != nil {
 			return nil, err
 		}
 	}
@@ -1104,7 +1013,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		res = keyVal
 
 	case keyTypeFloat:
-		keyVal, err := _readFloat(r.reader, asbNewLine)
+		keyVal, err := readFloat(r.reader, asbNewLine)
 		if err != nil {
 			return nil, err
 		}
@@ -1112,7 +1021,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		res = keyVal
 
 	case keyTypeString:
-		keyVal, err := _readStringSized(r.reader, ' ')
+		keyVal, err := readStringSized(r.reader, ' ')
 		if err != nil {
 			return nil, err
 		}
@@ -1120,27 +1029,19 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		res = keyVal
 
 	case keyTypeStringBase64:
-		keyVal, err := _readBase64BytesSized(r.reader, ' ')
+		keyVal, err := readBase64BytesSized(r.reader, ' ')
 		if err != nil {
 			return nil, err
 		}
 
 		res = string(keyVal)
 
-		returnBase64Buffer(keyVal)
-
 	case keyTypeBytes:
-		var keyVal, cVal []byte
+		var cVal []byte
 		if base64Encoded {
-			keyVal, err = _readBase64BytesSized(r.reader, ' ')
-			cVal = make([]byte, len(keyVal))
-			copy(cVal, keyVal)
-			returnBase64Buffer(keyVal)
+			cVal, err = readBase64BytesSized(r.reader, ' ')
 		} else {
-			keyVal, err = _readBytesSized(r.reader, ' ')
-			cVal = make([]byte, len(keyVal))
-			copy(cVal, keyVal)
-			returnBigBuffer(keyVal)
+			cVal, err = readBytesSized(r.reader, ' ')
 		}
 
 		if err != nil {
@@ -1154,7 +1055,7 @@ func (r *Decoder[T]) readUserKey() (any, error) {
 		return nil, fmt.Errorf("invalid key type %c", keyTypeChar)
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -1171,7 +1072,7 @@ func (r *Decoder[T]) readBinCount() (uint16, error) {
 		return 0, fmt.Errorf("invalid bin offset %d", binCount)
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1187,7 +1088,7 @@ func (r *Decoder[T]) readExpiration() (int64, error) {
 		return 0, err
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1208,7 +1109,7 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 		return 0, fmt.Errorf("invalid generation offset %d", gen)
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return 0, err
 	}
 
@@ -1216,12 +1117,12 @@ func (r *Decoder[T]) readGeneration() (uint32, error) {
 }
 
 func (r *Decoder[T]) readSet() (string, error) {
-	set, err := _readUntil(r.reader, asbNewLine, true)
+	set, err := readUntilEscaped(r.reader, asbNewLine)
 	if err != nil {
 		return "", err
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return "", err
 	}
 
@@ -1229,12 +1130,12 @@ func (r *Decoder[T]) readSet() (string, error) {
 }
 
 func (r *Decoder[T]) readDigest() ([]byte, error) {
-	digest, err := _readBase64BytesDelimited(r.reader, asbNewLine)
+	digest, err := readBase64BytesDelimited(r.reader, asbNewLine)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(r.reader, asbNewLine); err != nil {
+	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err
 	}
 
@@ -1243,13 +1144,11 @@ func (r *Decoder[T]) readDigest() ([]byte, error) {
 
 func (r *Decoder[T]) skipToNextLine() error {
 	// Read until newline, no escaping needed for skip.
-	buf, err := _readUntilAny(r.reader, []byte{asbNewLine}, false)
+	// Result is discarded - we just need to advance the reader
+	_, err := readUntilByte(r.reader, asbNewLine)
 	if err != nil {
 		return err
 	}
-
-	// Return buffer to pool immediately since we don't need the data.
-	returnSmallBuffer(buf)
 
 	// Consume the newline.
 	_, err = r.reader.ReadByte()
@@ -1259,70 +1158,40 @@ func (r *Decoder[T]) skipToNextLine() error {
 
 // ***** Helper Functions
 
-func _readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) {
-	encoded, err := _readUntilAny(src, []byte{delim}, false)
+func readBase64BytesDelimited(src *countingReader, delim byte) ([]byte, error) {
+	encoded, err := readUntilByte(src, delim)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := _decodeBase64(encoded)
-	if err != nil {
-		return nil, err
-	}
-
-	returnSmallBuffer(encoded)
-
-	decoded := make([]byte, len(result))
-	copy(decoded, result)
-
-	returnBase64Buffer(result)
-
-	return decoded, nil
+	return decodeBase64(encoded)
 }
 
-func _readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
+func readBase64BytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
 	size, err := readUnsignedInt(src, sizeDelim)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(src, sizeDelim); err != nil {
+	if err := expectChar(src, sizeDelim); err != nil {
 		return nil, err
 	}
 
-	return _readBlockDecodeBase64(src, int64(size))
+	return readBlockDecodeBase64(src, int64(size))
 }
 
-func _readBlockDecodeBase64(src *countingReader, n int64) ([]byte, error) {
-	data, err := _readNBytes(src, n)
+func readBlockDecodeBase64(src *countingReader, n int64) ([]byte, error) {
+	data, err := readNBytes(src, n)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := _decodeBase64(data)
-	if err != nil {
-		return nil, err
-	}
-
-	returnSmallBuffer(data)
-
-	return result, nil
+	return decodeBase64(data)
 }
 
-func _decodeBase64(src []byte) ([]byte, error) {
+func decodeBase64(src []byte) ([]byte, error) {
 	decodedLen := base64.StdEncoding.DecodedLen(len(src))
-
-	// Get a buffer from the pool
-	buf := base64BufferPool.Get().([]byte)
-
-	// Ensure the buffer is large enough
-	if cap(buf) < decodedLen {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, decodedLen)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:decodedLen]
-	}
+	buf := make([]byte, decodedLen)
 
 	bw, err := base64.StdEncoding.Decode(buf, src)
 	if err != nil {
@@ -1332,33 +1201,29 @@ func _decodeBase64(src []byte) ([]byte, error) {
 	return buf[:bw], nil
 }
 
-func _readStringSized(src *countingReader, sizeDelim byte) (string, error) {
-	val, err := _readBytesSized(src, sizeDelim)
+func readStringSized(src *countingReader, sizeDelim byte) (string, error) {
+	val, err := readBytesSized(src, sizeDelim)
 	if err != nil {
 		return "", err
 	}
 
-	result := string(val)
-
-	returnBigBuffer(val)
-
-	return result, nil
+	return string(val), nil
 }
 
-func _readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
+func readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
 	length, err := readUnsignedInt(src, sizeDelim)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := _expectChar(src, sizeDelim); err != nil {
+	if err := expectChar(src, sizeDelim); err != nil {
 		return nil, err
 	}
 
-	return _readNBytes(src, int64(length))
+	return readNBytes(src, int64(length))
 }
 
-func _readBool(src *countingReader) (bool, error) {
+func readBool(src *countingReader) (bool, error) {
 	b, err := src.ReadByte()
 	if err != nil {
 		return false, err
@@ -1374,8 +1239,8 @@ func _readBool(src *countingReader) (bool, error) {
 	}
 }
 
-func _readFloat(src *countingReader, delim byte) (float64, error) {
-	data, err := _readUntil(src, delim, false)
+func readFloat(src *countingReader, delim byte) (float64, error) {
+	data, err := readUntil(src, delim)
 	if err != nil {
 		return 0, err
 	}
@@ -1383,8 +1248,8 @@ func _readFloat(src *countingReader, delim byte) (float64, error) {
 	return strconv.ParseFloat(data, 64)
 }
 
-func _readGeoJSON(src *countingReader, sizeDelim byte) (a.GeoJSONValue, error) {
-	val, err := _readStringSized(src, sizeDelim)
+func readGeoJSON(src *countingReader, sizeDelim byte) (a.GeoJSONValue, error) {
+	val, err := readStringSized(src, sizeDelim)
 	if err != nil {
 		return "", err
 	}
@@ -1392,37 +1257,65 @@ func _readGeoJSON(src *countingReader, sizeDelim byte) (a.GeoJSONValue, error) {
 	return a.NewGeoJSONValue(val), nil
 }
 
-func _readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
-	data, err := _readBytesSized(src, sizeDelim)
+func readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
+	data, err := readBytesSized(src, sizeDelim)
 	if err != nil {
 		return nil, err
 	}
 
-	result := a.NewHLLValue(data)
-
-	returnBigBuffer(data)
-
-	return result, nil
+	return a.NewHLLValue(data), nil
 }
 
-func _readUntil(src *countingReader, delim byte, escaped bool) (string, error) {
-	result, err := _readUntilAny(src, []byte{delim}, escaped)
+func readUntilEscaped(src *countingReader, delim byte) (string, error) {
+	result, err := readUntilByteEscaped(src, delim)
 	if err != nil {
 		return "", err
 	}
 
-	resultStr := string(result)
-
-	returnSmallBuffer(result)
-
-	return resultStr, nil
+	return string(result), nil
 }
 
-func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, error) {
-	bufInterface := smallBufPool.Get()
-	buf := bufInterface.([]byte)
+func readUntil(src *countingReader, delim byte) (string, error) {
+	result, err := readUntilByte(src, delim)
+	if err != nil {
+		return "", err
+	}
 
-	var esc bool
+	return string(result), nil
+}
+
+func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
+	slice, err := src.ReadSlice(delim)
+	if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
+		return nil, err
+	}
+
+	n := len(slice)
+	// ReadSlice includes the delimiter, we need to exclude it
+	if n > 0 && slice[n-1] == delim {
+		n--
+	}
+
+	// Update tracker offset only
+	src.tracker.offset += uint64(n)
+
+	// Unread the delimiter
+	if err := src.Reader.UnreadByte(); err != nil {
+		return nil, err
+	}
+
+	// Copy slice data - ReadSlice returns internal buffer that becomes invalid on next read
+	buf := make([]byte, n)
+	copy(buf, slice[:n])
+
+	return buf, nil
+}
+
+func readUntilByteEscaped(src *countingReader, delim byte) ([]byte, error) {
+	var (
+		buf []byte
+		esc bool
+	)
 
 	for range maxTokenSize {
 		b, err := src.ReadByte()
@@ -1430,15 +1323,13 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 			return nil, err
 		}
 
-		if escaped && b == asbEscape && !esc {
+		if b == asbEscape && !esc {
 			esc = true
 			continue
 		}
 
-		if !esc {
-			if slices.Contains(delims, b) {
-				return buf, src.UnreadByte()
-			}
+		if !esc && b == delim {
+			return buf, src.UnreadByte()
 		}
 
 		esc = false
@@ -1449,17 +1340,97 @@ func _readUntilAny(src *countingReader, delims []byte, escaped bool) ([]byte, er
 	return nil, errors.New("token larger than max size")
 }
 
-func _readNBytes(src *countingReader, n int64) ([]byte, error) {
-	buf := bigBufPool.Get().([]byte)
+func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
+	var buf []byte
+	totalRead := 0
 
-	// Ensure the buffer is large enough
-	if int64(cap(buf)) < n {
-		// If the buffer is too small, create a new one with sufficient capacity
-		buf = make([]byte, n)
-	} else {
-		// Otherwise, resize the existing buffer
-		buf = buf[:n]
+	for {
+		if totalRead >= maxTokenSize {
+			return nil, errors.New("token larger than max size")
+		}
+
+		buffered := src.Buffered()
+		if buffered == 0 {
+			// Need to fill buffer
+			if _, err := src.Peek(1); err != nil {
+				return nil, err
+			}
+
+			buffered = src.Buffered()
+		}
+
+		data, err := src.Peek(buffered)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+
+		// Limit search to maxTokenSize
+		searchLen := len(data)
+		if totalRead+searchLen > maxTokenSize {
+			searchLen = maxTokenSize - totalRead
+		}
+
+		// Find first delimiter in buffered data
+		idx := bytes.IndexAny(data[:searchLen], string(delims))
+		if idx >= 0 {
+			// Found delimiter, read up to it
+			buf = append(buf, data[:idx]...)
+			if _, err := src.Discard(idx); err != nil {
+				return nil, err
+			}
+
+			src.tracker.offset += uint64(idx)
+
+			return buf, nil
+		}
+
+		// No delimiter found in search range
+		if totalRead+searchLen >= maxTokenSize {
+			return nil, errors.New("token larger than max size")
+		}
+
+		// No delimiter in buffer, consume all and continue
+		buf = append(buf, data[:searchLen]...)
+		if _, err := src.Discard(searchLen); err != nil {
+			return nil, err
+		}
+
+		src.tracker.offset += uint64(searchLen)
+		totalRead += searchLen
 	}
+}
+
+func readUntilAnyEscaped(src *countingReader, delims []byte) ([]byte, error) {
+	var (
+		buf []byte
+		esc bool
+	)
+
+	for range maxTokenSize {
+		b, err := src.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+
+		if b == asbEscape && !esc {
+			esc = true
+			continue
+		}
+
+		if !esc && bytes.IndexByte(delims, b) != -1 {
+			return buf, src.UnreadByte()
+		}
+
+		esc = false
+
+		buf = append(buf, b)
+	}
+
+	return nil, errors.New("token larger than max size")
+}
+
+func readNBytes(src *countingReader, n int64) ([]byte, error) {
+	buf := make([]byte, n)
 
 	_, err := io.ReadFull(src, buf)
 	if err != nil {
@@ -1471,9 +1442,7 @@ func _readNBytes(src *countingReader, n int64) ([]byte, error) {
 
 	// Update position tracker by counting newlines in the read data, only if we found at least one newline.
 	if bytes.IndexByte(buf, asbNewLine) != -1 {
-		// Us bytes.Count for fast counting of newlines.
 		newlineCount := bytes.Count(buf, []byte{asbNewLine})
-		// Increase counter.
 		src.tracker.line += int64(newlineCount)
 
 		if newlineCount > 0 {
@@ -1493,7 +1462,7 @@ func _readNBytes(src *countingReader, n int64) ([]byte, error) {
 	return buf, nil
 }
 
-func _expectChar(src *countingReader, c byte) error {
+func expectChar(src *countingReader, c byte) error {
 	b, err := src.ReadByte()
 	if err != nil {
 		return err
@@ -1506,23 +1475,20 @@ func _expectChar(src *countingReader, c byte) error {
 	return fmt.Errorf("invalid character, read %c, expected %c", b, c)
 }
 
-func _expectToken(src *countingReader, token string) error {
-	data, err := _readNBytes(src, int64(len(token)))
+func expectToken(src *countingReader, token string) error {
+	data, err := readNBytes(src, int64(len(token)))
 	if err != nil {
 		return err
 	}
 
-	result := string(data)
-	returnBigBuffer(data)
-
-	if result != token {
-		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, result, token)
+	if string(data) != token {
+		return fmt.Errorf("%w, read %s, expected %s", errInvalidToken, string(data), token)
 	}
 
 	return nil
 }
 
-func _peek(src *countingReader) (byte, error) {
+func peek(src *countingReader) (byte, error) {
 	b, err := src.ReadByte()
 	if err != nil {
 		return 0, err

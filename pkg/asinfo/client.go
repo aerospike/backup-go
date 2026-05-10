@@ -31,6 +31,22 @@ import (
 
 const errCmdRespPrefix = "ERROR"
 
+const (
+	indexTypeDefault   = "default"
+	indexTypeNone      = "none"
+	indexTypeList      = "list"
+	indexTypeMapKeys   = "mapkeys"
+	indexTypeMapValues = "mapvalues"
+
+	indexBinTypeNumeric     = "numeric"
+	indexBinTypeIntSigned   = "int signed"
+	indexBinTypeString      = "string"
+	indexBinTypeText        = "text"
+	indexBinTypeBlob        = "blob"
+	indexBinTypeGeo2DSphere = "geo2dsphere"
+	indexBinTypeGeoJSON     = "geojson"
+)
+
 var (
 	aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
 	secretAgentValRegex   = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
@@ -1154,13 +1170,13 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 		var sindexType models.SIndexType
 
 		switch strings.ToLower(val) {
-		case "default", "none":
+		case indexTypeDefault, indexTypeNone:
 			sindexType = models.BinSIndex
-		case "list":
+		case indexTypeList:
 			sindexType = models.ListElementSIndex
-		case "mapkeys":
+		case indexTypeMapKeys:
 			sindexType = models.MapKeySIndex
-		case "mapvalues":
+		case indexTypeMapValues:
 			sindexType = models.MapValueSIndex
 		default:
 			return nil, fmt.Errorf("invalid sindex index type: %s", val)
@@ -1180,13 +1196,13 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 			var binType models.SIPathBinType
 
 			switch strings.ToLower(val) {
-			case "numeric", "int signed":
+			case indexBinTypeNumeric, indexBinTypeIntSigned:
 				binType = models.NumericSIDataType
-			case "string", "text":
+			case indexBinTypeString, indexBinTypeText:
 				binType = models.StringSIDataType
-			case "blob":
+			case indexBinTypeBlob:
 				binType = models.BlobSIDataType
-			case "geo2dsphere", "geojson":
+			case indexBinTypeGeo2DSphere, indexBinTypeGeoJSON:
 				binType = models.GEO2DSphereSIDataType
 			default:
 				return nil, fmt.Errorf("invalid sindex type: %s", val)

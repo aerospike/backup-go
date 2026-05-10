@@ -15,6 +15,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -22,6 +23,10 @@ const (
 	testBackupDir  = "/"
 	testBackupFile = "/backup_folder/backup_file.txt"
 	testChunkSize  = 5242880
+
+	profile  = "minio"
+	region   = "eu"
+	endpoint = "http://localhost:9000"
 )
 
 type writeReadTestSuite struct {
@@ -73,12 +78,7 @@ aws_secret_access_key = minioadminpassword`)
 func (s *writeReadTestSuite) TearDownSuite() {}
 
 func (s *writeReadTestSuite) TestWriteRead() {
-	s3Client, err := getS3Client(
-		s.T().Context(),
-		"minio",
-		"eu",
-		"http://localhost:9000",
-	)
+	s3Client, err := getS3Client(s.T().Context())
 	s.Require().NoError(err)
 
 	size := 500_000
@@ -91,12 +91,7 @@ func (s *writeReadTestSuite) TestWriteRead() {
 }
 
 func (s *writeReadTestSuite) TestWriteReadSingleFile() {
-	s3Client, err := getS3Client(
-		s.T().Context(),
-		"minio",
-		"eu",
-		"http://localhost:9000",
-	)
+	s3Client, err := getS3Client(s.T().Context())
 	s.Require().NoError(err)
 
 	size := 500_000
@@ -259,7 +254,7 @@ func (s *writeReadTestSuite) readSingleFile(client *s3.Client) []byte {
 	return nil
 }
 
-func getS3Client(ctx context.Context, profile, region, endpoint string) (*s3.Client, error) {
+func getS3Client(ctx context.Context) (*s3.Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithSharedConfigProfile(profile),
 		config.WithRegion(region),
@@ -269,10 +264,7 @@ func getS3Client(ctx context.Context, profile, region, endpoint string) (*s3.Cli
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		if endpoint != "" {
-			o.BaseEndpoint = &endpoint
-		}
-
+		o.BaseEndpoint = ptr.String(endpoint)
 		o.UsePathStyle = true
 	})
 

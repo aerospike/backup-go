@@ -153,6 +153,11 @@ func NewClient(
 }
 
 func (ic *Client) GetInfo(ctx context.Context, names ...string) (map[string]string, error) {
+	// Check if any info commands are provided or command is not supported.
+	if len(names) == 0 || names[0] == "" {
+		return nil, fmt.Errorf("no info commands provided or command not supported")
+	}
+
 	var result map[string]string
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
@@ -978,14 +983,14 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	return bitMapToIntSlice(bitMap), nil
 }
 
-// StartBackup starts a backup job.
-func (ic *Client) StartBackup(ctx context.Context,
+// StartServerBackup starts a backup job on the server.
+func (ic *Client) StartServerBackup(ctx context.Context,
 	namespace, storage, bucket, region, profile, accessKey, secretKey string,
 ) (string, error) {
 	cNow := cltime.Now()
 	jobID := cNow.String()
 
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideBackup],
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerBackup],
 		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
 
 	resp, err := ic.GetInfo(ctx, cmd)
@@ -1001,11 +1006,11 @@ func (ic *Client) StartBackup(ctx context.Context,
 	return jobID, nil
 }
 
-// StartRestore starts a backup job.
-func (ic *Client) StartRestore(ctx context.Context, jobID string,
-	namespace, storage, bucket, region, profile, accessKey, secretKey string,
+// StartServerRestore starts a restore job on the server.
+func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, storage, bucket, region, profile,
+	accessKey, secretKey string,
 ) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerSideRestore],
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
 		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
 
 	resp, err := ic.GetInfo(ctx, cmd)
@@ -1016,6 +1021,23 @@ func (ic *Client) StartRestore(ctx context.Context, jobID string,
 	_, err = parseResultResponse(cmd, resp)
 	if err != nil {
 		return fmt.Errorf("failed to parse start restore response: %w", err)
+	}
+
+	return nil
+}
+
+// PrepareServerRestore starts a restore preparation on the server.
+func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace string) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed prepare restore: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return fmt.Errorf("failed to parse prepare restore response: %w", err)
 	}
 
 	return nil

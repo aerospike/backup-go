@@ -140,6 +140,7 @@ func NewDefaultBackupConfig() *ConfigBackup {
 		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
 		ParallelRead:     1,
 		ParallelWrite:    1,
+		Namespace:        "test", //nolint:goconst // default value
 		EncoderType:      EncoderTypeASB,
 		ScanPolicy:       a.NewScanPolicy(),
 	}

@@ -424,7 +424,7 @@ func (w *s3Writer) Close() error {
 
 	w.logger.Debug("completed multipart upload",
 		slog.String("key", w.key),
-		slog.String("uploadID", ptr.ToString(w.uploadID)),
+		slog.String("uploadId", ptr.ToString(w.uploadID)),
 		slog.Int("parts", len(w.completedParts)),
 		slog.String("etag", ptr.ToString(r.ETag)),
 		slog.String("checksum", ptr.ToString(r.ChecksumCRC32)),
@@ -460,7 +460,7 @@ func (w *s3Writer) abortUpload() {
 	if err != nil {
 		w.logger.Error("failed to abort multipart upload",
 			slog.String("key", w.key),
-			slog.String("uploadID", ptr.ToString(w.uploadID)),
+			slog.String("uploadId", ptr.ToString(w.uploadID)),
 			slog.Any("error", err))
 	}
 }

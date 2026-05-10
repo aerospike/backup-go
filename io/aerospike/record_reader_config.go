@@ -76,7 +76,7 @@ func (c *RecordReaderConfig) logAttrs() []any {
 	}
 
 	if c.noTTLOnly {
-		attrs = append(attrs, slog.Bool("noTTLOnly", true))
+		attrs = append(attrs, slog.Bool("noTtlOnly", true))
 	}
 
 	if c.pageSize > 0 {

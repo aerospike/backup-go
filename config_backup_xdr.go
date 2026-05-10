@@ -24,6 +24,8 @@ import (
 
 var expDCName = regexp.MustCompile(`^[a-zA-Z0-9_\-$]+$`)
 
+const rewindAll = "all"
+
 // ConfigBackupXDR contains configuration for the xdr backup operation.
 type ConfigBackupXDR struct {
 	// Encryption details.
@@ -176,7 +178,7 @@ func (c *ConfigBackupXDR) validate() error {
 }
 
 func validateRewind(value string) error {
-	if value == "all" {
+	if value == rewindAll {
 		return nil
 	}
 

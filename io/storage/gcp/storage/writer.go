@@ -30,7 +30,7 @@ import (
 
 const (
 	fileType         = "application/octet-stream"
-	defaultChunkSize = 5 * 1024 * 1024
+	defaultChunkSize = 50 * 1024 * 1024
 )
 
 // Writer represents a GCP storage writer.
@@ -54,38 +54,30 @@ func NewWriter(
 	bucketName string,
 	opts ...options.Opt,
 ) (*Writer, error) {
-	w := &Writer{}
+	w := &Writer{
+		bucketName:   bucketName,
+		bucketHandle: client.Bucket(bucketName),
+	}
 
 	for _, opt := range opts {
 		opt(&w.Options)
 	}
 
-	if w.ChunkSize < 0 {
-		return nil, fmt.Errorf("chunk size must be positive")
+	if err := w.validate(ctx); err != nil {
+		return nil, err
 	}
 
 	if w.ChunkSize == 0 {
 		w.ChunkSize = defaultChunkSize
 	}
 
-	if len(w.PathList) != 1 {
-		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
-	}
-
 	if w.IsDir {
 		w.prefix = common.CleanPath(w.PathList[0], false)
 	}
 
-	bucketHandler := client.Bucket(bucketName)
-	w.bucketName = bucketName
-	// Check if bucketHandler exists, to avoid errors.
-	if _, err := bucketHandler.Attrs(ctx); err != nil {
-		return nil, fmt.Errorf("failed to get bucketHandler %s attributes: %w", bucketName, err)
-	}
-
 	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
-		isEmpty, err := isEmptyDirectory(ctx, bucketHandler, w.prefix)
+		isEmpty, err := isEmptyDirectory(ctx, w.bucketHandle, w.prefix)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
@@ -95,8 +87,6 @@ func NewWriter(
 		}
 	}
 
-	w.bucketHandle = bucketHandler
-
 	if w.IsRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucketHandler.
 		if err := w.RemoveFiles(ctx); err != nil {
@@ -105,6 +95,23 @@ func NewWriter(
 	}
 
 	return w, nil
+}
+
+func (w *Writer) validate(ctx context.Context) error {
+	if w.ChunkSize < 0 {
+		return fmt.Errorf("chunk size must be positive")
+	}
+
+	if len(w.PathList) != 1 {
+		return fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
+	// Check if bucketHandler exists, to avoid errors.
+	if _, err := w.bucketHandle.Attrs(ctx); err != nil {
+		return fmt.Errorf("failed to get bucketHandler %s attributes: %w", w.bucketName, err)
+	}
+
+	return nil
 }
 
 // NewWriter returns a new GCP storage writer for the provided path.

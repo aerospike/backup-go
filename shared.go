@@ -77,3 +77,34 @@ func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 
 	return key, nil
 }
+
+// validateFileLimit checks if the file limit can be processed within the maximum allowed number of chunks.
+// Returns an error if the chunk size is zero or if the required chunks exceed the predefined maximum.
+func validateFileLimit(fileLimit uint64, w Writer) error {
+	// Skip validation if file limit is zero.
+	if fileLimit == 0 {
+		return nil
+	}
+
+	// Get chunk size from configured writer.
+	chunkSize := w.GetOptions().ChunkSize
+
+	// Double check chunk size. Not to divide by zero.
+	if chunkSize <= 0 {
+		return fmt.Errorf("chunk size must be positive, got %d", chunkSize)
+	}
+
+	const maxChunks = 10_000
+	// integer implementation of ceiling division.
+	chunks := (fileLimit-1)/uint64(chunkSize) + 1
+
+	if chunks >= maxChunks {
+		return fmt.Errorf(
+			"file limit %d with chunk size %d requires %d chunks, exceeds maximum of %d: "+
+				"increase chunk size or decrease file limit",
+			fileLimit, chunkSize, chunks, maxChunks,
+		)
+	}
+
+	return nil
+}

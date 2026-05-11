@@ -63,6 +63,11 @@ func newBackupXDRHandler(
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, writer.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
 
+	// Validate file size here, because this is entry point where we have configured writer and file limit.
+	if err := validateFileLimit(config.FileLimit, writer); err != nil {
+		return nil, err
+	}
+
 	// Create handler base first to get the derived context.
 	base := newHandlerBase(ctx)
 

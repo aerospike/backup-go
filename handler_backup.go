@@ -102,20 +102,20 @@ func newBackupHandler(
 	scanLimiter scanlimiter.Limiter,
 	infoClient InfoGetter,
 ) (*BackupHandler, error) {
-	id := uuid.NewString()[:6]
 	// For estimates calculations, a writer will be nil.
-	storageType := ""
+	var storageType string
+
 	if writer != nil {
+		// Validate file size here, because this is entry point where we have configured writer and file limit.
+		if err := validateFileLimit(config.FileLimit, writer); err != nil {
+			return nil, err
+		}
 		storageType = writer.GetType()
 	}
 
+	id := uuid.NewString()[:6]
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeBackup, storageType)
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeBackup, id)
-
-	// Validate file size here, because this is entry point where we have configured writer and file limit.
-	if err := validateFileLimit(config.FileLimit, writer); err != nil {
-		return nil, err
-	}
 
 	// Create handler base first to get the derived context.
 	base := newHandlerBase(ctx)

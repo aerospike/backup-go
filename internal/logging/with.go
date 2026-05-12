@@ -24,7 +24,12 @@ const (
 )
 
 func WithHandler(logger *slog.Logger, id string, handlerType HandlerType, storageTpe string) *slog.Logger {
-	group := slog.Group("handler", "id", id, "type", handlerType, "storage", storageTpe)
+	group := slog.Group("handler",
+		slog.String("id", id),
+		slog.String("type", string(handlerType)),
+		slog.String("storage", storageTpe),
+	)
+
 	return logger.With(group)
 }
 
@@ -37,7 +42,7 @@ const (
 )
 
 func WithReader(logger *slog.Logger, id string, readerType ReaderType) *slog.Logger {
-	group := slog.Group("reader", "id", id, "type", readerType)
+	group := slog.Group("reader", slog.String("id", id), slog.String("type", string(readerType)))
 	return logger.With(group)
 }
 
@@ -49,7 +54,7 @@ const (
 )
 
 func WithProcessor(logger *slog.Logger, id string, processorType ProcessorType) *slog.Logger {
-	group := slog.Group("processor", "id", id, "type", processorType)
+	group := slog.Group("processor", slog.String("id", id), slog.String("type", string(processorType)))
 	return logger.With(group)
 }
 
@@ -62,6 +67,6 @@ const (
 )
 
 func WithWriter(logger *slog.Logger, id string, writerType WriterType) *slog.Logger {
-	group := slog.Group("writer", "id", id, "type", writerType)
+	group := slog.Group("writer", slog.String("id", id), slog.String("type", string(writerType)))
 	return logger.With(group)
 }

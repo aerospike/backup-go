@@ -1694,3 +1694,111 @@ func TestReader_CheckWarm_PollError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to poll dir status")
 }
+
+func (s *AwsSuite) TestReaderWriter_RoundTripLargeFilesParallel() {
+	s.suiteWg.Wait()
+	ctx := s.T().Context()
+	client, err := testClient(ctx)
+	s.Require().NoError(err)
+
+	uploadPrefix := fmt.Sprintf("transfermanager_roundtrip_%d", time.Now().UnixNano())
+
+	writer, err := NewWriter(
+		ctx,
+		client,
+		testBucket,
+		options.WithDir(uploadPrefix),
+		options.WithUploadConcurrency(4),
+	)
+	s.Require().NoError(err)
+
+	makePayload := func(size int, seed byte) []byte {
+		payload := make([]byte, size)
+		for i := range payload {
+			payload[i] = seed + byte(i%251)
+		}
+		return payload
+	}
+
+	filesToUpload := []struct {
+		name    string
+		payload []byte
+	}{
+		{name: "parallel_large_1.asb", payload: makePayload(int(s3DefaultChunkSize)+12345, 11)},
+		{name: "parallel_large_2.asb", payload: makePayload(int(s3DefaultChunkSize*2)+54321, 27)},
+		{name: "parallel_large_3.asb", payload: makePayload(int(s3DefaultChunkSize*3)+11111, 39)},
+	}
+
+	expected := make(map[string][]byte, len(filesToUpload))
+	for _, file := range filesToUpload {
+		expected[file.name] = file.payload
+	}
+
+	var uploadWG sync.WaitGroup
+	uploadErrCh := make(chan error, len(filesToUpload))
+
+	for _, file := range filesToUpload {
+		uploadWG.Go(func() {
+			w, err := writer.NewWriter(ctx, file.name)
+			if err != nil {
+				uploadErrCh <- err
+				return
+			}
+
+			if _, err = io.Copy(w, bytes.NewReader(file.payload)); err != nil {
+				uploadErrCh <- err
+				_ = w.Close()
+				return
+			}
+
+			if err = w.Close(); err != nil {
+				uploadErrCh <- err
+			}
+		})
+	}
+
+	uploadWG.Wait()
+	close(uploadErrCh)
+
+	for err := range uploadErrCh {
+		s.Require().NoError(err)
+	}
+
+	reader, err := NewReader(
+		ctx,
+		client,
+		testBucket,
+		options.WithDir(uploadPrefix),
+		options.WithChunkSize(s3DefaultChunkSize),
+		options.WithUploadConcurrency(4),
+	)
+	s.Require().NoError(err)
+
+	rCH := make(chan models.File)
+	eCH := make(chan error)
+	go reader.StreamFiles(ctx, rCH, eCH, nil)
+
+	received := make(map[string][]byte, len(filesToUpload))
+
+	for {
+		select {
+		case err = <-eCH:
+			s.Require().NoError(err)
+		case file, ok := <-rCH:
+			if !ok {
+				s.Require().Len(received, len(filesToUpload))
+				for fileName, expectedData := range expected {
+					actualData, ok := received[fileName]
+					s.Require().True(ok, "downloaded file %s was not found", fileName)
+					s.Require().Equal(expectedData, actualData)
+				}
+				return
+			}
+
+			data, readErr := io.ReadAll(file.Reader)
+			s.Require().NoError(readErr)
+			s.Require().NoError(file.Reader.Close())
+			received[file.Name] = data
+		}
+	}
+}

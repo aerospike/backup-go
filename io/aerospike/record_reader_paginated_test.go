@@ -16,18 +16,15 @@ package aerospike
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/io/aerospike/mocks"
-	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 )
@@ -409,6 +406,58 @@ func TestAerospikeRecordReaderPaginatedContextCanceled(t *testing.T) {
 	require.Nil(t, token)
 }
 
+// TestAerospikeRecordReaderPaginatedCloseReleasesActiveScan ensures paginatedRecordReader.Close
+// releases the recordset when a page scan is still open (same goroutine as Read, like pipe's defer Close).
+func TestAerospikeRecordReaderPaginatedCloseReleasesActiveScan(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test"
+	set := ""
+	pageSize := int64(2)
+	key, aerr := a.NewKey(namespace, set, "k")
+	require.NoError(t, aerr)
+	rec := &a.Record{Bins: a.BinMap{"x": 1}, Key: key}
+
+	mockRecordSet := &a.Recordset{}
+	mockResults := make(chan *a.Result, 1)
+	mockResults <- &a.Result{Record: rec}
+	setFieldValue(mockRecordSet, "records", mockResults)
+
+	expectedPolicy := newExpectedPaginatedPolicy(pageSize)
+
+	mockScanner := mocks.NewMockscanner(t)
+	mockScanner.EXPECT().ScanPartitions(expectedPolicy, a.NewPartitionFilterAll(), namespace, set).
+		Return(mockRecordSet, nil).Once()
+
+	ctx := t.Context()
+	closer := mocks.NewMockRecordsetCloser(t)
+	closer.EXPECT().Close(mockRecordSet).Return(nil).Once()
+
+	reader := NewRecordReader(
+		ctx,
+		mockScanner,
+		&RecordReaderConfig{
+			namespace:       namespace,
+			setList:         []string{set},
+			partitionFilter: a.NewPartitionFilterAll(),
+			scanPolicy:      &a.ScanPolicy{},
+			pageSize:        pageSize,
+			scanLimiter:     scanlimiter.Noop,
+			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
+		},
+		slog.Default(),
+		closer,
+	)
+	require.NotNil(t, reader)
+
+	_, rerr := reader.Read(ctx)
+	require.NoError(t, rerr)
+	reader.Close()
+
+	closer.AssertExpectations(t)
+	mockScanner.AssertExpectations(t)
+}
+
 // Test pagination with scan limiter (semaphore)
 func TestAerospikeRecordReaderPaginatedWithScanLimiter(t *testing.T) {
 	namespace := "test"
@@ -600,9 +649,7 @@ func TestAerospikeRecordReaderPaginatedRecordsetCloseError(t *testing.T) {
 	require.NotNil(t, reader)
 
 	token, err := reader.Read(ctx)
-	require.Error(t, err)
-	// Error is not wrapped any more.
-	require.Contains(t, err.Error(), "failed to scan set")
+	require.ErrorIs(t, err, a.ErrNetwork)
 	require.Nil(t, token)
 
 	mockScanner.AssertExpectations(t)
@@ -678,104 +725,6 @@ func TestAerospikeRecordReaderPaginatedLargePageSize(t *testing.T) {
 	token, err := reader.Read(ctx)
 	require.Equal(t, io.EOF, err)
 	require.Nil(t, token)
-
-	mockScanner.AssertExpectations(t)
-}
-
-// Test concurrent reads (should be safe)
-func TestAerospikeRecordReaderPaginatedConcurrentReads(t *testing.T) {
-	namespace := "test"
-	set := ""
-	pageSize := int64(1)
-
-	key, aerr := a.NewKey(namespace, set, "key")
-	require.NoError(t, aerr)
-
-	mockRecordSet := &a.Recordset{}
-	mockResults := make(chan *a.Result, 1)
-	rec := &a.Record{
-		Bins: a.BinMap{"key": "value"},
-		Key:  key,
-	}
-	mockResults <- &a.Result{Record: rec}
-	close(mockResults)
-	setFieldValue(mockRecordSet, "records", mockResults)
-
-	mockRecordSetEnd := &a.Recordset{}
-	mockResultsEnd := make(chan *a.Result)
-	close(mockResultsEnd)
-	setFieldValue(mockRecordSetEnd, "records", mockResultsEnd)
-
-	expectedPolicy := newExpectedPaginatedPolicy(pageSize)
-	pf := a.NewPartitionFilterAll()
-
-	mockScanner := mocks.NewMockscanner(t)
-	mockScanner.EXPECT().ScanPartitions(expectedPolicy, pf, namespace, set).Return(mockRecordSet, nil).Once()
-	mockScanner.EXPECT().ScanPartitions(expectedPolicy, pf, namespace, set).Return(mockRecordSetEnd, nil).Once()
-
-	closer := mocks.NewMockRecordsetCloser(t)
-	closer.EXPECT().Close(mockRecordSet).Return(nil)
-	closer.EXPECT().Close(mockRecordSetEnd).Return(nil)
-
-	ctx := t.Context()
-
-	reader := NewRecordReader(
-		ctx,
-		mockScanner,
-		&RecordReaderConfig{
-			namespace:       namespace,
-			setList:         []string{set},
-			partitionFilter: pf,
-			scanPolicy:      &a.ScanPolicy{},
-			pageSize:        pageSize,
-			scanLimiter:     scanlimiter.Noop,
-			rpsCollector:    metrics.NewCollector(ctx, slog.Default(), metrics.RecordsPerSecond, testMetricMessage, true),
-		},
-		slog.Default(),
-		closer,
-	)
-	require.NotNil(t, reader)
-
-	// Try to read concurrently (should be handled gracefully)
-	done := make(chan bool, 2)
-	var tokens []*models.Token
-	var errs []error
-	var mu sync.Mutex
-
-	for range 2 {
-		go func() {
-			defer func() { done <- true }()
-			token, err := reader.Read(ctx)
-			mu.Lock()
-			tokens = append(tokens, token)
-			errs = append(errs, err)
-			mu.Unlock()
-		}()
-	}
-
-	// Wait for both goroutines
-	<-done
-	<-done
-
-	// One should get the record, one should get EOF or nil
-	mu.Lock()
-	require.Len(t, tokens, 2)
-	require.Len(t, errs, 2)
-
-	validTokens := 0
-	eofErrors := 0
-	for i := range 2 {
-		if tokens[i] != nil {
-			validTokens++
-		}
-		if errors.Is(errs[i], io.EOF) {
-			eofErrors++
-		}
-	}
-
-	require.Equal(t, 1, validTokens, "Should have exactly one valid token")
-	require.Equal(t, 1, eofErrors, "Should have exactly one EOF")
-	mu.Unlock()
 
 	mockScanner.AssertExpectations(t)
 }

@@ -24,11 +24,28 @@ import (
 	"strings"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 )
 
 const errCmdRespPrefix = "ERROR"
+
+const (
+	indexTypeDefault   = "default"
+	indexTypeNone      = "none"
+	indexTypeList      = "list"
+	indexTypeMapKeys   = "mapkeys"
+	indexTypeMapValues = "mapvalues"
+
+	indexBinTypeNumeric     = "numeric"
+	indexBinTypeIntSigned   = "int signed"
+	indexBinTypeString      = "string"
+	indexBinTypeText        = "text"
+	indexBinTypeBlob        = "blob"
+	indexBinTypeGeo2DSphere = "geo2dsphere"
+	indexBinTypeGeoJSON     = "geojson"
+)
 
 var (
 	aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
@@ -47,6 +64,9 @@ var (
 	// AerospikeVersionRecentInfoCommands after this version, all commands should use
 	// `namespace` parameter instead of `ns` or `id`.
 	AerospikeVersionRecentInfoCommands = AerospikeVersion{8, 1, 0}
+
+	// AerospikeVersionSupportsIntegratedBackup TODO: change this, after server release.
+	AerospikeVersionSupportsIntegratedBackup = AerospikeVersion{8, 1, 0}
 )
 
 var (
@@ -133,6 +153,11 @@ func NewClient(
 }
 
 func (ic *Client) GetInfo(ctx context.Context, names ...string) (map[string]string, error) {
+	// Check if any info commands are provided or command is not supported.
+	if len(names) == 0 || names[0] == "" {
+		return nil, fmt.Errorf("no info commands provided or command not supported")
+	}
+
 	var result map[string]string
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
@@ -958,6 +983,66 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	return bitMapToIntSlice(bitMap), nil
 }
 
+// StartServerBackup starts a backup job on the server.
+func (ic *Client) StartServerBackup(ctx context.Context,
+	namespace, storage, bucket, region, profile, accessKey, secretKey string,
+) (string, error) {
+	cNow := cltime.Now()
+	jobID := cNow.String()
+
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerBackup],
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed start backup: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse start backup response: %w", err)
+	}
+
+	return jobID, nil
+}
+
+// StartServerRestore starts a restore job on the server.
+func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, storage, bucket, region, profile,
+	accessKey, secretKey string,
+) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed start restore: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return fmt.Errorf("failed to parse start restore response: %w", err)
+	}
+
+	return nil
+}
+
+// PrepareServerRestore starts a restore preparation on the server.
+func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace string) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID)
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed prepare restore: %w", err)
+	}
+
+	_, err = parseResultResponse(cmd, resp)
+	if err != nil {
+		return fmt.Errorf("failed to parse prepare restore response: %w", err)
+	}
+
+	return nil
+}
+
 // ***** Utility functions *****
 
 func parseResultResponse(cmd string, result map[string]string) (string, error) {
@@ -1107,13 +1192,13 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 		var sindexType models.SIndexType
 
 		switch strings.ToLower(val) {
-		case "default", "none":
+		case indexTypeDefault, indexTypeNone:
 			sindexType = models.BinSIndex
-		case "list":
+		case indexTypeList:
 			sindexType = models.ListElementSIndex
-		case "mapkeys":
+		case indexTypeMapKeys:
 			sindexType = models.MapKeySIndex
-		case "mapvalues":
+		case indexTypeMapValues:
 			sindexType = models.MapValueSIndex
 		default:
 			return nil, fmt.Errorf("invalid sindex index type: %s", val)
@@ -1133,13 +1218,13 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 			var binType models.SIPathBinType
 
 			switch strings.ToLower(val) {
-			case "numeric", "int signed":
+			case indexBinTypeNumeric, indexBinTypeIntSigned:
 				binType = models.NumericSIDataType
-			case "string", "text":
+			case indexBinTypeString, indexBinTypeText:
 				binType = models.StringSIDataType
-			case "blob":
+			case indexBinTypeBlob:
 				binType = models.BlobSIDataType
-			case "geo2dsphere", "geojson":
+			case indexBinTypeGeo2DSphere, indexBinTypeGeoJSON:
 				binType = models.GEO2DSphereSIDataType
 			default:
 				return nil, fmt.Errorf("invalid sindex type: %s", val)

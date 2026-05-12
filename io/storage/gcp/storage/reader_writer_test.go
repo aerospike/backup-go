@@ -454,7 +454,7 @@ func (s *GCPSuite) TestReader_GetType() {
 	s.Require().NoError(err)
 
 	result := reader.GetType()
-	s.Require().Equal(gcpStorageType, result)
+	s.Require().Equal(TypeGcp, result)
 }
 
 func (s *GCPSuite) TestWriter_WriteEmptyDir() {
@@ -593,7 +593,7 @@ func (s *GCPSuite) TestWriter_GetType() {
 	s.Require().NoError(err)
 
 	result := writer.GetType()
-	s.Require().Equal(gcpStorageType, result)
+	s.Require().Equal(TypeGcp, result)
 }
 
 func (s *GCPSuite) TestReader_OpenFileOk() {

@@ -20,7 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-const s3type = "s3"
+const TypeAwsS3 = "s3"
 
 // Client is an interface for *s3.Client. Used for testing purposes.
 type Client interface {

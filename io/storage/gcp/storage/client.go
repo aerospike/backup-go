@@ -16,7 +16,7 @@ package storage
 
 import "cloud.google.com/go/storage"
 
-const gcpStorageType = "gcp-storage"
+const TypeGcp = "gcp-storage"
 
 // Client is an interface for *storage.Client. Used for testing purposes.
 type Client interface {

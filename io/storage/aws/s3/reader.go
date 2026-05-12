@@ -296,7 +296,7 @@ func (r *Reader) StreamFile(
 
 // GetType return `s3type` type of storage. Used in logging.
 func (r *Reader) GetType() string {
-	return s3type
+	return TypeAwsS3
 }
 
 // checkRestoreDirectory checks that the restore directory contains any file.

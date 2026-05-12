@@ -20,6 +20,7 @@ import (
 	"runtime/debug"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/segmentio/asm/base64"
 )
 
@@ -81,8 +82,8 @@ func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 // validateFileLimit checks if the file limit can be processed within the maximum allowed number of chunks.
 // Returns an error if the chunk size is zero or if the required chunks exceed the predefined maximum.
 func validateFileLimit(fileLimit uint64, w Writer) error {
-	// Skip validation if file limit is zero.
-	if fileLimit == 0 {
+	// Skip validation if file limit is zero, or writer is not configured or writer is local.
+	if fileLimit == 0 || w == nil || w.GetType() == local.TypeLocal {
 		return nil
 	}
 

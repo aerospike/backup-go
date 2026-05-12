@@ -246,7 +246,7 @@ func (w *blobWriter) Close() error {
 
 // GetType return `azureBlobType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
-	return azureBlobType
+	return TypeAzureBlob
 }
 
 func isEmptyDirectory(ctx context.Context, client Client, containerName, prefix string) (bool, error) {

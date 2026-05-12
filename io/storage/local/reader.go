@@ -29,7 +29,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
-const localType = "directory"
+const TypeLocal = "directory"
 
 // Reader represents local storage reader.
 type Reader struct {
@@ -313,7 +313,7 @@ func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.F
 
 // GetType returns the type of the reader.
 func (r *Reader) GetType() string {
-	return localType
+	return TypeLocal
 }
 
 // calculateTotalSize calculates the total size and number of objects in all paths.

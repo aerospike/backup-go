@@ -22,7 +22,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 )
 
-const azureBlobType = "azure-blob"
+const TypeAzureBlob = "azure-blob"
 
 // Client is an interface for *azblob.Client. Used for testing purposes.
 type Client interface {

@@ -197,7 +197,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 // GetType returns the type of the writer.
 func (w *Writer) GetType() string {
-	return s3type
+	return TypeAwsS3
 }
 
 // s3Writer wrapper for writing files, as S3 in not supporting creation of io.Writer.

@@ -646,7 +646,7 @@ func (s *AwsSuite) TestReader_GetType() {
 	s.Require().NoError(err)
 
 	result := reader.GetType()
-	s.Require().Equal(s3type, result)
+	s.Require().Equal(TypeAwsS3, result)
 }
 
 func (s *AwsSuite) TestReader_OpenFileOk() {

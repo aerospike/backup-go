@@ -190,7 +190,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 
 // GetType returns the `gcpStorageType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
-	return gcpStorageType
+	return TypeGcp
 }
 
 // GetOptions returns initialized options for the writer.

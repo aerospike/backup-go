@@ -16,7 +16,6 @@ package pipe
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
@@ -89,48 +88,6 @@ func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *bandw
 		Chains: chains,
 		Inputs: inputs,
 	}
-}
-
-// AddReader adds a new reader chain to the pool and starts it.
-func (p *Pool[T]) AddReader(ctx context.Context, reader Reader[T], pc ProcessorCreator[T]) (chan T, error) {
-	chain, output := NewReaderChain[T](reader, pc())
-
-	p.mu.Lock()
-	if p.eg == nil {
-		p.mu.Unlock()
-		return nil, fmt.Errorf("pool is not running")
-	}
-
-	p.Chains = append(p.Chains, chain)
-	p.Outputs = append(p.Outputs, output)
-	p.mu.Unlock()
-
-	p.eg.Go(func() error {
-		return chain.Run(ctx)
-	})
-
-	return output, nil
-}
-
-// AddWriter adds a new writer chain to the pool and starts it.
-func (p *Pool[T]) AddWriter(ctx context.Context, writer Writer[T], limiter *bandwidth.Limiter) (chan T, error) {
-	chain, input := NewWriterChain[T](writer, limiter)
-
-	p.mu.Lock()
-	if p.eg == nil {
-		p.mu.Unlock()
-		return nil, fmt.Errorf("pool is not running")
-	}
-
-	p.Chains = append(p.Chains, chain)
-	p.Inputs = append(p.Inputs, input)
-	p.mu.Unlock()
-
-	p.eg.Go(func() error {
-		return chain.Run(ctx)
-	})
-
-	return input, nil
 }
 
 // Close closing channels and cleaning links.

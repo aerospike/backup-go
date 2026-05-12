@@ -89,10 +89,6 @@ type BackupHandler struct {
 	rpsCollector *metrics.Collector
 	// kilobytes per second collector.
 	kbpsCollector *metrics.Collector
-
-	rpsMA        *models.MovingAverage
-	kbpsMA       *models.MovingAverage
-	queueDepthMA *models.MovingAverage
 }
 
 // newBackupHandler creates a new BackupHandler.
@@ -206,9 +202,6 @@ func newBackupHandler(
 		stats:                  stats,
 		rpsCollector:           rpsCollector,
 		kbpsCollector:          kbpsCollector,
-		rpsMA:                  models.NewMovingAverage(30),
-		kbpsMA:                 models.NewMovingAverage(30),
-		queueDepthMA:           models.NewMovingAverage(30),
 	}
 
 	encryptionKey, err := resolveEncryptionKey(base.ctx, config.EncryptionPolicy, config.SecretAgentConfig)
@@ -590,21 +583,12 @@ func (bh *BackupHandler) GetMetrics() *models.Metrics {
 
 	rps := bh.rpsCollector.GetLastResult()
 	kbps := bh.kbpsCollector.GetLastResult()
-	queueDepth := uint64(pr + pw)
-
-	bh.rpsMA.Add(rps)
-	bh.kbpsMA.Add(kbps)
-	bh.queueDepthMA.Add(queueDepth)
 
 	m := models.NewMetrics(
 		pr, pw,
 		rps,
 		kbps,
 	)
-
-	m.AverageRecordsPerSecond = bh.rpsMA.Average()
-	m.AverageKilobytesPerSecond = bh.kbpsMA.Average()
-	m.AverageQueueDepth = bh.queueDepthMA.Average()
 
 	return m
 }

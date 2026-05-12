@@ -74,10 +74,6 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	rpsCollector  *metrics.Collector
 	kbpsCollector *metrics.Collector
 
-	rpsMA        *models.MovingAverage
-	kbpsMA       *models.MovingAverage
-	queueDepthMA *models.MovingAverage
-
 	dynamicBatchSize atomic.Int32
 
 	useBatchWrites bool
@@ -147,9 +143,6 @@ func newRestoreHandler[T models.TokenConstraint](
 		logger:        logger,
 		rpsCollector:  rpsCollector,
 		kbpsCollector: kbpsCollector,
-		rpsMA:         models.NewMovingAverage(30), // 30s window
-		kbpsMA:        models.NewMovingAverage(30),
-		queueDepthMA:  models.NewMovingAverage(30),
 	}
 
 	rh.dynamicBatchSize.Store(int32(config.BatchSize))
@@ -256,7 +249,7 @@ func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe
 	if rh.config.EncoderType == EncoderTypeASB {
 		controller := newRestoreScalingController[T](rh, &rh.dynamicBatchSize)
 		rh.wg.Go(func() {
-			controller.run(ctx, pl)
+			controller.run(ctx)
 		})
 	}
 
@@ -339,21 +332,12 @@ func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 
 	rps := rh.rpsCollector.GetLastResult()
 	kbps := rh.kbpsCollector.GetLastResult()
-	queueDepth := uint64(pr + pw)
-
-	rh.rpsMA.Add(rps)
-	rh.kbpsMA.Add(kbps)
-	rh.queueDepthMA.Add(queueDepth)
 
 	m := models.NewMetrics(
 		pr, pw,
 		rps,
 		kbps,
 	)
-
-	m.AverageRecordsPerSecond = rh.rpsMA.Average()
-	m.AverageKilobytesPerSecond = rh.kbpsMA.Average()
-	m.AverageQueueDepth = rh.queueDepthMA.Average()
 
 	return m
 }

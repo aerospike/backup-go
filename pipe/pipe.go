@@ -87,30 +87,6 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 	return errGroup.Wait()
 }
 
-// AddReader adds a new reader to the pipe mid-flight.
-func (p *Pipe[T]) AddReader(ctx context.Context, reader Reader[T]) error {
-	input, err := p.readPool.AddReader(ctx, reader, p.pc)
-	if err != nil {
-		return err
-	}
-
-	p.fanout.AddInput(ctx, input)
-
-	return nil
-}
-
-// AddWriter adds a new writer to the pipe mid-flight.
-func (p *Pipe[T]) AddWriter(ctx context.Context, writer Writer[T]) error {
-	output, err := p.writePool.AddWriter(ctx, writer, p.limiter)
-	if err != nil {
-		return err
-	}
-
-	p.fanout.AddOutput(output)
-
-	return nil
-}
-
 // GetMetrics returns the accumulated length for input and output channels.
 func (p *Pipe[T]) GetMetrics() (in, out int) {
 	// Lock before reading metrics from fanout.

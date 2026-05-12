@@ -63,14 +63,11 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 
 // newDataWriters creates the data writers for restoring data.
 func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Writer[T], error) {
-	var parallelism int
+	parallelism := rw.determineParallelism()
 
-	// Determine the parallelism based on the encoder type and batch writes support.
-	switch {
-	case rw.config.EncoderType == EncoderTypeASBX, rw.config.DisableBatchWrites:
-		parallelism = rw.config.Parallel
-	default:
-		parallelism = rw.config.MaxAsyncBatches
+	// If we need only validation, we create discard writers.
+	if rw.config.ValidateOnly {
+		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
 	}
 
 	// Check if batch writes are supported.
@@ -91,6 +88,15 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 	}
 
 	return dataWriters, nil
+}
+
+// Determine the parallelism based on the encoder type and batch writes support.
+func (rw *recordWriterProcessor[T]) determineParallelism() int {
+	if rw.config.EncoderType == EncoderTypeASBX && rw.config.DisableBatchWrites {
+		return rw.config.Parallel
+	}
+
+	return rw.config.MaxAsyncBatches
 }
 
 // newDataWriter creates a single data writer.

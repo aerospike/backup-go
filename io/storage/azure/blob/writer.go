@@ -32,7 +32,7 @@ import (
 
 const (
 	uploadStreamFileType           = "application/octet-stream"
-	uploadStreamBlockSize          = 5 * 1024 * 1024
+	uploadStreamBlockSize          = 50 * 1024 * 1024
 	uploadStreamConcurrencyDefault = 5
 )
 
@@ -59,15 +59,17 @@ func NewWriter(
 	opts ...options.Opt,
 ) (*Writer, error) {
 	w := &Writer{
-		client: client,
+		client:          client,
+		containerName:   containerName,
+		containerClient: client.ServiceClient().NewContainerClient(containerName),
 	}
 
 	for _, opt := range opts {
 		opt(&w.Options)
 	}
 
-	if w.ChunkSize < 0 {
-		return nil, fmt.Errorf("chunk size must be positive")
+	if err := w.validate(ctx); err != nil {
+		return nil, err
 	}
 
 	// Set default value.
@@ -76,18 +78,8 @@ func NewWriter(
 		w.ChunkSize = uploadStreamBlockSize
 	}
 
-	if len(w.PathList) != 1 {
-		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
-	}
-
 	if w.IsDir {
 		w.prefix = common.CleanPath(w.PathList[0], false)
-	}
-
-	// Check if a container exists.
-	w.containerClient = client.ServiceClient().NewContainerClient(containerName)
-	if _, err := w.containerClient.GetProperties(ctx, nil); err != nil {
-		return nil, fmt.Errorf("failed to get container properties: %w", err)
 	}
 
 	if w.IsDir && !w.SkipDirCheck {
@@ -101,8 +93,6 @@ func NewWriter(
 			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
 		}
 	}
-
-	w.containerName = containerName
 
 	if w.IsRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
@@ -122,6 +112,23 @@ func NewWriter(
 	}
 
 	return w, nil
+}
+
+func (w *Writer) validate(ctx context.Context) error {
+	if w.ChunkSize < 0 {
+		return fmt.Errorf("chunk size must be positive")
+	}
+
+	if len(w.PathList) != 1 {
+		return fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
+	// Check if a container exists.
+	if _, err := w.containerClient.GetProperties(ctx, nil); err != nil {
+		return fmt.Errorf("failed to get container properties: %w", err)
+	}
+
+	return nil
 }
 
 // NewWriter returns a new Azure blob writer to the specified path.
@@ -239,7 +246,7 @@ func (w *blobWriter) Close() error {
 
 // GetType return `azureBlobType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
-	return azureBlobType
+	return TypeAzureBlob
 }
 
 func isEmptyDirectory(ctx context.Context, client Client, containerName, prefix string) (bool, error) {

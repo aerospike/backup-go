@@ -233,7 +233,7 @@ func (r *Reader) StreamFile(
 
 // GetType returns the `gcpStorageType` type of storage. Used in logging.
 func (r *Reader) GetType() string {
-	return gcpStorageType
+	return TypeGcp
 }
 
 // checkRestoreDirectory checks that the restore directory contains any file.

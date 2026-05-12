@@ -251,7 +251,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 // GetType returns the `localType` type of storage. Used in logging.
 func (w *Writer) GetType() string {
-	return localType
+	return TypeLocal
 }
 
 // GetOptions returns initialized options for the writer.

@@ -346,7 +346,7 @@ func (s *WriterSuite) TestWriter_GetType() {
 	s.Require().NoError(err)
 
 	result := writer.GetType()
-	s.Require().Equal(s3type, result)
+	s.Require().Equal(TypeAwsS3, result)
 }
 
 // TestNewWriter_Success tests successful Writer creation
@@ -692,7 +692,7 @@ func TestWriter_GetType(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	assert.Equal(t, s3type, writer.GetType())
+	assert.Equal(t, TypeAwsS3, writer.GetType())
 }
 
 // TestWriter_NewWriter_Success tests successful creation of s3Writer

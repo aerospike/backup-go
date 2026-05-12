@@ -390,7 +390,7 @@ func (s *AzureSuite) TestReader_GetType() {
 	s.Require().NoError(err)
 
 	result := reader.GetType()
-	s.Require().Equal(azureBlobType, result)
+	s.Require().Equal(TypeAzureBlob, result)
 }
 
 func (s *AzureSuite) TestReader_OpenFileOk() {
@@ -610,7 +610,7 @@ func (s *AzureSuite) TestWriter_GetType() {
 	s.Require().NoError(err)
 
 	result := writer.GetType()
-	s.Require().Equal(azureBlobType, result)
+	s.Require().Equal(TypeAzureBlob, result)
 }
 
 func (s *AzureSuite) TestReader_WithMarker() {

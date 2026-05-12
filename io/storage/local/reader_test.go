@@ -228,7 +228,7 @@ func TestDirectoryReader_GetType(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, localType, r.GetType())
+	require.Equal(t, TypeLocal, r.GetType())
 }
 
 func createTmpFile(dir, fileName string) error {

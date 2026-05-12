@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	s3DefaultChunkSize         = 5 * 1024 * 1024 // 5MB, minimum size of a part
+	s3DefaultChunkSize         = 50 * 1024 * 1024 // 50MB, minimum size of a part
 	s3DefaultChecksumAlgorithm = types.ChecksumAlgorithmCrc32
 	// s3DeleteObjectsMaxKeys is the maximum number of keys per DeleteObjects request (S3 limit).
 	s3DeleteObjectsMaxKeys = 1000
@@ -74,18 +74,17 @@ func NewWriter(
 	bucketName string,
 	opts ...options.Opt,
 ) (*Writer, error) {
-	w := &Writer{}
+	w := &Writer{
+		client:     client,
+		bucketName: bucketName,
+	}
 
 	for _, opt := range opts {
 		opt(&w.Options)
 	}
 
-	if len(w.PathList) != 1 {
-		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
-	}
-
-	if w.ChunkSize < 0 {
-		return nil, fmt.Errorf("chunk size must be positive")
+	if err := w.validate(ctx); err != nil {
+		return nil, err
 	}
 
 	if w.ChunkSize == 0 {
@@ -100,14 +99,6 @@ func NewWriter(
 		w.prefix = common.CleanPath(w.PathList[0], true)
 	}
 
-	// Check if the bucket exists and we have permissions.
-	_, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(bucketName),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)
-	}
-
 	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, client, bucketName, w.prefix)
@@ -120,11 +111,8 @@ func NewWriter(
 		}
 	}
 
-	w.client = client
-	w.bucketName = bucketName
-
 	if w.IsRemovingFiles {
-		err = w.RemoveFiles(ctx)
+		err := w.RemoveFiles(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to delete files under prefix %s: %w", w.prefix, err)
 		}
@@ -141,6 +129,24 @@ func NewWriter(
 	}
 
 	return w, nil
+}
+
+func (w *Writer) validate(ctx context.Context) error {
+	if len(w.PathList) != 1 {
+		return fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
+	}
+
+	if w.ChunkSize < 0 {
+		return fmt.Errorf("chunk size must be positive")
+	}
+
+	// Check if the bucket exists and we have permissions.
+	_, err := w.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(w.bucketName)})
+	if err != nil {
+		return fmt.Errorf("bucket %s does not exist or you don't have access: %w", w.bucketName, err)
+	}
+
+	return nil
 }
 
 // NewWriter returns a new S3 writer to the specified path.
@@ -191,7 +197,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 // GetType returns the type of the writer.
 func (w *Writer) GetType() string {
-	return s3type
+	return TypeAwsS3
 }
 
 // s3Writer wrapper for writing files, as S3 in not supporting creation of io.Writer.

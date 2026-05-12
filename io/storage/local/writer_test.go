@@ -77,7 +77,7 @@ func TestDirectoryWriter_GetType(t *testing.T) {
 	w, err := NewWriter(ctx, options.WithRemoveFiles(), options.WithDir(tmpDir))
 	require.NoError(t, err)
 
-	require.Equal(t, localType, w.GetType())
+	require.Equal(t, TypeLocal, w.GetType())
 }
 
 func TestNewWriter_NoPath(t *testing.T) {

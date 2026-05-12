@@ -294,7 +294,7 @@ func (r *Reader) shouldSkip(path, fileName string, fileSize int64) bool {
 
 // GetType return `azureBlobType` type of storage. Used in logging.
 func (r *Reader) GetType() string {
-	return azureBlobType
+	return TypeAzureBlob
 }
 
 // checkRestoreDirectory checks that the restore directory contains any file.

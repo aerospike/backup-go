@@ -586,11 +586,16 @@ func (bh *BackupHandler) GetMetrics() *models.Metrics {
 		pr, pw = pl.GetMetrics()
 	}
 
-	return models.NewMetrics(
+	rps := bh.rpsCollector.GetLastResult()
+	kbps := bh.kbpsCollector.GetLastResult()
+
+	m := models.NewMetrics(
 		pr, pw,
-		bh.rpsCollector.GetLastResult(),
-		bh.kbpsCollector.GetLastResult(),
+		rps,
+		kbps,
 	)
+
+	return m
 }
 
 // stateSuffixGenerator returns state suffix generator.

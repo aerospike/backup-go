@@ -29,6 +29,10 @@ type Pipe[T models.TokenConstraint] struct {
 	readPool  *Pool[T]
 	writePool *Pool[T]
 	fanout    *Fanout[T]
+
+	pc      ProcessorCreator[T]
+	limiter *bandwidth.Limiter
+
 	// Mutex used to avoid race condition on metrics check after a pipeline was stopped.
 	fanMu sync.Mutex
 }
@@ -55,6 +59,8 @@ func NewPipe[T models.TokenConstraint](
 		readPool:  readPool,
 		writePool: writePool,
 		fanout:    fanout,
+		pc:        pc,
+		limiter:   limiter,
 	}, nil
 }
 

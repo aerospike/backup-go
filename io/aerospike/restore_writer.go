@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -52,7 +53,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 	stats *models.RestoreStats,
 	logger *slog.Logger,
 	useBatchWrites bool,
-	batchSize int,
+	batchSize *atomic.Int32,
 	retryPolicy *models.RetryPolicy,
 	rpsCollector *metrics.Collector,
 	ignoreRecordError bool,
@@ -60,25 +61,40 @@ func NewRestoreWriter[T models.TokenConstraint](
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer",
 		slog.Bool("useBatchWrites", useBatchWrites),
-		slog.Int("batchSize", batchSize),
+		slog.Int("batchSize", int(batchSize.Load())),
 		slog.Bool("ignoreRecordError", ignoreRecordError),
 	)
 
-	return &RestoreWriter[T]{
-		sindexWriter: newSindexWriter(ctx, asc, writePolicy, retryPolicy, logger),
-		udfWriter:    newUdfWriter(ctx, asc, writePolicy, retryPolicy, logger),
-		recordWriter: newRecordWriter(
+	var rw recordWriter
+	if useBatchWrites {
+		rw = newBatchRecordWriter(
 			ctx,
 			asc,
 			writePolicy,
 			stats,
-			logger,
-			useBatchWrites,
+			retryPolicy,
+			rpsCollector,
 			batchSize,
+			ignoreRecordError,
+			logger,
+		)
+	} else {
+		rw = newSingleRecordWriter(
+			ctx,
+			asc,
+			writePolicy,
+			stats,
 			retryPolicy,
 			rpsCollector,
 			ignoreRecordError,
-		),
+			logger,
+		)
+	}
+
+	return &RestoreWriter[T]{
+		sindexWriter: newSindexWriter(ctx, asc, writePolicy, retryPolicy, logger),
+		udfWriter:    newUdfWriter(ctx, asc, writePolicy, retryPolicy, logger),
+		recordWriter: rw,
 		payloadWriter: newPayloadWriter(
 			ctx,
 			asc,
@@ -91,44 +107,6 @@ func NewRestoreWriter[T models.TokenConstraint](
 		),
 		logger: logger,
 	}
-}
-
-func newRecordWriter(
-	ctx context.Context,
-	asc dbWriter,
-	writePolicy *a.WritePolicy,
-	stats *models.RestoreStats,
-	logger *slog.Logger,
-	useBatchWrites bool,
-	batchSize int,
-	retryPolicy *models.RetryPolicy,
-	rpsCollector *metrics.Collector,
-	ignoreRecordError bool,
-) recordWriter {
-	if useBatchWrites {
-		return newBatchRecordWriter(
-			ctx,
-			asc,
-			writePolicy,
-			stats,
-			retryPolicy,
-			rpsCollector,
-			batchSize,
-			ignoreRecordError,
-			logger,
-		)
-	}
-
-	return newSingleRecordWriter(
-		ctx,
-		asc,
-		writePolicy,
-		stats,
-		retryPolicy,
-		rpsCollector,
-		ignoreRecordError,
-		logger,
-	)
 }
 
 // Write writes the types from the models package to an Aerospike DB.

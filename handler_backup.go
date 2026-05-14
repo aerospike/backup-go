@@ -375,6 +375,14 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 		}
 	}
 
+	if true {
+		bh.logger.Info("running partitioned backup architecture")
+
+		pool := NewPartitionWorkerPool(ctx, bh, bh.config.ParallelRead)
+
+		return pool.Run()
+	}
+
 	return bh.runBackupPipeline(ctx, dataWriters)
 }
 

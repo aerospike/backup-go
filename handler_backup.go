@@ -23,6 +23,7 @@ import (
 	"log/slog"
 	"math"
 	"sync/atomic"
+	"time"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/internal/logging"
@@ -35,6 +36,8 @@ import (
 	"github.com/aerospike/backup-go/pipe"
 	"github.com/google/uuid"
 )
+
+const recordsRecountInterval = 10 * time.Minute
 
 // Writer defines an interface for writing backup data to a storage provider.
 // Implementations, handling different storage types, are located within the io.storage package.
@@ -365,7 +368,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	// start counting backup records in a separate goroutine to estimate the total number of records.
 	// This is done in parallel with the backup process to avoid delaying the start of the backup.
 	// The estimated backup record count will be available in statistics once the estimation process is completed.
-	go bh.countRecords(ctx)
+	go bh.startRecordCounting(ctx)
 
 	if bh.config.isStateContinue() {
 		// Have to reload filter, as on count records cursor is moving and future scans returns nothing.
@@ -436,7 +439,25 @@ func (bh *BackupHandler) backupMetadata(ctx context.Context, writer io.WriteClos
 	return nil
 }
 
-func (bh *BackupHandler) countRecords(ctx context.Context) {
+func (bh *BackupHandler) startRecordCounting(ctx context.Context) {
+	// Run immediately on startup.
+	bh.updateRecordCount(ctx)
+
+	ticker := time.NewTicker(recordsRecountInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			bh.updateRecordCount(ctx)
+		}
+	}
+}
+
+func (bh *BackupHandler) updateRecordCount(ctx context.Context) {
 	records, err := bh.recordCounter.countRecords(ctx, bh.infoClient)
 	if err != nil {
 		bh.logger.Warn("failed to count records", slog.Any("error", err))

@@ -200,9 +200,6 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 		opt(client)
 	}
 
-	// Further customization after applying options
-	client.logger = client.logger.WithGroup("backup")
-
 	// Initialize the info client only if the Aerospike client is available.
 	if ac != nil {
 		client.infoPolicy = client.getUsableInfoPolicy(client.infoPolicy)

@@ -26,6 +26,7 @@ import (
 	"github.com/aerospike/backup-go/internal/processors"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
+	"github.com/aerospike/backup-go/pkg/estimates"
 	"github.com/google/uuid"
 )
 
@@ -161,6 +162,8 @@ func newRestoreHandler[T models.TokenConstraint](
 
 func (rh *RestoreHandler[T]) run() {
 	rh.stats.Start()
+
+	go estimates.PrintRestoreEstimate(rh.ctx, rh.stats, rh.GetMetrics, rh.readProcessor.reader.GetSize, rh.logger)
 
 	rh.wg.Go(func() {
 		doWork(rh.errors, rh.done, rh.logger, func() error {

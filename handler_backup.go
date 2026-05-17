@@ -34,6 +34,7 @@ import (
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
+	"github.com/aerospike/backup-go/pkg/estimates"
 	"github.com/google/uuid"
 )
 
@@ -246,6 +247,8 @@ func newBackupHandler(
 // currently this should only be run once.
 func (bh *BackupHandler) run() {
 	bh.stats.Start()
+
+	go estimates.PrintBackupEstimate(bh.ctx, bh.stats, bh.GetMetrics, bh.logger)
 
 	bh.wg.Go(func() {
 		doWork(bh.errors, bh.done, bh.logger, func() error {

@@ -128,17 +128,17 @@ func printEstimate(
 	getMetrics func() *models.Metrics,
 	logger *slog.Logger,
 ) (float64, error) {
-	percentage := done / total
-	estimatedEndTime := calculateEstimatedEndTime(startTime, percentage)
+	ratio := done / total
+	estimatedEndTime := calculateEstimatedEndTime(startTime, ratio)
 
 	switch {
-	case percentage >= 1:
+	case ratio >= 1:
 		// Exit after 100%.
 		return 0, errBrake
-	case percentage*100 < 1:
+	case ratio*100 < 1:
 		// Start printing only when we have something.
 		return 0, errContinue
-	case percentage-previousVal < 0.01:
+	case ratio-previousVal < 0.01:
 		// if less than 1% then don't print anything.
 		return 0, errContinue
 	}
@@ -163,7 +163,7 @@ func printEstimate(
 	}
 
 	logger.Info("progress",
-		slog.Uint64("pct", uint64(percentage*100)),
+		slog.Uint64("pct", uint64(ratio*100)),
 		// Formatting the remaining time to milliseconds to avoid printing 0.000000000 seconds.
 		slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
 		slog.Uint64("rec/s", rps),
@@ -171,7 +171,7 @@ func printEstimate(
 		slog.Uint64("b/rec", recSize),
 	)
 
-	return percentage, nil
+	return ratio, nil
 }
 
 func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Duration {

@@ -194,7 +194,6 @@ func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Du
 func PrintFilesNumber(
 	ctx context.Context,
 	getNumber func() int64,
-	fileTypes string,
 	logger *slog.Logger,
 ) {
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -211,7 +210,7 @@ func PrintFilesNumber(
 				continue
 			}
 
-			logger.Info("found "+fileTypes+" files", slog.Int64("number", num))
+			logger.Info("found backup files", slog.Int64("number", num))
 
 			return
 		case <-ctx.Done():

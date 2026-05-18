@@ -163,6 +163,7 @@ func newRestoreHandler[T models.TokenConstraint](
 func (rh *RestoreHandler[T]) run() {
 	rh.stats.Start()
 
+	go estimates.PrintFilesNumber(rh.ctx, rh.readProcessor.reader.GetNumber, rh.logger)
 	go estimates.PrintRestoreEstimate(rh.ctx, rh.stats, rh.GetMetrics, rh.readProcessor.reader.GetSize, rh.logger)
 
 	rh.wg.Go(func() {

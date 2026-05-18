@@ -489,7 +489,7 @@ func TestPrintFilesNumberContextCancellation(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		PrintFilesNumber(ctx, getNumber, "test", logger)
+		PrintFilesNumber(ctx, getNumber, logger)
 		close(done)
 	}()
 
@@ -511,7 +511,6 @@ func TestPrintFilesNumber(t *testing.T) {
 	tests := []struct {
 		name           string
 		getNumber      func() int64
-		fileTypes      string
 		contextTimeout time.Duration
 		expectLog      bool
 		expectTimeout  bool
@@ -521,7 +520,6 @@ func TestPrintFilesNumber(t *testing.T) {
 			getNumber: func() int64 {
 				return 42
 			},
-			fileTypes:      "backup",
 			contextTimeout: 200 * time.Millisecond,
 			expectLog:      true,
 			expectTimeout:  false,
@@ -531,7 +529,6 @@ func TestPrintFilesNumber(t *testing.T) {
 			getNumber: func() int64 {
 				return 0
 			},
-			fileTypes:      "restore",
 			contextTimeout: 150 * time.Millisecond,
 			expectLog:      false,
 			expectTimeout:  true,
@@ -541,7 +538,6 @@ func TestPrintFilesNumber(t *testing.T) {
 			getNumber: func() int64 {
 				return -1
 			},
-			fileTypes:      "data",
 			contextTimeout: 200 * time.Millisecond,
 			expectLog:      false,
 			expectTimeout:  false,
@@ -552,7 +548,6 @@ func TestPrintFilesNumber(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 				return 10
 			},
-			fileTypes:      "index",
 			contextTimeout: 200 * time.Millisecond,
 			expectLog:      true,
 			expectTimeout:  false,
@@ -573,7 +568,7 @@ func TestPrintFilesNumber(t *testing.T) {
 			done := make(chan struct{})
 
 			go func() {
-				PrintFilesNumber(ctx, tt.getNumber, tt.fileTypes, logger)
+				PrintFilesNumber(ctx, tt.getNumber, logger)
 				close(done)
 			}()
 
@@ -589,10 +584,10 @@ func TestPrintFilesNumber(t *testing.T) {
 			}
 
 			if tt.expectLog {
-				assert.Contains(t, buf.String(), "found "+tt.fileTypes+" files")
+				assert.Contains(t, buf.String(), "found backup files")
 				assert.Contains(t, buf.String(), "number")
 			} else {
-				assert.NotContains(t, buf.String(), "found "+tt.fileTypes+" files")
+				assert.NotContains(t, buf.String(), "found backup files")
 			}
 		})
 	}

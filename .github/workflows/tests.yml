@@ -34,12 +34,6 @@ jobs:
           fsouza/fake-gcs-server:1.52.2
           -c "/bin/fake-gcs-server -data /data -scheme http -public-host 127.0.0.1:4443"
 
-      # Azurite
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite:3.35.0
-        ports:
-          - 10000:10000
-
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -56,6 +50,17 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Set up Azurite
+        run: |
+          docker run -d \
+            -p 10000:10000 \
+            --name azurite \
+            mcr.microsoft.com/azure-storage/azurite:3.35.0 \
+            azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck \
+          && until curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:10000/devstoreaccount1 | grep -qE "400|403"; do \
+              echo "Waiting for Azurite..."; sleep 1; \
+            done
 
       - name: Set up Minio
         run: |

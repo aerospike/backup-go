@@ -146,6 +146,8 @@ func NewDefaultBackupConfig() *ConfigBackup {
 	}
 }
 
+// test
+
 // isProcessedByNodes determines whether the backup is parallelized by nodes.
 func (c *ConfigBackup) isProcessedByNodes() bool {
 	return len(c.NodeList) > 0 || len(c.RackList) > 0

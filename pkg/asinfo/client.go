@@ -15,9 +15,11 @@
 package asinfo
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -72,6 +74,7 @@ var (
 var (
 	ErrReplicationFactorZero = errors.New("replication factor is zero")
 	ErrNoNode                = errors.New("no node found")
+	ErrNotFound              = errors.New("not found")
 )
 
 func (av AerospikeVersion) String() string {
@@ -1043,6 +1046,91 @@ func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace str
 	return nil
 }
 
+func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
+	var (
+		result float64
+		err    error
+	)
+
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
+		nodes := ic.cluster.GetNodes()
+
+		var (
+			total     float64
+			firstTrID int64
+		)
+
+		for _, node := range nodes {
+			one, trID, err := ic.getBackupStatusByNode(node)
+			if err != nil {
+				return fmt.Errorf("failed to get backup status from node %s: %w", node.GetName(), err)
+			}
+
+			if firstTrID == 0 {
+				firstTrID = trID
+			}
+
+			if trID != firstTrID {
+				return fmt.Errorf("backup is starting on node %s, but not all nodes have the same trid: %s",
+					node.GetName(), node.GetName())
+			}
+
+			total += one
+		}
+
+		result = math.Min(100, 100*total/4096)
+
+		return nil
+	})
+
+	return result, err
+}
+
+func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int64, err error) {
+	jobs, err := ic.getBackupJobsByNode(node)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get backup jobs: %w", err)
+	}
+
+	latestBackup := jobs[0]
+
+	trID, okTrID, err := latestBackup.parseInt64("trid")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	progress, okProgress, err := latestBackup.parseFloat64("job-progress")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	pids, okPids, err := latestBackup.parseFloat64("n-pids-requested")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if okProgress && okPids && okTrID {
+		return progress / 100 * float64(pids), trID, nil
+	}
+
+	return 0, 0, ErrNotFound
+}
+
+func (ic *Client) getBackupJobsByNode(node infoGetter) ([]infoMap, error) {
+	jobs, err := ic.getJobsQueriesByNode(node)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs: %w", err)
+	}
+
+	// Latest backup job will be first.
+	jobs, err = filterBackupsSortedByTimeSinceDone(jobs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter backups sorted by time since done: %w", err)
+	}
+
+	return jobs, nil
+}
+
 // ***** Utility functions *****
 
 func parseResultResponse(cmd string, result map[string]string) (string, error) {
@@ -1436,6 +1524,22 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoP
 	return 0, errors.New("replication factor not found")
 }
 
+func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]infoMap, error) {
+	cmd := ic.cmdDict[cmdIDShowJobsQueries]
+
+	response, aerr := node.RequestInfo(ic.policy, cmd)
+	if aerr != nil {
+		return nil, fmt.Errorf("failed to show job queries: %w", aerr)
+	}
+
+	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse show job info response: %w", err)
+	}
+
+	return infoResponse, nil
+}
+
 func parseUDF(udfMap infoMap) (*models.UDF, error) {
 	var (
 		udf     models.UDF
@@ -1474,31 +1578,49 @@ type infoMap map[string]string
 // parseUint64 returns the parsed uint64 value from the map for the given key if found.
 // ok = true if the key was found.
 func (m infoMap) parseUint64(key string) (result uint64, ok bool, err error) {
-	if val, ok := m[key]; ok {
-		result, err = strconv.ParseUint(val, 10, 64)
-		if err != nil {
-			return 0, ok, fmt.Errorf("failed to parse %s: %w", key, err)
-		}
-
-		return result, ok, nil
+	val, ok := m[key]
+	if !ok {
+		return 0, false, nil
 	}
 
-	return 0, false, nil
+	v, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+	}
+
+	return v, true, nil
 }
 
 // parseInt64 returns the parsed int64 value from the map for the given key if found.
 // ok = true if the key was found.
 func (m infoMap) parseInt64(key string) (result int64, ok bool, err error) {
-	if val, ok := m[key]; ok {
-		result, err = strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return 0, ok, fmt.Errorf("failed to parse %s: %w", key, err)
-		}
-
-		return result, ok, nil
+	val, ok := m[key]
+	if !ok {
+		return 0, false, nil
 	}
 
-	return 0, false, nil
+	v, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+	}
+
+	return v, true, nil
+}
+
+// parseFloat64 returns the parsed float64 value from the map for the given key if found.
+// ok = true if the key was found.
+func (m infoMap) parseFloat64(key string) (result float64, ok bool, err error) {
+	val, ok := m[key]
+	if !ok {
+		return 0, false, nil
+	}
+
+	v, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+	}
+
+	return v, true, nil
 }
 
 // parseInfoResponse parses a single info response format string.
@@ -1650,4 +1772,46 @@ func bitMapToIntSlice(b []bool) []int {
 	}
 
 	return result
+}
+
+// filterBackupsSortedByTimeSinceDone filters backup jobs from the given list
+// and sorts them by time-since-done in ascending order.
+func filterBackupsSortedByTimeSinceDone(jobs []infoMap) ([]infoMap, error) {
+	jobs = slices.DeleteFunc(jobs, func(j infoMap) bool {
+		return j["job-type"] != "backup"
+	})
+
+	type indexed struct {
+		t       int64
+		present bool
+		job     infoMap
+	}
+
+	idx := make([]indexed, len(jobs))
+	for i, j := range jobs {
+		v, ok, err := j.parseInt64("time-since-done")
+		if err != nil {
+			return nil, fmt.Errorf("job %d: %w", i, err)
+		}
+		idx[i] = indexed{t: v, present: ok, job: j}
+	}
+
+	slices.SortFunc(idx, func(a, b indexed) int {
+		switch {
+		case !a.present && !b.present:
+			return 0
+		case !a.present:
+			return 1
+		case !b.present:
+			return -1
+		}
+
+		return cmp.Compare(a.t, b.t)
+	})
+
+	for i, x := range idx {
+		jobs[i] = x.job
+	}
+
+	return jobs, nil
 }

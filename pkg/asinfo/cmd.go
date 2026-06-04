@@ -41,10 +41,11 @@ const (
 	cmdIDServerBackup
 	cmdIDServerRestore
 	cmdIDServerPrepareRestore
+	cmdIDShowJobsQueries
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 26
+const commandsNumber = 27
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
@@ -77,6 +78,8 @@ const (
 	cmdServerRestore = "restore:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s"
 	cmdServerPrepareRestore = "prepare-restore:namespace=%s;job-id=%s;"
+
+	cmdShowJobsQueries = "query-show"
 
 	// Deprecated commands:
 
@@ -114,6 +117,7 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 	cmds[cmdIDSetXDRForward] = cmdSetXDRForward
 	cmds[cmdIDGetConfigXDR] = cmdGetConfigXDR
 	cmds[cmdIDReplicas] = cmdReplicas
+	cmds[cmdIDShowJobsQueries] = cmdShowJobsQueries
 
 	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList

@@ -2109,3 +2109,17 @@ func TestClient_GetPendingMigrations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), result)
 }
+
+func TestClient_GetBackupStatus(t *testing.T) {
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	ctx := t.Context()
+
+	res, err := ic.GetBackupStatus(ctx)
+	require.ErrorIs(t, err, ErrNotFound)
+	require.InEpsilon(t, float64(0), res, 0.1)
+}

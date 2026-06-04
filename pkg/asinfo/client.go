@@ -1092,6 +1092,10 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 		return 0, 0, fmt.Errorf("failed to get backup jobs: %w", err)
 	}
 
+	if len(jobs) == 0 {
+		return 0, 0, ErrNotFound
+	}
+
 	latestBackup := jobs[0]
 
 	trID, okTrID, err := latestBackup.parseInt64("trid")

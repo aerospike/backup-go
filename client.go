@@ -103,6 +103,7 @@ type InfoGetter interface {
 	StartServerRestore(ctx context.Context, jobID,
 		namespace, storage, bucket, region, profile, accessKey, secretKey string) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
+	GetBackupStatus(ctx context.Context) (float64, error)
 }
 
 // Client is the main entry point for the backup package.

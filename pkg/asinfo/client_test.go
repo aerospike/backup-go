@@ -24,6 +24,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
 	"github.com/segmentio/asm/base64"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +37,11 @@ const (
 	testASRewind        = "all"
 	testXDRHostPort     = "127.0.0.1:3003"
 	testSetInfo         = "info_set"
+	testShowJobsCmd     = "show-jobs:module=query"
 )
+
+// errParseGeneric — sentinel only used to mark "any parse error is acceptable" in table.
+var errParseGeneric = errors.New("parse error sentinel")
 
 func newAerospikeClient() (*a.Client, a.Error) {
 	asPolicy := a.NewClientPolicy()
@@ -2119,7 +2124,189 @@ func TestClient_GetBackupStatus(t *testing.T) {
 
 	ctx := t.Context()
 
-	res, err := ic.GetBackupStatus(ctx)
+	_, err = ic.GetBackupStatus(ctx)
 	require.ErrorIs(t, err, ErrNotFound)
-	require.InEpsilon(t, float64(0), res, 0.1)
+}
+
+// backupJob builds a minimal infoMap representing a backup job.
+func backupJob(trid, timeSinceDone, progress, pids string) infoMap {
+	return infoMap{
+		"trid":             trid,
+		"ns":               "test-ns",
+		"job-type":         jobTypeBackup,
+		"time-since-done":  timeSinceDone,
+		"job-progress":     progress,
+		"n-pids-requested": pids,
+	}
+}
+
+func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     []infoMap
+		wantTRIDs []string
+		wantErr   bool
+	}{
+		{
+			name:      "empty input",
+			input:     nil,
+			wantTRIDs: []string{},
+		},
+		{
+			name: "filters out non-backup jobs",
+			input: []infoMap{
+				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
+				{"trid": "2", "job-type": "query", "time-since-done": "50"},
+				backupJob("3", "200", "100", "2048"),
+			},
+			wantTRIDs: []string{"3"},
+		},
+		{
+			name: "ascending by time-since-done",
+			input: []infoMap{
+				backupJob("1", "300", "20", "1024"),
+				backupJob("2", "100", "40", "2048"),
+				backupJob("3", "200", "100", "4096"),
+			},
+			wantTRIDs: []string{"2", "3", "1"},
+		},
+		{
+			name: "missing time-since-done goes to the end",
+			input: []infoMap{
+				backupJob("1", "300", "50", "2048"),
+				{"trid": "2", "job-type": jobTypeBackup},
+				backupJob("3", "100", "100", "4096"),
+			},
+			wantTRIDs: []string{"3", "1", "2"},
+		},
+		{
+			name: "all jobs filtered out",
+			input: []infoMap{
+				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
+			},
+			wantTRIDs: []string{},
+		},
+		{
+			name: "malformed time-since-done returns error",
+			input: []infoMap{
+				backupJob("1", "not-a-number", "100", "4096"),
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := filterBackupsSortedByTimeSinceDone(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			gotTRIDs := make([]string, len(got))
+			for i, j := range got {
+				gotTRIDs[i] = j["trid"]
+			}
+			assert.Equal(t, tt.wantTRIDs, gotTRIDs)
+		})
+	}
+}
+
+func newTestClient(t *testing.T) *Client {
+	t.Helper()
+	return &Client{
+		policy:      nil,
+		retryPolicy: models.NewDefaultRetryPolicy(),
+		cmdDict: map[int]string{
+			cmdIDShowJobsQueries: testShowJobsCmd,
+		},
+	}
+}
+
+func TestClient_getBackupStatusByNode(t *testing.T) {
+	t.Parallel()
+
+	const (
+		// Two backup jobs: trid=2 finished more recently (smaller time-since-done),
+		// so it must be picked.
+		twoBackups = "trid=2:ns=test-ns:job-type=backup:job-progress=75.00:" +
+			"n-pids-requested=4096:time-since-done=100;" +
+			"trid=1:ns=test-ns:job-type=backup:job-progress=100.00:" +
+			"n-pids-requested=4096:time-since-done=999"
+
+		noBackupsJustScan = "trid=5:ns=test-ns:job-type=scan:time-since-done=10"
+
+		malformedProgress = "trid=2:ns=test-ns:job-type=backup:" +
+			"job-progress=oops:n-pids-requested=4096:time-since-done=100"
+	)
+
+	tests := []struct {
+		name     string
+		response string
+		reqErr   a.Error
+		wantVal  float64
+		wantTRID int64
+		wantErr  error
+	}{
+		{
+			name:     "picks the most recently finished backup",
+			response: twoBackups,
+			// progress=75% of 4096 partitions = 3072
+			wantVal:  3072,
+			wantTRID: 2,
+		},
+		{
+			name:     "no backup jobs returns ErrNotFound",
+			response: noBackupsJustScan,
+			wantErr:  ErrNotFound,
+		},
+		{
+			name:     "empty response returns ErrNotFound",
+			response: "",
+			wantErr:  ErrNotFound,
+		},
+		{
+			name:     "malformed numeric field returns parse error",
+			response: malformedProgress,
+			wantErr:  errParseGeneric, // sentinel matched by errors.As below
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := newMockInfoGetter(t, testShowJobsCmd, map[string]string{testShowJobsCmd: tt.response}, nil)
+
+			ic := newTestClient(t)
+			val, trID, err := ic.getBackupStatusByNode(node)
+
+			switch {
+			case errors.Is(tt.wantErr, errParseGeneric):
+				require.Error(t, err)
+			case tt.wantErr != nil:
+				require.ErrorIs(t, err, tt.wantErr)
+			default:
+				require.NoError(t, err)
+				assert.InEpsilon(t, tt.wantVal, val, 0.1)
+				assert.Equal(t, tt.wantTRID, trID)
+			}
+		})
+	}
+}
+
+func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
+	t.Parallel()
+
+	node := newMockInfoGetter(t, testShowJobsCmd, nil, a.ErrInvalidParam)
+
+	ic := newTestClient(t)
+	_, _, err := ic.getBackupStatusByNode(node)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to show job queries")
 }

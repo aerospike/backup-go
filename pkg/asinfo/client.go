@@ -47,6 +47,8 @@ const (
 	indexBinTypeBlob        = "blob"
 	indexBinTypeGeo2DSphere = "geo2dsphere"
 	indexBinTypeGeoJSON     = "geojson"
+
+	jobTypeBackup = "backup"
 )
 
 var (
@@ -1782,7 +1784,7 @@ func bitMapToIntSlice(b []bool) []int {
 // and sorts them by time-since-done in ascending order.
 func filterBackupsSortedByTimeSinceDone(jobs []infoMap) ([]infoMap, error) {
 	jobs = slices.DeleteFunc(jobs, func(j infoMap) bool {
-		return j["job-type"] != "backup"
+		return j["job-type"] != jobTypeBackup
 	})
 
 	type indexed struct {

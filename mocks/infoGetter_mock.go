@@ -9,6 +9,7 @@ import (
 
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
+	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -1015,22 +1016,22 @@ func (_c *MockInfoGetter_GetUDFs_Call) RunAndReturn(run func(ctx context.Context
 }
 
 // GetVersion provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetVersion(ctx context.Context) (asinfo.AerospikeVersion, error) {
+func (_mock *MockInfoGetter) GetVersion(ctx context.Context) (models2.AerospikeVersion, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetVersion")
 	}
 
-	var r0 asinfo.AerospikeVersion
+	var r0 models2.AerospikeVersion
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (asinfo.AerospikeVersion, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (models2.AerospikeVersion, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) asinfo.AerospikeVersion); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) models2.AerospikeVersion); ok {
 		r0 = returnFunc(ctx)
 	} else {
-		r0 = ret.Get(0).(asinfo.AerospikeVersion)
+		r0 = ret.Get(0).(models2.AerospikeVersion)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = returnFunc(ctx)
@@ -1064,12 +1065,12 @@ func (_c *MockInfoGetter_GetVersion_Call) Run(run func(ctx context.Context)) *Mo
 	return _c
 }
 
-func (_c *MockInfoGetter_GetVersion_Call) Return(aerospikeVersion asinfo.AerospikeVersion, err error) *MockInfoGetter_GetVersion_Call {
+func (_c *MockInfoGetter_GetVersion_Call) Return(aerospikeVersion models2.AerospikeVersion, err error) *MockInfoGetter_GetVersion_Call {
 	_c.Call.Return(aerospikeVersion, err)
 	return _c
 }
 
-func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func(ctx context.Context) (asinfo.AerospikeVersion, error)) *MockInfoGetter_GetVersion_Call {
+func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func(ctx context.Context) (models2.AerospikeVersion, error)) *MockInfoGetter_GetVersion_Call {
 	_c.Call.Return(run)
 	return _c
 }

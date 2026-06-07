@@ -23,6 +23,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
+	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,7 +69,7 @@ func newClient(
 		retryPolicy: retryPolicy,
 	}
 
-	ic.cmdDict = newCmdDict(AerospikeVersionRecentInfoCommands)
+	ic.cmdDict = newCmdDict(models2.AerospikeVersionRecentInfoCommands)
 
 	return ic
 }
@@ -81,7 +82,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    AerospikeVersion
+		want    models2.AerospikeVersion
 		wantErr bool
 	}{
 		{
@@ -89,7 +90,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "5.6.0.0",
 			},
-			want: AerospikeVersion{
+			want: models2.AerospikeVersion{
 				Major: 5,
 				Minor: 6,
 				Patch: 0,
@@ -100,7 +101,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "1829.123.0.33333",
 			},
-			want: AerospikeVersion{
+			want: models2.AerospikeVersion{
 				Major: 1829,
 				Minor: 123,
 				Patch: 0,
@@ -111,7 +112,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "7.1.0.0-rc1-g1234",
 			},
-			want: AerospikeVersion{
+			want: models2.AerospikeVersion{
 				Major: 7,
 				Minor: 1,
 				Patch: 0,
@@ -176,7 +177,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 		Patch int
 	}
 	type args struct {
-		other AerospikeVersion
+		other models2.AerospikeVersion
 	}
 	tests := []struct {
 		name   string
@@ -192,7 +193,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -208,7 +209,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 5,
 					Minor: 5,
 					Patch: 0,
@@ -224,7 +225,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 1,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -240,7 +241,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -256,7 +257,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -272,7 +273,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -288,7 +289,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 1,
@@ -300,7 +301,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			av := AerospikeVersion{
+			av := models2.AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
 				Patch: tt.fields.Patch,
@@ -364,7 +365,7 @@ func Test_parseSIndex(t *testing.T) {
 	}
 
 	type args struct {
-		sindexMap infoMap
+		sindexMap models2.InfoMap
 	}
 	tests := []struct {
 		args    args
@@ -375,7 +376,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive bin (default) sindex",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -400,7 +401,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive bin (none) sindex",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -425,7 +426,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive list elements sindex",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -450,7 +451,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive map keys sindex",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -475,7 +476,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive map values sindex",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -500,7 +501,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive ctx",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -526,7 +527,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive null set",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "null",
@@ -551,7 +552,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive numeric bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -576,7 +577,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive numeric (int signed) bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -601,7 +602,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive string bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -626,7 +627,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive string (text) bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -651,7 +652,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive blob bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -676,7 +677,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive geojson (geo2dsphere) bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -701,7 +702,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive geojson bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -726,7 +727,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing namespace",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"indexname": "testindex",
 					"set":       "testset",
 					"bin":       "testbin",
@@ -741,7 +742,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing indexname",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"set":       "testset",
 					"bin":       "testbin",
@@ -756,7 +757,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing indextype",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -771,7 +772,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing bin",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -786,7 +787,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing type",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -801,7 +802,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative invalid indextype",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -817,7 +818,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative invalid type",
 			args: args{
-				sindexMap: infoMap{
+				sindexMap: models2.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -857,7 +858,7 @@ func Test_parseInfoResponse(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []infoMap
+		want    []models2.InfoMap
 		wantErr bool
 	}{
 		{
@@ -868,7 +869,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []infoMap{
+			want: []models2.InfoMap{
 				{
 					"foo": "bar",
 				},
@@ -902,7 +903,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []infoMap{
+			want: []models2.InfoMap{
 				{
 					"foo": "bar=as",
 				},
@@ -916,7 +917,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []infoMap{
+			want: []models2.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -931,7 +932,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []infoMap{
+			want: []models2.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -950,7 +951,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []infoMap{
+			want: []models2.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -969,7 +970,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ",",
 				kvSep:   ".",
 			},
-			want: []infoMap{
+			want: []models2.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -1033,7 +1034,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 	tests := []struct {
 		args    args
 		name    string
-		want    AerospikeVersion
+		want    models2.AerospikeVersion
 		wantErr bool
 	}{
 		{
@@ -1041,7 +1042,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 			args: args{
 				node: newMockInfoGetter(t, "build", map[string]string{"build": "5.6.0.0"}, nil),
 			},
-			want: AerospikeVersion{
+			want: models2.AerospikeVersion{
 				Major: 5,
 				Minor: 6,
 				Patch: 0,
@@ -1052,7 +1053,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 			args: args{
 				node: newMockInfoGetter(t, "build", map[string]string{"build": "7.6.1.0-rc2-ghasd"}, nil),
 			},
-			want: AerospikeVersion{
+			want: models2.AerospikeVersion{
 				Major: 7,
 				Minor: 6,
 				Patch: 1,
@@ -1320,7 +1321,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 		Patch int
 	}
 	type args struct {
-		other AerospikeVersion
+		other models2.AerospikeVersion
 	}
 	tests := []struct {
 		name   string
@@ -1336,7 +1337,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -1352,7 +1353,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -1368,7 +1369,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: AerospikeVersion{
+				other: models2.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -1380,7 +1381,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			av := AerospikeVersion{
+			av := models2.AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
 				Patch: tt.fields.Patch,
@@ -1395,7 +1396,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 func Test_parseUDF(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		udfMap infoMap
+		udfMap models2.InfoMap
 	}
 	tests := []struct {
 		args    args
@@ -1406,7 +1407,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				udfMap: infoMap{
+				udfMap: models2.InfoMap{
 					"type":    "LUA",
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
@@ -1419,7 +1420,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative missing type",
 			args: args{
-				udfMap: infoMap{
+				udfMap: models2.InfoMap{
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
 			},
@@ -1428,7 +1429,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative bad language type",
 			args: args{
-				udfMap: infoMap{
+				udfMap: models2.InfoMap{
 					"type":    "BADTYPE",
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
@@ -1438,7 +1439,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative missing content",
 			args: args{
-				udfMap: infoMap{
+				udfMap: models2.InfoMap{
 					"type": "LUA",
 				},
 			},
@@ -1447,7 +1448,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative content is not base64 encoded",
 			args: args{
-				udfMap: infoMap{
+				udfMap: models2.InfoMap{
 					"type":    "LUA",
 					"content": "function test()\n return 1\n end\n",
 				},
@@ -1457,7 +1458,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative wrong number of info elements",
 			args: args{
-				udfMap: infoMap{
+				udfMap: models2.InfoMap{
 					"type":     "LUA",
 					"content":  "function test()\n return 1\n end\n",
 					"too many": "elements",
@@ -1786,7 +1787,7 @@ func Test_parseInfoObject(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		obj    string
-		result infoMap
+		result models2.InfoMap
 		err    error
 	}{
 		{
@@ -2128,9 +2129,9 @@ func TestClient_GetBackupStatus(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound)
 }
 
-// backupJob builds a minimal infoMap representing a backup job.
-func backupJob(trid, timeSinceDone, progress, pids string) infoMap {
-	return infoMap{
+// backupJob builds a minimal InfoMap representing a backup job.
+func backupJob(trid, timeSinceDone, progress, pids string) models2.InfoMap {
+	return models2.InfoMap{
 		"trid":             trid,
 		"ns":               "test-ns",
 		"job-type":         jobTypeBackup,
@@ -2145,7 +2146,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		input     []infoMap
+		input     []models2.InfoMap
 		wantTRIDs []string
 		wantErr   bool
 	}{
@@ -2156,7 +2157,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "filters out non-backup jobs",
-			input: []infoMap{
+			input: []models2.InfoMap{
 				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
 				{"trid": "2", "job-type": "query", "time-since-done": "50"},
 				backupJob("3", "200", "100", "2048"),
@@ -2165,7 +2166,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "ascending by time-since-done",
-			input: []infoMap{
+			input: []models2.InfoMap{
 				backupJob("1", "300", "20", "1024"),
 				backupJob("2", "100", "40", "2048"),
 				backupJob("3", "200", "100", "4096"),
@@ -2174,7 +2175,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "missing time-since-done goes to the end",
-			input: []infoMap{
+			input: []models2.InfoMap{
 				backupJob("1", "300", "50", "2048"),
 				{"trid": "2", "job-type": jobTypeBackup},
 				backupJob("3", "100", "100", "4096"),
@@ -2183,14 +2184,14 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "all jobs filtered out",
-			input: []infoMap{
+			input: []models2.InfoMap{
 				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
 			},
 			wantTRIDs: []string{},
 		},
 		{
 			name: "malformed time-since-done returns error",
-			input: []infoMap{
+			input: []models2.InfoMap{
 				backupJob("1", "not-a-number", "100", "4096"),
 			},
 			wantErr: true,

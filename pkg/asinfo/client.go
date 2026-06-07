@@ -15,7 +15,6 @@
 package asinfo
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -28,7 +27,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
-	"github.com/segmentio/asm/base64"
+	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 const errCmdRespPrefix = "ERROR"
@@ -52,60 +51,12 @@ const (
 )
 
 var (
-	aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
-	secretAgentValRegex   = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
-)
-
-type AerospikeVersion struct {
-	Major int
-	Minor int
-	Patch int
-}
-
-var (
-	AerospikeVersionSupportsSIndexContext = AerospikeVersion{6, 1, 0}
-	AerospikeVersionSupportsBatchWrites   = AerospikeVersion{6, 0, 0}
-	// AerospikeVersionRecentInfoCommands after this version, all commands should use
-	// `namespace` parameter instead of `ns` or `id`.
-	AerospikeVersionRecentInfoCommands = AerospikeVersion{8, 1, 0}
-
-	// AerospikeVersionSupportsIntegratedBackup TODO: change this, after server release.
-	AerospikeVersionSupportsIntegratedBackup = AerospikeVersion{8, 1, 0}
-)
-
-var (
 	ErrReplicationFactorZero = errors.New("replication factor is zero")
 	ErrNoNode                = errors.New("no node found")
 	ErrNotFound              = errors.New("not found")
+
+	secretAgentValRegex = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
 )
-
-func (av AerospikeVersion) String() string {
-	return fmt.Sprintf("%d.%d.%d", av.Major, av.Minor, av.Patch)
-}
-
-func (av AerospikeVersion) IsGreater(other AerospikeVersion) bool {
-	if av.Major > other.Major {
-		return true
-	}
-
-	if av.Major == other.Major {
-		if av.Minor > other.Minor {
-			return true
-		}
-
-		if av.Minor == other.Minor {
-			if av.Patch > other.Patch {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func (av AerospikeVersion) IsGreaterOrEqual(other AerospikeVersion) bool {
-	return av.IsGreater(other) || av == other
-}
 
 // infoGetter defines the methods for doing info requests with the Aerospike database.
 // Is used for tests.
@@ -194,8 +145,8 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 }
 
 // GetVersion returns lowest node version from cluster.
-func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
-	var result AerospikeVersion
+func (ic *Client) GetVersion(ctx context.Context) (models2.AerospikeVersion, error) {
+	var result models2.AerospikeVersion
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		nodes := ic.cluster.GetNodes()
@@ -203,7 +154,7 @@ func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
 			return fmt.Errorf("no nodes available in cluster")
 		}
 
-		var lowestVersion AerospikeVersion
+		var lowestVersion models2.AerospikeVersion
 
 		for i, node := range nodes {
 			currentVersion, err := ic.getAerospikeVersion(node, ic.policy)
@@ -221,7 +172,7 @@ func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
 		return nil
 	})
 	if err != nil {
-		return AerospikeVersion{}, err
+		return models2.AerospikeVersion{}, err
 	}
 
 	return result, nil
@@ -292,7 +243,7 @@ func (ic *Client) SupportsBatchWrite(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
 
-	return v.IsGreaterOrEqual(AerospikeVersionSupportsBatchWrites), nil
+	return v.IsGreaterOrEqual(models2.AerospikeVersionSupportsBatchWrites), nil
 }
 
 // GetRecordCount counts number of records in given namespace and sets.
@@ -402,7 +353,7 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint6
 	var totalRemaining uint64
 
 	for i := range resultMap {
-		result, ok, err := resultMap[i].parseUint64("migrate_tx_partitions_remaining")
+		result, ok, err := resultMap[i].ParseUint64("migrate_tx_partitions_remaining")
 		if err != nil {
 			return 0, err
 		}
@@ -411,7 +362,7 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint6
 			totalRemaining += result
 		}
 
-		result, ok, err = resultMap[i].parseUint64("migrate_rx_partitions_remaining")
+		result, ok, err = resultMap[i].ParseUint64("migrate_rx_partitions_remaining")
 		if err != nil {
 			return 0, err
 		}
@@ -800,7 +751,7 @@ func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
 	var stats Stats
 
 	for i := range resultMap {
-		lag, ok, err := resultMap[i].parseInt64("lag")
+		lag, ok, err := resultMap[i].ParseInt64("lag")
 		if err != nil {
 			return Stats{}, err
 		}
@@ -809,7 +760,7 @@ func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
 			stats.Lag = lag
 		}
 
-		recoveries, ok, err := resultMap[i].parseInt64("recoveries")
+		recoveries, ok, err := resultMap[i].ParseInt64("recoveries")
 		if err != nil {
 			return Stats{}, err
 		}
@@ -818,7 +769,7 @@ func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
 			stats.Recoveries = recoveries
 		}
 
-		recoveriesPending, ok, err := resultMap[i].parseInt64("recoveries_pending")
+		recoveriesPending, ok, err := resultMap[i].ParseInt64("recoveries_pending")
 		if err != nil {
 			return Stats{}, err
 		}
@@ -1080,7 +1031,7 @@ func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
 			total += one
 		}
 
-		result = math.Min(100, 100*total/4096)
+		math.Min(1.0, total/4096)
 
 		return nil
 	})
@@ -1100,17 +1051,17 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 
 	latestBackup := jobs[0]
 
-	trID, okTrID, err := latestBackup.parseInt64("trid")
+	trID, okTrID, err := latestBackup.ParseInt64("trid")
 	if err != nil {
 		return 0, 0, err
 	}
 
-	progress, okProgress, err := latestBackup.parseFloat64("job-progress")
+	progress, okProgress, err := latestBackup.ParseFloat64("job-progress")
 	if err != nil {
 		return 0, 0, err
 	}
 
-	pids, okPids, err := latestBackup.parseFloat64("n-pids-requested")
+	pids, okPids, err := latestBackup.ParseFloat64("n-pids-requested")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -1122,7 +1073,7 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 	return 0, 0, ErrNotFound
 }
 
-func (ic *Client) getBackupJobsByNode(node infoGetter) ([]infoMap, error) {
+func (ic *Client) getBackupJobsByNode(node infoGetter) ([]models2.InfoMap, error) {
 	jobs, err := ic.getJobsQueriesByNode(node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
@@ -1135,223 +1086,6 @@ func (ic *Client) getBackupJobsByNode(node infoGetter) ([]infoMap, error) {
 	}
 
 	return jobs, nil
-}
-
-// ***** Utility functions *****
-
-func parseResultResponse(cmd string, result map[string]string) (string, error) {
-	v, ok := result[cmd]
-	if !ok {
-		return "", fmt.Errorf("no response for command %s", cmd)
-	}
-
-	if strings.Contains(v, errCmdRespPrefix) {
-		return "", fmt.Errorf("command %s failed: %s", cmd, v)
-	}
-
-	return v, nil
-}
-
-func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
-	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext
-
-	version, err := ic.getAerospikeVersion(node, policy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
-	}
-
-	getCtx := version.IsGreaterOrEqual(supportsSIndexCTX)
-	cmd := ic.buildSindexCmd(namespace, getCtx)
-
-	response, err := node.RequestInfo(policy, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sindexes: %w", err)
-	}
-
-	cmdResp, err := parseResultResponse(cmd, response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
-	}
-
-	return parseSIndexes(cmdResp)
-}
-
-func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSindexList], namespace)
-
-	// NOTE: getting the sindex ctx was added in Aerospike 6.1
-	// so don't include this in the command at all if the server is older
-	if getCtx {
-		cmd += ";b64=true"
-	}
-
-	return cmd
-}
-
-func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (AerospikeVersion, error) {
-	// As we need to check version before we form dict, this command will be loaded directly.
-	cmd := cmdBuild
-
-	versionResp, aErr := conn.RequestInfo(policy, cmd)
-	if aErr != nil {
-		return AerospikeVersion{}, aErr
-	}
-
-	versionStr, err := parseResultResponse(cmd, versionResp)
-	if err != nil {
-		return AerospikeVersion{}, fmt.Errorf("failed to parse get version response: %s: %w", versionResp, err)
-	}
-
-	return parseAerospikeVersion(versionStr)
-}
-
-func parseAerospikeVersion(versionStr string) (AerospikeVersion, error) {
-	matches := aerospikeVersionRegex.FindStringSubmatch(versionStr)
-	if len(matches) != 4 {
-		return AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike version from '%s'", versionStr)
-	}
-
-	major, err := strconv.Atoi(matches[1])
-	if err != nil {
-		return AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike major version %w", err)
-	}
-
-	minor, err := strconv.Atoi(matches[2])
-	if err != nil {
-		return AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike minor version %w", err)
-	}
-
-	patch, err := strconv.Atoi(matches[3])
-	if err != nil {
-		return AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike patch version %w", err)
-	}
-
-	return AerospikeVersion{
-		Major: major,
-		Minor: minor,
-		Patch: patch,
-	}, nil
-}
-
-func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
-	sindexInfo, err := parseSindexListResponse(sindexListInfoResp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
-	}
-
-	// No sindexes
-	if sindexInfo == nil {
-		return nil, nil
-	}
-
-	sindexes := make([]*models.SIndex, len(sindexInfo))
-
-	for i, sindexStr := range sindexInfo {
-		sindex, err := parseSIndex(sindexStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse sindex: %w", err)
-		}
-
-		sindexes[i] = sindex
-	}
-
-	return sindexes, nil
-}
-
-// parseSIndex parses a single infoMap containing a sindex into a SecondaryIndex model
-func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
-	si := &models.SIndex{}
-
-	if val, ok := sindexMap["ns"]; ok {
-		si.Namespace = val
-	} else {
-		return nil, fmt.Errorf("sindex missing namespace")
-	}
-
-	if val, ok := sindexMap["set"]; ok {
-		// "NULL" is the server's representation of an empty set
-		// in the sindex list info response
-		if !strings.EqualFold(val, "null") {
-			si.Set = val
-		}
-	}
-
-	if val, ok := sindexMap["indexname"]; ok {
-		si.Name = val
-	} else {
-		return nil, fmt.Errorf("sindex missing indexname")
-	}
-
-	if val, ok := sindexMap["indextype"]; ok {
-		var sindexType models.SIndexType
-
-		switch strings.ToLower(val) {
-		case indexTypeDefault, indexTypeNone:
-			sindexType = models.BinSIndex
-		case indexTypeList:
-			sindexType = models.ListElementSIndex
-		case indexTypeMapKeys:
-			sindexType = models.MapKeySIndex
-		case indexTypeMapValues:
-			sindexType = models.MapValueSIndex
-		default:
-			return nil, fmt.Errorf("invalid sindex index type: %s", val)
-		}
-
-		si.IndexType = sindexType
-	} else {
-		return nil, fmt.Errorf("sindex missing indextype")
-	}
-
-	if val, ok := sindexMap["bin"]; ok { //nolint:nestif // parsing optional map fields: bin → type → context
-		path := models.SIndexPath{
-			BinName: val,
-		}
-
-		if val, ok := sindexMap["type"]; ok {
-			var binType models.SIPathBinType
-
-			switch strings.ToLower(val) {
-			case indexBinTypeNumeric, indexBinTypeIntSigned:
-				binType = models.NumericSIDataType
-			case indexBinTypeString, indexBinTypeText:
-				binType = models.StringSIDataType
-			case indexBinTypeBlob:
-				binType = models.BlobSIDataType
-			case indexBinTypeGeo2DSphere, indexBinTypeGeoJSON:
-				binType = models.GEO2DSphereSIDataType
-			default:
-				return nil, fmt.Errorf("invalid sindex type: %s", val)
-			}
-
-			path.BinType = binType
-		} else {
-			return nil, fmt.Errorf("sindex missing type")
-		}
-
-		if val, ok := sindexMap["context"]; ok {
-			// "NULL" is the server's representation of an empty context
-			// in the sindex list info response
-			if !strings.EqualFold(val, "null") {
-				path.B64Context = val
-			}
-		}
-
-		si.Path = path
-	} else {
-		return nil, fmt.Errorf("sindex missing bin")
-	}
-
-	// Set index expression value
-	if val, ok := sindexMap["exp"]; ok {
-		if strings.EqualFold(val, "null") {
-			val = ""
-		}
-
-		si.Expression = val
-	}
-
-	return si, nil
 }
 
 func (ic *Client) getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF, error) {
@@ -1419,20 +1153,6 @@ func (ic *Client) getUDF(node infoGetter, name string, policy *a.InfoPolicy) (*m
 	return udf, nil
 }
 
-func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
-	udfInfo, err := parseUDFGetResponse(udfGetInfoResp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse UDF response: %w", err)
-	}
-
-	udf, err := parseUDF(udfInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse UDF: %w", err)
-	}
-
-	return udf, nil
-}
-
 func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, namespace string, sets []string,
 ) (uint64, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetsOfNamespace], namespace)
@@ -1493,7 +1213,7 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 	}
 
 	for i := range resultMap {
-		result, ok, err := resultMap[i].parseUint64("objects")
+		result, ok, err := resultMap[i].ParseUint64("objects")
 		if err != nil {
 			return 0, err
 		}
@@ -1530,7 +1250,7 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoP
 	return 0, errors.New("replication factor not found")
 }
 
-func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]infoMap, error) {
+func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]models2.InfoMap, error) {
 	cmd := ic.cmdDict[cmdIDShowJobsQueries]
 
 	response, aerr := node.RequestInfo(ic.policy, cmd)
@@ -1544,280 +1264,4 @@ func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]infoMap, error) {
 	}
 
 	return infoResponse, nil
-}
-
-func parseUDF(udfMap infoMap) (*models.UDF, error) {
-	var (
-		udf     models.UDF
-		udfLang string
-	)
-
-	if val, ok := udfMap["type"]; ok {
-		udfLang = val
-	} else {
-		return nil, fmt.Errorf("UDF info response missing language type")
-	}
-
-	if strings.EqualFold(udfLang, "lua") {
-		udf.UDFType = models.UDFTypeLUA
-	} else {
-		return nil, fmt.Errorf("invalid UDF language type: %s", udfLang)
-	}
-
-	if val, ok := udfMap["content"]; ok {
-		// the udf content field is base64 encoded in info responses
-		content, err := base64.StdEncoding.DecodeString(val)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode UDF content: %w", err)
-		}
-
-		udf.Content = content
-	} else {
-		return nil, fmt.Errorf("UDF info response missing content")
-	}
-
-	return &udf, nil
-}
-
-type infoMap map[string]string
-
-// parseUint64 returns the parsed uint64 value from the map for the given key if found.
-// ok = true if the key was found.
-func (m infoMap) parseUint64(key string) (result uint64, ok bool, err error) {
-	val, ok := m[key]
-	if !ok {
-		return 0, false, nil
-	}
-
-	v, err := strconv.ParseUint(val, 10, 64)
-	if err != nil {
-		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
-	}
-
-	return v, true, nil
-}
-
-// parseInt64 returns the parsed int64 value from the map for the given key if found.
-// ok = true if the key was found.
-func (m infoMap) parseInt64(key string) (result int64, ok bool, err error) {
-	val, ok := m[key]
-	if !ok {
-		return 0, false, nil
-	}
-
-	v, err := strconv.ParseInt(val, 10, 64)
-	if err != nil {
-		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
-	}
-
-	return v, true, nil
-}
-
-// parseFloat64 returns the parsed float64 value from the map for the given key if found.
-// ok = true if the key was found.
-func (m infoMap) parseFloat64(key string) (result float64, ok bool, err error) {
-	val, ok := m[key]
-	if !ok {
-		return 0, false, nil
-	}
-
-	v, err := strconv.ParseFloat(val, 64)
-	if err != nil {
-		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
-	}
-
-	return v, true, nil
-}
-
-// parseInfoResponse parses a single info response format string.
-// the string may contain multiple response objects each separated by a semicolon
-// each key-value pair is separated by a colon and the key is separated from the value by an equals sign
-// e.g. "foo=bar:baz=qux;foo=bar:baz=qux"
-// the above example is returned as []infoMap{infoMap{"foo": "bar", "baz": "qux"}, infoMap{"foo": "bar", "baz": "qux"}}
-// if the passed in info response is empty, nil is returned.
-func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]infoMap, error) {
-	if resp == "" {
-		return nil, nil
-	}
-
-	// remove the trailing object separator if it exists
-	if strings.HasSuffix(resp, objSep) {
-		resp = resp[:len(resp)-1]
-	}
-
-	if resp == "" {
-		return nil, nil
-	}
-
-	objects := strings.Split(resp, objSep)
-	info := make([]infoMap, len(objects))
-
-	for i, object := range objects {
-		data, err := parseInfoObject(object, pairSep, kvSep)
-		if err != nil {
-			return nil, err
-		}
-
-		info[i] = data
-	}
-
-	return info, nil
-}
-
-func parseInfoObject(obj, pairSep, kvSep string) (infoMap, error) {
-	if obj == "" {
-		return nil, nil
-	}
-
-	// remove the trailing object separator if it exists
-	if strings.HasSuffix(obj, pairSep) {
-		obj = obj[:len(obj)-1]
-	}
-
-	if obj == "" {
-		return nil, nil
-	}
-
-	data := map[string]string{}
-
-	var kvpairs []string
-
-	switch secretAgentValRegex.MatchString(obj) {
-	case true:
-		// If parameter is configured with secret agent, we don't split it.
-		kvpairs = append(kvpairs, obj)
-	case false:
-		kvpairs = strings.Split(obj, pairSep)
-	}
-
-	for _, pair := range kvpairs {
-		key, val, err := parseInfoKVPair(pair, kvSep)
-		if err != nil {
-			return nil, err
-		}
-
-		data[key] = val
-	}
-
-	return data, nil
-}
-
-func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
-	// some info key value pairs can contain kvSep in the value
-	// for example, the base64 encoded context for a secondary index can contain "="
-	// so we need to split on the first separator only
-	kv := strings.SplitN(pair, kvSep, 2)
-	if len(kv) != 2 {
-		return "", "", fmt.Errorf("invalid key-value pair: %s", pair)
-	}
-
-	// make keys case-insensitive
-	// to help with different version compatibility
-	key = strings.ToLower(kv[0])
-	val = kv[1]
-
-	return key, val, err
-}
-
-// parseSindexListResponse parses a sindex-list info response
-// example resp: ns=source-ns1:indexname=idx_timestamp:set=metrics:bin=timestamp:type=numeric:indextype=default
-func parseSindexListResponse(resp string) ([]infoMap, error) {
-	return parseInfoResponse(resp, ";", ":", "=")
-}
-
-// parseUDFListResponse parses a udf-list info response
-// example resp: filename=basic_udf.lua,hash=706c57cb29e027221560a3cb4b693573ada98bf2,type=LUA;...
-func parseUDFListResponse(resp string) ([]infoMap, error) {
-	return parseInfoResponse(resp, ";", ",", "=")
-}
-
-// parseUDFGetResponse parses a udf-get info response
-// example resp: type=LUA;content=LS0gQSB2ZXJ5IHNpbXBsZSBhcml0
-func parseUDFGetResponse(resp string) (infoMap, error) {
-	return parseInfoObject(resp, ";", "=")
-}
-
-func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command func() error) error {
-	if policy == nil {
-		return fmt.Errorf("retry policy cannot be nil")
-	}
-
-	return policy.Do(ctx, command)
-}
-
-// base64StringToBitArray decodes a base64 string and converts the result to a bitarray (slice of booleans).
-func base64StringToBitArray(base64Str string) ([]bool, error) {
-	decodedBytes, err := base64.StdEncoding.DecodeString(base64Str)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64 string: %w", err)
-	}
-
-	bitarray := make([]bool, 0, len(decodedBytes)*8) // Pre-allocate for efficiency
-
-	for _, b := range decodedBytes {
-		for i := 7; i >= 0; i-- {
-			// Check if the i-th bit is set (from most significant to least significant)
-			if (b>>i)&1 == 1 {
-				bitarray = append(bitarray, true)
-			} else {
-				bitarray = append(bitarray, false)
-			}
-		}
-	}
-
-	return bitarray, nil
-}
-
-func bitMapToIntSlice(b []bool) []int {
-	var result []int
-
-	for i, bit := range b {
-		if bit {
-			result = append(result, i)
-		}
-	}
-
-	return result
-}
-
-// filterBackupsSortedByTimeSinceDone filters backup jobs from the given list
-// and sorts them by time-since-done in ascending order.
-func filterBackupsSortedByTimeSinceDone(jobs []infoMap) ([]infoMap, error) {
-	jobs = slices.DeleteFunc(jobs, func(j infoMap) bool {
-		return j["job-type"] != jobTypeBackup
-	})
-
-	type indexed struct {
-		t       int64
-		present bool
-		job     infoMap
-	}
-
-	idx := make([]indexed, len(jobs))
-	for i, j := range jobs {
-		v, ok, err := j.parseInt64("time-since-done")
-		if err != nil {
-			return nil, fmt.Errorf("job %d: %w", i, err)
-		}
-		idx[i] = indexed{t: v, present: ok, job: j}
-	}
-
-	slices.SortFunc(idx, func(a, b indexed) int {
-		switch {
-		case !a.present && !b.present:
-			return 0
-		case !a.present:
-			return 1
-		case !b.present:
-			return -1
-		}
-
-		return cmp.Compare(a.t, b.t)
-	})
-
-	for i, x := range idx {
-		jobs[i] = x.job
-	}
-
-	return jobs, nil
 }

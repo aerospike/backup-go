@@ -14,6 +14,8 @@
 
 package asinfo
 
+import "github.com/aerospike/backup-go/pkg/asinfo/models"
+
 const (
 	cmdIDBuild = iota
 	cmdIDStatus
@@ -91,7 +93,7 @@ const (
 	cmdSindexList = "sindex-list:namespace=%s"
 )
 
-func newCmdDict(version AerospikeVersion) map[int]string {
+func newCmdDict(version models.AerospikeVersion) map[int]string {
 	cmds := make(map[int]string, commandsNumber)
 
 	cmds[cmdIDBuild] = cmdBuild
@@ -119,11 +121,11 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 	cmds[cmdIDReplicas] = cmdReplicas
 	cmds[cmdIDShowJobsQueries] = cmdShowJobsQueries
 
-	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
+	if version.IsGreaterOrEqual(models.AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList
 	}
 
-	if version.IsGreaterOrEqual(AerospikeVersionSupportsIntegratedBackup) {
+	if version.IsGreaterOrEqual(models.AerospikeVersionSupportsIntegratedBackup) {
 		cmds[cmdIDServerBackup] = cmdServerBackup
 		cmds[cmdIDServerRestore] = cmdServerRestore
 		cmds[cmdIDServerPrepareRestore] = cmdServerPrepareRestore

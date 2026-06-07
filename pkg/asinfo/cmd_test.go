@@ -17,6 +17,8 @@ package asinfo
 import (
 	"reflect"
 	"testing"
+
+	"github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 func TestNewCmdDict(t *testing.T) {
@@ -24,13 +26,13 @@ func TestNewCmdDict(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		version        AerospikeVersion
+		version        models.AerospikeVersion
 		expectedCmds   map[int]string
 		expectedLength int
 	}{
 		{
 			name:           "version less than versionLast uses deprecated commands",
-			version:        AerospikeVersionSupportsSIndexContext,
+			version:        models.AerospikeVersionSupportsSIndexContext,
 			expectedLength: commandsNumber - 3, // @ new commands are for new version only
 			expectedCmds: map[int]string{
 				cmdIDBuild:               cmdBuild,
@@ -61,7 +63,7 @@ func TestNewCmdDict(t *testing.T) {
 		},
 		{
 			name:           "version greater or equal to versionLast uses new commands",
-			version:        AerospikeVersionRecentInfoCommands,
+			version:        models.AerospikeVersionRecentInfoCommands,
 			expectedLength: commandsNumber,
 			expectedCmds: map[int]string{
 				cmdIDBuild:               cmdBuild,

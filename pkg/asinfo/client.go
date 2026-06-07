@@ -1031,7 +1031,7 @@ func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
 			total += one
 		}
 
-		math.Min(1.0, total/4096)
+		result = math.Min(1.0, total/4096)
 
 		return nil
 	})

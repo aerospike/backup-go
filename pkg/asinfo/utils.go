@@ -443,10 +443,10 @@ func bitMapToIntSlice(b []bool) []int {
 
 // filterBackupsSortedByTimeSinceDone filters backup jobs from the given list
 // and sorts them by time-since-done in ascending order.
-func filterBackupsSortedByTimeSinceDone(jobs1 []m.InfoMap) ([]m.InfoMap, error) {
+func filterBackupsSortedByTimeSinceDone(jobs []m.InfoMap) ([]m.InfoMap, error) {
 	fJobs := make([]m.InfoMap, 0)
 
-	for _, job := range jobs1 {
+	for _, job := range jobs {
 		if job["job-type"] != jobTypeBackup {
 			continue
 		}

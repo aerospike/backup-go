@@ -27,7 +27,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/models"
-	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
+	iModels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 const errCmdRespPrefix = "ERROR"
@@ -145,8 +145,8 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 }
 
 // GetVersion returns lowest node version from cluster.
-func (ic *Client) GetVersion(ctx context.Context) (models2.AerospikeVersion, error) {
-	var result models2.AerospikeVersion
+func (ic *Client) GetVersion(ctx context.Context) (iModels.AerospikeVersion, error) {
+	var result iModels.AerospikeVersion
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		nodes := ic.cluster.GetNodes()
@@ -154,7 +154,7 @@ func (ic *Client) GetVersion(ctx context.Context) (models2.AerospikeVersion, err
 			return fmt.Errorf("no nodes available in cluster")
 		}
 
-		var lowestVersion models2.AerospikeVersion
+		var lowestVersion iModels.AerospikeVersion
 
 		for i, node := range nodes {
 			currentVersion, err := ic.getAerospikeVersion(node, ic.policy)
@@ -172,7 +172,7 @@ func (ic *Client) GetVersion(ctx context.Context) (models2.AerospikeVersion, err
 		return nil
 	})
 	if err != nil {
-		return models2.AerospikeVersion{}, err
+		return iModels.AerospikeVersion{}, err
 	}
 
 	return result, nil
@@ -243,7 +243,7 @@ func (ic *Client) SupportsBatchWrite(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
 
-	return v.IsGreaterOrEqual(models2.AerospikeVersionSupportsBatchWrites), nil
+	return v.IsGreaterOrEqual(iModels.AerospikeVersionSupportsBatchWrites), nil
 }
 
 // GetRecordCount counts number of records in given namespace and sets.
@@ -1073,7 +1073,7 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 	return 0, 0, ErrNotFound
 }
 
-func (ic *Client) getBackupJobsByNode(node infoGetter) ([]models2.InfoMap, error) {
+func (ic *Client) getBackupJobsByNode(node infoGetter) ([]iModels.InfoMap, error) {
 	jobs, err := ic.getJobsQueriesByNode(node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
@@ -1250,7 +1250,7 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoP
 	return 0, errors.New("replication factor not found")
 }
 
-func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]models2.InfoMap, error) {
+func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]iModels.InfoMap, error) {
 	cmd := ic.cmdDict[cmdIDShowJobsQueries]
 
 	response, aerr := node.RequestInfo(ic.policy, cmd)

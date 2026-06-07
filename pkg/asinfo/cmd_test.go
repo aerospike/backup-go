@@ -17,6 +17,8 @@ package asinfo
 import (
 	"reflect"
 	"testing"
+
+	"github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 func TestNewCmdDict(t *testing.T) {
@@ -24,13 +26,13 @@ func TestNewCmdDict(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		version        AerospikeVersion
+		version        models.AerospikeVersion
 		expectedCmds   map[int]string
 		expectedLength int
 	}{
 		{
 			name:           "version less than versionLast uses deprecated commands",
-			version:        AerospikeVersionSupportsSIndexContext,
+			version:        models.AerospikeVersionSupportsSIndexContext,
 			expectedLength: commandsNumber - 3, // @ new commands are for new version only
 			expectedCmds: map[int]string{
 				cmdIDBuild:               cmdBuild,
@@ -56,36 +58,39 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDSetXDRForward:       cmdSetXDRForward,
 				cmdIDGetConfigXDR:        cmdGetConfigXDR,
 				cmdIDReplicas:            cmdReplicas,
+				cmdIDShowJobsQueries:     cmdShowJobsQueries,
 			},
 		},
 		{
 			name:           "version greater or equal to versionLast uses new commands",
-			version:        AerospikeVersionRecentInfoCommands,
+			version:        models.AerospikeVersionRecentInfoCommands,
 			expectedLength: commandsNumber,
 			expectedCmds: map[int]string{
-				cmdIDBuild:                cmdBuild,
-				cmdIDStatus:               cmdStatus,
-				cmdIDNamespaces:           cmdNamespaces,
-				cmdIDSetsOfNamespace:      cmdSetsOfNamespace,
-				cmdIDNamespaceInfo:        cmdNamespaceInfo,
-				cmdIDRack:                 cmdRack,
-				cmdIDServiceClearStd:      cmdServiceClearStd,
-				cmdIDServiceTLSStd:        cmdServiceTLSStd,
-				cmdIDSindexList:           cmdSindexList, // New version.
-				cmdIDUdfList:              cmdUdfList,
-				cmdIDUdfGetFilename:       cmdUdfGetFilename,
-				cmdIDCreateXDRDC:          cmdCreateXDRDC,
-				cmdIDCreateConnector:      cmdCreateConnector,
-				cmdIDCreateXDRNode:        cmdCreateXDRNode,
-				cmdIDCreateXDRNamespace:   cmdCreateXDRNamespace,
-				cmdIDDeleteXDRDC:          cmdDeleteXDRDC,
-				cmdIDGetXDRStats:          cmdGetXDRStats,
-				cmdIDBlockMRTWrites:       cmdBlockMRTWrites,
-				cmdIDUnBlockMRTWrites:     cmdUnBlockMRTWrites,
-				cmdIDSetXDRMaxThroughput:  cmdSetXDRMaxThroughput,
-				cmdIDSetXDRForward:        cmdSetXDRForward,
-				cmdIDGetConfigXDR:         cmdGetConfigXDR,
-				cmdIDReplicas:             cmdReplicas,
+				cmdIDBuild:               cmdBuild,
+				cmdIDStatus:              cmdStatus,
+				cmdIDNamespaces:          cmdNamespaces,
+				cmdIDSetsOfNamespace:     cmdSetsOfNamespace,
+				cmdIDNamespaceInfo:       cmdNamespaceInfo,
+				cmdIDRack:                cmdRack,
+				cmdIDServiceClearStd:     cmdServiceClearStd,
+				cmdIDServiceTLSStd:       cmdServiceTLSStd,
+				cmdIDSindexList:          cmdSindexList, // New version.
+				cmdIDUdfList:             cmdUdfList,
+				cmdIDUdfGetFilename:      cmdUdfGetFilename,
+				cmdIDCreateXDRDC:         cmdCreateXDRDC,
+				cmdIDCreateConnector:     cmdCreateConnector,
+				cmdIDCreateXDRNode:       cmdCreateXDRNode,
+				cmdIDCreateXDRNamespace:  cmdCreateXDRNamespace,
+				cmdIDDeleteXDRDC:         cmdDeleteXDRDC,
+				cmdIDGetXDRStats:         cmdGetXDRStats,
+				cmdIDBlockMRTWrites:      cmdBlockMRTWrites,
+				cmdIDUnBlockMRTWrites:    cmdUnBlockMRTWrites,
+				cmdIDSetXDRMaxThroughput: cmdSetXDRMaxThroughput,
+				cmdIDSetXDRForward:       cmdSetXDRForward,
+				cmdIDGetConfigXDR:        cmdGetConfigXDR,
+				cmdIDReplicas:            cmdReplicas,
+				cmdIDShowJobsQueries:     cmdShowJobsQueries,
+
 				cmdIDServerBackup:         cmdServerBackup,
 				cmdIDServerRestore:        cmdServerRestore,
 				cmdIDServerPrepareRestore: cmdServerPrepareRestore,

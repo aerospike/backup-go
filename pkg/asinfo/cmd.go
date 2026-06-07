@@ -14,6 +14,8 @@
 
 package asinfo
 
+import "github.com/aerospike/backup-go/pkg/asinfo/models"
+
 const (
 	cmdIDBuild = iota
 	cmdIDStatus
@@ -41,10 +43,11 @@ const (
 	cmdIDServerBackup
 	cmdIDServerRestore
 	cmdIDServerPrepareRestore
+	cmdIDShowJobsQueries
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 26
+const commandsNumber = 27
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
@@ -78,6 +81,8 @@ const (
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s"
 	cmdServerPrepareRestore = "prepare-restore:namespace=%s;job-id=%s;"
 
+	cmdShowJobsQueries = "query-show"
+
 	// Deprecated commands:
 
 	cmdSindexListDeprecated = "sindex-list:ns=%s"
@@ -88,7 +93,7 @@ const (
 	cmdSindexList = "sindex-list:namespace=%s"
 )
 
-func newCmdDict(version AerospikeVersion) map[int]string {
+func newCmdDict(version models.AerospikeVersion) map[int]string {
 	cmds := make(map[int]string, commandsNumber)
 
 	cmds[cmdIDBuild] = cmdBuild
@@ -114,12 +119,13 @@ func newCmdDict(version AerospikeVersion) map[int]string {
 	cmds[cmdIDSetXDRForward] = cmdSetXDRForward
 	cmds[cmdIDGetConfigXDR] = cmdGetConfigXDR
 	cmds[cmdIDReplicas] = cmdReplicas
+	cmds[cmdIDShowJobsQueries] = cmdShowJobsQueries
 
-	if version.IsGreaterOrEqual(AerospikeVersionRecentInfoCommands) {
+	if version.IsGreaterOrEqual(models.AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList
 	}
 
-	if version.IsGreaterOrEqual(AerospikeVersionSupportsIntegratedBackup) {
+	if version.IsGreaterOrEqual(models.AerospikeVersionSupportsIntegratedBackup) {
 		cmds[cmdIDServerBackup] = cmdServerBackup
 		cmds[cmdIDServerRestore] = cmdServerRestore
 		cmds[cmdIDServerPrepareRestore] = cmdServerPrepareRestore

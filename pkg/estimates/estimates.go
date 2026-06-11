@@ -146,10 +146,12 @@ func printEstimate(
 	switch {
 	case ratio >= 1:
 		return 0, errBrake
-	case ratio*100 < 0.01:
+	case ratio*100 < 0.01: // It duplicates progressThreshold but protect from division by zero.
 		return 0, errContinue
 	}
 
+	// Calculate dynamically how many times we should skip ticker before printing.
+	// Not to flood the logs.
 	threshold := progressThreshold(elapsed, ratio)
 	if ratio-previousVal < threshold {
 		return 0, errContinue
@@ -202,17 +204,19 @@ func progressThreshold(elapsed time.Duration, ratio float64) float64 {
 	}
 }
 
-func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Duration {
-	if percentDone < 0.01 {
-		return time.Duration(0)
+func calculateEstimatedEndTime(startTime time.Time, ratio float64) time.Duration {
+	elapsed := time.Since(startTime)
+
+	// Слишком рано — оценка будет недостоверной.
+	if elapsed < estimateWarmup || ratio <= 0 {
+		return 0
 	}
 
-	elapsed := time.Since(startTime)
-	totalTime := time.Duration(float64(elapsed) / percentDone)
-	result := totalTime - elapsed
+	totalTime := time.Duration(float64(elapsed) / ratio)
 
+	result := totalTime - elapsed
 	if result < 0 {
-		return time.Duration(0)
+		return 0
 	}
 
 	return result

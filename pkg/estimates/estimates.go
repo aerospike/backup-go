@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/aerospike/backup-go/models"
@@ -135,10 +136,10 @@ func printEstimate(
 	case ratio >= 1:
 		// Exit after 100%.
 		return 0, errBrake
-	case ratio*100 < 1:
+	case ratio*100 < 0.01:
 		// Start printing only when we have something.
 		return 0, errContinue
-	case ratio-previousVal < 0.01:
+	case ratio-previousVal < 0.0001:
 		// if less than 1% then don't print anything.
 		return 0, errContinue
 	}
@@ -163,7 +164,7 @@ func printEstimate(
 	}
 
 	logger.Info("progress",
-		slog.Uint64("pct", uint64(ratio*100)),
+		slog.Float64("pct", math.Round(ratio*10000)/100),
 		// Formatting the remaining time to milliseconds to avoid printing 0.000000000 seconds.
 		slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
 		slog.Uint64("rec/s", rps),

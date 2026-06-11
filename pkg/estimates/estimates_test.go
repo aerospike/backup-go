@@ -27,57 +27,306 @@ import (
 )
 
 func TestCalculateEstimatedEndTime(t *testing.T) {
+	t.Parallel()
+
+	// startTime is computed inside the subtest (not in the struct) to keep the
+	// gap between "time.Now() in the test" and "time.Since() inside the function"
+	// in the microsecond range. Otherwise time drift is amplified by 1/ratio.
 	tests := []struct {
-		name        string
-		startTime   time.Time
-		percentDone float64
-		expected    time.Duration
+		name      string
+		elapsed   time.Duration
+		ratio     float64
+		expected  time.Duration
+		tolerance time.Duration
 	}{
 		{
-			name:        "Zero Percent Done",
-			startTime:   time.Now().Add(-10 * time.Second),
-			percentDone: 0,
-			expected:    time.Duration(0),
+			name:      "elapsed less than warmup returns zero",
+			elapsed:   2 * time.Second, // < estimateWarmup (5s)
+			ratio:     0.5,
+			expected:  0,
+			tolerance: 100 * time.Millisecond,
 		},
 		{
-			name:        "Less Than 1 Percent Done",
-			startTime:   time.Now().Add(-10 * time.Second),
-			percentDone: 0.005,
-			expected:    time.Duration(0),
+			name:      "zero ratio returns zero",
+			elapsed:   10 * time.Second,
+			ratio:     0,
+			expected:  0,
+			tolerance: 100 * time.Millisecond,
 		},
 		{
-			name:        "10 Percent Done",
-			startTime:   time.Now().Add(-10 * time.Second),
-			percentDone: 0.1,
-			expected:    90 * time.Second,
+			name:      "negative ratio returns zero",
+			elapsed:   10 * time.Second,
+			ratio:     -0.1,
+			expected:  0,
+			tolerance: 100 * time.Millisecond,
 		},
 		{
-			name:        "50 Percent Done",
-			startTime:   time.Now().Add(-10 * time.Second),
-			percentDone: 0.5,
-			expected:    10 * time.Second,
+			name:     "10 percent done after 10s",
+			elapsed:  10 * time.Second,
+			ratio:    0.1,
+			expected: 90 * time.Second,
+			// drift amplified by 1/0.1 = 10x
+			tolerance: 500 * time.Millisecond,
 		},
 		{
-			name:        "100 Percent Done",
-			startTime:   time.Now().Add(-10 * time.Second),
-			percentDone: 1.0,
-			expected:    0 * time.Second,
+			name:      "50 percent done after 10s",
+			elapsed:   10 * time.Second,
+			ratio:     0.5,
+			expected:  10 * time.Second,
+			tolerance: 100 * time.Millisecond,
+		},
+		{
+			name:      "100 percent done returns zero",
+			elapsed:   10 * time.Second,
+			ratio:     1.0,
+			expected:  0,
+			tolerance: 100 * time.Millisecond,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := calculateEstimatedEndTime(tt.startTime, tt.percentDone)
+			t.Parallel()
 
-			if tt.percentDone < 0.01 {
-				assert.Equal(t, tt.expected, result)
+			startTime := time.Now().Add(-tt.elapsed)
+
+			result := calculateEstimatedEndTime(startTime, tt.ratio)
+
+			assert.InDelta(t, tt.expected.Milliseconds(), result.Milliseconds(), float64(tt.tolerance.Milliseconds()))
+		})
+	}
+}
+
+func TestProgressThreshold(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		elapsed  time.Duration
+		ratio    float64
+		expected float64
+	}{
+		{
+			name:     "during warmup returns max threshold",
+			elapsed:  2 * time.Second, // < estimateWarmup
+			ratio:    0.001,
+			expected: maxThreshold,
+		},
+		{
+			name:    "short backup clamps to max threshold",
+			elapsed: 10 * time.Second,
+			// totalDuration = 10s / 0.5 = 20s; threshold = 5s/20s = 0.25 -> clamped to 0.01
+			ratio:    0.5,
+			expected: maxThreshold,
+		},
+		{
+			name:    "very long backup clamps to min threshold",
+			elapsed: 10 * time.Second,
+			// totalDuration = 10s / 0.0001 = 100000s; threshold = 5s/100000s = 5e-5 -> clamped to 1e-4
+			ratio:    0.0001,
+			expected: minThreshold,
+		},
+		{
+			name:    "medium backup returns computed threshold",
+			elapsed: 10 * time.Second,
+			// totalDuration = 10s / 0.01 = 1000s; threshold = 5s/1000s = 0.005 (within bounds)
+			ratio:    0.01,
+			expected: 0.005,
+		},
+		{
+			name:    "boundary at max threshold returns max",
+			elapsed: 10 * time.Second,
+			// totalDuration = 10s / 0.02 = 500s; threshold = 5s/500s = 0.01 = maxThreshold
+			ratio:    0.02,
+			expected: maxThreshold,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := progressThreshold(tt.elapsed, tt.ratio)
+			assert.InDelta(t, tt.expected, got, 1e-9)
+		})
+	}
+}
+
+func TestPrintEstimate(t *testing.T) {
+	t.Parallel()
+
+	// elapsed is used instead of startTime to compute startTime inside the subtest,
+	// avoiding scheduling-induced time drift in time-sensitive cases (e.g. warmup).
+	tests := []struct {
+		name        string
+		elapsed     time.Duration
+		done        float64
+		total       float64
+		previousVal float64
+		getMetrics  func() *models.Metrics
+		wantErr     error
+		expectLog   bool
+	}{
+		{
+			name:        "completion at 100% returns errBrake",
+			elapsed:     10 * time.Second,
+			done:        100,
+			total:       100,
+			previousVal: 0.5,
+			getMetrics:  func() *models.Metrics { return &models.Metrics{} },
+			wantErr:     errBrake,
+			expectLog:   false,
+		},
+		{
+			name:        "ratio below 0.01% guard returns errContinue",
+			elapsed:     10 * time.Second,
+			done:        0.005, // ratio = 5e-5 = 0.005%, below the 0.01% guard
+			total:       100,
+			previousVal: 0,
+			getMetrics:  func() *models.Metrics { return &models.Metrics{} },
+			wantErr:     errContinue,
+			expectLog:   false,
+		},
+		{
+			name:    "delta below dynamic threshold returns errContinue",
+			elapsed: 10 * time.Second,
+			// elapsed=10s, ratio=0.5 -> totalDuration=20s -> threshold clamped to maxThreshold=0.01
+			// delta = 0.5 - 0.495 = 0.005 < 0.01
+			done:        50,
+			total:       100,
+			previousVal: 0.495,
+			getMetrics:  func() *models.Metrics { return &models.Metrics{} },
+			wantErr:     errContinue,
+			expectLog:   false,
+		},
+		{
+			name:    "delta above threshold prints with metrics",
+			elapsed: 10 * time.Second,
+			// delta = 0.5 - 0.4 = 0.1 > 0.01 (clamped threshold)
+			done:        50,
+			total:       100,
+			previousVal: 0.4,
+			getMetrics: func() *models.Metrics {
+				return &models.Metrics{
+					RecordsPerSecond:       1000,
+					KilobytesPerSecond:     1024,
+					PipelineReadQueueSize:  10,
+					PipelineWriteQueueSize: 5,
+				}
+			},
+			wantErr:   nil,
+			expectLog: true,
+		},
+		{
+			name: "during warmup uses max threshold",
+			// elapsed=2s < warmup, threshold=maxThreshold=0.01
+			// delta = 0.5 - 0 = 0.5 > 0.01 -> prints
+			elapsed:     2 * time.Second,
+			done:        50,
+			total:       100,
+			previousVal: 0,
+			getMetrics: func() *models.Metrics {
+				return &models.Metrics{
+					RecordsPerSecond:   1000,
+					KilobytesPerSecond: 1024,
+				}
+			},
+			wantErr:   nil,
+			expectLog: true,
+		},
+		{
+			name:        "zero RPS does not break record size calc",
+			elapsed:     10 * time.Second,
+			done:        70,
+			total:       100,
+			previousVal: 0.6,
+			getMetrics: func() *models.Metrics {
+				return &models.Metrics{
+					RecordsPerSecond:   0,
+					KilobytesPerSecond: 1000,
+				}
+			},
+			wantErr:   nil,
+			expectLog: true,
+		},
+		{
+			name:        "nil metrics still prints progress",
+			elapsed:     10 * time.Second,
+			done:        50,
+			total:       100,
+			previousVal: 0.4,
+			getMetrics:  func() *models.Metrics { return nil },
+			wantErr:     nil,
+			expectLog:   true,
+		},
+		{
+			name:    "fine-grained delta passes for long backup",
+			elapsed: 1 * time.Hour,
+			// elapsed=1h, ratio=0.01 -> totalDuration=100h -> threshold=5s/360000s=1.39e-5, clamped to 1e-4
+			// delta = 0.01 - 0.0098 = 0.0002 > 1e-4 -> prints
+			done:        1,
+			total:       100,
+			previousVal: 0.0098,
+			getMetrics:  func() *models.Metrics { return &models.Metrics{} },
+			wantErr:     nil,
+			expectLog:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+
+			logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+			startTime := time.Now().Add(-tt.elapsed)
+
+			pct, err := printEstimate(startTime, tt.done, tt.total, tt.previousVal, tt.getMetrics, logger)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
 			} else {
-				assert.InDelta(t, tt.expected.Milliseconds(), result.Milliseconds(), 100)
+				require.NoError(t, err)
+
+				expectedRatio := tt.done / tt.total
+				assert.InDelta(t, expectedRatio, pct, 1e-9, "returned value must be the raw ratio (0..1)")
+			}
+
+			logged := buf.String()
+			if tt.expectLog {
+				assert.Contains(t, logged, "progress")
+				// pct in the log must be a float with 2-decimal precision (not an integer cast).
+				assert.Contains(t, logged, "pct=")
+			} else {
+				assert.NotContains(t, logged, "progress")
 			}
 		})
 	}
 }
 
+// TestPrintEstimate_PctFormat verifies the percentage is rounded to 2 decimal places
+// in the log output (not truncated to an integer like the old uint64 cast).
+func TestPrintEstimate_PctFormat(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	// ratio = 0.5051 -> pct = round(50.51 * 100) / 100 = 50.51
+	startTime := time.Now().Add(-10 * time.Second)
+	_, err := printEstimate(startTime, 50.51, 100, 0, func() *models.Metrics { return nil }, logger)
+	require.NoError(t, err)
+
+	assert.Contains(t, buf.String(), "pct=50.51",
+		"percentage must be logged with 2-decimal precision")
+}
+
+// TestPrintBackupEstimate verifies the goroutine exits cleanly on context cancellation.
+// With ticker == targetPrintInterval (5s), no print happens within the test timeout —
+// we are validating the shutdown path, not the print path.
 func TestPrintBackupEstimate(t *testing.T) {
 	t.Parallel()
 
@@ -112,6 +361,7 @@ func TestPrintBackupEstimate(t *testing.T) {
 	}
 }
 
+// TestPrintRestoreEstimate — same intent as TestPrintBackupEstimate, see comment there.
 func TestPrintRestoreEstimate(t *testing.T) {
 	t.Parallel()
 
@@ -148,116 +398,6 @@ func TestPrintRestoreEstimate(t *testing.T) {
 	case <-done:
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("PrintRestoreEstimate did not complete in time")
-	}
-}
-
-func TestPrintEstimate(t *testing.T) {
-	tests := []struct {
-		name        string
-		startTime   time.Time
-		done        float64
-		total       float64
-		previousVal float64
-		getMetrics  func() *models.Metrics
-		wantErr     error
-		expectLog   bool
-	}{
-		{
-			name:        "completion at 100%",
-			startTime:   time.Now().Add(-10 * time.Second),
-			done:        100,
-			total:       100,
-			previousVal: 0.5,
-			getMetrics: func() *models.Metrics {
-				return &models.Metrics{
-					RecordsPerSecond:   1000,
-					KilobytesPerSecond: 1000,
-				}
-			},
-			wantErr:   errBrake,
-			expectLog: false,
-		},
-		{
-			name:        "less than 1% completed",
-			startTime:   time.Now().Add(-10 * time.Second),
-			done:        0.5,
-			total:       100,
-			previousVal: 0,
-			getMetrics: func() *models.Metrics {
-				return &models.Metrics{}
-			},
-			wantErr:   errContinue,
-			expectLog: false,
-		},
-		{
-			name:        "change less than 1%",
-			startTime:   time.Now().Add(-10 * time.Second),
-			done:        50,
-			total:       100,
-			previousVal: 0.495, // only 0.5% change
-			getMetrics: func() *models.Metrics {
-				return &models.Metrics{}
-			},
-			wantErr:   errContinue,
-			expectLog: false,
-		},
-		{
-			name:        "valid progress with metrics",
-			startTime:   time.Now().Add(-10 * time.Second),
-			done:        50,
-			total:       100,
-			previousVal: 0.4,
-			getMetrics: func() *models.Metrics {
-				return &models.Metrics{
-					RecordsPerSecond:       1000,
-					KilobytesPerSecond:     1024,
-					PipelineReadQueueSize:  10,
-					PipelineWriteQueueSize: 5,
-				}
-			},
-			wantErr:   nil,
-			expectLog: true,
-		},
-		{
-			name:        "valid progress with zero RPS",
-			startTime:   time.Now().Add(-10 * time.Second),
-			done:        70,
-			total:       100,
-			previousVal: 0.6,
-			getMetrics: func() *models.Metrics {
-				return &models.Metrics{
-					RecordsPerSecond:   0,
-					KilobytesPerSecond: 1000,
-				}
-			},
-			wantErr:   nil,
-			expectLog: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-
-			logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
-
-			pct, err := printEstimate(tt.startTime, tt.done, tt.total, tt.previousVal, tt.getMetrics, logger)
-
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-			} else {
-				require.NoError(t, err)
-
-				expectedPct := tt.done / tt.total
-				assert.InDelta(t, expectedPct, pct, 0.01)
-			}
-
-			if tt.expectLog {
-				assert.Contains(t, buf.String(), "progress")
-			} else {
-				assert.NotContains(t, buf.String(), "progress")
-			}
-		})
 	}
 }
 
@@ -430,7 +570,7 @@ func TestPrintRestoreEstimateExtended(t *testing.T) {
 			setupStats: func() *models.RestoreStats {
 				stats := models.NewRestoreStats()
 				stats.Start()
-				// Don't increment any bytes read
+				// Don't increment any bytes read.
 				return stats
 			},
 			getMetrics: func() *models.Metrics {
@@ -493,13 +633,13 @@ func TestPrintFilesNumberContextCancellation(t *testing.T) {
 		close(done)
 	}()
 
-	// Cancel context after a short delay
+	// Cancel context after a short delay.
 	time.Sleep(50 * time.Millisecond)
 	cancel()
 
 	select {
 	case <-done:
-		// Function should exit due to context cancellation
+		// Function should exit due to context cancellation.
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("PrintFilesNumber did not exit after context cancellation")
 	}

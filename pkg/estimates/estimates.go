@@ -24,6 +24,16 @@ import (
 	"github.com/aerospike/backup-go/models"
 )
 
+const (
+	// targetPrintInterval interval between log printing.
+	targetPrintInterval = 5 * time.Second
+	// estimateWarmup warmup time before printing the first estimate. To calculate the first estimate more accurately.
+	estimateWarmup = 5 * time.Second
+	// Limits of a dynamic threshold.
+	maxThreshold = 0.01
+	minThreshold = 0.0001
+)
+
 var (
 	errContinue = errors.New("continue")
 	errBrake    = errors.New("brake")
@@ -130,29 +140,28 @@ func printEstimate(
 	logger *slog.Logger,
 ) (float64, error) {
 	ratio := done / total
+	elapsed := time.Since(startTime)
 	estimatedEndTime := calculateEstimatedEndTime(startTime, ratio)
 
 	switch {
 	case ratio >= 1:
-		// Exit after 100%.
 		return 0, errBrake
 	case ratio*100 < 0.01:
-		// Start printing only when we have something.
-		return 0, errContinue
-	case ratio-previousVal < 0.0001:
-		// if less than 1% then don't print anything.
 		return 0, errContinue
 	}
 
-	var (
-		rps, kbps, recSize uint64
-	)
+	threshold := progressThreshold(elapsed, ratio)
+	if ratio-previousVal < threshold {
+		return 0, errContinue
+	}
+
+	var rps, kbps, recSize uint64
 
 	metrics := getMetrics()
 	if metrics != nil {
 		rps = metrics.RecordsPerSecond
+
 		kbps = metrics.KilobytesPerSecond
-		// Reformating record size for pretty printing to avoid printing 1024.000000000 bytes.
 		if rps > 0 {
 			recSize = uint64(float64(kbps) / float64(rps) * 1024)
 		}
@@ -165,7 +174,6 @@ func printEstimate(
 
 	logger.Info("progress",
 		slog.Float64("pct", math.Round(ratio*10000)/100),
-		// Formatting the remaining time to milliseconds to avoid printing 0.000000000 seconds.
 		slog.String("remaining", estimatedEndTime.Round(time.Millisecond).String()),
 		slog.Uint64("rec/s", rps),
 		slog.Uint64("kiB/s", kbps),
@@ -173,6 +181,25 @@ func printEstimate(
 	)
 
 	return ratio, nil
+}
+
+func progressThreshold(elapsed time.Duration, ratio float64) float64 {
+	// While we don't have enough data, use the default threshold of 1%.
+	if elapsed < estimateWarmup {
+		return maxThreshold
+	}
+
+	totalDuration := float64(elapsed) / ratio
+	threshold := float64(targetPrintInterval) / totalDuration
+
+	switch {
+	case threshold > maxThreshold:
+		return maxThreshold
+	case threshold < minThreshold:
+		return minThreshold
+	default:
+		return threshold
+	}
 }
 
 func calculateEstimatedEndTime(startTime time.Time, percentDone float64) time.Duration {

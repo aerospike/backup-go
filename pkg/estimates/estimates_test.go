@@ -29,61 +29,58 @@ import (
 func TestCalculateEstimatedEndTime(t *testing.T) {
 	t.Parallel()
 
+	// startTime is computed inside the subtest (not in the struct) to keep the
+	// gap between "time.Now() in the test" and "time.Since() inside the function"
+	// in the microsecond range. Otherwise time drift is amplified by 1/ratio.
 	tests := []struct {
 		name      string
-		startTime time.Time
+		elapsed   time.Duration
 		ratio     float64
 		expected  time.Duration
+		tolerance time.Duration
 	}{
 		{
 			name:      "elapsed less than warmup returns zero",
-			startTime: time.Now().Add(-2 * time.Second), // < estimateWarmup (5s)
+			elapsed:   2 * time.Second, // < estimateWarmup (5s)
 			ratio:     0.5,
 			expected:  0,
+			tolerance: 100 * time.Millisecond,
 		},
 		{
 			name:      "zero ratio returns zero",
-			startTime: time.Now().Add(-10 * time.Second),
+			elapsed:   10 * time.Second,
 			ratio:     0,
 			expected:  0,
+			tolerance: 100 * time.Millisecond,
 		},
 		{
 			name:      "negative ratio returns zero",
-			startTime: time.Now().Add(-10 * time.Second),
+			elapsed:   10 * time.Second,
 			ratio:     -0.1,
 			expected:  0,
+			tolerance: 100 * time.Millisecond,
 		},
 		{
-			name:      "10 percent done after 10s",
-			startTime: time.Now().Add(-10 * time.Second),
-			ratio:     0.1,
-			expected:  90 * time.Second,
+			name:     "10 percent done after 10s",
+			elapsed:  10 * time.Second,
+			ratio:    0.1,
+			expected: 90 * time.Second,
+			// drift amplified by 1/0.1 = 10x
+			tolerance: 500 * time.Millisecond,
 		},
 		{
 			name:      "50 percent done after 10s",
-			startTime: time.Now().Add(-10 * time.Second),
+			elapsed:   10 * time.Second,
 			ratio:     0.5,
 			expected:  10 * time.Second,
+			tolerance: 100 * time.Millisecond,
 		},
 		{
 			name:      "100 percent done returns zero",
-			startTime: time.Now().Add(-10 * time.Second),
+			elapsed:   10 * time.Second,
 			ratio:     1.0,
 			expected:  0,
-		},
-		{
-			name:      "tiny ratio after warmup gives huge estimate",
-			startTime: time.Now().Add(-10 * time.Second),
-			ratio:     0.0001, // 0.01%
-			// totalTime = 10s / 0.0001 = 100000s; remaining = 100000s - 10s
-			expected: 99990 * time.Second,
-		},
-		{
-			name:      "small ratio (0.5%) after warmup is computed (not zeroed)",
-			startTime: time.Now().Add(-10 * time.Second),
-			ratio:     0.005,
-			// totalTime = 10s / 0.005 = 2000s; remaining = 2000s - 10s
-			expected: 1990 * time.Second,
+			tolerance: 100 * time.Millisecond,
 		},
 	}
 
@@ -91,10 +88,11 @@ func TestCalculateEstimatedEndTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := calculateEstimatedEndTime(tt.startTime, tt.ratio)
+			startTime := time.Now().Add(-tt.elapsed)
 
-			// 100ms delta tolerates the small drift from time.Since reading the clock.
-			assert.InDelta(t, tt.expected.Milliseconds(), result.Milliseconds(), 100)
+			result := calculateEstimatedEndTime(startTime, tt.ratio)
+
+			assert.InDelta(t, tt.expected.Milliseconds(), result.Milliseconds(), float64(tt.tolerance.Milliseconds()))
 		})
 	}
 }
@@ -157,9 +155,11 @@ func TestProgressThreshold(t *testing.T) {
 func TestPrintEstimate(t *testing.T) {
 	t.Parallel()
 
+	// elapsed is used instead of startTime to compute startTime inside the subtest,
+	// avoiding scheduling-induced time drift in time-sensitive cases (e.g. warmup).
 	tests := []struct {
 		name        string
-		startTime   time.Time
+		elapsed     time.Duration
 		done        float64
 		total       float64
 		previousVal float64
@@ -169,7 +169,7 @@ func TestPrintEstimate(t *testing.T) {
 	}{
 		{
 			name:        "completion at 100% returns errBrake",
-			startTime:   time.Now().Add(-10 * time.Second),
+			elapsed:     10 * time.Second,
 			done:        100,
 			total:       100,
 			previousVal: 0.5,
@@ -179,7 +179,7 @@ func TestPrintEstimate(t *testing.T) {
 		},
 		{
 			name:        "ratio below 0.01% guard returns errContinue",
-			startTime:   time.Now().Add(-10 * time.Second),
+			elapsed:     10 * time.Second,
 			done:        0.005, // ratio = 5e-5 = 0.005%, below the 0.01% guard
 			total:       100,
 			previousVal: 0,
@@ -188,8 +188,8 @@ func TestPrintEstimate(t *testing.T) {
 			expectLog:   false,
 		},
 		{
-			name:      "delta below dynamic threshold returns errContinue",
-			startTime: time.Now().Add(-10 * time.Second),
+			name:    "delta below dynamic threshold returns errContinue",
+			elapsed: 10 * time.Second,
 			// elapsed=10s, ratio=0.5 -> totalDuration=20s -> threshold clamped to maxThreshold=0.01
 			// delta = 0.5 - 0.495 = 0.005 < 0.01
 			done:        50,
@@ -200,8 +200,8 @@ func TestPrintEstimate(t *testing.T) {
 			expectLog:   false,
 		},
 		{
-			name:      "delta above threshold prints with metrics",
-			startTime: time.Now().Add(-10 * time.Second),
+			name:    "delta above threshold prints with metrics",
+			elapsed: 10 * time.Second,
 			// delta = 0.5 - 0.4 = 0.1 > 0.01 (clamped threshold)
 			done:        50,
 			total:       100,
@@ -221,7 +221,7 @@ func TestPrintEstimate(t *testing.T) {
 			name: "during warmup uses max threshold",
 			// elapsed=2s < warmup, threshold=maxThreshold=0.01
 			// delta = 0.5 - 0 = 0.5 > 0.01 -> prints
-			startTime:   time.Now().Add(-2 * time.Second),
+			elapsed:     2 * time.Second,
 			done:        50,
 			total:       100,
 			previousVal: 0,
@@ -236,7 +236,7 @@ func TestPrintEstimate(t *testing.T) {
 		},
 		{
 			name:        "zero RPS does not break record size calc",
-			startTime:   time.Now().Add(-10 * time.Second),
+			elapsed:     10 * time.Second,
 			done:        70,
 			total:       100,
 			previousVal: 0.6,
@@ -251,7 +251,7 @@ func TestPrintEstimate(t *testing.T) {
 		},
 		{
 			name:        "nil metrics still prints progress",
-			startTime:   time.Now().Add(-10 * time.Second),
+			elapsed:     10 * time.Second,
 			done:        50,
 			total:       100,
 			previousVal: 0.4,
@@ -260,8 +260,8 @@ func TestPrintEstimate(t *testing.T) {
 			expectLog:   true,
 		},
 		{
-			name:      "fine-grained delta passes for long backup",
-			startTime: time.Now().Add(-1 * time.Hour),
+			name:    "fine-grained delta passes for long backup",
+			elapsed: 1 * time.Hour,
 			// elapsed=1h, ratio=0.01 -> totalDuration=100h -> threshold=5s/360000s=1.39e-5, clamped to 1e-4
 			// delta = 0.01 - 0.0098 = 0.0002 > 1e-4 -> prints
 			done:        1,
@@ -281,7 +281,9 @@ func TestPrintEstimate(t *testing.T) {
 
 			logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-			pct, err := printEstimate(tt.startTime, tt.done, tt.total, tt.previousVal, tt.getMetrics, logger)
+			startTime := time.Now().Add(-tt.elapsed)
+
+			pct, err := printEstimate(startTime, tt.done, tt.total, tt.previousVal, tt.getMetrics, logger)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)

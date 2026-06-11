@@ -49,7 +49,7 @@ func PrintBackupEstimate(
 	getMetrics func() *models.Metrics,
 	logger *slog.Logger,
 ) {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(targetPrintInterval)
 	defer ticker.Stop()
 
 	var previousVal float64
@@ -93,7 +93,7 @@ func PrintRestoreEstimate(
 	getSize func() int64,
 	logger *slog.Logger,
 ) {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(targetPrintInterval)
 	defer ticker.Stop()
 
 	var previousVal float64

@@ -207,7 +207,6 @@ func progressThreshold(elapsed time.Duration, ratio float64) float64 {
 func calculateEstimatedEndTime(startTime time.Time, ratio float64) time.Duration {
 	elapsed := time.Since(startTime)
 
-	// Слишком рано — оценка будет недостоверной.
 	if elapsed < estimateWarmup || ratio <= 0 {
 		return 0
 	}

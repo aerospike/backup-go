@@ -984,7 +984,8 @@ func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, stor
 
 // PrepareServerRestore starts a restore preparation on the server.
 func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID)
+	allNodes := ic.getNodesString()
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
@@ -997,6 +998,17 @@ func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace str
 	}
 
 	return nil
+}
+
+func (ic *Client) getNodesString() string {
+	nodes := ic.cluster.GetNodes()
+
+	var builder strings.Builder
+	for _, node := range nodes {
+		builder.WriteString(node.GetName() + ",")
+	}
+
+	return builder.String()
 }
 
 func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {

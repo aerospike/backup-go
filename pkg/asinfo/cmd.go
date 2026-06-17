@@ -79,7 +79,7 @@ const (
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s;modified-after=%s;modified-before=%s"
 	cmdServerRestore = "restore:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s"
-	cmdServerPrepareRestore = "prepare-restore:namespace=%s;job-id=%s;"
+	cmdServerPrepareRestore = "prepare-restore:namespace=%s;job-id=%s;nodes=%s"
 
 	cmdShowJobsQueries = "query-show"
 

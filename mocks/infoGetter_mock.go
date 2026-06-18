@@ -1205,8 +1205,8 @@ func (_c *MockInfoGetter_PrepareServerRestore_Call) RunAndReturn(run func(ctx co
 }
 
 // StartServerBackup provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StartServerBackup(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) (string, error) {
-	ret := _mock.Called(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+func (_mock *MockInfoGetter) StartServerBackup(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string, modifiedBefore string, modifiedAfter string) (string, error) {
+	ret := _mock.Called(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey, modifiedBefore, modifiedAfter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartServerBackup")
@@ -1214,16 +1214,16 @@ func (_mock *MockInfoGetter) StartServerBackup(ctx context.Context, namespace st
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) (string, error)); ok {
-		return returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string, string, string) (string, error)); ok {
+		return returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey, modifiedBefore, modifiedAfter)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string) string); ok {
-		r0 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, string, string, string, string) string); ok {
+		r0 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey, modifiedBefore, modifiedAfter)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, string, string) error); ok {
-		r1 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, string, string, string, string) error); ok {
+		r1 = returnFunc(ctx, namespace, storage, bucket, region, profile, accessKey, secretKey, modifiedBefore, modifiedAfter)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1244,11 +1244,13 @@ type MockInfoGetter_StartServerBackup_Call struct {
 //   - profile string
 //   - accessKey string
 //   - secretKey string
-func (_e *MockInfoGetter_Expecter) StartServerBackup(ctx interface{}, namespace interface{}, storage interface{}, bucket interface{}, region interface{}, profile interface{}, accessKey interface{}, secretKey interface{}) *MockInfoGetter_StartServerBackup_Call {
-	return &MockInfoGetter_StartServerBackup_Call{Call: _e.mock.On("StartServerBackup", ctx, namespace, storage, bucket, region, profile, accessKey, secretKey)}
+//   - modifiedBefore string
+//   - modifiedAfter string
+func (_e *MockInfoGetter_Expecter) StartServerBackup(ctx interface{}, namespace interface{}, storage interface{}, bucket interface{}, region interface{}, profile interface{}, accessKey interface{}, secretKey interface{}, modifiedBefore interface{}, modifiedAfter interface{}) *MockInfoGetter_StartServerBackup_Call {
+	return &MockInfoGetter_StartServerBackup_Call{Call: _e.mock.On("StartServerBackup", ctx, namespace, storage, bucket, region, profile, accessKey, secretKey, modifiedBefore, modifiedAfter)}
 }
 
-func (_c *MockInfoGetter_StartServerBackup_Call) Run(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string)) *MockInfoGetter_StartServerBackup_Call {
+func (_c *MockInfoGetter_StartServerBackup_Call) Run(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string, modifiedBefore string, modifiedAfter string)) *MockInfoGetter_StartServerBackup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1282,6 +1284,14 @@ func (_c *MockInfoGetter_StartServerBackup_Call) Run(run func(ctx context.Contex
 		if args[7] != nil {
 			arg7 = args[7].(string)
 		}
+		var arg8 string
+		if args[8] != nil {
+			arg8 = args[8].(string)
+		}
+		var arg9 string
+		if args[9] != nil {
+			arg9 = args[9].(string)
+		}
 		run(
 			arg0,
 			arg1,
@@ -1291,6 +1301,8 @@ func (_c *MockInfoGetter_StartServerBackup_Call) Run(run func(ctx context.Contex
 			arg5,
 			arg6,
 			arg7,
+			arg8,
+			arg9,
 		)
 	})
 	return _c
@@ -1301,7 +1313,7 @@ func (_c *MockInfoGetter_StartServerBackup_Call) Return(s string, err error) *Mo
 	return _c
 }
 
-func (_c *MockInfoGetter_StartServerBackup_Call) RunAndReturn(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string) (string, error)) *MockInfoGetter_StartServerBackup_Call {
+func (_c *MockInfoGetter_StartServerBackup_Call) RunAndReturn(run func(ctx context.Context, namespace string, storage string, bucket string, region string, profile string, accessKey string, secretKey string, modifiedBefore string, modifiedAfter string) (string, error)) *MockInfoGetter_StartServerBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }

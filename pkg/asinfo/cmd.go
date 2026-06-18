@@ -44,10 +44,11 @@ const (
 	cmdIDServerRestore
 	cmdIDServerPrepareRestore
 	cmdIDShowJobsQueries
+	cmdIDClusterStable
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 27
+const commandsNumber = 28
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
@@ -74,6 +75,7 @@ const (
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 	cmdGetConfigXDR        = "get-config:context=xdr"
 	cmdReplicas            = "replicas:max=1"
+	cmdClusterStable       = "cluster-stable:size=%d;ignore-migrations=false;namespace=%s"
 
 	cmdServerBackup = "backup:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s"
@@ -120,6 +122,7 @@ func newCmdDict(version models.AerospikeVersion) map[int]string {
 	cmds[cmdIDGetConfigXDR] = cmdGetConfigXDR
 	cmds[cmdIDReplicas] = cmdReplicas
 	cmds[cmdIDShowJobsQueries] = cmdShowJobsQueries
+	cmds[cmdIDClusterStable] = cmdClusterStable
 
 	if version.IsGreaterOrEqual(models.AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList

@@ -1216,7 +1216,7 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 		return false, fmt.Errorf("failed to get cluster statistics: %w", err)
 	}
 
-	clusterKey, ok := stats["cluster_key"]
+	clusterKey, ok := searchInInfoResponse(stats, "cluster_key")
 	if !ok {
 		return false, fmt.Errorf("cluster key not found in statistics")
 	}
@@ -1243,7 +1243,7 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 }
 
 // GetStatistics returns cluster statistics.
-func (ic *Client) getStatistics(ctx context.Context) (map[string]string, error) {
+func (ic *Client) getStatistics(ctx context.Context) ([]iModels.InfoMap, error) {
 	cmd := ic.cmdDict[cmdIDStatistics]
 
 	resp, err := ic.GetInfo(ctx, cmd)
@@ -1251,5 +1251,26 @@ func (ic *Client) getStatistics(ctx context.Context) (map[string]string, error) 
 		return nil, fmt.Errorf("failed to get cluster statistics: %w", err)
 	}
 
-	return resp, nil
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cluster statistics result response: %w", err)
+	}
+
+	infoResponse, err := parseInfoResponse(result, ";", ";", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cluster statistics info response: %w", err)
+	}
+
+	return infoResponse, nil
+}
+
+func searchInInfoResponse(infoResponse []iModels.InfoMap, key string) (string, bool) {
+	for _, r := range infoResponse {
+		val, ok := r[key]
+		if ok {
+			return val, true
+		}
+	}
+
+	return "", false
 }

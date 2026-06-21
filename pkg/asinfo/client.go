@@ -180,7 +180,7 @@ func (ic *Client) execByNode(nodeName, cmd, action string) error {
 	return nil
 }
 
-// GetVersion returns lowest node version from cluster.
+// GetVersion returns the lowest node version from the cluster.
 func (ic *Client) GetVersion(ctx context.Context) (iModels.AerospikeVersion, error) {
 	var result iModels.AerospikeVersion
 
@@ -1186,4 +1186,48 @@ func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]iModels.InfoMap, erro
 	}
 
 	return infoResponse, nil
+}
+
+// GetClusterStable checks the stability of a cluster within the specified namespace and retries on transient errors.
+// Returns a boolean indicating the stability status and an error if the operation fails after retries.
+func (ic *Client) GetClusterStable(ctx context.Context, namespace string) (bool, error) {
+	var result bool
+
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		res, err := ic.getClusterStable(ctx, namespace)
+		if err != nil {
+			return err
+		}
+
+		result = res
+
+		return nil
+	})
+
+	return result, err
+}
+
+func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool, error) {
+	nodes := ic.cluster.GetNodes()
+	nodesNum := len(nodes)
+
+	for _, node := range nodes {
+		cmd := fmt.Sprintf(ic.cmdDict[cmdIDClusterStable], nodesNum, namespace)
+
+		resp, err := ic.GetInfo(ctx, cmd)
+		if err != nil {
+			return false, fmt.Errorf("failed to get node %s stable status: %w", node.GetName(), err)
+		}
+
+		result, err := parseResultResponse(cmd, resp)
+		if err != nil {
+			return false, fmt.Errorf("failed to parse node %s stable status response: %w", node.GetName(), err)
+		}
+
+		if result != node.GetName() {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }

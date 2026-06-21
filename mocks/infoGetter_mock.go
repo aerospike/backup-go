@@ -163,6 +163,72 @@ func (_c *MockInfoGetter_GetBackupStatus_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// GetClusterStable provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) GetClusterStable(ctx context.Context, namespace string) (bool, error) {
+	ret := _mock.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterStable")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return returnFunc(ctx, namespace)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = returnFunc(ctx, namespace)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockInfoGetter_GetClusterStable_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterStable'
+type MockInfoGetter_GetClusterStable_Call struct {
+	*mock.Call
+}
+
+// GetClusterStable is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+func (_e *MockInfoGetter_Expecter) GetClusterStable(ctx interface{}, namespace interface{}) *MockInfoGetter_GetClusterStable_Call {
+	return &MockInfoGetter_GetClusterStable_Call{Call: _e.mock.On("GetClusterStable", ctx, namespace)}
+}
+
+func (_c *MockInfoGetter_GetClusterStable_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_GetClusterStable_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_GetClusterStable_Call) Return(b bool, err error) *MockInfoGetter_GetClusterStable_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockInfoGetter_GetClusterStable_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockInfoGetter_GetClusterStable_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetDCsList provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) GetDCsList(ctx context.Context) ([]string, error) {
 	ret := _mock.Called(ctx)

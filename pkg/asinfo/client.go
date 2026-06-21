@@ -1225,7 +1225,7 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 		}
 
 		if result != node.GetName() {
-			return false, nil
+			return false, fmt.Errorf("node %s is not stable, result is %s", node.GetName(), result)
 		}
 	}
 

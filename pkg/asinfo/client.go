@@ -1211,6 +1211,16 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 	nodes := ic.cluster.GetNodes()
 	nodesNum := len(nodes)
 
+	stats, err := ic.getStatistics(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get cluster statistics: %w", err)
+	}
+
+	clusterKey, ok := stats["cluster_key"]
+	if !ok {
+		return false, fmt.Errorf("cluster key not found in statistics")
+	}
+
 	for _, node := range nodes {
 		cmd := fmt.Sprintf(ic.cmdDict[cmdIDClusterStable], nodesNum, namespace)
 
@@ -1224,10 +1234,22 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 			return false, fmt.Errorf("failed to parse node %s stable status response: %w", node.GetName(), err)
 		}
 
-		if result != node.GetName() {
-			return false, fmt.Errorf("node %s is not stable, result is %s", node.GetName(), result)
+		if result != clusterKey {
+			return false, fmt.Errorf("cluster %s is not stable, result is %s", clusterKey, result)
 		}
 	}
 
 	return true, nil
+}
+
+// GetStatistics returns cluster statistics.
+func (ic *Client) getStatistics(ctx context.Context) (map[string]string, error) {
+	cmd := ic.cmdDict[cmdIDStatistics]
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster statistics: %w", err)
+	}
+
+	return resp, nil
 }

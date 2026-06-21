@@ -60,6 +60,7 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDReplicas:            cmdReplicas,
 				cmdIDShowJobsQueries:     cmdShowJobsQueries,
 				cmdIDClusterStable:       cmdClusterStable,
+				cmdIDStatistics:          cmdStatistics,
 			},
 		},
 		{
@@ -92,6 +93,7 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDReplicas:            cmdReplicas,
 				cmdIDShowJobsQueries:     cmdShowJobsQueries,
 				cmdIDClusterStable:       cmdClusterStable,
+				cmdIDStatistics:          cmdStatistics,
 
 				cmdIDServerBackup:         cmdServerBackup,
 				cmdIDServerRestore:        cmdServerRestore,

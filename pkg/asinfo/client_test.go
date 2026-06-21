@@ -2326,3 +2326,18 @@ func TestClient_getClusterStable(t *testing.T) {
 	_, err = ic.getClusterStable(ctx, testASNamespace)
 	require.NoError(t, err)
 }
+
+func TestClient_getStatistics(t *testing.T) {
+	t.Parallel()
+
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	ctx := t.Context()
+
+	_, err = ic.getStatistics(ctx)
+	require.NoError(t, err)
+}

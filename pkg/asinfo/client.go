@@ -964,10 +964,10 @@ func (ic *Client) StartServerBackup(ctx context.Context,
 
 // StartServerRestore starts a restore job on the server.
 func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, storage, bucket, region, profile,
-	accessKey, secretKey string,
+	accessKey, secretKey, endpoint string,
 ) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
-		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey, endpoint)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {

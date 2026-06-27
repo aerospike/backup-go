@@ -102,7 +102,7 @@ type InfoGetter interface {
 	StartServerBackup(ctx context.Context,
 		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string) (string, error)
 	StartServerRestore(ctx context.Context, jobID,
-		namespace, storage, bucket, region, profile, accessKey, secretKey string) error
+		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
 	GetBackupStatus(ctx context.Context) (float64, error)
 }

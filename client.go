@@ -100,10 +100,10 @@ type InfoGetter interface {
 	GetNodesNames() []string
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
 	StartServerBackup(ctx context.Context,
-		namespace, storage, bucket, region, profile, accessKey, secretKey, modifiedBefore, modifiedAfter string,
+		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint, modifiedBefore, modifiedAfter string,
 	) (string, error)
 	StartServerRestore(ctx context.Context, jobID,
-		namespace, storage, bucket, region, profile, accessKey, secretKey string) error
+		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
 	GetBackupStatus(ctx context.Context) (float64, error)
 	GetClusterStable(ctx context.Context, namespace string) (bool, error)

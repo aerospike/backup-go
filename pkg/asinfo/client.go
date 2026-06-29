@@ -941,13 +941,13 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 
 // StartServerBackup starts a backup job on the server.
 func (ic *Client) StartServerBackup(ctx context.Context,
-	namespace, storage, bucket, region, profile, accessKey, secretKey string,
+	namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string,
 ) (string, error) {
 	cNow := cltime.Now()
 	jobID := cNow.String()
 
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerBackup],
-		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey, endpoint)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
@@ -964,10 +964,10 @@ func (ic *Client) StartServerBackup(ctx context.Context,
 
 // StartServerRestore starts a restore job on the server.
 func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, storage, bucket, region, profile,
-	accessKey, secretKey string,
+	accessKey, secretKey, endpoint string,
 ) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
-		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey)
+		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey, endpoint)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {

@@ -44,10 +44,13 @@ const (
 	cmdIDServerRestore
 	cmdIDServerPrepareRestore
 	cmdIDShowJobsQueries
+	cmdIDClusterStable
+	cmdIDStatistics
+	cmdIDRestoreStatus
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 27
+const commandsNumber = 30
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
@@ -74,14 +77,19 @@ const (
 	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
 	cmdGetConfigXDR        = "get-config:context=xdr"
 	cmdReplicas            = "replicas:max=1"
+	cmdClusterStable       = "cluster-stable:size=%d;ignore-migrations=false;namespace=%s"
+	cmdStatistics          = "statistics"
 
 	cmdServerBackup = "backup:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
-		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s;s3-endpoint=%s"
+		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s;s3-endpoint=%s;" +
+		"modified-before=%s;modified-after=%s;set=%s;no-indexes=%t;no-udfs=%t"
 	cmdServerRestore = "restore:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s;s3-endpoint=%s"
-	cmdServerPrepareRestore = "prepare-restore:namespace=%s;job-id=%s;"
+	cmdServerPrepareRestore = "prepare-restore:namespace=%s;job-id=%s;nodes=%s"
 
 	cmdShowJobsQueries = "query-show"
+
+	cmdRestoreStatus = "restore-status:namespace=%s;"
 
 	// Deprecated commands:
 
@@ -120,6 +128,8 @@ func newCmdDict(version models.AerospikeVersion) map[int]string {
 	cmds[cmdIDGetConfigXDR] = cmdGetConfigXDR
 	cmds[cmdIDReplicas] = cmdReplicas
 	cmds[cmdIDShowJobsQueries] = cmdShowJobsQueries
+	cmds[cmdIDClusterStable] = cmdClusterStable
+	cmds[cmdIDStatistics] = cmdStatistics
 
 	if version.IsGreaterOrEqual(models.AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList
@@ -129,6 +139,7 @@ func newCmdDict(version models.AerospikeVersion) map[int]string {
 		cmds[cmdIDServerBackup] = cmdServerBackup
 		cmds[cmdIDServerRestore] = cmdServerRestore
 		cmds[cmdIDServerPrepareRestore] = cmdServerPrepareRestore
+		cmds[cmdIDRestoreStatus] = cmdRestoreStatus
 	}
 
 	return cmds

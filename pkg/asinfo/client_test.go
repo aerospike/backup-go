@@ -2311,3 +2311,33 @@ func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to show job queries")
 }
+
+func TestClient_getClusterStable(t *testing.T) {
+	t.Parallel()
+
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	ctx := t.Context()
+
+	_, err = ic.getClusterStable(ctx, testASNamespace)
+	require.NoError(t, err)
+}
+
+func TestClient_getStatistics(t *testing.T) {
+	t.Parallel()
+
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	ctx := t.Context()
+
+	_, err = ic.getStatistics(ctx)
+	require.NoError(t, err)
+}

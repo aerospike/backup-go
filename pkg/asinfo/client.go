@@ -50,10 +50,30 @@ const (
 	jobTypeBackup = "backup"
 )
 
+const (
+	// partitionsPerNamespace is the fixed number of partitions every Aerospike
+	// namespace is split into. Used to normalize aggregated backup progress.
+	partitionsPerNamespace = 4096
+	// percentBase converts a percentage value (0-100) into a ratio.
+	percentBase = 100
+	// minReplicasFields is the minimum number of comma-separated fields expected
+	// in a single namespace entry of the "replicas" info response.
+	minReplicasFields = 3
+)
+
 var (
 	ErrReplicationFactorZero = errors.New("replication factor is zero")
 	ErrNoNode                = errors.New("no node found")
 	ErrNotFound              = errors.New("not found")
+
+	// Static internal errors. Kept as package-level sentinels so they can be
+	// matched with errors.Is and satisfy err113/perfsprint linters.
+	errNoInfoCommands            = errors.New("no info commands provided or command not supported")
+	errNoNodesAvailable          = errors.New("no nodes available in cluster")
+	errNoNodesConnected          = errors.New("no nodes connected")
+	errReplicationFactorNotFound = errors.New("replication factor not found")
+	errParseRecordInfo           = errors.New("failed to parse record info request")
+	errUDFMissingFilename        = errors.New("udf-list response missing filename")
 
 	secretAgentValRegex = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
 )
@@ -108,10 +128,11 @@ func NewClient(
 	return ic, nil
 }
 
+// GetInfo runs the given info commands against a random cluster node with retries.
 func (ic *Client) GetInfo(ctx context.Context, names ...string) (map[string]string, error) {
 	// Check if any info commands are provided or command is not supported.
 	if len(names) == 0 || names[0] == "" {
-		return nil, fmt.Errorf("no info commands provided or command not supported")
+		return nil, errNoInfoCommands
 	}
 
 	var result map[string]string
@@ -144,14 +165,29 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 	return result, nil
 }
 
-// GetVersion returns lowest node version from cluster.
+// execByNode runs cmd on the named node and validates the result response.
+// action is a short verb phrase used to build the error messages, e.g. "create xdr dc".
+func (ic *Client) execByNode(nodeName, cmd, action string) error {
+	resp, err := ic.requestByNode(nodeName, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to %s: %w", action, err)
+	}
+
+	if _, err = parseResultResponse(cmd, resp); err != nil {
+		return fmt.Errorf("failed to parse %s response: %w", action, err)
+	}
+
+	return nil
+}
+
+// GetVersion returns the lowest node version from the cluster.
 func (ic *Client) GetVersion(ctx context.Context) (iModels.AerospikeVersion, error) {
 	var result iModels.AerospikeVersion
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		nodes := ic.cluster.GetNodes()
 		if len(nodes) == 0 {
-			return fmt.Errorf("no nodes available in cluster")
+			return errNoNodesAvailable
 		}
 
 		var lowestVersion iModels.AerospikeVersion
@@ -196,21 +232,18 @@ func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bo
 
 // GetSIndexes returns list of SIndexes for the given namespace.
 func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
-	var (
-		indexes []*models.SIndex
-		err     error
-	)
+	var indexes []*models.SIndex
 
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
 			return aErr.Unwrap()
 		}
 
-		var indErr error
-		indexes, indErr = ic.getSIndexes(node, namespace, ic.policy)
+		var getErr error
+		indexes, getErr = ic.getSIndexes(node, namespace, ic.policy)
 
-		return indErr
+		return getErr
 	})
 
 	return indexes, err
@@ -218,25 +251,24 @@ func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.
 
 // GetUDFs returns list of UDFs.
 func (ic *Client) GetUDFs(ctx context.Context) ([]*models.UDF, error) {
-	var (
-		udfs []*models.UDF
-		err  error
-	)
+	var udfs []*models.UDF
 
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
 			return aErr.Unwrap()
 		}
 
-		udfs, err = ic.getUDFs(node, ic.policy)
+		var getErr error
+		udfs, getErr = ic.getUDFs(node, ic.policy)
 
-		return err
+		return getErr
 	})
 
 	return udfs, err
 }
 
+// SupportsBatchWrite reports whether the cluster version supports batch writes.
 func (ic *Client) SupportsBatchWrite(ctx context.Context) (bool, error) {
 	v, err := ic.GetVersion(ctx)
 	if err != nil {
@@ -251,9 +283,9 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 	var count uint64
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-		node, aerr := ic.cluster.GetRandomNode()
-		if aerr != nil {
-			return aerr
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr
 		}
 
 		effectiveReplicationFactor, err := ic.getEffectiveReplicationFactor(node, ic.policy, namespace)
@@ -299,28 +331,27 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 
 // GetPendingMigrations returns the number of pending migrations.
 func (ic *Client) GetPendingMigrations(ctx context.Context, namespace string) (uint64, error) {
-	var (
-		result uint64
-		err    error
-	)
+	var result uint64
 
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
-		result, err = ic.getClusterTotalMigrations(namespace)
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		res, err := ic.getClusterTotalMigrations(namespace)
 		if err != nil {
 			return fmt.Errorf("failed to fetch migration stats: %w", err)
 		}
 
-		return err
+		result = res
+
+		return nil
 	})
 
 	return result, err
 }
 
-// getClusterTotalMigrations sums up migrations from ALL nodes at once
+// getClusterTotalMigrations sums up migrations from ALL nodes at once.
 func (ic *Client) getClusterTotalMigrations(namespace string) (uint64, error) {
 	nodes := ic.cluster.GetNodes()
 	if len(nodes) == 0 {
-		return 0, fmt.Errorf("no nodes connected")
+		return 0, errNoNodesConnected
 	}
 
 	var total uint64
@@ -340,9 +371,9 @@ func (ic *Client) getClusterTotalMigrations(namespace string) (uint64, error) {
 func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint64, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
 
-	response, aerr := node.RequestInfo(ic.policy, cmd)
-	if aerr != nil {
-		return 0, fmt.Errorf("failed to get request info: %w", aerr)
+	response, aErr := node.RequestInfo(ic.policy, cmd)
+	if aErr != nil {
+		return 0, fmt.Errorf("failed to get request info: %w", aErr)
 	}
 
 	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -379,65 +410,23 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint6
 func (ic *Client) StartXDR(
 	ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool,
 ) error {
-	// The Order of this operation is important. Don't move it if you don't know what you are doing!
-	if err := executeWithRetry(
-		ctx,
-		ic.retryPolicy,
-		func() error {
-			return ic.createXDRDC(nodeName, dc)
-		},
-	); err != nil {
-		return err
-	}
-
-	if err := executeWithRetry(
-		ctx,
-		ic.retryPolicy,
-		func() error {
-			return ic.createXDRConnector(nodeName, dc)
-		},
-	); err != nil {
-		return err
-	}
-
-	if err := executeWithRetry(
-		ctx,
-		ic.retryPolicy,
-		func() error {
-			return ic.createXDRNode(nodeName, dc, hostPort)
-		},
-	); err != nil {
-		return err
-	}
-
-	if err := executeWithRetry(
-		ctx,
-		ic.retryPolicy,
-		func() error {
-			return ic.setMaxThroughput(nodeName, dc, namespace, throughput)
-		},
-	); err != nil {
-		return err
-	}
-
-	if err := executeWithRetry(
-		ctx,
-		ic.retryPolicy,
-		func() error {
-			return ic.createXDRNamespace(nodeName, dc, namespace, rewind)
-		},
-	); err != nil {
-		return err
+	// The order of these operations is important. Don't reorder it if you don't know what you are doing!
+	steps := []func() error{
+		func() error { return ic.createXDRDC(nodeName, dc) },
+		func() error { return ic.createXDRConnector(nodeName, dc) },
+		func() error { return ic.createXDRNode(nodeName, dc, hostPort) },
+		func() error { return ic.setMaxThroughput(nodeName, dc, namespace, throughput) },
+		func() error { return ic.createXDRNamespace(nodeName, dc, namespace, rewind) },
 	}
 
 	if forward {
-		if err := executeWithRetry(
-			ctx,
-			ic.retryPolicy,
-			func() error {
-				return ic.setXDRForward(nodeName, dc, namespace, forward)
-			},
-		); err != nil {
+		steps = append(steps, func() error {
+			return ic.setXDRForward(nodeName, dc, namespace, forward)
+		})
+	}
+
+	for _, step := range steps {
+		if err := executeWithRetry(ctx, ic.retryPolicy, step); err != nil {
 			return err
 		}
 	}
@@ -448,91 +437,33 @@ func (ic *Client) StartXDR(
 // StopXDR disable replication and remove xdr config.
 func (ic *Client) StopXDR(ctx context.Context, nodeName, dc string) error {
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
-		return ic.stopXDR(nodeName, dc)
+		return ic.deleteXDRDC(nodeName, dc)
 	})
-}
-
-func (ic *Client) stopXDR(nodeName, dc string) error {
-	if err := ic.deleteXDRDC(nodeName, dc); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (ic *Client) createXDRDC(nodeName, dc string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateXDRDC], dc)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to create xdr dc: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse create xdr dc response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "create xdr dc")
 }
 
 func (ic *Client) createXDRConnector(nodeName, dc string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateConnector], dc)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to create xdr connector: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse create xdr connector response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "create xdr connector")
 }
 
 func (ic *Client) createXDRNode(nodeName, dc, hostPort string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateXDRNode], dc, hostPort)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to create xdr node: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse create xdr node response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "create xdr node")
 }
 
 func (ic *Client) createXDRNamespace(nodeName, dc, namespace, rewind string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateXDRNamespace], dc, namespace, rewind)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to create xdr namespace: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse create xdr namespace response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "create xdr namespace")
 }
 
 func (ic *Client) deleteXDRDC(nodeName, dc string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDDeleteXDRDC], dc)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to remove xdr dc: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse remove xdr dc response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "remove xdr dc")
 }
 
 // BlockMRTWrites blocks MRT writes on cluster.
@@ -544,17 +475,7 @@ func (ic *Client) BlockMRTWrites(ctx context.Context, nodeName, namespace string
 
 func (ic *Client) blockMRTWrites(nodeName, namespace string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBlockMRTWrites], namespace)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to block mrt writes: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse block mrt writes response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "block mrt writes")
 }
 
 // UnBlockMRTWrites unblocks MRT writes on cluster.
@@ -566,17 +487,7 @@ func (ic *Client) UnBlockMRTWrites(ctx context.Context, nodeName, namespace stri
 
 func (ic *Client) unBlockMRTWrites(nodeName, namespace string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDUnBlockMRTWrites], namespace)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to unblock mrt writes: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse unblock mrt writes response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "unblock mrt writes")
 }
 
 // GetNodesNames return list of active nodes names.
@@ -593,7 +504,7 @@ func (ic *Client) GetNodesNames() []string {
 	return result
 }
 
-// SetMaxThroughput sets max throughput for xdr. The Value should be in multiples of 100
+// setMaxThroughput sets max throughput for xdr. The value should be in multiples of 100.
 func (ic *Client) setMaxThroughput(nodeName, dc, namespace string, throughput int) error {
 	// Do nothing.
 	if throughput == 0 {
@@ -602,16 +513,7 @@ func (ic *Client) setMaxThroughput(nodeName, dc, namespace string, throughput in
 
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetXDRMaxThroughput], dc, namespace, throughput)
 
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to set max throughput: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse set max throughput response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "set max throughput")
 }
 
 // setXDRForward setting this parameter to true sends writes,
@@ -619,18 +521,10 @@ func (ic *Client) setMaxThroughput(nodeName, dc, namespace string, throughput in
 func (ic *Client) setXDRForward(nodeName, dc, namespace string, forward bool) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetXDRForward], dc, namespace, forward)
 
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to set xdr forward: %w", err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse set xdr forward response: %w", err)
-	}
-
-	return nil
+	return ic.execByNode(nodeName, cmd, "set xdr forward")
 }
 
+// GetSetsList returns the list of set names for the given namespace, excluding the MRT monitor set.
 func (ic *Client) GetSetsList(ctx context.Context, namespace string) ([]string, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetsOfNamespace], namespace)
 
@@ -649,7 +543,7 @@ func (ic *Client) GetSetsList(ctx context.Context, namespace string) ([]string, 
 		return nil, fmt.Errorf("failed to parse sets info: %w", err)
 	}
 
-	sets := make([]string, 0)
+	sets := make([]string, 0, len(resultMap))
 
 	for _, rec := range resultMap {
 		val, ok := rec["set"]
@@ -716,15 +610,17 @@ type Stats struct {
 // GetStats requests node statistics like recoveries, lag, etc.
 // returns Stats struct.
 func (ic *Client) GetStats(ctx context.Context, nodeName, dc, namespace string) (Stats, error) {
-	var (
-		result Stats
-		err    error
-	)
+	var result Stats
 
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
-		result, err = ic.getStats(nodeName, dc, namespace)
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		res, err := ic.getStats(nodeName, dc, namespace)
+		if err != nil {
+			return err
+		}
 
-		return err
+		result = res
+
+		return nil
 	})
 
 	return result, err
@@ -784,22 +680,31 @@ func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
 
 // GetService returns service name by node name.
 func (ic *Client) GetService(ctx context.Context, node string) (string, error) {
-	var (
-		result string
-		err    error
-	)
-	// First request TLS name.
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
-		result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceTLSStd])
+	var result string
 
-		return err
+	// First request TLS name.
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		res, err := ic.getByNode(node, ic.cmdDict[cmdIDServiceTLSStd])
+		if err != nil {
+			return err
+		}
+
+		result = res
+
+		return nil
 	})
+
 	// If result is empty, then request plain.
 	if result == "" {
 		err = executeWithRetry(ctx, ic.retryPolicy, func() error {
-			result, err = ic.getByNode(node, ic.cmdDict[cmdIDServiceClearStd])
+			res, err := ic.getByNode(node, ic.cmdDict[cmdIDServiceClearStd])
+			if err != nil {
+				return err
+			}
 
-			return err
+			result = res
+
+			return nil
 		})
 	}
 
@@ -873,7 +778,7 @@ func (ic *Client) GetDCsList(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("failed to parse DCs list info response: %w", err)
 	}
 
-	dcs := make([]string, 0)
+	dcs := make([]string, 0, len(infoResponse))
 
 	for _, rec := range infoResponse {
 		val, ok := rec["dcs"]
@@ -889,15 +794,17 @@ func (ic *Client) GetDCsList(ctx context.Context) ([]string, error) {
 
 // GetPrimaryPartitions returns a list of primary partitions.
 func (ic *Client) GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error) {
-	var (
-		result []int
-		err    error
-	)
+	var result []int
 
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
-		result, err = ic.getPrimaryPartitions(node, namespace)
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		res, err := ic.getPrimaryPartitions(node, namespace)
+		if err != nil {
+			return err
+		}
 
-		return err
+		result = res
+
+		return nil
 	})
 
 	return result, err
@@ -923,6 +830,11 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 
 		if res[0] == namespace {
 			data := strings.Split(res[1], ",")
+			// Guard against malformed responses to avoid an index-out-of-range panic.
+			if len(data) < minReplicasFields {
+				continue
+			}
+
 			base64Res = data[2]
 		}
 	}
@@ -940,22 +852,33 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 }
 
 // StartServerBackup starts a backup job on the server.
-func (ic *Client) StartServerBackup(ctx context.Context,
-	namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string,
-) (string, error) {
+func (ic *Client) StartServerBackup(ctx context.Context, request *iModels.RequestBackup) (string, error) {
 	cNow := cltime.Now()
 	jobID := cNow.String()
 
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerBackup],
-		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey, endpoint)
+		request.Namespace,
+		jobID,
+		request.Storage,
+		request.Bucket,
+		request.Region,
+		request.Profile,
+		request.AccessKey,
+		request.SecretKey,
+		request.Endpoint,
+		request.ModifiedBefore,
+		request.ModifiedAfter,
+		request.SetList,
+		request.NoIndexes,
+		request.NoUDFs,
+	)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return "", fmt.Errorf("failed start backup: %w", err)
 	}
 
-	_, err = parseResultResponse(cmd, resp)
-	if err != nil {
+	if _, err = parseResultResponse(cmd, resp); err != nil {
 		return "", fmt.Errorf("failed to parse start backup response: %w", err)
 	}
 
@@ -963,19 +886,24 @@ func (ic *Client) StartServerBackup(ctx context.Context,
 }
 
 // StartServerRestore starts a restore job on the server.
-func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, storage, bucket, region, profile,
-	accessKey, secretKey, endpoint string,
-) error {
+func (ic *Client) StartServerRestore(ctx context.Context, request *iModels.RequestRestore) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
-		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey, endpoint)
+		request.Namespace,
+		request.JobID,
+		request.Storage,
+		request.Bucket,
+		request.Region,
+		request.Profile,
+		request.AccessKey,
+		request.SecretKey,
+		request.Endpoint)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("failed start restore: %w", err)
 	}
 
-	_, err = parseResultResponse(cmd, resp)
-	if err != nil {
+	if _, err = parseResultResponse(cmd, resp); err != nil {
 		return fmt.Errorf("failed to parse start restore response: %w", err)
 	}
 
@@ -984,28 +912,40 @@ func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, stor
 
 // PrepareServerRestore starts a restore preparation on the server.
 func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID)
+	allNodes := ic.getNodesString()
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("failed prepare restore: %w", err)
 	}
 
-	_, err = parseResultResponse(cmd, resp)
-	if err != nil {
+	if _, err = parseResultResponse(cmd, resp); err != nil {
 		return fmt.Errorf("failed to parse prepare restore response: %w", err)
 	}
 
 	return nil
 }
 
-func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
-	var (
-		result float64
-		err    error
-	)
+func (ic *Client) getNodesString() string {
+	nodes := ic.cluster.GetNodes()
 
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
+	var builder strings.Builder
+
+	for _, node := range nodes {
+		builder.WriteString(node.GetName())
+		builder.WriteByte(',')
+	}
+
+	return builder.String()
+}
+
+// GetBackupStatus aggregates the server-side backup progress across all nodes and
+// returns it as a ratio in the [0, 1] range.
+func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
+	var result float64
+
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		nodes := ic.cluster.GetNodes()
 
 		var (
@@ -1024,14 +964,14 @@ func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
 			}
 
 			if trID != firstTrID {
-				return fmt.Errorf("backup is starting on node %s, but not all nodes have the same trid: %s",
-					node.GetName(), node.GetName())
+				return fmt.Errorf("backup trid mismatch: node %s has trid %d, expected %d",
+					node.GetName(), trID, firstTrID)
 			}
 
 			total += one
 		}
 
-		result = math.Min(1.0, total/4096)
+		result = math.Min(1.0, total/partitionsPerNamespace)
 
 		return nil
 	})
@@ -1067,10 +1007,92 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 	}
 
 	if okProgress && okPids && okTrID {
-		return progress / 100 * float64(pids), trID, nil
+		return progress / percentBase * float64(pids), trID, nil
 	}
 
 	return 0, 0, ErrNotFound
+}
+
+// restoreStatePriority defines priority for "active" states when
+// nodes disagree. Lower index = higher priority.
+var restoreStatePriority = []string{
+	"FAILED",
+	"RESTORING",
+	"PREPARING",
+}
+
+// resolveRestoreState picks a single state out of the states seen
+// across all nodes.
+//
+// Priority:
+//  1. If any node reports an active state (PREPARING, RESTORING, FAILED),
+//     return the highest-priority one among those seen.
+//  2. Otherwise all nodes report READY or NONE; return NONE if any node
+//     reports NONE, otherwise READY.
+func resolveRestoreState(seen map[string]struct{}) string {
+	for _, state := range restoreStatePriority {
+		if _, ok := seen[state]; ok {
+			return state
+		}
+	}
+
+	if _, ok := seen["NONE"]; ok {
+		return "NONE"
+	}
+
+	return "READY"
+}
+
+func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (string, error) {
+	var result string
+
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		nodes := ic.cluster.GetNodes()
+
+		seen := make(map[string]struct{}, len(nodes))
+
+		for _, node := range nodes {
+			resp, err := ic.getRestoreStatusByNode(node, namespace)
+			if err != nil {
+				return fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)
+			}
+
+			for _, r := range resp {
+				state, ok := r["state"]
+				if !ok {
+					continue
+				}
+
+				seen[state] = struct{}{}
+			}
+		}
+
+		if len(seen) == 0 {
+			return fmt.Errorf("no restore state found for namespace %s", namespace)
+		}
+
+		result = resolveRestoreState(seen)
+
+		return nil
+	})
+
+	return result, err
+}
+
+func (ic *Client) getRestoreStatusByNode(node infoGetter, namespace string) ([]iModels.InfoMap, error) {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDRestoreStatus], namespace)
+
+	response, aErr := node.RequestInfo(ic.policy, cmd)
+	if aErr != nil {
+		return nil, fmt.Errorf("failed to get restore status: %w", aErr)
+	}
+
+	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse restore status: %w", err)
+	}
+
+	return infoResponse, nil
 }
 
 func (ic *Client) getBackupJobsByNode(node infoGetter) ([]iModels.InfoMap, error) {
@@ -1091,9 +1113,9 @@ func (ic *Client) getBackupJobsByNode(node infoGetter) ([]iModels.InfoMap, error
 func (ic *Client) getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF, error) {
 	cmd := ic.cmdDict[cmdIDUdfList]
 
-	response, aerr := node.RequestInfo(policy, cmd)
-	if aerr != nil {
-		return nil, fmt.Errorf("failed to list UDFs: %w", aerr)
+	response, aErr := node.RequestInfo(policy, cmd)
+	if aErr != nil {
+		return nil, fmt.Errorf("failed to list UDFs: %w", aErr)
 	}
 
 	cmdResp, err := parseResultResponse(cmd, response)
@@ -1116,7 +1138,7 @@ func (ic *Client) getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF,
 	for i, udfMap := range udfList {
 		name, ok := udfMap["filename"]
 		if !ok {
-			return nil, fmt.Errorf("udf-list response missing filename")
+			return nil, errUDFMissingFilename
 		}
 
 		udf, err := ic.getUDF(node, name, policy)
@@ -1133,9 +1155,9 @@ func (ic *Client) getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF,
 func (ic *Client) getUDF(node infoGetter, name string, policy *a.InfoPolicy) (*models.UDF, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDUdfGetFilename], name)
 
-	response, aerr := node.RequestInfo(policy, cmd)
-	if aerr != nil {
-		return nil, fmt.Errorf("udf-get info command failed: %w", aerr)
+	response, aErr := node.RequestInfo(policy, cmd)
+	if aErr != nil {
+		return nil, fmt.Errorf("udf-get info command failed: %w", aErr)
 	}
 
 	cmdResp, err := parseResultResponse(cmd, response)
@@ -1157,9 +1179,9 @@ func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, n
 ) (uint64, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetsOfNamespace], namespace)
 
-	response, aerr := node.RequestInfo(policy, cmd)
-	if aerr != nil {
-		return 0, fmt.Errorf("failed to get record count: %w", aerr)
+	response, aErr := node.RequestInfo(policy, cmd)
+	if aErr != nil {
+		return 0, fmt.Errorf("failed to get record count: %w", aErr)
 	}
 
 	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -1202,9 +1224,9 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 ) (uint64, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
 
-	response, aerr := node.RequestInfo(policy, cmd)
-	if aerr != nil {
-		return 0, fmt.Errorf("failed to request info: %w", aerr)
+	response, aErr := node.RequestInfo(policy, cmd)
+	if aErr != nil {
+		return 0, fmt.Errorf("failed to request info: %w", aErr)
 	}
 
 	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -1223,16 +1245,16 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 		}
 	}
 
-	return 0, fmt.Errorf("failed to parse record info request")
+	return 0, errParseRecordInfo
 }
 
 func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoPolicy, namespace string,
 ) (int, error) {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
 
-	response, aerr := node.RequestInfo(policy, cmd)
-	if aerr != nil {
-		return 0, fmt.Errorf("failed to get namespace info: %w", aerr)
+	response, aErr := node.RequestInfo(policy, cmd)
+	if aErr != nil {
+		return 0, fmt.Errorf("failed to get namespace info: %w", aErr)
 	}
 
 	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -1247,15 +1269,15 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoP
 		}
 	}
 
-	return 0, errors.New("replication factor not found")
+	return 0, errReplicationFactorNotFound
 }
 
 func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]iModels.InfoMap, error) {
 	cmd := ic.cmdDict[cmdIDShowJobsQueries]
 
-	response, aerr := node.RequestInfo(ic.policy, cmd)
-	if aerr != nil {
-		return nil, fmt.Errorf("failed to show job queries: %w", aerr)
+	response, aErr := node.RequestInfo(ic.policy, cmd)
+	if aErr != nil {
+		return nil, fmt.Errorf("failed to show job queries: %w", aErr)
 	}
 
 	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -1264,4 +1286,91 @@ func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]iModels.InfoMap, erro
 	}
 
 	return infoResponse, nil
+}
+
+// GetClusterStable checks the stability of a cluster within the specified namespace and retries on transient errors.
+// Returns a boolean indicating the stability status and an error if the operation fails after retries.
+func (ic *Client) GetClusterStable(ctx context.Context, namespace string) (bool, error) {
+	var result bool
+
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		res, err := ic.getClusterStable(ctx, namespace)
+		if err != nil {
+			return err
+		}
+
+		result = res
+
+		return nil
+	})
+
+	return result, err
+}
+
+func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool, error) {
+	nodes := ic.cluster.GetNodes()
+	nodesNum := len(nodes)
+
+	stats, err := ic.getStatistics(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get cluster statistics: %w", err)
+	}
+
+	clusterKey, ok := searchInInfoResponse(stats, "cluster_key")
+	if !ok {
+		return false, fmt.Errorf("cluster key not found in statistics")
+	}
+
+	for _, node := range nodes {
+		cmd := fmt.Sprintf(ic.cmdDict[cmdIDClusterStable], nodesNum, namespace)
+
+		resp, err := ic.GetInfo(ctx, cmd)
+		if err != nil {
+			return false, fmt.Errorf("failed to get node %s stable status: %w", node.GetName(), err)
+		}
+
+		result, err := parseResultResponse(cmd, resp)
+		if err != nil {
+			return false, fmt.Errorf("failed to parse node %s stable status response: %w", node.GetName(), err)
+		}
+
+		if result != clusterKey {
+			return false, fmt.Errorf("cluster %s is not stable, result is %s", clusterKey, result)
+		}
+	}
+
+	return true, nil
+}
+
+// GetStatistics returns cluster statistics.
+func (ic *Client) getStatistics(ctx context.Context) ([]iModels.InfoMap, error) {
+	cmd := ic.cmdDict[cmdIDStatistics]
+
+	resp, err := ic.GetInfo(ctx, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster statistics: %w", err)
+	}
+
+	result, err := parseResultResponse(cmd, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cluster statistics result response: %w", err)
+	}
+
+	infoResponse, err := parseInfoResponse(result, ";", ";", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cluster statistics info response: %w", err)
+	}
+
+	return infoResponse, nil
+}
+
+func searchInInfoResponse(infoResponse []iModels.InfoMap, key string) (string, bool) {
+	for _, r := range infoResponse {
+		val, ok := r[key]
+		if ok {
+			return val, true
+		}
+	}
+
+	return "", false
 }

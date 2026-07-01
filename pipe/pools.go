@@ -16,6 +16,7 @@ package pipe
 
 import (
 	"context"
+	"sync"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
 	"github.com/aerospike/backup-go/models"
@@ -26,6 +27,9 @@ import (
 // All chains in a pool are running in parallel.
 // Pools are communicating via fanout.
 type Pool[T models.TokenConstraint] struct {
+	mu sync.RWMutex
+	eg *errgroup.Group
+
 	Chains []*Chain[T]
 	// Outputs and Inputs are mutually exclusive.
 	Inputs  []chan T
@@ -34,17 +38,21 @@ type Pool[T models.TokenConstraint] struct {
 
 // Run runs all chains in the pool.
 func (p *Pool[T]) Run(ctx context.Context) error {
-	errGroup, ctx := errgroup.WithContext(ctx)
+	p.eg, ctx = errgroup.WithContext(ctx)
+
+	p.mu.RLock()
 
 	for i := range p.Chains {
 		chain := p.Chains[i]
 
-		errGroup.Go(func() error {
+		p.eg.Go(func() error {
 			return chain.Run(ctx)
 		})
 	}
 
-	return errGroup.Wait()
+	p.mu.RUnlock()
+
+	return p.eg.Wait()
 }
 
 // ProcessorCreator is a function type that defines a creator for a Processor.
@@ -84,6 +92,9 @@ func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *bandw
 
 // Close closing channels and cleaning links.
 func (p *Pool[T]) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	// Nullify objects, so GC can free this memory.
 	p.Chains = nil
 	p.Inputs = nil

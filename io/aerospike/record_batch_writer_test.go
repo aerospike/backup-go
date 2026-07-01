@@ -17,6 +17,7 @@ package aerospike
 import (
 	"errors"
 	"log/slog"
+	"sync/atomic"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -66,9 +67,12 @@ func newTestWriter(t *testing.T, asc dbWriter) *batchRecordWriter {
 	// One attempt, no sleep.
 	rp := models.NewRetryPolicy(0, 1, 1)
 
+	batchSize := &atomic.Int32{}
+	batchSize.Store(100)
+
 	return newBatchRecordWriter(
 		ctx, asc, wp, stats, rp, nil,
-		100, false, logger,
+		batchSize, false, logger,
 	)
 }
 

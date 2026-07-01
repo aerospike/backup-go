@@ -45,6 +45,9 @@ const (
 // Fanout routes messages between chain pools.
 // FanoutStrategy controls the distribution of messages to output channels.
 type Fanout[T models.TokenConstraint] struct {
+	mu sync.RWMutex
+	wg sync.WaitGroup
+
 	Inputs  []chan T
 	Outputs []chan T
 
@@ -88,20 +91,49 @@ func NewFanout[T models.TokenConstraint](
 
 // Run starts routing messages in separate goroutines based on the defined fanout strategy.
 func (f *Fanout[T]) Run(ctx context.Context) {
-	var wg sync.WaitGroup
+	f.mu.RLock()
 
 	for i, input := range f.Inputs {
-		wg.Go(func() {
+		f.wg.Add(1)
+
+		go func(i int, input chan T) {
+			defer f.wg.Done()
+
 			f.processInput(ctx, i, input)
-		})
+		}(i, input)
 	}
 
-	wg.Wait()
+	f.mu.RUnlock()
+
+	f.wg.Wait()
 	f.Close()
+}
+
+// AddInput adds a new input channel to the fanout and starts its routing routine.
+func (f *Fanout[T]) AddInput(ctx context.Context, input chan T) {
+	f.mu.Lock()
+	index := len(f.Inputs)
+	f.Inputs = append(f.Inputs, input)
+	f.mu.Unlock()
+
+	f.wg.Go(func() {
+		f.processInput(ctx, index, input)
+	})
+}
+
+// AddOutput adds a new output channel to the fanout.
+func (f *Fanout[T]) AddOutput(output chan T) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.Outputs = append(f.Outputs, output)
 }
 
 // Close closes all output channels.
 func (f *Fanout[T]) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	for _, output := range f.Outputs {
 		close(output)
 	}
@@ -126,6 +158,9 @@ func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T)
 
 // routeData routes a given piece of data based on the current fanout strategy (Fixed, RoundRobin, or Split).
 func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	switch f.strategy {
 	case Fixed: // Send it to the current index.
 	case RoundRobin:
@@ -171,6 +206,9 @@ func (f *Fanout[T]) splitFunc(token T) int {
 
 // GetMetrics returns the accumulated length for input and output channels.
 func (f *Fanout[T]) GetMetrics() (in, out int) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	if f.Inputs != nil {
 		for _, input := range f.Inputs {
 			in += len(input)

@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
@@ -35,7 +36,7 @@ type batchRecordWriter struct {
 	retryPolicy       *models.RetryPolicy
 	operationBuffer   []a.BatchRecordIfc
 	rpsCollector      *metrics.Collector
-	batchSize         int
+	batchSize         *atomic.Int32
 	ignoreRecordError bool
 }
 
@@ -46,7 +47,7 @@ func newBatchRecordWriter(
 	stats *models.RestoreStats,
 	retryPolicy *models.RetryPolicy,
 	rpsCollector *metrics.Collector,
-	batchSize int,
+	batchSize *atomic.Int32,
 	ignoreRecordError bool,
 	logger *slog.Logger,
 ) *batchRecordWriter {
@@ -74,7 +75,7 @@ func (rw *batchRecordWriter) writeRecord(record *models.Record) error {
 
 	rw.rpsCollector.Increment()
 
-	if len(rw.operationBuffer) >= rw.batchSize {
+	if len(rw.operationBuffer) >= int(rw.batchSize.Load()) {
 		return rw.flushBuffer()
 	}
 

@@ -84,17 +84,17 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 
 	readWorkers := make([]pipe.Reader[T], fr.parallel)
 
-	switch fr.config.EncoderType {
-	case EncoderTypeASB:
-		for i := 0; i < fr.parallel; i++ {
-			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.initDecoder)
-		}
-	case EncoderTypeASBX:
+	for i := 0; i < fr.parallel; i++ {
+		readWorkers[i] = fr.newDataReader()
+	}
+
+	if fr.config.EncoderType == EncoderTypeASBX {
 		workersReadChans := make([]chan models.File, fr.parallel)
 
 		for i := 0; i < fr.parallel; i++ {
 			rCh := make(chan models.File)
 			workersReadChans[i] = rCh
+			// Re-create as ASBX needs per-worker channels
 			readWorkers[i] = newTokenReader(rCh, fr.logger, fr.initDecoder)
 		}
 
@@ -102,6 +102,11 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 	}
 
 	return readWorkers
+}
+
+// newDataReader creates a single data reader.
+func (fr *fileReaderProcessor[T]) newDataReader() pipe.Reader[T] {
+	return newTokenReader(fr.readersCh, fr.logger, fr.initDecoder)
 }
 
 // initDecoder initializes the decoder for the given reader.

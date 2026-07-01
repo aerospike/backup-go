@@ -23,7 +23,7 @@ import (
 	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
-	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
+	infoModels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 const (
@@ -82,7 +82,7 @@ type InfoGetter interface {
 	GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error)
 	GetRackNodes(ctx context.Context, rackID int) ([]string, error)
 	GetService(ctx context.Context, node string) (string, error)
-	GetVersion(ctx context.Context) (models2.AerospikeVersion, error)
+	GetVersion(ctx context.Context) (infoModels.AerospikeVersion, error)
 	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
 	GetUDFs(ctx context.Context) ([]*models.UDF, error)
 	SupportsBatchWrite(ctx context.Context) (bool, error)
@@ -99,14 +99,12 @@ type InfoGetter interface {
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetNodesNames() []string
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
-	StartServerBackup(ctx context.Context,
-		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint, modifiedBefore, modifiedAfter string,
-	) (string, error)
-	StartServerRestore(ctx context.Context, jobID,
-		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string) error
+	StartServerBackup(ctx context.Context, request *infoModels.RequestBackup) (string, error)
+	StartServerRestore(ctx context.Context, request *infoModels.RequestRestore) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
 	GetBackupStatus(ctx context.Context) (float64, error)
 	GetClusterStable(ctx context.Context, namespace string) (bool, error)
+	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
 }
 
 // Client is the main entry point for the backup package.

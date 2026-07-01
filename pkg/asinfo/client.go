@@ -852,15 +852,26 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 }
 
 // StartServerBackup starts a backup job on the server.
-func (ic *Client) StartServerBackup(ctx context.Context,
-	namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint, modifiedBefore, modifiedAfter string,
-) (string, error) {
+func (ic *Client) StartServerBackup(ctx context.Context, request *iModels.RequestBackup) (string, error) {
 	cNow := cltime.Now()
 	jobID := cNow.String()
 
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerBackup],
-		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey, endpoint,
-		modifiedBefore, modifiedAfter)
+		request.Namespace,
+		jobID,
+		request.Storage,
+		request.Bucket,
+		request.Region,
+		request.Profile,
+		request.AccessKey,
+		request.SecretKey,
+		request.Endpoint,
+		request.ModifiedBefore,
+		request.ModifiedAfter,
+		request.SetList,
+		request.NoIndexes,
+		request.NoUDFS,
+	)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
@@ -875,11 +886,17 @@ func (ic *Client) StartServerBackup(ctx context.Context,
 }
 
 // StartServerRestore starts a restore job on the server.
-func (ic *Client) StartServerRestore(ctx context.Context, jobID, namespace, storage, bucket, region, profile,
-	accessKey, secretKey, endpoint string,
-) error {
+func (ic *Client) StartServerRestore(ctx context.Context, request *iModels.RequestRestore) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
-		namespace, jobID, storage, bucket, region, profile, accessKey, secretKey, endpoint)
+		request.Namespace,
+		request.JobID,
+		request.Storage,
+		request.Bucket,
+		request.Region,
+		request.Profile,
+		request.AccessKey,
+		request.SecretKey,
+		request.Endpoint)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {
@@ -994,6 +1011,88 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 	}
 
 	return 0, 0, ErrNotFound
+}
+
+// restoreStatePriority defines priority for "active" states when
+// nodes disagree. Lower index = higher priority.
+var restoreStatePriority = []string{
+	"FAILED",
+	"RESTORING",
+	"PREPARING",
+}
+
+// resolveRestoreState picks a single state out of the states seen
+// across all nodes.
+//
+// Priority:
+//  1. If any node reports an active state (PREPARING, RESTORING, FAILED),
+//     return the highest-priority one among those seen.
+//  2. Otherwise all nodes report READY or NONE; return NONE if any node
+//     reports NONE, otherwise READY.
+func resolveRestoreState(seen map[string]struct{}) string {
+	for _, state := range restoreStatePriority {
+		if _, ok := seen[state]; ok {
+			return state
+		}
+	}
+
+	if _, ok := seen["NONE"]; ok {
+		return "NONE"
+	}
+
+	return "READY"
+}
+
+func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (string, error) {
+	var result string
+
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		nodes := ic.cluster.GetNodes()
+
+		seen := make(map[string]struct{}, len(nodes))
+
+		for _, node := range nodes {
+			resp, err := ic.getRestoreStatusByNode(node, namespace)
+			if err != nil {
+				return fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)
+			}
+
+			for _, r := range resp {
+				state, ok := r["state"]
+				if !ok {
+					continue
+				}
+
+				seen[state] = struct{}{}
+			}
+		}
+
+		if len(seen) == 0 {
+			return fmt.Errorf("no restore state found for namespace %s", namespace)
+		}
+
+		result = resolveRestoreState(seen)
+
+		return nil
+	})
+
+	return result, err
+}
+
+func (ic *Client) getRestoreStatusByNode(node infoGetter, namespace string) ([]iModels.InfoMap, error) {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDRestoreStatus], namespace)
+
+	response, aErr := node.RequestInfo(ic.policy, cmd)
+	if aErr != nil {
+		return nil, fmt.Errorf("failed to get restore status: %w", aErr)
+	}
+
+	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse restore status: %w", err)
+	}
+
+	return infoResponse, nil
 }
 
 func (ic *Client) getBackupJobsByNode(node infoGetter) ([]iModels.InfoMap, error) {

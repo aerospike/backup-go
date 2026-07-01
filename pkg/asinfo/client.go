@@ -870,7 +870,7 @@ func (ic *Client) StartServerBackup(ctx context.Context, request *iModels.Reques
 		request.ModifiedAfter,
 		request.SetList,
 		request.NoIndexes,
-		request.NoUDFS,
+		request.NoUDFs,
 	)
 
 	resp, err := ic.GetInfo(ctx, cmd)

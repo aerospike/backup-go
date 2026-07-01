@@ -20,7 +20,7 @@ type RequestBackup struct {
 	ModifiedAfter  string
 	SetList        string
 	NoIndexes      bool
-	NoUDFS         bool
+	NoUDFs         bool
 }
 
 type RequestRestore struct {

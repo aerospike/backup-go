@@ -16,11 +16,12 @@ package models
 
 type RequestBackup struct {
 	RequestCommon
-	ModifiedBefore string
-	ModifiedAfter  string
-	SetList        string
-	NoIndexes      bool
-	NoUDFs         bool
+	ModifiedBefore     string
+	ModifiedAfter      string
+	SetList            string
+	NoIndexes          bool
+	NoUDFs             bool
+	EnableChangeStream bool
 }
 
 type RequestRestore struct {

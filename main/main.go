@@ -32,15 +32,16 @@ import (
 	"time"
 
 	gcpStorage "cloud.google.com/go/storage"
+	"github.com/googleapis/gax-go/v2"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
+
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	gcs "github.com/aerospike/backup-go/io/storage/gcp/storage"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
-	"github.com/googleapis/gax-go/v2"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
 )
 
 // Writer parameters requested for the test.
@@ -105,6 +106,17 @@ func main() {
 	}
 	logger.Info("record prepared", slog.Int("encoded_bytes", len(recordBytes)))
 
+	// Pre-build one chunk-sized block of concatenated records. Writing big
+	// blocks (instead of ~110-byte pieces) is what keeps the client streaming
+	// at network speed - millions of tiny writes per 1GB file would otherwise
+	// bottleneck on the storage.Writer's internal pipe and never generate
+	// enough load to stress the upload/retry path.
+	block := buildBlock(recordBytes, cfg.chunkSize)
+	logger.Info("write block prepared",
+		slog.Int("block_bytes", len(block)),
+		slog.Int("records_per_block", len(block)/len(recordBytes)),
+	)
+
 	// Run context is cancelled on Ctrl+C (SIGINT) or SIGTERM. All in-flight
 	// uploads use this context, so an interrupt stops them promptly.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -152,7 +164,8 @@ func main() {
 
 			// Keep writing new files until interrupted.
 			for ctx.Err() == nil {
-				err := writeOneFile(ctx, writer, encoder, recordBytes, cfg.fileSize, logger, worker)
+				err := writeOneFile(ctx, writer, encoder, block, cfg.fileSize, logger, worker)
+
 				switch {
 				case err == nil:
 					filesDone.Add(1)
@@ -194,7 +207,7 @@ func writeOneFile(
 	ctx context.Context,
 	writer *gcs.Writer,
 	encoder backup.Encoder[*models.Token],
-	recordBytes []byte,
+	block []byte,
 	fileSize int64,
 	logger *slog.Logger,
 	worker int,
@@ -220,18 +233,21 @@ func writeOneFile(
 		return fmt.Errorf("write header to %s: %w", filename, err)
 	}
 
+	// Write full blocks until the target size is reached. The last block may
+	// overshoot fileSize by up to len(block); that is intentional to keep
+	// records intact and is irrelevant for a write/retry stress test.
 	for written < fileSize {
 		if ctx.Err() != nil {
 			_ = w.Close()
 			return ctx.Err()
 		}
 
-		n, err = w.Write(recordBytes)
+		n, err = w.Write(block)
 		written += int64(n)
 
 		if err != nil {
 			_ = w.Close()
-			return fmt.Errorf("write record to %s (after %d bytes): %w", filename, written, err)
+			return fmt.Errorf("write block to %s (after %d bytes): %w", filename, written, err)
 		}
 	}
 
@@ -292,6 +308,23 @@ func buildRecordToken(valueLen int) (*models.Token, error) {
 	}
 
 	return models.NewRecordToken(rec, 0, nil), nil
+}
+
+// buildBlock concatenates whole copies of record into a buffer close to
+// blockSize bytes. Writing this block (instead of a single record) turns
+// millions of tiny writes per file into a handful of chunk-sized writes.
+func buildBlock(record []byte, blockSize int) []byte {
+	count := blockSize / len(record)
+	if count < 1 {
+		count = 1
+	}
+
+	block := make([]byte, 0, count*len(record))
+	for i := 0; i < count; i++ {
+		block = append(block, record...)
+	}
+
+	return block
 }
 
 // newGcpClient builds a *storage.Client with the same options and retry policy

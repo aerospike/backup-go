@@ -1,7 +1,6 @@
 // Copyright 2024 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License").
-
 // Command gcpwritertest stress-tests the retry behaviour of
 // backup-go's io/storage/gcp/storage.Writer.
 //
@@ -32,22 +31,21 @@ import (
 	"time"
 
 	gcpStorage "cloud.google.com/go/storage"
-	"github.com/googleapis/gax-go/v2"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
-
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	gcs "github.com/aerospike/backup-go/io/storage/gcp/storage"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
+	"github.com/googleapis/gax-go/v2"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 )
 
 // Writer parameters requested for the test.
 const (
-	defaultChunkSize = 5 * 1024 * 1024        // 5 MB.
-	defaultFileSize  = 250 * 1024 * 1024 // 1 GB per object.
+	defaultChunkSize = 5 * 1024 * 1024    // 5 MB.
+	defaultFileSize  = 1024 * 1024 * 1024 // 1 GB per object.
 
 	// Target size of a single encoded ASB record.
 	minRecordSize = 100
@@ -64,17 +62,21 @@ const (
 	testNamespace = "test"
 	testSet       = "testset"
 	binName       = "b"
+
+	// bytesPerMB is used to convert raw byte counters into megabytes for logs.
+	bytesPerMB = 1024 * 1024
 )
 
 type config struct {
-	bucket      string
-	folder      string
-	keyFile     string
-	endpoint    string
-	parallelism int
-	chunkSize   int
-	fileSize    int64
-	removeFiles bool
+	bucket         string
+	folder         string
+	keyFile        string
+	endpoint       string
+	parallelism    int
+	chunkSize      int
+	fileSize       int64
+	removeFiles    bool
+	reportInterval time.Duration
 }
 
 func main() {
@@ -149,23 +151,25 @@ func main() {
 	)
 
 	start := time.Now()
-
 	var (
-		filesDone atomic.Int64
-		failed    atomic.Int64
+		filesDone  atomic.Int64
+		failed     atomic.Int64
+		totalBytes atomic.Int64
 	)
+
+	// speedReporter logs upload throughput based on the shared byte counter
+	// until ctx is cancelled. reporterDone lets main wait for its final flush.
+	reporterDone := make(chan struct{})
+	go speedReporter(ctx, &totalBytes, cfg.reportInterval, logger, reporterDone)
 
 	var wg sync.WaitGroup
 	for i := 0; i < cfg.parallelism; i++ {
 		wg.Add(1)
-
 		go func(worker int) {
 			defer wg.Done()
-
 			// Keep writing new files until interrupted.
 			for ctx.Err() == nil {
-				err := writeOneFile(ctx, writer, encoder, block, cfg.fileSize, logger, worker)
-
+				err := writeOneFile(ctx, writer, encoder, block, cfg.fileSize, &totalBytes, logger, worker)
 				switch {
 				case err == nil:
 					filesDone.Add(1)
@@ -189,12 +193,21 @@ func main() {
 	<-ctx.Done()
 	logger.Info("interrupt received, stopping workers...")
 	wg.Wait()
+	<-reporterDone
+
+	elapsed := time.Since(start)
+	var overallMBs float64
+	if sec := elapsed.Seconds(); sec > 0 {
+		overallMBs = float64(totalBytes.Load()) / bytesPerMB / sec
+	}
 
 	logger.Info("write test finished",
-		slog.Duration("elapsed", time.Since(start)),
+		slog.Duration("elapsed", elapsed),
 		slog.Int("total_workers", cfg.parallelism),
 		slog.Int64("files_written", filesDone.Load()),
 		slog.Int64("errors", failed.Load()),
+		slog.Int64("total_mb", totalBytes.Load()/bytesPerMB),
+		slog.Float64("overall_mb_s", overallMBs),
 	)
 
 	if failed.Load() > 0 {
@@ -202,14 +215,65 @@ func main() {
 	}
 }
 
+// speedReporter periodically logs instantaneous and average upload throughput,
+// computed from the delta of the shared byte counter between ticks. It runs
+// until ctx is cancelled, then closes done so main can wait for it.
+func speedReporter(
+	ctx context.Context,
+	totalBytes *atomic.Int64,
+	interval time.Duration,
+	logger *slog.Logger,
+	done chan<- struct{},
+) {
+	defer close(done)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	start := time.Now()
+	lastTime := start
+	lastBytes := int64(0)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			curBytes := totalBytes.Load()
+
+			intervalSec := now.Sub(lastTime).Seconds()
+			totalSec := now.Sub(start).Seconds()
+
+			var instMBs, avgMBs float64
+			if intervalSec > 0 {
+				instMBs = float64(curBytes-lastBytes) / bytesPerMB / intervalSec
+			}
+			if totalSec > 0 {
+				avgMBs = float64(curBytes) / bytesPerMB / totalSec
+			}
+
+			logger.Info("upload speed",
+				slog.Float64("current_mb_s", instMBs),
+				slog.Float64("avg_mb_s", avgMBs),
+				slog.Int64("total_mb", curBytes/bytesPerMB),
+			)
+
+			lastTime = now
+			lastBytes = curBytes
+		}
+	}
+}
+
 // writeOneFile writes header + repeated record to a single object until fileSize
 // bytes have been written, then closes it. Errors from Write/Close are returned.
+// Every successful write also advances totalBytes for the speed reporter.
 func writeOneFile(
 	ctx context.Context,
 	writer *gcs.Writer,
 	encoder backup.Encoder[*models.Token],
 	block []byte,
 	fileSize int64,
+	totalBytes *atomic.Int64,
 	logger *slog.Logger,
 	worker int,
 ) error {
@@ -224,10 +288,9 @@ func writeOneFile(
 	header := encoder.GetHeader(0, true)
 
 	var written int64
-
 	n, err := w.Write(header)
 	written += int64(n)
-
+	totalBytes.Add(int64(n))
 	if err != nil {
 		// Best-effort close, but return the original write error.
 		_ = w.Close()
@@ -242,10 +305,9 @@ func writeOneFile(
 			_ = w.Close()
 			return ctx.Err()
 		}
-
 		n, err = w.Write(block)
 		written += int64(n)
-
+		totalBytes.Add(int64(n))
 		if err != nil {
 			_ = w.Close()
 			return fmt.Errorf("write block to %s (after %d bytes): %w", filename, written, err)
@@ -261,7 +323,6 @@ func writeOneFile(
 	if err = w.Close(); err != nil {
 		return fmt.Errorf("close %s (after %d bytes): %w", filename, written, err)
 	}
-
 	return nil
 }
 
@@ -269,27 +330,21 @@ func writeOneFile(
 // until the encoded size is in the requested [minRecordSize, maxRecordSize] range.
 func buildRecordBytes(encoder backup.Encoder[*models.Token]) ([]byte, error) {
 	buf := new(bytes.Buffer)
-
 	for valueLen := 1; valueLen <= 256; valueLen++ {
 		buf.Reset()
-
 		token, err := buildRecordToken(valueLen)
 		if err != nil {
 			return nil, err
 		}
-
 		if err = encoder.EncodeToken(token, buf); err != nil {
 			return nil, fmt.Errorf("encode token: %w", err)
 		}
-
 		if size := buf.Len(); size >= minRecordSize && size <= maxRecordSize {
 			out := make([]byte, size)
 			copy(out, buf.Bytes())
-
 			return out, nil
 		}
 	}
-
 	return nil, errors.New("could not build a record within the requested size range")
 }
 
@@ -298,7 +353,6 @@ func buildRecordToken(valueLen int) (*models.Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create key: %w", err)
 	}
-
 	rec := &models.Record{
 		Record: &a.Record{
 			Key:        key,
@@ -307,7 +361,6 @@ func buildRecordToken(valueLen int) (*models.Token, error) {
 		},
 		VoidTime: models.VoidTimeNeverExpire,
 	}
-
 	return models.NewRecordToken(rec, 0, nil), nil
 }
 
@@ -319,12 +372,10 @@ func buildBlock(record []byte, blockSize int) []byte {
 	if count < 1 {
 		count = 1
 	}
-
 	block := make([]byte, 0, count*len(record))
 	for i := 0; i < count; i++ {
 		block = append(block, record...)
 	}
-
 	return block
 }
 
@@ -341,7 +392,6 @@ func newGcpClient(ctx context.Context, cfg config) (*gcpStorage.Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get GCP transport: %w", err)
 		}
-
 		opts = append(opts, option.WithHTTPClient(newHTTPClient(transport, defaultRequestTimeoutMs)))
 	}
 
@@ -355,7 +405,6 @@ func newGcpClient(ctx context.Context, cfg config) (*gcpStorage.Client, error) {
 		Max:        time.Duration(defaultRetryBackoffMaxMs) * time.Millisecond,
 		Multiplier: defaultRetryBackoffMultiplier,
 	}
-
 	gcpClient.SetRetry(
 		gcpStorage.WithPolicy(gcpStorage.RetryAlways),
 		gcpStorage.WithBackoff(backoff),
@@ -377,7 +426,6 @@ func getGcpTransport(ctx context.Context, keyFile string) (http.RoundTripper, er
 		if err != nil {
 			return nil, err
 		}
-
 		ts = creds.TokenSource
 	} else {
 		// ADC: uses attached VM service account or GOOGLE_APPLICATION_CREDENTIALS.
@@ -395,7 +443,6 @@ func getGcpAuth(ctx context.Context, keyFile string) (*google.Credentials, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key file %s: %w", keyFile, err)
 	}
-
 	creds, err := google.CredentialsFromJSONWithType(
 		ctx,
 		jsonKey,
@@ -405,7 +452,6 @@ func getGcpAuth(ctx context.Context, keyFile string) (*google.Credentials, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON key file %s: %w", keyFile, err)
 	}
-
 	return creds, nil
 }
 
@@ -440,7 +486,6 @@ func newHTTPClient(transport http.RoundTripper, requestTimeoutMs int) *http.Clie
 
 func parseFlags() config {
 	var cfg config
-
 	flag.StringVar(&cfg.bucket, "bucket", "", "GCS bucket name (required)")
 	flag.StringVar(&cfg.folder, "folder", "writer-retry-test", "Destination folder (prefix) inside the bucket")
 	flag.StringVar(&cfg.keyFile, "key-file", "", "Path to a service account JSON key; empty uses ADC")
@@ -449,8 +494,7 @@ func parseFlags() config {
 	flag.IntVar(&cfg.chunkSize, "chunk-size", defaultChunkSize, "Upload chunk size in bytes")
 	flag.Int64Var(&cfg.fileSize, "file-size", defaultFileSize, "Size of each written object in bytes")
 	flag.BoolVar(&cfg.removeFiles, "remove-files", true, "Remove existing files in the folder before writing")
-
+	flag.DurationVar(&cfg.reportInterval, "report-interval", 5*time.Second, "How often to log upload speed")
 	flag.Parse()
-
 	return cfg
 }

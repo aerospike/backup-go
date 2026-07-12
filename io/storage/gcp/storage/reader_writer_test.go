@@ -15,19 +15,24 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
+	"github.com/googleapis/gax-go/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/api/option"
@@ -958,4 +963,245 @@ func TestWriter_GetOptions(t *testing.T) {
 
 	o2 := w.GetOptions()
 	require.Equal(t, o1, o2)
+}
+
+const (
+	testFolderChunkRetry   = "folder_chunk_retry/"
+	testChunkRetryFileName = "chunk_retry_%d.asb"
+
+	// testRetryChunkSize is the minimum chunk size accepted by the GCS SDK (256KiB),
+	// so the object is uploaded as a multi-chunk resumable upload.
+	testRetryChunkSize = 256 * 1024
+	// testRetryChunkCount is the number of chunk-sized blocks written per object.
+	testRetryChunkCount = 4
+	// testRetryFillByte is used to build the payload.
+	testRetryFillByte = 'a'
+
+	// testSDKChunkRetryDeadline is the SDK default per-chunk retry deadline.
+	// An outage longer than this one is survivable only if the Writer sets
+	// its own ChunkRetryDeadline.
+	testSDKChunkRetryDeadline = 32 * time.Second
+	// testOutageMargin is added to the SDK deadline so the "long outage" case
+	// clearly crosses it, and to the short case so retries can land.
+	testOutageMargin = 8 * time.Second
+
+	// Retry backoff for the test client: small enough for retries to land
+	// inside the injected outage window.
+	testRetryBackoffInitial    = 500 * time.Millisecond
+	testRetryBackoffMax        = 2 * time.Second
+	testRetryBackoffMultiplier = 2.0
+
+	// uploadIDParam is present only on resumable chunk-transfer requests.
+	uploadIDParam = "upload_id"
+	// contentRangeHeader names the byte range of a chunk. It is stable across
+	// retries of the same chunk, so upload_id + range identify a chunk.
+	contentRangeHeader = "Content-Range"
+)
+
+// testFaultCodes are retriable HTTP statuses injected on chunk requests.
+var testFaultCodes = []int{
+	http.StatusInternalServerError, // 500.
+	http.StatusServiceUnavailable,  // 503.
+	http.StatusTooManyRequests,     // 429.
+}
+
+// TestWriter_ChunkRetryDeadline verifies that Writer applies
+// defaultChunkRetryDeadline to the underlying storage.Writer, so a multi-chunk
+// resumable upload survives a transient 5xx/429 outage that lasts longer than
+// the SDK default per-chunk deadline (32s). Without the deadline being set,
+// the "outage longer than SDK default" case fails on Close.
+func (s *GCPSuite) TestWriter_ChunkRetryDeadline() {
+	s.suiteWg.Wait()
+
+	tests := []struct {
+		name        string
+		faultWindow time.Duration
+		isLong      bool
+	}{
+		{
+			name:        "outage shorter than SDK default deadline",
+			faultWindow: testOutageMargin,
+		},
+		{
+			name:        "outage longer than SDK default deadline",
+			faultWindow: testSDKChunkRetryDeadline + testOutageMargin,
+			isLong:      true,
+		},
+	}
+
+	for i, tt := range tests {
+		s.Run(tt.name, func() {
+			if tt.isLong && testing.Short() {
+				s.T().Skip("skipping long chunk retry test in short mode")
+			}
+
+			ctx := s.T().Context()
+
+			injector := newFaultTransport(http.DefaultTransport, tt.faultWindow)
+
+			client, err := storage.NewClient(
+				ctx,
+				option.WithEndpoint(testServiceAddress),
+				option.WithoutAuthentication(),
+				option.WithHTTPClient(&http.Client{Transport: injector}),
+			)
+			s.Require().NoError(err)
+			defer func() {
+				s.Require().NoError(client.Close())
+			}()
+
+			// Retry on every retriable error, with a short backoff so retries
+			// keep landing inside the injected outage window.
+			client.SetRetry(
+				storage.WithPolicy(storage.RetryAlways),
+				storage.WithBackoff(gax.Backoff{
+					Initial:    testRetryBackoffInitial,
+					Max:        testRetryBackoffMax,
+					Multiplier: testRetryBackoffMultiplier,
+				}),
+			)
+
+			writer, err := NewWriter(
+				ctx,
+				client,
+				testBucketName,
+				options.WithDir(testFolderChunkRetry),
+				options.WithChunkSize(testRetryChunkSize),
+				options.WithSkipDirCheck(),
+			)
+			s.Require().NoError(err)
+
+			w, err := writer.NewWriter(ctx, fmt.Sprintf(testChunkRetryFileName, i))
+			s.Require().NoError(err)
+
+			// The deadline must be propagated to the underlying storage.Writer.
+			sw, ok := w.(*storage.Writer)
+			s.Require().True(ok)
+			s.Require().Equal(defaultChunkRetryDeadline, sw.ChunkRetryDeadline)
+
+			block := bytes.Repeat([]byte{testRetryFillByte}, testRetryChunkSize)
+			for range testRetryChunkCount {
+				n, err := w.Write(block)
+				s.Require().NoError(err)
+				s.Require().Equal(len(block), n)
+			}
+
+			// Errors of the chunked upload surface here.
+			s.Require().NoError(w.Close())
+
+			// Guard against a false green: if no fault was injected, the retry
+			// path was never exercised.
+			s.Require().Positive(injector.Injected())
+		})
+	}
+}
+
+// chunkID identifies a single resumable-upload chunk: the session upload_id
+// plus its byte range, which stays stable across retries of that chunk.
+type chunkID struct {
+	uploadID  string
+	byteRange string
+}
+
+// faultTransport injects retriable HTTP errors (500/503/429) into the first
+// resumable chunk upload it sees, for the configured window. It emulates a
+// transient GCS outage: only a retry that lands after the window succeeds,
+// which is exactly what ChunkRetryDeadline controls.
+type faultTransport struct {
+	base   http.RoundTripper
+	window time.Duration
+
+	mu       sync.Mutex
+	poisoned chunkID
+	deadline time.Time
+
+	injected atomic.Int64
+}
+
+func newFaultTransport(base http.RoundTripper, window time.Duration) *faultTransport {
+	return &faultTransport{
+		base:   base,
+		window: window,
+	}
+}
+
+// Injected returns the number of injected faults.
+func (t *faultTransport) Injected() int64 {
+	return t.injected.Load()
+}
+
+// RoundTrip faults the poisoned chunk inside its window and passes everything
+// else (auth, session creation, released chunks) to the base transport.
+func (t *faultTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	id, ok := chunkIdentity(req)
+	if !ok || !t.decide(id) {
+		return t.base.RoundTrip(req)
+	}
+
+	n := t.injected.Add(1)
+	code := testFaultCodes[int(n-1)%len(testFaultCodes)]
+
+	// The client owns the request body; drain and close it so the connection
+	// state stays consistent even though the request is never sent.
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+		_ = req.Body.Close()
+	}
+
+	return newFaultResponse(req, code), nil
+}
+
+// decide reports whether the request must be faulted. The first chunk seen is
+// poisoned and keeps failing until its window elapses; other chunks pass through.
+func (t *faultTransport) decide(id chunkID) bool {
+	now := time.Now()
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.deadline.IsZero() {
+		t.poisoned = id
+		t.deadline = now.Add(t.window)
+
+		return true
+	}
+
+	if id != t.poisoned {
+		return false
+	}
+
+	return now.Before(t.deadline)
+}
+
+// chunkIdentity returns the chunk identity if req is a resumable chunk transfer.
+// Session-creation requests carry no upload_id and no Content-Range, so they are
+// never faulted: they are retried by the outer retryer and do not exercise the
+// per-chunk deadline.
+func chunkIdentity(req *http.Request) (chunkID, bool) {
+	uploadID := req.URL.Query().Get(uploadIDParam)
+	byteRange := req.Header.Get(contentRangeHeader)
+
+	if uploadID == "" || byteRange == "" {
+		return chunkID{}, false
+	}
+
+	return chunkID{uploadID: uploadID, byteRange: byteRange}, true
+}
+
+// newFaultResponse builds a synthetic error response the GCS client treats as
+// retriable under RetryAlways.
+func newFaultResponse(req *http.Request, code int) *http.Response {
+	body := fmt.Sprintf("injected fault: HTTP %d %s", code, http.StatusText(code))
+
+	return &http.Response{
+		StatusCode:    code,
+		Status:        fmt.Sprintf("%d %s", code, http.StatusText(code)),
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Header:        http.Header{"Content-Type": []string{"text/plain; charset=utf-8"}},
+		Body:          io.NopCloser(strings.NewReader(body)),
+		ContentLength: int64(len(body)),
+		Request:       req,
+	}
 }

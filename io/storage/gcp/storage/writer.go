@@ -32,7 +32,7 @@ import (
 const (
 	fileType                  = "application/octet-stream"
 	defaultChunkSize          = 50 * 1024 * 1024
-	defaultChunkRetryDeadline = 90 * time.Second
+	defaultChunkRetryDeadline = 20 * time.Minute
 )
 
 // Writer represents a GCP storage writer.
@@ -124,17 +124,16 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return nil, fmt.Errorf("failed to get full path: %w", err)
 	}
 
-	oh := w.bucketHandle.Object(fullPath)
-	// .Retryer(
-	// 	storage.WithPolicy(storage.RetryAlways),
-	// )
+	oh := w.bucketHandle.Object(fullPath).Retryer( // Retryer will retry any retryable error.
+		storage.WithPolicy(storage.RetryAlways),
+	)
 	sw := oh.NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass
 	// Allow chunk uploads to survive transient errors (429/5xx) from GCS.
 	// Without this, per-chunk retries are capped at the SDK default of 32s.
-	//	sw.ChunkRetryDeadline = defaultChunkRetryDeadline
+	sw.ChunkRetryDeadline = defaultChunkRetryDeadline
 
 	if w.WithChecksum {
 		return newCrcWriter(ctx, sw, oh), nil

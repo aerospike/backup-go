@@ -21,6 +21,7 @@ import (
 	"hash"
 	"hash/crc32"
 	"io"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/io/storage/common"
@@ -29,8 +30,9 @@ import (
 )
 
 const (
-	fileType         = "application/octet-stream"
-	defaultChunkSize = 50 * 1024 * 1024
+	fileType                  = "application/octet-stream"
+	defaultChunkSize          = 50 * 1024 * 1024
+	defaultChunkRetryDeadline = 90 * time.Second
 )
 
 // Writer represents a GCP storage writer.
@@ -123,10 +125,16 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}
 
 	oh := w.bucketHandle.Object(fullPath)
+	// .Retryer(
+	// 	storage.WithPolicy(storage.RetryAlways),
+	// )
 	sw := oh.NewWriter(ctx)
 	sw.ContentType = fileType
 	sw.ChunkSize = w.ChunkSize
 	sw.StorageClass = w.StorageClass
+	// Allow chunk uploads to survive transient errors (429/5xx) from GCS.
+	// Without this, per-chunk retries are capped at the SDK default of 32s.
+	//	sw.ChunkRetryDeadline = defaultChunkRetryDeadline
 
 	if w.WithChecksum {
 		return newCrcWriter(ctx, sw, oh), nil

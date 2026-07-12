@@ -1,0 +1,422 @@
+// Copyright 2024 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License").
+
+// Command gcpwritertest stress-tests the retry behaviour of
+// backup-go's io/storage/gcp/storage.Writer.
+//
+// It builds a GCP storage client using the very same defaults as absctl
+// (RetryAlways, initial backoff 60s, max backoff 90s, multiplier 2, 10
+// attempts), wraps it with the ASB encoder and gcpStorage.Writer, and then
+// writes the same ~100-120 byte record into several 1GB objects in parallel,
+// using a 5MB chunk size. This forces multi-chunk resumable uploads, which is
+// exactly the code path where transient 5xx/429 errors and the retry/deadline
+// interaction show up. Any error returned by the writer chain is reported.
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	gcpStorage "cloud.google.com/go/storage"
+	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go"
+	gcs "github.com/aerospike/backup-go/io/storage/gcp/storage"
+	"github.com/aerospike/backup-go/io/storage/options"
+	"github.com/aerospike/backup-go/models"
+	"github.com/googleapis/gax-go/v2"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
+)
+
+// Writer parameters requested for the test.
+const (
+	defaultChunkSize = 5 * 1024 * 1024        // 5 MB.
+	defaultFileSize  = 1 * 1024 * 1024 * 1024 // 1 GB per object.
+
+	// Target size of a single encoded ASB record.
+	minRecordSize = 100
+	maxRecordSize = 120
+
+	// GCP client defaults, copied from absctl (internal/models/default_values.go).
+	defaultRetryMaxAttempts       = 10
+	defaultRetryBackoffMaxMs      = 90000 // 90s.
+	defaultRetryBackoffInitMs     = 60000 // 60s.
+	defaultRetryBackoffMultiplier = 2.0
+	defaultMaxConnsPerHost        = 0      // No limit.
+	defaultRequestTimeoutMs       = 600000 // 600s.
+
+	testNamespace = "test"
+	testSet       = "testset"
+	binName       = "b"
+)
+
+type config struct {
+	bucket      string
+	folder      string
+	keyFile     string
+	endpoint    string
+	parallelism int
+	chunkSize   int
+	fileSize    int64
+	removeFiles bool
+}
+
+func main() {
+	cfg := parseFlags()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	if cfg.bucket == "" {
+		logger.Error("bucket name is required, use -bucket")
+		os.Exit(1)
+	}
+
+	// Build the GCP client exactly as absctl does. Use a plain background
+	// context here so the auth token source is not tied to the interrupt.
+	client, err := newGcpClient(context.Background(), cfg)
+	if err != nil {
+		logger.Error("failed to create GCP client", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	// ASB encoder, same as a real backup.
+	encoder := backup.NewEncoder[*models.Token](backup.EncoderTypeASB, testNamespace, false, false)
+
+	// Prepare a single record whose encoded size lands in [100, 120] bytes.
+	recordBytes, err := buildRecordBytes(encoder)
+	if err != nil {
+		logger.Error("failed to build record", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("record prepared", slog.Int("encoded_bytes", len(recordBytes)))
+
+	// Run context is cancelled on Ctrl+C (SIGINT) or SIGTERM. All in-flight
+	// uploads use this context, so an interrupt stops them promptly.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Build the writer under test.
+	opts := []options.Opt{
+		options.WithDir(cfg.folder),
+		options.WithChunkSize(cfg.chunkSize),
+		options.WithLogger(logger),
+	}
+	if cfg.removeFiles {
+		opts = append(opts, options.WithRemoveFiles())
+	} else {
+		opts = append(opts, options.WithSkipDirCheck())
+	}
+
+	writer, err := gcs.NewWriter(ctx, client, cfg.bucket, opts...)
+	if err != nil {
+		logger.Error("failed to create writer", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	logger.Info("starting write test, press Ctrl+C to stop",
+		slog.Int("parallelism", cfg.parallelism),
+		slog.Int("chunk_size", cfg.chunkSize),
+		slog.Int64("file_size", cfg.fileSize),
+		slog.String("bucket", cfg.bucket),
+		slog.String("folder", cfg.folder),
+	)
+
+	start := time.Now()
+
+	var (
+		filesDone atomic.Int64
+		failed    atomic.Int64
+	)
+
+	var wg sync.WaitGroup
+	for i := 0; i < cfg.parallelism; i++ {
+		wg.Add(1)
+
+		go func(worker int) {
+			defer wg.Done()
+
+			// Keep writing new files until interrupted.
+			for ctx.Err() == nil {
+				err := writeOneFile(ctx, writer, encoder, recordBytes, cfg.fileSize, logger, worker)
+				switch {
+				case err == nil:
+					filesDone.Add(1)
+				case ctx.Err() != nil || errors.Is(err, context.Canceled):
+					// Interrupted mid-write; clean shutdown, not a real failure.
+					return
+				default:
+					// A genuine writer error - report it and keep stressing.
+					failed.Add(1)
+					logger.Error("worker failed",
+						slog.Int("worker", worker),
+						slog.Any("error", err),
+					)
+				}
+			}
+		}(i)
+	}
+
+	// Wait for the interrupt, then let in-flight workers unwind.
+	<-ctx.Done()
+	logger.Info("interrupt received, stopping workers...")
+	wg.Wait()
+
+	logger.Info("write test finished",
+		slog.Duration("elapsed", time.Since(start)),
+		slog.Int("total_workers", cfg.parallelism),
+		slog.Int64("files_written", filesDone.Load()),
+		slog.Int64("errors", failed.Load()),
+	)
+
+	if failed.Load() > 0 {
+		os.Exit(1)
+	}
+}
+
+// writeOneFile writes header + repeated record to a single object until fileSize
+// bytes have been written, then closes it. Errors from Write/Close are returned.
+func writeOneFile(
+	ctx context.Context,
+	writer *gcs.Writer,
+	encoder backup.Encoder[*models.Token],
+	recordBytes []byte,
+	fileSize int64,
+	logger *slog.Logger,
+	worker int,
+) error {
+	filename := encoder.GenerateFilename("", "")
+
+	w, err := writer.NewWriter(ctx, filename)
+	if err != nil {
+		return fmt.Errorf("open writer for %s: %w", filename, err)
+	}
+
+	// Write the ASB header first, exactly like a real backup records file.
+	header := encoder.GetHeader(0, true)
+
+	var written int64
+
+	n, err := w.Write(header)
+	written += int64(n)
+
+	if err != nil {
+		// Best-effort close, but return the original write error.
+		_ = w.Close()
+		return fmt.Errorf("write header to %s: %w", filename, err)
+	}
+
+	for written < fileSize {
+		if ctx.Err() != nil {
+			_ = w.Close()
+			return ctx.Err()
+		}
+
+		n, err = w.Write(recordBytes)
+		written += int64(n)
+
+		if err != nil {
+			_ = w.Close()
+			return fmt.Errorf("write record to %s (after %d bytes): %w", filename, written, err)
+		}
+	}
+
+	logger.Info("closing file",
+		slog.Int("worker", worker),
+		slog.String("file", filename),
+		slog.Int64("bytes", written),
+	)
+
+	if err = w.Close(); err != nil {
+		return fmt.Errorf("close %s (after %d bytes): %w", filename, written, err)
+	}
+
+	return nil
+}
+
+// buildRecordBytes creates a record and encodes it, padding a single string bin
+// until the encoded size is in the requested [minRecordSize, maxRecordSize] range.
+func buildRecordBytes(encoder backup.Encoder[*models.Token]) ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	for valueLen := 1; valueLen <= 256; valueLen++ {
+		buf.Reset()
+
+		token, err := buildRecordToken(valueLen)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = encoder.EncodeToken(token, buf); err != nil {
+			return nil, fmt.Errorf("encode token: %w", err)
+		}
+
+		if size := buf.Len(); size >= minRecordSize && size <= maxRecordSize {
+			out := make([]byte, size)
+			copy(out, buf.Bytes())
+
+			return out, nil
+		}
+	}
+
+	return nil, errors.New("could not build a record within the requested size range")
+}
+
+func buildRecordToken(valueLen int) (*models.Token, error) {
+	key, err := a.NewKey(testNamespace, testSet, 1)
+	if err != nil {
+		return nil, fmt.Errorf("create key: %w", err)
+	}
+
+	rec := &models.Record{
+		Record: &a.Record{
+			Key:        key,
+			Bins:       a.BinMap{binName: strings.Repeat("x", valueLen)},
+			Generation: 1,
+		},
+		VoidTime: models.VoidTimeNeverExpire,
+	}
+
+	return models.NewRecordToken(rec, 0, nil), nil
+}
+
+// newGcpClient builds a *storage.Client with the same options and retry policy
+// that absctl configures by default (internal/storage/clients.go).
+func newGcpClient(ctx context.Context, cfg config) (*gcpStorage.Client, error) {
+	opts := make([]option.ClientOption, 0)
+
+	if cfg.endpoint != "" {
+		// Used with fake-gcs for tests only.
+		opts = append(opts, option.WithEndpoint(cfg.endpoint), option.WithoutAuthentication())
+	} else {
+		transport, err := getGcpTransport(ctx, cfg.keyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get GCP transport: %w", err)
+		}
+
+		opts = append(opts, option.WithHTTPClient(newHTTPClient(transport, defaultRequestTimeoutMs)))
+	}
+
+	gcpClient, err := gcpStorage.NewClient(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
+	backoff := gax.Backoff{
+		Initial:    time.Duration(defaultRetryBackoffInitMs) * time.Millisecond,
+		Max:        time.Duration(defaultRetryBackoffMaxMs) * time.Millisecond,
+		Multiplier: defaultRetryBackoffMultiplier,
+	}
+
+	gcpClient.SetRetry(
+		gcpStorage.WithPolicy(gcpStorage.RetryAlways),
+		gcpStorage.WithBackoff(backoff),
+		gcpStorage.WithMaxAttempts(defaultRetryMaxAttempts),
+	)
+
+	return gcpClient, nil
+}
+
+func getGcpTransport(ctx context.Context, keyFile string) (http.RoundTripper, error) {
+	var (
+		transport = newTransport(defaultMaxConnsPerHost)
+		ts        oauth2.TokenSource
+		err       error
+	)
+
+	if keyFile != "" {
+		creds, err := getGcpAuth(ctx, keyFile)
+		if err != nil {
+			return nil, err
+		}
+
+		ts = creds.TokenSource
+	} else {
+		// ADC: uses attached VM service account or GOOGLE_APPLICATION_CREDENTIALS.
+		ts, err = google.DefaultTokenSource(ctx, gcpStorage.ScopeReadWrite)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ADC token source: %w", err)
+		}
+	}
+
+	return newAuthTransport(transport, ts), nil
+}
+
+func getGcpAuth(ctx context.Context, keyFile string) (*google.Credentials, error) {
+	jsonKey, err := os.ReadFile(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read key file %s: %w", keyFile, err)
+	}
+
+	creds, err := google.CredentialsFromJSONWithType(
+		ctx,
+		jsonKey,
+		google.ServiceAccount,
+		gcpStorage.ScopeReadWrite,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON key file %s: %w", keyFile, err)
+	}
+
+	return creds, nil
+}
+
+func newTransport(maxConnsPerHost int) *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxConnsPerHost:     maxConnsPerHost,
+		IdleConnTimeout:     120 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+		ReadBufferSize:      64 * 1024,
+		ForceAttemptHTTP2:   true,
+	}
+}
+
+func newAuthTransport(baseTransport http.RoundTripper, tokenSource oauth2.TokenSource) *oauth2.Transport {
+	return &oauth2.Transport{
+		Base:   baseTransport,
+		Source: tokenSource,
+	}
+}
+
+func newHTTPClient(transport http.RoundTripper, requestTimeoutMs int) *http.Client {
+	return &http.Client{
+		Transport: transport,
+		Timeout:   time.Duration(requestTimeoutMs) * time.Millisecond,
+	}
+}
+
+func parseFlags() config {
+	var cfg config
+
+	flag.StringVar(&cfg.bucket, "bucket", "", "GCS bucket name (required)")
+	flag.StringVar(&cfg.folder, "folder", "writer-retry-test", "Destination folder (prefix) inside the bucket")
+	flag.StringVar(&cfg.keyFile, "key-file", "", "Path to a service account JSON key; empty uses ADC")
+	flag.StringVar(&cfg.endpoint, "endpoint", "", "Alternate endpoint (e.g. fake-gcs); empty uses real GCP")
+	flag.IntVar(&cfg.parallelism, "parallelism", 80, "Number of concurrent files to write")
+	flag.IntVar(&cfg.chunkSize, "chunk-size", defaultChunkSize, "Upload chunk size in bytes")
+	flag.Int64Var(&cfg.fileSize, "file-size", defaultFileSize, "Size of each written object in bytes")
+	flag.BoolVar(&cfg.removeFiles, "remove-files", true, "Remove existing files in the folder before writing")
+
+	flag.Parse()
+
+	return cfg
+}

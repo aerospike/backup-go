@@ -19,7 +19,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
+	mathrand "math/rand/v2"
 	"net"
 	"net/http"
 	"os"
@@ -31,28 +33,29 @@ import (
 	"time"
 
 	gcpStorage "cloud.google.com/go/storage"
+	"github.com/googleapis/gax-go/v2"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
+
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go"
 	gcs "github.com/aerospike/backup-go/io/storage/gcp/storage"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
-	"github.com/googleapis/gax-go/v2"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
 )
 
 // Writer parameters requested for the test.
 const (
-	defaultChunkSize = 5 * 1024 * 1024    // 5 MB.
-	defaultFileSize  = 1024 * 1024 * 1024 // 1 GB per object.
+	defaultChunkSize = 5 * 1024 * 1024   // 5 MB.
+	defaultFileSize  = 250 * 1024 * 1024 // 1 GB per object.
 
 	// Target size of a single encoded ASB record.
 	minRecordSize = 100
 	maxRecordSize = 120
 
 	// GCP client defaults, copied from absctl (internal/models/default_values.go).
-	defaultRetryMaxAttempts       = 1
+	defaultRetryMaxAttempts       = 10
 	defaultRetryBackoffMaxMs      = 90000 // 90s.
 	defaultRetryBackoffInitMs     = 60000 // 60s.
 	defaultRetryBackoffMultiplier = 2.0
@@ -65,7 +68,19 @@ const (
 
 	// bytesPerMB is used to convert raw byte counters into megabytes for logs.
 	bytesPerMB = 1024 * 1024
+
+	// uploadPathMarker identifies GCS resumable-upload requests, so faults are
+	// injected only on the upload path and never on auth/token traffic.
+	uploadPathMarker = "/upload/"
 )
+
+// faultCodes are the retriable HTTP statuses randomly injected on upload
+// requests to exercise the client's retry/backoff behaviour.
+var faultCodes = []int{
+	http.StatusInternalServerError, // 500.
+	http.StatusServiceUnavailable,  // 503.
+	http.StatusTooManyRequests,     // 429.
+}
 
 type config struct {
 	bucket         string
@@ -77,6 +92,7 @@ type config struct {
 	fileSize       int64
 	removeFiles    bool
 	reportInterval time.Duration
+	faultProb      float64
 }
 
 func main() {
@@ -91,7 +107,7 @@ func main() {
 
 	// Build the GCP client exactly as absctl does. Use a plain background
 	// context here so the auth token source is not tied to the interrupt.
-	client, err := newGcpClient(context.Background(), cfg)
+	client, err := newGcpClient(context.Background(), cfg, logger)
 	if err != nil {
 		logger.Error("failed to create GCP client", slog.Any("error", err))
 		os.Exit(1)
@@ -381,7 +397,7 @@ func buildBlock(record []byte, blockSize int) []byte {
 
 // newGcpClient builds a *storage.Client with the same options and retry policy
 // that absctl configures by default (internal/storage/clients.go).
-func newGcpClient(ctx context.Context, cfg config) (*gcpStorage.Client, error) {
+func newGcpClient(ctx context.Context, cfg config, logger *slog.Logger) (*gcpStorage.Client, error) {
 	opts := make([]option.ClientOption, 0)
 
 	if cfg.endpoint != "" {
@@ -391,6 +407,15 @@ func newGcpClient(ctx context.Context, cfg config) (*gcpStorage.Client, error) {
 		transport, err := getGcpTransport(ctx, cfg.keyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get GCP transport: %w", err)
+		}
+		// Optionally wrap with a fault injector so the client sees real
+		// 500/503/429 responses on upload requests and runs its retry path.
+		if cfg.faultProb > 0 {
+			transport = newFaultTransport(transport, cfg.faultProb, logger)
+			logger.Info("fault injection enabled",
+				slog.Float64("fault_prob", cfg.faultProb),
+				slog.Any("codes", faultCodes),
+			)
 		}
 		opts = append(opts, option.WithHTTPClient(newHTTPClient(transport, defaultRequestTimeoutMs)))
 	}
@@ -477,6 +502,77 @@ func newAuthTransport(baseTransport http.RoundTripper, tokenSource oauth2.TokenS
 	}
 }
 
+// faultTransport is an http.RoundTripper that randomly replaces the response of
+// GCS upload requests with a retriable error (500/503/429). Non-upload traffic
+// (auth/token requests) is always passed through untouched. It is safe for
+// concurrent use: math/rand/v2 top-level functions are goroutine-safe.
+type faultTransport struct {
+	base     http.RoundTripper
+	prob     float64
+	logger   *slog.Logger
+	injected atomic.Int64
+}
+
+func newFaultTransport(base http.RoundTripper, prob float64, logger *slog.Logger) *faultTransport {
+	return &faultTransport{
+		base:   base,
+		prob:   prob,
+		logger: logger,
+	}
+}
+
+// RoundTrip injects a fault on upload requests with probability prob, otherwise
+// delegates to the base transport.
+func (t *faultTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !t.shouldInject(req) {
+		return t.base.RoundTrip(req)
+	}
+
+	code := faultCodes[mathrand.IntN(len(faultCodes))]
+	n := t.injected.Add(1)
+	t.logger.Debug("injecting fault",
+		slog.Int("status", code),
+		slog.String("method", req.Method),
+		slog.String("path", req.URL.Path),
+		slog.Int64("injected_total", n),
+	)
+
+	// The client owns the request body; drain and close it so the connection
+	// state stays consistent even though we never send the request.
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+		_ = req.Body.Close()
+	}
+
+	return newFaultResponse(req, code), nil
+}
+
+// shouldInject reports whether this request is an upload request selected for a
+// fault. Only requests on the resumable-upload path are eligible.
+func (t *faultTransport) shouldInject(req *http.Request) bool {
+	if !strings.Contains(req.URL.Path, uploadPathMarker) {
+		return false
+	}
+	return mathrand.Float64() < t.prob
+}
+
+// newFaultResponse builds a synthetic error response the GCS client treats as
+// retriable under RetryAlways.
+func newFaultResponse(req *http.Request, code int) *http.Response {
+	body := fmt.Sprintf("injected fault: HTTP %d %s", code, http.StatusText(code))
+	return &http.Response{
+		StatusCode:    code,
+		Status:        fmt.Sprintf("%d %s", code, http.StatusText(code)),
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Header:        http.Header{"Content-Type": []string{"text/plain; charset=utf-8"}},
+		Body:          io.NopCloser(strings.NewReader(body)),
+		ContentLength: int64(len(body)),
+		Request:       req,
+	}
+}
+
 func newHTTPClient(transport http.RoundTripper, requestTimeoutMs int) *http.Client {
 	return &http.Client{
 		Transport: transport,
@@ -495,6 +591,8 @@ func parseFlags() config {
 	flag.Int64Var(&cfg.fileSize, "file-size", defaultFileSize, "Size of each written object in bytes")
 	flag.BoolVar(&cfg.removeFiles, "remove-files", true, "Remove existing files in the folder before writing")
 	flag.DurationVar(&cfg.reportInterval, "report-interval", 5*time.Second, "How often to log upload speed")
+	flag.Float64Var(&cfg.faultProb, "fault-prob", 0.1,
+		"Probability [0..1] of injecting a 500/503/429 fault on each upload request; 0 disables")
 	flag.Parse()
 	return cfg
 }

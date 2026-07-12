@@ -52,9 +52,9 @@ const (
 	maxRecordSize = 120
 
 	// GCP client defaults, copied from absctl (internal/models/default_values.go).
-	defaultRetryMaxAttempts       = 2
-	defaultRetryBackoffMaxMs      = 900 // 90s.
-	defaultRetryBackoffInitMs     = 600 // 60s.
+	defaultRetryMaxAttempts       = 1
+	defaultRetryBackoffMaxMs      = 90000 // 90s.
+	defaultRetryBackoffInitMs     = 60000 // 60s.
 	defaultRetryBackoffMultiplier = 2.0
 	defaultMaxConnsPerHost        = 0      // No limit.
 	defaultRequestTimeoutMs       = 600000 // 600s.

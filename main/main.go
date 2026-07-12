@@ -47,7 +47,7 @@ import (
 // Writer parameters requested for the test.
 const (
 	defaultChunkSize = 5 * 1024 * 1024        // 5 MB.
-	defaultFileSize  = 1 * 1024 * 1024 * 1024 // 1 GB per object.
+	defaultFileSize  = 250 * 1024 * 1024 // 1 GB per object.
 
 	// Target size of a single encoded ASB record.
 	minRecordSize = 100
@@ -179,6 +179,7 @@ func main() {
 						slog.Int("worker", worker),
 						slog.Any("error", err),
 					)
+					os.Exit(1)
 				}
 			}
 		}(i)
